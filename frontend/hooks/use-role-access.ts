@@ -22,11 +22,13 @@ import { useAuth } from "@/lib/auth";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { usePermissionDebugger } from "@/providers/PermissionDebuggerProvider";
 import { roleAccessService } from "@/lib/services/role-access-service";
+import { getClientFeatureRegistry } from "@/lib/role-access-registry";
 import {
   resolveRoleAccess,
   navSurfaces,
   findSurface,
   isManageableRole,
+  toolFeatureKey,
   type RoleAccessManifest,
   type ResolvedSurface,
 } from "@shared/role-access";
@@ -43,6 +45,8 @@ export interface UseRoleAccess {
   isEnabled: (key: string) => boolean;
   /** Visible nav surfaces, sorted by per-role rank. */
   navItems: () => ResolvedSurface[];
+  /** Is a catalog tool visible for this role? Convenience over canSee. */
+  canSeeTool: (toolId: string) => boolean;
 }
 
 export function useRoleAccess(): UseRoleAccess {
@@ -59,9 +63,12 @@ export function useRoleAccess(): UseRoleAccess {
     enabled: isAuthenticated,
   });
 
-  // Fail-open to registry defaults if the server manifest isn't available.
+  // Resolve the role's overrides against the combined client registry (shared
+  // nav surfaces + tool surfaces from the catalog) with the shared resolver.
+  // Fail-open: no data (loading / endpoint down) → empty overrides → registry
+  // defaults, so the menu never empties.
   const manifest = useMemo<RoleAccessManifest>(
-    () => data ?? resolveRoleAccess(role, []),
+    () => resolveRoleAccess(role, data?.overrides ?? [], getClientFeatureRegistry()),
     [data, role],
   );
 
@@ -87,6 +94,7 @@ export function useRoleAccess(): UseRoleAccess {
       canSee: (key: string) => findSurface(manifest, key)?.visible ?? true,
       isEnabled: (key: string) => findSurface(manifest, key)?.enabled ?? true,
       navItems: () => navSurfaces(manifest),
+      canSeeTool: (toolId: string) => findSurface(manifest, toolFeatureKey(toolId))?.visible ?? true,
     }),
     [role, isLoading, manifest],
   );

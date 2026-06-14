@@ -11,26 +11,29 @@
  */
 import { apiClient } from "../api-client";
 import type {
-  RoleAccessManifest,
   RoleFeatureAccessRow,
   UpsertRoleAccessInput,
 } from "@shared/role-access";
-import type { FeatureRegistryEntry } from "@shared/feature-registry";
 import type { UserRole } from "@shared/user-roles";
 
 export interface RoleAccessAdminPayload {
-  registry: FeatureRegistryEntry[];
+  overrides: RoleFeatureAccessRow[];
+}
+
+export interface RoleAccessMineResponse {
+  role: string;
   overrides: RoleFeatureAccessRow[];
 }
 
 class RoleAccessService {
-  /** The viewer's resolved manifest. `role` is a SA-only preview override;
-   *  non-SA callers always get their own role. Fail-open: on any error the
-   *  caller falls back to registry defaults so the menu never empties. */
-  async getMine(role?: UserRole | string): Promise<RoleAccessManifest | null> {
+  /** The viewer's raw override deltas; the caller resolves them against the
+   *  client registry with the shared resolver. `role` is a SA-only preview
+   *  override; non-SA callers always get their own role. Returns null on error
+   *  so the caller can fail open to registry defaults (menu never empties). */
+  async getMine(role?: UserRole | string): Promise<RoleAccessMineResponse | null> {
     try {
       const qs = role ? `?role=${encodeURIComponent(role)}` : "";
-      const res = await apiClient.get<RoleAccessManifest>(
+      const res = await apiClient.get<RoleAccessMineResponse>(
         `/api/role-access/me${qs}`,
         undefined,
         { suppressErrorEvent: true },
@@ -43,7 +46,7 @@ class RoleAccessService {
 
   async adminGet(): Promise<RoleAccessAdminPayload> {
     const res = await apiClient.get<RoleAccessAdminPayload>("/api/admin/role-access");
-    return res.data ?? { registry: [], overrides: [] };
+    return res.data ?? { overrides: [] };
   }
 
   async adminUpsert(input: UpsertRoleAccessInput): Promise<void> {

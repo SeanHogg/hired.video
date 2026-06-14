@@ -16,6 +16,8 @@ import {
   Bug,
   PlayCircle,
   StopCircle,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { roleAccessService } from "@/lib/services/role-access-service";
+import { getClientFeatureRegistry } from "@/lib/role-access-registry";
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import { usePermissionDebugger } from "@/providers/PermissionDebuggerProvider";
 import {
@@ -31,10 +34,7 @@ import {
   type RoleFeatureAccessRow,
   type ResolvedSurface,
 } from "@shared/role-access";
-import {
-  ALL_ROLES,
-  type FeatureRegistryEntry,
-} from "@shared/feature-registry";
+import { ALL_ROLES } from "@shared/feature-registry";
 import { USER_ROLES, type UserRole } from "@shared/user-roles";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -49,7 +49,6 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default function RoleAccessManager() {
-  const [registry, setRegistry] = useState<FeatureRegistryEntry[]>([]);
   const [overrides, setOverrides] = useState<RoleFeatureAccessRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<UserRole>(USER_ROLES.JOB_SEEKER);
@@ -62,7 +61,6 @@ export default function RoleAccessManager() {
     setLoading(true);
     try {
       const data = await roleAccessService.adminGet();
-      setRegistry(data.registry);
       setOverrides(data.overrides);
     } finally {
       setLoading(false);
@@ -73,13 +71,14 @@ export default function RoleAccessManager() {
     void refresh();
   }, []);
 
-  // Resolve the active role's manifest with the shared resolver — identical to
-  // what the role sees in-app. The registry came from the server, but the
-  // resolver is pure, so we apply it client-side (no per-role round trips).
-  const surfaces = useMemo<ResolvedSurface[]>(() => {
-    if (registry.length === 0) return [];
-    return resolveRoleAccess(role, overrides).surfaces;
-  }, [registry, overrides, role]);
+  // Resolve the active role's manifest with the shared resolver over the
+  // COMBINED client registry (shared nav surfaces + tool surfaces from the
+  // catalog) — identical to what the role sees in-app. Pure, so applied
+  // client-side (no per-role round trips).
+  const surfaces = useMemo<ResolvedSurface[]>(
+    () => resolveRoleAccess(role, overrides, getClientFeatureRegistry()).surfaces,
+    [overrides, role],
+  );
 
   // Group surfaces by their registry group for the UI.
   const grouped = useMemo(() => {
@@ -117,6 +116,35 @@ export default function RoleAccessManager() {
           (o) => !(o.role === role && o.featureKey === key),
         );
         return [...others, next];
+      });
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  // Reorder a nav surface within the per-role rail by swapping its rank with
+  // the adjacent item — writes a `rank` override for both (#2040).
+  const moveNav = async (navSorted: ResolvedSurface[], index: number, dir: -1 | 1) => {
+    const a = navSorted[index];
+    const b = navSorted[index + dir];
+    if (!a || !b) return;
+    const mk = (s: ResolvedSurface, rank: number): RoleFeatureAccessRow => {
+      const ex = overrideFor(s.key);
+      return { role, featureKey: s.key, visible: ex?.visible ?? null, enabled: ex?.enabled ?? null, rank };
+    };
+    const ua = mk(a, b.rank);
+    const ub = mk(b, a.rank);
+    setBusyKey(a.key);
+    try {
+      await Promise.all([
+        roleAccessService.adminUpsert(ua),
+        roleAccessService.adminUpsert(ub),
+      ]);
+      setOverrides((prev) => {
+        const others = prev.filter(
+          (o) => !(o.role === role && (o.featureKey === a.key || o.featureKey === b.key)),
+        );
+        return [...others, ua, ub];
       });
     } finally {
       setBusyKey(null);
@@ -230,23 +258,42 @@ export default function RoleAccessManager() {
                 <Loader2 className="h-5 w-5 animate-spin" /> Loading…
               </div>
             ) : (
-              grouped.map(([group, items]) => (
-                <div key={group} className="space-y-2">
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                    {group}
-                  </h3>
-                  <div className="space-y-1.5">
-                    {items.map((s) => (
-                      <SurfaceRow
-                        key={s.key}
-                        surface={s}
-                        busy={busyKey === s.key}
-                        onToggleVisible={(v) => patchSurface(s.key, { visible: v })}
-                      />
-                    ))}
+              grouped.map(([group, items]) => {
+                // Navigation is reorderable per role (rank); other groups are
+                // shown in registry order.
+                const isNav = group === "Navigation";
+                const list = isNav
+                  ? [...items].sort((a, b) => a.rank - b.rank)
+                  : items;
+                return (
+                  <div key={group} className="space-y-2">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                      {group}
+                    </h3>
+                    <div className="space-y-1.5">
+                      {list.map((s, i) => (
+                        <SurfaceRow
+                          key={s.key}
+                          surface={s}
+                          busy={busyKey === s.key}
+                          onToggleVisible={(v) => patchSurface(s.key, { visible: v })}
+                          onToggleEnabled={(v) => patchSurface(s.key, { enabled: v })}
+                          reorder={
+                            isNav
+                              ? {
+                                  canUp: i > 0,
+                                  canDown: i < list.length - 1,
+                                  onUp: () => moveNav(list, i, -1),
+                                  onDown: () => moveNav(list, i, 1),
+                                }
+                              : undefined
+                          }
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </TabsContent>
         ))}
@@ -255,20 +302,55 @@ export default function RoleAccessManager() {
   );
 }
 
+interface ReorderControls {
+  canUp: boolean;
+  canDown: boolean;
+  onUp: () => void;
+  onDown: () => void;
+}
+
 function SurfaceRow({
   surface,
   busy,
   onToggleVisible,
+  onToggleEnabled,
+  reorder,
 }: {
   surface: ResolvedSurface;
   busy: boolean;
   onToggleVisible: (v: boolean) => void;
+  onToggleEnabled: (v: boolean) => void;
+  reorder?: ReorderControls;
 }) {
-  // Phase-1 nav surfaces are cosmetic (enforce=false): toggling Visible hides
-  // the menu link. The enforced "Enabled" (server-gated) toggle arrives with
-  // feature modules in Phase 3 (#2039).
+  // Visible = cosmetic (hides the menu link / catalog card). Enabled = enforced
+  // server-side (blocks the feature's API for the role) — shown only for
+  // enforced surfaces (feature modules, #2039). Visibility is never authz.
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2">
+      {reorder && (
+        <div className="flex flex-col">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5"
+            disabled={!reorder.canUp || busy}
+            onClick={reorder.onUp}
+            aria-label="Move up"
+          >
+            <ArrowUp className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5"
+            disabled={!reorder.canDown || busy}
+            onClick={reorder.onDown}
+            aria-label="Move down"
+          >
+            <ArrowDown className="h-3 w-3" />
+          </Button>
+        </div>
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="font-medium truncate">{surface.label}</span>
@@ -281,6 +363,11 @@ function SurfaceRow({
             </Badge>
           )}
           {!surface.visible && <Badge variant="secondary">Hidden</Badge>}
+          {surface.enforce && !surface.enabled && (
+            <Badge variant="destructive" className="text-[10px]">
+              Disabled
+            </Badge>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-4">
@@ -295,6 +382,19 @@ function SurfaceRow({
             {surface.visible ? "Visible" : "Hidden"}
           </Label>
         </div>
+        {surface.enforce && (
+          <div className="flex items-center gap-1.5">
+            <Switch
+              checked={surface.enabled}
+              onCheckedChange={onToggleEnabled}
+              disabled={busy}
+              aria-label={`Toggle enablement of ${surface.label}`}
+            />
+            <Label className="text-xs text-muted-foreground w-14">
+              {surface.enabled ? "Enabled" : "Off"}
+            </Label>
+          </div>
+        )}
         {busy && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
       </div>
     </div>

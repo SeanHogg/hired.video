@@ -2,6 +2,10 @@ import type { Context, MiddlewareHandler } from "hono";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getModuleStatusMap, isModuleActive } from "../services/auth/moduleStatus.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
+import { resolveAccessRole } from "../../../shared/role-access.js";
+import { RoleAccessService } from "../services/admin/RoleAccessService.js";
+import { buildRepos } from "../repositories/index.js";
+import { getDb } from "../db/index.js";
 
 type AppCtx = Context<AppEnv>;
 
@@ -67,9 +71,19 @@ export function moduleGateByPath(
     if (!matched) return next();
     if (isAdminRole(c)) return next();
     const slug = registry[matched];
+
+    // Global kill-switch (modules table) — disabled for everyone.
     const map = await getModuleStatusMap();
-    const status = map.get(slug);
-    if (status === false) return forbidden(c, slug);
+    if (map.get(slug) === false) return forbidden(c, slug);
+
+    // Per-role disable (role_feature_access, #2039) — absorbs the global module
+    // gate into the per-role manifest. Reads the role's cached overrides, so
+    // this stays cheap on the hot path.
+    const role = resolveAccessRole(c.var.user?.roles);
+    const svc = new RoleAccessService(buildRepos(getDb()).roleFeatureAccess);
+    if (!(await svc.isFeatureEnabledForRole(role, `module:${slug}`))) {
+      return forbidden(c, slug);
+    }
     return next();
   };
 }

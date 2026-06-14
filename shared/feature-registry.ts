@@ -111,8 +111,61 @@ export const FEATURE_REGISTRY: readonly FeatureRegistryEntry[] = [
   nav("services", "labels.myServices", "My Services", "ShoppingBag", "/services", ALL_ROLES, 11),
 ] as const;
 
+/**
+ * Feature modules — the back-end "feature bundle" kill-switches that used to be
+ * a GLOBAL-only on/off (`modules` table + moduleGateByPath, #2039). Registered
+ * here as enforced surfaces (enforce=true) so a SuperAdmin can disable a module
+ * PER ROLE — disabling blocks the module's API for that role (the path gate
+ * consults this). Slugs mirror the enforcement path map
+ * (api/src/lib/moduleRouteRegistry.ts); the global modules-table toggle still
+ * applies independently (a module off either globally OR for the role = off).
+ * defaultEnabled=true (opt-in enforcement: a module is on until disabled).
+ */
+const MODULE_DEFS: { slug: string; label: string }[] = [
+  { slug: "ads", label: "Ads" },
+  { slug: "advertising", label: "Advertising" },
+  { slug: "affiliates", label: "Affiliates" },
+  { slug: "ai", label: "AI" },
+  { slug: "ats", label: "ATS" },
+  { slug: "assessments", label: "Assessments" },
+  { slug: "auto-apply", label: "Auto-Apply" },
+  { slug: "exclusive-boards", label: "Exclusive Boards" },
+  { slug: "calendar", label: "Calendar" },
+  { slug: "career", label: "Career" },
+  { slug: "community", label: "Community" },
+  { slug: "creators", label: "Creators" },
+  { slug: "feed", label: "Feed" },
+  { slug: "followups", label: "Follow-ups" },
+  { slug: "hubs", label: "Hubs" },
+  { slug: "interview", label: "Interview" },
+  { slug: "people-ops", label: "People Ops" },
+  { slug: "resume-scorer", label: "Resume Scorer" },
+  { slug: "resume-optimizer", label: "Resume Optimizer" },
+  { slug: "video-studio", label: "Video Studio" },
+  { slug: "value-proposition", label: "Value Proposition" },
+];
+
+const MODULE_REGISTRY: readonly FeatureRegistryEntry[] = MODULE_DEFS.map((m, i) => ({
+  key: `module:${m.slug}`,
+  kind: "module" as const,
+  group: "Feature Modules",
+  labelKey: `modules.${m.slug}.label`,
+  label: m.label,
+  defaultRoles: ALL_ROLES,
+  defaultEnabled: true,
+  enforce: true, // disabling blocks the module's API for the role
+  order: 200 + i,
+}));
+
+/** The full static registry the server resolves over (nav + modules). The
+ *  client appends tool surfaces from its catalog (see role-access-registry.ts). */
+export const STATIC_REGISTRY: readonly FeatureRegistryEntry[] = [
+  ...FEATURE_REGISTRY,
+  ...MODULE_REGISTRY,
+];
+
 const REGISTRY_BY_KEY: ReadonlyMap<string, FeatureRegistryEntry> = new Map(
-  FEATURE_REGISTRY.map((e) => [e.key, e]),
+  STATIC_REGISTRY.map((e) => [e.key, e]),
 );
 
 export function getRegistryEntry(key: string): FeatureRegistryEntry | undefined {
@@ -121,6 +174,51 @@ export function getRegistryEntry(key: string): FeatureRegistryEntry | undefined 
 
 export function isKnownFeatureKey(key: string): boolean {
   return REGISTRY_BY_KEY.has(key);
+}
+
+/** Dynamic kinds whose entries are built at runtime from a frontend catalog
+ *  (so they aren't in the static shared registry) but are still valid override
+ *  targets. Tool surfaces are derived from the tools catalog client-side. */
+const DYNAMIC_KEY_PREFIXES = ["tool:"];
+
+/** May an override be stored against this key? True for static registry keys
+ *  and for well-formed dynamic keys (e.g. `tool:<id>`). Guards the admin POST
+ *  so typos are rejected but client-built tool keys are accepted. */
+export function isAssignableFeatureKey(key: string): boolean {
+  if (isKnownFeatureKey(key)) return true;
+  return DYNAMIC_KEY_PREFIXES.some((p) => key.startsWith(p) && key.length > p.length);
+}
+
+/** Minimal gating shape a frontend catalog supplies to register its surfaces. */
+export interface ToolGatingInput {
+  id: string;
+  title: string;
+}
+
+/**
+ * Build `tool:` registry entries from a catalog. Tool visibility is an
+ * OVERRIDE-ONLY hard gate layered on top of the existing audience-chip browse
+ * filter, so the default is ALL_ROLES (no role hidden unless a SuperAdmin
+ * explicitly hides it) — zero regression, while finally letting
+ * creator/affiliate/employee menus be trimmed. enforce=false (cosmetic; tools
+ * are client-gated). Built client-side because the catalog lives in the
+ * frontend.
+ */
+export function buildToolRegistryEntries(
+  tools: readonly ToolGatingInput[],
+  startOrder = 100,
+): FeatureRegistryEntry[] {
+  return tools.map((t, i) => ({
+    key: `tool:${t.id}`,
+    kind: "tool",
+    group: "AI Tools",
+    labelKey: `tools.card.${t.id}.title`,
+    label: t.title,
+    defaultRoles: ALL_ROLES,
+    defaultEnabled: true,
+    enforce: false,
+    order: startOrder + i,
+  }));
 }
 
 /** Does this role see the surface by default (before any DB override)? */

@@ -8,7 +8,10 @@
  * ?role=<role> to preview another role's manifest (used by the curation page
  * + Preview-as-role); non-SA callers always get their own role.
  *
- * Read-through cached per role in RoleAccessService.
+ * Returns the role's raw override deltas; the client resolves them against its
+ * combined registry (shared nav surfaces + tool surfaces from the catalog) via
+ * the shared resolver, so tools and nav share one truth. Read-through cached
+ * per role in RoleAccessService.
  */
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
@@ -33,8 +36,8 @@ roleAccessRoutes.get("/me", async (c) => {
       : viewerRole;
 
   const service = new RoleAccessService(buildRepos(getDb()).roleFeatureAccess);
-  const manifest = await service.getManifestForRole(role);
-  return c.json(success(manifest), 200);
+  const overrides = await service.getOverridesForRole(role);
+  return c.json(success({ role, overrides }), 200);
 });
 
 export default roleAccessRoutes;

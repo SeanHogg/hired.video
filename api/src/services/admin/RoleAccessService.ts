@@ -21,7 +21,10 @@ import {
   type RoleAccessManifest,
   type RoleFeatureAccessRow,
 } from "../../../../shared/role-access.js";
-import { isKnownFeatureKey } from "../../../../shared/feature-registry.js";
+import {
+  isAssignableFeatureKey,
+  getRegistryEntry,
+} from "../../../../shared/feature-registry.js";
 import type { UserRole } from "../../../../shared/user-roles.js";
 
 const CACHE_VERSION = "v1";
@@ -41,18 +44,42 @@ export interface RoleAccessOverrideDto {
 export class RoleAccessService {
   constructor(private readonly repo: IRoleFeatureAccessRepository) {}
 
-  /** Resolved manifest for a viewer's role — registry defaults ⊕ DB deltas.
-   *  Cached per role; the read never N+1s (one query per role, then a pure
-   *  merge). */
-  async getManifestForRole(role: UserRole): Promise<RoleAccessManifest> {
-    return getOrSetCached<RoleAccessManifest>({
+  /** A role's raw override deltas (resolver-shaped), cached per role. This is
+   *  the single cached read both `/me` (client resolves the combined registry
+   *  from it) and `getManifestForRole` (server-side enforcement) share — one
+   *  query per role, no N+1. */
+  async getOverridesForRole(role: UserRole): Promise<RoleFeatureAccessRow[]> {
+    return getOrSetCached<RoleFeatureAccessRow[]>({
       key: cacheKey(role),
       ttlSeconds: CACHE_TTL_SECONDS,
       loader: async () => {
         const rows = await this.repo.listByRole(role);
-        return resolveRoleAccess(role, rows.map(toResolverRow));
+        return rows.map(toResolverRow);
       },
     });
+  }
+
+  /** Server-resolved manifest over the SHARED registry (nav/modules) — used by
+   *  server-side enforcement (the feature gate). The client resolves a fuller
+   *  registry (incl. tools) itself from `getOverridesForRole`. */
+  async getManifestForRole(role: UserRole): Promise<RoleAccessManifest> {
+    const overrides = await this.getOverridesForRole(role);
+    return resolveRoleAccess(role, overrides);
+  }
+
+  /**
+   * Is an enforced feature enabled for a role? Used by the server-side gate
+   * (#2039). Resolution: explicit per-role override → registry default →
+   * true (unknown key = not gated here; the global module switch handles that).
+   * Reads the per-role cached overrides, so it's safe on the hot path.
+   */
+  async isFeatureEnabledForRole(role: string, key: string): Promise<boolean> {
+    if (!isManageableRole(role)) return true;
+    const overrides = await this.getOverridesForRole(role);
+    const o = overrides.find((r) => r.featureKey === key);
+    if (o?.enabled != null) return o.enabled;
+    const entry = getRegistryEntry(key);
+    return entry ? entry.defaultEnabled : true;
   }
 
   /** Every override row — the admin curation read. The admin UI resolves each
@@ -79,7 +106,7 @@ export class RoleAccessService {
     if (!isManageableRole(input.role)) {
       throw new RoleAccessError("INVALID_ROLE", `Unknown role: ${input.role}`);
     }
-    if (!isKnownFeatureKey(input.featureKey)) {
+    if (!isAssignableFeatureKey(input.featureKey)) {
       throw new RoleAccessError(
         "UNKNOWN_FEATURE",
         `Unknown feature key: ${input.featureKey}`,

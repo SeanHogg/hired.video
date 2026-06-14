@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
+import { useRoleAccess } from "@/hooks/use-role-access";
 import {
   getCatalogToolsForEntity,
   type ToolEntityContext,
@@ -40,9 +41,14 @@ interface Props {
 export function ToolsSubmenu({ entityType, entityId }: Props) {
   const { user } = useAuth();
   const { t } = useTranslation();
+  const { canSeeTool } = useRoleAccess();
   // useAuth already resolves SuperAdmin's preview/impersonation role into
-  // user.role, so we don't need a separate effective-role hook here.
-  const tools = getCatalogToolsForEntity(entityType, entityId, user?.role);
+  // user.role, so we don't need a separate effective-role hook here. The
+  // audience filter lives in getCatalogToolsForEntity; the SuperAdmin per-role
+  // hard gate is layered on via canSeeTool (#2038).
+  const tools = getCatalogToolsForEntity(entityType, entityId, user?.role).filter(
+    (tool) => canSeeTool(tool.id),
+  );
   if (tools.length === 0) return null;
 
   return (

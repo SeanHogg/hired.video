@@ -24,7 +24,6 @@ import {
   RoleAccessError,
 } from "../services/admin/RoleAccessService.js";
 import { UpsertRoleAccessSchema } from "../../../shared/role-access.js";
-import { FEATURE_REGISTRY } from "../../../shared/feature-registry.js";
 
 const { adminAuditLog } = schema;
 
@@ -55,12 +54,14 @@ async function audit(
 }
 
 // ---------------------------------------------------------------------------
-// GET / — the registry catalog + every stored override (the admin resolves
-// each role's manifest client-side with the shared resolver).
+// GET / — every stored override. The admin page resolves each role's manifest
+// client-side with the shared resolver over its COMBINED registry (shared nav
+// surfaces + tool surfaces derived from the frontend catalog), so the registry
+// itself is owned client-side and not re-sent here.
 // ---------------------------------------------------------------------------
 adminRoleAccessRoutes.get("/", async (c) => {
   const overrides = await buildService().listOverridesForAdmin();
-  return c.json(success({ registry: FEATURE_REGISTRY, overrides }), 200);
+  return c.json(success({ overrides }), 200);
 });
 
 // ---------------------------------------------------------------------------

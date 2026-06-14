@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
+import { useRoleAccess } from "@/hooks/use-role-access";
 import { useSearchQueryParam } from "@/hooks/use-search-query-param";
 import { ToolCard } from "@/components/ToolCard";
 import { ToolCategoryBadge } from "@/components/ToolCategoryBadge";
@@ -97,6 +98,7 @@ export default function Tools() {
   const { t } = useTranslation();
   const { isAuthenticated, user } = useAuth();
   const effectiveRole = useEffectiveRole();
+  const { canSeeTool } = useRoleAccess();
 
   // SEO for tools page
   useSEO(location.pathname);
@@ -213,6 +215,9 @@ export default function Tools() {
   const toolsByCategory = useMemo(() => {
     const q = toolQuery.trim().toLowerCase();
     return TOOLS_CATALOG.filter((tool) => {
+      // Role-access hard gate (SuperAdmin per-role override) applies first,
+      // before the user-driven audience/tier browse filters (#2038).
+      if (!canSeeTool(tool.id)) return false;
       if (!isToolInAudience(tool, resolvedAudience)) return false;
       if (tierFilter !== "all" && tool.tier !== tierFilter) return false;
       if (q === "") return true;
@@ -223,7 +228,7 @@ export default function Tools() {
         `${lt.title} ${lt.description} ${lt.features?.join(" ") ?? ""} ${lt.statusBadge?.label ?? ""}`.toLowerCase();
       return haystack.includes(q);
     });
-  }, [toolQuery, tierFilter, resolvedAudience, t]);
+  }, [toolQuery, tierFilter, resolvedAudience, t, canSeeTool]);
 
   const categoryCounts = useMemo(() => {
     const map = new Map<ToolCategory, number>();

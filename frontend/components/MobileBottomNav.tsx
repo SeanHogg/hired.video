@@ -7,15 +7,11 @@ import {
   TrendingUp,
   LogIn,
   Video,
-  PlusSquare,
-  Share2,
-  Shield,
   Wrench,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { useEffectiveRole } from "@/hooks/use-effective-role";
-import { USER_ROLES } from "@shared/user-roles";
+import { useRoleAccess } from "@/hooks/use-role-access";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
@@ -25,66 +21,46 @@ type NavItem = {
   accent?: boolean;
 };
 
-/** Return the 5 footer items for the given role. Keeps Home first and the
- * primary authenticated destination (Dashboard) last for muscle memory. */
-function itemsForRole(role: string | null, isAuthenticated: boolean): NavItem[] {
-  if (!isAuthenticated) {
-    return [
-      { label: "Home", href: "/", icon: Home },
-      { label: "Jobs", href: "/jobs", icon: Briefcase },
-      { label: "Tools", href: "/tools", icon: Wrench },
-      { label: "People", href: "/people", icon: Users },
-      { label: "Login", href: "/login", icon: LogIn, accent: true },
-    ];
-  }
+/**
+ * Mobile bottom bar = Home (anchor) + the top visible primary destinations for
+ * the role + Dashboard (anchor). The middle items come from ONE curated,
+ * mobile-priority candidate list (not the sidebar rank order, which isn't a
+ * good mobile priority) and are filtered through the shared role-access
+ * manifest (canSee) — so the bar is role-aware (e.g. an affiliate never sees
+ * Studio/Resumes) from the SAME visibility source as the desktop rail, with no
+ * per-role `switch`. (#2038)
+ */
+const MIDDLE_CANDIDATES: { label: string; href: string; icon: LucideIcon; key: string }[] = [
+  { label: "Jobs", href: "/jobs", icon: Briefcase, key: "nav:jobs" },
+  { label: "Resumes", href: "/resumes", icon: FileText, key: "nav:resumes" },
+  { label: "Studio", href: "/studio", icon: Video, key: "nav:studio" },
+  { label: "People", href: "/people", icon: Users, key: "nav:people" },
+  { label: "Tools", href: "/tools", icon: Wrench, key: "nav:tools" },
+];
 
-  switch (role) {
-    case USER_ROLES.JOB_SEEKER:
-      return [
-        { label: "Home", href: "/", icon: Home },
-        { label: "Jobs", href: "/jobs", icon: Briefcase },
-        { label: "Resumes", href: "/resumes", icon: FileText },
-        { label: "Studio", href: "/studio", icon: Video },
-        { label: "Dashboard", href: "/dashboard", icon: TrendingUp },
-      ];
+const HOME: NavItem = { label: "Home", href: "/", icon: Home };
+const DASHBOARD: NavItem = { label: "Dashboard", href: "/dashboard", icon: TrendingUp };
 
-    case USER_ROLES.EMPLOYER:
-      return [
-        { label: "Home", href: "/", icon: Home },
-        { label: "Post Job", href: "/post-a-job", icon: PlusSquare },
-        { label: "Jobs", href: "/jobs", icon: Briefcase },
-        { label: "People", href: "/people", icon: Users },
-        { label: "Dashboard", href: "/dashboard", icon: TrendingUp },
-      ];
-
-    case USER_ROLES.ADMIN:
-    case USER_ROLES.SUPER_ADMIN:
-      return [
-        { label: "Home", href: "/", icon: Home },
-        { label: "Jobs", href: "/jobs", icon: Briefcase },
-        { label: "People", href: "/people", icon: Users },
-        { label: "admin", href: "/admin/dashboard", icon: Shield },
-        { label: "Dashboard", href: "/dashboard", icon: TrendingUp },
-      ];
-
-    case USER_ROLES.RECRUITER:
-    default:
-      // Recruiter + unknown/unset roles fall back to the original menu.
-      return [
-        { label: "Home", href: "/", icon: Home },
-        { label: "Jobs", href: "/jobs", icon: Briefcase },
-        { label: "Resumes", href: "/resumes", icon: FileText },
-        { label: "People", href: "/people", icon: Users },
-        { label: "Dashboard", href: "/dashboard", icon: TrendingUp },
-      ];
-  }
-}
+const ANON_ITEMS: NavItem[] = [
+  HOME,
+  { label: "Jobs", href: "/jobs", icon: Briefcase },
+  { label: "Tools", href: "/tools", icon: Wrench },
+  { label: "People", href: "/people", icon: Users },
+  { label: "Login", href: "/login", icon: LogIn, accent: true },
+];
 
 export default function MobileBottomNav() {
   const location = useLocation();
   const { isAuthenticated } = useAuth();
-  const effectiveRole = useEffectiveRole();
-  const items = itemsForRole(effectiveRole, isAuthenticated);
+  const { canSee } = useRoleAccess();
+
+  const items: NavItem[] = isAuthenticated
+    ? [
+        HOME,
+        ...MIDDLE_CANDIDATES.filter((c) => canSee(c.key)).slice(0, 3),
+        DASHBOARD,
+      ]
+    : ANON_ITEMS;
 
   return (
     <nav

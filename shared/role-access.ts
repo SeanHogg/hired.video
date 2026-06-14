@@ -10,7 +10,7 @@
 import { z } from "zod";
 import { USER_ROLES, type UserRole } from "./user-roles.js";
 import {
-  FEATURE_REGISTRY,
+  STATIC_REGISTRY,
   ALL_ROLES,
   defaultVisibleForRole,
   type FeatureKind,
@@ -35,6 +35,10 @@ export interface ResolvedSurface {
   label: string;
   href?: string;
   icon?: string;
+  /** When true, disabling (`enabled=false`) is enforced server-side (the
+   *  feature's API is blocked), not just hidden. Drives the admin Enabled
+   *  toggle. Cosmetic surfaces (nav, tools) are enforce=false. */
+  enforce: boolean;
   visible: boolean;
   enabled: boolean;
   rank: number;
@@ -68,18 +72,30 @@ export function resolveAccessRole(roles: readonly string[] | null | undefined): 
 /**
  * Pure merge: registry defaults ⊕ per-role deltas → manifest. Surfaces are
  * returned in registry order; consumers sort nav by `rank` via `navSurfaces`.
+ *
+ * `registry` is parameterized so the SAME resolver runs everywhere: the server
+ * resolves the shared FEATURE_REGISTRY (nav/modules), while the client passes a
+ * combined registry that also includes tool surfaces derived from the frontend
+ * tools catalog (which can't live in shared). One function, no drift.
  */
 export function resolveRoleAccess(
   role: UserRole,
   overrides: readonly RoleFeatureAccessRow[],
+  registry: readonly FeatureRegistryEntry[] = STATIC_REGISTRY,
 ): RoleAccessManifest {
   const byKey = new Map<string, RoleFeatureAccessRow>();
   for (const o of overrides) {
     if (o.role === role) byKey.set(o.featureKey, o);
   }
 
-  const surfaces = FEATURE_REGISTRY.map((entry) => resolveOne(entry, role, byKey.get(entry.key)));
+  const surfaces = registry.map((entry) => resolveOne(entry, role, byKey.get(entry.key)));
   return { role, surfaces };
+}
+
+/** Stable feature-registry key for a catalog tool id. Single seam so client +
+ *  server agree on how a tool maps to an override row. */
+export function toolFeatureKey(toolId: string): string {
+  return `tool:${toolId}`;
 }
 
 function resolveOne(
@@ -103,6 +119,7 @@ function resolveOne(
     label: entry.label,
     href: entry.href,
     icon: entry.icon,
+    enforce: entry.enforce,
     visible,
     enabled,
     rank,
