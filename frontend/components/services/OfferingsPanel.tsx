@@ -8,6 +8,7 @@
 // trigger the Add-Service dialog from buttons rendered in the tabs row.
 
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   AlertCircle,
   CheckCircle,
@@ -54,6 +55,7 @@ import {
 } from "@/lib/services/services-service";
 import { confirmDialog } from "@/lib/dialogs";
 import { userService } from "@/lib/services/user-service";
+import { serviceCategoryLabel } from "@/lib/taxonomy/category-labels";
 import type { CreatorProfile } from "@/lib/services/creator-service";
 
 const SERVICE_CATEGORIES = [
@@ -104,6 +106,7 @@ const OfferingsPanel = forwardRef<OfferingsPanelHandle, Props>(function Offering
   profile,
   onProfileChange,
 }, ref) {
+  const { t } = useTranslation();
   const [providesServices, setProviderServices] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -170,7 +173,7 @@ const OfferingsPanel = forwardRef<OfferingsPanelHandle, Props>(function Offering
               {s.category && (
                 <Badge variant="secondary" className="text-xs">
                   <Tag className="h-3 w-3 mr-1" />
-                  {s.category}
+                  {serviceCategoryLabel(s.category, t)}
                 </Badge>
               )}
               {!s.isActive && (
@@ -291,7 +294,7 @@ const OfferingsPanel = forwardRef<OfferingsPanelHandle, Props>(function Offering
   }
 
   async function handleDelete(id: string) {
-    if (!(await confirmDialog({ title: "Delete service", description: "Delete this service?", confirmText: "Delete", destructive: true }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.offerings.deleteServiceTitle"), description: t("dialogs.offerings.deleteServiceDescription"), confirmText: t("dialogs.offerings.deleteConfirm"), destructive: true }))) return;
     try {
       await servicesService.deleteService(id);
       setServices((prev) => prev.filter((s) => s.id !== id));
@@ -511,6 +514,7 @@ function ServicesTable({
   onEdit: (s: ServiceOffering) => void;
   onDelete: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full text-left text-sm">
@@ -545,7 +549,7 @@ function ServicesTable({
                 {s.category ? (
                   <span className="inline-flex items-center gap-1">
                     <Tag className="h-3.5 w-3.5" />
-                    {s.category}
+                    {serviceCategoryLabel(s.category, t)}
                   </span>
                 ) : (
                   "—"

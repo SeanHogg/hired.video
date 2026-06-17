@@ -40,6 +40,7 @@
  */
 
 import type { CourseLesson } from "@/lib/services/course-service";
+import { escapeXmlText as escapeXml } from "@shared/course-cover";
 
 /** Optional knowledge-check form payload — when present, the launcher
  *  embeds the questions + grader + remediation hook. Mirrors
@@ -102,11 +103,6 @@ function escapeHtml(input: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-/** Escape for XML text/attribute context — same rules as HTML. */
-function escapeXml(input: string): string {
-  return escapeHtml(input);
 }
 
 /** Minimal markdown → HTML walker. Handles the subset the seeded library

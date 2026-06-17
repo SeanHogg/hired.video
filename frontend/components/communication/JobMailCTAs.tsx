@@ -138,7 +138,7 @@ export function JobMailCTAs({
           {jobGroups.map((group, idx) => (
             <div
               key={group.jobId ?? `${group.viewUrl}-${idx}`}
-              className="inline-flex rounded-md border border-emerald-200 bg-white overflow-hidden"
+              className="inline-flex rounded-md border border-emerald-200 bg-card overflow-hidden"
             >
               <a
                 href={group.viewUrl}

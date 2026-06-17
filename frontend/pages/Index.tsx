@@ -12,6 +12,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
 import FeaturedTools from "@/components/FeaturedTools";
+import FeaturedCreatorsCarousel from "@/components/creators/FeaturedCreatorsCarousel";
 import LatestGuides from "@/components/LatestGuides";
 import UnifiedSearch from "@/components/UnifiedSearch";
 import { AIInputBox } from "@/components/AIInputBox";
@@ -124,6 +125,12 @@ export default function Index() {
           <div>
             <JobTemplateGallery />
           </div>
+        </section>
+
+        {/* Featured Creators (#1771) — self-gates to null when the marketplace
+            has no ranked creators yet, so it adds nothing on an empty platform. */}
+        <section className="py-8 px-4 sm:px-6 lg:px-8 border-t border-border">
+          <FeaturedCreatorsCarousel seeAllHref="/creators/featured" />
         </section>
 
         {/* Public Video Resumes Section */}

@@ -22,6 +22,7 @@ import { getEffectDefinition, registerEffect } from "./registry";
 import { drawParticleField } from "./particle-field";
 import { ANIMATE_EFFECT_KINDS, applyAnimateEffectsToCtx } from "./animate";
 import { drawChart } from "@/lib/studio/chart-canvas";
+import { filtersToCss, type VideoFilters } from "@/lib/studio/video-filters";
 import { resolveCtaFontSizes } from "@/lib/studio/editor-v2/canvas-state";
 import {
   estimateVisemesForText,
@@ -582,11 +583,26 @@ registerEffect({
     const fit = stringOr(effect.params.fit, "cover") as "cover" | "contain" | "stretch";
     ctx.save();
     applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
+    applyWidgetGrade(ctx, effect.params);
     drawWithFit(ctx, img, x, y, w, h, fit, img.naturalWidth, img.naturalHeight);
     ctx.restore();
     applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
   },
 });
+
+/** Compose a per-widget colour grade (#596/#806) onto the current
+ *  `ctx.filter`, preserving any blur/glow `applyWidgetCanvasState`
+ *  already set. Identity grades are a no-op, so existing widgets are
+ *  unaffected. `ctx.restore()` (called by the applier) clears it. */
+function applyWidgetGrade(
+  ctx: CanvasRenderingContext2D,
+  params: Record<string, unknown>,
+): void {
+  const grade = filtersToCss(params.filters as VideoFilters | null | undefined);
+  if (!grade) return;
+  const existing = ctx.filter && ctx.filter !== "none" ? `${ctx.filter} ` : "";
+  ctx.filter = existing + grade;
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // canvas-v2:video — positioned video widget. URL-backed. The renderer
@@ -626,6 +642,7 @@ registerEffect({
     }
     ctx.save();
     applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
+    applyWidgetGrade(ctx, effect.params);
     drawWithFit(ctx, v, x, y, w, h, "cover", v.videoWidth, v.videoHeight);
     ctx.restore();
     applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);

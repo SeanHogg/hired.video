@@ -150,8 +150,8 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
             <Card key={i}>
               <CardContent className="p-6">
                 <div className="animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-                  <div className="h-8 bg-gray-200 rounded w-1/2" />
+                  <div className="h-4 bg-muted rounded w-3/4 mb-2" />
+                  <div className="h-8 bg-muted rounded w-1/2" />
                 </div>
               </CardContent>
             </Card>
@@ -160,7 +160,7 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
         <Card>
           <CardContent className="p-6">
             <div className="animate-pulse">
-              <div className="h-64 bg-gray-200 rounded" />
+              <div className="h-64 bg-muted rounded" />
             </div>
           </CardContent>
         </Card>
@@ -176,7 +176,7 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
           <h3 className="text-lg font-semibold mb-2">
             Unable to Load Analytics
           </h3>
-          <p className="text-gray-600 mb-4">{error || "No data available"}</p>
+          <p className="text-muted-foreground mb-4">{error || "No data available"}</p>
           <Button onClick={loadAnalytics}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Try Again
@@ -206,7 +206,7 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold">Invitation Analytics</h2>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Track your team invitation performance for {data.companyName}
           </p>
         </div>
@@ -235,11 +235,11 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">
+                <p className="text-sm font-medium text-muted-foreground">
                   Total Invitations
                 </p>
                 <p className="text-3xl font-bold">{data.totalInvitations}</p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {data.recentInvitations30Days} in last 30 days
                 </p>
               </div>
@@ -252,13 +252,13 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">
+                <p className="text-sm font-medium text-muted-foreground">
                   Acceptance Rate
                 </p>
                 <p className="text-3xl font-bold text-green-600">
                   {data.acceptanceRate}%
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {data.acceptedInvitations} accepted
                 </p>
               </div>
@@ -271,13 +271,13 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">
+                <p className="text-sm font-medium text-muted-foreground">
                   Pending Invitations
                 </p>
                 <p className="text-3xl font-bold text-yellow-600">
                   {data.pendingInvitations}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">Awaiting response</p>
+                <p className="text-xs text-muted-foreground mt-1">Awaiting response</p>
               </div>
               <Clock className="h-8 w-8 text-yellow-600" />
             </div>
@@ -288,13 +288,13 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">
+                <p className="text-sm font-medium text-muted-foreground">
                   Weekly Activity
                 </p>
                 <p className="text-3xl font-bold text-purple-600">
                   {data.weeklyInvitations}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Invitations this week
                 </p>
               </div>
@@ -410,13 +410,13 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
               <p className="text-2xl font-bold text-blue-600">
                 {data.recentInvitations30Days}
               </p>
-              <p className="text-sm text-gray-600">Invitations Sent</p>
+              <p className="text-sm text-muted-foreground">Invitations Sent</p>
             </div>
             <div className="text-center p-4 bg-green-50 rounded-lg">
               <p className="text-2xl font-bold text-green-600">
                 {data.recentAccepted30Days}
               </p>
-              <p className="text-sm text-gray-600">Invitations Accepted</p>
+              <p className="text-sm text-muted-foreground">Invitations Accepted</p>
             </div>
             <div className="text-center p-4 bg-purple-50 rounded-lg">
               <p className="text-2xl font-bold text-purple-600">
@@ -429,7 +429,7 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
                   : 0}
                 %
               </p>
-              <p className="text-sm text-gray-600">Recent Acceptance Rate</p>
+              <p className="text-sm text-muted-foreground">Recent Acceptance Rate</p>
             </div>
           </div>
         </CardContent>

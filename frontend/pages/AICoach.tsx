@@ -15,13 +15,14 @@ import AIChatPanel from "@/components/AIChatPanel";
 import FloatingAIButton from "@/components/FloatingAIButton";
 import { getCatalogTool } from "@/data/tools-catalog";
 import { localizeTool } from "@/lib/tools/localize-tool";
+import { createGeneralContext } from "@/lib/utils/ai-context-helpers";
 
 export default function AICoach() {
   const location = useLocation();
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const { isAuthenticated } = useAuth();
-  const { openAIChat, openAIWithMessage, isAIChatOpen } = useAI();
+  const { openAIChat, openAIWithMessage, openAIWithPageContextAndMessage, isAIChatOpen } = useAI();
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
 
   // Snapshot the prompt the visitor clicked so it auto-sends after login.
@@ -37,8 +38,19 @@ export default function AICoach() {
   useEffect(() => {
     if (!isAuthenticated || isAIChatOpen) return;
     const initialQuery = restored?.prompt ?? searchParams.get("q");
+    // #971 — durable hand-off priming (target role / seniority / style /
+    // source) arrives on `ctx` and is pinned in the system prompt so it
+    // survives history compaction, instead of riding the first user
+    // message that gets sliced off after a few turns.
+    const coachPriming = searchParams.get("ctx") ?? undefined;
     setTimeout(() => {
-      if (initialQuery) {
+      if (initialQuery && coachPriming) {
+        openAIWithPageContextAndMessage(
+          { ...createGeneralContext(), coachPriming },
+          initialQuery,
+        );
+        if (restored?.prompt) clear();
+      } else if (initialQuery) {
         openAIWithMessage(initialQuery);
         if (restored?.prompt) clear();
       } else {

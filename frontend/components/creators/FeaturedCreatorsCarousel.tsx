@@ -27,12 +27,16 @@ interface FeaturedCreatorsCarouselProps {
   category?: string;
   /** Optional heading override. Defaults to "Featured Creators". */
   heading?: string;
+  /** When set, renders a "See all →" link to this route (e.g. the Featured
+   *  Creators landing). Omitted on the landing page's own rows. */
+  seeAllHref?: string;
 }
 
 export default function FeaturedCreatorsCarousel({
   limit = 12,
   category,
   heading,
+  seeAllHref,
 }: FeaturedCreatorsCarouselProps) {
   const [items, setItems] = useState<FeaturedCreator[] | null>(null);
 
@@ -60,7 +64,14 @@ export default function FeaturedCreatorsCarousel({
 
   return (
     <section className="space-y-3">
-      <h2 className="text-lg font-semibold">{heading ?? "Featured Creators"}</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">{heading ?? "Featured Creators"}</h2>
+        {seeAllHref && (
+          <Link to={seeAllHref} className="text-sm text-primary hover:underline shrink-0">
+            See all
+          </Link>
+        )}
+      </div>
       <div className="-mx-1 overflow-x-auto">
         <div className="flex gap-3 px-1 pb-2">
           {items.map((c) => (

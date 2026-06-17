@@ -16,7 +16,7 @@ import { gigService, type GigProjectStatus } from "@/lib/services/gig-service";
 import { ProductivityItemStatus, taskDtoToUIState, type TaskUIState } from "@/types/task";
 
 const STATUS_BADGE: Record<GigProjectStatus, string> = {
-  draft: "bg-gray-100 text-gray-700",
+  draft: "bg-muted text-foreground",
   open: "bg-blue-100 text-blue-700",
   in_progress: "bg-amber-100 text-amber-700",
   completed: "bg-green-100 text-green-700",

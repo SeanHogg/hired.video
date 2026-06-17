@@ -27,7 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   CareerHealthWheel,
   HEALTH_FILL_COLORS,
-  HEALTH_LABELS,
+  useHealthLabels,
   type SegmentHealth,
   type WheelSegment,
 } from "@/components/career360/CareerHealthWheel";
@@ -295,6 +295,7 @@ interface MasterResumeRef {
 export default function Career360() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const healthLabels = useHealthLabels();
   const { isAuthenticated, user } = useAuth();
   const { openAIWithPageContextAndMessage } = useAI();
   const { recordRun } = useToolRunRecorder("career-360");
@@ -644,7 +645,7 @@ export default function Career360() {
                                 className="inline-block h-3 w-3 rounded-sm"
                                 style={{ backgroundColor: HEALTH_FILL_COLORS[h] }}
                               />
-                              <span>{HEALTH_LABELS[h]}</span>
+                              <span>{healthLabels[h]}</span>
                             </div>
                             <Badge variant="secondary" className="font-mono">
                               {counts[h]}
@@ -718,6 +719,7 @@ function Career360Marketing({
   inner: WheelSignal[];
 }) {
   const { t } = useTranslation();
+  const healthLabels = useHealthLabels();
   return (
     <div className="space-y-6 mt-4">
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6">
@@ -746,7 +748,7 @@ function Career360Marketing({
                     className="inline-block h-3 w-3 rounded-sm"
                     style={{ backgroundColor: HEALTH_FILL_COLORS[h] }}
                   />
-                  <span>{HEALTH_LABELS[h]}</span>
+                  <span>{healthLabels[h]}</span>
                 </div>
               ))}
             </div>

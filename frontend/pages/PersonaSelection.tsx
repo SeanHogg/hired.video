@@ -125,7 +125,7 @@ export default function PersonaSelection() {
                     <CardHeader className="text-center pb-4">
                       <div className="flex justify-center mb-4">
                         <div
-                          className={`p-4 rounded-full bg-white shadow-sm ${isSelected ? "ring-2 ring-primary" : ""}`}
+                          className={`p-4 rounded-full bg-card shadow-sm ${isSelected ? "ring-2 ring-primary" : ""}`}
                         >
                           <Icon className={`h-8 w-8 ${persona.iconColor}`} />
                         </div>

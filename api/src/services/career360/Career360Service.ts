@@ -46,7 +46,8 @@ import { ResumeContentSchema } from "../../../../shared/resume.js";
 import type { JwtPayload } from "../../types/index.js";
 import type { LLMEnv } from "../adapters/llm-client.js";
 
-const { users, userProfiles, toolRuns, resumeInformation, savedJobs } = schema;
+const { users, userProfiles, toolRuns, resumeInformation, savedJobs, jobApplications, interviewSessions } =
+  schema;
 
 // Tool ids whose `tool_runs.score` we plot as a sparkline under the
 // wheel. Stays in one place so adding a new "scored" tool is one line.
@@ -702,23 +703,48 @@ const INTERVIEW_THRESHOLDS = { good: 0.4, moderate: 0.15 } as const;
 const OFFER_THRESHOLDS = { good: 0.12, moderate: 0.04 } as const;
 /** Goal-fit is a 0..1 score (1 = no gaps); these are its band cut-offs. */
 const GOALFIT_THRESHOLDS = { good: 0.7, moderate: 0.34 } as const;
+/** Interview-practice `overallScore` (0..100) bands, used as the
+ *  interview-conversion readiness proxy when the real funnel is thin. */
+const PRACTICE_READINESS_THRESHOLDS = { good: 75, moderate: 55 } as const;
 /** Funnel aggregate TTL. Short because `saved_jobs` status changes live
  *  in the jobs domain and don't invalidate this key (see register #421
  *  follow-up); 2 minutes bounds staleness without re-querying per load. */
 const OUTCOMES_CACHE_TTL_SECONDS = 120;
 
+/** Statuses that represent a real submitted application (excludes
+ *  "tracked" = saved-not-applied and "cancelled" = job pulled). */
+const APPLIED_STATUSES = new Set([
+  "applied",
+  "interviewing",
+  "offered",
+  "accepted",
+  "declined",
+  "rejected",
+  "withdrawn",
+]);
+const INTERVIEWED_STATUSES = new Set(["interviewing", "offered", "accepted", "declined"]);
+const OFFERED_STATUSES = new Set(["offered", "accepted", "declined"]);
+
 export interface FunnelCounts {
-  /** Rows that represent a real submitted application (excludes "tracked"
-   *  = saved-not-applied and "cancelled" = job pulled). */
+  /** Distinct jobs the seeker actually applied to (saved-jobs pipeline ∪
+   *  the auto-apply `job_applications` log, deduped by jobId). */
   applied: number;
   /** Rows that reached the interview stage or beyond. */
   interviewed: number;
   /** Rows that produced an offer (offered / accepted / declined-by-user). */
   offered: number;
+  /** Mean of completed interview-practice `overallScore`s (0..100), or
+   *  null when the seeker hasn't finished a practice session. Used as a
+   *  readiness proxy for interview-conversion when the real funnel is
+   *  too thin to band (#2093). */
+  practiceAvg: number | null;
+  /** Number of completed practice sessions behind `practiceAvg`. */
+  practiceCount: number;
 }
 
-/** Read-through cached funnel aggregate. One `GROUP BY status` query per
- *  miss — never per-status fan-out. */
+/** Read-through cached funnel aggregate. A small, bounded set of queries
+ *  per miss (saved-jobs rows, application jobIds, practice scores) — never
+ *  a per-row fan-out. */
 async function loadFunnelCounts(userId: string): Promise<FunnelCounts> {
   return getOrSetCached<FunnelCounts>({
     key: `c360:funnel:${userId}`,
@@ -729,22 +755,57 @@ async function loadFunnelCounts(userId: string): Promise<FunnelCounts> {
 
 async function computeFunnelCounts(userId: string): Promise<FunnelCounts> {
   const db = getDb();
-  const rows = await db
-    .select({ status: savedJobs.status, n: sql<number>`count(*)::int` })
-    .from(savedJobs)
-    .where(eq(savedJobs.userId, userId))
-    .groupBy(savedJobs.status);
 
-  const byStatus = new Map<string, number>();
-  for (const row of rows) byStatus.set(row.status, Number(row.n) || 0);
-  const n = (status: string) => byStatus.get(status) ?? 0;
+  // Saved-jobs pipeline carries the full stage lifecycle; `job_applications`
+  // is the flat auto-apply log. Read both, then dedupe applications by jobId
+  // so a job that's in both surfaces isn't counted twice.
+  const [savedRows, applicationRows, practiceRows] = await Promise.all([
+    db
+      .select({ jobId: savedJobs.jobId, status: savedJobs.status })
+      .from(savedJobs)
+      .where(eq(savedJobs.userId, userId)),
+    db
+      .select({ jobId: jobApplications.jobId })
+      .from(jobApplications)
+      .where(eq(jobApplications.userId, userId)),
+    db
+      .select({ score: interviewSessions.overallScore })
+      .from(interviewSessions)
+      .where(
+        and(
+          eq(interviewSessions.userId, userId),
+          eq(interviewSessions.status, "completed"),
+          isNotNull(interviewSessions.overallScore),
+        ),
+      ),
+  ]);
 
-  const interviewed = n("interviewing") + n("offered") + n("accepted") + n("declined");
-  const offered = n("offered") + n("accepted") + n("declined");
-  // `rejected` / `withdrawn` were applied to but never reached interview;
-  // they count toward the denominator only.
-  const applied = interviewed + n("applied") + n("rejected") + n("withdrawn");
-  return { applied, interviewed, offered };
+  const appliedJobIds = new Set<string>();
+  let interviewed = 0;
+  let offered = 0;
+  for (const row of savedRows) {
+    if (INTERVIEWED_STATUSES.has(row.status)) interviewed += 1;
+    if (OFFERED_STATUSES.has(row.status)) offered += 1;
+    if (APPLIED_STATUSES.has(row.status) && row.jobId) appliedJobIds.add(row.jobId);
+  }
+  // Auto-apply rows that have no saved-jobs row still count as applications.
+  for (const row of applicationRows) {
+    if (row.jobId) appliedJobIds.add(row.jobId);
+  }
+  // `applied` floors at `interviewed` so a stray jobId mismatch can never
+  // make the denominator smaller than the interviewed numerator.
+  const applied = Math.max(appliedJobIds.size, interviewed);
+
+  const practiceScores = practiceRows
+    .map((r) => (r.score == null ? NaN : Number.parseFloat(r.score)))
+    .filter((n) => Number.isFinite(n));
+  const practiceCount = practiceScores.length;
+  const practiceAvg =
+    practiceCount > 0
+      ? practiceScores.reduce((sum, n) => sum + n, 0) / practiceCount
+      : null;
+
+  return { applied, interviewed, offered, practiceAvg, practiceCount };
 }
 
 /** Build the four inner-ring outcomes. Pure — goal-fit reads the freshly
@@ -760,13 +821,7 @@ export function computeOutcomes(counts: FunnelCounts, doc: CareerTargetDoc | nul
       CALLBACK_THRESHOLDS,
       MIN_APPLIED_FOR_SIGNAL,
     ),
-    funnelSignal(
-      "interview-conversion",
-      counts.offered,
-      counts.interviewed,
-      INTERVIEW_THRESHOLDS,
-      MIN_INTERVIEWS_FOR_SIGNAL,
-    ),
+    interviewConversionSignal(counts),
     funnelSignal(
       "offer-rate",
       counts.offered,
@@ -776,6 +831,31 @@ export function computeOutcomes(counts: FunnelCounts, doc: CareerTargetDoc | nul
     ),
     goalFitSignal(doc),
   ];
+}
+
+/** Interview-conversion: offers ÷ interviews when there's a real funnel;
+ *  otherwise fall back to interview-practice readiness (#2093) so a seeker
+ *  who's been practising sees a signal instead of grey. The practice
+ *  fallback reports `rate: null` — it's a readiness proxy, not a measured
+ *  conversion rate. */
+function interviewConversionSignal(counts: FunnelCounts): OutcomeSignal {
+  if (counts.interviewed >= MIN_INTERVIEWS_FOR_SIGNAL) {
+    return funnelSignal(
+      "interview-conversion",
+      counts.offered,
+      counts.interviewed,
+      INTERVIEW_THRESHOLDS,
+      MIN_INTERVIEWS_FOR_SIGNAL,
+    );
+  }
+  if (counts.practiceCount > 0 && counts.practiceAvg != null) {
+    const health =
+      counts.practiceAvg >= PRACTICE_READINESS_THRESHOLDS.good ? "good"
+      : counts.practiceAvg >= PRACTICE_READINESS_THRESHOLDS.moderate ? "moderate"
+      : "poor";
+    return { id: "interview-conversion", health, rate: null, sampleSize: counts.practiceCount };
+  }
+  return { id: "interview-conversion", health: "unknown", rate: null, sampleSize: counts.interviewed };
 }
 
 function funnelSignal(

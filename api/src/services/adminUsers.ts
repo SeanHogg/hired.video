@@ -33,6 +33,10 @@ export interface UserSearchParams {
   // default list — that's the point of a ban). "active"/"suspended"
   // implicitly exclude banned.
   status?: "active" | "suspended" | "banned";
+  // When true, restrict the list to editorial / house authors
+  // (users.is_system = true). These are the first-party authors whose
+  // content renders as "Editorial" rather than community UGC.
+  editorial?: boolean;
 }
 
 interface RawPlanOverrideRow {
@@ -83,7 +87,7 @@ async function loadPlanOverridesForUsers(
 }
 
 export async function searchUsers(
-  { page = 1, limit = 50, search, role, status }: UserSearchParams,
+  { page = 1, limit = 50, search, role, status, editorial }: UserSearchParams,
   deps: AdminUsersDeps = defaultApiDeps(),
 ) {
   // One residual direct-db call remains for toolRuns analytics below —
@@ -95,6 +99,7 @@ export async function searchUsers(
   const conditions: SQL[] = [];
   if (search) conditions.push(or(ilike(schema.users.email, `%${search}%`), ilike(schema.users.name, `%${search}%`)));
   if (role) conditions.push(eq(schema.users.role, role));
+  if (editorial) conditions.push(eq(schema.users.isSystem, true));
   if (status === "active") conditions.push(eq(schema.users.isActive, true));
   if (status === "suspended") conditions.push(eq(schema.users.isSuspended, true));
   // Ban = hidden by default. Banned users only surface when the admin
@@ -118,6 +123,7 @@ export async function searchUsers(
         isSuspended: schema.users.isSuspended,
         isBanned: schema.users.isBanned,
         isSuperAdmin: schema.users.isSuperAdmin,
+        isSystem: schema.users.isSystem,
         mfaEnabled: schema.users.mfaEnabled,
         createdAt: schema.users.createdAt,
         lastLoginAt: schema.users.lastLoginAt,
@@ -363,6 +369,34 @@ export async function setUserStatus(
     targetId: userId,
     metadata: { status },
   });
+}
+
+/**
+ * Toggle a user's `is_system` flag — marks them as an editorial / house
+ * author whose content renders as first-party "Editorial" rather than
+ * community UGC. SuperAdmin-only at the route boundary (the whole
+ * /admin/impersonate tree is gated by superAdminMiddleware).
+ */
+export async function setUserSystemFlag(
+  adminId: string,
+  userId: string,
+  isSystem: boolean,
+  deps: AdminUsersDeps = defaultApiDeps(),
+): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" }> {
+  const existing = await deps.repos.users.findById(userId);
+  if (!existing) return { ok: false, code: "NOT_FOUND" };
+
+  await deps.repos.users.updateById(userId, { isSystem });
+
+  await deps.audit.log({
+    actorId: adminId,
+    action: AUDIT_ACTIONS.USER_SYSTEM_FLAG_CHANGED,
+    targetType: "user",
+    targetId: userId,
+    metadata: { isSystem },
+  });
+
+  return { ok: true };
 }
 
 // ── Global stats ─────────────────────────────────────────────────────────────

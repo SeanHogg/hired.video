@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,6 +18,7 @@ interface Props {
  * /settings → Content Creator → Leave program.
  */
 export default function LeaveCreatorProgramCard({ onProfileChange }: Props = {}) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [profile, setProfile] = useState<CreatorProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,7 +35,7 @@ export default function LeaveCreatorProgramCard({ onProfileChange }: Props = {})
   }, []);
 
   const cancel = async () => {
-    if (!(await confirmDialog({ title: "Leave program", description: "Leave the Creator Program entirely? Your enrollment will end. You can re-enroll later — this starts a new enrollment row.", confirmText: "Leave", destructive: true }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.creator.leaveProgramTitle"), description: t("dialogs.creator.leaveProgramBody"), confirmText: t("dialogs.creator.leaveProgramConfirm"), destructive: true }))) return;
     setCancelling(true);
     try {
       await creatorService.cancel();

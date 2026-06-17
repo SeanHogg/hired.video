@@ -23,13 +23,10 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
 import { gigService, GigError } from "../services/gigs/GigService.js";
-
-const { gigProjects, gigMilestones, gigBids } = schema;
+import { isSuperAdmin } from "../middleware/superAdmin.js";
 
 export const gigsRoutes = new Hono<AppEnv>();
 
@@ -219,69 +216,98 @@ gigsRoutes.post("/milestones/:id/approve", async (c) => {
 
 /**
  * #101 — Release escrowed funds to the awarded bidder + record the 10%
- * platform fee. Idempotent on `(milestone_id, kind='accrual')` via
- * `payoutLedgerService.recordAccrual`. Kept in the route because it owns the
- * payment-provider side-effect; ownership is re-checked here.
+ * platform fee. Owner-gated, milestone must be 'approved'. The escrow-release
+ * + ledger side-effect lives in GigService (shared with dispute resolution).
  */
 gigsRoutes.post("/milestones/:id/release", async (c) => {
   const u = uid(c);
   if (!u) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-  const [milestone] = await db
-    .select()
-    .from(gigMilestones)
-    .where(eq(gigMilestones.id, c.req.param("id")))
-    .limit(1);
-  if (!milestone) return c.json(error("NOT_FOUND", "Milestone not found"), 404);
-  if (milestone.status !== "approved") {
-    return c.json(error("CONFLICT", "Milestone must be approved before release"), 409);
+  try {
+    const { milestone, payout, bidderUserId } = await gigService.releaseMilestoneEscrow(c.req.param("id"), u);
+    return c.json(success({ milestone, payout: { ...payout, bidderUserId } }), 200);
+  } catch (e) {
+    return handleGigError(c, e);
   }
+});
 
-  const [project] = await db
-    .select({ ownerUserId: gigProjects.ownerUserId, awardedBidId: gigProjects.awardedBidId })
-    .from(gigProjects)
-    .where(eq(gigProjects.id, milestone.projectId))
-    .limit(1);
-  if (!project || project.ownerUserId !== u) return c.json(error("FORBIDDEN", "Owner only"), 403);
-  if (!project.awardedBidId) {
-    return c.json(error("CONFLICT", "Project has no awarded bidder"), 409);
+// ── disputes (#1768) ───────────────────────────────────────────────────────
+
+const OpenDisputeSchema = z.object({ reason: z.string().min(10).max(5_000) });
+const DisputeEventSchema = z.object({
+  kind: z.enum(["evidence", "comment"]).default("comment"),
+  body: z.string().min(1).max(5_000),
+  attachments: z.array(z.object({ url: z.string().url(), name: z.string().max(255).optional() })).max(10).default([]),
+});
+const ResolveDisputeSchema = z.object({
+  resolution: z.enum(["release", "refund"]),
+  note: z.string().min(1).max(5_000),
+});
+
+// Open a dispute on a milestone (poster or awarded creator).
+gigsRoutes.post("/milestones/:id/dispute", async (c) => {
+  const u = uid(c);
+  if (!u) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const parsed = OpenDisputeSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "A dispute reason (≥10 chars) is required", parsed.error.flatten()), 400);
   }
-  const [bid] = await db
-    .select({ bidderUserId: gigBids.bidderUserId })
-    .from(gigBids)
-    .where(eq(gigBids.id, project.awardedBidId))
-    .limit(1);
-  if (!bid) return c.json(error("NOT_FOUND", "Awarded bid not found"), 404);
+  try {
+    const dispute = await gigService.openDispute(c.req.param("id"), u, parsed.data.reason);
+    return c.json(success({ dispute }), 201);
+  } catch (e) {
+    return handleGigError(c, e);
+  }
+});
 
-  // 10% platform fee on completed milestones per the gap-#101 spec.
-  const grossCents = milestone.amountCents;
-  const platformFeeCents = Math.round(grossCents * 0.1);
-  const creatorCents = grossCents - platformFeeCents;
+// Read the latest dispute + timeline for a milestone (participants or mediator).
+gigsRoutes.get("/milestones/:id/dispute", async (c) => {
+  const u = uid(c);
+  if (!u) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  try {
+    const detail = await gigService.getDisputeForMilestone(c.req.param("id"), u, isSuperAdmin(c.var.user));
+    return c.json(success(detail), 200);
+  } catch (e) {
+    return handleGigError(c, e);
+  }
+});
 
-  const { payoutLedgerService } = await import("../services/payout/PayoutLedgerService.js");
-  await payoutLedgerService.recordAccrual({
-    userId: bid.bidderUserId,
-    amountCents: creatorCents,
-    currency: "USD",
-    sourceKind: "service_order",
-    sourceId: milestone.id,
-    note: `Gig milestone "${milestone.title}" released (10% platform fee: $${(platformFeeCents / 100).toFixed(2)})`,
-  });
+// Append evidence / comment to an open dispute (participants).
+gigsRoutes.post("/disputes/:id/events", async (c) => {
+  const u = uid(c);
+  if (!u) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const parsed = DisputeEventSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Invalid dispute event", parsed.error.flatten()), 400);
+  }
+  try {
+    const event = await gigService.addDisputeEvent(
+      c.req.param("id"),
+      u,
+      parsed.data.kind,
+      parsed.data.body,
+      parsed.data.attachments,
+    );
+    return c.json(success({ event }), 201);
+  } catch (e) {
+    return handleGigError(c, e);
+  }
+});
 
-  const [row] = await db
-    .update(gigMilestones)
-    .set({ status: "released", releasedAt: new Date(), updatedAt: new Date() })
-    .where(eq(gigMilestones.id, milestone.id))
-    .returning();
-
-  gigService.bumpVersion();
-  return c.json(
-    success({
-      milestone: row,
-      payout: { grossCents, platformFeeCents, creatorCents, bidderUserId: bid.bidderUserId },
-    }),
-    200,
-  );
+// Mediator decision — SuperAdmin only.
+gigsRoutes.post("/disputes/:id/resolve", async (c) => {
+  const u = uid(c);
+  if (!u) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  if (!isSuperAdmin(c.var.user)) return c.json(error("FORBIDDEN", "Mediator (SuperAdmin) only"), 403);
+  const parsed = ResolveDisputeSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Invalid resolution", parsed.error.flatten()), 400);
+  }
+  try {
+    const result = await gigService.resolveDispute(c.req.param("id"), u, parsed.data.resolution, parsed.data.note);
+    return c.json(success(result), 200);
+  } catch (e) {
+    return handleGigError(c, e);
+  }
 });
 
 gigsRoutes.all("*", (c) =>

@@ -205,7 +205,7 @@ export default function MergeAnalysisView({
           <span>{analysis.summary.manualReview} review</span>
         </div>
         <div className="flex items-center gap-1">
-          <SkipForward className="h-4 w-4 text-gray-400" />
+          <SkipForward className="h-4 w-4 text-muted-foreground" />
           <span>{analysis.summary.skip} skip</span>
         </div>
         <div className="flex items-center gap-1">

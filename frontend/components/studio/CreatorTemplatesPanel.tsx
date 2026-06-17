@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Eye, EyeOff, Globe, Trash2, Edit3, ExternalLink, Store, ImagePlus } from "lucide-react";
 import {
   Sheet,
@@ -54,6 +55,7 @@ function formatPrice(cents: number, currency: string): string {
 }
 
 export default function CreatorTemplatesPanel({ open, onOpenChange, onEditTemplate }: Props) {
+  const { t: tr } = useTranslation();
   const { toast } = useToast();
   const [templates, setTemplates] = useState<StudioTemplate[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -105,9 +107,11 @@ export default function CreatorTemplatesPanel({ open, onOpenChange, onEditTempla
   async function archive(t: StudioTemplate) {
     if (
       !(await confirmDialog({
-        title: "Delete template",
-        description: `Delete "${t.name}"? This removes it from the marketplace permanently.`,
-        confirmText: "Delete",
+        title: tr("dialogs.creatorTemplates.deleteTemplateTitle"),
+        description: tr("dialogs.creatorTemplates.deleteTemplateDescription", {
+          name: t.name,
+        }),
+        confirmText: tr("dialogs.creatorTemplates.deleteConfirm"),
         destructive: true,
       }))
     )

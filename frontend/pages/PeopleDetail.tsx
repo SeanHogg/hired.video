@@ -31,6 +31,7 @@ import ProfileProgramPanel, {
 } from "@/components/profile/sections/programs/ProfileProgramPanel";
 import SkillsSection from "@/components/profile/sections/SkillsSection";
 import SocialProfilesSection from "@/components/profile/sections/SocialProfilesSection";
+import { BookingsSection } from "@/components/bookings/BookingsSection";
 import VideoResumeSection from "@/components/profile/sections/VideoResumeSection";
 import MasterResumeSection from "@/components/profile/sections/MasterResumeSection";
 import { ProfileSectionsProvider } from "@/components/profile/sections/profile-sections-context";
@@ -39,6 +40,7 @@ import VisitorActionsSection, {
 } from "@/components/profile/sections/VisitorActionsSection";
 import { GrabCoffeeButton } from "@/components/events/GrabCoffeeButton";
 import { WarmIntroRequestButton } from "@/components/graph/WarmIntroRequestButton";
+import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 import EmployerCompaniesTab from "@/components/company/EmployerCompaniesTab";
 import ConnectionRequestDialog from "@/components/profile/dialogs/ConnectionRequestDialog";
 import EditAboutDialog from "@/components/profile/dialogs/EditAboutDialog";
@@ -294,7 +296,7 @@ function PeopleDetailContent() {
 
   const handleDisconnect = async () => {
     if (!connection.id || connectionBusy) return;
-    if (!(await confirmDialog({ title: "Remove connection", description: t("messages.confirmRemoveConnection", { name: firstName || t("messages.thisUserFallback") }), confirmText: "Remove", destructive: true }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.connection.removeTitle"), description: t("messages.confirmRemoveConnection", { name: firstName || t("messages.thisUserFallback") }), confirmText: t("dialogs.connection.removeConfirm"), destructive: true }))) return;
     setConnectionBusy(true);
     try {
       await userService.rejectConnectionRequest(connection.id);
@@ -585,6 +587,17 @@ function PeopleDetailContent() {
                 targetName={[profile.firstName, profile.lastName].filter(Boolean).join(" ") || null}
                 isSelf={isOwner}
               />
+              {/* Report this profile — self-gates (hidden for the owner,
+                  bounces anon to /login). The user_profile entity id IS
+                  the profile user id, so owner == entityId. */}
+              {profile.id && (
+                <ReportAbuseButton
+                  entityType="user_profile"
+                  entityId={profile.id}
+                  entityOwnerId={profile.id}
+                  entityLabel="profile"
+                />
+              )}
             </div>
           )}
 
@@ -736,6 +749,10 @@ function PeopleDetailContent() {
                 lastActive={lastActive}
                 showOwnerMeta={isOwner}
               />
+
+              {/* Self-gating: renders a "Book a 1:1 session" card only when the
+                  viewed user has bookings enabled + active offerings (#1902). */}
+              <BookingsSection handle={profile.externalPublicHandle} />
             </div>
           </div>
         </div>,

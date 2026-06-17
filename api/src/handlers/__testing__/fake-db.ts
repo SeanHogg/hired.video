@@ -486,7 +486,14 @@ export function buildFakeDb(seed: Record<string, Row[]> = {}): FakeDbHandle {
               // rows per (user, job, resume), which mis-represents the
               // prod behaviour the uniqueIndex guarantees.
               const o = (opts ?? {}) as { target?: unknown; set?: Row };
-              const targetCols = Array.isArray(o.target) ? o.target : [];
+              // Drizzle accepts a single column (`target: t.userId`) or an
+              // array (`target: [t.a, t.b]`); normalise both so a single-column
+              // upsert — the most common shape — is simulated, not skipped.
+              const targetCols = Array.isArray(o.target)
+                ? o.target
+                : o.target != null
+                  ? [o.target]
+                  : [];
               const targetKeys = targetCols
                 .filter(isColumn)
                 .map((c) => jsPropNameForColumn(c));

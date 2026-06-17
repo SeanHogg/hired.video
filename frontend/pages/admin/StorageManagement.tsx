@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Trash2, RefreshCw, AlertTriangle, HardDrive, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +46,7 @@ function formatBytes(bytes: number): string {
 }
 
 export default function StorageManagement() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [view, setView] = useState<ViewTab>("usage");
   const [usage, setUsage] = useState<Usage | null>(null);
@@ -78,8 +80,7 @@ export default function StorageManagement() {
     const sizeBytes = orphans
       ? orphans.orphans.filter((o) => keys.includes(o.key)).reduce((a, o) => a + o.size, 0)
       : 0;
-    const noun = keys.length === 1 ? "this object" : `${keys.length} objects`;
-    if (!(await confirmDialog({ title: "Delete objects", description: `Delete ${noun}? It frees ${formatBytes(sizeBytes)} and cannot be undone.`, confirmText: "Delete", destructive: true }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.storage.deleteObjectsTitle"), description: t("dialogs.storage.deleteObjectsDescription", { count: keys.length, bytes: formatBytes(sizeBytes) }), confirmText: t("dialogs.storage.deleteObjectsConfirm"), destructive: true }))) return;
     setBulkBusy(true);
     try {
       const res = await adminStorageService.bulkDeleteObjects(keys);

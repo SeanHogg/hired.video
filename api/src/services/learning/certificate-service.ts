@@ -33,11 +33,35 @@ interface SignedPayload {
   finalScorePct: number | null;
 }
 
+/** #1500 — optional Ed25519 keys for asymmetric cert signing. PKCS8 (private)
+ *  + raw (public), both base64. Resolved from injected opts first (tests),
+ *  then env (`CERT_ED25519_PRIVATE_KEY` / `CERT_ED25519_PUBLIC_KEY`). When
+ *  neither is present the service stays on HMAC exactly as before — the
+ *  asymmetric path is fully dormant until an operator provisions a keypair. */
+export interface CertificateServiceOpts {
+  ed25519?: { privateKeyPkcs8B64?: string | null; publicKeyRawB64?: string | null };
+}
+
+function readCertEnv(name: string): string | null {
+  const fromGlobalEnv = (globalThis as unknown as { __ENV?: Record<string, string | undefined> }).__ENV?.[name];
+  const fromGlobal = (globalThis as unknown as Record<string, string | undefined>)[name];
+  const fromProcess =
+    typeof process !== "undefined" ? (process.env as Record<string, string | undefined>)?.[name] : undefined;
+  return fromGlobalEnv ?? fromGlobal ?? fromProcess ?? null;
+}
+
 export class CertificateService {
+  private readonly edPrivateKeyB64: string | null;
+  private readonly edPublicKeyB64: string | null;
+
   constructor(
     private readonly db: DbHandle,
     private readonly secret: string,
-  ) {}
+    opts: CertificateServiceOpts = {},
+  ) {
+    this.edPrivateKeyB64 = opts.ed25519?.privateKeyPkcs8B64 ?? readCertEnv("CERT_ED25519_PRIVATE_KEY");
+    this.edPublicKeyB64 = opts.ed25519?.publicKeyRawB64 ?? readCertEnv("CERT_ED25519_PUBLIC_KEY");
+  }
 
   /** Issue (or return the existing) certificate for a passed enrollment.
    *  Idempotent — re-issue returns the existing row. Returns null when
@@ -179,8 +203,10 @@ export class CertificateService {
       return { valid: false, reason: "expired" };
     }
 
-    // Cert payload is encoded as `${base64url(canonicalJson)}.${hmac}`
-    const [b64, sig] = cert.signedPayload.split(".");
+    // Format discrimination (#1500): `${b64}.${sig}` = HMAC (default/legacy);
+    // `${b64}.${sig}.ed25519` = asymmetric. base64url has no ".", so every
+    // existing 2-part cert deterministically takes the unchanged HMAC path.
+    const [b64, sig, alg] = cert.signedPayload.split(".");
     if (!b64 || !sig) return { valid: false, reason: "tampered" };
     let payload: SignedPayload;
     try {
@@ -188,8 +214,11 @@ export class CertificateService {
     } catch {
       return { valid: false, reason: "tampered" };
     }
-    const expectedSig = await this.hmac(b64);
-    if (!constantTimeEqual(sig, expectedSig)) {
+    const signatureOk =
+      alg === "ed25519"
+        ? await this.verifyEd25519(b64, sig)
+        : constantTimeEqual(sig, await this.hmac(b64));
+    if (!signatureOk) {
       return { valid: false, reason: "tampered" };
     }
     return { valid: true, certificate: cert, payload };
@@ -200,6 +229,12 @@ export class CertificateService {
   private async sign(payload: SignedPayload): Promise<string> {
     const canonical = canonicalJson(payload as unknown as Record<string, unknown>);
     const b64 = base64UrlEncode(canonical);
+    // Prefer Ed25519 when a keypair is provisioned (off-platform-verifiable
+    // via the JWKS endpoint); the 3-part suffix tells verify() which alg to
+    // use. Falls back to same-origin HMAC otherwise (#1500).
+    if (this.edPrivateKeyB64) {
+      return `${b64}.${await this.signEd25519(b64)}.ed25519`;
+    }
     const sig = await this.hmac(b64);
     return `${b64}.${sig}`;
   }
@@ -216,6 +251,68 @@ export class CertificateService {
       await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message)),
     );
     return base64UrlEncode(bytes);
+  }
+
+  // ── Ed25519 (asymmetric) helpers (#1500) ──────────────────────────────
+
+  private edPrivateKeyPromise: Promise<CryptoKey> | null = null;
+  private edPublicKeyPromise: Promise<CryptoKey | null> | null = null;
+
+  private edPrivateKey(): Promise<CryptoKey> {
+    if (!this.edPrivateKeyB64) return Promise.reject(new Error("Ed25519 private key not configured"));
+    if (!this.edPrivateKeyPromise) {
+      this.edPrivateKeyPromise = crypto.subtle.importKey(
+        "pkcs8",
+        base64ToBytes(this.edPrivateKeyB64),
+        { name: "Ed25519" },
+        false,
+        ["sign"],
+      );
+    }
+    return this.edPrivateKeyPromise;
+  }
+
+  private edPublicKey(): Promise<CryptoKey | null> {
+    if (!this.edPublicKeyB64) return Promise.resolve(null);
+    if (!this.edPublicKeyPromise) {
+      this.edPublicKeyPromise = crypto.subtle
+        .importKey("raw", base64ToBytes(this.edPublicKeyB64), { name: "Ed25519" }, true, ["verify"])
+        .catch(() => null);
+    }
+    return this.edPublicKeyPromise;
+  }
+
+  private async signEd25519(message: string): Promise<string> {
+    const key = await this.edPrivateKey();
+    const bytes = new Uint8Array(
+      await crypto.subtle.sign({ name: "Ed25519" }, key, new TextEncoder().encode(message)),
+    );
+    return base64UrlEncode(bytes);
+  }
+
+  private async verifyEd25519(message: string, sigB64Url: string): Promise<boolean> {
+    const key = await this.edPublicKey();
+    if (!key) return false; // can't verify an ed25519 cert without the public key
+    try {
+      return await crypto.subtle.verify(
+        { name: "Ed25519" },
+        key,
+        base64UrlToBytes(sigB64Url),
+        new TextEncoder().encode(message),
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /** #1500 — the published verification key as a JWK for the JWKS endpoint
+   *  (`GET /api/verify/.well-known/jwks.json`). Null when no Ed25519 public
+   *  key is configured (verify stays on the same-origin HMAC path). */
+  async publicJwk(): Promise<Record<string, unknown> | null> {
+    const key = await this.edPublicKey();
+    if (!key) return null;
+    const jwk = (await crypto.subtle.exportKey("jwk", key)) as unknown as Record<string, unknown>;
+    return { ...jwk, alg: "EdDSA", use: "sig", kid: "hv-cert-ed25519-1" };
   }
 }
 
@@ -257,4 +354,19 @@ function constantTimeEqual(a: string, b: string): boolean {
     result |= a.charCodeAt(i) ^ b.charCodeAt(i);
   }
   return result === 0;
+}
+
+/** Decode standard base64 (e.g. a stored PKCS8/raw key) to bytes. */
+function base64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+/** Decode base64url (the signature segment) to bytes. */
+function base64UrlToBytes(b64url: string): Uint8Array {
+  const padded =
+    b64url.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (b64url.length % 4)) % 4);
+  return base64ToBytes(padded);
 }

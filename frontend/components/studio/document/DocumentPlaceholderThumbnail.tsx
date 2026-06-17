@@ -39,7 +39,7 @@ export default function DocumentPlaceholderThumbnail({
   return (
     <div
       className={cn(
-        "relative flex h-full w-full items-center justify-center bg-slate-200/70 p-3",
+        "relative flex h-full w-full items-center justify-center bg-muted/70 p-3",
         className,
       )}
     >
@@ -67,7 +67,7 @@ export default function DocumentPlaceholderThumbnail({
           </>
         )}
       </div>
-      <FileText className="absolute bottom-2 right-2 h-4 w-4 text-slate-400" />
+      <FileText className="absolute bottom-2 right-2 h-4 w-4 text-muted-foreground" />
     </div>
   );
 }

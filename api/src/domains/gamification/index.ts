@@ -51,6 +51,24 @@ export class GamificationService {
           return null;
         }
       },
+      // #1117 — source the sybil / device-cluster signals, cached for 1h
+      // (these change slowly and the fraud check runs on the hot user-task
+      // path). Best-effort: any failure → empty signals (heuristics dormant).
+      getExtraFraudSignals: async (userId) => {
+        try {
+          return await getOrSetCached({
+            key: `fraud-cluster:${userId}`,
+            ttlSeconds: 3600,
+            loader: async () => ({
+              accountsOnSignupIp: await this.repos.points.countAccountsOnSignupIp(userId),
+              accountsOnDeviceFingerprint:
+                await this.repos.points.countAccountsOnDeviceFingerprint(userId),
+            }),
+          });
+        } catch {
+          return {};
+        }
+      },
       onBadgeUnlock: async (userId, slug) => {
         const badge = await this.repos.points.findBadgeBySlug(slug);
         if (!badge) return;
@@ -399,6 +417,30 @@ export class GamificationService {
       ...args,
       refId: args.cohortId,
       refType: "learning_cohort",
+    });
+  }
+
+  /** #1952 — a reviewer submitted a completed peer resume review. The
+   *  submitter is the caller, so role is supplied. RefId = review id makes
+   *  the award idempotent per review. Feeds the "Mentor" badge. */
+  async onFeedbackReviewSubmitted(args: AwardArgs & { reviewId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.FEEDBACK_REVIEW_SUBMITTED, {
+      ...args,
+      refId: args.reviewId,
+      refType: "resume_review",
+    });
+  }
+
+  /** #1952 — the resume owner accepted a suggested edit. The reward goes to
+   *  the REVIEWER who authored the suggestion (not the accepting owner), so
+   *  the role is resolved from the db by id. Idempotent per annotation. */
+  async onFeedbackSuggestionAccepted(
+    args: { userId: string; annotationId: string },
+  ): Promise<AwardOutcome> {
+    return this.awardWithRoleLookup(ACTIONS.FEEDBACK_SUGGESTION_ACCEPTED, {
+      userId: args.userId,
+      refId: args.annotationId,
+      refType: "resume_review_annotation",
     });
   }
 

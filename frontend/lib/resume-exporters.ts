@@ -15,6 +15,7 @@
 import type { Resume, ResumeContent } from "@/types/resume";
 import { slugify } from "@shared/slugify";
 import { alertDialog } from "@/lib/dialogs";
+import i18n from "@/lib/i18n/i18n";
 
 function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -304,8 +305,8 @@ export async function exportResumePdf(printUrl: string): Promise<void> {
   const w = window.open(printUrl, "_blank", "noopener,noreferrer");
   if (!w) {
     await alertDialog({
-      title: "Pop-up blocked",
-      description: "Your browser blocked the print window. Allow pop-ups for this site, then try again.",
+      title: i18n.t("dialogs.resumeExport.popupBlockedTitle"),
+      description: i18n.t("dialogs.resumeExport.popupBlockedDescription"),
     });
   }
 }

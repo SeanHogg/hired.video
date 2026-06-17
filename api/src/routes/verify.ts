@@ -19,6 +19,17 @@ import { getJwtSecret } from "../utils/jwt.js";
 
 export const verifyRoutes = new Hono<{ Variables: Variables } & AppEnv>();
 
+/** #1500 — published JWKS so a third party (LinkedIn, an LMS, an enterprise
+ *  verifier) can validate an Ed25519-signed cert off-platform. Empty `keys`
+ *  array when no asymmetric key is provisioned (certs stay HMAC same-origin).
+ *  Registered before `/:certNumber`; the 2-segment path can't collide with
+ *  the single-segment cert-number route. */
+verifyRoutes.get("/.well-known/jwks.json", async (c) => {
+  const certService = new CertificateService(getDb(), getJwtSecret());
+  const jwk = await certService.publicJwk();
+  return c.json({ keys: jwk ? [jwk] : [] }, 200);
+});
+
 verifyRoutes.get("/:certNumber", async (c) => {
   const certService = new CertificateService(getDb(), getJwtSecret());
   const result = await certService.verify(c.req.param("certNumber"));

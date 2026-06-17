@@ -28,6 +28,7 @@ import { useEffectiveRole } from "@/hooks/use-effective-role";
 import useDashboard from "@/hooks/dashboard/useDashboard";
 import ReferralBanner from "@/components/ReferralBanner";
 import AdSlot from "@/components/ads/AdSlot";
+import FeaturedCreatorsCarousel from "@/components/creators/FeaturedCreatorsCarousel";
 
 // Role-specific dashboard components — lazy-loaded so a user only downloads
 // the variant they actually see (gap #1341). Each is ~300–500 LOC; bundling
@@ -97,6 +98,11 @@ export default function Dashboard() {
       <ReferralBanner />
       <AdSlot slot="dashboard-banner" size="banner" className="mb-4" />
       {children}
+      {/* Featured Creators (#1771) — discovery surface for signed-in users
+          across every role dashboard. Self-gates to null when empty. */}
+      <div className="mt-8">
+        <FeaturedCreatorsCarousel seeAllHref="/creators/featured" />
+      </div>
     </div>
   );
 

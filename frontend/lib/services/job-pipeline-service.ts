@@ -18,6 +18,10 @@ type PipelineStage = _PipelineStage;
 export interface PipelineEntry {
   id: string;
   jobId: string;
+  /** The originating job application, when the entry was created from one
+   *  (added_from = 'application'). Drives "send this role's screening to the
+   *  applicant" from the pipeline (#1855). Null for manually-added entries. */
+  jobApplicationId: string | null;
   candidateUserId: string | null;
   candidateName: string;
   candidateEmail: string | null;

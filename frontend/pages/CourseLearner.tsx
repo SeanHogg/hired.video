@@ -29,7 +29,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   Award,
@@ -55,7 +54,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { courseCategoryI18nKey } from "@/lib/course-category";
+import { courseCategoryLabel } from "@/lib/course-category";
 import { signalBadgeRefresh } from "@/lib/badges/refresh";
 import ScormPlayer from "@/components/courses/ScormPlayer";
 import TextNarrator from "@/components/audio/TextNarrator";
@@ -296,9 +295,7 @@ export default function CourseLearner() {
                 <>
                   ·{" "}
                   <Badge variant="outline">
-                    {t(courseCategoryI18nKey(course.category), {
-                      defaultValue: course.category,
-                    })}
+                    {courseCategoryLabel(course.category, t)}
                   </Badge>
                 </>
               )}
@@ -673,7 +670,9 @@ function LessonBody({
   // prop-drilling capability flags through the parent.
   switch (lesson.sourceType) {
     case "text_md":
-      return <TextMdLesson lesson={lesson} />;
+      // #1782 — a text_md lesson can also carry a companion video; the
+      // shared Read/Watch component decides its own toggle visibility.
+      return <ReadWatchLesson lesson={lesson} defaultTab="read" />;
 
     case "scorm_package":
       if (!lesson.scormEntryUrl || !lesson.scormVersion) {
@@ -705,23 +704,9 @@ function LessonBody({
           </div>
         );
       }
-      // The studio project gets a public watch URL keyed off its slug,
-      // but only after the author published. Embed via the existing
-      // public /v/:slug route — same surface analytics already wire.
-      // When the project hasn't published we fall back to a deep-link
-      // hint so the learner isn't staring at a blank iframe.
-      return (
-        <div className="p-4">
-          <div className="aspect-video w-full bg-black rounded-md overflow-hidden">
-            <iframe
-              src={`/v/${lesson.studioProjectId}`}
-              title={lesson.title}
-              className="w-full h-full border-0"
-              allow="autoplay; fullscreen; picture-in-picture"
-            />
-          </div>
-        </div>
-      );
+      // #1782 — a studio_video lesson can also carry a readable body; the
+      // shared Read/Watch component defaults a video lesson to "watch".
+      return <ReadWatchLesson lesson={lesson} defaultTab="watch" />;
 
     case "external_url":
       if (!lesson.externalUrl) {
@@ -731,26 +716,7 @@ function LessonBody({
           </div>
         );
       }
-      return (
-        <div className="p-4 space-y-3">
-          <div className="aspect-video w-full bg-muted rounded-md overflow-hidden border">
-            <iframe
-              src={lesson.externalUrl}
-              title={lesson.title}
-              className="w-full h-full border-0"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-            />
-          </div>
-          <a
-            href={lesson.externalUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm text-primary hover:underline inline-flex items-center gap-1"
-          >
-            {t("actions.courseLearner.openInNewTab")} <ExternalLink className="h-3 w-3" />
-          </a>
-        </div>
-      );
+      return <ExternalUrlLesson lesson={lesson} />;
 
     default:
       return null;
@@ -758,18 +724,37 @@ function LessonBody({
 }
 
 /**
- * #1520 — text_md lesson with optional companion video. Renders a
- * Read / Watch tab toggle when `companionStudioProjectId` is set; falls
- * back to the prose-only view otherwise. Self-gates per the DRY rule —
- * no `hasCompanion` boolean drilled into parents.
+ * #1782 — shared Read / Watch surface. Decides its OWN visibility: when a
+ * lesson carries BOTH a readable body and a video source it shows a small
+ * two-tab toggle; when it has a single modality it renders that modality
+ * with no toggle. No `hasToggle` boolean drilled in from the parent — the
+ * caller only hints the preferred default tab (video lessons → "watch").
+ *
+ * Video source resolution (#1464): prefer the published `studioSlug` for
+ * the /v/ embed so share links + analytics use the slug; fall back to the
+ * raw project id for back-compat when the slug hasn't been resolved.
  */
-function TextMdLesson({ lesson }: { lesson: CourseLesson }) {
+function ReadWatchLesson({
+  lesson,
+  defaultTab,
+}: {
+  lesson: CourseLesson;
+  defaultTab: "read" | "watch";
+}) {
   const { t } = useTranslation();
-  const companionId = (lesson as any).companionStudioProjectId as string | undefined;
-  const [tab, setTab] = useState<"read" | "watch">("read");
+  // #1464 — `studioSlug` is added to each lesson by the learner-content
+  // API for studio_video lessons (resolves studio_projects.slug). The
+  // shared CourseLesson type doesn't yet carry it, so read it narrowly.
+  const studioSlug = (lesson as { studioSlug?: string | null }).studioSlug ?? null;
+  const videoRef = studioSlug || lesson.studioProjectId;
+
+  const hasBody = !!lesson.bodyMd;
+  const hasVideo = !!videoRef;
+
+  const [tab, setTab] = useState<"read" | "watch">(defaultTab);
 
   const readView = (
-    <div className="p-6 space-y-4">
+    <div className="space-y-4">
       {lesson.bodyMd ? (
         <TextNarrator
           text={lesson.bodyMd}
@@ -790,13 +775,31 @@ function TextMdLesson({ lesson }: { lesson: CourseLesson }) {
     </div>
   );
 
-  if (!companionId) return readView;
+  const watchView = videoRef ? (
+    <div className="aspect-video w-full bg-black rounded-md overflow-hidden">
+      <iframe
+        src={`/v/${videoRef}`}
+        title={lesson.title}
+        className="w-full h-full border-0"
+        allow="autoplay; fullscreen; picture-in-picture"
+      />
+    </div>
+  ) : (
+    <div className="text-sm text-muted-foreground italic">
+      {t("messages.courseLearner.noStudioProject")}
+    </div>
+  );
+
+  // Single-modality lessons render directly — no toggle.
+  if (hasBody && !hasVideo) return <div className="p-6">{readView}</div>;
+  if (hasVideo && !hasBody) return <div className="p-4">{watchView}</div>;
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-4 space-y-4">
       <div className="inline-flex rounded-md border p-0.5 text-sm">
         <button
           type="button"
+          aria-pressed={tab === "read"}
           className={`px-3 py-1 rounded ${tab === "read" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
           onClick={() => setTab("read")}
         >
@@ -804,17 +807,92 @@ function TextMdLesson({ lesson }: { lesson: CourseLesson }) {
         </button>
         <button
           type="button"
+          aria-pressed={tab === "watch"}
           className={`px-3 py-1 rounded ${tab === "watch" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
           onClick={() => setTab("watch")}
         >
           {t("actions.courseLearner.watch")}
         </button>
       </div>
-      {tab === "read" ? (
-        readView
-      ) : (
-        <StudioVideoSurface mode="lazy" videoId={companionId} />
+      {tab === "read" ? readView : watchView}
+    </div>
+  );
+}
+
+/**
+ * #1463 — external_url lessons embedded in a sandboxed iframe. Requires
+ * HTTPS (refuses to embed plaintext-http origins, showing an inline
+ * warning + open-in-new-tab affordance instead) and surfaces a
+ * `Hosted at <domain>` badge so the learner can see where the embedded
+ * content originates.
+ */
+function ExternalUrlLesson({ lesson }: { lesson: CourseLesson }) {
+  const { t } = useTranslation();
+  const url = lesson.externalUrl ?? "";
+
+  // Parse once; guard against malformed URLs so a bad row never throws.
+  const parsed = useMemo(() => {
+    try {
+      return new URL(url);
+    } catch {
+      return null;
+    }
+  }, [url]);
+
+  const isHttps = parsed?.protocol === "https:";
+  const hostname = parsed?.hostname ?? null;
+
+  if (!isHttps) {
+    return (
+      <div className="p-4 space-y-3">
+        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900 p-3 text-sm text-amber-800 dark:text-amber-300">
+          <Lock className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            {t("messages.courseLearner.externalUrlNotSecure", {
+              defaultValue:
+                "This lesson links to an insecure (http) address and can't be embedded. Open it in a new tab instead.",
+            })}
+          </span>
+        </div>
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+        >
+          {t("actions.courseLearner.openInNewTab")} <ExternalLink className="h-3 w-3" />
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-3">
+      {hostname && (
+        <Badge variant="outline" className="inline-flex items-center gap-1">
+          <Lock className="h-3 w-3" />
+          {t("labels.courseLearner.hostedAt", {
+            domain: hostname,
+            defaultValue: "Hosted at {{domain}}",
+          })}
+        </Badge>
       )}
+      <div className="aspect-video w-full bg-muted rounded-md overflow-hidden border">
+        <iframe
+          src={url}
+          title={lesson.title}
+          className="w-full h-full border-0"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+        />
+      </div>
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+      >
+        {t("actions.courseLearner.openInNewTab")} <ExternalLink className="h-3 w-3" />
+      </a>
     </div>
   );
 }

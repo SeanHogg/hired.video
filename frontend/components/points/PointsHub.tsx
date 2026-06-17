@@ -14,6 +14,7 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
   Calendar,
@@ -49,6 +50,7 @@ import {
   type PointsSummary,
 } from "@/lib/services/points-service";
 import { BadgesGallery, type BadgeGalleryItem } from "@/components/badges/BadgesGallery";
+import { pointsCategoryLabel } from "@/lib/taxonomy/category-labels";
 
 export interface PointsHubProps {
   /** Show the H1 + tagline. Pages set true; tab embeds set false because
@@ -443,6 +445,7 @@ function GiftCardDialog({
 // ── Activity ────────────────────────────────────────────────────────
 
 function ActivityFeed({ activity }: { activity: PointsSummary["recentActivity"] }) {
+  const { t } = useTranslation();
   return (
     <Card className="p-5">
       <h2 className="font-semibold mb-3">Recent activity</h2>
@@ -460,7 +463,7 @@ function ActivityFeed({ activity }: { activity: PointsSummary["recentActivity"] 
               <div>
                 <div className="font-medium">{a.label}</div>
                 <div className="text-xs text-muted-foreground">
-                  {new Date(a.at).toLocaleString()} · {a.category}
+                  {new Date(a.at).toLocaleString()} · {pointsCategoryLabel(a.category, t)}
                 </div>
               </div>
               <div

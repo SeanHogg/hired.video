@@ -5,6 +5,7 @@ import "./global.css";
 import "@/lib/i18n/i18n";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider } from "next-themes";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { Suspense, lazy, useEffect, type ReactNode } from "react";
@@ -22,6 +23,7 @@ import { AIProvider } from "@/lib/ai-context";
 import { AuthProvider, useAuth, useVerificationBlocked } from "@/lib/auth";
 import { useShouldRenderAppChrome } from "@/components/AppShell";
 import { LocaleSync } from "@/lib/i18n/LocaleSync";
+import { ThemeSync } from "@/components/theme/ThemeSync";
 import { PermissionDebuggerProvider } from "@/providers/PermissionDebuggerProvider";
 import { PersonaPreviewProvider } from "@/providers/PersonaPreviewProvider";
 import { PermissionDebuggerPanel } from "@/components/PermissionDebuggerPanel";
@@ -63,6 +65,7 @@ import AcceptInvitation from "./pages/AcceptInvitation";
 const PlacementDetail = lazy(() => import("./pages/recruiter/PlacementDetail"));
 const ForAgencies = lazy(() => import("./pages/ForAgencies"));
 const WorkforceGuide = lazy(() => import("./pages/guides/WorkforceGuide"));
+const FeaturedCreators = lazy(() => import("./pages/FeaturedCreators"));
 const BlogIndex = lazy(() => import("./pages/blog/BlogIndex"));
 const BlogPost = lazy(() => import("./pages/blog/BlogPost"));
 const PostAJob = lazy(() => import("./pages/PostAJob"));
@@ -301,6 +304,7 @@ const BookingsHost = lazy(() => import("./pages/bookings/BookingsHost"));
 const ArticlesIndex = lazy(() => import("./pages/ArticlesIndex"));
 const ArticleView = lazy(() => import("./pages/ArticleView"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
+const EmbeddedStudioProject = lazy(() => import("./pages/EmbeddedStudioProject"));
 const SharedCandidateResume = lazy(() => import("./pages/SharedCandidateResume"));
 const SharedPitchDeck = lazy(() => import("./pages/SharedPitchDeck"));
 const CandidateDetail = lazy(() => import("./pages/services/CandidateDetail"));
@@ -643,8 +647,19 @@ const App = () => (
     }}
   >
     <QueryClientProvider client={queryClient}>
+      {/* attribute="class" → toggles <html class="dark">, matching global.css
+          + the no-FOUC bootstrap in index.html. enableSystem honours the OS
+          preference for "system"; disableTransitionOnChange avoids a colour
+          smear on every element when switching. */}
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        disableTransitionOnChange
+      >
       <AuthProvider>
         <LocaleSync />
+        <ThemeSync />
         <PersonaPreviewProvider>
         <PermissionDebuggerProvider>
           <CartProvider>
@@ -1071,6 +1086,10 @@ const App = () => (
                       <Route path="/courses" element={<Navigate to="/services/creator/courses" replace />} />
                       <Route path="/creators" element={<Navigate to="/search?category=creators" replace />} />
                       <Route path="/creators/dashboard" element={<Navigate to="/services" replace />} />
+                      {/* Featured Creators discovery landing (#1772) — static
+                          segments rank above /creators/:userId in RRv6. */}
+                      <Route path="/creators/featured" element={<FeaturedCreators />} />
+                      <Route path="/creators/featured/:category" element={<FeaturedCreators />} />
                       <Route path="/creators/:userId" element={<CreatorPublicProfileRedirect />} />
                       <Route path="/marketplace" element={<Navigate to="/search" replace />} />
                       <Route path="/marketplace/templates" element={<Navigate to="/search?category=templates" replace />} />
@@ -1207,6 +1226,13 @@ const App = () => (
                         path="/embedded/resumes/:identifier"
                         element={<EmbeddedResume />}
                       />
+                      {/* #696 — project-keyed studio embed: works for any
+                          public project, including ones with no published
+                          render. */}
+                      <Route
+                        path="/embedded/studio/:projectId"
+                        element={<EmbeddedStudioProject />}
+                      />
 
                       {/* Public video resume page */}
                       <Route path="/v/:videoId" element={<PublicVideoResume />} />
@@ -1256,6 +1282,7 @@ const App = () => (
         </PermissionDebuggerProvider>
         </PersonaPreviewProvider>
       </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   </ErrorBoundary>
 );

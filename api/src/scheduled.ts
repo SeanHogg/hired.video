@@ -32,6 +32,7 @@ import {
 import { TremendousClient } from "./services/tremendous/client.js";
 import { seedSuperAdminAndCompany } from "./seed.js";
 import { runRetentionSweep } from "./services/maintenance/retention-sweep.js";
+import { runGeocoderRefresh, buildGeocoderRefreshDeps } from "./services/location/geocoder-refresh.js";
 import { runCounterRecompute } from "./services/maintenance/counter-recompute.js";
 import { payoutReleaseWorker } from "./services/payout/ReleaseWorker.js";
 import { engagementPayoutService } from "./services/articles/EngagementPayoutService.js";
@@ -499,6 +500,51 @@ async function processRegisteredWorkers(): Promise<void> {
 // tick is the trigger; a window guard keeps it from firing 288 times
 // per day.
 
+// ---------------------------------------------------------------------------
+// Geocoder cache refresh + eviction (#1161)
+// ---------------------------------------------------------------------------
+// Once per day (05:45–05:50 UTC window guard so the /5 tick fires it once):
+// re-geocode popular-but-stale geocoder_cache rows + LRU-evict the stale tail.
+export function isGeocoderRefreshWindow(d: Date): boolean {
+  return d.getUTCHours() === 5 && d.getUTCMinutes() >= 45 && d.getUTCMinutes() < 50;
+}
+
+// ---------------------------------------------------------------------------
+// Placement stage-event sweep (#230)
+// ---------------------------------------------------------------------------
+// Once per day (06:00–06:05 UTC window so the /5 tick fires it once): fire the
+// DATE-based placement stage events (started / first_day / guarantee_expires)
+// to their subscribers. Idempotent via placement_notification_log.
+export function isPlacementStageWindow(d: Date): boolean {
+  return d.getUTCHours() === 6 && d.getUTCMinutes() >= 0 && d.getUTCMinutes() < 5;
+}
+
+async function processPlacementStageEvents(): Promise<void> {
+  if (!isPlacementStageWindow(new Date())) return;
+  try {
+    const { buildPlacementNotificationService } = await import(
+      "./services/notifications/placement-notifications.js"
+    );
+    const fired = await buildPlacementNotificationService(getDb()).sweepStageEvents(new Date());
+    console.log(`[scheduled] placement stage events fired=${fired}`);
+  } catch (err) {
+    console.error("[scheduled] placement stage sweep failed:", err);
+  }
+}
+
+async function processGeocoderRefresh(): Promise<void> {
+  if (!isGeocoderRefreshWindow(new Date())) return;
+  try {
+    const env = (globalThis as any).__ENV ?? {};
+    const repos = buildRepos(getDb());
+    const deps = buildGeocoderRefreshDeps(env, repos.geocoderCache);
+    const result = await runGeocoderRefresh(deps);
+    console.log("[scheduled] geocoder refresh", result);
+  } catch (err) {
+    console.error("[scheduled] geocoder refresh failed:", err);
+  }
+}
+
 async function processGamificationFraudSweep(): Promise<void> {
   if (!isFraudSweepWindow(new Date())) return;
   try {
@@ -920,6 +966,8 @@ export async function runScheduled(): Promise<void> {
     processPayoutRelease(),
     processArticleEngagementPayout(),
     processModelCatalogDrift(),
+    processGeocoderRefresh(),
+    processPlacementStageEvents(),
   ];
   if (isQuarterTick(now)) sweeps.push(processRegisteredWorkers());
   if (isHalfTick(now))    sweeps.push(scrapeAllActiveSources());

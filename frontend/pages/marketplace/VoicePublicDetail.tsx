@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import MarketplaceItemShell from "@/components/marketplace/MarketplaceItemShell";
+import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 import BaseCard from "@/components/ui/BaseCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -199,6 +200,14 @@ export default function VoicePublicDetail() {
           </>
         )}
       </Button>
+      {/* Report this listing — self-gates (hidden for the clone owner,
+          bounces anon to /login). */}
+      <ReportAbuseButton
+        entityType="voice_clone"
+        entityId={clone.id}
+        entityOwnerId={clone.userId}
+        entityLabel="voice clone"
+      />
     </>
   );
 

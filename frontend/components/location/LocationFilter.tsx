@@ -32,6 +32,10 @@ export interface LocationFilterProps {
   /** Compact horizontal layout for header filter bars. Defaults to
    *  stacked vertical (drawer-style). */
   compact?: boolean;
+  /** Show the "Remote only" toggle. Defaults to true. Off for surfaces where
+   *  remote is meaningless (Companies, Resumes) so the control isn't shown
+   *  where it can't filter anything (#1177). */
+  showRemote?: boolean;
 }
 
 export function LocationFilter({
@@ -39,6 +43,7 @@ export function LocationFilter({
   onChange,
   showRadius = false,
   compact = false,
+  showRemote = true,
 }: LocationFilterProps) {
   const [text, setText] = useState(value.text ?? "");
   const [hits, setHits] = useState<GeocodeHit[]>([]);
@@ -56,6 +61,13 @@ export function LocationFilter({
       return;
     }
     const handle = setTimeout(async () => {
+      // Propagate freeform text even when the user never picks an autocomplete
+      // hit, so string-match endpoints (companies, articles) still receive
+      // `?location=` without geocoder coverage (#1176). The server prefers
+      // structured ids when present and falls back to ilike on this text.
+      if (q !== (value.text ?? "")) {
+        onChange({ ...value, text: q });
+      }
       setSearching(true);
       try {
         const results = await locationsService.search(q);
@@ -65,7 +77,7 @@ export function LocationFilter({
       }
     }, 250);
     return () => clearTimeout(handle);
-  }, [text]);
+  }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const accept = useCallback(
     (hit: GeocodeHit) => {
@@ -143,13 +155,15 @@ export function LocationFilter({
         )}
       </div>
 
-      <div className="flex items-center gap-2">
-        <Switch
-          checked={value.remote === true}
-          onCheckedChange={(v) => onChange({ ...value, remote: v ? true : undefined })}
-        />
-        <Label className="text-sm">Remote only</Label>
-      </div>
+      {showRemote && (
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={value.remote === true}
+            onCheckedChange={(v) => onChange({ ...value, remote: v ? true : undefined })}
+          />
+          <Label className="text-sm">Remote only</Label>
+        </div>
+      )}
 
       {showRadius && value.latitude != null && value.longitude != null && (
         <div className="flex items-center gap-2">

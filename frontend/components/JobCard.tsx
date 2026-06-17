@@ -209,7 +209,7 @@ export default function JobCard({
       await navigator.clipboard.writeText(url);
       toast.success(t("messages.jobLinkCopied"));
     } catch {
-      await promptDialog({ title: "Copy link", label: t("prompts.copyThisLink"), defaultValue: url });
+      await promptDialog({ title: t("dialogs.jobCard.copyLinkTitle"), label: t("prompts.copyThisLink"), defaultValue: url });
     }
   };
 

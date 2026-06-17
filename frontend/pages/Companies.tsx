@@ -75,8 +75,8 @@ export default function Companies() {
 
   // Structured geo filter — shared component, same URL state-shape as Jobs /
   // People / Search so deep-links survive cross-surface nav. company-service
-  // currently honours only the free-text `location` fallback; structured
-  // ids ride along for forward compat (gap entry in README).
+  // now honours the structured ids server-side via content_locations
+  // (kind='company') as well as the free-text `location` fallback (#1178).
   const [geoFilter, setGeoFilter] = useState<LocationFilterValue>(() =>
     locationFilterFromQuery(searchParams),
   );
@@ -191,6 +191,12 @@ export default function Companies() {
         industry: searchFilters.industry || undefined,
         size: searchFilters.size || undefined,
         location: geoFilter.text || searchFilters.location || undefined,
+        // Structured geo ids (#1178) — server resolves these against
+        // content_locations(kind='company') for city/region deep-links.
+        countryId: geoFilter.countryId ?? undefined,
+        stateId: geoFilter.stateId ?? undefined,
+        cityId: geoFilter.cityId ?? undefined,
+        isRemote: geoFilter.remote ?? undefined,
         page: currentPage,
         limit: itemsPerPage,
       };
@@ -356,7 +362,7 @@ export default function Companies() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {Array.from({ length: 6 }).map((_, index) => (
                 <div key={index} className="animate-pulse">
-                  <div className="bg-gray-200 rounded-lg h-48" />
+                  <div className="bg-muted rounded-lg h-48" />
                 </div>
               ))}
             </div>
@@ -367,7 +373,7 @@ export default function Companies() {
             </div>
           ) : displayedCompanies.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-600 mb-4">
+              <p className="text-muted-foreground mb-4">
                 {listMembership
                   ? t("messages.companies.noneInListMatch")
                   : t("messages.companies.noneMatchCriteria")}
@@ -470,6 +476,7 @@ export default function Companies() {
         <LocationFilterButton
           value={geoFilter}
           onChange={handleGeoFilterChange}
+          showRemote={false}
         />
         <ViewModeToggle
           value={viewMode}

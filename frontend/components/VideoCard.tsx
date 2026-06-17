@@ -8,6 +8,7 @@ import { CardActions } from "@/components/ui/CardActions";
 import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
 import PublicVideoPreview from "@/components/PublicVideoPreview";
 import { buildShareAction } from "@/lib/card-share-action";
+import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
 import type { PublicVideo } from "@/lib/services/studio-service";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
@@ -178,6 +179,23 @@ export default function VideoCard({
                 </>
               )}
             </Badge>
+          </div>
+
+          {/* Report Abuse — published videos are studio_project rows. The
+              button self-gates (hidden for the owner via the server-side
+              owner snapshot, bounces anonymous viewers to /login) and stops
+              propagation so a flag-click never opens the video. Wrapped in
+              an opacity-on-hover shell so it stays unobtrusive. */}
+          <div
+            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ReportAbuseButton
+              entityType="studio_project"
+              entityId={id}
+              entityLabel="video"
+              triggerVariant="secondary"
+            />
           </div>
         </div>
 

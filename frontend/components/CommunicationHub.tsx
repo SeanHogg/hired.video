@@ -32,6 +32,22 @@ import { useSharedCommHub } from "@/providers/CommHubProvider";
 import { InboxPanel } from "@/components/communication/InboxPanel";
 import type { HubItem } from "@/hooks/use-comm-hub";
 
+/**
+ * Static notification-type → deep-link map. Used as the fallback target
+ * when a notification row carries no per-row `data.url` (the primary,
+ * payload-driven deep-link). Lets type-keyed system notifications jump to
+ * a sensible destination without the emitter having to stamp a url on
+ * every row. Reporter-facing rows (e.g. `moderation_report_resolved`) are
+ * intentionally absent so they fall through to the /outreach inbox tab
+ * where the reporter's follow-up thread lives.
+ */
+const NOTIFICATION_TYPE_DEEP_LINK: Record<string, string> = {
+  // Admin/staff-facing moderation events route to the moderation queue
+  // (the same surface the /admin/moderation nav icon points at).
+  moderation_report_filed: "/admin/moderation",
+  moderation_action_taken: "/admin/moderation",
+};
+
 export default function CommunicationHub() {
   const { isAuthenticated } = useAuth();
   // Self-gate: anonymous visitors never mount the inner component, so the
@@ -61,8 +77,10 @@ function AuthenticatedCommunicationHub() {
   const handleItemSelect = useCallback(
     (item: HubItem) => {
       const deepLink =
-        item.kind === "notification" && typeof item.data?.url === "string"
-          ? item.data.url
+        item.kind === "notification"
+          ? typeof item.data?.url === "string"
+            ? item.data.url
+            : NOTIFICATION_TYPE_DEEP_LINK[item.iconType] ?? null
           : null;
       if (item.kind === "message" && item.conversationId) {
         hub.openMessage(item.conversationId);

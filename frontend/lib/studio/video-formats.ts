@@ -117,6 +117,41 @@ const BLEED_SAFE_ZONE: SafeZone = {
   inset: BLEED_SAFE_INSET,
 };
 
+/** TikTok / Reels / Shorts chrome band — the same zone portrait-1080p
+ *  hand-declares, lifted out so every 9:16 preset (720p, 4K) inherits it
+ *  via the aspect table below (#856). */
+const PORTRAIT_PLATFORM_UI_ZONE: SafeZone = {
+  kind: "platform-ui",
+  label: "Platform UI",
+  inset: { top: 0.08, right: 0.12, bottom: 0.25, left: 0.04 },
+};
+
+/** Default safe zones derived from aspect ratio (#856). Previously only
+ *  landscape-1080p + portrait-1080p hand-declared `safeZones`, so 720p /
+ *  4K / square presets showed no guides at all. This table gives every
+ *  preset of a given shape the same guides as its 1080p sibling. A
+ *  format's own explicit `safeZones` still takes precedence (e.g.
+ *  billboards keep their bleed-only zone). */
+const SAFE_ZONES_BY_ASPECT: Partial<Record<AspectRatio, SafeZone[]>> = {
+  "16:9": [{ ...BLEED_SAFE_ZONE, label: "Action safe (90%)" }],
+  "9:16": [PORTRAIT_PLATFORM_UI_ZONE],
+  "1:1": [{ ...BLEED_SAFE_ZONE, label: "Action safe (90%)" }],
+  "4:3": [{ ...BLEED_SAFE_ZONE, label: "Action safe (90%)" }],
+};
+
+/**
+ * Resolve the safe zones to draw for a format: an explicit per-format
+ * declaration wins, otherwise fall back to the aspect-derived default.
+ * Single seam so the overlay and any future consumer agree (#856).
+ */
+export function safeZonesForFormat(
+  format: VideoFormat | null | undefined,
+): SafeZone[] {
+  if (!format) return [];
+  if (format.safeZones && format.safeZones.length > 0) return format.safeZones;
+  return SAFE_ZONES_BY_ASPECT[format.aspect] ?? [];
+}
+
 export const VIDEO_FORMATS: VideoFormat[] = [
   {
     id: "landscape-1080p",

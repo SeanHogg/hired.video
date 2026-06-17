@@ -20,6 +20,7 @@ import {
   findMutualConnections,
   findShortestPath,
   forwardWarmIntro,
+  declineWarmIntro,
   listWarmIntros,
   rankTopIntroducers,
   requestWarmIntro,
@@ -121,6 +122,26 @@ graphRoutes.post("/intros/:conversationId/forward", async (c) => {
     if (result.error === "not_warm_intro")
       return c.json(error("BAD_REQUEST", "Not a warm-intro conversation"), 400);
     return c.json(error("BAD_REQUEST", "Cannot forward this intro"), 400);
+  }
+  return c.json(success(result), result.created ? 201 : 200);
+});
+
+// ─── POST /intros/:conversationId/decline — mutual declines the ask (#1465) ──
+graphRoutes.post("/intros/:conversationId/decline", async (c) => {
+  const me = userId(c);
+  if (!me) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const conversationId = c.req.param("conversationId");
+  if (!conversationId) return c.json(error("VALIDATION_ERROR", "conversationId required"), 400);
+  const result = await declineWarmIntro(me, conversationId);
+  if ("error" in result) {
+    if (result.error === "not_found") return c.json(error("NOT_FOUND", "Intro not found"), 404);
+    if (result.error === "not_via")
+      return c.json(error("FORBIDDEN", "Only the asked mutual can decline this intro"), 403);
+    if (result.error === "not_warm_intro")
+      return c.json(error("BAD_REQUEST", "Not a warm-intro conversation"), 400);
+    if (result.error === "already_forwarded")
+      return c.json(error("CONFLICT", "This intro was already forwarded"), 409);
+    return c.json(error("BAD_REQUEST", "Cannot decline this intro"), 400);
   }
   return c.json(success(result), result.created ? 201 : 200);
 });

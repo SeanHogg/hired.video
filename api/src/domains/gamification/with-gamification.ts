@@ -34,10 +34,22 @@ function workerEnvOf(c: Context<AppEnv>): Record<string, string | undefined> {
   return env as unknown as Record<string, string | undefined>;
 }
 
+/** #1363 — `buildRepos(getDb())` rebuilt all 31 repos (and a fresh Neon
+ *  client) on every gamification event. Both the db handle and the worker
+ *  env are isolate-stable (one Cloudflare isolate = one DATABASE_URL + one
+ *  set of TREMENDOUS_* bindings), so the configured service is built once
+ *  per isolate and reused — the award methods take `userId`/`role` per call
+ *  and hold no request state. This is dependency memoization (an isolate-
+ *  level singleton), not a data cache. */
+let cachedService: GamificationService | null = null;
+
 export function gamificationFromContext(c: Context<AppEnv>): GamificationService {
-  return new GamificationService(buildRepos(getDb()), {
-    workerEnv: workerEnvOf(c),
-  });
+  if (!cachedService) {
+    cachedService = new GamificationService(buildRepos(getDb()), {
+      workerEnv: workerEnvOf(c),
+    });
+  }
+  return cachedService;
 }
 
 /** Callback runs inside withGamification's try/catch; the return value

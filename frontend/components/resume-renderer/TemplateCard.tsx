@@ -17,6 +17,7 @@ import TemplateApplyButton from "@/components/templates/TemplateApplyButton";
 import TemplateInfoButton from "@/components/templates/TemplateInfoButton";
 import TemplatePreview from "@/components/templates/TemplatePreview";
 import FirstPartyBadge from "@/components/templates/FirstPartyBadge";
+import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 import { priceLabel } from "@/lib/templates/use-apply-template";
 import { getStaticTemplateBySlug } from "@/lib/templates/registry";
 import { buildShareAction } from "@/lib/card-share-action";
@@ -113,6 +114,20 @@ export default function TemplateCard({ meta, descriptor }: TemplateCardProps) {
             >
               <Share2 className="w-4 h-4" />
             </Button>
+            {/* Report Abuse — only creator-authored templates carry a
+                backend uuid + owner to moderate (resume + studio-builtin
+                templates are platform content). Self-gates: hidden for the
+                creator, bounces anonymous viewers to /login. Mirrors the
+                MarketplaceTemplatePreview wiring. */}
+            {resolved.origin.kind === "studio-creator" && (
+              <ReportAbuseButton
+                entityType="studio_template"
+                entityId={resolved.origin.template.id}
+                entityOwnerId={resolved.origin.template.creatorId ?? undefined}
+                entityLabel="studio template"
+                triggerVariant="ghost"
+              />
+            )}
             <Badge variant={isFree ? "secondary" : "default"}>
               {priceLabel(resolved.priceCents)}
             </Badge>

@@ -96,6 +96,10 @@ export default function PublishAsTemplateDialog({
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(defaultThumbnailUrl ?? null);
   const [submitting, setSubmitting] = useState(false);
+  // #853 — the existing listing published from THIS project, if any. When
+  // set, submitting updates that row instead of minting a duplicate
+  // listing (re-clicking "Publish" used to silently create a second one).
+  const [existing, setExisting] = useState<StudioTemplate | null>(null);
 
   // Reset + refresh creator status whenever the dialog re-opens so we react
   // to the user enrolling in another tab.
@@ -120,10 +124,34 @@ export default function PublishAsTemplateDialog({
         if (cancelled) return;
         setCreatorState({ status: "ready", profile: null });
       });
+
+    // #853 — detect a listing already published from this project so a
+    // re-open offers "Update" instead of silently minting a duplicate.
+    // Prefill the form from the existing row so the update shows current
+    // values rather than blank defaults.
+    setExisting(null);
+    if (projectId) {
+      void studioTemplatesService
+        .listMine()
+        .then((rows) => {
+          if (cancelled) return;
+          const match = rows.find((r) => r.sourceProjectId === projectId);
+          if (!match) return;
+          setExisting(match);
+          setName(match.name);
+          setDescription(match.description ?? "");
+          setPriceDollars((match.priceCents / 100).toString());
+          setVisibility(match.visibility);
+          setThumbnailUrl(match.thumbnailUrl ?? null);
+        })
+        .catch(() => {
+          /* listing fetch is best-effort — fall back to publish mode */
+        });
+    }
     return () => {
       cancelled = true;
     };
-  }, [open, defaultName, defaultThumbnailUrl]);
+  }, [open, defaultName, defaultThumbnailUrl, projectId]);
 
   const isVideoCreator =
     creatorState.status === "ready" && creatorState.profile?.videoActive === true;
@@ -159,22 +187,34 @@ export default function PublishAsTemplateDialog({
     setSubmitting(true);
     try {
       const priceCents = Math.round(dollars * 100);
-      const template = await studioTemplatesService.publish({
-        sourceProjectId: projectId,
-        name: name.trim(),
-        description: description.trim() || null,
-        thumbnailUrl: thumbnailUrl ?? null,
-        priceCents,
-        visibility,
-        consentAccepted: visibility === "public" ? consentAccepted : undefined,
-        // V2 callers compute the script at click time so we don't have
-        // to mirror it on the project row — see #637 + ProjectChromeMenu.
-        ...(getVideoScript ? { videoScript: getVideoScript() } : {}),
-      });
+      // #853 — update the existing listing in place when one was already
+      // published from this project; only mint a new row otherwise.
+      const template = existing
+        ? await studioTemplatesService.update(existing.id, {
+            name: name.trim(),
+            description: description.trim() || null,
+            thumbnailUrl: thumbnailUrl ?? null,
+            priceCents,
+            visibility,
+            consentAccepted: visibility === "public" ? consentAccepted : undefined,
+          })
+        : await studioTemplatesService.publish({
+            sourceProjectId: projectId,
+            name: name.trim(),
+            description: description.trim() || null,
+            thumbnailUrl: thumbnailUrl ?? null,
+            priceCents,
+            visibility,
+            consentAccepted: visibility === "public" ? consentAccepted : undefined,
+            // V2 callers compute the script at click time so we don't have
+            // to mirror it on the project row — see #637 + ProjectChromeMenu.
+            ...(getVideoScript ? { videoScript: getVideoScript() } : {}),
+          });
       toast({
-        title: "Template published",
-        description:
-          visibility === "public"
+        title: existing ? "Listing updated" : "Template published",
+        description: existing
+          ? "Your marketplace listing has been updated."
+          : visibility === "public"
             ? "Your template is now in the marketplace."
             : "Saved as a private draft. Publish it whenever you're ready.",
       });
@@ -361,12 +401,17 @@ export default function PublishAsTemplateDialog({
               <Button type="submit" disabled={submitting || !name.trim()}>
                 {submitting ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Publishing…
+                    <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />{" "}
+                    {existing ? "Updating…" : "Publishing…"}
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 mr-1.5" />
-                    {visibility === "public" ? "Publish to Marketplace" : "Save Draft"}
+                    {existing
+                      ? "Update listing"
+                      : visibility === "public"
+                        ? "Publish to Marketplace"
+                        : "Save Draft"}
                   </>
                 )}
               </Button>

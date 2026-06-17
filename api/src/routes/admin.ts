@@ -595,7 +595,6 @@ adminRoutes.get("/studio/projects", async (c) => {
 					youtubeVideoId: schema.videos.youtubeVideoId,
 					thumbnailUrl: schema.videos.thumbnailUrl,
 					privacyStatus: schema.videos.privacyStatus,
-					isFeatured: schema.videos.isFeatured,
 					createdAt: schema.videos.createdAt,
 				})
 				.from(schema.videos)
@@ -635,7 +634,6 @@ adminRoutes.get("/studio/projects", async (c) => {
 			youtubeVideoId: v.youtubeVideoId,
 			thumbnailUrl: v.thumbnailUrl,
 			privacyStatus: v.privacyStatus,
-			isFeatured: v.isFeatured,
 			isOrphan: !allLinkedVideoIds.has(v.id),
 			createdAt: v.createdAt instanceof Date ? v.createdAt.toISOString() : v.createdAt,
 		}));
@@ -705,7 +703,6 @@ adminRoutes.get("/studio/projects", async (c) => {
 				youtubeVideoId: schema.videos.youtubeVideoId,
 				thumbnailUrl: schema.videos.thumbnailUrl,
 				privacyStatus: schema.videos.privacyStatus,
-				isFeatured: schema.videos.isFeatured,
 				createdAt: schema.videos.createdAt,
 			})
 			.from(schema.videos)
@@ -726,7 +723,6 @@ adminRoutes.get("/studio/projects", async (c) => {
 				youtubeVideoId: schema.videos.youtubeVideoId,
 				thumbnailUrl: schema.videos.thumbnailUrl,
 				privacyStatus: schema.videos.privacyStatus,
-				isFeatured: schema.videos.isFeatured,
 				createdAt: schema.videos.createdAt,
 			})
 			.from(schema.videos)
@@ -745,7 +741,6 @@ adminRoutes.get("/studio/projects", async (c) => {
 		youtubeVideoId: v.youtubeVideoId,
 		thumbnailUrl: v.thumbnailUrl,
 		privacyStatus: v.privacyStatus,
-		isFeatured: v.isFeatured,
 		isOrphan: true,
 		createdAt: v.createdAt instanceof Date ? v.createdAt.toISOString() : v.createdAt,
 	}));

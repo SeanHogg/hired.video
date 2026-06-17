@@ -58,6 +58,14 @@ export interface CreateCourseInput {
   themeTokens?: Record<string, string> | null;
 }
 
+// #1432 — compile-time lock for the quick-create flow. AttachToCourseDialog
+// calls `courseService.create({ title })` with NO other fields, so EVERY
+// field except `title` must stay optional. This `satisfies` assertion has no
+// runtime effect but fails `tsc` if a future refactor makes any field
+// required, catching the silent break before it ships (a stronger guard than
+// a unit test under the current frontend test-infra issues, #2166).
+void ({ title: "Minimal quick-create payload" } satisfies CreateCourseInput);
+
 export interface UpdateCourseInput extends Partial<CreateCourseInput> {
   slug?: string;
   /** #1502 — set when the author submits the course for review or
@@ -91,6 +99,10 @@ export interface CourseLesson {
   summary: string | null;
   sourceType: CourseLessonSourceType;
   studioProjectId: string | null;
+  /** #1464 — published studio_projects.slug resolved server-side for
+   *  studio_video lessons; the learner UI prefers it over the raw project
+   *  id for /v/ share links + analytics. Null when unresolved. */
+  studioSlug?: string | null;
   scormManifestUrl: string | null;
   scormEntryUrl: string | null;
   scormVersion: ScormVersion | null;

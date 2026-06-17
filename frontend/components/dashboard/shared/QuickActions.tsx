@@ -178,15 +178,15 @@ export function QuickActions({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <div className="h-5 w-5 bg-gray-200 rounded animate-pulse" />
-            <div className="h-5 w-24 bg-gray-200 rounded animate-pulse" />
+            <div className="h-5 w-5 bg-muted rounded animate-pulse" />
+            <div className="h-5 w-24 bg-muted rounded animate-pulse" />
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {Array.from({ length: 3 }).map((_, index) => (
             <div
               key={index}
-              className="h-10 w-full bg-gray-200 rounded animate-pulse"
+              className="h-10 w-full bg-muted rounded animate-pulse"
             />
           ))}
         </CardContent>

@@ -171,7 +171,7 @@ export default function CadStage({
   }, [tool]);
 
   return (
-    <div className="flex h-full w-full items-center justify-center overflow-auto bg-slate-200 p-6">
+    <div className="flex h-full w-full items-center justify-center overflow-auto bg-muted p-6">
       <div className="shadow-xl" style={{ width: pxWidth, height: pxHeight }}>
         <canvas
           ref={canvasRef}

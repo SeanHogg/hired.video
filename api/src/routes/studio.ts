@@ -3596,7 +3596,6 @@ const PUBLIC_VIDEO_SELECT = {
   r2Key: videos.r2Key,
   thumbnailUrl: videos.thumbnailUrl,
   description: videos.description,
-  isFeatured: videos.isFeatured,
   createdAt: videos.createdAt,
   ownerName: users.name,
   resumeId: videos.resumeId,
@@ -3610,7 +3609,6 @@ type PublicVideoRow = {
   r2Key: string | null;
   thumbnailUrl: string | null;
   description: string | null;
-  isFeatured: boolean;
   createdAt: Date | string;
   ownerName: string | null;
   resumeId: string | null;
@@ -3625,7 +3623,12 @@ function mapPublicVideo(v: PublicVideoRow) {
     youtubeVideoId: v.youtubeVideoId,
     thumbnailUrl: v.thumbnailUrl,
     description: v.description,
-    isFeatured: v.isFeatured,
+    // The featured flag moved to `studio_projects.is_featured` in
+    // migration 0091 and the legacy `videos.is_featured` column was
+    // dropped in 0460 (gap #754). This discovery feed no longer carries
+    // it — featured rows are served by the dedicated /videos/featured
+    // route, which sources the project flag.
+    isFeatured: false,
     ownerName: v.ownerName,
     resumeId: v.resumeId,
     // mediaKind always "video" here — the source is the `videos`
@@ -3654,7 +3657,7 @@ studioRoutes.get("/videos/public", async (c) => {
     .from(videos)
     .innerJoin(users, eq(videos.userId, users.id))
     .where(eq(videos.privacyStatus, "public"))
-    .orderBy(desc(videos.isFeatured), desc(videos.createdAt))
+    .orderBy(desc(videos.createdAt))
     .limit(20);
   return c.json(ok(rows.map(mapPublicVideo)));
 });

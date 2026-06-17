@@ -3,7 +3,7 @@ import { eq, and, sql } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { isUuid } from "../../../shared/value-types.js";
-import { renderCourseCoverSvg } from "../../../shared/course-cover.js";
+import { renderCourseCoverSvg, escapeXmlText as escapeXml } from "../../../shared/course-cover.js";
 import { getCourseDiagram } from "../../../shared/course-diagrams.js";
 
 const {
@@ -265,15 +265,6 @@ async function resolveOgMetaForVideoId(
     ownerName: row.ownerName,
     mediaKind: "video",
   };
-}
-
-function escapeXml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 function truncate(s: string, n: number): string {

@@ -223,3 +223,108 @@ describe("points-engine — badge unlock hook", () => {
     );
   });
 });
+
+describe("points-engine — task streak routes the On Fire badge (#1136)", () => {
+  // Mutable clock so we can simulate consecutive UTC days.
+  function buildWithClock() {
+    let clock = new Date("2026-06-01T12:00:00Z");
+    const repo = new FakePointsRepo(() => clock);
+    const badgeUnlocks: string[] = [];
+    const engine = new PointsEngine(repo, {
+      now: () => clock,
+      getUserTimezone: async () => null, // UTC day resolution
+      onBadgeUnlock: async (_userId, slug) => {
+        badgeUnlocks.push(slug);
+      },
+    });
+    const advanceDay = () => {
+      clock = new Date(clock.getTime() + 86_400_000);
+    };
+    return { repo, engine, badgeUnlocks, advanceDay };
+  }
+
+  it("awards on_fire after 7 consecutive task-completion days", async () => {
+    const { engine, repo, badgeUnlocks, advanceDay } = buildWithClock();
+    const user = uid();
+    for (let day = 1; day <= 7; day++) {
+      await engine.awardForAction(ACTIONS.TASK_COMPLETE_SYSTEM, { ...seeker(user), refId: `sys-${day}` });
+      if (day < 7) advanceDay();
+    }
+    assert.equal((await repo.findTaskStreak(user))?.currentStreak, 7);
+    assert.ok(badgeUnlocks.includes("on_fire"), "on_fire awarded off the task streak at day 7");
+  });
+
+  it("does NOT award on_fire from a 7-day NON-task engagement streak", async () => {
+    const { engine, repo, badgeUnlocks, advanceDay } = buildWithClock();
+    const user = uid();
+    for (let day = 1; day <= 7; day++) {
+      await engine.awardForAction(ACTIONS.SAVED_SEARCH_RUN, { ...seeker(user), refId: `ss-${day}` });
+      if (day < 7) advanceDay();
+    }
+    // The general streak reaches 7 …
+    assert.equal((await repo.findStreak(user))?.currentStreak, 7);
+    // … but the On Fire BADGE must NOT fire off non-task engagement (#1136),
+    // and no task streak is created at all.
+    assert.equal(badgeUnlocks.includes("on_fire"), false);
+    assert.equal(await repo.findTaskStreak(user), null);
+  });
+
+  it("still pays the general streak-bonus POINTS at the 7-day milestone", async () => {
+    const { engine, repo, advanceDay } = buildWithClock();
+    const user = uid();
+    for (let day = 1; day <= 7; day++) {
+      await engine.awardForAction(ACTIONS.SAVED_SEARCH_RUN, { ...seeker(user), refId: `ss-${day}` });
+      if (day < 7) advanceDay();
+    }
+    const ledger = await repo.findRecentLedger(user, 100);
+    const bonus = ledger.find((r) => r.category === "streak_bonus");
+    assert.ok(bonus, "general streak still pays the engagement bonus");
+    assert.equal(bonus!.delta, 100); // 7-day milestone bonus
+  });
+});
+
+describe("points-engine — sourced cluster fraud signals (#1117)", () => {
+  it("raises a sybil flag + auto-suspends when many accounts share the signup IP", async () => {
+    const repo = new FakePointsRepo(() => NOW);
+    repo.signupIpAccounts = 5; // sourced via getExtraFraudSignals below
+    const engine = new PointsEngine(repo, {
+      now: () => NOW,
+      getUserTimezone: async () => null,
+      getExtraFraudSignals: async () => ({
+        accountsOnSignupIp: await repo.countAccountsOnSignupIp(),
+        accountsOnDeviceFingerprint: await repo.countAccountsOnDeviceFingerprint(),
+      }),
+    });
+    const user = uid();
+    // Open the 100-task gate so the user-task award (and fraud check) runs.
+    await repo.incrementCounter(user, "user_task", 100);
+
+    await engine.awardForAction(ACTIONS.TASK_COMPLETE_USER, { ...seeker(user), refId: "ut-1" });
+
+    const flags = await repo.findFraudFlagsForUser(user);
+    assert.ok(
+      flags.some((f) => f.kind === "sybil_signup_ip" && f.autoSuspended),
+      "sybil signup-IP flag raised + auto-suspended",
+    );
+    assert.equal((await repo.findBalance(user))?.isSuspended, true);
+  });
+
+  it("does NOT flag when the cluster signals are clean", async () => {
+    const repo = new FakePointsRepo(() => NOW);
+    repo.signupIpAccounts = 0;
+    repo.deviceFpAccounts = 0;
+    const engine = new PointsEngine(repo, {
+      now: () => NOW,
+      getUserTimezone: async () => null,
+      getExtraFraudSignals: async () => ({
+        accountsOnSignupIp: await repo.countAccountsOnSignupIp(),
+        accountsOnDeviceFingerprint: await repo.countAccountsOnDeviceFingerprint(),
+      }),
+    });
+    const user = uid();
+    await repo.incrementCounter(user, "user_task", 100);
+    await engine.awardForAction(ACTIONS.TASK_COMPLETE_USER, { ...seeker(user), refId: "ut-1" });
+    assert.equal((await repo.findFraudFlagsForUser(user)).length, 0);
+    assert.notEqual((await repo.findBalance(user))?.isSuspended, true);
+  });
+});

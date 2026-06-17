@@ -203,6 +203,12 @@ export const CompanyFiltersSchema = z.object({
   industry: z.string().optional(),
   size: z.string().optional(),
   location: z.string().optional(),
+  // Structured geo (#1178) — forwarded to /Companies/public, which resolves
+  // them against content_locations(kind='company').
+  countryId: z.number().optional(),
+  stateId: z.string().optional(),
+  cityId: z.string().optional(),
+  isRemote: z.boolean().optional(),
   page: z.number().optional(),
   limit: z.number().optional(),
 });

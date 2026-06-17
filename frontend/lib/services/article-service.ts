@@ -73,7 +73,7 @@ export interface PublicArticleCard {
   readMinutes: number;
   viewCount: number;
   publishedAt: string | null;
-  author: { id: string; name: string; avatarUrl: string | null; slug: string };
+  author: { id: string; name: string; avatarUrl: string | null; slug: string; isSystem?: boolean };
 }
 
 export interface CreateArticleInput {
@@ -207,6 +207,28 @@ export const articleService = {
   }> {
     const res = await apiClient.get<any>(`/api/articles/public/${userId}/${slug}`);
     return res.data;
+  },
+
+  // View-count beacon (#858). The public slug read is edge-cached, so the
+  // view bump is a separate fire-and-forget call made on article mount.
+  async recordView(id: string): Promise<void> {
+    await apiClient.post(`/api/articles/${id}/view`, {}).catch(() => undefined);
+  },
+
+  // Engagement beacon (#1577). `scroll` = visual reading, `narrator` =
+  // read-aloud listening. Fire-and-forget; failures never surface to the reader.
+  async recordReadProgress(
+    id: string,
+    seconds: number,
+    source: "scroll" | "narrator" = "scroll",
+  ): Promise<void> {
+    if (!(seconds >= 1)) return;
+    await apiClient
+      .post(`/api/articles/${id}/read-progress`, {
+        seconds: Math.min(600, Math.round(seconds)),
+        source,
+      })
+      .catch(() => undefined);
   },
 };
 

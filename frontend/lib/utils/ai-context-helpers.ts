@@ -365,6 +365,13 @@ export function createGeneralContext(
     actions.push("recommend-courses", "create-study-plan", "explain-concept", "quiz-me");
     return finishGeneralContext(contextType, userRole, actions);
   }
+  // Studio editor surface (#1910) — surface the in-editor AI abilities the
+  // studio_* tools provide so the chip count + suggestions reflect what the
+  // brain can actually DO here, not generic career prompts.
+  if (contextType === "studio") {
+    actions.push("record-demo", "add-scene", "insert-cta", "generate-scene-image");
+    return finishGeneralContext(contextType, userRole, actions);
+  }
 
   // Add role-specific general actions
   if (userRole === "job_seeker" || !userRole) {
@@ -570,6 +577,12 @@ export function getActionLabel(action: string): string {
     "quiz-me": "Quiz Me",
     "outline-course": "Outline a Course",
     "write-lesson": "Draft a Lesson",
+
+    // Studio editor actions (#1910)
+    "record-demo": "Record a Demo",
+    "add-scene": "Add a Scene",
+    "insert-cta": "Insert a CTA",
+    "generate-scene-image": "Generate an Image",
   };
 
   return labels[action] || action;

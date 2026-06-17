@@ -334,7 +334,7 @@ function NewCampaignForm({ onSubmit, submitting }: { onSubmit: (input: Partial<C
 function StatusBadge({ status }: { status: string }) {
   const cls = status === "active" ? "bg-green-100 text-green-800" :
               status === "paused" ? "bg-amber-100 text-amber-800" :
-              status === "archived" || status === "completed" ? "bg-gray-100 text-gray-700" :
+              status === "archived" || status === "completed" ? "bg-muted text-muted-foreground" :
               "bg-blue-50 text-blue-800";
   return <span className={`text-xs rounded px-2 py-0.5 ${cls}`}>{status}</span>;
 }

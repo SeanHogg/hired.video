@@ -12,6 +12,7 @@
 import { Share } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { promptDialog } from "@/lib/dialogs";
+import i18n from "@/lib/i18n/i18n";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
 
 interface ShareActionOptions {
@@ -58,7 +59,7 @@ export function buildShareAction({
           });
         })
         .catch(async () => {
-          await promptDialog({ title: "Copy link", label: "Copy this link:", defaultValue: url });
+          await promptDialog({ title: i18n.t("dialogs.share.copyLinkTitle"), label: i18n.t("dialogs.share.copyLinkLabel"), defaultValue: url });
         });
     },
   };

@@ -50,7 +50,7 @@ export default function DrawingPlaceholderThumbnail({
   return (
     <div
       className={cn(
-        "absolute inset-0 flex items-center justify-center bg-slate-100 p-3",
+        "absolute inset-0 flex items-center justify-center bg-muted p-3",
         className,
       )}
     >

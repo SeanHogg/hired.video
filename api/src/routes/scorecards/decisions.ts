@@ -9,6 +9,7 @@ import { success, error } from "../../types/index.js";
 import { CreateDecisionSchema } from "../../domains/scorecards/schemas.js";
 import { mapServiceError, requireUser } from "../helpers/routerHelpers.js";
 import type { ScorecardsService } from "../../domains/scorecards/scorecardsService.js";
+import { withGamification } from "../../domains/gamification/with-gamification.js";
 
 export function decisionRoutes(
   service: () => ScorecardsService,
@@ -39,10 +40,19 @@ export function decisionRoutes(
       return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
     }
     try {
-      return c.json(
-        success(await service().createDecision(auth.userId, parsed.data)),
-        201,
-      );
+      const created = await service().createDecision(auth.userId, parsed.data);
+      // #1118 — an "approve" hiring decision is the hire-confirmed signal.
+      // RefId = the decision id keeps it idempotent. Best-effort.
+      if (parsed.data.decision === "approve") {
+        await withGamification(c, "hire-confirmed", (game, role, uidEarner) =>
+          game.onHireConfirmed({
+            userId: uidEarner,
+            role,
+            hireId: (created as { id?: string } | null)?.id ?? parsed.data.applicationId,
+          }),
+        );
+      }
+      return c.json(success(created), 201);
     } catch (e) {
       return mapServiceError(c, e);
     }

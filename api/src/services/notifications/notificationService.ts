@@ -32,6 +32,7 @@ import { buildRepos } from "../../repositories/index.js";
 import { getDb } from "../../db/index.js";
 import { actorDisplayName, toUserActor, type UserActor } from "../user/userActor.js";
 import { sendPushToUser } from "../push/web-push.js";
+import { getEmailProvider, buildNotificationEmail } from "../adapters/email.js";
 import { isChannelAllowed } from "../../../../shared/notification-preferences.js";
 import { loadNotificationPreferences } from "./preferences.js";
 
@@ -72,6 +73,10 @@ export interface EmitNotificationInput {
   /** Set false to persist the bell row(s) only, with no push fan-out.
    *  Default true. */
   push?: boolean;
+  /** Set true to ALSO send a transactional email (opt-in — most
+   *  notifications are bell+push only, so email defaults OFF to avoid
+   *  inbox spam). Still pref-gated on the recipient's email toggle. */
+  email?: boolean;
 }
 
 /** Look up an actor and a display name in one shot. Use this when the
@@ -87,28 +92,62 @@ export async function resolveActor(
 }
 
 /**
- * Fan a Web Push out to recipients who allow this notification's category
- * on the push channel. Best-effort: a prefs-lookup failure errs toward
- * sending (a cache/DB hiccup never silently swallows a notification), and
- * a push transport failure is swallowed (the durable row already landed).
+ * Fan the OUTBOUND channels (push + optional email) out to each recipient,
+ * gated by that recipient's notification preferences. One prefs load per
+ * recipient gates both channels (no double lookup). Best-effort: a
+ * prefs-lookup failure errs toward sending (a cache/DB hiccup never
+ * silently swallows a notification), and a transport failure is swallowed
+ * (the durable bell row already landed).
  */
-async function fanOutPush(
+async function fanOutChannels(
+  deps: NotificationServiceDeps,
   recipients: string[],
-  type: string,
-  title: string,
-  body: string,
-  url: string | undefined,
+  opts: {
+    type: string;
+    title: string;
+    message: string;
+    url: string | undefined;
+    push: boolean;
+    email: boolean;
+  },
 ): Promise<void> {
+  // Resolve recipient emails once (single query, no N+1) only when email
+  // is opted in AND a provider is actually configured.
+  const emailProvider = opts.email ? getEmailProvider() : null;
+  const emailById = new Map<string, string>();
+  if (emailProvider) {
+    for (const row of await deps.repos.users.findManyByIds(recipients)) {
+      if (row.email) emailById.set(row.id, row.email);
+    }
+  }
+
   await Promise.all(
     recipients.map(async (userId) => {
-      let allowed = true;
+      let prefs: Awaited<ReturnType<typeof loadNotificationPreferences>> | null = null;
       try {
-        allowed = isChannelAllowed(await loadNotificationPreferences(userId), "push", type);
+        prefs = await loadNotificationPreferences(userId);
       } catch {
-        allowed = true;
+        prefs = null; // err toward sending
       }
-      if (allowed) {
-        await sendPushToUser(userId, { title, body, url }).catch(() => undefined);
+
+      if (opts.push && (!prefs || isChannelAllowed(prefs, "push", opts.type))) {
+        await sendPushToUser(userId, {
+          title: opts.title,
+          body: opts.message,
+          url: opts.url,
+        }).catch(() => undefined);
+      }
+
+      if (emailProvider && (!prefs || isChannelAllowed(prefs, "email", opts.type))) {
+        const to = emailById.get(userId);
+        if (to) {
+          const { subject, html } = buildNotificationEmail({
+            title: opts.title,
+            message: opts.message,
+            url: opts.url,
+          });
+          await emailProvider.send({ to, subject, html }).catch(() => undefined);
+        }
       }
     }),
   );
@@ -147,8 +186,15 @@ export async function emitNotification(
     })) as any,
   );
 
-  if (input.push !== false) {
-    await fanOutPush(recipients, input.type, input.title, message, input.url);
+  if (input.push !== false || input.email === true) {
+    await fanOutChannels(deps, recipients, {
+      type: input.type,
+      title: input.title,
+      message,
+      url: input.url,
+      push: input.push !== false,
+      email: input.email === true,
+    });
   }
 }
 
@@ -181,6 +227,8 @@ export interface NotifyInput {
   refId?: string;
   /** Set false to persist only (no Web Push). Default true. */
   push?: boolean;
+  /** Set true to ALSO send a transactional email (opt-in, pref-gated). */
+  email?: boolean;
 }
 
 export const NotificationService = {
@@ -203,6 +251,7 @@ export const NotificationService = {
           url: input.url,
           extraData,
           push: input.push,
+          email: input.email,
         },
       );
     } catch {

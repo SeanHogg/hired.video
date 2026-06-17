@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Loader2, Plus, FileText, EyeOff, Trash2, Sparkles, Lock, Send, Undo2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ function statusVariant(s: ArticleStatus): "default" | "secondary" | "outline" | 
 
 export default function ArticlesManagerPanel() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [articles, setArticles] = useState<Article[]>([]);
@@ -298,7 +300,7 @@ export default function ArticlesManagerPanel() {
   };
 
   const remove = async (a: Article) => {
-    if (!(await confirmDialog({ title: "Delete article", description: `Delete "${a.title}"? This cannot be undone.`, confirmText: "Delete", destructive: true }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.articles.deleteTitle"), description: t("dialogs.articles.deleteBody", { title: a.title }), confirmText: t("dialogs.articles.deleteConfirm"), destructive: true }))) return;
     const previous = articles;
     setArticles((cur) => cur.filter((x) => x.id !== a.id));
     try {

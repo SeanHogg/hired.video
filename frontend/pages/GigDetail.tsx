@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import GigBidDialog from "@/components/gigs/GigBidDialog";
+import MilestoneDisputePanel from "@/components/gigs/MilestoneDisputePanel";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useSEO } from "@/lib/seo";
@@ -32,13 +33,17 @@ const MILESTONE_BADGE: Record<GigMilestoneStatus, string> = {
   approved: "bg-violet-100 text-violet-700",
   disputed: "bg-red-100 text-red-700",
   released: "bg-green-100 text-green-700",
+  refunded: "bg-orange-100 text-orange-700",
 };
+
+// Milestone states from which either party may open a dispute.
+const DISPUTABLE = new Set(["in_progress", "submitted", "approved"]);
 
 export default function GigDetail() {
   const { id = "" } = useParams();
   const location = useLocation();
   useSEO(location.pathname, { title: "Gig — hired.video", description: "Gig brief, deliverables and bids." });
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const { t } = useTranslation();
 
@@ -85,6 +90,15 @@ export default function GigDetail() {
     } finally {
       setBusyId(null);
     }
+  };
+
+  const openDispute = (milestoneId: string) => {
+    const reason = window.prompt(t("gigs.detail.disputePrompt", "Describe the problem with this milestone (the other party + a mediator will see it):"));
+    if (reason == null || reason.trim().length < 10) {
+      if (reason != null) toast({ title: t("gigs.detail.disputeTooShort", "Please add a bit more detail (10+ characters)."), variant: "destructive" });
+      return;
+    }
+    void run(milestoneId, () => gigService.openDispute(milestoneId, reason.trim()), t("gigs.detail.disputeOpened", "Dispute opened"));
   };
 
   if (loading) {
@@ -156,32 +170,44 @@ export default function GigDetail() {
           ) : (
             milestones.map((m) => (
               <Card key={m.id}>
-                <CardContent className="py-3 flex items-center justify-between gap-3">
-                  <div>
-                    <div className="font-medium flex items-center gap-2">
-                      {m.title}
-                      <Badge variant="secondary" className={MILESTONE_BADGE[m.status]}>
-                        {m.status.replace("_", " ")}
-                      </Badge>
+                <CardContent className="py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-medium flex items-center gap-2">
+                        {m.title}
+                        <Badge variant="secondary" className={MILESTONE_BADGE[m.status]}>
+                          {m.status.replace("_", " ")}
+                        </Badge>
+                      </div>
+                      {m.description && <div className="text-xs text-muted-foreground mt-0.5">{m.description}</div>}
                     </div>
-                    {m.description && <div className="text-xs text-muted-foreground mt-0.5">{m.description}</div>}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-sm font-semibold inline-flex items-center">
+                        <DollarSign className="w-3 h-3" />
+                        {money(m.amountCents)}
+                      </span>
+                      {isOwner && m.status === "submitted" && (
+                        <Button size="sm" disabled={busyId === m.id} onClick={() => run(m.id, () => gigService.approveMilestone(m.id), t("gigs.detail.approved"))}>
+                          <Check className="w-3.5 h-3.5 mr-1" /> {t("gigs.detail.approve")}
+                        </Button>
+                      )}
+                      {isOwner && m.status === "approved" && (
+                        <Button size="sm" variant="default" disabled={busyId === m.id} onClick={() => run(m.id, () => gigService.releaseMilestone(m.id), t("gigs.detail.released"))}>
+                          {t("gigs.detail.release", { amount: `$${(m.amountCents / 100).toLocaleString()}` })}
+                        </Button>
+                      )}
+                      {/* Either participant may dispute an in-flight milestone (#1768).
+                          The API authorises (poster / awarded creator only). */}
+                      {user && DISPUTABLE.has(m.status) && (
+                        <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" disabled={busyId === m.id} onClick={() => openDispute(m.id)}>
+                          {t("gigs.detail.dispute", "Dispute")}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-sm font-semibold inline-flex items-center">
-                      <DollarSign className="w-3 h-3" />
-                      {money(m.amountCents)}
-                    </span>
-                    {isOwner && m.status === "submitted" && (
-                      <Button size="sm" disabled={busyId === m.id} onClick={() => run(m.id, () => gigService.approveMilestone(m.id), t("gigs.detail.approved"))}>
-                        <Check className="w-3.5 h-3.5 mr-1" /> {t("gigs.detail.approve")}
-                      </Button>
-                    )}
-                    {isOwner && m.status === "approved" && (
-                      <Button size="sm" variant="default" disabled={busyId === m.id} onClick={() => run(m.id, () => gigService.releaseMilestone(m.id), t("gigs.detail.released"))}>
-                        {t("gigs.detail.release", { amount: `$${(m.amountCents / 100).toLocaleString()}` })}
-                      </Button>
-                    )}
-                  </div>
+                  {m.status === "disputed" && (
+                    <MilestoneDisputePanel milestoneId={m.id} isMediator={isSuperAdmin} onResolved={load} />
+                  )}
                 </CardContent>
               </Card>
             ))

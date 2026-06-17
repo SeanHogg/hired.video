@@ -58,7 +58,7 @@ export function FieldInput({
 }) {
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
   const labelEl = (
-    <label className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">
+    <label className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
       {field.label}
     </label>
   );
@@ -82,7 +82,7 @@ export function FieldInput({
             )
           }
           placeholder="One per line"
-          className="w-full resize-y rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
+          className="w-full resize-y rounded border border-border px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
         />
       </div>
     );
@@ -101,7 +101,7 @@ export function FieldInput({
           rows={2}
           onClick={stop}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full resize-y rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
+          className="w-full resize-y rounded border border-border px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
         />
       </div>
     );
@@ -118,7 +118,7 @@ export function FieldInput({
           onChange={(e) =>
             onChange(field.numeric ? Number(e.target.value) : e.target.value)
           }
-          className="w-full rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
+          className="w-full rounded border border-border px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
         >
           {(field.options ?? []).map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -157,7 +157,7 @@ export function FieldInput({
                 "rounded-full border px-2 py-0.5 text-xs transition",
                 selected(opt.value)
                   ? "border-brand-purple bg-brand-purple/10 text-brand-purple"
-                  : "border-slate-200 text-slate-500 hover:border-slate-300",
+                  : "border-border text-muted-foreground hover:border-border",
               )}
             >
               {opt.label}
@@ -177,7 +177,7 @@ export function FieldInput({
           value={typeof value === "string" ? value : ""}
           onClick={stop}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
+          className="w-full rounded border border-border px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
         />
       </div>
     );
@@ -194,7 +194,7 @@ export function FieldInput({
           onChange={(e) =>
             onChange(e.target.value === "" ? undefined : Number(e.target.value))
           }
-          className="w-full rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
+          className="w-full rounded border border-border px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
         />
       </div>
     );
@@ -210,7 +210,7 @@ export function FieldInput({
             <img
               src={url}
               alt=""
-              className="h-16 w-28 rounded border border-slate-200 object-cover"
+              className="h-16 w-28 rounded border border-border object-cover"
             />
             <div className="flex flex-col gap-1">
               <MediaPicker
@@ -222,7 +222,7 @@ export function FieldInput({
               <button
                 type="button"
                 onClick={() => onChange("")}
-                className="text-xs text-slate-400 hover:text-red-600"
+                className="text-xs text-muted-foreground hover:text-red-600"
               >
                 Remove
               </button>
@@ -250,7 +250,7 @@ export function FieldInput({
         onClick={stop}
         onChange={(e) => onChange(e.target.value)}
         placeholder={field.type === "date" ? "YYYY-MM" : undefined}
-        className="w-full rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
+        className="w-full rounded border border-border px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
       />
     </div>
   );
@@ -317,7 +317,7 @@ function ChipsInput({
         }}
         onBlur={add}
         placeholder="Type and press Enter"
-        className="w-full rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
+        className="w-full rounded border border-border px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
       />
     </div>
   );

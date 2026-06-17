@@ -674,3 +674,18 @@ export function stampLinkedContentColors(
 ): import("./canvas-state").LinkedContentWidgetParams {
   return { ...data, ...colors };
 }
+
+/** Theme-aware colour set for an engagement-asset card (#1587). Reuses
+ *  `resolveLinkedContentColors` so engagement cards and linked-content
+ *  cards can't drift apart — engagement params carry the same four
+ *  colour fields (no `mutedColor`), so we project the relevant subset.
+ *  Stamped at insert time and re-stamped by `applyThemeToState`, exactly
+ *  like linked-content. */
+export function stampEngagementAssetColors(
+  data: import("./canvas-state").EngagementAssetWidgetParams,
+  state: Pick<import("./canvas-state").CanvasState, "colorPalette" | "themeId">,
+): import("./canvas-state").EngagementAssetWidgetParams {
+  const { bgColor, textColor, accentColor, accentTextColor } =
+    resolveLinkedContentColors(state);
+  return { ...data, bgColor, textColor, accentColor, accentTextColor };
+}

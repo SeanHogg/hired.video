@@ -31,6 +31,7 @@ const {
   courseEnrollments,
   learningPaths,
   learningPathEnrollments,
+  learningPathCourses,
 } = schema;
 
 export class AssignmentSubjectNotFoundError extends Error {
@@ -159,6 +160,44 @@ export class AssignmentService {
           .set({ enrollmentCount: sql`${learningPaths.enrollmentCount} + ${inserted.length}` } as never)
           .where(eq(learningPaths.id, subjectId))
           .catch(() => undefined);
+      }
+
+      // Also materialise per-course enrollments for every course in the path
+      // so per-course analytics start tracking immediately instead of reading
+      // not_started until each learner opens the course (#1893). Idempotent via
+      // onConflictDoNothing against uq_course_enrollments_user_course; one bulk
+      // insert for the full (user × course) cross-product, then one count-bump
+      // update per distinct course that actually gained rows.
+      const pathCourses = await this.db
+        .select({ courseId: learningPathCourses.courseId })
+        .from(learningPathCourses)
+        .where(eq(learningPathCourses.pathId, subjectId));
+      const courseIds = pathCourses.map((r) => r.courseId);
+      if (courseIds.length > 0) {
+        const insertedCourseEnrollments = await this.db
+          .insert(courseEnrollments)
+          .values(
+            userIds.flatMap((userId) => courseIds.map((courseId) => ({ courseId, userId }))) as never,
+          )
+          .onConflictDoNothing()
+          .returning({ id: courseEnrollments.id, courseId: courseEnrollments.courseId });
+        if (insertedCourseEnrollments.length > 0) {
+          // Group new rows by courseId in memory → one update per distinct
+          // course (no N+1 over the (user, course) pairs).
+          const insertedCountByCourse = new Map<string, number>();
+          for (const row of insertedCourseEnrollments) {
+            insertedCountByCourse.set(row.courseId, (insertedCountByCourse.get(row.courseId) ?? 0) + 1);
+          }
+          await Promise.all(
+            [...insertedCountByCourse].map(([courseId, count]) =>
+              this.db
+                .update(courses)
+                .set({ enrollmentCount: sql`${courses.enrollmentCount} + ${count}` } as never)
+                .where(eq(courses.id, courseId))
+                .catch(() => undefined),
+            ),
+          );
+        }
       }
     }
     return userIds;

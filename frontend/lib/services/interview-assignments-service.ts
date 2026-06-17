@@ -367,12 +367,11 @@ export interface PracticeHandoff {
   skills?: ExtractedSkill[];
 }
 
-/** Build a /ai-coach?q=... URL that drops the candidate (or self-
- *  practicer) into the AI Coach with the full generator context inline,
- *  so the coach can begin Q1 without re-asking for role / seniority /
- *  source. Used by the tool's "Practise in AI Coach" button. */
-export function buildAICoachPracticeHref(handoff: PracticeHandoff): string {
-  const { questions, targetRole, seniority, style, sourceDescription, skills } = handoff;
+/** The durable session context (role / seniority / style / source / skills)
+ *  for a practice hand-off, as the bullet block the AI Coach pins in its
+ *  system prompt. Empty string when the hand-off carries no context. */
+function buildPracticeContext(handoff: PracticeHandoff): string {
+  const { targetRole, seniority, style, sourceDescription, skills } = handoff;
   const contextLines: string[] = [];
   if (targetRole) contextLines.push(`- Target role: ${targetRole}`);
   if (seniority) contextLines.push(`- Seniority: ${seniority}`);
@@ -381,17 +380,31 @@ export function buildAICoachPracticeHref(handoff: PracticeHandoff): string {
   if (skills && skills.length > 0) {
     contextLines.push(`- Skills probed: ${skills.slice(0, 10).map((s) => s.name).join(", ")}`);
   }
+  return contextLines.length > 0
+    ? `Interview practice session:\n${contextLines.join("\n")}`
+    : "";
+}
+
+/** Build a /ai-coach?q=...&ctx=... URL that drops the candidate (or self-
+ *  practicer) into the AI Coach with the full generator context, so the
+ *  coach can begin Q1 without re-asking for role / seniority / source.
+ *  Used by the tool's "Practise in AI Coach" button.
+ *
+ *  #971: the durable context rides a separate `ctx` param so the AI Coach
+ *  pins it in the SYSTEM prompt (never compacted) — only the questions +
+ *  kickoff instruction go in `q` (the first user message). Previously the
+ *  whole block was the first user message and evaporated after a few turns
+ *  of server-side history compaction. */
+export function buildAICoachPracticeHref(handoff: PracticeHandoff): string {
+  const { questions } = handoff;
+  const context = buildPracticeContext(handoff);
 
   const lines = [
     "I'm starting an interview practice session — please run me through the questions below in order, one at a time. After each of my answers, give me STAR-method feedback and a 0–10 score, then move to the next question.",
-    "DO NOT ask me for additional context — everything you need is supplied below. Begin with Question 1.",
-  ];
-  if (contextLines.length > 0) {
-    lines.push("Context:\n" + contextLines.join("\n"));
-  }
-  lines.push(
+    "DO NOT ask me for additional context — everything you need is supplied (the session context is pinned above). Begin with Question 1.",
     "Questions (ask in this exact order):\n" +
       questions.map((q, i) => `${i + 1}. ${q.text}`).join("\n"),
-  );
-  return `/ai-coach?q=${encodeURIComponent(lines.join("\n\n"))}`;
+  ];
+  const ctxParam = context ? `&ctx=${encodeURIComponent(context)}` : "";
+  return `/ai-coach?q=${encodeURIComponent(lines.join("\n\n"))}${ctxParam}`;
 }

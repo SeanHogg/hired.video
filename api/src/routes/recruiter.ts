@@ -4,6 +4,7 @@ import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
+import { withGamification } from "../domains/gamification/with-gamification.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { TALENT_POOL_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
@@ -19,7 +20,12 @@ import {
 import {
 	resolvePlacementFeeCents,
 	deriveLegacyCommissionFields,
+	sanitizePlacementBackOffice,
 } from "../services/recruiter/placement-fee.js";
+import {
+	buildPlacementNotificationService,
+	isPlacementEvent,
+} from "../services/notifications/placement-notifications.js";
 
 export const recruiterRoutes = new Hono<AppEnv>();
 
@@ -227,6 +233,13 @@ recruiterRoutes.post("/talent-pool", async (c) => {
 		nextFollowUpAt: body.nextFollowUpAt ? new Date(body.nextFollowUpAt) : null,
 		contactFrequency: body.contactFrequency ?? null,
 	} as any).returning();
+	// #1118 — sourcing a candidate into the talent pool credits the recruiter.
+	// RefId = candidate id so re-adding the same candidate doesn't re-pay.
+	if (entry?.candidateId) {
+		await withGamification(c, "candidate-sourced", (game, role, uidEarner) =>
+			game.onCandidateSourced({ userId: uidEarner, role, candidateId: entry.candidateId as string }),
+		);
+	}
 	return c.json(success(rowToTalentPoolEntry(entry)), 201);
 });
 
@@ -531,7 +544,27 @@ recruiterRoutes.post("/placements", async (c) => {
 		// #226 — Placement Type field FK → workspace_job_types. Optional;
 		// when absent the placement inherits no financial defaults.
 		placementTypeId: body.placementTypeId ?? null,
+		// #229 — back-office axis (invoice / payable / payroll): PO, MSA,
+		// bill/pay rates, contract kind + timesheet flag. Whitelisted +
+		// coerced by the shared sanitizer so the create route can't inject
+		// arbitrary columns.
+		...sanitizePlacementBackOffice(body),
 	} as any).returning();
+	// #1118 — a placement is the highest-value recruiter action; award it.
+	// RefId = placement id keeps it idempotent. Best-effort.
+	await withGamification(c, "candidate-placed", (game, role, uidEarner) =>
+		game.onCandidatePlaced({ userId: uidEarner, role, placementId: placement.id }),
+	);
+	// #230 — auto-subscribe the owning recruiter to this placement's stage
+	// events, then fire the synchronous `signed` event. Best-effort: a
+	// notification hiccup must never fail the placement write.
+	try {
+		const svc = buildPlacementNotificationService(db);
+		await svc.subscribeAll(placement.id, user.sub);
+		await svc.notifyEvent(placement.id, "signed");
+	} catch (err) {
+		console.warn("[recruiter] placement signed-notify failed", err);
+	}
 	return c.json(responseEnvelope(rowToPlacement(placement)));
 });
 
@@ -675,7 +708,66 @@ recruiterRoutes.put("/placements/:id/guarantee", async (c) => {
 		)
 		.returning();
 	if (!updated) return c.json(responseEnvelope(null), 404);
+	// #230 — when the recruiter marks the guarantee met, notify subscribers.
+	if (body.guaranteeMet === true) {
+		try {
+			await buildPlacementNotificationService(db).notifyEvent(id, "guarantee_met");
+		} catch (err) {
+			console.warn("[recruiter] placement guarantee-notify failed", err);
+		}
+	}
 	return c.json(responseEnvelope(rowToPlacement(updated)));
+});
+
+// ─── Placement notification subscriptions (#230) ────────────────────────────────
+// Per-placement opt-in to stage-event alerts (bell + pref-gated email).
+// All owner-scoped: only the placement's recruiter manages its subscriptions.
+
+async function loadOwnedPlacement(db: any, id: string, recruiterId: string) {
+	const [row] = await db
+		.select({ id: schema.placements.id })
+		.from(schema.placements)
+		.where(and(eq(schema.placements.id, id), eq(schema.placements.recruiterId, recruiterId)))
+		.limit(1);
+	return row ?? null;
+}
+
+// GET /placements/:id/notifications — list the caller's subscriptions
+recruiterRoutes.get("/placements/:id/notifications", async (c) => {
+	const user = c.get("user");
+	const id = c.req.param("id");
+	const db = getDb();
+	if (!(await loadOwnedPlacement(db, id, user.sub))) return c.json(responseEnvelope(null), 404);
+	const subs = await buildPlacementNotificationService(db).listForPlacement(id);
+	return c.json(responseEnvelope(subs.filter((s) => s.userId === user.sub)));
+});
+
+// POST /placements/:id/notifications { event } — subscribe to a stage event
+recruiterRoutes.post("/placements/:id/notifications", async (c) => {
+	const user = c.get("user");
+	const id = c.req.param("id");
+	const body = await c.req.json().catch(() => ({}));
+	if (!isPlacementEvent(body.event)) {
+		return c.json(error("VALIDATION_ERROR", "Unknown placement event"), 400);
+	}
+	const db = getDb();
+	if (!(await loadOwnedPlacement(db, id, user.sub))) return c.json(responseEnvelope(null), 404);
+	await buildPlacementNotificationService(db).subscribe(id, user.sub, body.event);
+	return c.json(responseEnvelope({ subscribed: true, event: body.event }));
+});
+
+// DELETE /placements/:id/notifications/:event — unsubscribe
+recruiterRoutes.delete("/placements/:id/notifications/:event", async (c) => {
+	const user = c.get("user");
+	const id = c.req.param("id");
+	const event = c.req.param("event");
+	if (!isPlacementEvent(event)) {
+		return c.json(error("VALIDATION_ERROR", "Unknown placement event"), 400);
+	}
+	const db = getDb();
+	if (!(await loadOwnedPlacement(db, id, user.sub))) return c.json(responseEnvelope(null), 404);
+	await buildPlacementNotificationService(db).unsubscribe(id, user.sub, event);
+	return c.json(responseEnvelope({ unsubscribed: true, event }));
 });
 
 // ─── Submissions ──────────────────────────────────────────────────────────────
@@ -719,6 +811,11 @@ recruiterRoutes.post("/submissions", async (c) => {
 		status: "Submitted",
 		notes: body.notes ?? null,
 	} as any).returning();
+	// #1118 — award the recruiter for submitting a candidate. RefId = submission
+	// id makes it idempotent across retries; best-effort (never fails the write).
+	await withGamification(c, "candidate-submitted", (game, role, uidEarner) =>
+		game.onCandidateSubmitted({ userId: uidEarner, role, submissionId: sub.id }),
+	);
 	return c.json(responseEnvelope(rowToSubmission(sub)));
 });
 
@@ -1466,15 +1563,52 @@ recruiterRoutes.post("/extract-profiles/batch", async (c) => {
 	const { sourceUrl, cards, force } = parsed.data;
 	const recruiterId = user.sub;
 
-	const items: Array<
+	type BatchItem =
 		| { ok: true; profile: any; talentPoolCandidate: any; duplicate: boolean }
-		| { ok: false; code: string; message: string }
-	> = [];
+		| { ok: false; code: string; message: string };
 
-	for (const html of cards) {
-		const result = await extractProfileFromHtml(c, { html, sourceUrl, force, recruiterId });
-		items.push(result);
+	// Fan out the per-card LLM extraction with a concurrency cap (#1394) instead
+	// of awaiting each in series — a 25-card bulk capture was serializing ~25
+	// LLM round-trips. Token-budget enforcement already lives inside
+	// extractProfileFromHtml (via createLLMClient), so the cap just keeps the
+	// upstream provider happy while cutting wall time ~CONCURRENCY×.
+	const CONCURRENCY = 5;
+
+	// Dedup is a SELECT-then-INSERT on (recruiterId, contentHash) with no unique
+	// constraint, so two byte-identical cards racing in the same chunk would both
+	// miss and double-insert. Collapse identical cards to one extraction, then
+	// fan the result back out — the first occurrence keeps its real status and
+	// the repeats are reported as duplicates so the counts stay honest.
+	const uniqueHtml: string[] = [];
+	const htmlToUnique = new Map<string, number>();
+	const cardToUnique = cards.map((html) => {
+		let u = htmlToUnique.get(html);
+		if (u === undefined) {
+			u = uniqueHtml.length;
+			htmlToUnique.set(html, u);
+			uniqueHtml.push(html);
+		}
+		return u;
+	});
+
+	const uniqueResults: BatchItem[] = new Array(uniqueHtml.length);
+	for (let i = 0; i < uniqueHtml.length; i += CONCURRENCY) {
+		const slice = uniqueHtml.slice(i, i + CONCURRENCY);
+		const settled = await Promise.all(
+			slice.map((html) => extractProfileFromHtml(c, { html, sourceUrl, force, recruiterId })),
+		);
+		settled.forEach((r, j) => { uniqueResults[i + j] = r; });
 	}
+
+	const seenUnique = new Set<number>();
+	const items: BatchItem[] = cardToUnique.map((u) => {
+		const r = uniqueResults[u];
+		if (seenUnique.has(u)) {
+			return r.ok ? { ...r, duplicate: true } : r;
+		}
+		seenUnique.add(u);
+		return r;
+	});
 
 	const created = items.filter((r) => r.ok && !r.duplicate).length;
 	const duplicates = items.filter((r) => r.ok && r.duplicate).length;

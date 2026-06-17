@@ -44,6 +44,22 @@
     crossorigin="anonymous"></script>
   <!-- End Google AdSense -->
 
+  <!-- Theme no-FOUC: apply the persisted (or system) color scheme to <html>
+       BEFORE the app bundle loads, so a dark-mode user never sees a flash of
+       the light theme. Mirrors next-themes' storageKey ("theme") + class
+       strategy; the React <ThemeProvider> takes over once mounted. -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("theme");
+        var dark = t === "dark" ||
+          ((!t || t === "system") &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) document.documentElement.classList.add("dark");
+      } catch (e) {}
+    })();
+  </script>
+
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Video Resumes, Resume Builder & AI Job Search Platform — hired.video</title>

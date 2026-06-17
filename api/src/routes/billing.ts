@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, count, desc, eq, inArray, lte } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, lte } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, AppEnv } from "../types/index.js";
 import { error } from "../types/index.js";
@@ -7,9 +7,11 @@ import { getDb, schema } from "../db/index.js";
 import * as billingService from "../services/billing/BillingService.js";
 import { getPricingConfig } from "../services/platform/PricingConfigService.js";
 import { TIER_COPY } from "../../../shared/tier-copy.js";
+import { ANNUAL_DISCOUNT_RATE, yearlyPriceFromMonthly } from "../../../shared/pricing.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import type { UsageInvoice } from "../../../shared/usage-statement.js";
 import { inboxSeatAddonService } from "../services/billing/InboxSeatAddonService.js";
+import { handleRefundRequest, handleCancelAccount } from "../services/billing/handlers.js";
 import { requirePro } from "../middleware/auth-gates.js";
 
 export const billingRoutes = new Hono<AppEnv>();
@@ -123,25 +125,12 @@ billingRoutes.get("/usage-invoices", async (c) => {
 });
 
 billingRoutes.post("/refund-request", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  // Delegates to the pure, fully-tested handler (billing/handlers.ts) so the
+  // refund-row shape + validation (incl. rejecting negative amountCents via
+  // RefundRequestSchema) lives in ONE place instead of a divergent inline copy.
   const body = await c.req.json().catch(() => ({}));
-  const reason = String(body?.reason ?? "");
-  if (!reason) return c.json(error("VALIDATION_ERROR", "reason is required"), 400);
-
-  const db = getDb();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [inserted] = await (db.insert(schema.refundRequests) as any)
-    .values({
-      userId,
-      invoiceId: body?.invoiceId ?? null,
-      reason,
-      amount: body?.amountCents ? String(Number(body.amountCents) / 100) : null,
-      status: "pending",
-    })
-    .returning();
-
-  return c.json(ok(inserted), 201);
+  const result = await handleRefundRequest({ db: getDb(), now: () => new Date() }, uid(c), body);
+  return c.json(result.body as any, result.status as any);
 });
 
 billingRoutes.get("/refund-requests", async (c) => {
@@ -170,20 +159,11 @@ billingRoutes.get("/refund-requests/:requestId", async (c) => {
 });
 
 billingRoutes.post("/cancel-account", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  // Delegates to the pure handler — same CANCELLATION: marker + requestRefund
+  // carry-through, but defined once (handlers.ts) and covered by its tests.
   const body = await c.req.json().catch(() => ({}));
-  // Record a refund request as the cancellation marker (no dedicated table yet)
-  const db = getDb();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [inserted] = await (db.insert(schema.refundRequests) as any)
-    .values({
-      userId,
-      reason: `CANCELLATION: ${String(body?.reason ?? "user_requested")}`,
-      status: "pending",
-    })
-    .returning();
-  return c.json(ok({ ...inserted, type: "cancellation", requestRefund: Boolean(body?.requestRefund) }), 201);
+  const result = await handleCancelAccount({ db: getDb(), now: () => new Date() }, uid(c), body);
+  return c.json(result.body as any, result.status as any);
 });
 
 billingRoutes.get("/cancellation-requests", async (c) => {
@@ -310,13 +290,17 @@ billingRoutes.post("/trial/start", async (c) => {
     return c.json(error("CONFLICT", "You already have an active subscription or trial"), 409);
   }
 
-  // Also reject if user has ever had a trial (trialing or canceled-after-trial)
+  // Reject if the user has EVER had a trial. The signal is a non-null
+  // `trialEnd` on ANY prior subscription, regardless of current status — a
+  // user who started then canceled a trial has status 'canceled', so the
+  // old `status = 'trialing'` check (identical to the active/trialing guard
+  // above) never fired and let them re-trial indefinitely. (#2190)
   const [priorTrial] = await db
     .select({ id: schema.subscriptions.id })
     .from(schema.subscriptions)
     .where(and(
       eq(schema.subscriptions.userId, userId),
-      eq(schema.subscriptions.status, "trialing"),
+      isNotNull(schema.subscriptions.trialEnd),
     ))
     .limit(1);
 
@@ -391,11 +375,14 @@ billingRoutes.post("/subscribe", async (c) => {
 
   if (!plan) return c.json(error("NOT_FOUND", "Plan not found"), 404);
 
-  // Determine effective price
+  // Determine effective price. When a plan has no explicit yearly price we
+  // derive it from the canonical annual-discount helper (true 20% off) rather
+  // than the old `monthly × 10` fallback, which only meant ~16.7% off yet the
+  // success message still claimed "saved 20%".
   const isYearly = interval === "yearly";
-  const effectivePrice = isYearly && plan.priceYearly
-    ? Number(plan.priceYearly)
-    : Number(plan.priceMonthly) * (isYearly ? 10 : 1); // fallback: 2 months free if no explicit yearly price
+  const effectivePrice = isYearly
+    ? (plan.priceYearly ? Number(plan.priceYearly) : yearlyPriceFromMonthly(Number(plan.priceMonthly)))
+    : Number(plan.priceMonthly);
 
   const periodDays = isYearly ? 365 : 30;
   const periodEnd = new Date(Date.now() + periodDays * 24 * 60 * 60 * 1000);
@@ -421,17 +408,19 @@ billingRoutes.post("/subscribe", async (c) => {
     } as any)
     .returning();
 
-  // Billing invoice record
+  // Billing invoice record. Only columns that exist on `invoices` (schema/
+  // billing.ts) — the previous `amount` / `tax` / `invoiceDate` keys were
+  // silently dropped (no such columns; `total` + `createdAt` are the real
+  // ones), and a "paid" invoice now stamps `paidAt`.
+  const paidNow = new Date();
   await db.insert(schema.invoices).values({
     userId,
     subscriptionId: sub.id,
-    amount: String(effectivePrice),
-    tax: "0",
     total: String(effectivePrice),
     currency: plan.currency,
     status: "paid",
-    invoiceDate: new Date(),
-    dueDate: new Date(),
+    paidAt: paidNow,
+    dueDate: paidNow,
   } as any).catch(() => undefined);
 
   // Notify user of successful subscription
@@ -439,7 +428,7 @@ billingRoutes.post("/subscribe", async (c) => {
     userId,
     type: "billing",
     title: `Welcome to ${plan.name}!`,
-    message: `Your ${interval} subscription is now active. ${isYearly ? "You saved 20% with annual billing." : ""}`,
+    message: `Your ${interval} subscription is now active. ${isYearly ? `You saved ${Math.round(ANNUAL_DISCOUNT_RATE * 100)}% with annual billing.` : ""}`,
     data: { subscriptionId: sub.id, planSlug, interval } as any,
   } as any).catch(() => undefined);
 

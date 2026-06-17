@@ -22,6 +22,7 @@ import { getDb, schema } from "../db/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { scanContent } from "../services/moderation/contentScan.js";
 import { bumpSearchVersion } from "../utils/search-cache.js";
+import { NotificationService } from "../services/notifications/notificationService.js";
 
 const { articles, users, userProfiles, adminAuditLog, feedPosts } = schema;
 
@@ -219,6 +220,17 @@ adminArticleRoutes.post("/approve", async (c) => {
         author: { name: author?.name ?? null, slug: authorSlug, avatarUrl: profile?.avatarUrl ?? null },
       },
     } as any).catch(() => undefined);
+
+    // Notify the author their submission was approved + published (#898).
+    await NotificationService.notify({
+      userId: a.userId,
+      type: "review",
+      title: `Your ${a.kind} was approved`,
+      message: a.title,
+      url: `/articles/${authorSlug}/${a.slug}`,
+      refType: "article",
+      refId: a.id,
+    });
   }
 
   await db.insert(adminAuditLog).values({
@@ -254,6 +266,19 @@ adminArticleRoutes.post("/reject", async (c) => {
     inArray(articles.id, ids),
     eq(articles.status, "submitted"),
   )).returning();
+
+  // Notify each author their submission was not approved, with the reason (#898).
+  for (const a of updatedRows) {
+    await NotificationService.notify({
+      userId: a.userId,
+      type: "review",
+      title: `Your ${a.kind} was not approved`,
+      message: reason,
+      url: `/services/creator/articles`,
+      refType: "article",
+      refId: a.id,
+    });
+  }
 
   await db.insert(adminAuditLog).values({
     actorId,

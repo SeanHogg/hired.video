@@ -375,10 +375,12 @@ export default function StudioProjectActions({
                     </Button>
                   </div>
                 )}
-                {/* Embed + QR — only meaningful when the video is public,
-                    so the items only render in that state. Keeps the
-                    consumer free of `canEmbed` / `canShowQR` props. */}
-                {isPublic && embedVideoId && (
+                {/* Embed + QR — only meaningful when the project is public.
+                    #696: gate on `projectId` (not a published-render id) so
+                    saved-but-unrendered public projects can embed via the
+                    project-keyed iframe. Keeps the consumer free of
+                    `canEmbed` / `canShowQR` props. */}
+                {isPublic && projectId && (
                   <>
                     <DropdownMenuItem
                       onClick={() => setEmbedOpen(true)}
@@ -423,6 +425,7 @@ export default function StudioProjectActions({
               open={embedOpen}
               onOpenChange={setEmbedOpen}
               videoId={embedVideoId}
+              projectId={projectId}
               videoTitle={state.name}
             />
           </Suspense>

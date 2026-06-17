@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Upload, X, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +25,7 @@ export function ProfileAvatarEditor({
   isLoading = false,
   disabled = false,
 }: ProfileAvatarEditorProps) {
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | undefined>(
     currentAvatarUrl,
@@ -33,13 +35,13 @@ export function ProfileAvatarEditor({
   const handleFileSelect = async (file: File) => {
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      await alertDialog({ title: "Invalid file", description: "Please select an image file" });
+      await alertDialog({ title: t("dialogs.avatar.invalidFileTitle"), description: t("dialogs.avatar.invalidFileType") });
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      await alertDialog({ title: "Invalid file", description: "File size must be less than 5MB" });
+      await alertDialog({ title: t("dialogs.avatar.invalidFileTitle"), description: t("dialogs.avatar.invalidFileSize") });
       return;
     }
 

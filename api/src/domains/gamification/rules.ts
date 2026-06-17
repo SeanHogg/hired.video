@@ -167,6 +167,12 @@ export const ACTIONS = {
   STUDIO_GAME_PUBLISHED: "studio.game.published",
   STUDIO_COMIC_PUBLISHED: "studio.comic.published",
   STUDIO_PODCAST_PUBLISHED: "studio.podcast.published",
+
+  // Peer resume feedback (#1952). A reviewer earns for completing a review
+  // (the "Mentor" community action) and earns again, separately, when a
+  // suggested edit they made is accepted by the resume owner.
+  FEEDBACK_REVIEW_SUBMITTED: "feedback.review.submitted",
+  FEEDBACK_SUGGESTION_ACCEPTED: "feedback.suggestion.accepted",
 } as const;
 
 export type ActionKey = (typeof ACTIONS)[keyof typeof ACTIONS];
@@ -522,6 +528,29 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
     source: "studio",
   },
 
+  // ── Peer resume feedback (#1952) ────────────────────────────────────
+  // Completing a review is the high-effort, high-signal community act
+  // (feeds the "Mentor" badge); a reviewer also earns when one of their
+  // suggested edits is accepted by the owner. Both capped to deter farming.
+  [ACTIONS.FEEDBACK_REVIEW_SUBMITTED]: {
+    key: ACTIONS.FEEDBACK_REVIEW_SUBMITTED,
+    label: "Submitted resume feedback",
+    roles: GENERAL_EARNING_ROLES,
+    points: 40,
+    category: "earn",
+    dailyCapPoints: 200,
+    source: "feedback",
+  },
+  [ACTIONS.FEEDBACK_SUGGESTION_ACCEPTED]: {
+    key: ACTIONS.FEEDBACK_SUGGESTION_ACCEPTED,
+    label: "A suggested edit was accepted",
+    roles: GENERAL_EARNING_ROLES,
+    points: 15,
+    category: "earn",
+    dailyCapPoints: 150,
+    source: "feedback",
+  },
+
   // ── Recruiter catalog ───────────────────────────────────────────────
   [ACTIONS.CANDIDATE_SOURCED]: {
     key: ACTIONS.CANDIDATE_SOURCED,
@@ -646,6 +675,10 @@ export const STREAK_SIGNAL_ACTIONS: ReadonlySet<ActionKey> = new Set<ActionKey>(
   ACTIONS.STUDIO_GAME_PUBLISHED,
   ACTIONS.STUDIO_COMIC_PUBLISHED,
   ACTIONS.STUDIO_PODCAST_PUBLISHED,
+  // peer feedback (#1952) — giving feedback / having a suggestion accepted
+  // is an active community day
+  ACTIONS.FEEDBACK_REVIEW_SUBMITTED,
+  ACTIONS.FEEDBACK_SUGGESTION_ACCEPTED,
   // recruiter
   ACTIONS.CANDIDATE_SOURCED,
   ACTIONS.CANDIDATE_SUBMITTED,

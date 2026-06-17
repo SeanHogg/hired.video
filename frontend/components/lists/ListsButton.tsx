@@ -10,6 +10,7 @@
 // their personal lists + team-shared lists from any of their companies.
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import {
   Building2,
@@ -72,6 +73,7 @@ export default function ListsButton({
   paramKey = "list_id",
   className,
 }: ListsButtonProps) {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
 
@@ -222,7 +224,7 @@ export default function ListsButton({
 
   async function handleDelete() {
     if (!editingList) return;
-    if (!(await confirmDialog({ title: "Delete list", description: `Delete list "${editingList.title}"? This cannot be undone.`, confirmText: "Delete", destructive: true }))) {
+    if (!(await confirmDialog({ title: t("dialogs.lists.deleteListTitle"), description: t("dialogs.lists.deleteListDescription", { title: editingList.title }), confirmText: t("dialogs.lists.deleteConfirm"), destructive: true }))) {
       return;
     }
     try {

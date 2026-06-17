@@ -21,6 +21,7 @@
 import {
   resolveLinkedContentColors,
   stampLinkedContentColors,
+  stampEngagementAssetColors,
 } from "./linked-content";
 
 export const CANVAS_STATE_VERSION = 1;
@@ -124,6 +125,12 @@ export interface ImageWidgetParams {
    *  the public viewer. Optional for back-compat with pre-#1556 widgets;
    *  the audit flags any image whose alt is empty / missing. */
   altText?: string;
+  /** Per-widget colour-grading filters (#596 / #806). Same `VideoFilters`
+   *  shape scenes use, applied to THIS widget only. `null` / undefined =
+   *  identity (no grade). The DOM preview folds it into the element's CSS
+   *  `filter`; the canvas-v2 image applier bakes the same grade into the
+   *  exported frame so preview === render. */
+  filters?: import("../video-filters").VideoFilters | null;
 }
 
 export interface VideoWidgetParams {
@@ -136,6 +143,10 @@ export interface VideoWidgetParams {
    *  key math lives in `lib/studio/chroma-key.ts` so the editor preview
    *  and the canvas-v2 video applier produce identical pixels. */
   chromaKey?: ChromaKeyParams | null;
+  /** Per-widget colour-grading filters (#596 / #806). Same `VideoFilters`
+   *  shape scenes use, applied to THIS widget only. `null` / undefined =
+   *  identity. Composes with `chromaKey` (key first, then grade). */
+  filters?: import("../video-filters").VideoFilters | null;
 }
 
 /** Chroma-key configuration. `keyColor` is the colour to knock out
@@ -1212,6 +1223,17 @@ export function applyThemeToState(
             params: {
               kind: "linked-content",
               data: stampLinkedContentColors(w.params.data, linkedColors),
+            },
+          };
+        }
+        // #1587 — re-stamp engagement-asset cards on theme switch, same
+        // as linked-content, so a theme change restyles forms/CTAs too.
+        if (w.params.kind === "engagement-asset") {
+          return {
+            ...w,
+            params: {
+              kind: "engagement-asset",
+              data: stampEngagementAssetColors(w.params.data, themedState),
             },
           };
         }

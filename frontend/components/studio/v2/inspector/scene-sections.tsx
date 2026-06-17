@@ -15,6 +15,7 @@ import VisualThemePicker from "@/components/studio/shared/VisualThemePicker";
 import BackgroundPicker from "@/components/studio/shared/BackgroundPicker";
 import MusicPicker from "@/components/studio/shared/MusicPicker";
 import VideoFormatPicker from "@/components/studio/shared/VideoFormatPicker";
+import SafeZoneToggle from "@/components/studio/shared/SafeZoneToggle";
 import CodecPicker from "@/components/studio/shared/CodecPicker";
 import MotionTransitionPicker from "@/components/studio/shared/MotionTransitionPicker";
 import FiltersPicker from "@/components/studio/shared/FiltersPicker";
@@ -178,10 +179,15 @@ export const CANVAS_SECTIONS: CanvasInspectorSection[] = [
     id: "canvas-format",
     title: "Format",
     render: ({ state, onSelectFormat }) => (
-      <VideoFormatPicker
-        activeFormatId={findFormatByDimensions(state.width, state.height)?.id ?? null}
-        onSelect={onSelectFormat}
-      />
+      <div className="space-y-3">
+        <VideoFormatPicker
+          activeFormatId={findFormatByDimensions(state.width, state.height)?.id ?? null}
+          onSelect={onSelectFormat}
+        />
+        {/* #855 — let the user hide the safe-zone guides; self-gates when
+            the active format has no zones. */}
+        <SafeZoneToggle width={state.width} height={state.height} />
+      </div>
     ),
   },
   {

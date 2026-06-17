@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { GraduationCap, Clock, Award, Users, Star, Share2 } from "lucide-react";
 import { CardContent } from "@/components/ui/card";
 import BaseCard from "@/components/ui/BaseCard";
@@ -6,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { buildShareAction } from "@/lib/card-share-action";
 import { buildImageUrl } from "@/lib/utils";
+import { courseCategoryLabel } from "@/lib/course-category";
 import WishlistButton from "@/components/wishlist/WishlistButton";
+import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 
 export interface CourseMarketplaceItem {
   id: string;
@@ -43,6 +46,7 @@ function formatDuration(minutes: number | null) {
 }
 
 export default function CourseMarketplaceCard({ item }: { item: CourseMarketplaceItem }) {
+  const { t } = useTranslation();
   const href = `/courses/${item.author.slug}/${item.slug}`;
   const shareAction = buildShareAction({
     entityUrl: href,
@@ -59,7 +63,7 @@ export default function CourseMarketplaceCard({ item }: { item: CourseMarketplac
           </div>
         )}
         {item.category && (
-          <Badge className="absolute top-2 left-2 bg-background/90 text-foreground border">{item.category}</Badge>
+          <Badge className="absolute top-2 left-2 bg-background/90 text-foreground border">{courseCategoryLabel(item.category, t)}</Badge>
         )}
         {item.issuesCertificate && (
           <Badge className="absolute top-2 right-2 bg-amber-500 text-white border-0">
@@ -83,6 +87,19 @@ export default function CourseMarketplaceCard({ item }: { item: CourseMarketplac
           variant="outline"
           className="absolute bottom-2 left-2 h-7 w-7 bg-background/90 hover:bg-background"
         />
+        {/* Report Abuse — self-gates: hidden for the course author, bounces
+            anonymous viewers to /login. Owner snapshot resolved server-side
+            from courses.user_id when omitted; passing it here lets the button
+            hide the affordance for the author up front. */}
+        <div className="absolute top-2 left-1/2 -translate-x-1/2">
+          <ReportAbuseButton
+            entityType="course"
+            entityId={item.id}
+            entityOwnerId={item.author.id}
+            entityLabel="course"
+            triggerVariant="secondary"
+          />
+        </div>
       </div>
       <CardContent className="p-4 space-y-2 flex-1 flex flex-col">
         <h3 className="font-semibold leading-tight line-clamp-2">

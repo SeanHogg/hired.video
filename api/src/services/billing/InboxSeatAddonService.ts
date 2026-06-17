@@ -8,11 +8,15 @@
  * `getEffectiveInboxCap(userId)` which the cap-check in
  * routes/email-integration.ts uses to compute the real ceiling.
  *
- * Stripe / Helcim subscription-line synchronisation is intentionally
- * pluggable: `updateAddonQuantity()` writes the local row, then calls
- * `syncSubscriptionQuantity()` which today is a no-op stub. When the
- * billing-provider abstraction grows a `setSubscriptionQuantity()`
- * method the stub becomes a real call without touching callers.
+ * Provider (Stripe / Helcim) subscription-line synchronisation is
+ * intentionally decoupled: `setQuantity()` / `cancel()` write the local
+ * row (authoritative for entitlement checks) and then record an
+ * `inbox_seat_quantity_synced` row in `billing_events`. That durable
+ * audit row is the canonical change-stream a billing-provider connector
+ * job consumes to push the new quantity upstream — the same pattern the
+ * workforce seat reconciler (#1409/#1424) uses. The provider push itself
+ * is tracked as a follow-on (it needs a per-addon provider subscription
+ * line id, which `inbox_seat_addons` does not yet carry — see register).
  */
 
 import { eq, sql } from "drizzle-orm";
@@ -22,7 +26,15 @@ import {
   INBOX_SYNC_EXTRA_ACCOUNT_PRICE,
 } from "../../../../shared/pricing.js";
 
-const { inboxSeatAddons } = schema;
+const { inboxSeatAddons, billingEvents } = schema;
+
+type Db = ReturnType<typeof getDb>;
+
+/** Optional dependency override so the service is unit-testable against the
+ *  fake-db harness without a live connection. */
+export interface InboxSeatAddonDeps {
+  db?: Db;
+}
 
 export interface InboxAddonState {
   quantity: number;
@@ -35,9 +47,16 @@ export interface InboxAddonState {
 const PRICE_CENTS = Math.round(INBOX_SYNC_EXTRA_ACCOUNT_PRICE * 100);
 const MAX_QUANTITY = 50;
 
+/** billing_events.event_type emitted on every addon quantity change. */
+export const INBOX_SEAT_SYNC_EVENT = "inbox_seat_quantity_synced";
+
 export class InboxSeatAddonService {
-  async getState(userId: string): Promise<InboxAddonState> {
-    const db = getDb();
+  private resolveDb(deps?: InboxSeatAddonDeps): Db {
+    return deps?.db ?? getDb();
+  }
+
+  async getState(userId: string, deps?: InboxSeatAddonDeps): Promise<InboxAddonState> {
+    const db = this.resolveDb(deps);
     const [row] = await db
       .select()
       .from(inboxSeatAddons)
@@ -56,8 +75,8 @@ export class InboxSeatAddonService {
     };
   }
 
-  async getEffectiveCap(userId: string): Promise<number> {
-    const state = await this.getState(userId);
+  async getEffectiveCap(userId: string, deps?: InboxSeatAddonDeps): Promise<number> {
+    const state = await this.getState(userId, deps);
     return state.effectiveCap;
   }
 
@@ -67,11 +86,11 @@ export class InboxSeatAddonService {
    * collection — this method assumes the provider has already accepted
    * the subscription-quantity change.
    */
-  async setQuantity(userId: string, quantity: number): Promise<InboxAddonState> {
+  async setQuantity(userId: string, quantity: number, deps?: InboxSeatAddonDeps): Promise<InboxAddonState> {
     if (!Number.isInteger(quantity) || quantity < 0 || quantity > MAX_QUANTITY) {
       throw new Error(`quantity must be an integer in [0, ${MAX_QUANTITY}]`);
     }
-    const db = getDb();
+    const db = this.resolveDb(deps);
     const now = new Date();
 
     await db
@@ -92,28 +111,45 @@ export class InboxSeatAddonService {
         },
       });
 
-    // Provider sync intentionally separated — see file header.
-    await this.syncSubscriptionQuantity(userId, quantity);
-
-    return this.getState(userId);
+    const state = await this.getState(userId, deps);
+    await this.recordSyncEvent(userId, state, db);
+    return state;
   }
 
-  async cancel(userId: string): Promise<void> {
-    const db = getDb();
+  async cancel(userId: string, deps?: InboxSeatAddonDeps): Promise<void> {
+    const db = this.resolveDb(deps);
     await db
       .update(inboxSeatAddons)
       .set({ status: "cancelled", updatedAt: new Date() })
       .where(eq(inboxSeatAddons.userId, userId));
-    await this.syncSubscriptionQuantity(userId, 0);
+    // After cancellation getState() reports quantity 0 (status !== active),
+    // so the audit row records the effective drop to zero.
+    const state = await this.getState(userId, deps);
+    await this.recordSyncEvent(userId, state, db);
   }
 
   // ---------------------------------------------------------------------
-  // Provider sync stub — see file header.
+  // Durable change-stream audit — see file header. Writes a billing_events
+  // row a provider-sync connector consumes. Best-effort: a failed audit
+  // insert must not fail the entitlement write (the local row is
+  // authoritative), so we swallow + log.
   // ---------------------------------------------------------------------
-  private async syncSubscriptionQuantity(_userId: string, _quantity: number): Promise<void> {
-    // Wire-in pending billing-provider abstraction work. Local row is
-    // authoritative for entitlement checks; provider sync is a billing
-    // concern that's separately observable via `billing_events`.
+  private async recordSyncEvent(userId: string, state: InboxAddonState, db: Db): Promise<void> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (db.insert(billingEvents) as any).values({
+        userId,
+        eventType: INBOX_SEAT_SYNC_EVENT,
+        payload: {
+          quantity: state.quantity,
+          unitPriceCents: state.unitPriceCents,
+          monthlyTotalCents: state.monthlyTotalCents,
+          effectiveCap: state.effectiveCap,
+        },
+      });
+    } catch (err) {
+      console.warn(`[billing] inbox-seat sync audit failed for ${userId}:`, err);
+    }
   }
 }
 

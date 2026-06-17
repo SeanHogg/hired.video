@@ -22,6 +22,7 @@ import HeaderSearch from "@/components/HeaderSearch";
 import ShoppingCart from "@/components/ShoppingCart";
 import CommunicationHub from "@/components/CommunicationHub";
 import { LocaleSwitcher } from "@/components/i18n/LocaleSwitcher";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { Badge } from "@/components/ui/badge";
 import { EmulationHeaderControls, useEmulationStyle } from "@/components/EmulationBar";
@@ -262,6 +263,10 @@ export default function Navigation({
                 always-on place to switch language (the sidebar lives behind
                 the hamburger). */}
             <LocaleSwitcher variant="compact" className="inline-flex" />
+
+            {/* Light/dark toggle — always-on chrome so the theme is reachable
+                from any surface, same rationale as the locale switcher. */}
+            <ThemeToggle className="inline-flex" />
 
             {/* Sign out — mobile/tablet only (lg:hidden). Below lg the sidebar
                 is a drawer, so without this the only logout is buried behind

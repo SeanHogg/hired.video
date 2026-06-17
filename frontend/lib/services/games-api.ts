@@ -17,6 +17,7 @@
  */
 
 import { runtimeConfig } from "@/lib/runtime-config";
+import { standardAuthHeaders } from "@/lib/api-client";
 
 /** Resolve an absolute API URL from a relative API path. Trims a
  *  trailing slash on the base + drops a leading slash on the path so
@@ -58,29 +59,20 @@ interface FetchOpts {
   body?: unknown;
 }
 
-/** Resolve the current Authorization bearer header value, if any. The
- *  hired.video auth layer reads `Authorization: Bearer <jwt>` (NOT
- *  cookies) — see [api/src/middleware/auth.ts](../../../api/src/middleware/auth.ts).
- *  This helper mirrors the same `localStorage.getItem("auth_token")`
- *  pattern [api-client.ts](../api-client.ts) uses (DRY: one token
- *  storage key across every fetch site). */
-function authBearerHeader(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  const token = window.localStorage.getItem("auth_token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-/** JSON fetch helper — sends + receives JSON, attaches the Bearer
- *  token from localStorage so the request passes authMiddleware.
- *  Returns the parsed `data` envelope on success, throws an Error on
- *  network or HTTP failure. Callers `.catch(...)` if they want to
- *  swallow; the helper itself never silently no-ops on a non-OK
+/** JSON fetch helper — sends + receives JSON, attaches the canonical
+ *  auth headers (Bearer token from localStorage + the active SuperAdmin
+ *  X-Emulation-Token) via the shared `standardAuthHeaders` extractor so
+ *  the request passes authMiddleware AND works while a SuperAdmin is
+ *  impersonating. Returns the parsed `data` envelope on success, throws
+ *  an Error on network or HTTP failure. Callers `.catch(...)` if they
+ *  want to swallow; the helper itself never silently no-ops on a non-OK
  *  status (which is what would let an HTML response slide through as
  *  "success" again). */
 export async function gamesApiJson<T>(path: string, opts: FetchOpts = {}): Promise<T> {
-  const res = await fetch(gamesApiUrl(path), {
+  const url = gamesApiUrl(path);
+  const res = await fetch(url, {
     method: opts.method ?? "GET",
-    headers: { "content-type": "application/json", ...authBearerHeader() },
+    headers: { "content-type": "application/json", ...standardAuthHeaders(url) },
     credentials: "include",
     body: opts.body != null ? JSON.stringify(opts.body) : undefined,
   });

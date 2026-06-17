@@ -591,7 +591,7 @@ export default function ProductDashboard() {
                             />
                             {getRoleDisplayLabel(role)}
                             <span
-                              className={`px-2 py-1 rounded-full text-xs ${isPaid ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
+                              className={`px-2 py-1 rounded-full text-xs ${isPaid ? "bg-green-100 text-green-800" : "bg-muted text-muted-foreground"}`}
                             >
                               {isPaid ? "Paid" : "Free"}
                             </span>

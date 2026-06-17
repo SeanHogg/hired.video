@@ -25,6 +25,7 @@ import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { recruiterBdPipelineService } from "../services/recruiter/bd-pipeline.js";
+import { resolveCompanyScope } from "../services/company/scope.js";
 
 export const recruiterBdRoutes = new Hono<AppEnv>();
 
@@ -38,6 +39,14 @@ function requireAuth(c: any): string | Response {
   return userId;
 }
 
+/** Resolve the caller's shared BD workspaces (#1766): every company/agency they
+ *  own or are an active member of. Reads fall through these OR the owner id, and
+ *  creates stamp the primary workspace so teammates see the new row. */
+async function bdScope(userId: string): Promise<{ workspaceIds: string[]; primary: string | null }> {
+  const scope = await resolveCompanyScope(userId);
+  return { workspaceIds: scope.companyIds, primary: scope.primaryCompanyId };
+}
+
 const NewClientSchema = z.object({
   clientName: z.string().min(1).max(255),
   companyId: z.string().uuid().optional(),
@@ -48,14 +57,16 @@ const NewClientSchema = z.object({
 
 recruiterBdRoutes.get("/clients", async (c) => {
   const u = requireAuth(c); if (typeof u !== "string") return u;
-  return c.json(success({ items: await recruiterBdPipelineService.listClients(u) }), 200);
+  const { workspaceIds } = await bdScope(u);
+  return c.json(success({ items: await recruiterBdPipelineService.listClients(u, workspaceIds) }), 200);
 });
 
 recruiterBdRoutes.post("/clients", async (c) => {
   const u = requireAuth(c); if (typeof u !== "string") return u;
   const parsed = NewClientSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid client", parsed.error.flatten()), 400);
-  return c.json(success({ client: await recruiterBdPipelineService.createClient(u, parsed.data) }), 201);
+  const { primary } = await bdScope(u);
+  return c.json(success({ client: await recruiterBdPipelineService.createClient(u, parsed.data, primary) }), 201);
 });
 
 const ClientContactSchema = z.object({
@@ -70,9 +81,11 @@ recruiterBdRoutes.post("/clients/:id/contacts", async (c) => {
   const u = requireAuth(c); if (typeof u !== "string") return u;
   const parsed = ClientContactSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid contact", parsed.error.flatten()), 400);
+  const { workspaceIds } = await bdScope(u);
   const row = await recruiterBdPipelineService.addClientContact({
     clientId: c.req.param("id"),
     recruiterUserId: u,
+    workspaceIds,
     name: parsed.data.name,
     title: parsed.data.title ?? null,
     email: parsed.data.email ?? null,
@@ -127,14 +140,16 @@ const NewDealSchema = z.object({
 
 recruiterBdRoutes.get("/deals", async (c) => {
   const u = requireAuth(c); if (typeof u !== "string") return u;
-  return c.json(success({ items: await recruiterBdPipelineService.listDeals(u) }), 200);
+  const { workspaceIds } = await bdScope(u);
+  return c.json(success({ items: await recruiterBdPipelineService.listDeals(u, workspaceIds) }), 200);
 });
 
 recruiterBdRoutes.post("/deals", async (c) => {
   const u = requireAuth(c); if (typeof u !== "string") return u;
   const parsed = NewDealSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid deal", parsed.error.flatten()), 400);
-  return c.json(success({ deal: await recruiterBdPipelineService.createDeal(u, parsed.data) }), 201);
+  const { primary } = await bdScope(u);
+  return c.json(success({ deal: await recruiterBdPipelineService.createDeal(u, parsed.data, primary) }), 201);
 });
 
 const StageMoveSchema = z.object({
@@ -146,9 +161,11 @@ recruiterBdRoutes.patch("/deals/:id/stage", async (c) => {
   const u = requireAuth(c); if (typeof u !== "string") return u;
   const parsed = StageMoveSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid stage move", parsed.error.flatten()), 400);
+  const { workspaceIds } = await bdScope(u);
   const row = await recruiterBdPipelineService.moveDealToStage({
     dealId: c.req.param("id"),
     recruiterUserId: u,
+    workspaceIds,
     stageKey: parsed.data.stageKey,
     pipelineKey: parsed.data.pipelineKey,
   });
@@ -165,9 +182,11 @@ recruiterBdRoutes.patch("/deals/:id/owner", async (c) => {
   const u = requireAuth(c); if (typeof u !== "string") return u;
   const parsed = OwnerSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid owner", parsed.error.flatten()), 400);
+  const { workspaceIds } = await bdScope(u);
   const row = await recruiterBdPipelineService.assignDealOwner({
     dealId: c.req.param("id"),
     recruiterUserId: u,
+    workspaceIds,
     ownerUserId: parsed.data.ownerUserId,
     ownerType: parsed.data.ownerType,
   });
@@ -178,7 +197,8 @@ recruiterBdRoutes.patch("/deals/:id/owner", async (c) => {
 recruiterBdRoutes.get("/rollup", async (c) => {
   const u = requireAuth(c); if (typeof u !== "string") return u;
   const pipelineKey = c.req.query("pipelineKey") ?? "default";
-  return c.json(success(await recruiterBdPipelineService.pipelineRollup(u, pipelineKey)), 200);
+  const { workspaceIds } = await bdScope(u);
+  return c.json(success(await recruiterBdPipelineService.pipelineRollup(u, pipelineKey, workspaceIds)), 200);
 });
 
 recruiterBdRoutes.all("*", (c) =>

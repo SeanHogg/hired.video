@@ -83,9 +83,9 @@ export function AccountManagementPanel() {
       if (result.requiresSeatConfirmation) {
         const price = ((result.seatInfo?.pricePerSeatCents ?? 0) / 100).toFixed(2);
         const confirmed = await confirmDialog({
-          title: "Add paid seat",
-          description: `${result.message} This adds a seat at $${price}/mo to your bill. Add it?`,
-          confirmText: "Add seat",
+          title: t("dialogs.account.addPaidSeatTitle"),
+          description: t("dialogs.account.addPaidSeatBody", { message: result.message, price }),
+          confirmText: t("dialogs.account.addPaidSeatConfirm"),
         });
         if (!confirmed) {
           setInviteModalOpen(false);

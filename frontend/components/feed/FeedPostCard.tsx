@@ -39,13 +39,13 @@ import {
   resharePost,
   deleteFeedPost,
   updateFeedPost,
-  reportFeedPost,
 } from "@/lib/services/feed-service";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import type { FeedPost, FeedPostComment, FeedRepostPreview } from "@/types/feed";
 import { FeedReviewEmbed } from "./FeedReviewEmbed";
 import PostStatsSheet from "./PostStatsSheet";
+import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 
 // Sub-components
 const FeedPostMedia = ({ media }: { media: FeedPost['media'] }) => {
@@ -299,15 +299,6 @@ const FeedPostActions = ({
     }
   };
 
-  const handleReport = async () => {
-    try {
-      await reportFeedPost(post.id, "inappropriate");
-      toast({ title: "Post reported", description: "Thank you for helping keep the community safe." });
-    } catch {
-      toast({ title: "Could not report", description: "Please try again later.", variant: "destructive" });
-    }
-  };
-
   const handleHide = () => {
     onHide(post.id);
     toast({ title: "Post hidden", description: "You won't see this post in your feed anymore." });
@@ -455,6 +446,15 @@ const FeedPostActions = ({
             <Repeat2 className="h-4 w-4 mr-2" />
             {post.repostCount > 0 ? post.repostCount : "Repost"}
           </Button>
+          {/* Canonical moderation report — self-gates (hidden for the
+              author, bounces anon to /login) and routes into the admin
+              moderation queue with a reason picker. */}
+          <ReportAbuseButton
+            entityType="feed_post"
+            entityId={post.id}
+            entityOwnerId={post.userId}
+            entityLabel="feed post"
+          />
         </div>
 
         <DropdownMenu>
@@ -464,7 +464,6 @@ const FeedPostActions = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handleReport}>Report Post</DropdownMenuItem>
             <DropdownMenuItem onClick={handleHide}>Hide Post</DropdownMenuItem>
             {post.userId === user?.id && (
               <>

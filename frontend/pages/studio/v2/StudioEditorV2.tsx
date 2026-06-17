@@ -89,6 +89,7 @@ import {
 } from "@/lib/studio/editor-v2/canvas-state";
 import {
   resolveLinkedContentColors,
+  stampEngagementAssetColors,
   type LinkedContentKind,
 } from "@/lib/studio/editor-v2/linked-content";
 import type { EngagementAssetKind } from "@/lib/studio/editor-v2/engagement-assets";
@@ -1770,15 +1771,19 @@ export default function StudioEditorV2() {
       assetId: string,
       atFraction?: { x: number; y: number },
     ) => {
-      // Engagement assets adopt the same warm-card defaults as
-      // linked-content (defined inside the widget factory) — no per-
-      // theme stamping at insert time today since the per-kind body
-      // renders its own chrome from the bound artifact. Theme-aware
-      // stamping can layer in later via a `resolveEngagementAssetColors`
-      // helper that mirrors `resolveLinkedContentColors`.
-      placeWidget(makeEngagementAssetWidget({ assetKind, assetId }), atFraction);
+      // #1587 — stamp the active theme/palette colours at insert time so
+      // a form/CTA dropped onto a themed canvas adopts that theme's
+      // chrome immediately. Same seam (`stampEngagementAssetColors` →
+      // `resolveLinkedContentColors`) that `applyThemeToState` uses to
+      // re-stamp on later theme switches, so the two paths can't drift.
+      placeWidget(
+        makeEngagementAssetWidget(
+          stampEngagementAssetColors({ assetKind, assetId }, state),
+        ),
+        atFraction,
+      );
     },
-    [placeWidget],
+    [placeWidget, state],
   );
 
   const updateWidgetPosition = useCallback(
@@ -2387,6 +2392,10 @@ export default function StudioEditorV2() {
         isPro: subscription.isPro,
         removeBrandingFlag: removeBranding,
       }),
+      // #1803 — thread the resolved Pro flag so the facade can enforce
+      // `proOnly` export profiles (4K60 / ProRes / broadcast) instead of
+      // trusting the picker UI alone.
+      isPro: subscription.isPro,
     });
     renderedBlobRef.current = result.blob;
     return result.blob;
@@ -3209,6 +3218,20 @@ export default function StudioEditorV2() {
                 onDelete={deleteScene}
                 onDuplicate={duplicateScene}
                 onReorder={reorderScenes}
+                // #589 — drop a background preset directly onto a scene tile
+                // to re-skin THAT scene (canvas drop only ever hits the
+                // active one). Same BG_PRESETS → scenePatchFromBgPreset seam
+                // the canvas drop uses.
+                onBackgroundDrop={
+                  playback.isPlaying
+                    ? undefined
+                    : (sceneId, bgValue) => {
+                        const preset = BG_PRESETS.find((p) => p.value === bgValue);
+                        if (!preset) return;
+                        updateScene(sceneId, scenePatchFromBgPreset(preset));
+                        toast({ title: t("studio.editor.backgroundToast", { label: preset.label }) });
+                      }
+                }
               />
             </div>
             <div
@@ -3243,6 +3266,7 @@ export default function StudioEditorV2() {
                   )}
                   {leftTab === "actions" && (
                     <ActionsPanel
+                      mediaKind={currentMediaKind}
                       openAction={openAction}
                       onOpenActionChange={handleOpenActionChange}
                       recordAsScene={recordAsScene}

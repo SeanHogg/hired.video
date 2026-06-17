@@ -161,34 +161,77 @@ export interface UpdateProfileInput {
   averageDeliveryDays?: number;
 }
 
+// `GET /api/creators/me` dedupe + cache (#734). The Creator workspace mounts
+// several self-gating components (CreatorProfileForm, LeaveCreatorProgramCard,
+// PayoutProfileForm, PayoutBalanceCard, …) that each independently fetch the
+// caller's creator profile on mount. Without this, that's 3-5 identical
+// round-trips per page load. An in-flight promise collapses concurrent mounts
+// onto ONE request, and a short TTL serves remounts from memory. Every mutation
+// below primes or clears the cache so callers never read stale enrollment.
+let _mineCache: { value: CreatorProfile | null; at: number } | null = null;
+let _mineInFlight: Promise<CreatorProfile | null> | null = null;
+const MINE_TTL_MS = 30_000;
+
+function primeMine(value: CreatorProfile | null): void {
+  _mineCache = { value, at: Date.now() };
+  _mineInFlight = null;
+}
+
+/** Drop the cached `getMine()` result. Call after any out-of-band change to the
+ *  caller's creator enrollment that doesn't return the fresh row. */
+export function invalidateMyCreatorProfile(): void {
+  _mineCache = null;
+  _mineInFlight = null;
+}
+
 export const creatorService = {
-  async getMine(): Promise<CreatorProfile | null> {
-    const res = await apiClient.get<CreatorProfile | null>("/api/creators/me");
-    return res.data ?? null;
+  async getMine(opts?: { force?: boolean }): Promise<CreatorProfile | null> {
+    if (!opts?.force) {
+      if (_mineCache && Date.now() - _mineCache.at < MINE_TTL_MS) return _mineCache.value;
+      if (_mineInFlight) return _mineInFlight;
+    }
+    const p = apiClient
+      .get<CreatorProfile | null>("/api/creators/me")
+      .then((res) => {
+        const value = res.data ?? null;
+        primeMine(value);
+        return value;
+      })
+      .catch((e) => {
+        _mineInFlight = null;
+        throw e;
+      });
+    _mineInFlight = p;
+    return p;
   },
 
   async optIn(input: OptInInput): Promise<CreatorProfile> {
     const res = await apiClient.post<CreatorProfile>("/api/creators/opt-in", input);
+    primeMine(res.data);
     return res.data;
   },
 
   async updateProfile(input: UpdateProfileInput): Promise<CreatorProfile> {
     const res = await apiClient.patch<CreatorProfile>("/api/creators/me", input);
+    primeMine(res.data);
     return res.data;
   },
 
   async enableProgram(program: CreatorProgram): Promise<CreatorProfile> {
     const res = await apiClient.post<CreatorProfile>(`/api/creators/me/programs/${program}`, {});
+    primeMine(res.data);
     return res.data;
   },
 
   async disableProgram(program: CreatorProgram): Promise<CreatorProfile> {
     const res = await apiClient.delete<CreatorProfile>(`/api/creators/me/programs/${program}`);
+    primeMine(res.data);
     return res.data;
   },
 
   async cancel(): Promise<CreatorProfile> {
     const res = await apiClient.post<CreatorProfile>("/api/creators/me/cancel", {});
+    primeMine(res.data);
     return res.data;
   },
 

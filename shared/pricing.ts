@@ -11,8 +11,20 @@
 // 1080p, voice cloning, brand kits, unlimited published videos) — the
 // per-token rate alone is intentionally not the cheapest option.
 export const PRO_MONTHLY_PRICE = 9.95;
+/** Fractional discount applied to annual (yearly) billing vs paying 12× the
+ *  monthly price. SSoT for the "20% off" claim across pricing copy, the
+ *  subscribe route, and PRO_YEARLY_PRICE. */
+export const ANNUAL_DISCOUNT_RATE = 0.2;
+/** Canonical yearly price for any monthly price: 12 months at the annual
+ *  discount, rounded to cents. Every "what's the yearly price?" path should
+ *  call this instead of re-deriving the factor (e.g. the old `monthly × 10`
+ *  fallback in routes/billing.ts that silently meant only ~16.7% off, not the
+ *  advertised 20%). */
+export function yearlyPriceFromMonthly(monthly: number): number {
+  return +(monthly * 12 * (1 - ANNUAL_DISCOUNT_RATE)).toFixed(2);
+}
 /** 20% annual discount: 9.95 × 12 × 0.8 = 95.52 */
-export const PRO_YEARLY_PRICE = +(PRO_MONTHLY_PRICE * 12 * 0.8).toFixed(2);
+export const PRO_YEARLY_PRICE = yearlyPriceFromMonthly(PRO_MONTHLY_PRICE);
 
 /** Canonical per-seat monthly price in cents. Every workforce seat / creator
  *  seat is $9.95 (see project_pricing_seats). Single source of truth for the

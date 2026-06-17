@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { z } from "zod";
+import { z } from "zod";
 import { UuidLikeSchema, UUID_LIKE_REGEX } from "../../../../shared/validation.js";
 import { desc, eq } from "drizzle-orm";
 import type { Variables, AppEnv } from "../../types/index.js";
@@ -15,6 +15,7 @@ import {
   getUserDetail,
   assignUserRole,
   setUserStatus,
+  setUserSystemFlag,
   resetUserMonthlyTokens,
   grantUserTokens,
   sendUserPasswordReset,
@@ -38,6 +39,8 @@ const UserSearchSchema = z.object({
   search: z.string().optional(),
   role: z.string().optional(),
   status: z.enum(["active", "suspended", "banned"]).optional(),
+  // Restrict the list to editorial / house authors (users.is_system = true).
+  editorial: z.coerce.boolean().optional(),
 });
 
 // Bulk-action cap mirrors the page size — the /admin/users UI can only
@@ -53,6 +56,10 @@ const AssignRoleSchema = z.object({
 
 const SetStatusSchema = z.object({
   status: z.enum(["active", "suspended"], { error: "status must be 'active' or 'suspended'" }),
+});
+
+const SetSystemSchema = z.object({
+  isSystem: z.boolean({ error: "isSystem must be a boolean" }),
 });
 
 const AssignModuleSchema = z.object({
@@ -125,6 +132,17 @@ userMgmtRoutes.put("/:id/status", async (c) => {
 
   await setUserStatus(c.var.user.sub, c.req.param("id"), body.data.status);
   return c.json(ok({ userId: c.req.param("id"), status: body.data.status }), 200);
+});
+
+// Toggle the editorial / house-author flag (users.is_system). SuperAdmin-only
+// via the superAdminMiddleware applied at the parent /admin/impersonate mount.
+userMgmtRoutes.put("/:id/system", async (c) => {
+  const body = SetSystemSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
+
+  const result = await setUserSystemFlag(c.var.user.sub, c.req.param("id"), body.data.isSystem);
+  if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
+  return c.json(ok({ userId: c.req.param("id"), isSystem: body.data.isSystem }), 200);
 });
 
 userMgmtRoutes.post("/:id/modules", async (c) => {

@@ -361,7 +361,7 @@ function DocumentBlockView({
     >
       {/* Per-block action bar — shown when selected. */}
       {selected && (
-        <div className="absolute -top-3 right-2 z-10 flex items-center gap-1 rounded-full border border-border bg-white px-1 py-0.5 shadow-sm">
+        <div className="absolute -top-3 right-2 z-10 flex items-center gap-1 rounded-full border border-border bg-card px-1 py-0.5 shadow-sm">
           {onMoveUp && (
             <button type="button" aria-label="Move up" className="p-1 hover:text-brand-purple" onClick={(e) => { e.stopPropagation(); onMoveUp(); }}>
               <ArrowUp className="h-3.5 w-3.5" />

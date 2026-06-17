@@ -299,8 +299,8 @@ function GameSettingsInspector({
             </Field>
             <p className="text-[10px] text-muted-foreground">
               Sprites are kinematic by default — set a sprite's body kind to
-              <code className="mx-1 rounded bg-slate-100 px-1">dynamic</code>
-              or <code className="rounded bg-slate-100 px-1">static</code> in
+              <code className="mx-1 rounded bg-muted px-1">dynamic</code>
+              or <code className="rounded bg-muted px-1">static</code> in
               the sprite inspector to make them participate.
             </p>
           </>

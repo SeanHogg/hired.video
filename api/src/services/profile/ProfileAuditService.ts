@@ -260,9 +260,9 @@ function activityCheck(p: ProfileSnapshot): AuditCheck {
 
 function openToWorkCheck(p: ProfileSnapshot): AuditCheck {
   if (p.openToWork) {
-    return { id: "openToWork", label: "Open to work", status: "pass", detail: "Open-to-work flag is on — you'll surface higher in recruiter search." };
+    return { id: "openToWork", label: "Open to work", status: "pass", detail: "Open-to-work signal is on — you'll surface higher in recruiter search. It's a search-ranking signal, not a visibility setting (your profile visibility is controlled separately)." };
   }
-  return { id: "openToWork", label: "Open to work", status: "warn", detail: "Open-to-work is off. Turn it on if you're passively open — recruiter search still uses it as a signal." };
+  return { id: "openToWork", label: "Open to work", status: "warn", detail: "Open-to-work is off. Turn it on if you're passively open — it's a signal that boosts you in recruiter search, separate from your profile visibility setting." };
 }
 
 function avatarCheck(p: ProfileSnapshot): AuditCheck {

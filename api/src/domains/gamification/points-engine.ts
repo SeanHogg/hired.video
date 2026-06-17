@@ -74,6 +74,13 @@ export interface PointsEngineOpts {
    *  when the timezone can't be determined — the streak engine falls
    *  back to UTC. */
   getUserTimezone?: (userId: string) => Promise<string | null>;
+  /** #1117 — source the phase-4 cluster signals (sybil signup-IP + device
+   *  fingerprint). Injected (and cached by the caller) so the engine stays
+   *  free of cross-aggregate DB access, mirroring `getUserTimezone`. When
+   *  absent, those heuristics stay dormant exactly as before. */
+  getExtraFraudSignals?: (
+    userId: string,
+  ) => Promise<{ accountsOnSignupIp?: number; accountsOnDeviceFingerprint?: number }>;
 }
 
 export class PointsEngine {
@@ -255,10 +262,17 @@ export class PointsEngine {
   private async maybeAdvanceStreak(action: string, ctx: AwardContext): Promise<void> {
     if (!STREAK_SIGNAL_ACTIONS.has(action as ActionKey)) return;
 
-    const [current, timezone] = await Promise.all([
-      this.repo.findStreak(ctx.userId),
-      this.opts.getUserTimezone ? this.opts.getUserTimezone(ctx.userId) : Promise.resolve(null),
-    ]);
+    const timezone = this.opts.getUserTimezone
+      ? await this.opts.getUserTimezone(ctx.userId)
+      : null;
+    const activityDate = localDay(timezone, this.now());
+
+    // General engagement streak — advances on ANY signal and pays the
+    // streak-bonus POINTS. The milestone BADGE is intentionally NOT awarded
+    // here: per #1136 the "On Fire" family of badges is routed off the
+    // task-completion streak below so they can't be farmed via non-task
+    // engagement (saved searches, feed posts, …).
+    const current = await this.repo.findStreak(ctx.userId);
     const out = rollStreak({
       current: current
         ? {
@@ -268,7 +282,7 @@ export class PointsEngine {
             lastBonusMilestone: current.lastBonusMilestone,
           }
         : null,
-      activityDate: localDay(timezone, this.now()),
+      activityDate,
     });
 
     await this.repo.upsertStreak(ctx.userId, {
@@ -293,10 +307,43 @@ export class PointsEngine {
         refType: "streak_milestone",
         metadata: { milestoneDay: milestone.day, currentStreak: out.next.currentStreak },
       });
+    }
 
-      if (milestone.badgeSlug && this.opts.onBadgeUnlock) {
-        await this.opts.onBadgeUnlock(ctx.userId, milestone.badgeSlug);
-      }
+    // Task-completion streak (#1136) — advances ONLY on task closes and is
+    // the SOLE source of the streak milestone badges. Shares the same
+    // activityDate so the day boundary is identical to the general streak.
+    if (action === ACTIONS.TASK_COMPLETE_SYSTEM || action === ACTIONS.TASK_COMPLETE_USER) {
+      await this.maybeAdvanceTaskStreak(ctx, activityDate);
+    }
+  }
+
+  /** Advance the task-completion streak and award the milestone BADGE only.
+   *  The engagement points for the day were already paid by the general
+   *  streak, so this grants no second bonus ledger row. */
+  private async maybeAdvanceTaskStreak(ctx: AwardContext, activityDate: string): Promise<void> {
+    const current = await this.repo.findTaskStreak(ctx.userId);
+    const out = rollStreak({
+      current: current
+        ? {
+            currentStreak: current.currentStreak,
+            longestStreak: current.longestStreak,
+            lastActivityDate: current.lastActivityDate ?? null,
+            lastBonusMilestone: current.lastBonusMilestone,
+          }
+        : null,
+      activityDate,
+    });
+
+    await this.repo.upsertTaskStreak(ctx.userId, {
+      currentStreak: out.next.currentStreak,
+      longestStreak: out.next.longestStreak,
+      lastActivityDate: out.next.lastActivityDate,
+      lastBonusAt: out.next.lastBonusAt ?? null,
+      lastBonusMilestone: out.next.lastBonusMilestone,
+    });
+
+    if (out.milestoneAwarded?.badgeSlug && this.opts.onBadgeUnlock) {
+      await this.opts.onBadgeUnlock(ctx.userId, out.milestoneAwarded.badgeSlug);
     }
   }
 
@@ -349,11 +396,20 @@ export class PointsEngine {
     }
     const recentBuckets = Array.from(buckets.values());
 
+    // #1117 — source the cluster signals (sybil signup-IP + device
+    // fingerprint) so those heuristics actually fire. Injected + cached by
+    // the caller; absent → undefined → heuristics stay dormant.
+    const extra = this.opts.getExtraFraudSignals
+      ? await this.opts.getExtraFraudSignals(userId)
+      : {};
+
     const flags = evaluateFraud({
       userId,
       recentUserTaskClosesPerMinute: recentBuckets,
       recentUserTaskClosesLastHour: recent.length,
       earningDayBuckets24h: 1, // placeholder for v1 — broadened in phase 4
+      accountsOnSignupIp: extra.accountsOnSignupIp,
+      accountsOnDeviceFingerprint: extra.accountsOnDeviceFingerprint,
       recentLedgerSample: recent.slice(0, 20).map((r) => ({
         action: r.action,
         delta: r.delta,

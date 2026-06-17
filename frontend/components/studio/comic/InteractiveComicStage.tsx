@@ -62,14 +62,14 @@ export default function InteractiveComicStage({ state, onChange }: InteractiveCo
 
   if (!activePage) {
     return (
-      <div className="flex h-full items-center justify-center bg-slate-50">
+      <div className="flex h-full items-center justify-center bg-muted">
         <Button onClick={addPage}>Add first page</Button>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full bg-slate-50">
+    <div className="flex h-full bg-muted">
       <div className="w-48 border-r bg-background">
         <div className="flex items-center justify-between border-b px-2 py-1.5">
           <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Pages</span>

@@ -51,11 +51,11 @@ export function NextBestActionCard({ recommendations, loading = false }: NextBes
     return (
       <Card className="border-brand-blue/20 bg-brand-blue/5">
         <CardHeader>
-          <div className="h-6 w-48 bg-gray-200 rounded animate-pulse" />
+          <div className="h-6 w-48 bg-muted rounded animate-pulse" />
         </CardHeader>
         <CardContent className="space-y-2">
           {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="h-14 w-full bg-gray-200 rounded animate-pulse" />
+            <div key={i} className="h-14 w-full bg-muted rounded animate-pulse" />
           ))}
         </CardContent>
       </Card>

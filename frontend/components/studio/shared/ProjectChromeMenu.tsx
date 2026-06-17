@@ -181,16 +181,20 @@ export function useProjectChrome({
             open={myTemplatesOpen}
             onOpenChange={setMyTemplatesOpen}
             onEditTemplate={(t) => {
-              // Loading the source project into the editor is a separate
-              // follow-up flow (#633). For now the panel closes and points
-              // the user at their Recent list.
+              // #633 — Edit now loads the template's source project into the
+              // editor directly instead of just toasting a hint. Templates
+              // carry `sourceProjectId`; navigating there opens the live
+              // editor on the project the template was published from.
               setMyTemplatesOpen(false);
-              toast({
-                title: "Open template to edit",
-                description: t.sourceProjectId
-                  ? "Switch to the source project from Recent to keep editing."
-                  : "Templates without a source project can be edited from the marketplace listing.",
-              });
+              if (t.sourceProjectId) {
+                navigate(`/studio/${encodeURIComponent(t.sourceProjectId)}`);
+              } else {
+                toast({
+                  title: "No source project",
+                  description:
+                    "This template has no source project to edit — edit it from the marketplace listing.",
+                });
+              }
             }}
           />
         </Suspense>

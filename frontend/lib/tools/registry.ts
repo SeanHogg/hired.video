@@ -206,6 +206,60 @@ async function runSkillExtractor(ctx: ToolRunContext): Promise<NormalizedToolRun
   };
 }
 
+const INTERVIEW_QUESTION_TYPES = [
+  "technical",
+  "behavioral",
+  "system-design",
+  "product",
+  "general",
+] as const;
+
+async function runInterviewQuestions(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  // The endpoint requires a job description (or a detailed target-role brief)
+  // ≥20 chars. "From my resume" alone has no JD, so the coach must supply the
+  // target — its description tells the model that.
+  const jobDescription = asString(ctx.args.jobDescription);
+  if (!jobDescription || jobDescription.trim().length < 20) {
+    throw new Error(
+      "A target job description or detailed target-role brief (20+ characters) is required to generate interview questions.",
+    );
+  }
+  const rawType = asString(ctx.args.type);
+  const type = (INTERVIEW_QUESTION_TYPES as readonly string[]).includes(rawType ?? "")
+    ? rawType
+    : "behavioral";
+  const count =
+    typeof ctx.args.count === "number" && ctx.args.count >= 3 && ctx.args.count <= 10
+      ? Math.round(ctx.args.count)
+      : 5;
+  // Best-effort: personalise against the active resume when one is bound.
+  let resumeText: string | undefined;
+  try {
+    resumeText = (await resolveResumeText(ctx)).slice(0, 5000);
+  } catch {
+    resumeText = undefined;
+  }
+  const { data } = await apiClient.post<any>("/api/interview/questions", {
+    jobDescription: jobDescription.slice(0, 5000),
+    resumeText,
+    type,
+    count,
+  });
+  const questions: Array<{ question: string; category: string; timeLimit?: number }> = Array.isArray(
+    data?.questions,
+  )
+    ? data.questions
+    : [];
+  return {
+    summary: `Generated ${questions.length} ${type} interview question${questions.length === 1 ? "" : "s"}.`,
+    recommendations: questions.map((q) => ({
+      title: q.question,
+      description: [q.category, q.timeLimit ? `${q.timeLimit}s` : null].filter(Boolean).join(" · "),
+    })),
+    raw: data,
+  };
+}
+
 async function runJobMatch(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
   const jobDescription = asString(ctx.args.jobDescription);
   if (!jobDescription) throw new Error("A job description is required for job matching.");
@@ -1073,6 +1127,38 @@ export const toolRegistry: ToolDefinition[] = [
       additionalProperties: false,
     },
     run: runJobMatch,
+  },
+  {
+    id: "interview-questions",
+    label: "Interview Questions",
+    description:
+      "Generate calibrated interview questions for a target role from a job description (or a detailed target-role brief). Personalises against the user's active resume when one is open. Use when the user asks to practise or prep interview questions. Requires a jobDescription — if the user only names a role, write a short JD for it before calling.",
+    icon: ListChecks,
+    accentClassName: "bg-sky-100 text-sky-600",
+    route: "/tools/interview-questions",
+    inputs: ["resume", "job"],
+    parameters: {
+      type: "object",
+      properties: {
+        jobDescription: {
+          type: "string",
+          description:
+            "The target job description (or a detailed target-role brief, 20+ characters) to generate questions for.",
+        },
+        type: {
+          type: "string",
+          enum: ["technical", "behavioral", "system-design", "product", "general"],
+          description: "Interview type. Defaults to behavioral.",
+        },
+        count: {
+          type: "number",
+          description: "How many questions to generate (3–10). Defaults to 5.",
+        },
+      },
+      required: ["jobDescription"],
+      additionalProperties: false,
+    },
+    run: runInterviewQuestions,
   },
   {
     id: "skill-extractor",

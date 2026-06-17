@@ -59,6 +59,27 @@ export interface RenderOptions {
    *  the batch facade so the same Timeline can produce a YouTube
    *  1080p60 master AND a TikTok 9:16 vertical from one click. */
   platformProfile?: PlatformExportProfile;
+  /** Caller's resolved Pro entitlement. Required to export a `proOnly`
+   *  platform profile (`youtube-4k60` / `vimeo-prores-master` /
+   *  `broadcast-1080i`). The picker UI greys these out for free users,
+   *  but the facade enforces it too so a programmatic / batch caller
+   *  can't slip a Pro-only master past the paywall (#1803). Defaults to
+   *  false — callers MUST pass the resolved boolean to unlock Pro
+   *  profiles. */
+  isPro?: boolean;
+}
+
+/**
+ * Thrown by the render facade when a `proOnly` platform profile is
+ * requested without Pro entitlement (#1803). Carries a stable `code` so
+ * the export UI can show an upgrade prompt rather than a generic error.
+ */
+export class RenderEntitlementError extends Error {
+  readonly code = "PRO_REQUIRED" as const;
+  constructor(profileId: string) {
+    super(`Export profile '${profileId}' requires a Pro subscription.`);
+    this.name = "RenderEntitlementError";
+  }
 }
 
 export interface RenderResult {
@@ -123,6 +144,12 @@ export async function renderTimeline(
     throw new Error(
       "Timeline is not renderable — empty, or has overlapping clips on a track.",
     );
+  }
+  // #1803 — enforce Pro-only export profiles at the facade, not just in
+  // the picker UI. Batch renders flow through here per-profile (with
+  // `...opts` carrying isPro), so this single guard covers both paths.
+  if (opts.platformProfile?.proOnly && !opts.isPro) {
+    throw new RenderEntitlementError(opts.platformProfile.id);
   }
   const engineId = pickRenderEngine(timeline);
   const strategy = await loadStrategy(engineId);

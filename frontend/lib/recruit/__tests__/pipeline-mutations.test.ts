@@ -26,6 +26,7 @@ function entry(id: string, stage: PipelineEntry["stage"]): PipelineEntry {
   return {
     id,
     jobId: "job-1",
+    jobApplicationId: null,
     candidateUserId: null,
     candidateName: `Cand ${id}`,
     candidateEmail: null,

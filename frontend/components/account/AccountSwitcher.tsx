@@ -101,7 +101,7 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
       case "recruiter":
         return "bg-green-100 text-green-800";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-muted text-foreground";
     }
   };
 
@@ -194,7 +194,7 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem className="text-sm text-gray-600 p-3">
+        <DropdownMenuItem className="text-sm text-muted-foreground p-3">
           <div>
             <p className="font-medium">Need to create a new account?</p>
             <p className="text-xs mt-1">

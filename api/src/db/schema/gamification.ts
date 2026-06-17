@@ -166,6 +166,37 @@ export const pointsStreaks = pgTable(
 export type PointsStreaks = typeof pointsStreaks.$inferSelect;
 
 /**
+ * Task-completion streak (#1136). A SECOND, parallel streak that advances
+ * ONLY on `task.complete.system` / `task.complete.user` — distinct from the
+ * general `points_streaks` that advances on any of the engagement signals.
+ * Product spec ties the "On Fire" badge (and the 14/30/60/90 rungs) to a
+ * task-completion streak specifically, so the engine routes the streak
+ * milestone BADGES off this counter while the general streak keeps paying
+ * the engagement streak-bonus points. Same shape as `points_streaks`.
+ */
+export const pointsTaskStreaks = pgTable(
+  "points_task_streaks",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    currentStreak: integer("current_streak").default(0).notNull(),
+    longestStreak: integer("longest_streak").default(0).notNull(),
+    lastActivityDate: date("last_activity_date"),
+    lastBonusAt: timestamp("last_bonus_at", { withTimezone: true }),
+    lastBonusMilestone: integer("last_bonus_milestone").default(0).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    lastActivityIdx: index("idx_points_task_streaks_last_activity")
+      .on(t.lastActivityDate)
+      .where(sql`${t.lastActivityDate} IS NOT NULL`),
+  }),
+);
+
+export type PointsTaskStreaks = typeof pointsTaskStreaks.$inferSelect;
+
+/**
  * Fraud flags. Open flags surface in the superadmin review queue.
  * `severity = high` => engine auto-suspends. `medium` => engine flags
  * but lets earning continue; `low` => observational only.

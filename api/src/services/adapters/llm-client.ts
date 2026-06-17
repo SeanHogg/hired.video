@@ -521,8 +521,13 @@ function buildProfileChain(
  * Charge the token-ledger after a successful LLM call. Fire-and-forget
  * — billing failures must NEVER fail an otherwise-successful AI
  * response.
+ *
+ * Exported for the metering regression suite (#429): this is the single
+ * choke point every metered LLM call flows through, so asserting its
+ * gate (charge iff a billed user + positive usage) protects the whole
+ * AI surface from silently re-introducing the "forgot to bill" leak.
  */
-async function chargeLedger(
+export async function chargeLedger(
   user: JwtPayload | null | undefined,
   featureKey: string,
   usage: LLMUsage | undefined,

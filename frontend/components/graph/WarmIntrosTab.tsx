@@ -69,6 +69,24 @@ export function WarmIntrosTab() {
     }
   }
 
+  async function decline(conversationId: string) {
+    setBusyId(conversationId);
+    setError(null);
+    try {
+      await graphService.declineIntro(conversationId);
+      await reload();
+    } catch (err: any) {
+      const msg = String(err?.message ?? err ?? "");
+      if (msg.includes("403")) {
+        setError("Only the asked mutual can decline this intro.");
+      } else {
+        setError("Couldn't decline the intro. Please try again.");
+      }
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-2">
@@ -142,16 +160,26 @@ export function WarmIntrosTab() {
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
                   {r.status === "pending" ? (
-                    <Button
-                      size="sm"
-                      onClick={() => forward(r.conversationId)}
-                      disabled={busyId === r.conversationId}
-                    >
-                      {busyId === r.conversationId && (
-                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                      )}
-                      Forward intro
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => forward(r.conversationId)}
+                        disabled={busyId === r.conversationId}
+                      >
+                        {busyId === r.conversationId && (
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                        )}
+                        Forward intro
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => decline(r.conversationId)}
+                        disabled={busyId === r.conversationId}
+                      >
+                        Decline
+                      </Button>
+                    </>
                   ) : (
                     <WarmIntroStatusBadge status={r.status} />
                   )}
@@ -223,5 +251,9 @@ function WarmIntroStatusBadge({ status }: { status: WarmIntroSummary["status"] }
           Forwarded
         </Badge>
       );
+    case "declined":
+      return <Badge variant="destructive">Declined</Badge>;
+    case "expired":
+      return <Badge variant="outline">Expired</Badge>;
   }
 }

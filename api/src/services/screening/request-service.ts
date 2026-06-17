@@ -301,6 +301,60 @@ async function recomputeStatus(db: Db, requestId: string): Promise<void> {
     .where(eq(screeningRequests.id, requestId));
 }
 
+/**
+ * Resolve a job application into the candidate + company context needed to send
+ * it a screening (#1855). The route authorizes the returned `companyId` before
+ * calling `createScreeningRequest`, so this only reads — it never writes.
+ *
+ * Returns null when the application doesn't exist. `companyId` is null when the
+ * job has no company association (legacy postings) — the caller turns that into
+ * a 409 ("link this job to a company first") since a screening is company-scoped.
+ */
+export async function resolveApplicationForScreening(
+  db: Db,
+  applicationId: string,
+): Promise<{
+  applicationId: string;
+  jobId: string | null;
+  companyId: string | null;
+  candidateUserId: string;
+  candidateEmail: string;
+  candidateName: string | null;
+} | null> {
+  const { jobApplications, jobItems, users } = schema;
+  const [app] = await db
+    .select()
+    .from(jobApplications)
+    .where(eq(jobApplications.id, applicationId))
+    .limit(1);
+  if (!app) return null;
+
+  const [candidate] = await db
+    .select({ email: users.email, name: users.name })
+    .from(users)
+    .where(eq(users.id, app.userId))
+    .limit(1);
+
+  let companyId: string | null = null;
+  if (app.jobId) {
+    const [job] = await db
+      .select({ companyId: jobItems.companyId })
+      .from(jobItems)
+      .where(eq(jobItems.id, app.jobId))
+      .limit(1);
+    companyId = job?.companyId ?? null;
+  }
+
+  return {
+    applicationId: app.id,
+    jobId: app.jobId,
+    companyId,
+    candidateUserId: app.userId,
+    candidateEmail: candidate?.email ?? "",
+    candidateName: candidate?.name ?? null,
+  };
+}
+
 /** List a company's sent requests (newest first) for the recruiter dashboard. */
 export async function listRequests(db: Db, companyIds: string[]) {
   if (companyIds.length === 0) return [];

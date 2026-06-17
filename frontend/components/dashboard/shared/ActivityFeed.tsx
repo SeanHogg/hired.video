@@ -46,10 +46,10 @@ export function ActivityFeed({
                 key={index}
                 className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg"
               >
-                <div className="w-2 h-2 bg-gray-200 rounded-full mt-2 flex-shrink-0 animate-pulse" />
+                <div className="w-2 h-2 bg-muted rounded-full mt-2 flex-shrink-0 animate-pulse" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse" />
-                  <div className="h-3 w-1/2 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-4 w-3/4 bg-muted rounded animate-pulse" />
+                  <div className="h-3 w-1/2 bg-muted rounded animate-pulse" />
                 </div>
               </div>
             ))}

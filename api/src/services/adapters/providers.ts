@@ -365,3 +365,99 @@ export function resolveProfileChainForUseCase(useCase: LLMUseCase): InferencePro
   const { fallbacks, ...primary } = profile;
   return [primary, ...(fallbacks ?? [])];
 }
+
+// ── Feature-key → use-case registry (#457) ───────────────────────────────────
+//
+// `ai_usage_records.feature_key` is the per-call billing dimension, but it's
+// finer-grained than the use-case profile that selected the model (e.g.
+// `career_360_suggest` / `career_360_plan` / `career_360_evaluate` all run on
+// the one `career_360` profile). This registry is the single source of truth
+// for which feature keys roll up to which use case, so SuperAdmin can attribute
+// spend per use case at a glance instead of eyeballing 65 raw feature keys.
+//
+// Derived from the actual `client.callX(featureKey, { useCase })` call sites —
+// keep it in sync when adding a new AI call (the SA `/use-cases` row for that
+// use case lists the key once registered). The record's value type forces every
+// entry to be a real `LLMUseCase`.
+export const FEATURE_KEY_USE_CASE: Record<string, LLMUseCase> = {
+  assessment_grading: "reviews",
+  auto_apply_match: "match",
+  auto_apply_tailor: "auto_apply",
+  autofill_analyze_form: "autofill",
+  autofill_analyze_questions: "autofill",
+  autofill_generate_answers: "autofill",
+  career_360_evaluate: "career_360",
+  career_360_plan: "career_360",
+  career_360_suggest: "career_360",
+  career_copilot: "career",
+  career_resilience: "career",
+  chat: "chat",
+  comic_scaffold: "studio_script",
+  company_extract_brief: "company_brief",
+  content_safety_scan: "reviews",
+  course_recommend: "course_recommend",
+  dashboard_insights: "dashboard_summary",
+  discovery_career_guide: "discovery",
+  email_classify: "email_classify",
+  email_summary: "email_summary",
+  inbox_draft_jd: "inbox_draft_jd",
+  interview_analyze: "interview_analyze",
+  interview_answer_score: "interview_answer_score",
+  interview_questions: "interview_questions",
+  linkedin_post_gen: "linkedin_post",
+  linkedin_post_share: "linkedin_post",
+  match_analyze: "match",
+  match_bycontent: "match",
+  match_byid: "match",
+  match_insights: "match_insights",
+  match_tailor: "match_tailor",
+  message_personalize: "recruiter_outreach",
+  ops_meeting_summary: "chat",
+  page_video_scaffold: "studio_script",
+  profile_audit: "profile_audit",
+  recruiter_agent_intake: "recruiter_match",
+  recruiter_agent_score: "recruiter_match",
+  recruiter_extract_profile: "recruiter_match",
+  recruiter_match_score_candidates: "recruiter_match",
+  recruiter_match_score_jobs: "recruiter_match",
+  recruiter_outreach: "recruiter_outreach",
+  resume_consolidate_highlights: "resume_consolidate_highlights",
+  resume_parse_ai: "resume_optimize",
+  resume_roast: "resume_roast",
+  resume_shorten_bullet: "resume_consolidate_highlights",
+  resume_summary: "resume_summary",
+  resume_template_extractor: "resume_consolidate_highlights",
+  salary_analyze: "salary_estimate",
+  salary_negotiation: "salary_negotiation",
+  scorecard_bias_check: "scorecard_bias_check",
+  skill_extractor: "skill_extract",
+  studio_ats_package: "studio_misc",
+  studio_clarity_score: "reviews",
+  studio_dubbing_translate: "studio_misc",
+  studio_edit_script: "studio_edit_script",
+  studio_game_agent: "studio_game_agent",
+  studio_hook_optimize: "studio_script",
+  studio_interview_score: "interview_analyze",
+  studio_interview_talking_points: "interview_questions",
+  studio_script_rewrite: "studio_misc",
+  studio_skills_demo_script: "studio_script",
+  studio_storyboard: "studio_script",
+  studio_thumbnail_score: "studio_misc",
+  video_pitch_script: "video_pitch_script",
+  visitor_chat: "chat",
+};
+
+/** The use case a billing feature key rolls up to, or `undefined` for an
+ *  unregistered key (a new AI call not yet added to the registry). */
+export function useCaseForFeatureKey(featureKey: string): LLMUseCase | undefined {
+  return FEATURE_KEY_USE_CASE[featureKey];
+}
+
+/** All registered feature keys that roll up to `useCase`, sorted. Empty when
+ *  none map to it. Drives the SA `/use-cases` per-row feature-key list. */
+export function featureKeysForUseCase(useCase: LLMUseCase): string[] {
+  return Object.entries(FEATURE_KEY_USE_CASE)
+    .filter(([, uc]) => uc === useCase)
+    .map(([key]) => key)
+    .sort();
+}

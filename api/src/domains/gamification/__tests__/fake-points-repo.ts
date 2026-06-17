@@ -25,6 +25,7 @@ import type {
   PointsLedgerInsert,
   PointsCountersRow,
   PointsStreakRow,
+  PointsTaskStreakRow,
   PointsFraudFlagRow,
   PointsFraudFlagInsert,
   BadgeRow,
@@ -45,6 +46,7 @@ export class FakePointsRepo implements IPointsRepository {
   ledger: PointsLedgerRow[] = [];
   counters = new Map<string, PointsCountersRow>();
   streaks = new Map<string, PointsStreakRow>();
+  taskStreaks = new Map<string, PointsTaskStreakRow>();
   fraudFlags: PointsFraudFlagRow[] = [];
   badges: BadgeRow[] = [];
   userBadges: UserBadgeRow[] = [];
@@ -276,6 +278,34 @@ export class FakePointsRepo implements IPointsRepository {
     return row;
   }
 
+  async findTaskStreak(userId: string): Promise<PointsTaskStreakRow | null> {
+    return this.taskStreaks.get(userId) ?? null;
+  }
+
+  async upsertTaskStreak(
+    userId: string,
+    patch: {
+      currentStreak: number;
+      longestStreak: number;
+      lastActivityDate: string;
+      lastBonusAt?: Date | null;
+      lastBonusMilestone?: number;
+    },
+  ): Promise<PointsTaskStreakRow> {
+    const existing = this.taskStreaks.get(userId);
+    const row: PointsTaskStreakRow = {
+      userId,
+      currentStreak: patch.currentStreak,
+      longestStreak: patch.longestStreak,
+      lastActivityDate: patch.lastActivityDate,
+      lastBonusAt: patch.lastBonusAt ?? existing?.lastBonusAt ?? null,
+      lastBonusMilestone: patch.lastBonusMilestone ?? existing?.lastBonusMilestone ?? 0,
+      updatedAt: this.now(),
+    } as PointsTaskStreakRow;
+    this.taskStreaks.set(userId, row);
+    return row;
+  }
+
   // ── fraud ───────────────────────────────────────────────────────────
   async insertFraudFlag(input: PointsFraudFlagInsert): Promise<PointsFraudFlagRow> {
     const row: PointsFraudFlagRow = {
@@ -315,6 +345,16 @@ export class FakePointsRepo implements IPointsRepository {
     f.reviewerNotes = notes;
     f.reviewedAt = this.now();
     return f;
+  }
+
+  // #1117 — cluster-signal counts; tests set these to exercise the heuristics.
+  signupIpAccounts = 0;
+  deviceFpAccounts = 0;
+  async countAccountsOnSignupIp(): Promise<number> {
+    return this.signupIpAccounts;
+  }
+  async countAccountsOnDeviceFingerprint(): Promise<number> {
+    return this.deviceFpAccounts;
   }
 
   // ── badges ──────────────────────────────────────────────────────────

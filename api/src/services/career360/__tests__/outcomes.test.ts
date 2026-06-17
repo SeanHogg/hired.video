@@ -24,7 +24,20 @@ import {
   type OutcomeSignal,
 } from "../../../../../shared/career360-types.js";
 
-const NO_FUNNEL: FunnelCounts = { applied: 0, interviewed: 0, offered: 0 };
+/** Build a FunnelCounts with zero defaults so each test states only the
+ *  fields it exercises. */
+function fc(partial: Partial<FunnelCounts>): FunnelCounts {
+  return {
+    applied: 0,
+    interviewed: 0,
+    offered: 0,
+    practiceAvg: null,
+    practiceCount: 0,
+    ...partial,
+  };
+}
+
+const NO_FUNNEL: FunnelCounts = fc({});
 
 function signal(outcomes: OutcomeSignal[], id: OutcomeSegmentId): OutcomeSignal {
   const found = outcomes.find((o) => o.id === id);
@@ -80,15 +93,46 @@ describe("computeOutcomes — shape + ordering", () => {
 describe("computeOutcomes — sample-size floors", () => {
   it("keeps callbacks/offers 'unknown' below the 3-application floor", () => {
     // 2 applied, both reached interview — a perfect ratio, but too few to trust.
-    const out = computeOutcomes({ applied: 2, interviewed: 2, offered: 1 }, null);
+    const out = computeOutcomes(fc({ applied: 2, interviewed: 2, offered: 1 }), null);
     assert.equal(signal(out, "callback-rate").health, "unknown");
     assert.equal(signal(out, "offer-rate").health, "unknown");
     assert.equal(signal(out, "callback-rate").sampleSize, 2);
   });
 
-  it("keeps interview-conversion 'unknown' below the 2-interview floor", () => {
-    const out = computeOutcomes({ applied: 10, interviewed: 1, offered: 1 }, null);
+  it("keeps interview-conversion 'unknown' below the 2-interview floor with no practice", () => {
+    const out = computeOutcomes(fc({ applied: 10, interviewed: 1, offered: 1 }), null);
     assert.equal(signal(out, "interview-conversion").health, "unknown");
+  });
+});
+
+describe("computeOutcomes — interview-practice readiness fallback (#2093)", () => {
+  it("falls back to practice readiness when the real interview funnel is thin", () => {
+    // No interviews yet, but a strong practice average → not grey.
+    const out = signal(
+      computeOutcomes(fc({ interviewed: 1, practiceAvg: 80, practiceCount: 3 }), null),
+      "interview-conversion",
+    );
+    assert.equal(out.health, "good");
+    assert.equal(out.rate, null, "practice readiness is a proxy, not a measured rate");
+    assert.equal(out.sampleSize, 3);
+  });
+
+  it("prefers the real funnel over practice once there are enough interviews", () => {
+    // 2 interviews → real ratio 0/2 = poor, even with great practice scores.
+    const out = signal(
+      computeOutcomes(fc({ interviewed: 2, offered: 0, practiceAvg: 95, practiceCount: 5 }), null),
+      "interview-conversion",
+    );
+    assert.equal(out.health, "poor");
+    assert.equal(out.sampleSize, 2);
+  });
+
+  it("bands a mediocre practice average as moderate", () => {
+    const out = signal(
+      computeOutcomes(fc({ practiceAvg: 60, practiceCount: 1 }), null),
+      "interview-conversion",
+    );
+    assert.equal(out.health, "moderate");
   });
 });
 
@@ -96,19 +140,19 @@ describe("computeOutcomes — funnel banding", () => {
   it("bands callback rate good/moderate/poor at the documented cut-offs", () => {
     // good: 4/10 = 0.40 ≥ 0.30
     assert.equal(
-      signal(computeOutcomes({ applied: 10, interviewed: 4, offered: 0 }, null), "callback-rate")
+      signal(computeOutcomes(fc({ applied: 10, interviewed: 4, offered: 0 }), null), "callback-rate")
         .health,
       "good",
     );
     // moderate: 2/10 = 0.20, between 0.12 and 0.30
     assert.equal(
-      signal(computeOutcomes({ applied: 10, interviewed: 2, offered: 0 }, null), "callback-rate")
+      signal(computeOutcomes(fc({ applied: 10, interviewed: 2, offered: 0 }), null), "callback-rate")
         .health,
       "moderate",
     );
     // poor: 1/20 = 0.05 < 0.12
     assert.equal(
-      signal(computeOutcomes({ applied: 20, interviewed: 1, offered: 0 }, null), "callback-rate")
+      signal(computeOutcomes(fc({ applied: 20, interviewed: 1, offered: 0 }), null), "callback-rate")
         .health,
       "poor",
     );
@@ -117,7 +161,7 @@ describe("computeOutcomes — funnel banding", () => {
   it("computes the offer rate over applications, not interviews", () => {
     // 2 offers / 20 applied = 0.10 (moderate band: ≥0.04, <0.12)
     const offer = signal(
-      computeOutcomes({ applied: 20, interviewed: 5, offered: 2 }, null),
+      computeOutcomes(fc({ applied: 20, interviewed: 5, offered: 2 }), null),
       "offer-rate",
     );
     assert.equal(offer.sampleSize, 20);

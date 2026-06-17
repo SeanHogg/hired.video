@@ -11,6 +11,7 @@
 import { StickyNote } from "lucide-react";
 import type { Scene } from "@/lib/studio/editor-v2/canvas-state";
 import SceneThumbnail from "@/components/studio/shared/SceneThumbnail";
+import { DRAG_MIME, readDragPayload } from "@/lib/studio/editor-v2/drag-protocol";
 import UnitsRail from "./UnitsRail";
 
 export interface ScenesRailProps {
@@ -21,6 +22,10 @@ export interface ScenesRailProps {
   onDelete: (sceneId: string) => void;
   onDuplicate: (sceneId: string) => void;
   onReorder: (nextOrderIds: string[]) => void;
+  /** #589 — drop a background preset onto a specific scene tile to re-skin
+   *  THAT scene (the canvas drop target only ever hits the active scene).
+   *  `bgValue` is the encoded `BgPreset.value`. */
+  onBackgroundDrop?: (sceneId: string, bgValue: string) => void;
 }
 
 export default function ScenesRail({
@@ -31,6 +36,7 @@ export default function ScenesRail({
   onDelete,
   onDuplicate,
   onReorder,
+  onBackgroundDrop,
 }: ScenesRailProps) {
   return (
     <UnitsRail
@@ -50,6 +56,29 @@ export default function ScenesRail({
           type="button"
           onClick={selectScene}
           className="block w-full py-2 pr-2 text-left"
+          // #589 — make each tile a background drop target. Only react to
+          // the background drag kind so scene-reorder (dnd-kit, pointer)
+          // and other HTML5 drags pass through untouched.
+          onDragOver={
+            onBackgroundDrop
+              ? (e) => {
+                  if (e.dataTransfer.types.includes(DRAG_MIME.background)) {
+                    e.preventDefault();
+                  }
+                }
+              : undefined
+          }
+          onDrop={
+            onBackgroundDrop
+              ? (e) => {
+                  const payload = readDragPayload(e.dataTransfer);
+                  if (payload?.kind !== "background") return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onBackgroundDrop(scene.id, payload.data);
+                }
+              : undefined
+          }
         >
           <div className="aspect-video w-full overflow-hidden rounded border border-border">
             <SceneThumbnail scene={scene} />

@@ -235,14 +235,14 @@ function DeveloperToast({
                 {toast.code}
               </span>
             )}
-            <span className="ml-auto text-xs text-gray-400 font-normal whitespace-nowrap">
+            <span className="ml-auto text-xs text-muted-foreground font-normal whitespace-nowrap">
               {new Date(toast.timestamp).toLocaleTimeString()}
             </span>
           </div>
           <p className="text-sm text-gray-700 dark:text-gray-300 truncate mt-0.5">
             {toast.message}
           </p>
-          <p className="text-xs text-gray-400 truncate mt-0.5">
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
             {toast.method} {toast.url}
           </p>
           {diag && (
@@ -255,7 +255,7 @@ function DeveloperToast({
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => onToggleExpand(toast.id)}
-            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded transition-colors"
+            className="p-1 text-muted-foreground hover:text-foreground rounded transition-colors"
             title={toast.expanded ? "Collapse" : "Expand details"}
           >
             {toast.expanded ? (
@@ -267,7 +267,7 @@ function DeveloperToast({
 
           <button
             onClick={() => onCopy(toast)}
-            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded transition-colors"
+            className="p-1 text-muted-foreground hover:text-foreground rounded transition-colors"
             title="Copy support ticket"
           >
             {toast.copied ? (
@@ -279,7 +279,7 @@ function DeveloperToast({
 
           <button
             onClick={() => onDismiss(toast.id)}
-            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded transition-colors"
+            className="p-1 text-muted-foreground hover:text-foreground rounded transition-colors"
             title="Dismiss"
           >
             <X className="h-4 w-4" />
@@ -389,7 +389,7 @@ function UserToast({
         </div>
         <button
           onClick={() => onDismiss(toast.id)}
-          className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded transition-colors shrink-0"
+          className="p-1 text-muted-foreground hover:text-foreground rounded transition-colors shrink-0"
           title={t("actions.dismiss")}
         >
           <X className="h-4 w-4" />

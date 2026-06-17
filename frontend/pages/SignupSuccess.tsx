@@ -73,7 +73,7 @@ export default function SignupSuccess() {
 
                 <div className="space-y-3">
                   <div className="text-center">
-                    <p className="text-sm text-gray-600 mb-3">
+                    <p className="text-sm text-muted-foreground mb-3">
                       {t("prompts.didNotReceiveEmail")}
                     </p>
 
@@ -119,7 +119,7 @@ export default function SignupSuccess() {
                   </div>
 
                   <div className="text-center pt-4 border-t">
-                    <p className="text-sm text-gray-600 mb-2">
+                    <p className="text-sm text-muted-foreground mb-2">
                       {t("prompts.alreadyConfirmedEmail")}
                     </p>
                     <Button asChild className="w-full">
@@ -130,7 +130,7 @@ export default function SignupSuccess() {
                   <div className="text-center">
                     <Link
                       to="/"
-                      className="text-sm text-gray-600 hover:text-gray-500 inline-flex items-center"
+                      className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center"
                     >
                       <ArrowLeft className="h-4 w-4 mr-1" />
                       {t("actions.backToHome")}
@@ -138,8 +138,8 @@ export default function SignupSuccess() {
                   </div>
                 </div>
 
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-xs text-gray-600 text-center">
+                <div className="bg-muted rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground text-center">
                     <strong>{t("prompts.troubleHelp")}</strong> {t("messages.troubleBody")}
                   </p>
                 </div>

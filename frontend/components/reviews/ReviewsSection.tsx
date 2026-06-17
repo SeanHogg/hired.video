@@ -216,7 +216,7 @@ export function ReviewsSection({
                     <div key={bucket} className="flex items-center gap-2 text-xs">
                       <span className="w-3 text-right">{bucket}</span>
                       <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
-                      <div className="flex-1 h-2 rounded bg-gray-200 overflow-hidden">
+                      <div className="flex-1 h-2 rounded bg-muted overflow-hidden">
                         <div className="h-full bg-yellow-500" style={{ width: `${pct}%` }} />
                       </div>
                       <span className="w-10 text-muted-foreground text-right">{count}</span>

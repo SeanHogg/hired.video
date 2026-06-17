@@ -19,6 +19,7 @@ import {
   type LifeStageAudienceMeta,
 } from "@shared/audiences-registry";
 import { audienceSlug } from "@shared/audiences";
+import { audienceLabel } from "./localize-audience";
 
 const ROLE_KEYS: LifeStageAudienceMeta["key"][] = [
   "job_seekers",
@@ -39,12 +40,6 @@ export function AudienceLinks({ variant }: AudienceLinksProps): JSX.Element {
     (a) => !ROLE_KEYS.includes(a.key),
   );
 
-  // Audience labels live in the shared registry (English source of truth);
-  // resolve each through i18n keyed by its stable enum, falling back to the
-  // registry label so a missing translation still renders real copy.
-  const audienceLabel = (a: LifeStageAudienceMeta) =>
-    t(`audiences.${a.key}.label`, { defaultValue: a.label });
-
   if (variant === "compact") {
     return (
       <div>
@@ -58,7 +53,7 @@ export function AudienceLinks({ variant }: AudienceLinksProps): JSX.Element {
                 to={`/for/${audienceSlug(a.key)}`}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
-                {audienceLabel(a)}
+                {audienceLabel(t, a)}
               </Link>
             </li>
           ))}
@@ -88,7 +83,7 @@ export function AudienceLinks({ variant }: AudienceLinksProps): JSX.Element {
             to={`/for/${audienceSlug(a.key)}`}
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
-            {audienceLabel(a)}
+            {audienceLabel(t, a)}
           </Link>
         ))}
       </div>

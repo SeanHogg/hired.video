@@ -143,7 +143,7 @@ export default function DiscoverPeopleGrid({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {Array.from({ length: 6 }).map((_, index) => (
             <div key={index} className="animate-pulse">
-              <div className="bg-gray-200 rounded-lg h-48" />
+              <div className="bg-muted rounded-lg h-48" />
             </div>
           ))}
         </div>
@@ -154,7 +154,7 @@ export default function DiscoverPeopleGrid({
         </div>
       ) : visiblePeople.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-600 mb-4">
+          <p className="text-muted-foreground mb-4">
             {isFilteredByList
               ? "No people in this list match your filters."
               : "No people found matching your criteria."}

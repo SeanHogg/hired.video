@@ -6,6 +6,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Search, ShieldAlert, AlertOctagon, Plus, Minus, RotateCcw, Gift } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -395,6 +396,7 @@ function UserTab() {
 // ── Redemptions queue ──────────────────────────────────────────────
 
 function RedemptionsTab() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [filter, setFilter] = useState<"queue" | "fulfilled" | "failed" | "cancelled">("queue");
 
@@ -485,7 +487,7 @@ function RedemptionsTab() {
                       variant="outline"
                       disabled={cancelMut.isPending}
                       onClick={async () => {
-                        const reason = await promptDialog({ title: "Cancel reason", label: "Cancel reason?", required: false });
+                        const reason = await promptDialog({ title: t("dialogs.points.cancelReasonTitle"), label: t("dialogs.points.cancelReasonLabel"), required: false });
                         if (reason) cancelMut.mutate({ id: r.id, reason });
                       }}
                     >

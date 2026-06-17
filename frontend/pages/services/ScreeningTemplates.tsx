@@ -12,7 +12,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ClipboardList, Plus, Send, Archive, Loader2, Link as LinkIcon } from "lucide-react";
+import { ClipboardList, Plus, Send, Archive, Loader2, Link as LinkIcon, Pencil } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import ScreeningResultsPanel from "@/components/jobs/ScreeningResultsPanel";
 import { AppShell } from "@/components/AppShell";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
@@ -78,6 +80,9 @@ export default function ScreeningTemplates() {
   const [minReferences, setMinReferences] = useState(2);
   const [questions, setQuestions] = useState<DraftQuestion[]>([]);
   const [saving, setSaving] = useState(false);
+  // #1854 — null = create mode, a template id = editing that template.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [loadingEdit, setLoadingEdit] = useState(false);
 
   // Send state
   const [sendFor, setSendFor] = useState<ScreeningTemplateRow | null>(null);
@@ -104,6 +109,7 @@ export default function ScreeningTemplates() {
   }, [load]);
 
   function resetBuilder() {
+    setEditingId(null);
     setName("");
     setRoleFamily("");
     setDescription("");
@@ -111,6 +117,62 @@ export default function ScreeningTemplates() {
     setIncludeReferences(false);
     setMinReferences(2);
     setQuestions([]);
+  }
+
+  function openNew() {
+    resetBuilder();
+    setBuilderOpen(true);
+  }
+
+  // #1854 — load an existing template into the builder. Reverses buildItems():
+  // the always-required floor (résumé + contact) is implicit, so we hydrate the
+  // optional items (assessments / references / questions) back into draft state.
+  async function startEdit(tpl: ScreeningTemplateRow) {
+    setEditingId(tpl.id);
+    setBuilderOpen(true);
+    setLoadingEdit(true);
+    try {
+      const { template, items } = await screeningService.getTemplate(tpl.id);
+      setName(template.name);
+      setRoleFamily(template.roleFamily ?? "");
+      setDescription(template.description ?? "");
+
+      const kinds: string[] = [];
+      let refs = false;
+      let minRefs = 2;
+      let qs: DraftQuestion[] = [];
+      for (const it of items) {
+        if (it.itemType === "predictive_assessment") {
+          const k = (it.config?.assessmentKind as string | undefined) ?? "";
+          if (k) kinds.push(k);
+        } else if (it.itemType === "references") {
+          refs = true;
+          minRefs = Math.max(1, Number(it.config?.minReferences ?? 2) || 2);
+        } else if (it.itemType === "application_questions") {
+          const raw = Array.isArray(it.config?.questions) ? (it.config!.questions as any[]) : [];
+          qs = raw.map((q) => ({
+            id: typeof q.id === "string" && q.id ? q.id : uid(),
+            prompt: String(q.prompt ?? ""),
+            kind: (q.kind as DraftQuestion["kind"]) ?? "custom",
+            answerType: (q.answerType as DraftQuestion["answerType"]) ?? "text",
+          }));
+        }
+      }
+      setAssessmentKinds(kinds);
+      setIncludeReferences(refs);
+      setMinReferences(minRefs);
+      setQuestions(qs);
+    } catch (e) {
+      toast({
+        title: t("messages.screeningTemplates.couldntSaveTemplate"),
+        description: e instanceof Error ? e.message : undefined,
+        variant: "destructive",
+      });
+      setBuilderOpen(false);
+      resetBuilder();
+    } finally {
+      setLoadingEdit(false);
+    }
   }
 
   function buildItems(): ScreeningTemplateItemInput[] {
@@ -149,14 +211,26 @@ export default function ScreeningTemplates() {
     if (!companyId || !name.trim()) return;
     setSaving(true);
     try {
-      await screeningService.createTemplate({
-        companyId,
-        name: name.trim(),
-        roleFamily: roleFamily.trim() || null,
-        description: description.trim() || null,
-        items: buildItems(),
-      });
-      toast({ title: t("messages.screeningTemplates.templateCreated") });
+      if (editingId) {
+        // updateTemplate replaces items wholesale (the route's documented
+        // semantics), so we resend the full draft — same builder, same shape.
+        await screeningService.updateTemplate(editingId, {
+          name: name.trim(),
+          roleFamily: roleFamily.trim() || null,
+          description: description.trim() || null,
+          items: buildItems(),
+        });
+        toast({ title: t("messages.screeningTemplates.templateUpdated", "Template updated") });
+      } else {
+        await screeningService.createTemplate({
+          companyId,
+          name: name.trim(),
+          roleFamily: roleFamily.trim() || null,
+          description: description.trim() || null,
+          items: buildItems(),
+        });
+        toast({ title: t("messages.screeningTemplates.templateCreated") });
+      }
       setBuilderOpen(false);
       resetBuilder();
       await load();
@@ -221,11 +295,24 @@ export default function ScreeningTemplates() {
               {t("messages.screeningTemplates.intro")}
             </p>
           </div>
-          <Button onClick={() => setBuilderOpen(true)} disabled={!companyId}>
+          <Button onClick={openNew} disabled={!companyId}>
             <Plus className="mr-1.5 h-4 w-4" /> {t("actions.screeningTemplates.newTemplate")}
           </Button>
         </div>
 
+        <Tabs defaultValue="templates" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="templates">{t("tabs.screeningTemplates.templates", "Templates")}</TabsTrigger>
+            <TabsTrigger value="sent">{t("tabs.screeningTemplates.sent", "Sent screenings")}</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="sent">
+            {/* #1852 — recruiter review of returned screenings (the results half
+                of the loop). Self-contained; reads the existing requests API. */}
+            <ScreeningResultsPanel companyId={companyId} />
+          </TabsContent>
+
+          <TabsContent value="templates">
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -256,6 +343,9 @@ export default function ScreeningTemplates() {
                   <Button size="sm" onClick={() => { setSendFor(tpl); setLastMagicLink(null); }}>
                     <Send className="mr-1.5 h-3.5 w-3.5" /> {t("actions.screeningTemplates.sendToCandidate")}
                   </Button>
+                  <Button size="sm" variant="outline" onClick={() => void startEdit(tpl)}>
+                    <Pencil className="mr-1.5 h-3.5 w-3.5" /> {t("actions.edit", "Edit")}
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={() => void archive(tpl)}>
                     <Archive className="mr-1.5 h-3.5 w-3.5" /> {t("actions.archive")}
                   </Button>
@@ -264,13 +354,19 @@ export default function ScreeningTemplates() {
             ))}
           </div>
         )}
+          </TabsContent>
+        </Tabs>
       </main>
 
       {/* Builder dialog */}
-      <Dialog open={builderOpen} onOpenChange={setBuilderOpen}>
+      <Dialog open={builderOpen} onOpenChange={(o) => { setBuilderOpen(o); if (!o) resetBuilder(); }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{t("headings.screeningTemplates.newScreeningTemplate")}</DialogTitle>
+            <DialogTitle>
+              {editingId
+                ? t("headings.screeningTemplates.editScreeningTemplate", "Edit screening template")
+                : t("headings.screeningTemplates.newScreeningTemplate")}
+            </DialogTitle>
             <DialogDescription>{t("messages.screeningTemplates.alwaysRequired")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -406,9 +502,15 @@ export default function ScreeningTemplates() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setBuilderOpen(false)}>{t("actions.cancel")}</Button>
-            <Button onClick={() => void saveTemplate()} disabled={saving || !name.trim()}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : t("actions.screeningTemplates.createTemplate")}
+            <Button variant="ghost" onClick={() => { setBuilderOpen(false); resetBuilder(); }}>{t("actions.cancel")}</Button>
+            <Button onClick={() => void saveTemplate()} disabled={saving || loadingEdit || !name.trim()}>
+              {saving || loadingEdit ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : editingId ? (
+                t("actions.screeningTemplates.saveTemplate", "Save changes")
+              ) : (
+                t("actions.screeningTemplates.createTemplate")
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

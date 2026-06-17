@@ -1,10 +1,12 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ShoppingBag, Clock, MessageSquare, Sparkles, Share2 } from "lucide-react";
 import { CardContent } from "@/components/ui/card";
 import BaseCard from "@/components/ui/BaseCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { buildShareAction } from "@/lib/card-share-action";
+import { serviceCategoryLabel } from "@/lib/taxonomy/category-labels";
 
 export interface ServiceMarketplaceItem {
   id: string;
@@ -28,6 +30,7 @@ function formatPrice(cents: number | null) {
 }
 
 export default function ServiceMarketplaceCard({ item }: { item: ServiceMarketplaceItem }) {
+  const { t } = useTranslation();
   const providerHref = `/people/${item.providerSlug || item.provider.id}?tab=services`;
   const ctaHref = item.isPlatformService ? "/services?wizard=open" : providerHref;
   const shareAction = buildShareAction({
@@ -49,7 +52,7 @@ export default function ServiceMarketplaceCard({ item }: { item: ServiceMarketpl
           </div>
         )}
         {item.category && (
-          <Badge className="absolute top-2 left-2 bg-background/90 text-foreground border">{item.category}</Badge>
+          <Badge className="absolute top-2 left-2 bg-background/90 text-foreground border">{serviceCategoryLabel(item.category, t)}</Badge>
         )}
         {item.isPlatformService && (
           <Badge className="absolute top-2 right-2 bg-purple-600 text-white border-0">hired.video</Badge>

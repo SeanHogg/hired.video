@@ -234,8 +234,12 @@ export const JobListResponseSchema = z.object({
           remote: z.boolean(),
         }),
         employmentType: EmploymentTypeSchema,
+        // Canonical seniority vocabulary — keep in sync with the SSoT in
+        // shared/seniority.ts (#2090). `junior` was missing here, so a job
+        // stored as canonical "junior" would fail response validation.
         experienceLevel: z.enum([
           "entry",
+          "junior",
           "mid",
           "senior",
           "lead",

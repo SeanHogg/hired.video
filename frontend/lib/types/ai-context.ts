@@ -61,6 +61,12 @@ export interface BaseAIContext {
    *  business shapes (`JobContext.job`, `ResumeContext.resume`, etc.).
    *  Read it as a free-form record — keys/values are page-specific. */
   formSnapshot?: Record<string, unknown>;
+  /** Durable hand-off priming for the AI Coach (#971) — e.g. the target
+   *  role / seniority / interview style / source the session was launched
+   *  with. Rendered into the SYSTEM prompt (which is always re-sent),
+   *  NOT the first user message, so server-side history compaction can't
+   *  drop it after a few turns. */
+  coachPriming?: string;
 }
 
 // AIContextType is imported + re-exported from @shared/ai-context-types
@@ -374,7 +380,13 @@ export type GeneralAIAction =
   | "quiz-me"
   // Course authoring surface
   | "outline-course"
-  | "write-lesson";
+  | "write-lesson"
+  // Studio editor surface (#1910) — the AI can drive the editor via its
+  // studio_* tools; these surface as the "N actions" count + quick chips.
+  | "record-demo"
+  | "add-scene"
+  | "insert-cta"
+  | "generate-scene-image";
 
 // ============================================================================
 // UNION TYPE FOR ALL CONTEXTS

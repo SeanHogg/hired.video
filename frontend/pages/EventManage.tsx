@@ -13,6 +13,7 @@
  */
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { AppShell } from "@/components/AppShell";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { confirmDialog } from "@/lib/dialogs";
@@ -43,6 +44,7 @@ import {
 import type { ResolvedEvent } from "@shared/events";
 
 export default function EventManage() {
+  const { t } = useTranslation();
   const { idOrSlug } = useParams<{ idOrSlug: string }>();
   const navigate = useNavigate();
 
@@ -127,7 +129,7 @@ export default function EventManage() {
 
   async function cancelEvent() {
     if (!event) return;
-    if (!(await confirmDialog({ title: "Cancel event", description: "Cancel this event? Attendees will be notified.", confirmText: "Cancel event", destructive: true }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.event.cancelTitle"), description: t("dialogs.event.cancelDescription"), confirmText: t("dialogs.event.cancelConfirm"), destructive: true }))) return;
     await eventsService.cancel(event.id);
     void reload();
   }

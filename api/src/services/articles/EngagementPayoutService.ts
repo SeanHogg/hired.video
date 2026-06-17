@@ -1,10 +1,12 @@
 /**
  * #896 — Article engagement → payout calculation worker.
  *
- * Reads `articles.viewCount` + `articles.readMinutes` deltas captured
- * since the previous run (or all-time for the first run on an article),
- * applies a $/1k-read-minute rate, and writes a `payout_ledger_entries`
- * credit per article owed. Per-period idempotency comes from
+ * Sums VERIFIED read-seconds from `article_engagement` within the run's
+ * [periodStart, periodEnd) window (only authenticated + email-verified
+ * readers accrue there, #1757), caps each day per article to blunt fraud,
+ * converts to read-minutes, applies a $/1k-read-minute rate, and writes a
+ * `payout_ledger_entries` credit per article owed. Per-period idempotency
+ * comes from
  * `article_payout_runs (period_start, period_end)` UNIQUE; per-article
  * idempotency within a run comes from
  * `article_payout_entries (run_id, article_id)` UNIQUE.
@@ -14,11 +16,10 @@
  *   centsCredited = floor(qualifyingReadMinutes
  *                         × centsPer1kReadMinutes / 1000)
  *
- * "Qualifying" today means raw counts on a published article whose
- * author has the partner-program eligibility flag set. Fraud detection
- * + verified-account weighting is tracked separately under the
- * gamification gap-pass; this worker is the money seam they will plug
- * into.
+ * "Qualifying" means verified read-minutes (above) on a published article
+ * whose author has the partner-program eligibility flag set. Anonymous and
+ * unverified-account traffic is excluded at the beacon (it lands in
+ * `anonymous_read_seconds`), and the per-day cap bounds burst fabrication.
  *
  * Call sites:
  *   • `runForPeriod(opts)` — manual SuperAdmin trigger / cron worker
@@ -29,7 +30,15 @@ import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { payoutLedgerService } from "../payout/PayoutLedgerService.js";
 
-const { articles, articlePayoutRuns, articlePayoutEntries } = schema;
+const { articles, articleEngagement, articlePayoutRuns, articlePayoutEntries } = schema;
+
+/**
+ * Fraud-weighting cap (#1757). A single (article, day) row can contribute at
+ * most this many verified read-seconds to the payout basis, bounding the
+ * damage a fabricated burst of beacons on one day can do. 6h is far above any
+ * legitimate single-day reading of one article.
+ */
+const MAX_DAILY_READ_SECONDS = 6 * 60 * 60;
 
 export interface RunPeriodOptions {
   periodStart: Date;
@@ -106,27 +115,40 @@ export class EngagementPayoutService {
     }
 
     try {
+      // Qualifying read-minutes now come from ACTUAL verified consumption in
+      // the period — `article_engagement.read_seconds` only accrues from
+      // authenticated + email-verified readers (#1757), with each day capped
+      // (MAX_DAILY_READ_SECONDS) before summing. This replaces the old basis of
+      // `articles.read_minutes` (the article's estimated LENGTH), which paid
+      // regardless of whether anyone actually read it.
+      const startDay = opts.periodStart.toISOString().slice(0, 10);
+      const endDay = opts.periodEnd.toISOString().slice(0, 10);
       const eligible = await db
         .select({
-          id: articles.id,
+          id: articleEngagement.articleId,
           userId: articles.userId,
-          readMinutes: articles.readMinutes,
           viewCount: articles.viewCount,
+          verifiedReadSeconds: sql<number>`coalesce(sum(least(${articleEngagement.readSeconds}, ${MAX_DAILY_READ_SECONDS})), 0)::int`,
         })
-        .from(articles)
+        .from(articleEngagement)
+        .innerJoin(articles, eq(articles.id, articleEngagement.articleId))
         .where(
           and(
             eq(articles.status, "published"),
             eq(articles.partnerProgramEligible, true),
             isNotNull(articles.publishedAt),
+            sql`${articleEngagement.day} >= ${startDay}`,
+            sql`${articleEngagement.day} < ${endDay}`,
           ),
-        );
+        )
+        .groupBy(articleEngagement.articleId, articles.userId, articles.viewCount);
 
       let totalCents = 0;
       let creditedCount = 0;
       for (const a of eligible) {
-        if (a.readMinutes <= 0) continue;
-        const cents = Math.floor((a.readMinutes * opts.centsPer1kReadMinutes) / 1000);
+        const readMinutes = Math.floor(a.verifiedReadSeconds / 60);
+        if (readMinutes <= 0) continue;
+        const cents = Math.floor((readMinutes * opts.centsPer1kReadMinutes) / 1000);
         if (cents <= 0) continue;
 
         // Idempotent on (runId, articleId).
@@ -148,14 +170,14 @@ export class EngagementPayoutService {
           currency: "USD",
           sourceKind: "article",
           sourceId: a.id,
-          note: `Article engagement payout — ${a.readMinutes} read-minutes @ ${opts.centsPer1kReadMinutes}¢/1k`,
+          note: `Article engagement payout — ${readMinutes} verified read-minutes @ ${opts.centsPer1kReadMinutes}¢/1k`,
         });
 
         await db.insert(articlePayoutEntries).values({
           runId,
           articleId: a.id,
           creatorUserId: a.userId,
-          qualifyingReadMinutes: a.readMinutes,
+          qualifyingReadMinutes: readMinutes,
           qualifyingViewCount: a.viewCount,
           centsCredited: cents,
           ledgerEntryId: ledger.entryId,

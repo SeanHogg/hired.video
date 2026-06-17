@@ -12,6 +12,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   Calendar,
@@ -110,6 +111,7 @@ function wrapAsResume(row: CandidateResumeRow): Resume {
 }
 
 export default function CandidateDetail() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -242,9 +244,9 @@ export default function CandidateDetail() {
     if (!row) return;
     if (
       !(await confirmDialog({
-        title: "Delete candidate",
-        description: "Delete this candidate resume? Variants and share links will also be removed.",
-        confirmText: "Delete",
+        title: t("dialogs.candidate.deleteTitle"),
+        description: t("dialogs.candidate.deleteDescription"),
+        confirmText: t("dialogs.candidate.deleteConfirm"),
         destructive: true,
       }))
     ) {

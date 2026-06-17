@@ -28,6 +28,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import AddFirstServiceCTA from "@/components/services/AddFirstServiceCTA";
+import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
+import { serviceCategoryLabel } from "@/lib/taxonomy/category-labels";
 import { servicesService, type ServiceOffering } from "@/lib/services/services-service";
 import { userService } from "@/lib/services/user-service";
 
@@ -145,6 +147,7 @@ export default function ProfileServicesPanel({
               key={svc.id}
               service={svc}
               isOwner={isOwner}
+              ownerUserId={userId}
               onAddToCart={onAddToCart}
               onRequestQuote={onRequestQuote}
             />
@@ -158,11 +161,13 @@ export default function ProfileServicesPanel({
 interface ServiceRowProps {
   service: ServiceOffering;
   isOwner: boolean;
+  /** Provider user id — owner of the offering, for report self-gating. */
+  ownerUserId: string;
   onAddToCart?: (service: ServiceOffering) => void;
   onRequestQuote?: (service: ServiceOffering) => void;
 }
 
-function ServiceRow({ service, isOwner, onAddToCart, onRequestQuote }: ServiceRowProps) {
+function ServiceRow({ service, isOwner, ownerUserId, onAddToCart, onRequestQuote }: ServiceRowProps) {
   const { t } = useTranslation();
   return (
     <div className="flex items-start justify-between gap-4 p-3 rounded-lg border bg-card hover:bg-accent/5 transition-colors">
@@ -171,7 +176,7 @@ function ServiceRow({ service, isOwner, onAddToCart, onRequestQuote }: ServiceRo
           <span className="font-medium">{service.title}</span>
           {service.category && (
             <Badge variant="secondary" className="text-xs">
-              {service.category}
+              {serviceCategoryLabel(service.category, t)}
             </Badge>
           )}
         </div>
@@ -199,7 +204,7 @@ function ServiceRow({ service, isOwner, onAddToCart, onRequestQuote }: ServiceRo
         </div>
       </div>
       {!isOwner && (
-        <div className="shrink-0">
+        <div className="shrink-0 flex items-center gap-1">
           {service.priceCents !== null ? (
             <Button size="sm" onClick={() => onAddToCart?.(service)}>
               {t("actions.addToCart")}
@@ -213,6 +218,14 @@ function ServiceRow({ service, isOwner, onAddToCart, onRequestQuote }: ServiceRo
               {t("actions.requestQuote")}
             </Button>
           )}
+          {/* Report this offering — self-gates (hidden for the provider,
+              bounces anon to /login). */}
+          <ReportAbuseButton
+            entityType="service"
+            entityId={service.id}
+            entityOwnerId={ownerUserId}
+            entityLabel="service"
+          />
         </div>
       )}
     </div>

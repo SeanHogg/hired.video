@@ -78,7 +78,7 @@ function getConfidenceBadge(confidence: number, action: string) {
     return <Badge className="bg-green-100 text-green-800 text-xs">Auto {(confidence * 100).toFixed(0)}%</Badge>;
   if (action === "manual" || confidence >= 0.4)
     return <Badge className="bg-yellow-100 text-yellow-800 text-xs">Review {(confidence * 100).toFixed(0)}%</Badge>;
-  return <Badge className="bg-gray-100 text-gray-600 text-xs">Low {(confidence * 100).toFixed(0)}%</Badge>;
+  return <Badge className="bg-muted text-muted-foreground text-xs">Low {(confidence * 100).toFixed(0)}%</Badge>;
 }
 
 function getSectionLabel(item: Record<string, any>, sectionType: string): string {

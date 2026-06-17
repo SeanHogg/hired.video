@@ -7,6 +7,7 @@
 // company picker only when the recruiter belongs to more than one company.
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Check, Plus, ShieldCheck, Star, Trash2 } from "lucide-react";
 import { confirmDialog } from "@/lib/dialogs";
 import { Badge } from "@/components/ui/badge";
@@ -93,6 +94,7 @@ export default function RedactionProfilesSection({
   selectedCompanyId,
   onChange,
 }: RedactionProfilesSectionProps) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -166,10 +168,9 @@ export default function RedactionProfilesSection({
   const deleteProfile = async (id: string) => {
     if (
       !(await confirmDialog({
-        title: "Delete profile",
-        description:
-          "Delete this redaction profile? Shares using it will fall back to defaults.",
-        confirmText: "Delete",
+        title: t("dialogs.redaction.deleteProfileTitle"),
+        description: t("dialogs.redaction.deleteProfileDescription"),
+        confirmText: t("dialogs.redaction.deleteConfirm"),
         destructive: true,
       }))
     ) {

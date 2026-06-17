@@ -249,7 +249,7 @@ export function InvitationManagement({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Users</p>
+                <p className="text-sm font-medium text-muted-foreground">Total Users</p>
                 <p className="text-2xl font-bold">{statusCounts.total}</p>
               </div>
               <Users className="h-8 w-8 text-blue-600" />
@@ -261,7 +261,7 @@ export function InvitationManagement({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">
+                <p className="text-sm font-medium text-muted-foreground">
                   Active Members
                 </p>
                 <p className="text-2xl font-bold text-green-600">
@@ -277,7 +277,7 @@ export function InvitationManagement({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">
+                <p className="text-sm font-medium text-muted-foreground">
                   Pending Invites
                 </p>
                 <p className="text-2xl font-bold text-yellow-600">
@@ -293,7 +293,7 @@ export function InvitationManagement({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Expired</p>
+                <p className="text-sm font-medium text-muted-foreground">Expired</p>
                 <p className="text-2xl font-bold text-red-600">
                   {statusCounts.expired}
                 </p>
@@ -347,7 +347,7 @@ export function InvitationManagement({
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by name or email..."
                   value={searchTerm}
@@ -402,7 +402,7 @@ export function InvitationManagement({
                   <TableRow>
                     <TableCell
                       colSpan={5}
-                      className="text-center py-8 text-gray-500"
+                      className="text-center py-8 text-muted-foreground"
                     >
                       No users found matching your criteria
                     </TableCell>
@@ -423,7 +423,7 @@ export function InvitationManagement({
                               {user.firstName || "Unknown"}{" "}
                               {user.lastName || "User"}
                             </p>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-muted-foreground">
                               {user.email || "No email"}
                             </p>
                           </div>
@@ -452,7 +452,7 @@ export function InvitationManagement({
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-gray-500">
+                        <span className="text-sm text-muted-foreground">
                           {user.inviteStatusStartDateTime
                             ? new Date(
                                 user.inviteStatusStartDateTime,

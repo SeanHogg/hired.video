@@ -8,6 +8,7 @@
  * page.
  */
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ import {
   type LifeStageAudienceMeta,
 } from "@shared/audiences-registry";
 import { audienceSlug } from "@shared/audiences";
+import { audienceLabel, audienceThesis } from "@/components/landing/localize-audience";
 
 const ROLE_KEYS: LifeStageAudienceMeta["key"][] = ["job_seekers", "employers", "recruiters"];
 
@@ -67,15 +69,16 @@ export default function ForIndex(): JSX.Element {
 }
 
 function AudienceCard({ meta }: { meta: LifeStageAudienceMeta }): JSX.Element {
+  const { t } = useTranslation();
   return (
     <Link to={`/for/${audienceSlug(meta.key)}`} className="block">
       <Card className="h-full hover:shadow-md transition-shadow">
         <CardContent className="p-6">
-          <h3 className="text-xl font-semibold mb-2">{meta.label}</h3>
-          <p className="text-sm text-muted-foreground line-clamp-3 mb-4">{meta.thesis}</p>
+          <h3 className="text-xl font-semibold mb-2">{audienceLabel(t, meta)}</h3>
+          <p className="text-sm text-muted-foreground line-clamp-3 mb-4">{audienceThesis(t, meta)}</p>
           <Button asChild variant="ghost" className="px-0">
             <span>
-              Open map
+              {t("audiences.forIndex.openMap", { defaultValue: "Open map" })}
               <ArrowRight className="ml-1 h-4 w-4" />
             </span>
           </Button>

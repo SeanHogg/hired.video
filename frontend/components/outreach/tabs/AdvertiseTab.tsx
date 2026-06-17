@@ -7,6 +7,7 @@
  * Pure presentation; boost actions + dialog trigger come in as props.
  */
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   DollarSign,
   Eye,
@@ -63,6 +64,7 @@ export function AdvertiseTab({
   onResumeBoost,
   onCancelBoost,
 }: AdvertiseTabProps) {
+  const { t } = useTranslation();
   const [busyBoostId, setBusyBoostId] = useState<string | null>(null);
 
   const runBoostAction = async (
@@ -215,7 +217,7 @@ export function AdvertiseTab({
                           className="text-destructive hover:text-destructive"
                           disabled={busyBoostId === boost.id}
                           onClick={async () => {
-                            if (!(await confirmDialog({ title: "Cancel boost", description: "Cancel this boost?", confirmText: "Cancel boost", destructive: true }))) return;
+                            if (!(await confirmDialog({ title: t("dialogs.advertise.cancelBoostTitle"), description: t("dialogs.advertise.cancelBoostDescription"), confirmText: t("dialogs.advertise.cancelBoostConfirm"), destructive: true }))) return;
                             runBoostAction(boost.id, onCancelBoost);
                           }}
                         >

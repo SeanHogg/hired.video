@@ -206,6 +206,9 @@ export default function People() {
     BROWSE_VIEW_MODES,
   );
   const [people, setPeople] = useState<PublicUser[]>([]);
+  // The viewer's accepted connections (Connections tab) — fetched from
+  // /me/connections/cards (#802). Empty until the authed load resolves.
+  const [myConnections, setMyConnections] = useState<PublicUser[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   // Lists filter: when ?list_id=X is on the URL, restrict displayed people to
   // members of that list. Null = no filter; Set = filter to these IDs.
@@ -320,6 +323,25 @@ export default function People() {
     fetchPeople();
   }, [searchFilters, currentPage, itemsPerPage]);
 
+  // Load the viewer's accepted connections for the Connections tab (#802).
+  // Self-contained: clears when signed out, refetches on sign-in.
+  useEffect(() => {
+    if (!user) {
+      setMyConnections([]);
+      return;
+    }
+    let cancelled = false;
+    userService
+      .getMyConnectionCards()
+      .then((cards) => {
+        if (!cancelled) setMyConnections(cards);
+      })
+      .catch((err) => console.error("Failed to load connections:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   // Load list membership when ?list_id changes. Membership is a Set of user
   // ids that the displayed people array gets filtered against client-side.
   useEffect(() => {
@@ -424,12 +446,11 @@ export default function People() {
     return { tracked: trackedWithOwnership };
   };
 
-  // Get user-specific people data (tracked people)
-  const getAllPeopleForUser = (userId: string) => {
-    // TODO: Replace with actual API calls when backend supports user people associations
-    // For now, return empty arrays as placeholder
+  // Get user-specific people data (the viewer's accepted connections). Backed
+  // by /me/connections/cards (#802); loaded into `myConnections` on auth.
+  const getAllPeopleForUser = (_userId: string) => {
     return {
-      tracked: [] as PublicUser[],
+      tracked: myConnections,
     };
   };
 
@@ -460,8 +481,8 @@ export default function People() {
   // its own batched fetch for the Browse tab. Shared hook is the single
   // source of truth for the request + status-mapping logic.
   const trackedIds = useMemo(
-    () => (user ? getAllPeopleForUser(user.id).tracked.map((p) => p.id) : []),
-    [user, people],
+    () => (user ? myConnections.map((p) => p.id) : []),
+    [user, myConnections],
   );
   const connectionStatuses = useConnectionStatuses(trackedIds);
   const getConnectionStatus = (

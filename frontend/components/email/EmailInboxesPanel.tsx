@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Mail, RefreshCw, Trash2, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +53,7 @@ function formatRelative(iso: string | null): string {
 }
 
 export function EmailInboxesPanel() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   // Accounts come from the shared `useEmailAccounts()` hook — same
@@ -113,7 +115,7 @@ export function EmailInboxesPanel() {
   }, [refreshAccounts, refreshRuns]);
 
   const handleDisconnect = async (id: string) => {
-    if (!(await confirmDialog({ title: "Disconnect mailbox", description: "Disconnect this mailbox? Synced messages stay; new emails will stop arriving.", confirmText: "Disconnect", destructive: true }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.email.disconnectTitle"), description: t("dialogs.email.disconnectBody"), confirmText: t("dialogs.email.disconnectConfirm"), destructive: true }))) return;
     await emailIntegrationService.disconnect(id);
     setAccounts((prev) => prev.filter((a) => a.id !== id));
     setSelected((prev) => {

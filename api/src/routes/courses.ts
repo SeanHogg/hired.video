@@ -62,6 +62,7 @@ import { gamificationFromContext, withGamification } from "../domains/gamificati
 import { getJwtSecret } from "../utils/jwt.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
 import { bumpSearchVersion } from "../utils/search-cache.js";
+import { invalidateCohortAnalyticsCache } from "../services/learning/cohort-analytics.js";
 
 const {
   courses,
@@ -75,6 +76,8 @@ const {
   learningPathCourses,
   scormCmiStates,
   xapiStatements,
+  studioProjects,
+  cohortMembers,
 } = schema;
 
 export const courseRoutes = new Hono<AppEnv>();
@@ -127,15 +130,56 @@ async function canEditCourse(
   return row != null;
 }
 
+/** #1892 — After a learner progress / SCORM write, eagerly invalidate the
+ *  educator cohort-analytics cache for every cohort the user is an active
+ *  member of, so a finished lesson surfaces in the educator grid
+ *  immediately instead of after the 45s TTL. One indexed query returns all
+ *  the user's active cohort ids (no N+1); the cache bust is in-process and
+ *  cheap. Best-effort: any failure is swallowed so it can never break the
+ *  progress write that already succeeded. Call once per write, not per
+ *  lesson. */
+async function invalidateLearnerCohortCaches(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+): Promise<void> {
+  try {
+    const memberships = await db
+      .select({ cohortId: cohortMembers.cohortId })
+      .from(cohortMembers)
+      .where(and(eq(cohortMembers.userId, userId), eq(cohortMembers.status, "active")));
+    for (const m of memberships) {
+      invalidateCohortAnalyticsCache(m.cohortId);
+    }
+  } catch (e) {
+    console.warn(
+      "[courses] cohort-analytics cache invalidation failed",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Validators
 // ---------------------------------------------------------------------------
+
+// #2150 — accept EITHER an absolute http(s) URL OR a leading-slash
+// relative path (e.g. `/api/og/courses?…` cover URLs that the seed
+// backfill in migration 0190 writes, which `z.string().url()` rejected).
+// Kept local to this file for now; the article cover schema could later
+// share this exact helper.
+const coverImageUrlSchema = z
+  .string()
+  .refine(
+    (v) => v.startsWith("/") || /^https?:\/\//.test(v),
+    "Must be an absolute URL or a root-relative path",
+  )
+  .optional();
 
 const CreateCourseSchema = z.object({
   title: z.string().min(1).max(255),
   summary: z.string().max(1000).optional(),
   description: z.string().optional(),
-  coverImageUrl: z.string().url().optional(),
+  coverImageUrl: coverImageUrlSchema,
   category: z.string().max(100).optional(),
   tags: z.array(z.string().max(60)).max(20).optional(),
   difficulty: z.enum(COURSE_DIFFICULTIES).optional(),
@@ -615,9 +659,40 @@ courseRoutes.get("/enrollments/:enrollmentId/content", async (c) => {
   const modules = await db.select().from(courseModules)
     .where(eq(courseModules.courseId, course.id))
     .orderBy(courseModules.sortOrder);
-  const lessons = await db.select().from(courseLessons)
+  const lessonRows = await db.select().from(courseLessons)
     .where(eq(courseLessons.courseId, course.id))
     .orderBy(courseLessons.sortOrder);
+
+  // #1464 — for studio_video lessons, resolve the published studio
+  // project slug server-side so the frontend can prefer the slug URL
+  // (`/studio/<slug>`) over the opaque project id. Batched: one inArray
+  // query over every studio_video lesson's project id — no per-lesson
+  // round-trip (N+1). When a slug can't be resolved the field stays null
+  // and the existing studioProjectId is still returned.
+  const studioProjectIds = Array.from(new Set(
+    lessonRows
+      .filter((l) => l.sourceType === "studio_video" && l.studioProjectId)
+      .map((l) => l.studioProjectId as string),
+  ));
+  let slugByProjectId = new Map<string, string>();
+  if (studioProjectIds.length > 0) {
+    const slugRows = await db
+      .select({ id: studioProjects.id, slug: studioProjects.slug })
+      .from(studioProjects)
+      .where(inArray(studioProjects.id, studioProjectIds));
+    slugByProjectId = new Map(
+      slugRows
+        .filter((r) => r.slug != null)
+        .map((r) => [r.id, r.slug as string]),
+    );
+  }
+  const lessons = lessonRows.map((l) => ({
+    ...l,
+    studioSlug:
+      l.sourceType === "studio_video" && l.studioProjectId
+        ? slugByProjectId.get(l.studioProjectId) ?? null
+        : null,
+  }));
 
   // Surface the issued certificate (when it exists) so the learner page
   // can show a "View certificate" CTA without a second round-trip.
@@ -1344,6 +1419,10 @@ courseRoutes.patch("/enrollments/:enrollmentId/progress", async (c) => {
     }
   }
 
+  // #1892 — bust the educator cohort-analytics cache so this learner's
+  // progress shows up in the grid without waiting out the TTL.
+  await invalidateLearnerCohortCaches(db, userId);
+
   return c.json(success(updated), 200);
 });
 
@@ -1512,6 +1591,8 @@ courseRoutes.post("/scorm/:enrollmentId/commit", async (c) => {
       scormVersion: parsed.data.scormVersion,
       updatedAt: new Date(),
     } as never).where(eq(scormCmiStates.id, existing.id)).returning();
+    // #1892 — eager cohort-analytics cache bust on the SCORM write path too.
+    await invalidateLearnerCohortCaches(db, userId);
     return c.json(success(updated), 200);
   }
 
@@ -1527,6 +1608,8 @@ courseRoutes.post("/scorm/:enrollmentId/commit", async (c) => {
     totalTimeSec: parsed.data.totalTimeSec ?? 0,
     suspendData: parsed.data.suspendData ?? null,
   } as never).returning();
+  // #1892 — eager cohort-analytics cache bust on the SCORM write path too.
+  await invalidateLearnerCohortCaches(db, userId);
   return c.json(success(created), 201);
 });
 

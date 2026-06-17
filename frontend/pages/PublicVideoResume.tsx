@@ -185,6 +185,19 @@ export default function PublicVideoResume() {
             Get Started Free
           </Link>
         </div>
+
+        {/* #884 — restore the viral "Roast your resume" cross-link lost
+            when this page adopted the standard AppShell chrome. A free,
+            low-commitment hook (instant AI feedback) that converts
+            passive viewers before the signup CTA. */}
+        <div className="text-center">
+          <Link
+            to="/tools/resume-roast"
+            className="text-sm font-medium text-brand-purple hover:underline"
+          >
+            🔥 Get instant AI feedback on your own resume →
+          </Link>
+        </div>
       </main>
     </AppShell>
   );

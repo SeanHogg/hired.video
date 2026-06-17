@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Mail, Phone, FileText, Linkedin, MoreHorizontal, MapPin, Clock, Trash2, Sparkles } from "lucide-react";
+import { Mail, Phone, FileText, Linkedin, MoreHorizontal, MapPin, Clock, Trash2, Sparkles, ClipboardCheck } from "lucide-react";
 import { initials } from "@/lib/utils/initials";
 import { daysSince } from "@/lib/utils/datetime";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -25,6 +25,7 @@ import {
   type PipelineStage,
 } from "@/lib/services/job-pipeline-service";
 import PersonalizeMessageDialog from "@/components/recruit/PersonalizeMessageDialog";
+import SendScreeningDialog from "@/components/jobs/SendScreeningDialog";
 
 /** Fire-and-forget touchpoint log — never blocks the click handler. */
 function logTouchpointSafe(jobId: string, entryId: string, type: "email" | "sms") {
@@ -50,6 +51,7 @@ export default function JobPipelineCard({
 }: JobPipelineCardProps) {
   const { t } = useTranslation();
   const [composeOpen, setComposeOpen] = useState(false);
+  const [screeningOpen, setScreeningOpen] = useState(false);
 
   return (
     <div className="rounded-lg border bg-card p-3 hover:shadow-md transition-shadow space-y-2">
@@ -172,6 +174,15 @@ export default function JobPipelineCard({
                 {t(`pipelineStage.${s}`)}
               </DropdownMenuItem>
             ))}
+            {entry.jobApplicationId && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setScreeningOpen(true)}>
+                  <ClipboardCheck className="w-3.5 h-3.5 mr-2" />
+                  {t("actions.sendScreening", "Send screening")}
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
@@ -212,6 +223,13 @@ export default function JobPipelineCard({
         recipientName={entry.candidateName}
         recipientEmail={entry.candidateEmail}
         recipientLocation={entry.candidateLocation}
+      />
+
+      <SendScreeningDialog
+        applicationId={entry.jobApplicationId}
+        candidateName={entry.candidateName}
+        open={screeningOpen}
+        onOpenChange={setScreeningOpen}
       />
     </div>
   );

@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 
 import ErrorBoundary from "@/components/ErrorBoundary";
+import CreatorAttribution from "@/components/studio/CreatorAttribution";
 import CreatorPitchAside from "@/components/marketplace/CreatorPitchAside";
 import MarketplaceItemShell from "@/components/marketplace/MarketplaceItemShell";
 import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
@@ -135,6 +136,12 @@ export default function MarketplaceTemplatePreview() {
   // stays visible even when the visitor scrolls past the top action bar.
   const secondary = (
     <div className="rounded-xl border p-4 space-y-2">
+      {/* #633 — credit the publishing creator with a link to their public
+          profile. Self-gating: renders nothing for non-creator templates
+          or while the user resolves. */}
+      {meta.origin.kind === "studio-creator" && (
+        <CreatorAttribution creatorId={meta.origin.template.creatorId} label="Created by" />
+      )}
       <h4 className="text-sm font-semibold">Like this template?</h4>
       <p className="text-xs text-muted-foreground">
         Add it to your library and use it on any of your work — same content,

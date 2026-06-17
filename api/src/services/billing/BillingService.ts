@@ -414,6 +414,21 @@ export async function grantTokenPack(args: {
   deps?: Partial<BillingServiceDeps>): Promise<void> {
   const d = resolveDeps(deps); const db = d.db;
 
+  // Idempotency (#2196): a Stripe/Helcim webhook can deliver the SAME
+  // payment-intent more than once, and the token-pack SKU can also be granted
+  // from the cart-finalize path. There is no DB unique constraint on
+  // `stripe_payment_intent_id` (residual gap below), so enforce single-credit
+  // here — if a purchase row for this intent already exists the tokens were
+  // already granted; bail before re-crediting the balance + re-awarding points.
+  if (args.stripePaymentIntentId) {
+    const [dupe] = await db
+      .select({ id: tokenPackPurchases.id })
+      .from(tokenPackPurchases)
+      .where(eq(tokenPackPurchases.stripePaymentIntentId, args.stripePaymentIntentId))
+      .limit(1);
+    if (dupe) return;
+  }
+
   // Audit row.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (db.insert(tokenPackPurchases) as any).values({

@@ -16,6 +16,7 @@
  *   • video_interview       → job-specific, recorded fresh each time
  *   • tool_run              → recruiter wants the run done for THIS screen
  *   • application_questions → answered fresh per request (legal/EEO answers)
+ *   • ai_screening_chat     → conversational AI screen run fresh per request
  *
  * Everything here is read-only and candidate-scoped — it resolves the candidate
  * to a user id (by bound id, else by email) and inspects that user's own
@@ -174,6 +175,7 @@ export async function checkItemSatisfied(
     case "video_interview":
     case "tool_run":
     case "application_questions":
+    case "ai_screening_chat":
     default:
       return NOT_SATISFIED;
   }

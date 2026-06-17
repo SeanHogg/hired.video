@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Loader2,
   Plus,
@@ -161,6 +162,7 @@ interface Props {
 }
 
 export default function CourseContentEditor({ courseId }: Props) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [course, setCourse] = useState<Course | null>(null);
@@ -259,7 +261,7 @@ export default function CourseContentEditor({ courseId }: Props) {
   };
 
   const removeModule = async (m: CourseModule) => {
-    if (!(await confirmDialog({ title: "Delete module", description: `Delete module "${m.title}"? Lessons inside it will also be deleted.`, confirmText: "Delete", destructive: true }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.courses.deleteModuleTitle"), description: t("dialogs.courses.deleteModuleBody", { title: m.title }), confirmText: t("dialogs.courses.deleteConfirm"), destructive: true }))) return;
     const previousModules = modules;
     const previousLessons = lessons;
     setModules((cur) => cur.filter((x) => x.id !== m.id));
@@ -371,7 +373,7 @@ export default function CourseContentEditor({ courseId }: Props) {
   };
 
   const removeLesson = async (l: CourseLesson) => {
-    if (!(await confirmDialog({ title: "Delete lesson", description: `Delete lesson "${l.title}"?`, confirmText: "Delete", destructive: true }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.courses.deleteLessonTitle"), description: t("dialogs.courses.deleteLessonBody", { title: l.title }), confirmText: t("dialogs.courses.deleteConfirm"), destructive: true }))) return;
     const previous = lessons;
     setLessons((cur) => cur.filter((x) => x.id !== l.id));
     try {

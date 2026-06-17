@@ -10,6 +10,7 @@
 // label placement, matching the wheel in the design spec.
 
 import { useId } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
 export type SegmentHealth = "good" | "moderate" | "poor" | "unknown";
@@ -45,12 +46,27 @@ const HEALTH_STROKE: Record<SegmentHealth, string> = {
   unknown: "#334155",
 };
 
-const HEALTH_LABEL: Record<SegmentHealth, string> = {
+/** English defaults — also the i18next fallbacks so a missing key never
+ *  renders a raw key string. */
+const HEALTH_LABEL_DEFAULTS: Record<SegmentHealth, string> = {
   good: "Good",
   moderate: "Moderate",
   poor: "Poor",
   unknown: "Not measured",
 };
+
+/** Localized health labels (#443). Shared by the wheel's own tooltips AND
+ *  the Career 360 page legend so both surfaces stay in sync from one
+ *  source — no duplicated literal maps. */
+export function useHealthLabels(): Record<SegmentHealth, string> {
+  const { t } = useTranslation();
+  return {
+    good: t("tools.career360.wheel.health.good", HEALTH_LABEL_DEFAULTS.good),
+    moderate: t("tools.career360.wheel.health.moderate", HEALTH_LABEL_DEFAULTS.moderate),
+    poor: t("tools.career360.wheel.health.poor", HEALTH_LABEL_DEFAULTS.poor),
+    unknown: t("tools.career360.wheel.health.unknown", HEALTH_LABEL_DEFAULTS.unknown),
+  };
+}
 
 function polarToCartesian(cx: number, cy: number, r: number, angleRad: number) {
   return { x: cx + r * Math.cos(angleRad), y: cy + r * Math.sin(angleRad) };
@@ -91,6 +107,7 @@ interface RingProps {
 }
 
 function Ring({ segments, cx, cy, rInner, rOuter, onSegmentClick, labelFontSize }: RingProps) {
+  const healthLabels = useHealthLabels();
   if (segments.length === 0) return null;
   const stepRad = (Math.PI * 2) / segments.length;
   // Start at -90° (top of the wheel) so the first segment renders top-right
@@ -126,7 +143,7 @@ function Ring({ segments, cx, cy, rInner, rOuter, onSegmentClick, labelFontSize 
             }
           >
             <title>
-              {seg.label}: {HEALTH_LABEL[seg.health]}
+              {seg.label}: {healthLabels[seg.health]}
               {seg.scoreLabel ? ` — ${seg.scoreLabel}` : ""}
             </title>
             <path
@@ -220,5 +237,4 @@ export function CareerHealthWheel({ outer, inner, onSegmentClick, className, siz
   );
 }
 
-export const HEALTH_LABELS = HEALTH_LABEL;
 export const HEALTH_FILL_COLORS = HEALTH_FILL;

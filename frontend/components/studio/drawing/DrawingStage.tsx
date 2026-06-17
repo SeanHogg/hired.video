@@ -789,7 +789,7 @@ export default function DrawingStage({
               <button
                 type="button"
                 onClick={() => onMarqueeChange(null)}
-                className="rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-md ring-1 ring-slate-300 hover:bg-slate-50"
+                className="rounded-md bg-card px-2 py-1 text-[11px] font-semibold text-foreground shadow-md ring-1 ring-border hover:bg-muted"
                 aria-label="Cancel selection"
               >
                 ✕

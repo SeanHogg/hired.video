@@ -3,6 +3,7 @@
  * performance, and remove stale postings. Stats cards summarise board-wide
  * performance; the table below is filterable by job / board / status.
  */
+import { useTranslation } from "react-i18next";
 import {
   BarChart3,
   ExternalLink,
@@ -74,6 +75,7 @@ export function JobBoardsTab({
   onOpenPostDialog,
   onRemovePosting,
 }: JobBoardsTabProps) {
+  const { t } = useTranslation();
   const filtersActive =
     postingFilters.jobId !== "all" ||
     postingFilters.boardId !== "all" ||
@@ -292,10 +294,11 @@ export function JobBoardsTab({
                           onClick={async () => {
                             if (
                               await confirmDialog({
-                                title: "Remove posting",
-                                description:
-                                  "Are you sure you want to remove this posting?",
-                                confirmText: "Remove",
+                                title: t("dialogs.jobBoards.removePostingTitle"),
+                                description: t(
+                                  "dialogs.jobBoards.removePostingDescription",
+                                ),
+                                confirmText: t("dialogs.jobBoards.removeConfirm"),
                                 destructive: true,
                               })
                             ) {

@@ -40,6 +40,7 @@ import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
 import LeftPanelTile from "./LeftPanelTile";
 import MediaSection from "./MediaSection";
 import { useCollapsibleSections } from "@/lib/hooks/useCollapsibleSections";
+import { mediaKindHasAudio, mediaKindHasVideo } from "@shared/media-kinds";
 import type {
   CanvasAudioMix,
   CanvasCaptions,
@@ -182,6 +183,12 @@ export interface ActionsPanelProps {
     assetKind: import("@/lib/studio/editor-v2/engagement-assets").EngagementAssetKind,
     assetId: string,
   ) => void;
+  /** Active project media kind. Audio-only kinds (voice / podcast) default
+   *  to the "Recording & Audio" section expanded and everything else
+   *  collapsed (#925) — the video-shaped all-open default buries the only
+   *  section those projects use. Omit (or pass a video/both kind) to keep
+   *  the all-open default. */
+  mediaKind?: import("@shared/media-kinds").MediaKind;
 }
 
 const SECTION_IDS = ["recording", "media", "ai", "engagement", "advisory"] as const;
@@ -203,8 +210,18 @@ export default function ActionsPanel(props: ActionsPanelProps) {
   // Shared multi-open accordion state — every left-rail panel uses the
   // SAME hook so the open/close UX is identical across Widgets / Design
   // / Actions tabs.
+  // #925 — audio-only kinds (voice / podcast) lead with "Recording &
+  // Audio" expanded and everything else collapsed; the video-shaped
+  // all-open default otherwise buries the only section they use. Persisted
+  // state still wins, so a user who customises keeps their layout.
+  const audioOnly =
+    props.mediaKind != null &&
+    mediaKindHasAudio(props.mediaKind) &&
+    !mediaKindHasVideo(props.mediaKind);
   const sections = useCollapsibleSections<SectionId>(SECTION_IDS, {
     storageKey: "studio.v2.left.actions.sections",
+    defaultClosed: audioOnly,
+    initialOpen: audioOnly ? new Set<SectionId>(["recording"]) : undefined,
   });
 
   return (

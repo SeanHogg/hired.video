@@ -3,9 +3,13 @@
  *
  * The payout amount is computed in EngagementPayoutService.runForPeriod as
  *
+ *   readMinutes   = floor(verifiedReadSeconds / 60)   // #1757 — verified-only,
+ *                                                      //   per-day-capped basis
  *   centsCredited = Math.floor(readMinutes * centsPer1kReadMinutes / 1000)
  *
- * The math is entwined with the DB (getDb() + the payoutLedgerService
+ * (`readMinutes` here is the per-article verified read-minutes for the period,
+ * NOT the article's estimated length.) The math is entwined with the DB
+ * (getDb() + the payoutLedgerService
  * singleton are reached directly inside runForPeriod, with no DI seam), so
  * the per-article formula is not exported as a pure helper. Following the
  * same approach time-to-hire.test.ts uses for its un-exported math, we lock

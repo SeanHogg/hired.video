@@ -12,6 +12,7 @@ import { AppShell } from "@/components/AppShell";
 import { articleService } from "@/lib/services/article-service";
 import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
 import ArtifactDetailsSheet from "@/components/shared/ArtifactDetailsSheet";
+import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 import TextNarrator from "@/components/audio/TextNarrator";
 
 interface ArticleData {
@@ -53,6 +54,28 @@ export default function ArticleView() {
     artifactId: article?.id ?? null,
     ownerUserId: article?.author?.id ?? null,
   });
+
+  // View-count beacon (#858) — the public read is edge-cached, so the bump is
+  // a separate fire-and-forget call once per loaded article.
+  useEffect(() => {
+    if (!article?.id) return;
+    void articleService.recordView(article.id);
+  }, [article?.id]);
+
+  // Read-time beacon (#1508) — while the reader page is loaded AND visible,
+  // post 30s of read-progress every 30s (source "scroll"). Pauses when the tab
+  // is backgrounded so idle background tabs don't inflate engagement.
+  useEffect(() => {
+    const id = article?.id;
+    if (!id) return;
+    const TICK = 30;
+    const handle = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void articleService.recordReadProgress(id, TICK, "scroll");
+      }
+    }, TICK * 1000);
+    return () => window.clearInterval(handle);
+  }, [article?.id]);
 
   // SEO — single adapter call. Replaces the previous bug of passing the
   // hardcoded "/articles" path key, which meant every article shared the
@@ -110,6 +133,14 @@ export default function ArticleView() {
                     ],
                   }}
                 />
+                {/* Report this article — self-gates (hidden for the
+                    author, bounces anon to /login). */}
+                <ReportAbuseButton
+                  entityType="article"
+                  entityId={article.id}
+                  entityOwnerId={article.author.id}
+                  entityLabel="article"
+                />
               </div>
               {article.summary && <p className="text-lg text-muted-foreground">{article.summary}</p>}
               <div className="flex items-center gap-3 text-sm text-muted-foreground pt-2 border-t">
@@ -136,6 +167,15 @@ export default function ArticleView() {
                 text={`${article.title}. ${article.summary ?? ""}\n\n${article.bodyMd}`}
                 preferenceKey={`article.${article.id}`}
                 label="Listen to this article"
+                onListenProgress={(elapsedSeconds) => {
+                  // Read-aloud listening is a real consumption signal (#1577) —
+                  // feed it into the same engagement telemetry as scroll reads.
+                  void articleService.recordReadProgress(
+                    article.id,
+                    elapsedSeconds,
+                    "narrator",
+                  );
+                }}
               />
             </div>
 

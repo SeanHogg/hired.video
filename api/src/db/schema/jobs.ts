@@ -108,7 +108,14 @@ export const jobItems = pgTable("job_items", {
    *  HM-portal renderer gates each field against the matrix when set. */
   sharePermissions: jsonb("share_permissions"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  // `.$onUpdate` is app-level: Drizzle stamps a fresh Date on every `.update()`
+  // through the ORM (defaultNow() only fires on insert, leaving this stale after
+  // edits — gap #473). No DB trigger exists for updated_at in this codebase, so
+  // the ORM hook is the correct seam; raw SQL updates must still set it manually.
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
 });
 
 export type JobItem = typeof jobItems.$inferSelect;

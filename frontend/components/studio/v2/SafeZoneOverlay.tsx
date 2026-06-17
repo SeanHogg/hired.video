@@ -13,7 +13,8 @@
  * runtime enforcement that widgets stay inside them, by design (users
  * may want to bleed text past safe edges intentionally).
  */
-import { findFormatByDimensions } from "@/lib/studio/video-formats";
+import { findFormatByDimensions, safeZonesForFormat } from "@/lib/studio/video-formats";
+import { useSafeZonePreference } from "@/lib/studio/editor-v2/use-safe-zone-pref";
 
 interface SafeZoneOverlayProps {
   /** Unscaled canvas dimensions in pixels. The overlay positions zones as
@@ -39,13 +40,20 @@ export default function SafeZoneOverlay({
   canvasHeight,
   mode,
 }: SafeZoneOverlayProps) {
-  if (mode === "playback") return null;
+  // #855 — user-controllable: hidden when the editor preference is off.
+  // Read unconditionally (hooks rule); the early returns below are fine
+  // because they come after the hook call.
+  const [showSafeZones] = useSafeZonePreference();
+  if (mode === "playback" || !showSafeZones) return null;
   const format = findFormatByDimensions(canvasWidth, canvasHeight);
-  if (!format?.safeZones || format.safeZones.length === 0) return null;
+  // #856 — derive zones by aspect when the format doesn't hand-declare
+  // them, so 720p / 4K / square presets show guides too.
+  const zones = safeZonesForFormat(format);
+  if (zones.length === 0) return null;
 
   return (
     <div className="pointer-events-none absolute inset-0">
-      {format.safeZones.map((zone, idx) => {
+      {zones.map((zone, idx) => {
         const left = zone.inset.left * 100;
         const top = zone.inset.top * 100;
         const right = zone.inset.right * 100;

@@ -130,9 +130,9 @@ export function EditRolesModal({
                   <h3 className="font-medium text-lg">
                     {user.firstName} {user.lastName}
                   </h3>
-                  <p className="text-gray-600">{user.email}</p>
+                  <p className="text-muted-foreground">{user.email}</p>
                   <div className="flex gap-1 mt-2">
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-muted-foreground">
                       Current roles:
                     </span>
                     {user.rolesAssigned?.map((role) => (
@@ -173,7 +173,7 @@ export function EditRolesModal({
                       >
                         {getRoleDisplayLabel(role)}
                       </Label>
-                      <p className="text-xs text-gray-600 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         {getRoleDescription(role)}
                       </p>
                     </div>

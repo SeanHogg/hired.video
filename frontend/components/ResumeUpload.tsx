@@ -1,5 +1,6 @@
 import { Upload, Loader2, X, AlertTriangle } from "lucide-react";
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { extractTextFromFile, parseJsonResumeFile } from "@/lib/extract-text";
 import { useIsFirstResumeUpload } from "@/hooks/useIsFirstResumeUpload";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -86,6 +87,7 @@ export default function ResumeUpload({
   submitLabel,
   targetResumeId,
 }: ResumeUploadProps) {
+  const { t } = useTranslation();
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(initialFile);
   const [name, setName] = useState("");
@@ -310,11 +312,9 @@ export default function ResumeUpload({
     // before we proceed.
     if (targetResumeId) {
       const proceed = await confirmDialog({
-        title: "Replace this résumé?",
-        description:
-          "Importing this file replaces the current résumé's content. The editor's Undo won't revert this, but the current version is saved to Version History first, so you can restore it.",
-        confirmText: "Replace résumé",
-        cancelText: "Cancel",
+        title: t("dialogs.resumeUpload.replaceTitle"),
+        description: t("dialogs.resumeUpload.replaceDescription"),
+        confirmText: t("dialogs.resumeUpload.replaceConfirm"),
         destructive: true,
       });
       if (!proceed) return;

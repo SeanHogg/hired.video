@@ -16,6 +16,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Search,
   Folder,
@@ -62,6 +63,7 @@ interface Props {
 }
 
 export default function BinPanel({ initial, onPickSource }: Props) {
+  const { t } = useTranslation();
   const [sources, setSources] = useState<NleMediaSourceWithBin[]>(initial ?? []);
   const [loaded, setLoaded] = useState(initial != null);
   const [query, setQuery] = useState("");
@@ -274,10 +276,10 @@ export default function BinPanel({ initial, onPickSource }: Props) {
               onSelect={(path) => setActiveFolder(path)}
               onRename={async (from) => {
                 const to = await promptDialog({
-                  title: "Move folder",
-                  label: `Move "${from}" to:`,
+                  title: t("dialogs.bin.moveFolderTitle"),
+                  label: t("dialogs.bin.moveFolderLabel", { from }),
                   defaultValue: from,
-                  confirmText: "Move",
+                  confirmText: t("dialogs.bin.moveFolderConfirm"),
                 });
                 if (to === null || to === from) return;
                 try {

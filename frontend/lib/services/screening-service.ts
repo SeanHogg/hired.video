@@ -209,6 +209,21 @@ export const screeningService = {
     return res.data;
   },
 
+  // Send a role's screening to an existing applicant straight from the pipeline
+  // (#1855). Candidate email + company are resolved server-side from the
+  // application, so the caller only needs the application + template ids.
+  async sendFromApplication(input: {
+    applicationId: string;
+    templateId: string;
+    message?: string;
+    expiresInDays?: number;
+  }): Promise<ScreeningRequestWithItems & { magicLink: string }> {
+    const res = await apiClient.post<
+      ScreeningRequestWithItems & { magicLink: string }
+    >("/api/recruit/screening/requests/from-application", input);
+    return res.data;
+  },
+
   async resendRequest(id: string): Promise<ScreeningRequestRow> {
     const res = await apiClient.post<ScreeningRequestRow>(
       `/api/recruit/screening/requests/${id}/resend`,

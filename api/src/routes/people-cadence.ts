@@ -18,6 +18,7 @@ import { getDb, schema } from "../db/index.js";
 import { SYNC_STATUSES, SCORECARD_CATEGORIES, WORKFLOW_TRIGGER_TYPES } from "../../../shared/people-ops.js";
 import { PeopleActionItemsRepository } from "../repositories/peopleActionItemsRepository.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { deliverWorkflowAction } from "../services/people-ops/workflow-delivery.js";
 
 const {
   peopleWeeklySyncs, peopleScorecards, peopleScorecardSnapshots,
@@ -159,10 +160,18 @@ workflowsRouter.post("/:id/run", async (c) => {
         });
         results.push({ action: a.type, ok: true });
       } else {
-        // notify / slack_message / send_email / send_notification / escalate /
-        // create_meeting — recorded; external delivery lands with the
-        // integrations work (#1816).
-        results.push({ action: a.type, ok: true, detail: "recorded (delivery pending integrations)" });
+        // notify / send_notification / escalate → in-app; send_email → mailer;
+        // slack_message → company Slack webhook (#1843). Delivered best-effort
+        // via the single workflow-delivery seam; failures are recorded, never
+        // abort the run.
+        const r = await deliverWorkflowAction(a, {
+          tenantId: ctx.tenantId,
+          segmentId: ctx.segmentId,
+          companyId: ctx.companyId,
+          actorUserId: c.var.user.sub,
+          workflowName: trigger.name,
+        });
+        results.push(r);
       }
     }
     await execRepo.update(ctx, exec.id, { status: "succeeded", completedAt: new Date(), results: { actions: results } });

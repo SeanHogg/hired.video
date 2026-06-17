@@ -84,6 +84,7 @@ interface ApiUser {
   isSuspended: boolean;
   isBanned: boolean;
   isSuperAdmin: boolean;
+  isSystem: boolean;
   mfaEnabled: boolean;
   createdAt: string;
   lastLoginAt: string | null;
@@ -126,6 +127,10 @@ export default function UserManagement() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  // Editorial filter — restricts the list to is_system (house) authors.
+  // SuperAdmin-only (the chip is hidden for non-SA), mirroring the
+  // server-side gate on the underlying flag.
+  const [editorialFilter, setEditorialFilter] = useState(false);
   const [users, setUsers] = useState<ApiUser[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -142,7 +147,7 @@ export default function UserManagement() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { user: currentUser, startImpersonation } = useAuth();
+  const { user: currentUser, startImpersonation, isSuperAdmin } = useAuth();
   const { format: formatTz } = useUserTimezone();
   const { toast } = useToast();
   const { can } = useAdminPermissions();
@@ -189,6 +194,7 @@ export default function UserManagement() {
       if (search) params.set("search", search);
       if (roleFilter !== "all") params.set("role", roleFilter);
       if (statusFilter !== "all") params.set("status", statusFilter);
+      if (editorialFilter) params.set("editorial", "true");
 
       const res = await apiClient.get<{ users: ApiUser[]; total: number; page: number; limit: number }>(
         `/api/admin/impersonate/users?${params.toString()}`
@@ -200,7 +206,7 @@ export default function UserManagement() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, roleFilter, statusFilter, t]);
+  }, [page, search, roleFilter, statusFilter, editorialFilter, t]);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
@@ -237,7 +243,7 @@ export default function UserManagement() {
   // Clear selection whenever the visible set changes — paginating or
   // filtering replaces the users on screen, and a lingering selection from
   // the previous view would act on rows the admin can no longer see.
-  useEffect(() => { setSelectedIds(new Set()); }, [page, search, roleFilter, statusFilter]);
+  useEffect(() => { setSelectedIds(new Set()); }, [page, search, roleFilter, statusFilter, editorialFilter]);
 
   // Debounce search
   const [searchInput, setSearchInput] = useState("");
@@ -266,7 +272,7 @@ export default function UserManagement() {
   };
 
   const handleSendPasswordReset = async (user: ApiUser) => {
-    if (!(await confirmDialog({ title: "Send password reset", description: t("messages.confirmPasswordReset", { name: user.name, email: user.email }), confirmText: "Send" }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.userManagement.sendPasswordResetTitle"), description: t("messages.confirmPasswordReset", { name: user.name, email: user.email }), confirmText: t("dialogs.userManagement.sendPasswordResetConfirm") }))) return;
     try {
       await apiClient.post(`/api/admin/impersonate/users/${user.id}/password-reset`, {});
       toast({ title: t("messages.passwordResetSent", { email: user.email }) });
@@ -281,7 +287,7 @@ export default function UserManagement() {
 
   const handleHealResumes = async (user: ApiUser) => {
     if (user.resumeCount === 0) return;
-    if (!(await confirmDialog({ title: "Heal resumes", description: t("messages.confirmHealResumes", { count: user.resumeCount, name: user.name }), confirmText: "Heal" }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.userManagement.healResumesTitle"), description: t("messages.confirmHealResumes", { count: user.resumeCount, name: user.name }), confirmText: t("dialogs.userManagement.healResumesConfirm") }))) return;
     try {
       setHealingUserId(user.id);
       const res = await apiClient.post<{
@@ -312,7 +318,7 @@ export default function UserManagement() {
   };
 
   const handleResetTokens = async (user: ApiUser) => {
-    if (!(await confirmDialog({ title: "Reset tokens", description: t("messages.confirmResetTokens", { name: user.name }), confirmText: "Reset" }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.userManagement.resetTokensTitle"), description: t("messages.confirmResetTokens", { name: user.name }), confirmText: t("dialogs.userManagement.resetTokensConfirm") }))) return;
     try {
       const res = await apiClient.post<{ tokensReset: number }>(
         `/api/admin/impersonate/users/${user.id}/tokens/reset`,
@@ -438,7 +444,7 @@ export default function UserManagement() {
 
   const handleClearOverride = async (user: ApiUser) => {
     const original = user.planOverride?.originalPlanName ?? "their subscription plan";
-    if (!(await confirmDialog({ title: "Clear override", description: t("messages.confirmClearOverride", { name: user.name, plan: original }), confirmText: "Clear" }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.userManagement.clearOverrideTitle"), description: t("messages.confirmClearOverride", { name: user.name, plan: original }), confirmText: t("dialogs.userManagement.clearOverrideConfirm") }))) return;
     try {
       await clearPlanOverride(user.id);
       toast({ title: t("messages.userResetTo", { name: user.name, plan: original }) });
@@ -457,6 +463,24 @@ export default function UserManagement() {
       refresh();
     } catch {
       toast({ title: t("errors.failedToUpdateStatusUser"), variant: "destructive" });
+    }
+  };
+
+  // Toggle the editorial / house-author flag (is_system). SuperAdmin-only —
+  // the menu item is hidden for non-SA, and the server re-checks via the
+  // superAdminMiddleware on /admin/impersonate.
+  const handleToggleSystem = async (user: ApiUser) => {
+    const next = !user.isSystem;
+    try {
+      await apiClient.put(`/api/admin/impersonate/users/${user.id}/system`, { isSystem: next });
+      toast({
+        title: next
+          ? t("messages.userMarkedEditorial", { name: user.name })
+          : t("messages.userUnmarkedEditorial", { name: user.name }),
+      });
+      refresh();
+    } catch {
+      toast({ title: t("errors.failedToUpdateEditorial"), variant: "destructive" });
     }
   };
 
@@ -600,6 +624,21 @@ export default function UserManagement() {
               <SelectItem value="banned">{t("status.bannedStatus")}</SelectItem>
             </SelectContent>
           </Select>
+          {/* Editorial filter chip — SuperAdmin-only. Toggles the
+              is_system (house author) restriction on the list. */}
+          {isSuperAdmin && (
+            <Button
+              type="button"
+              variant={editorialFilter ? "default" : "outline"}
+              size="sm"
+              className="h-10 whitespace-nowrap"
+              aria-pressed={editorialFilter}
+              onClick={() => { setEditorialFilter((v) => !v); setPage(1); }}
+            >
+              <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+              {t("labels.editorial")}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -739,9 +778,17 @@ export default function UserManagement() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS[user.role] ?? ""}`}>
-                        {user.isSuperAdmin ? t("labels.superAdmin") : getRoleDisplayLabel(user.role)}
-                      </span>
+                      <div className="flex flex-col items-start gap-1">
+                        <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS[user.role] ?? ""}`}>
+                          {user.isSuperAdmin ? t("labels.superAdmin") : getRoleDisplayLabel(user.role)}
+                        </span>
+                        {user.isSystem && (
+                          <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+                            <Sparkles className="h-2.5 w-2.5" />
+                            {t("labels.editorial")}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
@@ -884,6 +931,13 @@ export default function UserManagement() {
                           {canUpdate && (
                             <DropdownMenuItem onSelect={() => handleSendPasswordReset(user)}>
                               <KeyRound className="h-4 w-4 mr-2" />{t("actions.sendPasswordReset")}
+                            </DropdownMenuItem>
+                          )}
+                          {/* Editorial / house-author flag — SuperAdmin-only. */}
+                          {isSuperAdmin && (
+                            <DropdownMenuItem onSelect={() => handleToggleSystem(user)}>
+                              <Sparkles className="h-4 w-4 mr-2" />
+                              {user.isSystem ? t("actions.unmarkEditorial") : t("actions.markEditorial")}
                             </DropdownMenuItem>
                           )}
                           {canUpdate && user.resumeCount > 0 && (

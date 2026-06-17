@@ -184,7 +184,7 @@ export default function EmbeddedResume() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t bg-white/50 backdrop-blur-sm mt-16">
+      <footer className="border-t bg-card/50 backdrop-blur-sm mt-16">
         <div className="px-4 py-6">
           <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
             <span>Powered by</span>

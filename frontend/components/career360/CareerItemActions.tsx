@@ -49,7 +49,7 @@ const VERDICT_STYLES: Record<EvaluationResult["verdict"], string> = {
   closed: "bg-emerald-50 text-emerald-800 border-emerald-200",
   partial: "bg-amber-50 text-amber-800 border-amber-200",
   open: "bg-blue-50 text-blue-800 border-blue-200",
-  uncertain: "bg-slate-50 text-slate-700 border-slate-200",
+  uncertain: "bg-muted text-foreground border-border",
 };
 
 const VERDICT_LABEL: Record<EvaluationResult["verdict"], string> = {

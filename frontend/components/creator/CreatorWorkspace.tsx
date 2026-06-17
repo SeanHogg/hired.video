@@ -92,9 +92,16 @@ export default function CreatorWorkspace({
   const urlTab = useMemo<CreatorWorkspaceTab>(() => {
     if (!basePath || !location.pathname.startsWith(basePath)) return resolvedDefaultTab;
     const tail = location.pathname.slice(basePath.length).replace(/^\//, "").split("/")[0];
-    if (!tail) return resolvedDefaultTab;
-    return (TAB_VALUES as readonly string[]).includes(tail) ? (tail as CreatorWorkspaceTab) : resolvedDefaultTab;
-  }, [basePath, location.pathname, resolvedDefaultTab]);
+    if (tail && (TAB_VALUES as readonly string[]).includes(tail)) return tail as CreatorWorkspaceTab;
+    // Legacy `?tab=payouts` deep-link support (#744): when the path carries no
+    // valid tab segment, fall back to the query param before the default, so
+    // pre-consolidation links (e.g. from emails) still land on the right tab.
+    const queryTab = new URLSearchParams(location.search).get("tab");
+    if (queryTab && (TAB_VALUES as readonly string[]).includes(queryTab)) {
+      return queryTab as CreatorWorkspaceTab;
+    }
+    return resolvedDefaultTab;
+  }, [basePath, location.pathname, location.search, resolvedDefaultTab]);
   const tabsProps = basePath
     ? { value: urlTab, onValueChange: (v: string) => navigate(`${basePath}/${v}`) }
     : { defaultValue: resolvedDefaultTab };

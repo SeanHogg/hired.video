@@ -78,7 +78,7 @@ interface BillingResponse {
 const STATUS_STYLES: Record<string, string> = {
   active:   "bg-green-100 text-green-800",
   trialing: "bg-blue-100 text-blue-800",
-  canceled: "bg-gray-100 text-gray-600",
+  canceled: "bg-muted text-muted-foreground",
   past_due: "bg-red-100 text-red-800",
 };
 

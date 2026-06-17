@@ -61,7 +61,7 @@ export function WelcomeHero() {
           {/* Path 1: Create a Video */}
           <Link
             to="/studio"
-            className="group block p-5 rounded-lg bg-white border-2 border-blue-200 hover:border-blue-500 hover:shadow-md transition-all"
+            className="group block p-5 rounded-lg bg-card border-2 border-blue-200 hover:border-blue-500 hover:shadow-md transition-all"
           >
             <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-200 transition-colors">
               <Film className="h-6 w-6 text-blue-600" />
@@ -81,7 +81,7 @@ export function WelcomeHero() {
           {/* Path 2: Install Chrome Extension */}
           <Link
             to="/chrome-extension"
-            className="group block p-5 rounded-lg bg-white border-2 border-green-200 hover:border-green-500 hover:shadow-md transition-all"
+            className="group block p-5 rounded-lg bg-card border-2 border-green-200 hover:border-green-500 hover:shadow-md transition-all"
           >
             <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center mb-3 group-hover:bg-green-200 transition-colors">
               <Chrome className="h-6 w-6 text-green-600" />
@@ -101,7 +101,7 @@ export function WelcomeHero() {
           {/* Path 3: Earn as a Creator */}
           <Link
             to="/services"
-            className="group block p-5 rounded-lg bg-white border-2 border-purple-200 hover:border-purple-500 hover:shadow-md transition-all"
+            className="group block p-5 rounded-lg bg-card border-2 border-purple-200 hover:border-purple-500 hover:shadow-md transition-all"
           >
             <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-200 transition-colors">
               <Sparkles className="h-6 w-6 text-purple-600" />

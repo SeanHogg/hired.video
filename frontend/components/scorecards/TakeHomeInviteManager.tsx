@@ -11,6 +11,7 @@
 // reviewer's scorecard fills end up linked back to the candidate work.
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Copy,
   ExternalLink,
@@ -57,6 +58,7 @@ export function TakeHomeInviteManager({
   companyId,
   defaultTemplateId,
 }: Props) {
+  const { t } = useTranslation();
   const [submissions, setSubmissions] = useState<TakeHomeSubmission[]>([]);
   const [templates, setTemplates] = useState<ScorecardTemplate[]>([]);
   const [templateId, setTemplateId] = useState<string | null>(
@@ -128,8 +130,10 @@ export function TakeHomeInviteManager({
       // keyed by application; the link here is informative.
       if (typeof window !== "undefined") {
         await alertDialog({
-          title: "Review ready",
-          description: `Scorecard submission ${scorecardSubmissionId} ready to fill on the candidate's debrief page.`,
+          title: t("dialogs.takeHome.reviewReadyTitle"),
+          description: t("dialogs.takeHome.reviewReadyDescription", {
+            id: scorecardSubmissionId,
+          }),
         });
       }
     } finally {

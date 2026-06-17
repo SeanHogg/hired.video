@@ -102,10 +102,10 @@ export function AccountAnalytics({
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4" />
+          <div className="h-8 bg-muted rounded w-1/4 mb-4" />
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded" />
+              <div key={i} className="h-32 bg-muted rounded" />
             ))}
           </div>
         </div>
@@ -247,9 +247,9 @@ export function AccountAnalytics({
                 {formatNumber(merged.invitesAccepted)}
               </p>
             </div>
-            <div className="p-4 rounded-lg bg-gray-50">
+            <div className="p-4 rounded-lg bg-muted">
               <p className="text-xs text-muted-foreground">Last active</p>
-              <p className="text-sm font-medium text-gray-700 mt-2">
+              <p className="text-sm font-medium text-foreground mt-2">
                 {merged.lastActiveAt
                   ? new Date(merged.lastActiveAt).toLocaleString()
                   : "Never"}

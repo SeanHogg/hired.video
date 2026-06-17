@@ -87,17 +87,17 @@ function ArrayEditor({
   return (
     <div className="space-y-3">
       {items.length === 0 && (
-        <p className="text-xs italic text-slate-400">No {schema.itemNoun} yet.</p>
+        <p className="text-xs italic text-muted-foreground">No {schema.itemNoun} yet.</p>
       )}
       {items.map((item, idx) => (
         <div
           key={(item.id as string) ?? idx}
-          className="relative rounded border border-slate-200 p-2"
+          className="relative rounded border border-border p-2"
         >
           <button
             type="button"
             aria-label={`Remove ${schema.itemNoun}`}
-            className="absolute right-1 top-1 p-1 text-slate-400 hover:text-red-600"
+            className="absolute right-1 top-1 p-1 text-muted-foreground hover:text-red-600"
             onClick={(e) => {
               e.stopPropagation();
               removeItem(idx);
@@ -115,7 +115,7 @@ function ArrayEditor({
       ))}
       <button
         type="button"
-        className="inline-flex items-center gap-1 rounded border border-dashed border-slate-300 px-2 py-1 text-xs text-slate-500 hover:border-brand-purple hover:text-brand-purple"
+        className="inline-flex items-center gap-1 rounded border border-dashed border-border px-2 py-1 text-xs text-muted-foreground hover:border-brand-purple hover:text-brand-purple"
         onClick={(e) => {
           e.stopPropagation();
           addItem();

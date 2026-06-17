@@ -116,12 +116,12 @@ export default function AcceptInvitation() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-muted flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="flex items-center justify-center p-8">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-              <p className="text-gray-600">{t("status.loadingInvitation")}</p>
+              <p className="text-muted-foreground">{t("status.loadingInvitation")}</p>
             </div>
           </CardContent>
         </Card>
@@ -131,7 +131,7 @@ export default function AcceptInvitation() {
 
   if (error || !invitationDetails) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-muted flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
@@ -153,7 +153,7 @@ export default function AcceptInvitation() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-muted flex items-center justify-center p-4">
       <Card className="w-full max-w-2xl">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
@@ -179,17 +179,17 @@ export default function AcceptInvitation() {
 
         <CardContent className="space-y-6">
           {/* Company Information */}
-          <div className="bg-gray-50 rounded-lg p-4">
+          <div className="bg-muted rounded-lg p-4">
             <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
               <Building2 className="h-5 w-5" />
               {invitationDetails.companyName}
             </h3>
             {invitationDetails.companyDescription && (
-              <p className="text-gray-600 mb-3">
+              <p className="text-muted-foreground mb-3">
                 {invitationDetails.companyDescription}
               </p>
             )}
-            <div className="flex items-center gap-4 text-sm text-gray-500">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Mail className="h-4 w-4" />
                 {t("labels.invited")}: {invitationDetails.invitedEmail}
@@ -297,7 +297,7 @@ export default function AcceptInvitation() {
             </div>
           )}
 
-          <p className="text-xs text-gray-500 text-center">
+          <p className="text-xs text-muted-foreground text-center">
             {t("messages.invitedOn", {
               date: new Date(invitationDetails.invitedAt).toLocaleDateString(intlLocale(i18n.language)),
             })}

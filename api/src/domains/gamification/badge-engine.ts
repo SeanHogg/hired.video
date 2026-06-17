@@ -164,6 +164,13 @@ export function evaluateBadges(input: BadgeEvaluationInput): string[] {
       break;
     }
 
+    // ─── Peer resume feedback (gap #1952) ─────────────────────────────
+    case "feedback.review.submitted": {
+      considerBadge("feedback_first", input.totalEarnsForAction >= 1);
+      considerBadge("mentor", input.totalEarnsForAction >= 5);
+      break;
+    }
+
     // ─── Educator / cohort / student (gap #1966) ──────────────────────
     case "cohort.created": {
       considerBadge("educator_first_cohort", input.totalEarnsForAction >= 1);

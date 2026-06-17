@@ -40,6 +40,7 @@ import QRCodeDialog from "@/components/QRCodeDialog";
 import ShareModal from "@/components/ShareModal";
 import ResumeAnalyticsDialog from "@/components/ResumeAnalyticsDialog";
 import ResumeStatsSheet from "@/components/ResumeStatsSheet";
+import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 import SkillNetwork from "@/components/SkillNetwork";
 import { Button } from "@/components/ui/button";
 import {
@@ -120,6 +121,12 @@ function VideoSlot({ items }: { items: VideoSlotItem[] }) {
         title={current.title}
         fallbackVideoUrl={current.videoUrl}
         fallbackYoutubeVideoId={current.youtubeVideoId}
+        // #2128 — count CTA-hotzone clicks from the in-platform resume
+        // watch surface too (not just /v/:id). `current.id` is the studio
+        // project id the CtaHotzonesOverlay keys engagement on; without it
+        // the overlay self-disables and owner analytics under-report clicks
+        // that happen on the resume detail page.
+        analyticsProjectId={current.id}
       />
     ) : (() => {
         // metaData: derive the flat source from the metaType.
@@ -334,7 +341,7 @@ export default function ResumeDetail() {
     };
   }, [resume]);
 
-  const applyPreset = (preset: ResumeTemplateDescriptor) => {
+  const applyPreset = async (preset: ResumeTemplateDescriptor) => {
     setDescriptor(preset);
     // Canvas resumes re-skin their saved layout to the picked template; the id
     // is shared between the declarative preset and the document-template option
@@ -342,6 +349,34 @@ export default function ResumeDetail() {
     setLayoutTemplateOverrideId(preset.id);
     setEditorText(JSON.stringify(preset, null, 2));
     setEditorError(null);
+
+    // #1945 — for a canvas-authored resume the dropdown used to re-skin only
+    // the view-local preview; the saved `documentLayout` kept its old
+    // templateId so reopening the studio editor (or reloading) reverted the
+    // look (themed-layout drift). Persist the re-skinned layout here using the
+    // SAME `applyDocumentTemplate` seam the renderer uses, so page + editor +
+    // print all agree.
+    if (isSample || !resume?.id) return;
+    const meta = resume.content?.meta as Record<string, unknown> | undefined;
+    const baseLayout = meta?.documentLayout as DocumentState | undefined;
+    if (!baseLayout || baseLayout.templateId === preset.id) return;
+    const option = documentTemplatesForEntity("resume").find((o) => o.id === preset.id);
+    if (!option) return;
+    try {
+      const newLayout = applyDocumentTemplate(baseLayout, option, () => crypto.randomUUID());
+      const nextData = {
+        ...(resume.content as Record<string, unknown>),
+        meta: { ...(meta ?? {}), documentLayout: newLayout, template: preset.id },
+      };
+      const updated = await resumeService.updateResumeData(resume.id, { data: nextData as any });
+      setResume(updated);
+    } catch (e) {
+      toast({
+        title: t("errors.resumeDetail.couldNotSaveTemplate"),
+        description: (e as Error)?.message || t("messages.pleaseTryAgain"),
+        variant: "destructive",
+      });
+    }
   };
 
   const applyEditor = () => {
@@ -719,6 +754,18 @@ export default function ResumeDetail() {
                     onDelete={perms.canDelete ? handleDelete : undefined}
                     onViewToolHistory={() => setToolHistoryOpen(true)}
                     onViewAnalytics={perms.canViewAnalytics ? () => setAnalyticsOpen(true) : undefined}
+                    triggerVariant="outline"
+                  />
+                )}
+                {/* Report this resume — self-gates (hidden for the
+                    owner, bounces anon to /login). entityId is the real
+                    resume_information id the backend resolver expects. */}
+                {resume && !isSample && (
+                  <ReportAbuseButton
+                    entityType="resume"
+                    entityId={resume.id}
+                    entityOwnerId={resume.userId}
+                    entityLabel="resume"
                     triggerVariant="outline"
                   />
                 )}

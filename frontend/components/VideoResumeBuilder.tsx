@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +55,7 @@ export function VideoResumeBuilder({
   onSave,
   onCancel,
 }: VideoResumeBuilderProps) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("upload");
   const [videoResume, setVideoResume] = useState<VideoResumeData>({
     title: resumeData?.basics?.name
@@ -140,7 +142,7 @@ export function VideoResumeBuilder({
 
   const handleSave = async () => {
     if (!uploadedVideo) {
-      await alertDialog({ title: "No video", description: "Please upload or generate a video first" });
+      await alertDialog({ title: t("dialogs.videoResume.noVideoTitle"), description: t("dialogs.videoResume.noVideoDescription") });
       return;
     }
 

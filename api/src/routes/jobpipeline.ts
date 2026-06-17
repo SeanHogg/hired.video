@@ -19,6 +19,7 @@ import {
 } from "../../../shared/recruiter-pipeline.js";
 import { requireJobOwner } from "../services/jobs/jobOwnership.js";
 import * as pipelineService from "../services/pipeline/PipelineService.js";
+import { withGamification } from "../domains/gamification/with-gamification.js";
 import { cacheMiddleware } from "../utils/cache-headers.js";
 import { etagMiddleware } from "../utils/etag.js";
 
@@ -143,6 +144,15 @@ jobPipelineRoutes.patch("/:entryId/stage", async (c) => {
     performedByUserId: userId,
   });
   if (!found) return c.json(error("NOT_FOUND", "Pipeline entry not found"), 404);
+  // #1118 — moving a candidate to the "offer" stage = the employer extending
+  // an offer. Credits the actor (job owner = employer); refId = entry so a
+  // re-move into offer doesn't re-pay. (The "hired" transition is awarded via
+  // the scorecard hire-decision path, so it's intentionally not duplicated here.)
+  if (parsed.data.stage === "offer") {
+    await withGamification(c, "offer-extended", (game, role, uidEarner) =>
+      game.onOfferExtended({ userId: uidEarner, role, offerId: entryId }),
+    );
+  }
   return c.json(success(updated), 200);
 });
 

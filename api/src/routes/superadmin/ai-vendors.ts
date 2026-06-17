@@ -16,6 +16,7 @@ import type { Env, Variables, AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
 import {
   USE_CASE_PROFILES,
+  featureKeysForUseCase,
   type InferenceProfile,
   type LLMUseCase,
 } from "../../services/adapters/providers.js";
@@ -34,7 +35,9 @@ const profileRow = (profile: InferenceProfile) => ({
 });
 
 // GET /use-cases — full use-case → primary profile + cross-vendor
-// fallback chain. SA sees what we *ask* the gateway for per action.
+// fallback chain, plus the billing feature keys that roll up to each use
+// case (#457) so SA can attribute spend per use case (e.g. all three
+// `career_360_*` keys bucket under the one `career_360` row).
 aiVendorRoutes.get("/use-cases", (c) => {
   const rows = (Object.keys(USE_CASE_PROFILES) as LLMUseCase[]).map((useCase) => {
     const profile = USE_CASE_PROFILES[useCase];
@@ -43,6 +46,7 @@ aiVendorRoutes.get("/use-cases", (c) => {
       useCase,
       ...profileRow(primary),
       fallbacks: (fallbacks ?? []).map(profileRow),
+      featureKeys: featureKeysForUseCase(useCase),
     };
   });
   return c.json(success(rows));

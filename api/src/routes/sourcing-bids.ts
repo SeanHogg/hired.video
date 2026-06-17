@@ -170,7 +170,30 @@ sourcingBidActionRoutes.patch("/:bidId/accept", async (c) => {
   const { denied } = await requireJobOwner(c, bid.jobId);
   if (denied) return denied;
 
-  return c.json(success(await listings.acceptBid(bidId, userId)), 200);
+  const accepted = await listings.acceptBid(bidId, userId);
+
+  // Credit the bid WINNER (the recruiter `bid.bidderId`), who is NOT the
+  // caller here — the job owner is the one accepting. Role is resolved from
+  // the db via awardWithRoleLookup since we can't read the winner's JWT.
+  // RefId = bid id makes the award idempotent across re-accepts. Best-effort.
+  try {
+    const { gamificationFromContext } = await import(
+      "../domains/gamification/with-gamification.js"
+    );
+    const { ACTIONS } = await import("../domains/gamification/index.js");
+    await gamificationFromContext(c).awardWithRoleLookup(ACTIONS.BID_WON, {
+      userId: bid.bidderId,
+      refId: bid.id,
+      refType: "sourcing_bid",
+    });
+  } catch (e) {
+    console.warn("[gamification] bid-won failed", {
+      bidId: bid.id,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+
+  return c.json(success(accepted), 200);
 });
 
 sourcingBidActionRoutes.patch("/:bidId/reject", async (c) => {

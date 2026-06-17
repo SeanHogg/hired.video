@@ -76,6 +76,7 @@ import SourceEditor from "./SourceEditor";
 import PositionPresets from "./PositionPresets";
 import EffectStackEditor from "@/components/studio/effects/EffectStackEditor";
 import ContentLinkPicker from "@/components/studio/shared/ContentLinkPicker";
+import FiltersPicker from "@/components/studio/shared/FiltersPicker";
 import UrlPickerInput from "@/components/shared/UrlPickerInput";
 import type { WidgetInspectorSection, WidgetSectionCtx } from "./types";
 
@@ -625,6 +626,42 @@ const VIDEO_CHROMA_SECTION: WidgetInspectorSection = {
         )}
       </div>
     );
+  },
+};
+
+/** Per-widget colour-grading filters (#596 / #806). Self-gates to image
+ *  + video widgets (the only kinds carrying a `filters` field). Reuses
+ *  the same `<FiltersPicker>` the scene-level grade uses, so a widget
+ *  grade and a scene grade share one control + one `VideoFilters` shape.
+ *  The DOM preview folds the grade into the widget's CSS `filter`; the
+ *  canvas-v2 image/video appliers bake the identical grade into export. */
+const WIDGET_FILTERS_SECTION: WidgetInspectorSection = {
+  id: "filters",
+  title: "Filters",
+  render: ({ widget, onUpdateWidgetParams }) => {
+    if (widget.params.kind === "image") {
+      const data = widget.params.data;
+      return (
+        <FiltersPicker
+          filters={data.filters ?? null}
+          onChange={(filters) =>
+            onUpdateWidgetParams({ kind: "image", data: { ...data, filters } })
+          }
+        />
+      );
+    }
+    if (widget.params.kind === "video") {
+      const data = widget.params.data;
+      return (
+        <FiltersPicker
+          filters={data.filters ?? null}
+          onChange={(filters) =>
+            onUpdateWidgetParams({ kind: "video", data: { ...data, filters } })
+          }
+        />
+      );
+    }
+    return null;
   },
 };
 
@@ -1546,8 +1583,8 @@ const AVATAR_CONTENT_SECTION: WidgetInspectorSection = {
 export const WIDGET_INSPECTOR: Record<WidgetKind, WidgetInspectorSection[]> = {
   text: [LAYOUT_SECTION, textContentSection("text"), ...SHARED_TAIL],
   heading: [LAYOUT_SECTION, textContentSection("heading"), ...SHARED_TAIL],
-  image: [LAYOUT_SECTION, IMAGE_CONTENT_SECTION, ...SHARED_TAIL],
-  video: [LAYOUT_SECTION, VIDEO_CONTENT_SECTION, VIDEO_CHROMA_SECTION, ...SHARED_TAIL],
+  image: [LAYOUT_SECTION, IMAGE_CONTENT_SECTION, WIDGET_FILTERS_SECTION, ...SHARED_TAIL],
+  video: [LAYOUT_SECTION, VIDEO_CONTENT_SECTION, VIDEO_CHROMA_SECTION, WIDGET_FILTERS_SECTION, ...SHARED_TAIL],
   "shape-rect": [LAYOUT_SECTION, shapeContentSection("shape-rect"), ...SHARED_TAIL],
   "shape-circle": [LAYOUT_SECTION, shapeContentSection("shape-circle"), ...SHARED_TAIL],
   divider: [LAYOUT_SECTION, DIVIDER_CONTENT_SECTION, ...SHARED_TAIL],

@@ -42,6 +42,10 @@ import {
   SubmitReviewInputSchema,
   ProposeDraftInputSchema,
 } from "../../../shared/resume-feedback.js";
+import {
+  withGamification,
+  gamificationFromContext,
+} from "../domains/gamification/with-gamification.js";
 
 export const resumeFeedbackRoutes = new Hono<AppEnv>();
 
@@ -129,7 +133,12 @@ resumeFeedbackRoutes.post("/reviews/:id/submit", async (c) => {
   const parsed = SubmitReviewInputSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid payload"), 400);
   try {
-    return c.json(success(await buildService().submitReview(c.req.param("id"), userId, parsed.data)), 200);
+    const dto = await buildService().submitReview(c.req.param("id"), userId, parsed.data);
+    // #1952 — reward the reviewer for completing a peer review (Mentor badge).
+    await withGamification(c, "feedback.review.submitted", (game, role, reviewerId) =>
+      game.onFeedbackReviewSubmitted({ userId: reviewerId, role, reviewId: c.req.param("id") }),
+    );
+    return c.json(success(dto), 200);
   } catch (e) {
     return mapError(c, e);
   }
@@ -202,7 +211,15 @@ resumeFeedbackRoutes.post("/annotations/:aid/accept", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Sign in required"), 401);
   try {
-    return c.json(success(await buildService().acceptAnnotation(c.req.param("aid"), userId)), 200);
+    const result = await buildService().acceptAnnotation(c.req.param("aid"), userId);
+    // #1952 — credit the reviewer who authored the accepted suggestion (not
+    // the owner who accepted it). Resolved by id since they aren't the caller.
+    if (result.reviewerId) {
+      await gamificationFromContext(c)
+        .onFeedbackSuggestionAccepted({ userId: result.reviewerId, annotationId: c.req.param("aid") })
+        .catch(() => undefined);
+    }
+    return c.json(success(result), 200);
   } catch (e) {
     return mapError(c, e);
   }

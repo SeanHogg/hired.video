@@ -15,13 +15,29 @@ interface Props {
    *  this is `project.youtubeVideoId ?? project.id` (the same id used in
    *  the public `/v/:id` URL). */
   videoId: string | null;
+  /** Studio project id (#696). When the project has no published render
+   *  (`/api/studio/videos/:id/embed` 404s), fall back to a project-keyed
+   *  iframe at `/embedded/studio/:projectId`, which the unified player
+   *  serves straight from `studio_projects` — so unrendered-but-public
+   *  projects are still embeddable. */
+  projectId?: string | null;
   videoTitle?: string;
+}
+
+/** Build the project-keyed iframe snippet client-side (#696). The
+ *  `/embedded/studio/:id` route mounts the unified player, so this works
+ *  without a published `videos.id`. */
+function projectEmbedSnippet(projectId: string, title?: string): string {
+  const src = `https://hired.video/embedded/studio/${projectId}`;
+  const safeTitle = (title ?? "Video").replace(/"/g, "&quot;");
+  return `<iframe width="640" height="360" src="${src}" title="${safeTitle}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
 }
 
 export default function StudioVideoEmbedSheet({
   open,
   onOpenChange,
   videoId,
+  projectId,
   videoTitle,
 }: Props) {
   const [snippet, setSnippet] = useState<string | null>(null);
@@ -30,7 +46,23 @@ export default function StudioVideoEmbedSheet({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open || !videoId) return;
+    if (!open) return;
+    // #696 — a public project with no published render has no `videos.id`
+    // embed row. Serve the project-keyed iframe directly instead of
+    // showing "make it public". Rendered / YouTube projects still prefer
+    // the richer backend snippet below.
+    const projectFallback = (): boolean => {
+      if (!projectId) return false;
+      setSnippet(projectEmbedSnippet(projectId, videoTitle));
+      setPreviewUrl(`https://hired.video/v/${projectId}`);
+      setError(null);
+      return true;
+    };
+    if (!videoId) {
+      // No render id at all — go straight to the project iframe.
+      if (!projectFallback()) setError("Save and publish the project to embed it.");
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -43,15 +75,16 @@ export default function StudioVideoEmbedSheet({
         if (res.data) {
           setSnippet(res.data.embedHtml);
           setPreviewUrl(res.data.shareUrl);
-        } else {
+        } else if (!projectFallback()) {
           setError("Could not load the embed snippet.");
         }
       })
       .catch((err: unknown) => {
         if (cancelled) return;
+        // The endpoint 404s when there's no published render — fall back to
+        // the project-keyed embed before surfacing any error.
+        if (projectFallback()) return;
         const msg = err instanceof Error ? err.message : "Could not load the embed snippet.";
-        // The endpoint 404s when the video isn't public — surface that as a
-        // friendlier message rather than a raw API error.
         setError(
           /not found|404/i.test(msg)
             ? "Make the video public to generate an embed snippet."
@@ -64,7 +97,7 @@ export default function StudioVideoEmbedSheet({
     return () => {
       cancelled = true;
     };
-  }, [open, videoId]);
+  }, [open, videoId, projectId, videoTitle]);
 
   return (
     <EmbedSheet

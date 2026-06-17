@@ -23,6 +23,7 @@
  */
 
 import { getDb, schema } from "../../db/index.js";
+import { HunterEnrichmentProvider } from "./hunter.js";
 
 const { enrichmentProviderCalls } = schema;
 
@@ -84,6 +85,9 @@ export function getActiveEnrichmentProvider(): EnrichmentProvider {
   // route layer doesn't change.
   const choice = (process.env.ENRICHMENT_PROVIDER ?? "null").toLowerCase();
   switch (choice) {
+    case "hunter":
+      cachedProvider = new HunterEnrichmentProvider();
+      break;
     default:
       cachedProvider = new NullEnrichmentProvider();
   }

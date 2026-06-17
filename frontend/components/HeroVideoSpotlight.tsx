@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Play, Pause, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import PublicVideoPreview from "@/components/PublicVideoPreview";
@@ -44,6 +45,7 @@ export default function HeroVideoSpotlight({
   mobileRotationMs = 6000,
 }: HeroVideoSpotlightProps) {
   const { t } = useTranslation();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const [index, setIndex] = useState(0);
@@ -149,7 +151,11 @@ export default function HeroVideoSpotlight({
                   {t("messages.videoResumesLandHere")}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {t("messages.beOneOfFirstCreators")}
+                  {/* Signed-in viewers get a "record your own" nudge; anonymous
+                      visitors get the signup-oriented "be one of the first". */}
+                  {isAuthenticated
+                    ? t("messages.heroEmptyRecordFirst")
+                    : t("messages.beOneOfFirstCreators")}
                 </p>
               </div>
             </div>
@@ -182,7 +188,9 @@ export default function HeroVideoSpotlight({
         <Button
           size="sm"
           className="gap-2"
-          onClick={() => navigate("/studio")}
+          onClick={() =>
+            navigate(isAuthenticated ? "/studio" : "/signup?redirect=%2Fstudio")
+          }
         >
           <Sparkles className="h-4 w-4" />
           {t("actions.createYourVideoResume")}

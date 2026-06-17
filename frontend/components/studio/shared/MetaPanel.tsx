@@ -36,7 +36,7 @@ export default function MetaPanel({
 }: MetaPanelProps) {
   return (
     <div className={className}>
-      {title && <h3 className="text-sm font-semibold text-slate-700">{title}</h3>}
+      {title && <h3 className="text-sm font-semibold text-foreground">{title}</h3>}
       {description && (
         <p className="mb-2 mt-0.5 text-xs text-muted-foreground">{description}</p>
       )}

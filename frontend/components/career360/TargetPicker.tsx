@@ -5,6 +5,7 @@
 // disabled states from the props it owns.
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ export function TargetPicker({
   onChoose,
   onCustom,
 }: Props) {
+  const { t } = useTranslation();
   const [showCustom, setShowCustom] = useState(false);
   const [customTitle, setCustomTitle] = useState("");
   const [customSeniority, setCustomSeniority] = useState("");
@@ -48,9 +50,9 @@ export function TargetPicker({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h3 className="text-lg font-semibold">What do you want to become?</h3>
+          <h3 className="text-lg font-semibold">{t("tools.career360.picker.heading")}</h3>
           <p className="text-sm text-muted-foreground">
-            Pick one of these AI-suggested targets — we'll build the gap analysis and roadmap from your profile.
+            {t("tools.career360.picker.subtitle")}
           </p>
         </div>
         <Button
@@ -64,14 +66,14 @@ export function TargetPicker({
           ) : (
             <RefreshCw className="mr-2 h-4 w-4" />
           )}
-          Suggest different ones
+          {t("tools.career360.picker.suggestDifferent")}
         </Button>
       </div>
 
       {suggestions.length === 0 && !isSuggesting && (
         <Card>
           <CardContent className="p-6 text-center text-sm text-muted-foreground">
-            No suggestions yet — click "Suggest different ones" to generate three.
+            {t("tools.career360.picker.empty")}
           </CardContent>
         </Card>
       )}
@@ -80,7 +82,7 @@ export function TargetPicker({
         <Card>
           <CardContent className="p-6 flex items-center justify-center text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Reading your profile…
+            {t("tools.career360.picker.reading")}
           </CardContent>
         </Card>
       )}
@@ -111,7 +113,7 @@ export function TargetPicker({
                 </div>
                 <p className="text-sm text-muted-foreground">{s.description}</p>
                 <p className="text-xs text-muted-foreground italic">
-                  Why: {s.why}
+                  {t("tools.career360.picker.whyLabel")} {s.why}
                 </p>
                 <div className="mt-auto pt-2">
                   <Button
@@ -125,7 +127,7 @@ export function TargetPicker({
                     ) : (
                       <Sparkles className="mr-2 h-4 w-4" />
                     )}
-                    Build my plan
+                    {t("tools.career360.picker.buildPlan")}
                   </Button>
                 </div>
               </CardContent>
@@ -139,7 +141,7 @@ export function TargetPicker({
           {!showCustom ? (
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <p className="text-sm text-muted-foreground">
-                Have a different target in mind?
+                {t("tools.career360.picker.customPrompt")}
               </p>
               <Button
                 variant="outline"
@@ -147,7 +149,7 @@ export function TargetPicker({
                 onClick={() => setShowCustom(true)}
                 disabled={disabled}
               >
-                Enter a custom target
+                {t("tools.career360.picker.enterCustom")}
               </Button>
             </div>
           ) : (
@@ -165,27 +167,27 @@ export function TargetPicker({
             >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="md:col-span-2">
-                  <Label htmlFor="career360-target-title">Target role</Label>
+                  <Label htmlFor="career360-target-title">{t("tools.career360.picker.targetRole")}</Label>
                   <Input
                     id="career360-target-title"
-                    placeholder="e.g. Staff Backend Engineer"
+                    placeholder={t("tools.career360.picker.targetRolePlaceholder")}
                     value={customTitle}
                     onChange={(e) => setCustomTitle(e.target.value)}
                     disabled={disabled}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="career360-target-seniority">Seniority</Label>
+                  <Label htmlFor="career360-target-seniority">{t("tools.career360.picker.seniority")}</Label>
                   <Input
                     id="career360-target-seniority"
-                    placeholder="Staff"
+                    placeholder={t("tools.career360.picker.seniorityPlaceholder")}
                     value={customSeniority}
                     onChange={(e) => setCustomSeniority(e.target.value)}
                     disabled={disabled}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="career360-target-timeline">Timeline (months)</Label>
+                  <Label htmlFor="career360-target-timeline">{t("tools.career360.picker.timeline")}</Label>
                   <Input
                     id="career360-target-timeline"
                     type="number"
@@ -208,7 +210,7 @@ export function TargetPicker({
                   ) : (
                     <Sparkles className="mr-2 h-4 w-4" />
                   )}
-                  Build plan for this target
+                  {t("tools.career360.picker.buildForTarget")}
                 </Button>
                 <Button
                   type="button"
@@ -217,7 +219,7 @@ export function TargetPicker({
                   onClick={() => setShowCustom(false)}
                   disabled={disabled}
                 >
-                  Cancel
+                  {t("tools.career360.picker.cancel")}
                 </Button>
               </div>
             </form>

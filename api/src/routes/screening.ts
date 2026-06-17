@@ -55,6 +55,7 @@ import {
   createScreeningRequest,
   getRequestByToken,
   listRequests,
+  resolveApplicationForScreening,
   satisfyRequestItem,
 } from "../services/screening/request-service.js";
 import { sendScreeningInvitationEmail } from "../services/adapters/email.js";
@@ -64,6 +65,44 @@ export const screeningPublicRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
+}
+
+/**
+ * Best-effort invite send + stamp, shared by the standalone send, the resend,
+ * and the from-application send (#1855). A send failure must NOT roll back the
+ * row — the recruiter can always resend (mirrors the account-invite pattern).
+ * `incrementResend` bumps the resend counter for the resend path only.
+ */
+async function deliverInvitation(
+  request: {
+    id: string;
+    candidateEmail: string;
+    candidateName: string | null;
+    token: string;
+    message: string | null;
+    resendCount?: number | null;
+  },
+  opts?: { incrementResend?: boolean },
+) {
+  await sendScreeningInvitationEmail({
+    to: request.candidateEmail,
+    candidateName: request.candidateName,
+    token: request.token,
+    message: request.message,
+  }).catch(() => undefined);
+  const now = new Date();
+  const [updated] = await getDb()
+    .update(schema.screeningRequests)
+    .set({
+      lastSentAt: now,
+      updatedAt: now,
+      ...(opts?.incrementResend
+        ? { resendCount: (request.resendCount ?? 0) + 1 }
+        : {}),
+    })
+    .where(eq(schema.screeningRequests.id, request.id))
+    .returning();
+  return updated;
 }
 
 // ── Shared zod ───────────────────────────────────────────────────────────────
@@ -262,19 +301,58 @@ screeningRoutes.post("/requests", async (c) => {
   });
   if (!created) return c.json(error("NOT_FOUND", "Template not found for this company"), 404);
 
-  // Best-effort invite send + stamp (mirrors the account-invite pattern: a send
-  // failure must not roll back the row — the recruiter can resend).
-  await sendScreeningInvitationEmail({
-    to: created.request.candidateEmail,
-    candidateName: created.request.candidateName,
-    token: created.request.token,
-    message: created.request.message,
-  }).catch(() => undefined);
-  await getDb()
-    .update(schema.screeningRequests)
-    .set({ lastSentAt: new Date(), updatedAt: new Date() })
-    .where(eq(schema.screeningRequests.id, created.request.id));
+  await deliverInvitation(created.request);
+  return c.json(success({ ...created }), 201);
+});
 
+const FromApplicationSchema = z.object({
+  applicationId: UuidLikeSchema,
+  templateId: UuidLikeSchema,
+  message: z.string().max(4000).optional(),
+  expiresInDays: z.number().int().min(1).max(60).optional(),
+});
+
+// Send a role's screening template to an existing applicant straight from the
+// pipeline (#1855). Resolves candidate + company from the application, so the
+// recruiter doesn't re-type the email — the application IS the candidate.
+screeningRoutes.post("/requests/from-application", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const parsed = FromApplicationSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+  }
+
+  const ctx = await resolveApplicationForScreening(getDb(), parsed.data.applicationId);
+  if (!ctx) return c.json(error("NOT_FOUND", "Application not found"), 404);
+  if (!ctx.companyId) {
+    return c.json(
+      error("CONFLICT", "Link this job to a company before sending a screening"),
+      409,
+    );
+  }
+  if (!ctx.candidateEmail) {
+    return c.json(error("CONFLICT", "This applicant has no email on file"), 409);
+  }
+  if (!(await userCanAccessCompany(userId, ctx.companyId))) {
+    return c.json(error("FORBIDDEN", "Access denied"), 403);
+  }
+
+  const created = await createScreeningRequest(getDb(), {
+    companyId: ctx.companyId,
+    createdByUserId: userId,
+    templateId: parsed.data.templateId,
+    candidateEmail: ctx.candidateEmail,
+    candidateName: ctx.candidateName,
+    candidateUserId: ctx.candidateUserId,
+    jobId: ctx.jobId,
+    applicationId: ctx.applicationId,
+    message: parsed.data.message,
+    expiresInDays: parsed.data.expiresInDays,
+  });
+  if (!created) return c.json(error("NOT_FOUND", "Template not found for this company"), 404);
+
+  await deliverInvitation(created.request);
   return c.json(success({ ...created }), 201);
 });
 

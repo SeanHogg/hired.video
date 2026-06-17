@@ -154,7 +154,7 @@ export function InviteUserModal({
                 {errors.email && (
                   <p className="text-sm text-red-500 mt-1">{errors.email}</p>
                 )}
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   They'll get an email link and set up their own profile when they accept.
                 </p>
               </div>
@@ -188,7 +188,7 @@ export function InviteUserModal({
                       >
                         {getRoleDisplayLabel(role)}
                       </Label>
-                      <p className="text-xs text-gray-600 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         {getRoleDescription(role)}
                       </p>
                     </div>

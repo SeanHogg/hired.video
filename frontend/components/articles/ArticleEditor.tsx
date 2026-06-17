@@ -27,6 +27,7 @@
  */
 
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
@@ -126,6 +127,7 @@ export default function ArticleEditor({
   onAutosave,
   onChange,
 }: Props) {
+  const { t } = useTranslation();
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const editor = useEditor({
@@ -187,7 +189,7 @@ export default function ArticleEditor({
             size="sm"
             variant="ghost"
             onClick={async () => {
-              const url = await promptDialog({ title: "Insert link", label: "URL", placeholder: "https://…" });
+              const url = await promptDialog({ title: t("dialogs.articleEditor.insertLinkTitle"), label: t("dialogs.articleEditor.insertLinkLabel"), placeholder: "https://…" });
               if (url) editor.chain().focus().setLink({ href: url }).run();
               else editor.chain().focus().unsetLink().run();
             }}

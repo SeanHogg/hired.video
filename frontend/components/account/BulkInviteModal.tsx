@@ -204,7 +204,7 @@ export function BulkInviteModal({
                   <p className="text-2xl font-bold text-blue-600">
                     {result.totalProcessed}
                   </p>
-                  <p className="text-sm text-gray-600">Total Processed</p>
+                  <p className="text-sm text-muted-foreground">Total Processed</p>
                 </CardContent>
               </Card>
               <Card>
@@ -212,7 +212,7 @@ export function BulkInviteModal({
                   <p className="text-2xl font-bold text-green-600">
                     {result.successCount}
                   </p>
-                  <p className="text-sm text-gray-600">Successful</p>
+                  <p className="text-sm text-muted-foreground">Successful</p>
                 </CardContent>
               </Card>
               <Card>
@@ -220,7 +220,7 @@ export function BulkInviteModal({
                   <p className="text-2xl font-bold text-red-600">
                     {result.failureCount}
                   </p>
-                  <p className="text-sm text-gray-600">Failed</p>
+                  <p className="text-sm text-muted-foreground">Failed</p>
                 </CardContent>
               </Card>
             </div>
@@ -368,7 +368,7 @@ export function BulkInviteModal({
             </CardHeader>
             <CardContent>
               {users.length === 0 ? (
-                <p className="text-center text-gray-500 py-8">
+                <p className="text-center text-muted-foreground py-8">
                   No users added yet. Click "Add User" or import from CSV to get
                   started.
                 </p>

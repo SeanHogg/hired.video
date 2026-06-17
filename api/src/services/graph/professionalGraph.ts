@@ -418,7 +418,7 @@ export interface WarmIntroSummary {
   conversationId: string;
   createdAt: string;
   message: string;
-  status: "pending" | "forwarded";
+  status: "pending" | "forwarded" | "declined" | "expired";
   forwardedConversationId: string | null;
   requester: PersonRef;
   via: PersonRef;
@@ -427,9 +427,14 @@ export interface WarmIntroSummary {
 
 export type WarmIntroSide = "incoming" | "outgoing";
 
+/** A still-pending ask older than this self-clears to `expired` (#1466), so a
+ *  stale request that the mutual never acted on stops nagging both inboxes. */
+export const WARM_INTRO_EXPIRY_DAYS = 30;
+const WARM_INTRO_EXPIRY_MS = WARM_INTRO_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+
 async function fetchFirstAndForwardedMessages(
   conversationIds: string[],
-): Promise<Map<string, { first: any; forwarded: any | null }>> {
+): Promise<Map<string, { first: any; forwarded: any | null; declined: any | null }>> {
   if (conversationIds.length === 0) return new Map();
   const db = getDb();
   const rows = await db
@@ -439,16 +444,34 @@ async function fetchFirstAndForwardedMessages(
     .orderBy(asc(schema.messages.createdAt))
     .catch(() => [] as any[]);
 
-  const out = new Map<string, { first: any; forwarded: any | null }>();
+  const out = new Map<string, { first: any; forwarded: any | null; declined: any | null }>();
   for (const m of rows as any[]) {
-    const slot = out.get(m.conversationId) ?? { first: null, forwarded: null };
+    const slot = out.get(m.conversationId) ?? { first: null, forwarded: null, declined: null };
     if (!slot.first) slot.first = m;
     if (!slot.forwarded && m?.metadata?.kind === "warm_intro_forwarded") {
       slot.forwarded = m;
     }
+    if (!slot.declined && m?.metadata?.kind === "warm_intro_declined") {
+      slot.declined = m;
+    }
     out.set(m.conversationId, slot);
   }
   return out;
+}
+
+/** Derive a warm-intro's status from its markers + age. Forward wins over
+ *  decline (a forwarded intro that's also somehow declined is forwarded);
+ *  an un-acted ask past the expiry window reads as `expired`. */
+function deriveWarmIntroStatus(
+  createdAt: Date,
+  forwarded: unknown,
+  declined: unknown,
+  now: number,
+): WarmIntroSummary["status"] {
+  if (forwarded) return "forwarded";
+  if (declined) return "declined";
+  if (now - new Date(createdAt).getTime() > WARM_INTRO_EXPIRY_MS) return "expired";
+  return "pending";
 }
 
 export async function listWarmIntros(
@@ -486,6 +509,7 @@ export async function listWarmIntros(
     senderId: string;
     targetUserId: string;
     forwarded: { id: string; metadata: any } | null;
+    declined: boolean;
   };
   const raw: Raw[] = [];
   for (const id of convoIds) {
@@ -506,6 +530,7 @@ export async function listWarmIntros(
       forwarded: pair.forwarded
         ? { id: pair.forwarded.id, metadata: pair.forwarded.metadata }
         : null,
+      declined: !!pair.declined,
     });
   }
   if (raw.length === 0) return [];
@@ -543,6 +568,7 @@ export async function listWarmIntros(
     headline: null,
   });
 
+  const now = Date.now();
   return raw
     .map((r): WarmIntroSummary | null => {
       const parts = partsByConvo.get(r.conversationId) ?? [];
@@ -552,7 +578,7 @@ export async function listWarmIntros(
         conversationId: r.conversationId,
         createdAt: r.createdAt.toISOString(),
         message: r.messageContent,
-        status: r.forwarded ? "forwarded" : "pending",
+        status: deriveWarmIntroStatus(r.createdAt, r.forwarded, r.declined, now),
         forwardedConversationId: r.forwarded?.metadata?.toConversationId ?? null,
         requester: hydrated.get(r.senderId) ?? blank(r.senderId),
         via: hydrated.get(viaId) ?? blank(viaId),
@@ -726,6 +752,108 @@ export async function forwardWarmIntro(
   })();
 
   return { forwardedConversationId: newConvo.id, created: true };
+}
+
+// ---------------------------------------------------------------------------
+// Decline a warm intro (#1465). The asked mutual (`via`) can now say no
+// instead of leaving the ask in limbo. Writes a `warm_intro_declined` marker
+// on the original convo (what listWarmIntros reads for status='declined') and
+// notifies the requester. Idempotent + mutually exclusive with forward: a
+// forwarded ask can't be declined.
+// ---------------------------------------------------------------------------
+
+export type DeclineWarmIntroError =
+  | "not_found"
+  | "not_via"
+  | "not_warm_intro"
+  | "already_forwarded"
+  | "missing_first_message";
+
+export interface DeclineWarmIntroResult {
+  declined: true;
+  /** False when the ask was already declined (idempotent re-call). */
+  created: boolean;
+}
+
+export async function declineWarmIntro(
+  viaUserId: string,
+  originalConversationId: string,
+): Promise<DeclineWarmIntroResult | { error: DeclineWarmIntroError }> {
+  const db = getDb();
+
+  const [convo] = await db
+    .select()
+    .from(schema.conversations)
+    .where(eq(schema.conversations.id, originalConversationId))
+    .limit(1);
+  if (!convo) return { error: "not_found" };
+  if (convo.type !== "warm_intro") return { error: "not_warm_intro" };
+
+  const parts = await db
+    .select({ userId: schema.conversationParticipants.userId })
+    .from(schema.conversationParticipants)
+    .where(eq(schema.conversationParticipants.conversationId, originalConversationId));
+  if (!parts.map((p: any) => p.userId).includes(viaUserId)) return { error: "not_via" };
+
+  const msgs = await db
+    .select()
+    .from(schema.messages)
+    .where(eq(schema.messages.conversationId, originalConversationId))
+    .orderBy(asc(schema.messages.createdAt));
+  const first: any = msgs[0];
+  if (!first || first?.metadata?.kind !== "warm_intro_request") {
+    return { error: "missing_first_message" };
+  }
+  const requesterId: string = first.senderId;
+  if (requesterId === viaUserId) return { error: "not_via" };
+  // A forwarded intro is already resolved — can't decline it.
+  if (msgs.some((m: any) => m?.metadata?.kind === "warm_intro_forwarded")) {
+    return { error: "already_forwarded" };
+  }
+  // Idempotent: already declined → no-op.
+  if (msgs.some((m: any) => m?.metadata?.kind === "warm_intro_declined")) {
+    return { declined: true, created: false };
+  }
+
+  const [viaRow] = await db
+    .select({ name: schema.users.name })
+    .from(schema.users)
+    .where(eq(schema.users.id, viaUserId))
+    .limit(1);
+  const viaName = (viaRow?.name ?? "").trim() || "A connection";
+
+  // Marker on the original convo — listWarmIntros reads this for status.
+  await db.insert(schema.messages).values({
+    conversationId: originalConversationId,
+    senderId: viaUserId,
+    content: `${viaName} declined to forward this introduction.`,
+    contentType: "text",
+    metadata: { kind: "warm_intro_declined" },
+  } as any);
+
+  // Notify the requester their ask was declined so it doesn't sit silently.
+  (async () => {
+    try {
+      const repos = buildRepos(db);
+      const { actor, actorName } = await resolveActor({ repos }, viaUserId);
+      await emitNotification(
+        { repos },
+        {
+          recipientIds: [requesterId],
+          type: "warm_intro_declined",
+          actor,
+          title: `${actorName} couldn't make that introduction`,
+          message: `${actorName} declined to forward your warm-intro request.`,
+          target: { id: originalConversationId, type: "conversation" },
+          extraData: { kind: "warm_intro_declined" },
+        },
+      );
+    } catch (err) {
+      console.error("[warm-intro] decline notification failed:", err);
+    }
+  })();
+
+  return { declined: true, created: true };
 }
 
 // ---------------------------------------------------------------------------

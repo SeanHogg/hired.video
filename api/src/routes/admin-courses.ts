@@ -20,6 +20,7 @@ import { ok } from "../utils/response.js";
 import { error } from "../types/index.js";
 import { CertificateService } from "../services/learning/certificate-service.js";
 import { getJwtSecret } from "../utils/jwt.js";
+import { gamificationFromContext } from "../domains/gamification/with-gamification.js";
 
 export const adminCourseRoutes = new Hono<AppEnv>();
 
@@ -38,12 +39,15 @@ adminCourseRoutes.use("*", superAdminMiddleware);
  * [CourseLearner](../../../frontend/pages/CourseLearner.tsx) catches up
  * any learner who revisits; this route catches the rest in one sweep.
  *
- * **Badges are deliberately NOT re-fired** — the gamification engine
- * uses the JWT-bound user to attribute the award, and the admin running
- * the backfill isn't the learner. Re-firing badges per-learner without
- * a JWT means a parallel path through `GamificationService` that hasn't
- * been hardened; tracked as a follow-up in [#1568](../../../README.md)
- * if the celebration-toast gap matters for backfilled certs.
+ * **Badges ARE re-fired for the LEARNER** (#1571) — the backfill actor
+ * is a SuperAdmin, not the learner, so `withGamification` (JWT-bound)
+ * would credit the wrong user. Instead, for each NEWLY issued cert we
+ * fire the learner's `certificate.earned` award via
+ * `awardWithRoleLookup({ userId: <learner> })`, which resolves the
+ * learner's role from the users table rather than the request JWT. The
+ * award is best-effort — wrapped so a gamification failure never breaks
+ * the cert sweep. Already-issued rows (`newlyIssued === false`) are
+ * skipped so re-running the route doesn't double-award.
  *
  * Idempotent on the cert side via the underlying `_issueFor` check —
  * re-running the route is safe and reports `newlyIssued` per row so the
@@ -52,7 +56,7 @@ adminCourseRoutes.use("*", superAdminMiddleware);
 adminCourseRoutes.post("/issue-backfill-certs", async (c) => {
   const db = getDb();
   const certService = new CertificateService(db, getJwtSecret());
-  void c; // marker that the SuperAdmin context check ran via middleware
+  const gamification = gamificationFromContext(c);
 
 
   // Find every passed enrollment whose course issues certs and whose
@@ -85,8 +89,21 @@ adminCourseRoutes.post("/issue-backfill-certs", async (c) => {
   for (const candidate of candidates) {
     try {
       const result = await certService.issueForEnrollmentAsAdmin(candidate.enrollmentId);
-      if (result?.newlyIssued) issued++;
-      else if (result) alreadyIssued++;
+      if (result?.newlyIssued) {
+        issued++;
+        // #1571 — fire the LEARNER's certificate.earned badge/points.
+        // The backfill actor is a SuperAdmin, so we credit the learner
+        // by explicit userId (awardWithRoleLookup resolves their role
+        // from the users table, not the request JWT). Best-effort: a
+        // gamification failure must never abort the cert sweep.
+        await gamification
+          .awardWithRoleLookup("certificate.earned", {
+            userId: candidate.userId,
+            refId: result.certificate.id,
+            refType: "course_certificate",
+          })
+          .catch(() => undefined);
+      } else if (result) alreadyIssued++;
     } catch (e) {
       failed.push({
         enrollmentId: candidate.enrollmentId,

@@ -4,6 +4,7 @@ import { getDb, schema } from "../../db/index.js";
 import { classifyJobSector } from "../../../../shared/sectors.js";
 import { normalizeEmploymentType } from "../../../../shared/employment-types.js";
 import { normalizeWorkSetting, normalizeHybridDays } from "../../../../shared/work-settings.js";
+import { normalizeSeniority } from "../../../../shared/seniority.js";
 import type { LLMClient } from "../adapters/llm-client.js";
 import { canViewerManageJob } from "../jobs/jobOwnership.js";
 import { bumpSearchVersion } from "../../utils/search-cache.js";
@@ -467,7 +468,9 @@ export async function getPublicJobs(filters?: JobQuery,
     filters?.employmentType
       ? eq(jobItems.jobType, normalizeEmploymentType(filters.employmentType) ?? filters.employmentType)
       : undefined,
-    filters?.experienceLevel ? eq(jobItems.experienceLevel, filters.experienceLevel) : undefined,
+    filters?.experienceLevel
+      ? eq(jobItems.experienceLevel, normalizeSeniority(filters.experienceLevel) ?? filters.experienceLevel)
+      : undefined,
     filters?.isRemote !== undefined ? eq(jobItems.isRemote, filters.isRemote) : undefined,
     filters?.workSetting
       ? eq((jobItems as any).workSetting, normalizeWorkSetting(filters.workSetting) ?? filters.workSetting)
@@ -576,9 +579,12 @@ export function buildJobColumnPatch(job: Partial<CreateJobDTO>): Record<string, 
     const first = firstOf(job.employmentType);
     p.jobType = first ? (normalizeEmploymentType(first) ?? first) : null;
   }
-  // seniority / experienceLevel (either wire name) → experience_level.
+  // seniority / experienceLevel (either wire name, any spelling) → canonical
+  // lowercase experience_level (#2090). "None"/unmapped normalize to null so a
+  // not-specified posting stores NULL rather than an un-filterable raw string.
   if (job.seniority !== undefined || job.experienceLevel !== undefined) {
-    p.experienceLevel = firstOf(job.seniority) ?? job.experienceLevel ?? null;
+    const first = firstOf(job.seniority) ?? job.experienceLevel ?? null;
+    p.experienceLevel = first ? normalizeSeniority(first) : null;
   }
   if (job.salaryMin !== undefined) p.salaryMin = job.salaryMin == null ? null : String(job.salaryMin);
   if (job.salaryMax !== undefined) p.salaryMax = job.salaryMax == null ? null : String(job.salaryMax);

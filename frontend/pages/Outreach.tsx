@@ -1382,7 +1382,7 @@ export default function Outreach() {
                           );
                         }
                       }}
-                      className="rounded border-gray-300"
+                      className="rounded border-border"
                     />
                     <label
                       htmlFor={`board-${board.id}`}
@@ -1422,7 +1422,7 @@ export default function Outreach() {
             <Button
               onClick={async () => {
                 if (!selectedJobId || selectedBoardIds.length === 0) {
-                  await alertDialog({ title: "Error", description: t("errors.selectJobBoard") });
+                  await alertDialog({ title: t("dialogs.outreach.errorTitle"), description: t("errors.selectJobBoard") });
                   return;
                 }
 
@@ -1444,7 +1444,7 @@ export default function Outreach() {
                   setJobBoardStats(stats);
                 } catch (err) {
                   console.error("Failed to post job to boards:", err);
-                  await alertDialog({ title: "Error", description: t("errors.postToBoardsFailed") });
+                  await alertDialog({ title: t("dialogs.outreach.errorTitle"), description: t("errors.postToBoardsFailed") });
                 }
               }}
               disabled={!selectedJobId || selectedBoardIds.length === 0}

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +49,7 @@ function ActiveDialog({ request }: { request: DialogRequest }) {
     return <PromptDialogView request={request} />;
   }
 
+  const { t } = useTranslation();
   const isConfirm = request.kind === "confirm";
   return (
     <AlertDialog
@@ -70,7 +72,7 @@ function ActiveDialog({ request }: { request: DialogRequest }) {
         <AlertDialogFooter>
           {isConfirm && (
             <AlertDialogCancel onClick={() => resolveDialog(request.id, false)}>
-              {request.cancelText ?? "Cancel"}
+              {request.cancelText ?? t("actions.cancel")}
             </AlertDialogCancel>
           )}
           <AlertDialogAction
@@ -81,7 +83,7 @@ function ActiveDialog({ request }: { request: DialogRequest }) {
             )}
             onClick={() => resolveDialog(request.id, isConfirm ? true : null)}
           >
-            {request.confirmText ?? (isConfirm ? "Confirm" : "OK")}
+            {request.confirmText ?? (isConfirm ? t("actions.confirm") : t("actions.ok"))}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -94,6 +96,7 @@ function PromptDialogView({
 }: {
   request: Extract<DialogRequest, { kind: "prompt" }>;
 }) {
+  const { t } = useTranslation();
   const [value, setValue] = React.useState(request.defaultValue ?? "");
   const trimmed = value.trim();
   const disabled = request.required ? trimmed.length === 0 : false;
@@ -154,10 +157,10 @@ function PromptDialogView({
             type="button"
             onClick={() => resolveDialog(request.id, null)}
           >
-            {request.cancelText ?? "Cancel"}
+            {request.cancelText ?? t("actions.cancel")}
           </Button>
           <Button type="button" disabled={disabled} onClick={submit}>
-            {request.confirmText ?? "OK"}
+            {request.confirmText ?? t("actions.ok")}
           </Button>
         </DialogFooter>
       </DialogContent>

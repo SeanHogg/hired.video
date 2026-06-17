@@ -169,8 +169,13 @@ export async function sendScreeningInvitationEmail(
 }
 
 let _provider: EmailProvider | null = null;
+/** Test seam — when set, overrides provider resolution so a spy/fake can
+ *  observe `.send()` without SendPulse credentials. Mirrors the
+ *  enrichment provider's `__setActiveEnrichmentProvider`. */
+let _providerOverride: EmailProvider | null = null;
 
 export function getEmailProvider(): EmailProvider | null {
+  if (_providerOverride) return _providerOverride;
   if (_provider) return _provider;
 
   const clientId = getEnv("EMAIL_CLIENTID");
@@ -184,6 +189,11 @@ export function getEmailProvider(): EmailProvider | null {
   const fromAddress = getEnv("EMAIL_FROM") || "info@hired.video";
   _provider = new SendPulseEmailProvider(clientId, clientSecret, fromAddress);
   return _provider;
+}
+
+/** Test seam: swap the email provider for a fake/spy. Pass null to reset. */
+export function __setEmailProvider(p: EmailProvider | null): void {
+  _providerOverride = p;
 }
 
 // ============================================================================
@@ -1016,6 +1026,80 @@ export function buildConnectionRequestEmail(
     html,
     profileUrl,
   };
+}
+
+// ============================================================================
+// Generic notification email — the email channel of the unified
+// notification dispatcher (services/notifications/notificationService.ts).
+// Any pref-gated notification with `email: true` renders through here, so
+// there is ONE transactional notification-email shape (DRY).
+// ============================================================================
+
+const NOTIFICATION_TITLE_BLOCK = `
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 16px;">
+                <tr>
+                  <td align="center">
+                    <span style="color: #111827; font-size: 22px; font-weight: bold;">{{Title}}</span>
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td style="color: #374151; line-height: 1.6; padding-bottom: 24px;">{{Message}}</td>
+                </tr>
+              </table>`;
+
+/** Absolute URL for a notification deep-link. Accepts an already-absolute
+ *  http(s) URL or a site-relative path ("/services/inquiries"); anything
+ *  else yields no CTA (defends against javascript:/data: injection). */
+function notificationCtaUrl(url: string | undefined): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith("/")) return `${getBaseUrl()}${url}`;
+  return null;
+}
+
+/** Pure builder: render a generic notification email. Exported for tests
+ *  and for the dispatcher. `title`/`message` are HTML-escaped; the CTA
+ *  href is a validated absolute/relative URL only. */
+export function buildNotificationEmail(input: {
+  title: string;
+  message: string;
+  url?: string;
+}): { subject: string; html: string } {
+  const ctaUrl = notificationCtaUrl(input.url);
+  const ctaBlock = ctaUrl
+    ? `
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td align="center" style="padding-bottom: 8px;">
+                    <a href="${ctaUrl}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 28px;border-radius:8px;">View</a>
+                  </td>
+                </tr>
+              </table>`
+    : "";
+  // render() escapes only the {{vars}}; the CTA block is trusted markup
+  // appended to the body (its href is validated above).
+  const html = render(NOTIFICATION_TITLE_BLOCK + ctaBlock, {
+    Title: input.title,
+    Message: input.message,
+  });
+  return { subject: input.title, html };
+}
+
+/** Send a generic notification email. No-ops when no provider is
+ *  configured (matches every other sender here). Channel gating +
+ *  recipient selection are the dispatcher's responsibility. */
+export async function sendNotificationEmail(input: {
+  to: string;
+  title: string;
+  message: string;
+  url?: string;
+}): Promise<void> {
+  const provider = getEmailProvider();
+  if (!provider) return;
+  const { subject, html } = buildNotificationEmail(input);
+  await provider.send({ to: input.to, subject, html });
 }
 
 export async function sendConnectionRequestEmail(

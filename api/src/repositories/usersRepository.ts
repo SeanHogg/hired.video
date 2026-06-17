@@ -62,6 +62,7 @@ export interface UserPatch {
   isSuspended?: boolean;
   isBanned?: boolean;
   isSuperAdmin?: boolean;
+  isSystem?: boolean;
   mfaEnabled?: boolean;
   emailVerified?: boolean;
   mustChangePassword?: boolean;

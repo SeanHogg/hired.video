@@ -23,7 +23,7 @@ function scoreColor(score: number): string {
 }
 
 function gradeChipColor(grade?: string): string {
-  if (!grade) return "text-slate-600 bg-slate-100";
+  if (!grade) return "text-muted-foreground bg-muted";
   const g = grade.toLowerCase();
   if (g.startsWith("a") || g === "positive") return "text-green-600 bg-green-100";
   if (g.startsWith("b") || g === "neutral") return "text-blue-600 bg-blue-100";
@@ -51,7 +51,7 @@ function recommendationBadgeColor(category?: string): string {
     case "minor":
       return "bg-blue-100 text-blue-800";
     default:
-      return "bg-slate-100 text-slate-700";
+      return "bg-muted text-foreground";
   }
 }
 

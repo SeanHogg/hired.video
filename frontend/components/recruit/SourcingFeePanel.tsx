@@ -292,9 +292,9 @@ function StatusPill({ status, label }: { status: string; label: string }) {
     pending: "bg-blue-100 text-blue-800",
     accepted: "bg-green-100 text-green-800",
     rejected: "bg-red-100 text-red-800",
-    withdrawn: "bg-gray-100 text-gray-700",
+    withdrawn: "bg-muted text-muted-foreground",
   };
-  const cls = styles[status] ?? "bg-gray-100 text-gray-700";
+  const cls = styles[status] ?? "bg-muted text-muted-foreground";
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${cls}`}>
       {label}

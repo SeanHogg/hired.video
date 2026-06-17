@@ -17,14 +17,17 @@
  * `services/gamification/`; this file is just the typed Drizzle wrapper.
  */
 
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 const {
+  users,
+  sessions,
   userPointsBalance,
   pointsLedger,
   pointsActivityCounters,
   pointsStreaks,
+  pointsTaskStreaks,
   pointsFraudFlags,
   badges,
   userBadges,
@@ -42,6 +45,7 @@ export type PointsLedgerRow = typeof pointsLedger.$inferSelect;
 export type PointsLedgerInsert = typeof pointsLedger.$inferInsert;
 export type PointsCountersRow = typeof pointsActivityCounters.$inferSelect;
 export type PointsStreakRow = typeof pointsStreaks.$inferSelect;
+export type PointsTaskStreakRow = typeof pointsTaskStreaks.$inferSelect;
 export type PointsFraudFlagRow = typeof pointsFraudFlags.$inferSelect;
 export type PointsFraudFlagInsert = typeof pointsFraudFlags.$inferInsert;
 export type BadgeRow = typeof badges.$inferSelect;
@@ -111,6 +115,19 @@ export interface IPointsRepository {
       lastBonusMilestone?: number;
     },
   ): Promise<PointsStreakRow>;
+  /** #1136 — task-completion streak (parallel counter; same shape as the
+   *  general streak, advances only on task.complete.* actions). */
+  findTaskStreak(userId: string): Promise<PointsTaskStreakRow | null>;
+  upsertTaskStreak(
+    userId: string,
+    patch: {
+      currentStreak: number;
+      longestStreak: number;
+      lastActivityDate: string; // YYYY-MM-DD
+      lastBonusAt?: Date | null;
+      lastBonusMilestone?: number;
+    },
+  ): Promise<PointsTaskStreakRow>;
 
   // ── fraud ───────────────────────────────────────────────────────────
   insertFraudFlag(input: PointsFraudFlagInsert): Promise<PointsFraudFlagRow>;
@@ -122,6 +139,12 @@ export interface IPointsRepository {
     reviewerId: string,
     notes: string | null,
   ): Promise<PointsFraudFlagRow>;
+  /** #1117 — count OTHER accounts that share this user's signup IP (sybil
+   *  ring signal). 0 when the user has no recorded signup IP. */
+  countAccountsOnSignupIp(userId: string): Promise<number>;
+  /** #1117 — count OTHER accounts that share any of this user's device
+   *  fingerprints (device-clustering signal). 0 when none recorded. */
+  countAccountsOnDeviceFingerprint(userId: string): Promise<number>;
 
   // ── badges ──────────────────────────────────────────────────────────
   listBadges(): Promise<BadgeRow[]>;
@@ -470,6 +493,54 @@ export class PointsRepository implements IPointsRepository {
     return row as PointsStreakRow;
   }
 
+  // ── task streak (#1136) — same logic, different table ──────────────────
+
+  async findTaskStreak(userId: string): Promise<PointsTaskStreakRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(pointsTaskStreaks)
+      .where(eq(pointsTaskStreaks.userId, userId))
+      .limit(1);
+    return (row as PointsTaskStreakRow) ?? null;
+  }
+
+  async upsertTaskStreak(
+    userId: string,
+    patch: {
+      currentStreak: number;
+      longestStreak: number;
+      lastActivityDate: string;
+      lastBonusAt?: Date | null;
+      lastBonusMilestone?: number;
+    },
+  ): Promise<PointsTaskStreakRow> {
+    const [row] = await this.db
+      .insert(pointsTaskStreaks)
+      .values({
+        userId,
+        currentStreak: patch.currentStreak,
+        longestStreak: patch.longestStreak,
+        lastActivityDate: patch.lastActivityDate,
+        lastBonusAt: patch.lastBonusAt ?? null,
+        lastBonusMilestone: patch.lastBonusMilestone ?? 0,
+      })
+      .onConflictDoUpdate({
+        target: pointsTaskStreaks.userId,
+        set: {
+          currentStreak: patch.currentStreak,
+          longestStreak: patch.longestStreak,
+          lastActivityDate: patch.lastActivityDate,
+          ...(patch.lastBonusAt !== undefined ? { lastBonusAt: patch.lastBonusAt } : {}),
+          ...(patch.lastBonusMilestone !== undefined
+            ? { lastBonusMilestone: patch.lastBonusMilestone }
+            : {}),
+          updatedAt: this.now(),
+        },
+      })
+      .returning();
+    return row as PointsTaskStreakRow;
+  }
+
   // ── fraud ─────────────────────────────────────────────────────────────
 
   async insertFraudFlag(input: PointsFraudFlagInsert): Promise<PointsFraudFlagRow> {
@@ -513,6 +584,37 @@ export class PointsRepository implements IPointsRepository {
       .where(eq(pointsFraudFlags.id, flagId))
       .returning();
     return row as PointsFraudFlagRow;
+  }
+
+  // #1117 — fraud-cluster signals. Bounded single-row counts; the engine
+  // caller caches these (slow-changing) so they don't hit the DB on every
+  // user-task award.
+  async countAccountsOnSignupIp(userId: string): Promise<number> {
+    const [me] = await this.db
+      .select({ ip: users.signupIp })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (!me?.ip) return 0;
+    const [row] = await this.db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(users)
+      .where(and(eq(users.signupIp, me.ip), ne(users.id, userId)));
+    return row?.c ?? 0;
+  }
+
+  async countAccountsOnDeviceFingerprint(userId: string): Promise<number> {
+    const myRows = await this.db
+      .select({ fp: sessions.deviceFingerprint })
+      .from(sessions)
+      .where(and(eq(sessions.userId, userId), isNotNull(sessions.deviceFingerprint)));
+    const fps = [...new Set(myRows.map((r) => r.fp).filter((f): f is string => Boolean(f)))];
+    if (fps.length === 0) return 0;
+    const rows = await this.db
+      .select({ uid: sessions.userId })
+      .from(sessions)
+      .where(and(inArray(sessions.deviceFingerprint, fps), ne(sessions.userId, userId)));
+    return new Set(rows.map((r) => r.uid)).size;
   }
 
   // ── badges ────────────────────────────────────────────────────────────

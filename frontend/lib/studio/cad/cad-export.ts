@@ -12,6 +12,11 @@
  */
 
 import type { CadState, CadShape } from "@shared/cad-state";
+// Shared XML text escaper (single source of truth — register gap #1942).
+// Same `&`/`<`/`>`/`"`/`'` set as the prior local copy; the apostrophe is
+// emitted as `&#39;` rather than `&apos;` — both parse to a literal `'` in
+// any conformant XML parser, so the exported SVG 1.1 document is equivalent.
+import { escapeXmlText as escapeXml } from "@shared/course-cover";
 
 /** Render the CAD state as an SVG 1.1 document. Returns a Blob with
  *  `image/svg+xml` mime. Coordinates are in millimetres (per the CAD
@@ -85,13 +90,4 @@ function shapeToSvg(shape: CadShape): string {
       return `<text x="${shape.x}" y="${shape.y}" font-size="${shape.heightMm}" fill="${color}"${rotation}>${escapeXml(shape.text)}</text>`;
     }
   }
-}
-
-function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
 }

@@ -72,7 +72,16 @@ type Props = {
   variant?: "pill" | "inline";
   /** Optional label override for the pill. Defaults to "Listen". */
   label?: string;
+  /** Fired periodically (≈ every 20s) while actively playing, with the
+   *  seconds of playback elapsed since the previous tick. Lets a host surface
+   *  feed listen-time into its own engagement telemetry (#1577) without the
+   *  narrator knowing anything domain-specific. */
+  onListenProgress?: (elapsedSeconds: number) => void;
 };
+
+/** Debounce window for the onListenProgress tick. Matches the ~20-30s beacon
+ *  cadence the article read-progress endpoint expects. */
+const LISTEN_PROGRESS_TICK_SECONDS = 20;
 
 type NarratorVoice = {
   id: string;
@@ -173,6 +182,7 @@ export function TextNarrator({
   preferenceKey,
   variant = "pill",
   label,
+  onListenProgress,
 }: Props) {
   const { t } = useTranslation();
   const pillLabel = label ?? t("narrator.listen");
@@ -210,6 +220,20 @@ export function TextNarrator({
   >("idle");
   const [activeWordIdx, setActiveWordIdx] = useState<number | null>(null);
   const cancelRef = useRef<(() => void) | null>(null);
+
+  // Listen-time telemetry (#1577). While actively playing, tick the host's
+  // onListenProgress every LISTEN_PROGRESS_TICK_SECONDS with the elapsed
+  // playback seconds. A ref holds the latest callback so the interval doesn't
+  // churn when the parent passes a fresh closure each render.
+  const onListenProgressRef = useRef(onListenProgress);
+  onListenProgressRef.current = onListenProgress;
+  useEffect(() => {
+    if (status !== "playing" || !onListenProgressRef.current) return;
+    const handle = window.setInterval(() => {
+      onListenProgressRef.current?.(LISTEN_PROGRESS_TICK_SECONDS);
+    }, LISTEN_PROGRESS_TICK_SECONDS * 1000);
+    return () => window.clearInterval(handle);
+  }, [status]);
 
   const spoken = useMemo(() => plainTextFromMarkdown(text || ""), [text]);
   const words = useMemo(() => spoken.split(/\s+/).filter(Boolean), [spoken]);

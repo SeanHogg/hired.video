@@ -25,8 +25,8 @@ export function ProfileStatistics({ stats, loading = false }: ProfileStatisticsP
           <div className="grid grid-cols-2 gap-2 sm:gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="text-center p-2 sm:p-3 bg-muted/30 rounded-lg animate-pulse">
-                <div className="h-6 w-12 bg-gray-200 rounded mx-auto mb-1" />
-                <div className="h-3 w-16 bg-gray-200 rounded mx-auto" />
+                <div className="h-6 w-12 bg-muted rounded mx-auto mb-1" />
+                <div className="h-3 w-16 bg-muted rounded mx-auto" />
               </div>
             ))}
           </div>

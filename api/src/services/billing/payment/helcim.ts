@@ -450,10 +450,16 @@ export class HelcimPaymentProvider implements PaymentProvider {
     const signature = headers.get("helcim-signature");
     if (!signature) throw new Error("Missing helcim-signature header");
 
-    // Helcim signs webhooks with HMAC-SHA256.
-    const { createHmac } = await import("node:crypto");
+    // Helcim signs webhooks with HMAC-SHA256. Compare in constant time so the
+    // verification can't be turned into a byte-by-byte signature oracle via
+    // response-timing (a plain `!==` short-circuits on the first wrong byte).
+    const { createHmac, timingSafeEqual } = await import("node:crypto");
     const expected = createHmac("sha256", this.config.webhookToken).update(body).digest("hex");
-    if (signature !== expected) {
+    const sigBuf = Buffer.from(signature);
+    const expBuf = Buffer.from(expected);
+    // timingSafeEqual throws on unequal lengths; the HMAC hex is always 64
+    // chars, so a length mismatch is already an invalid signature.
+    if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
       throw new Error("Helcim webhook signature verification failed");
     }
 
@@ -462,7 +468,11 @@ export class HelcimPaymentProvider implements PaymentProvider {
     const eventType: NormalizedEventType = HELCIM_EVENT_MAP[payload.eventType] ?? "unknown";
 
     return {
-      eventId: String(payload.eventId ?? payload.transactionId ?? Date.now()),
+      // Idempotency key for billing_events. Prefer Helcim's own ids; fall back
+      // to the body HMAC (deterministic per payload) rather than Date.now() —
+      // a wall-clock fallback gave every redelivery a fresh id, so a retried
+      // webhook for the same body slipped past the dedupe and reprocessed.
+      eventId: String(payload.eventId ?? payload.transactionId ?? `helcim:${expected}`),
       eventType,
       customerId: payload.cardToken ?? payload.customerId,
       providerSubscriptionId: payload.recurringPlanId,

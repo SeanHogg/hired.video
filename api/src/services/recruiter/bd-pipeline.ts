@@ -13,10 +13,27 @@
  * ceiling.
  */
 
-import { and, eq, sql, desc, asc } from "drizzle-orm";
+import { and, eq, or, inArray, sql, desc, asc, type SQL } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 
 const { recruiterClients, recruiterClientContacts, pipelineStages, recruiterDeals } = schema;
+
+/**
+ * Row-visibility clause for a BD client/deal (#1766). A row is visible when the
+ * caller owns it (recruiter_user_id) OR it belongs to one of the caller's shared
+ * workspaces (workspace_id IN scope). `workspaceIds` empty → owner-only, i.e.
+ * exactly the pre-#1766 behavior, so solo recruiters are unaffected.
+ */
+export function visibleTo(
+  ownerCol: typeof recruiterClients.recruiterUserId | typeof recruiterDeals.recruiterUserId,
+  workspaceCol: typeof recruiterClients.workspaceId | typeof recruiterDeals.workspaceId,
+  recruiterUserId: string,
+  workspaceIds: string[],
+): SQL {
+  const owner = eq(ownerCol, recruiterUserId);
+  if (workspaceIds.length === 0) return owner;
+  return or(owner, inArray(workspaceCol, workspaceIds))!;
+}
 
 export interface NewClientInput {
   clientName: string;
@@ -167,21 +184,33 @@ export class RecruiterBdPipelineService {
   }
 
   // -- Clients ---------------------------------------------------------------
-  async listClients(recruiterUserId: string) {
+  async listClients(recruiterUserId: string, workspaceIds: string[] = []) {
     const db = getDb();
     return db
       .select()
       .from(recruiterClients)
-      .where(eq(recruiterClients.recruiterUserId, recruiterUserId))
+      .where(
+        visibleTo(
+          recruiterClients.recruiterUserId,
+          recruiterClients.workspaceId,
+          recruiterUserId,
+          workspaceIds,
+        ),
+      )
       .orderBy(desc(recruiterClients.updatedAt));
   }
 
-  async createClient(recruiterUserId: string, input: NewClientInput) {
+  async createClient(
+    recruiterUserId: string,
+    input: NewClientInput,
+    workspaceId: string | null = null,
+  ) {
     const db = getDb();
     const [row] = await db
       .insert(recruiterClients)
       .values({
         recruiterUserId,
+        workspaceId,
         companyId: input.companyId ?? null,
         clientName: input.clientName,
         website: input.website ?? null,
@@ -192,7 +221,7 @@ export class RecruiterBdPipelineService {
     return row;
   }
 
-  async getClient(clientId: string, recruiterUserId: string) {
+  async getClient(clientId: string, recruiterUserId: string, workspaceIds: string[] = []) {
     const db = getDb();
     const [row] = await db
       .select()
@@ -200,7 +229,12 @@ export class RecruiterBdPipelineService {
       .where(
         and(
           eq(recruiterClients.id, clientId),
-          eq(recruiterClients.recruiterUserId, recruiterUserId),
+          visibleTo(
+            recruiterClients.recruiterUserId,
+            recruiterClients.workspaceId,
+            recruiterUserId,
+            workspaceIds,
+          ),
         ),
       )
       .limit(1);
@@ -210,13 +244,14 @@ export class RecruiterBdPipelineService {
   async addClientContact(args: {
     clientId: string;
     recruiterUserId: string;
+    workspaceIds?: string[];
     name: string;
     title?: string | null;
     email?: string | null;
     phone?: string | null;
     isPrimary?: boolean;
   }) {
-    const client = await this.getClient(args.clientId, args.recruiterUserId);
+    const client = await this.getClient(args.clientId, args.recruiterUserId, args.workspaceIds ?? []);
     if (!client) return null;
     const db = getDb();
     const [row] = await db
@@ -234,23 +269,35 @@ export class RecruiterBdPipelineService {
   }
 
   // -- Deals -----------------------------------------------------------------
-  async listDeals(recruiterUserId: string) {
+  async listDeals(recruiterUserId: string, workspaceIds: string[] = []) {
     const db = getDb();
     await this.ensureDefaultPipeline(recruiterUserId);
     return db
       .select()
       .from(recruiterDeals)
-      .where(eq(recruiterDeals.recruiterUserId, recruiterUserId))
+      .where(
+        visibleTo(
+          recruiterDeals.recruiterUserId,
+          recruiterDeals.workspaceId,
+          recruiterUserId,
+          workspaceIds,
+        ),
+      )
       .orderBy(desc(recruiterDeals.updatedAt));
   }
 
-  async createDeal(recruiterUserId: string, input: NewDealInput) {
+  async createDeal(
+    recruiterUserId: string,
+    input: NewDealInput,
+    workspaceId: string | null = null,
+  ) {
     const db = getDb();
     await this.ensureDefaultPipeline(recruiterUserId);
     const [row] = await db
       .insert(recruiterDeals)
       .values({
         recruiterUserId,
+        workspaceId,
         clientId: input.clientId ?? null,
         jobId: input.jobId ?? null,
         name: input.name,
@@ -270,6 +317,7 @@ export class RecruiterBdPipelineService {
   async moveDealToStage(args: {
     dealId: string;
     recruiterUserId: string;
+    workspaceIds?: string[];
     stageKey: string;
     pipelineKey?: string;
   }) {
@@ -300,7 +348,12 @@ export class RecruiterBdPipelineService {
       .where(
         and(
           eq(recruiterDeals.id, args.dealId),
-          eq(recruiterDeals.recruiterUserId, args.recruiterUserId),
+          visibleTo(
+            recruiterDeals.recruiterUserId,
+            recruiterDeals.workspaceId,
+            args.recruiterUserId,
+            args.workspaceIds ?? [],
+          ),
         ),
       )
       .returning();
@@ -310,6 +363,7 @@ export class RecruiterBdPipelineService {
   async assignDealOwner(args: {
     dealId: string;
     recruiterUserId: string;
+    workspaceIds?: string[];
     ownerUserId: string | null;
     ownerType?: string;
   }) {
@@ -324,7 +378,12 @@ export class RecruiterBdPipelineService {
       .where(
         and(
           eq(recruiterDeals.id, args.dealId),
-          eq(recruiterDeals.recruiterUserId, args.recruiterUserId),
+          visibleTo(
+            recruiterDeals.recruiterUserId,
+            recruiterDeals.workspaceId,
+            args.recruiterUserId,
+            args.workspaceIds ?? [],
+          ),
         ),
       )
       .returning();
@@ -332,7 +391,11 @@ export class RecruiterBdPipelineService {
   }
 
   // -- Dashboard rollup ------------------------------------------------------
-  async pipelineRollup(recruiterUserId: string, pipelineKey = "default") {
+  async pipelineRollup(
+    recruiterUserId: string,
+    pipelineKey = "default",
+    workspaceIds: string[] = [],
+  ) {
     const db = getDb();
     const rows = await db
       .select({
@@ -344,7 +407,12 @@ export class RecruiterBdPipelineService {
       .from(recruiterDeals)
       .where(
         and(
-          eq(recruiterDeals.recruiterUserId, recruiterUserId),
+          visibleTo(
+            recruiterDeals.recruiterUserId,
+            recruiterDeals.workspaceId,
+            recruiterUserId,
+            workspaceIds,
+          ),
           eq(recruiterDeals.pipelineKey, pipelineKey),
           sql`${recruiterDeals.closedAt} IS NULL`,
         ),

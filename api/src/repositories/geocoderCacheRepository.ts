@@ -6,12 +6,17 @@
  * services/adapters/cached-geocoder.ts; this file is just CRUD.
  */
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, gt, lt, lte, sql, asc } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 const { geocoderCache } = schema;
 
 export type DbLike = any;
+
+export interface StaleCacheRow {
+  cacheKey: string;
+  result: unknown;
+}
 
 export interface IGeocoderCacheRepository {
   /**
@@ -28,6 +33,18 @@ export interface IGeocoderCacheRepository {
   /** Bump hit_count + last_hit_at without rewriting the result.
    *  Called on cache hits so eviction / refresh jobs see usage signal. */
   touch(cacheKey: string): Promise<void>;
+
+  /** Popular-but-stale rows (`last_hit_at < before AND hit_count > minHits`),
+   *  oldest first — the refresh job re-geocodes these (#1161). */
+  findStalePopular(before: Date, minHits: number, limit: number): Promise<StaleCacheRow[]>;
+
+  /** Overwrite a row's result + reset last_hit_at WITHOUT bumping hit_count
+   *  (a refresh is not a user hit). */
+  refresh(cacheKey: string, result: unknown): Promise<void>;
+
+  /** LRU-evict low-traffic stale rows (`last_hit_at < before AND
+   *  hit_count <= maxHits`). Returns the number deleted. */
+  deleteStaleLowTraffic(before: Date, maxHits: number, limit: number): Promise<number>;
 }
 
 export class GeocoderCacheRepository implements IGeocoderCacheRepository {
@@ -73,5 +90,38 @@ export class GeocoderCacheRepository implements IGeocoderCacheRepository {
         hitCount: sql`${geocoderCache.hitCount} + 1`,
       })
       .where(eq(geocoderCache.cacheKey, cacheKey));
+  }
+
+  async findStalePopular(before: Date, minHits: number, limit: number): Promise<StaleCacheRow[]> {
+    const rows = (await this.db
+      .select({ cacheKey: geocoderCache.cacheKey, result: geocoderCache.result })
+      .from(geocoderCache)
+      .where(and(lt(geocoderCache.lastHitAt, before), gt(geocoderCache.hitCount, minHits)))
+      .orderBy(asc(geocoderCache.lastHitAt))
+      .limit(limit)) as Array<{ cacheKey: string; result: unknown }>;
+    return rows;
+  }
+
+  async refresh(cacheKey: string, result: unknown): Promise<void> {
+    await this.db
+      .update(geocoderCache)
+      .set({ result: result as any, lastHitAt: this.now() })
+      .where(eq(geocoderCache.cacheKey, cacheKey));
+  }
+
+  async deleteStaleLowTraffic(before: Date, maxHits: number, limit: number): Promise<number> {
+    // Two-step (select ids → delete) so we can both bound the batch and report
+    // the count without relying on driver-specific affected-row semantics.
+    const victims = (await this.db
+      .select({ cacheKey: geocoderCache.cacheKey })
+      .from(geocoderCache)
+      .where(and(lt(geocoderCache.lastHitAt, before), lte(geocoderCache.hitCount, maxHits)))
+      .orderBy(asc(geocoderCache.lastHitAt))
+      .limit(limit)) as Array<{ cacheKey: string }>;
+    if (victims.length === 0) return 0;
+    for (const v of victims) {
+      await this.db.delete(geocoderCache).where(eq(geocoderCache.cacheKey, v.cacheKey));
+    }
+    return victims.length;
   }
 }

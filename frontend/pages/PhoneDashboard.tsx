@@ -230,7 +230,7 @@ export default function PhoneDashboard() {
       setNewNumberName("");
       setAvailableNumbers([]);
     } catch (err) {
-      await alertDialog({ title: "Error", description: err instanceof Error ? err.message : t("errors.failedToProvisionNumber") });
+      await alertDialog({ title: t("dialogs.phone.errorTitle"), description: err instanceof Error ? err.message : t("errors.failedToProvisionNumber") });
     } finally {
       setProvisionLoading(false);
     }
@@ -255,14 +255,14 @@ export default function PhoneDashboard() {
       setNumbers((prev) => prev.map((n) => n.id === updated.id ? updated : n));
       setEditNumber(null);
     } catch (err) {
-      await alertDialog({ title: "Error", description: err instanceof Error ? err.message : t("errors.failedToSave") });
+      await alertDialog({ title: t("dialogs.phone.errorTitle"), description: err instanceof Error ? err.message : t("errors.failedToSave") });
     } finally {
       setEditSaving(false);
     }
   };
 
   const handleReleaseNumber = async (id: string) => {
-    if (!(await confirmDialog({ title: "Release number", description: t("messages.confirmReleaseNumber"), confirmText: "Release", destructive: true }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.phone.releaseTitle"), description: t("messages.confirmReleaseNumber"), confirmText: t("dialogs.phone.releaseConfirm"), destructive: true }))) return;
     await phoneService.releaseNumber(id).catch(() => undefined);
     setNumbers((prev) => prev.filter((n) => n.id !== id));
   };
@@ -277,7 +277,7 @@ export default function PhoneDashboard() {
       setSmsTo("");
       setSmsBody("");
     } catch (err) {
-      await alertDialog({ title: "Error", description: err instanceof Error ? err.message : t("errors.failedToSendSms") });
+      await alertDialog({ title: t("dialogs.phone.errorTitle"), description: err instanceof Error ? err.message : t("errors.failedToSendSms") });
     } finally {
       setSmsSending(false);
     }
@@ -291,7 +291,7 @@ export default function PhoneDashboard() {
       const res = await phoneService.createTopupSession(cents);
       window.location.href = res.checkoutUrl;
     } catch (err) {
-      await alertDialog({ title: "Error", description: err instanceof Error ? err.message : t("errors.failedToCreateCheckout") });
+      await alertDialog({ title: t("dialogs.phone.errorTitle"), description: err instanceof Error ? err.message : t("errors.failedToCreateCheckout") });
     } finally {
       setTopupLoading(false);
     }

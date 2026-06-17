@@ -11,6 +11,13 @@
  * cleanly in dev without phone credentials configured.
  */
 
+// Shared XML text escaper (single source of truth — register gap #1942).
+// Escapes the same `&`/`<`/`>`/`"`/`'` set the local copy did; the apostrophe
+// is emitted as the numeric `&#39;` instead of `&apos;` — both parse to a
+// literal `'` in any conformant XML parser (TwiML included), so the emitted
+// `<Response>` document is semantically identical.
+import { escapeXmlText as escapeXml } from "../../../../shared/course-cover.js";
+
 function getEnv() {
   const g = globalThis as any;
   const spaceUrl   = g.__ENV?.SIGNALWIRE_SPACE_URL   || process.env.SIGNALWIRE_SPACE_URL   || "";
@@ -230,15 +237,6 @@ export function buildCallTwiML(opts: {
   ${greeting}
   <Say voice="Polly.Joanna">This number is currently unavailable. Goodbye.</Say>
 </Response>`;
-}
-
-function escapeXml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
 }
 
 /** Build TwiML acknowledgement for inbound SMS (empty 200 response). */

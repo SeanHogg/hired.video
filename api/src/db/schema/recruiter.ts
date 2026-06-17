@@ -200,6 +200,24 @@ export const placementNotificationSubscriptions = pgTable("placement_notificatio
 export type PlacementNotificationSubscription = typeof placementNotificationSubscriptions.$inferSelect;
 export type NewPlacementNotificationSubscription = typeof placementNotificationSubscriptions.$inferInsert;
 
+/** Idempotency log for date-based placement stage events (#230). The daily
+ *  sweep records each (placementId × event) it has fired so the /5 cron tick
+ *  never re-notifies subscribers for the same event. UNIQUE(placement_id,
+ *  event) makes `markEventFired` a single insert-on-conflict. */
+export const placementNotificationLog = pgTable(
+  "placement_notification_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    placementId: uuid("placement_id").notNull().references(() => placements.id, { onDelete: "cascade" }),
+    event: varchar("event", { length: 48 }).notNull(),
+    firedAt: timestamp("fired_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    uqPlacementEvent: uniqueIndex("uq_placement_notification_log").on(t.placementId, t.event),
+  }),
+);
+export type PlacementNotificationLogRow = typeof placementNotificationLog.$inferSelect;
+
 export const jobBoards = pgTable("job_boards", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 255 }).notNull(),

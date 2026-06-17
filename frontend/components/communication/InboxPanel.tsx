@@ -13,6 +13,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   MessageCircle,
   UserPlus,
@@ -25,6 +26,7 @@ import {
   X,
   Loader2,
   Mail,
+  ShieldCheck,
 } from "lucide-react";
 import { InboxEmptyState } from "@/components/email/InboxEmptyState";
 import { ReconnectMailboxBanner } from "@/components/email/ReconnectMailbox";
@@ -39,6 +41,7 @@ import {
   updateLeadStatus,
   type MarketingLeadStatus,
 } from "@/lib/services/marketing-leads-service";
+import { emailCategoryLabel } from "@/lib/taxonomy/category-labels";
 
 const KIND_LABEL: Record<HubItemKind, string> = {
   message: "Message",
@@ -79,6 +82,15 @@ function iconForItem(item: HubItem) {
       // with a distinct purple chat-bubble so triage row stands out vs the
       // generic blue info notification.
       return <MessageCircle className="h-4 w-4 text-brand-purple" />;
+    case "moderation_report_filed":
+    case "moderation_report_resolved":
+    case "moderation_action_taken":
+      // Community-moderation lifecycle events emitted by the API's
+      // moderationService (report filed → resolved → action taken). A
+      // shield reads as "safety/trust" and matches the /admin/moderation
+      // nav icon so the inbox row and the queue it links to feel like the
+      // same surface — instead of the generic blue info dot.
+      return <ShieldCheck className="h-4 w-4 text-emerald-600" />;
     default:
       return <Info className="h-4 w-4 text-blue-500" />;
   }
@@ -240,6 +252,7 @@ function InboxRow({
   isSelected = false,
   onToggleSelected,
 }: RowProps) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
 
   const handleClick = () => {
@@ -338,7 +351,7 @@ function InboxRow({
           )}
           {item.kind === "external_email" && item.category && (
             <span className="text-[10px] uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
-              {item.category.replace(/_/g, " ")}
+              {emailCategoryLabel(item.category, t)}
             </span>
           )}
           <span

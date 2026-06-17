@@ -53,44 +53,50 @@ body[data-print-mode] [data-print-hide] {
    * tailwind.config.ts expects the following color variables to be expressed as HSL values.
    * A different format will require also updating the theme in tailwind.config.ts.
   */
+  /* Light theme — "Soft Slate" (palette A). The canvas is a cool light gray so
+   * white cards/popovers visibly float instead of dissolving into a pure-white
+   * page (the "too much white" complaint). Brand purple is unchanged. */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 220 23% 96.5%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 222 47% 11%;
 
     --primary: 262 83% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 10%;
+    --secondary: 220 16% 92%;
+    --secondary-foreground: 222 30% 18%;
 
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
+    --muted: 220 18% 93%;
+    --muted-foreground: 220 9% 43%;
 
-    --accent: 262 83% 95%;
-    --accent-foreground: 262 83% 15%;
+    --accent: 262 60% 94%;
+    --accent-foreground: 262 70% 24%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
+    --border: 220 16% 88%;
+    --input: 220 16% 86%;
     --ring: 262 83% 58%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Sidebar reads as a panel one shade off the canvas. Kept LIGHT on purpose:
+     * Sidebar.tsx renders on `bg-background`/`text-foreground`, and several nav
+     * items use neutral grays — a dark sidebar here would drop their contrast. */
+    --sidebar-background: 220 24% 94%;
+    --sidebar-foreground: 222 30% 25%;
     --sidebar-primary: 262 83% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
+    --sidebar-accent: 220 18% 90%;
+    --sidebar-accent-foreground: 222 30% 18%;
+    --sidebar-border: 220 16% 86%;
     --sidebar-ring: 262 83% 58%;
 
     /* Brand specific colors */
@@ -105,43 +111,46 @@ body[data-print-mode] [data-print-hide] {
     --brand-gradient-end: 217 91% 60%;
   }
 
+  /* Dark theme — "Midnight" (palette D). A deep slate canvas, not pure black,
+   * with cards a step lighter so surfaces still separate. Reduces glare hard
+   * while keeping the purple brand legible. Applied when <html class="dark">. */
   .dark {
-    --background: 240 10% 4%;
-    --foreground: 0 0% 98%;
+    --background: 224 34% 11%;
+    --foreground: 220 20% 92%;
 
-    --card: 240 10% 4%;
-    --card-foreground: 0 0% 98%;
+    --card: 223 30% 15%;
+    --card-foreground: 220 20% 95%;
 
-    --popover: 240 10% 4%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 223 30% 15%;
+    --popover-foreground: 220 20% 95%;
 
-    --primary: 262 83% 58%;
+    --primary: 262 83% 66%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 4% 16%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 223 24% 21%;
+    --secondary-foreground: 220 18% 90%;
 
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 223 22% 19%;
+    --muted-foreground: 220 12% 62%;
 
-    --accent: 240 4% 16%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 262 45% 28%;
+    --accent-foreground: 262 70% 88%;
 
-    --destructive: 0 63% 31%;
+    --destructive: 0 63% 40%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 4% 16%;
-    --input: 240 4% 16%;
-    --ring: 262 83% 58%;
+    --border: 223 20% 24%;
+    --input: 223 20% 26%;
+    --ring: 262 83% 66%;
 
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 262 83% 58%;
+    --sidebar-background: 225 38% 9%;
+    --sidebar-foreground: 220 16% 78%;
+    --sidebar-primary: 262 83% 66%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 262 83% 58%;
+    --sidebar-accent: 224 26% 18%;
+    --sidebar-accent-foreground: 220 16% 92%;
+    --sidebar-border: 224 26% 18%;
+    --sidebar-ring: 262 83% 66%;
 
     /* Brand specific colors for dark mode */
     --brand-purple: 262 83% 58%;

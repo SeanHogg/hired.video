@@ -288,7 +288,7 @@ export function CompanyCareersControl({
       case "internship":
         return "bg-orange-100 text-orange-800";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-muted text-foreground";
     }
   };
 
@@ -303,7 +303,7 @@ export function CompanyCareersControl({
       case "executive":
         return "bg-red-100 text-red-800";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-muted text-foreground";
     }
   };
 
@@ -312,11 +312,11 @@ export function CompanyCareersControl({
       <div className={`space-y-6 ${className}`}>
         <div className="animate-pulse">
           {showCompanyHeader && (
-            <div className="h-32 bg-gray-200 rounded-lg mb-6" />
+            <div className="h-32 bg-muted rounded-lg mb-6" />
           )}
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded-lg" />
+              <div key={i} className="h-24 bg-muted rounded-lg" />
             ))}
           </div>
         </div>

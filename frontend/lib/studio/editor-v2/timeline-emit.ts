@@ -448,6 +448,10 @@ function widgetToEffect(widget: Widget): ClipEffect {
           url,
           sourceId: p.data.source.kind === "sourceId" ? p.data.source.id : "",
           fit: p.data.fit,
+          // Per-widget colour grade (#596/#806) — baked into the export
+          // frame by the canvas-v2:image applier. Omitted when absent so
+          // the round-trip payload stays minimal.
+          ...(p.data.filters ? { filters: p.data.filters } : {}),
         },
       };
     }
@@ -465,6 +469,8 @@ function widgetToEffect(widget: Widget): ClipEffect {
           // `chroma-key` effect for the pixel pass. Omitted when null
           // so the round-trip payload stays minimal.
           ...(p.data.chromaKey ? { chromaKey: p.data.chromaKey } : {}),
+          // Per-widget colour grade (#596/#806).
+          ...(p.data.filters ? { filters: p.data.filters } : {}),
         },
       };
     }

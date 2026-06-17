@@ -1,11 +1,12 @@
 import { Hono } from "hono";
-import { eq, or, and, lte, isNull, inArray, notInArray, sql } from "drizzle-orm";
+import { eq, or, and, lte, isNull, inArray, notInArray, sql, count } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { getDb, schema } from "../db/index.js";
 import { bumpSearchVersion } from "../utils/search-cache.js";
+import { getOrSetCached, invalidateCachedKey } from "../utils/edge-cache.js";
 import { buildRepos } from "../repositories/index.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { cdnUrl } from "../utils/cdn.js";
@@ -209,6 +210,7 @@ function toUserProfileDto(
   row: {
     id: string; email: string; name: string; role: string;
     emailVerified: boolean; createdAt: Date | string; updatedAt?: Date | string;
+    externalPublicHandle?: string | null;
   },
   profile?: {
     headline?: string | null; summary?: string | null; location?: string | null;
@@ -343,6 +345,8 @@ function toUserProfileDto(
       : null,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(profileUpdatedAt).toISOString(),
+    // Booking host handle (#1902) — lets the profile mount <BookingsSection/>.
+    externalPublicHandle: row.externalPublicHandle ?? null,
   };
 }
 
@@ -365,6 +369,68 @@ function makeConnection(id: string, fromUserId: string, toUserId: string, status
 }
 
 const inMemoryConnections = new Map<string, ReturnType<typeof makeConnection>>();
+
+/** Shared user-card query: the exact select + DTO mapping the People grid
+ *  needs. Both `/public` (directory) and `/me/connections/cards` (the
+ *  Connections tab) read through this so the card shape can't drift (DRY). */
+async function queryUserCards(
+  db: ReturnType<typeof getDb>,
+  conds: ReturnType<typeof and>[],
+  opts: { limit?: number; offset?: number } = {},
+) {
+  let q = db
+    .select({
+      id: users.id,
+      name: users.name,
+      role: users.role,
+      emailVerified: users.emailVerified,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt,
+      headline: userProfiles.headline,
+      summary: userProfiles.summary,
+      location: userProfiles.location,
+      avatarUrl: userProfiles.avatarUrl,
+      currentRole: userProfiles.currentRole,
+      currentCompany: userProfiles.currentCompany,
+      openToWork: userProfiles.openToWork,
+      skills: userProfiles.skills,
+      yearsOfExperience: userProfiles.yearsOfExperience,
+      profileVisibility: userProfiles.profileVisibility,
+      customUrlSlug: userProfiles.customUrlSlug,
+      creatorIsActive: creatorProfiles.isActive,
+      creatorEndedAt: creatorProfiles.endedAt,
+      creatorVideoActive: creatorProfiles.videoActive,
+      creatorVoiceActive: creatorProfiles.voiceActive,
+      creatorServicesActive: creatorProfiles.servicesActive,
+      creatorArticlesActive: creatorProfiles.articlesActive,
+      creatorCoursesActive: creatorProfiles.coursesActive,
+      creatorTemplatesActive: creatorProfiles.templatesActive,
+    })
+    .from(users)
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .leftJoin(
+      creatorProfiles,
+      and(eq(creatorProfiles.userId, users.id), sql`${creatorProfiles.endedAt} IS NULL`),
+    )
+    .where(and(...conds)) as any;
+  if (opts.limit != null) q = q.limit(opts.limit);
+  if (opts.offset != null) q = q.offset(opts.offset);
+  const rows = await q;
+  return rows.map((r: any) =>
+    toPublicUserCardDto({
+      ...r,
+      isCreator: r.creatorIsActive === true && r.creatorEndedAt === null,
+      creatorPrograms: {
+        video: r.creatorVideoActive === true,
+        voice: r.creatorVoiceActive === true,
+        services: r.creatorServicesActive === true,
+        articles: r.creatorArticlesActive === true,
+        courses: r.creatorCoursesActive === true,
+        templates: r.creatorTemplatesActive === true,
+      },
+    }),
+  );
+}
 
 /** GET /api/users/public — list public users (optional auth).
  *
@@ -399,56 +465,7 @@ userRoutes.get("/public", async (c) => {
     sql`${userProfiles.confidentialMode} IS NOT TRUE`,
   ];
 
-  const rows = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      role: users.role,
-      emailVerified: users.emailVerified,
-      createdAt: users.createdAt,
-      updatedAt: users.updatedAt,
-      headline: userProfiles.headline,
-      summary: userProfiles.summary,
-      location: userProfiles.location,
-      avatarUrl: userProfiles.avatarUrl,
-      currentRole: userProfiles.currentRole,
-      currentCompany: userProfiles.currentCompany,
-      openToWork: userProfiles.openToWork,
-      skills: userProfiles.skills,
-      yearsOfExperience: userProfiles.yearsOfExperience,
-      profileVisibility: userProfiles.profileVisibility,
-      customUrlSlug: userProfiles.customUrlSlug,
-      creatorIsActive: creatorProfiles.isActive,
-      creatorEndedAt: creatorProfiles.endedAt,
-      creatorVideoActive: creatorProfiles.videoActive,
-      creatorVoiceActive: creatorProfiles.voiceActive,
-      creatorServicesActive: creatorProfiles.servicesActive,
-      creatorArticlesActive: creatorProfiles.articlesActive,
-      creatorCoursesActive: creatorProfiles.coursesActive,
-      creatorTemplatesActive: creatorProfiles.templatesActive,
-    })
-    .from(users)
-    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-    .leftJoin(
-      creatorProfiles,
-      and(eq(creatorProfiles.userId, users.id), sql`${creatorProfiles.endedAt} IS NULL`),
-    )
-    .where(and(...baseConds))
-    .limit(limit)
-    .offset(offset);
-
-  const items = rows.map((r) => toPublicUserCardDto({
-    ...r,
-    isCreator: r.creatorIsActive === true && r.creatorEndedAt === null,
-    creatorPrograms: {
-      video: r.creatorVideoActive === true,
-      voice: r.creatorVoiceActive === true,
-      services: r.creatorServicesActive === true,
-      articles: r.creatorArticlesActive === true,
-      courses: r.creatorCoursesActive === true,
-      templates: r.creatorTemplatesActive === true,
-    },
-  }));
+  const items = await queryUserCards(db, baseConds, { limit, offset });
 
   // `?fields=id,fullName,avatar,headline,...` projection (gap #1370) — the
   // /people directory card view only needs a handful of fields; clipping the
@@ -457,7 +474,25 @@ userRoutes.get("/public", async (c) => {
   // note). Detail endpoints still return the full row.
   const fields = parseFields(c.req.query("fields"), USER_LIST_FIELDS);
   const projected = projectRows(items as unknown as Array<Record<string, unknown>>, fields);
-  return c.json(success({ items: projected, total: items.length, page, limit }));
+
+  // Real global count over `baseConds` (NOT the current page size) so the
+  // frontend pagination UI shows the correct number of pages (#904). The
+  // directory's membership changes only on signup/verify/visibility edits, so
+  // a short read-through TTL is plenty and avoids a COUNT(*) on every page
+  // request. baseConds reference only userProfiles (the lone join in WHERE).
+  const total = await getOrSetCached({
+    key: "users:public:count",
+    ttlSeconds: 60,
+    loader: async () => {
+      const [row] = await db
+        .select({ value: count() })
+        .from(users)
+        .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+        .where(and(...baseConds));
+      return Number(row?.value ?? 0);
+    },
+  });
+  return c.json(success({ items: projected, total, page, limit }));
 });
 
 /** GET /api/users/me — frontend compatibility endpoint */
@@ -713,6 +748,41 @@ userRoutes.get("/me/connections", async (c) => {
   return c.json(success(list.map((row) => makeConnectionDto(row))), 200);
 });
 
+const connCardsKey = (userId: string) => `conns:cards:${userId}`;
+
+/** GET /api/users/me/connections/cards — the viewer's accepted connections as
+ *  People cards (#802). Powers the Connections tab, which previously read a
+ *  frontend stub that always returned []. Reuses `queryUserCards` so the card
+ *  shape matches the Discover grid exactly. Read-through cached per viewer +
+ *  invalidated on accept/remove (bounded by the viewer's connection count). */
+userRoutes.get("/me/connections/cards", async (c) => {
+  const me = c.var.user.sub;
+  const db = getDb();
+  const items = await getOrSetCached({
+    key: connCardsKey(me),
+    ttlSeconds: 120,
+    loader: async () => {
+      const links = await db
+        .select({ fromUserId: userConnections.fromUserId, toUserId: userConnections.toUserId })
+        .from(userConnections)
+        .where(
+          and(
+            eq(userConnections.status, "Accepted"),
+            or(eq(userConnections.fromUserId, me), eq(userConnections.toUserId, me)),
+          ),
+        );
+      const otherIds = [
+        ...new Set(links.map((l) => (l.fromUserId === me ? l.toUserId : l.fromUserId))),
+      ];
+      if (otherIds.length === 0) return [];
+      // Your own connections are visible regardless of public-directory
+      // visibility; only require the account still be active.
+      return queryUserCards(db, [eq(users.isActive, true), inArray(users.id, otherIds)]);
+    },
+  });
+  return c.json(success({ items }), 200);
+});
+
 /** GET /api/users/me/connections/pending */
 userRoutes.get("/me/connections/pending", async (c) => {
   const me = c.var.user.sub;
@@ -753,6 +823,10 @@ userRoutes.put("/connections/:id/accept", async (c) => {
     return c.json(error("NOT_FOUND", "Connection request not found"), 404);
   }
 
+  // Both sides just gained a connection — drop their cached card lists (#802).
+  invalidateCachedKey(connCardsKey(me));
+  invalidateCachedKey(connCardsKey(updated.fromUserId));
+
   // Notify the original sender that their request was accepted.
   (async () => {
     try {
@@ -783,14 +857,20 @@ userRoutes.delete("/connections/:id", async (c) => {
   const me = c.var.user.sub;
   const db = getDb();
 
-  await db
+  const [removed] = await db
     .delete(userConnections)
     .where(
       and(
         eq(userConnections.id, id),
         or(eq(userConnections.fromUserId, me), eq(userConnections.toUserId, me)),
       ),
-    );
+    )
+    .returning();
+  // Drop both sides' cached card lists so a removed connection disappears (#802).
+  if (removed) {
+    invalidateCachedKey(connCardsKey(removed.fromUserId));
+    invalidateCachedKey(connCardsKey(removed.toUserId));
+  }
   return c.json(success(null), 200);
 });
 
@@ -968,7 +1048,7 @@ userRoutes.get("/:id", async (c) => {
   const targetUserId = await resolveUserRef(db, id);
   if (targetUserId) {
     const [row] = await db
-      .select({ id: users.id, email: users.email, name: users.name, role: users.role, emailVerified: users.emailVerified, createdAt: users.createdAt, updatedAt: users.updatedAt })
+      .select({ id: users.id, email: users.email, name: users.name, role: users.role, emailVerified: users.emailVerified, createdAt: users.createdAt, updatedAt: users.updatedAt, externalPublicHandle: users.externalPublicHandle })
       .from(users)
       .where(eq(users.id, targetUserId))
       .limit(1);

@@ -27,7 +27,6 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
-import { scanContent } from "../services/moderation/contentScan.js";
 import { slugify } from "../../../shared/slugify.js";
 import { ARTICLE_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import { resolveUserRef } from "../services/user/resolveUserRef.js";
@@ -54,6 +53,8 @@ import {
   gateForSeverity,
   toFindings,
 } from "../services/articles/moderation-classifier.js";
+import { NotificationService } from "../services/notifications/notificationService.js";
+import { USER_ROLES } from "../../../shared/user-roles.js";
 
 export const articleRoutes = new Hono<AppEnv>();
 
@@ -76,6 +77,26 @@ function uid(c: any): string | null {
 function readMinutes(bodyMd: string): number {
   const words = bodyMd.trim().split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.ceil(words / 225));
+}
+
+/**
+ * Run the article moderation/quality classifier (#175) and compute the
+ * severity → status/eligibility gate. Shared by `POST /:id/classify`
+ * (author-triggered preview) and `submit-for-review` (auto-gate, #1512) so
+ * quality_score + partner_program_eligible are derived exactly one way.
+ */
+async function runArticleClassifier(
+  c: any,
+  art: { title: string; bodyMd: string | null; bodyJson?: unknown },
+) {
+  const env = (c.env as any) ?? {};
+  const llm = createLLMClient(env, c.var.user ?? null);
+  const result = await classifyArticle({
+    llm,
+    title: art.title,
+    body: (art.bodyMd ?? "") || JSON.stringify(art.bodyJson ?? {}),
+  });
+  return { result, gate: gateForSeverity(result.findings.severity) };
 }
 
 const KindSchema = z.enum(ARTICLE_KINDS);
@@ -124,7 +145,7 @@ articleRoutes.get("/public", async (c) => {
     const rows = await db
       .select({
         article: articles,
-        author: { id: users.id, name: users.name },
+        author: { id: users.id, name: users.name, isSystem: users.isSystem },
         authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
       })
       .from(articles)
@@ -161,7 +182,7 @@ articleRoutes.get("/public/by-user/:userId", async (c) => {
     const rows = await db
       .select({
         article: articles,
-        author: { id: users.id, name: users.name },
+        author: { id: users.id, name: users.name, isSystem: users.isSystem },
         authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
       })
       .from(articles)
@@ -209,10 +230,11 @@ articleRoutes.get("/public/:userId/:slug", async (c) => {
     return c.json(error("NOT_FOUND", "Article not found"), 404);
   }
 
-  db.update(articles)
-    .set({ viewCount: sql`${articles.viewCount} + 1` } as any)
-    .where(eq(articles.id, row.article.id))
-    .catch(() => undefined);
+  // CDN-cacheable read (#858). The view-count bump is a write side-effect that
+  // would be skipped whenever Cloudflare serves a cached body, so it no longer
+  // lives here — the client beacons `POST /:id/view` on mount instead. With the
+  // bump gone the response is pure-read and safe to edge-cache.
+  withCacheHeaders(c, { scope: "public", maxAge: 60, sMaxAge: 300, swr: 600 });
 
   return c.json(success({
     id: row.article.id,
@@ -227,7 +249,7 @@ articleRoutes.get("/public/:userId/:slug", async (c) => {
     sector: row.article.sector,
     audience: row.article.audience,
     readMinutes: row.article.readMinutes,
-    viewCount: row.article.viewCount + 1,
+    viewCount: row.article.viewCount,
     publishedAt: row.article.publishedAt,
     author: {
       id: row.author.id,
@@ -397,39 +419,76 @@ articleRoutes.post("/:id/submit-for-review", async (c) => {
     return c.json(error("ALREADY_SUBMITTED", "Already in the review queue."), 409);
   }
 
-  // Inline scan — gives the creator immediate signal on hard-block content
-  // before it ever enters the SA queue. The same scan output is shown to the
-  // SA so they don't burn an LLM call on already-scanned rows.
-  const scan = await scanContent(
-    { title: existing.title, bodyMd: existing.bodyMd, kind: existing.kind as any },
-    c.var.user,
-  );
+  // Auto-run the article moderation/quality classifier inline (#1512). This is
+  // the SAME classifier the author-triggered POST /:id/classify uses, so a
+  // submission's quality_score + partner_program_eligible are set the moment it
+  // enters review — no separate manual classify step, and the SA sees the
+  // findings without burning a second LLM call.
+  let classified: Awaited<ReturnType<typeof runArticleClassifier>>;
+  try {
+    classified = await runArticleClassifier(c, existing);
+  } catch (e) {
+    return c.json(error("CLASSIFIER_FAILED", e instanceof Error ? e.message : String(e)), 502);
+  }
+  const { result, gate } = classified;
+  const findings = toFindings(result);
+  const now = new Date();
+  const qualityFields = {
+    qualityScore: result.qualityScore,
+    qualityRationale: result.qualityRationale,
+    qualityCheckedAt: now,
+    moderationScore: result.qualityScore,
+    moderationFindings: findings,
+    moderationScannedAt: now,
+    moderationScannedBy: userId,
+  };
 
-  // Hard-block path: severity === 'block' (racial slurs detected by either
-  // floor or LLM) rejects automatically. Creator can edit and re-submit.
-  if (scan.findings.severity === "block") {
+  // block | high (slurs / harassment / illegal) bounce straight back to the
+  // author instead of entering the SA queue. Creator can revise and re-submit.
+  if (result.findings.severity === "block" || result.findings.severity === "high") {
     const [rejected] = await db.update(articles).set({
+      ...qualityFields,
       status: "rejected",
       rejectionReason:
-        "Automatic rejection: prohibited content detected. " +
-        (scan.findings.rationale ?? "Please revise and re-submit."),
-      rejectedAt: new Date(),
-      moderationScore: scan.score,
-      moderationFindings: scan.findings,
-      moderationScannedAt: new Date(),
-      updatedAt: new Date(),
+        "Automatic rejection: content failed moderation. " +
+        (findings.rationale ?? "Please revise and re-submit."),
+      rejectedAt: now,
+      partnerProgramEligible: false,
+      updatedAt: now,
     } as any).where(eq(articles.id, existing.id)).returning();
     return c.json(success(rejected), 200);
   }
 
+  // low | medium → enters the SA review queue and is marked partner-eligible
+  // (gateForSeverity). Earning still requires status='published' downstream.
   const [updated] = await db.update(articles).set({
+    ...qualityFields,
     status: "submitted",
-    submittedForReviewAt: new Date(),
-    moderationScore: scan.score,
-    moderationFindings: scan.findings,
-    moderationScannedAt: new Date(),
-    updatedAt: new Date(),
+    submittedForReviewAt: now,
+    partnerProgramEligible: gate.partnerProgramEligible,
+    updatedAt: now,
   } as any).where(eq(articles.id, existing.id)).returning();
+
+  // Ping reviewers (SuperAdmins) that a new submission landed in the queue
+  // (#898). Best-effort, non-blocking — never fail the submit on a notify hiccup.
+  void (async () => {
+    const admins = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.role, USER_ROLES.SUPER_ADMIN));
+    for (const admin of admins) {
+      await NotificationService.notify({
+        userId: admin.id,
+        type: "review",
+        title: `New ${existing.kind} awaiting review`,
+        message: existing.title,
+        url: `/admin/articles`,
+        refType: "article",
+        refId: existing.id,
+        push: false,
+      });
+    }
+  })();
 
   return c.json(success(updated), 200);
 });
@@ -602,8 +661,29 @@ articleRoutes.post("/:id/versions/:vid/restore", async (c) => {
 // unauthenticated traffic for analytics.
 // ===========================================================================
 
+// POST /:id/view — lightweight view-count beacon (#858). Split out of the
+// public slug read so that route can be edge-cached. Fire-and-forget from the
+// client on article mount; bumps the denormalised `articles.view_count`.
+articleRoutes.post("/:id/view", async (c) => {
+  const id = c.req.param("id");
+  const db = getDb();
+  const [art] = await db.select({ id: articles.id, status: articles.status })
+    .from(articles).where(eq(articles.id, id)).limit(1);
+  if (!art || art.status !== "published") {
+    return c.json(error("NOT_FOUND", "Article not found"), 404);
+  }
+  await db.update(articles)
+    .set({ viewCount: sql`${articles.viewCount} + 1` } as any)
+    .where(eq(articles.id, id));
+  return c.json(success({ recorded: true }), 200);
+});
+
 const ReadProgressSchema = z.object({
   seconds: z.number().min(1).max(600), // beacon every ~30s; cap protects against tampering
+  // Engagement source (#1577). `scroll` = visual reading (default), `narrator`
+  // = read-aloud listening — both are real "consuming the content" signals and
+  // accrue identically; the field is kept for per-source analytics.
+  source: z.enum(["scroll", "narrator"]).default("scroll"),
 });
 
 articleRoutes.post("/:id/read-progress", async (c) => {
@@ -620,27 +700,40 @@ articleRoutes.post("/:id/read-progress", async (c) => {
   }
   const today = new Date().toISOString().slice(0, 10);
   const seconds = parsed.data.seconds;
+  // Verified-account-only payout counting (#1757). Only an authenticated AND
+  // email-verified reader's seconds accrue to `read_seconds` (the column the
+  // partner pool pays on); unverified-authenticated + anonymous traffic falls
+  // to `anonymous_read_seconds`, which is excluded from the pool. This blocks
+  // throwaway-signup farming of read-minutes.
   const userId = uid(c);
-  const colToBump = userId ? articleEngagement.readSeconds : articleEngagement.anonymousReadSeconds;
+  let verified = false;
+  if (userId) {
+    const [u] = await db
+      .select({ emailVerified: users.emailVerified })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    verified = !!u?.emailVerified;
+  }
   await db.insert(articleEngagement).values({
     articleId: id,
     day: today,
-    readSeconds: userId ? seconds : 0,
-    anonymousReadSeconds: userId ? 0 : seconds,
+    readSeconds: verified ? seconds : 0,
+    anonymousReadSeconds: verified ? 0 : seconds,
     uniqueReaders: 0,
   }).onConflictDoUpdate({
     target: [articleEngagement.articleId, articleEngagement.day],
     set: {
-      readSeconds: userId
+      readSeconds: verified
         ? sql`${articleEngagement.readSeconds} + ${seconds}`
         : articleEngagement.readSeconds,
-      anonymousReadSeconds: userId
+      anonymousReadSeconds: verified
         ? articleEngagement.anonymousReadSeconds
         : sql`${articleEngagement.anonymousReadSeconds} + ${seconds}`,
       updatedAt: new Date(),
     },
   });
-  return c.json(success({ counted: !!userId }), 200);
+  return c.json(success({ counted: verified }), 200);
 });
 
 const ClapSchema = z.object({
@@ -755,15 +848,8 @@ articleRoutes.post("/:id/classify", async (c) => {
   if (!art) return c.json(error("NOT_FOUND", "Article not found"), 404);
   if (art.userId !== userId) return c.json(error("FORBIDDEN", "Not your article"), 403);
 
-  const env = (c.env as any) ?? {};
-  const llm = createLLMClient(env, c.var.user ?? null);
   try {
-    const result = await classifyArticle({
-      llm,
-      title: art.title,
-      body: (art.bodyMd ?? "") || JSON.stringify(art.bodyJson ?? {}),
-    });
-    const gate = gateForSeverity(result.findings.severity);
+    const { result, gate } = await runArticleClassifier(c, art);
     const now = new Date();
     const update: Record<string, unknown> = {
       qualityScore: result.qualityScore,
@@ -883,7 +969,7 @@ articleRoutes.get("/partner-program/status", async (c) => {
 // ---------------------------------------------------------------------------
 function toPublicCard(r: {
   article: typeof articles.$inferSelect;
-  author: { id: string; name: string | null };
+  author: { id: string; name: string | null; isSystem: boolean };
   authorProfile: { avatarUrl: string | null; customUrlSlug: string | null } | null;
 }) {
   return {
@@ -906,6 +992,7 @@ function toPublicCard(r: {
       name: r.author.name,
       avatarUrl: r.authorProfile?.avatarUrl ?? null,
       slug: r.authorProfile?.customUrlSlug ?? r.author.id,
+      isSystem: r.author.isSystem,
     },
   };
 }

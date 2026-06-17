@@ -29,6 +29,11 @@ import type {
   World3DEntity,
   World3DState,
 } from "@shared/game-state";
+// Shared XML text escaper (single source of truth — register gap #1942).
+// Same `&`/`<`/`>`/`"`/`'` set as the prior local copy; the apostrophe is
+// emitted as `&#39;` rather than `&apos;` — both parse to a literal `'` in
+// any conformant XML parser, so the generated `.rbxlx` is equivalent.
+import { escapeXmlText as escapeXml } from "@shared/course-cover";
 
 const RBX_VERSION = "4";
 
@@ -164,15 +169,6 @@ function hexToRgb(hex: string): [number, number, number] {
   if (!m) return [128, 128, 128];
   const n = parseInt(m[1], 16);
   return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
-}
-
-function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
 }
 
 function indent(s: string, n: number): string {

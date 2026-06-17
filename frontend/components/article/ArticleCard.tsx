@@ -10,6 +10,7 @@
  */
 
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { PublicArticleCard } from "@/lib/services/article-service";
@@ -28,6 +29,7 @@ export interface ArticleCardProps {
 }
 
 export function ArticleCard({ article }: ArticleCardProps) {
+  const { t } = useTranslation();
   const sectorLabel =
     article.sector && isValidSector(article.sector)
       ? sectorMeta(article.sector as Sector).label
@@ -64,8 +66,15 @@ export function ArticleCard({ article }: ArticleCardProps) {
           {article.summary && (
             <p className="text-muted-foreground line-clamp-3">{article.summary}</p>
           )}
-          <p className="text-xs text-muted-foreground">
-            {article.readMinutes} min read · {article.author.name}
+          <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5">
+            <span>
+              {article.readMinutes} min read · {article.author.name}
+            </span>
+            {article.author.isSystem && (
+              <Badge variant="secondary" className="text-xs">
+                {t("labels.editorial")}
+              </Badge>
+            )}
           </p>
         </CardContent>
       </Card>

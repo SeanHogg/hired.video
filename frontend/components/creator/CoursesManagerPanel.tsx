@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Loader2, Plus, GraduationCap, Eye, EyeOff, Trash2, Lock, DollarSign, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -15,8 +16,10 @@ import MediaPicker from "@/components/shared/MediaPicker";
 import CourseContentEditor from "@/components/creator/CourseContentEditor";
 import LessonAuthoringCTAs from "@/components/creator/LessonAuthoringCTAs";
 import { studioTemplatesService, type StudioTemplate } from "@/lib/services/studio-templates-service";
+import { userService, type PublicUser } from "@/lib/services/user-service";
 import { generateAndUploadCover } from "@/lib/courses/cover-generator";
 import { confirmDialog } from "@/lib/dialogs";
+import { courseCategoryLabel } from "@/lib/course-category";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Mode = "list" | "edit";
@@ -33,6 +36,7 @@ interface Props {
 // it can also render for non-enrolled creators with an inline enroll CTA.
 export default function CoursesManagerPanel({ profile: profileProp, onEnrollClick }: Props = {}) {
   const { isAuthenticated } = useAuth();
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [courses, setCourses] = useState<Course[]>([]);
@@ -53,9 +57,16 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
-  // #1502 — optional reviewer-uuid input. Blank = open queue (any
-  // SuperAdmin in the review pool can claim).
+  // #1502 — optional reviewer. Blank = open queue (any SuperAdmin in the
+  // review pool can claim). `reviewerUserId` is the submitted value (the
+  // selected user's id); #1571 replaces the raw-UUID input with a
+  // search-as-you-type autocomplete whose text lives in `reviewerQuery`
+  // while the resolved id stays in `reviewerUserId`.
   const [reviewerUserId, setReviewerUserId] = useState("");
+  const [reviewerQuery, setReviewerQuery] = useState("");
+  const [reviewerResults, setReviewerResults] = useState<PublicUser[]>([]);
+  const [reviewerOpen, setReviewerOpen] = useState(false);
+  const [reviewerSearching, setReviewerSearching] = useState(false);
   // #1501 — theme picker. `null` = platform default; otherwise the
   // user's owned studio_template row supplies the SCORM-player chrome
   // tokens. Loaded once on mount via studioTemplatesService.
@@ -128,6 +139,9 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
     setPriceDollars("");
     setThemeId(null);
     setReviewerUserId("");
+    setReviewerQuery("");
+    setReviewerResults([]);
+    setReviewerOpen(false);
     setMode("edit");
   };
 
@@ -142,7 +156,21 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
     setPriceDollars(c.priceCents ? (c.priceCents / 100).toFixed(2) : "");
     setThemeId(c.themeId ?? null);
     setReviewerUserId(c.assignedReviewerId ?? "");
+    // Seed the autocomplete text with whatever the course already has
+    // assigned so the field isn't blank for an in-flight review; the
+    // resolved id is the source of truth and unchanged until the author
+    // picks a new result.
+    setReviewerQuery(c.assignedReviewerId ?? "");
+    setReviewerResults([]);
+    setReviewerOpen(false);
     setMode("edit");
+  };
+
+  // #1571 — derive a readable "Name — email" label for a public user;
+  // falls back to id so an unresolved row is never blank in the list.
+  const reviewerLabel = (u: PublicUser): string => {
+    const name = u.fullName || [u.firstName, u.lastName].filter(Boolean).join(" ") || u.userName || "";
+    return [name, u.email].filter(Boolean).join(" — ") || u.id || "Unknown user";
   };
 
   // #1521 — deep-link from /learn/:enrollmentId's "Edit" button.
@@ -173,6 +201,51 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
     // setters aren't in deps (would loop).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, searchParams.get("courseId")]);
+
+  // #1571 — debounced reviewer search-as-you-type. Mirrors the
+  // LocationFilter pattern: a 250ms setTimeout-debounce (cleanup-cancelled
+  // on each keystroke) calls userService.searchUsers, and the results
+  // render in an absolute dropdown. Selecting a row sets reviewerUserId to
+  // the user's id while reviewerQuery holds the readable label — the
+  // submit payload (submitForReview) still sends only the id.
+  useEffect(() => {
+    const q = reviewerQuery.trim();
+    // Don't re-search when the box still shows the label of an already-
+    // selected reviewer (avoids a redundant fetch right after a pick).
+    if (!q || q === reviewerUserId) {
+      setReviewerResults([]);
+      return;
+    }
+    const handle = setTimeout(async () => {
+      setReviewerSearching(true);
+      try {
+        const res = await userService.searchUsers({ search: q, limit: 8 });
+        setReviewerResults(res.items ?? []);
+      } catch {
+        setReviewerResults([]);
+      } finally {
+        setReviewerSearching(false);
+      }
+    }, 250);
+    return () => clearTimeout(handle);
+    // reviewerUserId intentionally omitted: it only gates the redundant-
+    // fetch shortcut and is set synchronously alongside reviewerQuery.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewerQuery]);
+
+  const selectReviewer = (u: PublicUser) => {
+    setReviewerUserId(u.id ?? "");
+    setReviewerQuery(reviewerLabel(u));
+    setReviewerResults([]);
+    setReviewerOpen(false);
+  };
+
+  const clearReviewer = () => {
+    setReviewerUserId("");
+    setReviewerQuery("");
+    setReviewerResults([]);
+    setReviewerOpen(false);
+  };
 
   const buildInput = (): CreateCourseInput => ({
     title: title.trim(),
@@ -269,7 +342,7 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
   };
 
   const remove = async (c: Course) => {
-    if (!(await confirmDialog({ title: "Delete course", description: `Delete "${c.title}"? This cannot be undone.`, confirmText: "Delete", destructive: true }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.courses.deleteCourseTitle"), description: t("dialogs.courses.deleteCourseBody", { title: c.title }), confirmText: t("dialogs.courses.deleteConfirm"), destructive: true }))) return;
     const previous = courses;
     setCourses((cur) => cur.filter((x) => x.id !== c.id));
     try {
@@ -346,7 +419,7 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
                     {c.summary && <p className="text-sm text-muted-foreground line-clamp-2">{c.summary}</p>}
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       {c.enrollmentCount > 0 && <span>{c.enrollmentCount} enrolled</span>}
-                      {c.category && <span>· {c.category}</span>}
+                      {c.category && <span>· {courseCategoryLabel(c.category, t)}</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -483,19 +556,74 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
             />
           </div>
 
-          {/* #1502 — Optional named reviewer for in-review workflow.
-              Blank = open queue for any SuperAdmin. We accept a raw
-              UUID for now; richer user-picker is tracked as #1571. */}
+          {/* #1502/#1571 — Optional named reviewer for in-review workflow.
+              Blank = open queue for any SuperAdmin. Search-as-you-type
+              autocomplete: the dropdown shows name/email, picking a row
+              stores the user's id (submitted on "Submit for review"). */}
           {editing && (
             <div className="space-y-1 pt-2 border-t">
-              <Label htmlFor="reviewer-id" className="text-xs">Reviewer (optional)</Label>
-              <Input
-                id="reviewer-id"
-                value={reviewerUserId}
-                onChange={(e) => setReviewerUserId(e.target.value)}
-                placeholder="User UUID — leave blank to send to any SuperAdmin"
-                className="text-xs"
-              />
+              <Label htmlFor="reviewer-search" className="text-xs">Reviewer (optional)</Label>
+              <div className="relative">
+                <Input
+                  id="reviewer-search"
+                  role="combobox"
+                  aria-expanded={reviewerOpen && reviewerResults.length > 0}
+                  aria-autocomplete="list"
+                  aria-controls="reviewer-results"
+                  autoComplete="off"
+                  value={reviewerQuery}
+                  onChange={(e) => {
+                    setReviewerQuery(e.target.value);
+                    // Typing invalidates a prior pick — clear the resolved
+                    // id so a partial query is never submitted as an id.
+                    if (reviewerUserId) setReviewerUserId("");
+                    setReviewerOpen(true);
+                  }}
+                  onFocus={() => setReviewerOpen(true)}
+                  onBlur={() => setReviewerOpen(false)}
+                  placeholder="Search by name or email — leave blank to send to any SuperAdmin"
+                  className="text-xs"
+                />
+                {reviewerSearching && (
+                  <span className="absolute right-2 top-2 text-xs text-muted-foreground">…</span>
+                )}
+                {reviewerOpen && reviewerResults.length > 0 && (
+                  <ul
+                    id="reviewer-results"
+                    role="listbox"
+                    className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover shadow-md"
+                  >
+                    {reviewerResults.map((u) => (
+                      <li
+                        key={u.id ?? reviewerLabel(u)}
+                        role="option"
+                        aria-selected={u.id === reviewerUserId}
+                        className="cursor-pointer px-3 py-2 text-xs hover:bg-accent"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          selectReviewer(u);
+                        }}
+                      >
+                        <div className="font-medium text-foreground">
+                          {u.fullName || [u.firstName, u.lastName].filter(Boolean).join(" ") || u.userName || "Unnamed user"}
+                        </div>
+                        {u.email && (
+                          <div className="text-[11px] text-muted-foreground">{u.email}</div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {reviewerUserId && (
+                <button
+                  type="button"
+                  onClick={clearReviewer}
+                  className="text-[11px] text-muted-foreground hover:text-foreground underline"
+                >
+                  Clear reviewer
+                </button>
+              )}
             </div>
           )}
           <div className="flex items-center justify-between gap-2 pt-2 border-t">

@@ -37,6 +37,68 @@ function toNumber(v: number | string | null | undefined): number {
   return typeof v === "number" ? v : Number(v) || 0;
 }
 
+/** Placement kinds the back-office axis (#229) understands. Contract work
+ *  requires timesheets; direct-hire does not. */
+export const PLACEMENT_KINDS = ["direct_hire", "contract", "contract_to_hire"] as const;
+export type PlacementKind = (typeof PLACEMENT_KINDS)[number];
+
+export interface PlacementBackOffice {
+  placementKind: PlacementKind | null;
+  endDate: Date | null;
+  billRateHourly: string | null;
+  payRateHourly: string | null;
+  currency: string | null;
+  burdenPct: string | null;
+  poNumber: string | null;
+  msaRef: string | null;
+  parentPlacementId: string | null;
+  timesheetRequired: boolean | null;
+}
+
+function optStr(v: unknown, max: number): string | null {
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  return t ? t.slice(0, max) : null;
+}
+
+function optDecimal(v: unknown): string | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? String(n) : null;
+}
+
+/**
+ * Whitelist + coerce the #229 back-office fields off a request body. Pure
+ * (no I/O) so the create/update routes share one mapping and it's unit
+ * testable. `timesheetRequired` derives from `placementKind` when the
+ * client doesn't set it explicitly (contract / contract_to_hire ⇒ true,
+ * direct_hire ⇒ false), matching the schema comment.
+ */
+export function sanitizePlacementBackOffice(body: unknown): PlacementBackOffice {
+  const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+
+  const kind = (PLACEMENT_KINDS as readonly string[]).includes(b.placementKind as string)
+    ? (b.placementKind as PlacementKind)
+    : null;
+
+  let timesheetRequired: boolean | null = null;
+  if (typeof b.timesheetRequired === "boolean") timesheetRequired = b.timesheetRequired;
+  else if (kind) timesheetRequired = kind !== "direct_hire";
+
+  return {
+    placementKind: kind,
+    endDate: b.endDate ? new Date(b.endDate as string) : null,
+    billRateHourly: optDecimal(b.billRateHourly),
+    payRateHourly: optDecimal(b.payRateHourly),
+    currency: optStr(b.currency, 8),
+    burdenPct: optDecimal(b.burdenPct),
+    poNumber: optStr(b.poNumber, 100),
+    msaRef: optStr(b.msaRef, 100),
+    parentPlacementId: optStr(b.parentPlacementId, 64),
+    timesheetRequired,
+  };
+}
+
 export function resolvePlacementFeeCents(input: PlacementFeeInputs): ResolvedPlacementFee {
   const mode: "flat" | "percent" = input.feeMode === "flat" ? "flat" : "percent";
 

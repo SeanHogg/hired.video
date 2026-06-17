@@ -13,7 +13,8 @@ export type GigMilestoneStatus =
   | "submitted"
   | "approved"
   | "disputed"
-  | "released";
+  | "released"
+  | "refunded";
 export type GigBidStatus = "submitted" | "shortlisted" | "awarded" | "rejected" | "withdrawn";
 
 export interface GigProject {
@@ -62,6 +63,39 @@ export interface GigBidWithBidder {
   bid: GigBid;
   bidderName: string | null;
   bidderAvatarUrl: string | null;
+}
+
+export type GigDisputeStatus = "open" | "resolved" | "cancelled";
+export type GigDisputeResolution = "release" | "refund";
+
+export interface GigDispute {
+  id: string;
+  milestoneId: string;
+  projectId: string;
+  openedByUserId: string;
+  reason: string;
+  status: GigDisputeStatus;
+  resolution: GigDisputeResolution | null;
+  resolutionNote: string | null;
+  resolvedByUserId: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  updatedAt: string;
+}
+
+export interface GigDisputeEvent {
+  id: string;
+  disputeId: string;
+  authorUserId: string;
+  kind: "evidence" | "comment" | "decision";
+  body: string;
+  attachments: Array<{ url: string; name?: string }>;
+  createdAt: string;
+}
+
+export interface GigDisputeDetail {
+  dispute: GigDispute;
+  events: GigDisputeEvent[];
 }
 
 export interface GigItemInput {
@@ -149,5 +183,45 @@ export const gigService = {
   async releaseMilestone(milestoneId: string): Promise<GigMilestone> {
     const res = await apiClient.post<{ milestone: GigMilestone }>(`/api/gigs/milestones/${milestoneId}/release`, {});
     return res.data.milestone;
+  },
+
+  // ── disputes (#1768) ──────────────────────────────────────────────────────
+
+  async openDispute(milestoneId: string, reason: string): Promise<GigDispute> {
+    const res = await apiClient.post<{ dispute: GigDispute }>(
+      `/api/gigs/milestones/${milestoneId}/dispute`,
+      { reason },
+    );
+    return res.data.dispute;
+  },
+
+  async getMilestoneDispute(milestoneId: string): Promise<GigDisputeDetail> {
+    const res = await apiClient.get<GigDisputeDetail>(`/api/gigs/milestones/${milestoneId}/dispute`);
+    return res.data;
+  },
+
+  async addDisputeEvent(
+    disputeId: string,
+    body: string,
+    kind: "evidence" | "comment" = "comment",
+  ): Promise<GigDisputeEvent> {
+    const res = await apiClient.post<{ event: GigDisputeEvent }>(
+      `/api/gigs/disputes/${disputeId}/events`,
+      { kind, body },
+    );
+    return res.data.event;
+  },
+
+  /** Mediator decision — SuperAdmin only (the API enforces it). */
+  async resolveDispute(
+    disputeId: string,
+    resolution: "release" | "refund",
+    note: string,
+  ): Promise<{ dispute: GigDispute }> {
+    const res = await apiClient.post<{ dispute: GigDispute }>(
+      `/api/gigs/disputes/${disputeId}/resolve`,
+      { resolution, note },
+    );
+    return res.data;
   },
 };

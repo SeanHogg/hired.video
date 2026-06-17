@@ -28,6 +28,7 @@ export const UserProfileSchema = z.object({
     )
     .optional(),
   profilePicture: nullableString(),
+  externalPublicHandle: nullableString(),
   bio: nullableString(),
   location: nullableString(),
   website: nullableString(),
@@ -132,6 +133,9 @@ export const PublicUserSchema = z.object({
   // checks (e.g. the Creators category filter) silently fail.
   type: z.literal("people").optional(),
   slug: nullableString(),
+  // Booking host handle (#1902) — declared so Zod doesn't strip it from the
+  // detail response, which would leave <BookingsSection/> permanently empty.
+  externalPublicHandle: nullableString(),
   email: nullableString(),
   userName: nullableString(),
   // Computed properties from nested Data object
@@ -367,6 +371,7 @@ export class UserService {
       profileSections: payload.profileSections ?? undefined,
       profileSectionsRaw: payload.profileSectionsRaw ?? undefined,
       slug: payload.slug || undefined,
+      externalPublicHandle: payload.externalPublicHandle ?? undefined,
       createdAt: payload.createdAt ?? undefined,
       updatedAt: payload.updatedAt ?? undefined,
       isVerified: payload.isVerified ?? undefined,
@@ -444,6 +449,17 @@ export class UserService {
       hasNextPage: page * limit < total,
       hasPreviousPage: page > 1,
     } as PaginatedPublicUsers;
+  }
+
+  /**
+   * The viewer's accepted connections as People cards (#802). Powers the
+   * Connections tab. Returns the same `PublicUser` shape as the Discover grid.
+   */
+  async getMyConnectionCards(): Promise<PublicUser[]> {
+    const response = await apiClient.get<{ items: PublicUser[] }>(
+      "/api/users/me/connections/cards",
+    );
+    return (response.data?.items ?? []) as PublicUser[];
   }
 
   /**

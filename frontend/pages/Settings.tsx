@@ -68,6 +68,7 @@ import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel, roleUtils } from "@/lib/role-utils";
 import { useTranslation, Trans } from "react-i18next";
 import { applyLocale } from "@/lib/i18n/i18n";
+import { NATIVE_LABELS } from "@/lib/i18n/locale-labels";
 import { PUBLIC_LOCALES, type Locale } from "@shared/i18n";
 import { USER_ROLES } from "@shared/user-roles";
 
@@ -79,6 +80,7 @@ import ConfidentialModeToggle from "@/components/settings/ConfidentialModeToggle
 import ProfileSectionsSettingsCard from "@/components/settings/ProfileSectionsSettingsCard";
 import { AccountAuditLogPanel } from "@/components/settings/AccountAuditLogPanel";
 import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
+import { useThemePreference, type ThemeChoice } from "@/lib/theme/use-theme-preference";
 import { servicesService } from "@/lib/services/services-service";
 import { userService } from "@/lib/services/user-service";
 import { youtubeService, type YouTubeAccount } from "@/lib/services/youtube-service";
@@ -108,6 +110,9 @@ function SettingsContent() {
   const cookiePrefs = useCookiePreferences();
   const { toast } = useToast();
   const { t } = useTranslation();
+  // Theme is applied + persisted through the shared seam (same one the nav
+  // toggle uses); `currentTheme` reflects the live choice incl. "system".
+  const { theme: currentTheme, select: selectTheme } = useThemePreference();
   // The W-language is a debug locale only super_admins should see in
   // the picker — normal users get the public set (en, es).
   const availableLocales: readonly Locale[] = user?.role === USER_ROLES.SUPER_ADMIN
@@ -650,7 +655,7 @@ function SettingsContent() {
               </div>
 
               {/* Benefits Section */}
-              <div className="bg-white/50 rounded-2xl p-8 mb-16">
+              <div className="bg-card/50 rounded-2xl p-8 mb-16">
                 <h2 className="text-3xl font-bold text-center mb-12">
                   {t("headings.whyOurSettingsMatter")}
                 </h2>
@@ -1380,13 +1385,12 @@ function SettingsContent() {
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <Label>{t("settings.appearance.themeLabel")}</Label>
-                      <Select value={appearance.theme} onValueChange={async (value) => {
-                        setAppearance({ ...appearance, theme: value as AccountSettings["theme"] });
-                        try {
-                          await settingsService.updateAccountSettings({ theme: value as AccountSettings["theme"] });
-                        } catch (e) {
-                          console.error("Failed to save appearance (theme)", e);
-                        }
+                      <Select value={currentTheme} onValueChange={(value) => {
+                        // Applies the theme live + persists to the server via the
+                        // shared hook; keep the local mirror in sync for the form.
+                        const theme = value as ThemeChoice;
+                        setAppearance({ ...appearance, theme });
+                        selectTheme(theme);
                       }}>
                         <SelectTrigger>
                           <SelectValue />
@@ -1417,7 +1421,10 @@ function SettingsContent() {
                         <SelectContent>
                           {availableLocales.map((loc) => (
                             <SelectItem key={loc} value={loc}>
-                              {t(`settings.appearance.languageOption.${loc}`)}
+                              {/* Native-script name (Español, Français…) — the
+                                  universal picker convention, shared with
+                                  LocaleSwitcher via NATIVE_LABELS (DRY). */}
+                              {NATIVE_LABELS[loc]}
                             </SelectItem>
                           ))}
                         </SelectContent>

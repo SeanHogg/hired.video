@@ -21,6 +21,9 @@ import type { LocationFilter as LocationFilterValue } from "@/lib/services/locat
 interface LocationFilterButtonProps {
   value: LocationFilterValue;
   onChange: (next: LocationFilterValue) => void;
+  /** Forwarded to LocationFilter — hide the "Remote only" toggle on surfaces
+   *  where remote is meaningless (Companies, Resumes) (#1177). */
+  showRemote?: boolean;
 }
 
 /** Treat any structured id, geo coord, radius, free-text, or remote toggle
@@ -42,6 +45,7 @@ function isActive(filter: LocationFilterValue): boolean {
 export default function LocationFilterButton({
   value,
   onChange,
+  showRemote = true,
 }: LocationFilterButtonProps) {
   const active = isActive(value);
   return (
@@ -63,7 +67,7 @@ export default function LocationFilterButton({
       <PopoverContent align="end" className="w-80">
         <div className="space-y-3">
           <h4 className="text-sm font-semibold">Location</h4>
-          <LocationFilter value={value} onChange={onChange} compact={false} />
+          <LocationFilter value={value} onChange={onChange} compact={false} showRemote={showRemote} />
         </div>
       </PopoverContent>
     </Popover>

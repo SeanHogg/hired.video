@@ -65,7 +65,6 @@ interface VideoRecord {
   thumbnailUrl: string | null;
   privacyStatus: string | null;
   isPublic: boolean;
-  isFeatured: boolean;
   isOrphan: boolean;
   createdAt: string;
 }
@@ -274,12 +273,12 @@ function ProjectFeatureMenuItem({
 
 const STATUS_COLORS: Record<string, string> = {
   draft:      "bg-yellow-100 text-yellow-800",
-  pending:    "bg-gray-200 text-gray-800",
+  pending:    "bg-muted text-foreground",
   processing: "bg-blue-100 text-blue-800",
   exported:   "bg-indigo-100 text-indigo-800",
   published:  "bg-green-100 text-green-800",
   Completed:  "bg-green-100 text-green-800",
-  Queued:     "bg-gray-200 text-gray-800",
+  Queued:     "bg-muted text-foreground",
   failed:     "bg-red-100 text-red-800",
   Failed:     "bg-red-100 text-red-800",
 };
@@ -615,7 +614,7 @@ export default function StudioManagement() {
                 {orphanVideos.map((v) => (
                   <tr
                     key={v.id}
-                    className={`border-b last:border-0 ${v.isFeatured ? "bg-amber-50/60" : "bg-orange-50/40"}`}
+                    className="border-b last:border-0 bg-orange-50/40"
                   >
                     <td className="py-1.5 pr-3 align-middle">
                       <VideoPreviewCell video={v} />
@@ -629,7 +628,7 @@ export default function StudioManagement() {
                     </td>
                     <td className="py-1.5 pr-3">
                       <span
-                        className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[v.status] ?? "bg-gray-100 text-gray-800"}`}
+                        className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[v.status] ?? "bg-muted text-foreground"}`}
                       >
                         {v.status}
                       </span>
@@ -845,7 +844,7 @@ export default function StudioManagement() {
                       </TableCell>
                       <TableCell>
                         <span
-                          className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[project.status] ?? "bg-gray-100 text-gray-800"}`}
+                          className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[project.status] ?? "bg-muted text-foreground"}`}
                         >
                           {project.status}
                         </span>
@@ -939,14 +938,14 @@ export default function StudioManagement() {
                                   {project.userVideos.map((v) => (
                                     <tr
                                       key={v.id}
-                                      className={`border-b last:border-0 ${v.isOrphan ? "bg-orange-50" : v.isFeatured ? "bg-amber-50/60" : ""}`}
+                                      className={`border-b last:border-0 ${v.isOrphan ? "bg-orange-50" : ""}`}
                                     >
                                       <td className="py-1.5 pr-3 align-middle">
                                         <VideoPreviewCell video={v} />
                                       </td>
                                       <td className="py-1.5 pr-3">
                                         <span
-                                          className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[v.status] ?? "bg-gray-100 text-gray-800"}`}
+                                          className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[v.status] ?? "bg-muted text-foreground"}`}
                                         >
                                           {v.status}
                                         </span>

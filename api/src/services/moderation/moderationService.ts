@@ -45,6 +45,7 @@ const {
   feedPosts,
   studioVoiceClones,
   communityResources,
+  courses,
 } = schema;
 
 // ── Errors ──────────────────────────────────────────────────────────────────
@@ -151,6 +152,14 @@ export async function resolveEntityOwner(
         .select({ userId: communityResources.submittedBy })
         .from(communityResources)
         .where(eq(communityResources.id, entityId))
+        .limit(1);
+      return row?.userId ?? null;
+    }
+    case "course": {
+      const [row] = await db
+        .select({ userId: courses.userId })
+        .from(courses)
+        .where(eq(courses.id, entityId))
         .limit(1);
       return row?.userId ?? null;
     }
@@ -486,6 +495,7 @@ const ENTITY_LABEL: Record<ReportEntityType, string> = {
   studio_template: "studio template",
   studio_project: "studio video",
   community_resource: "community resource",
+  course: "course",
 };
 
 function prettyEntityType(t: ReportEntityType): string {

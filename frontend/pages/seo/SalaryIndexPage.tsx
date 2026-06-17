@@ -140,32 +140,37 @@ export default function SalaryIndexPage() {
                     No city data yet.
                   </p>
                 ) : (
-                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                    {/* Static (non-collapsible) city × role grid: every leaf
+                        `/salary/:role/:city` link sits in the rendered DOM so
+                        crawlers see the full internal link graph and the leaf
+                        pages get the internal-PageRank signal. (#1212 — the
+                        former <details> hid these behind a click.) Role list is
+                        already capped at 6/city and cities at 30, so the link
+                        count stays bounded. */}
                     {data.cities.slice(0, 30).map((city) => (
-                      <li key={city.slug}>
-                        <details className="py-1.5">
-                          <summary className="cursor-pointer text-sm hover:underline list-none flex items-center gap-1">
-                            <span>{city.label}</span>
-                            <span className="text-xs text-muted-foreground">
-                              ({city.jobCount})
-                            </span>
-                          </summary>
-                          <ul className="mt-1 ml-3 border-l pl-3 space-y-1">
-                            {data.roles.slice(0, 6).map((r) => (
-                              <li key={`${city.slug}-${r.slug}`}>
-                                <Link
-                                  to={`/salary/${r.slug}/${city.slug}`}
-                                  className="text-xs text-muted-foreground hover:text-foreground hover:underline"
-                                >
-                                  {titleCase(r.title)} in {city.label}
-                                </Link>
-                              </li>
-                            ))}
-                          </ul>
-                        </details>
-                      </li>
+                      <div key={city.slug} className="py-1.5">
+                        <div className="text-sm font-medium flex items-center gap-1">
+                          <span>{city.label}</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({city.jobCount})
+                          </span>
+                        </div>
+                        <ul className="mt-1 ml-1 border-l pl-3 space-y-1">
+                          {data.roles.slice(0, 6).map((r) => (
+                            <li key={`${city.slug}-${r.slug}`}>
+                              <Link
+                                to={`/salary/${r.slug}/${city.slug}`}
+                                className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                              >
+                                {titleCase(r.title)} in {city.label}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 )}
               </CardContent>
             </Card>

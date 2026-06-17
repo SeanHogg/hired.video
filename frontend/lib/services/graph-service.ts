@@ -37,7 +37,7 @@ export interface WarmIntroResult {
   created: boolean;
 }
 
-export type WarmIntroStatus = "pending" | "forwarded";
+export type WarmIntroStatus = "pending" | "forwarded" | "declined" | "expired";
 
 export interface WarmIntroSummary {
   conversationId: string;
@@ -95,6 +95,15 @@ export const graphService = {
   async forwardIntro(conversationId: string): Promise<ForwardWarmIntroResult> {
     const res = await apiClient.post<ForwardWarmIntroResult>(
       `/api/graph/intros/${conversationId}/forward`,
+      {},
+    );
+    return res.data;
+  },
+
+  /** Mutual declines the ask — marks it declined + notifies the requester (#1465). */
+  async declineIntro(conversationId: string): Promise<{ declined: true; created: boolean }> {
+    const res = await apiClient.post<{ declined: true; created: boolean }>(
+      `/api/graph/intros/${conversationId}/decline`,
       {},
     );
     return res.data;

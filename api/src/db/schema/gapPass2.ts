@@ -23,6 +23,7 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 
 // ---------------------------------------------------------------------------
@@ -102,6 +103,67 @@ export const gigMilestones = pgTable(
 
 export type GigMilestone = typeof gigMilestones.$inferSelect;
 export type NewGigMilestone = typeof gigMilestones.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// #1768 — Gig milestone dispute resolution.
+//
+// When the poster and the awarded creator disagree on a milestone's delivery,
+// either party opens a dispute (milestone → 'disputed', frozen from the normal
+// approve/release flow). Both sides append evidence/comments to a timeline; a
+// platform mediator (SuperAdmin) decides the escrow direction — 'release' pays
+// the creator, 'refund' returns the milestone to the poster — which closes the
+// dispute and unfreezes the milestone into its terminal state. Mirrors the
+// moderation timeline pattern (append-only events + a single decision row).
+// ---------------------------------------------------------------------------
+export const gigDisputes = pgTable(
+  "gig_disputes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    milestoneId: uuid("milestone_id").notNull().references(() => gigMilestones.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull().references(() => gigProjects.id, { onDelete: "cascade" }),
+    openedByUserId: uuid("opened_by_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    /** 'open' | 'resolved' | 'cancelled'. */
+    status: varchar("status", { length: 16 }).notNull().default("open"),
+    /** Mediator's escrow direction once resolved: 'release' | 'refund'. */
+    resolution: varchar("resolution", { length: 16 }),
+    resolutionNote: text("resolution_note"),
+    resolvedByUserId: uuid("resolved_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_gig_disputes_milestone").on(t.milestoneId),
+    index("idx_gig_disputes_project").on(t.projectId),
+    // At most one OPEN dispute per milestone — re-opening requires the prior to
+    // be resolved/cancelled first.
+    uniqueIndex("uq_gig_disputes_open_per_milestone")
+      .on(t.milestoneId)
+      .where(sql`${t.status} = 'open'`),
+  ],
+);
+
+export type GigDispute = typeof gigDisputes.$inferSelect;
+export type NewGigDispute = typeof gigDisputes.$inferInsert;
+
+export const gigDisputeEvents = pgTable(
+  "gig_dispute_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    disputeId: uuid("dispute_id").notNull().references(() => gigDisputes.id, { onDelete: "cascade" }),
+    authorUserId: uuid("author_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    /** 'evidence' | 'comment' | 'decision'. */
+    kind: varchar("kind", { length: 16 }).notNull(),
+    body: text("body").notNull(),
+    attachments: jsonb("attachments").$type<Array<{ url: string; name?: string }>>().notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("idx_gig_dispute_events_dispute").on(t.disputeId, t.createdAt)],
+);
+
+export type GigDisputeEvent = typeof gigDisputeEvents.$inferSelect;
+export type NewGigDisputeEvent = typeof gigDisputeEvents.$inferInsert;
 
 // ---------------------------------------------------------------------------
 // #1560 — photorealistic avatar render jobs

@@ -12,6 +12,7 @@ import {
 } from "../../domains/scorecards/schemas.js";
 import { mapServiceError, requireUser } from "../helpers/routerHelpers.js";
 import type { ScorecardsService } from "../../domains/scorecards/scorecardsService.js";
+import { withGamification } from "../../domains/gamification/with-gamification.js";
 
 export function submissionRoutes(
   service: () => ScorecardsService,
@@ -85,9 +86,13 @@ export function submissionRoutes(
     const auth = requireUser(c);
     if ("response" in auth) return auth.response;
     try {
-      return c.json(
-        success(await service().submitSubmission(auth.userId, c.req.param("id"))),
+      const result = await service().submitSubmission(auth.userId, c.req.param("id"));
+      // #1118 — award the interviewer for completing a scorecard. RefId = the
+      // submission id keeps it idempotent across resubmits. Best-effort.
+      await withGamification(c, "scorecard-completed", (game, role, uidEarner) =>
+        game.onScorecardCompleted({ userId: uidEarner, role, scorecardId: c.req.param("id") }),
       );
+      return c.json(success(result));
     } catch (e) {
       return mapServiceError(c, e);
     }

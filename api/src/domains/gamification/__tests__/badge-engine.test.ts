@@ -150,4 +150,38 @@ describe("badge-engine — new surfaces (gap #1966)", () => {
       [],
     );
   });
+
+  // #1952 — peer resume feedback badges.
+  it("unlocks feedback_first on the first submitted review", () => {
+    assert.deepEqual(
+      evaluateBadges(input({ action: "feedback.review.submitted", totalEarnsForAction: 1 })),
+      ["feedback_first"],
+    );
+  });
+
+  it("unlocks mentor on the 5th review (only it, when feedback_first is held)", () => {
+    assert.deepEqual(
+      evaluateBadges(
+        input({
+          action: "feedback.review.submitted",
+          totalEarnsForAction: 5,
+          alreadyEarnedSlugs: new Set(["feedback_first"]),
+        }),
+      ),
+      ["mentor"],
+    );
+  });
+
+  it("does not unlock mentor before the 5th review", () => {
+    assert.deepEqual(
+      evaluateBadges(
+        input({
+          action: "feedback.review.submitted",
+          totalEarnsForAction: 4,
+          alreadyEarnedSlugs: new Set(["feedback_first"]),
+        }),
+      ),
+      [],
+    );
+  });
 });

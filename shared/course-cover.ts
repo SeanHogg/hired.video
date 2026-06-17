@@ -67,7 +67,13 @@ export function renderCourseCoverSvg({
   difficulty,
 }: CourseCoverInput): string {
   const [dark, mid, light] = pickCoursePalette(`${title}|${category ?? ""}`);
-  const safeTitle = escapeXmlText(title.slice(0, 120));
+  // Slice the RAW title BEFORE escaping. Slicing post-escape at fixed char
+  // offsets (e.g. 38/76 below) can sever a multi-char entity like `&amp;`,
+  // leaving a stray `&` that makes the whole SVG invalid XML (broken image).
+  const rawTitle = title.slice(0, 120);
+  const safeTitle = escapeXmlText(rawTitle);
+  const safeTitleLine1 = escapeXmlText(rawTitle.slice(0, 38));
+  const safeTitleLine2 = escapeXmlText(rawTitle.slice(38, 76));
   const safeCategory = category ? escapeXmlText(category.slice(0, 40)) : "";
   const safeDifficulty = difficulty ? escapeXmlText(difficulty.slice(0, 20)) : "";
 
@@ -91,8 +97,8 @@ export function renderCourseCoverSvg({
   </g>
   <g transform="translate(80, 300)">
     <text x="0" y="0" fill="white" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="72" font-weight="800">
-      <tspan x="0" dy="0">${safeTitle.length > 38 ? safeTitle.slice(0, 38) : safeTitle}</tspan>
-      ${safeTitle.length > 38 ? `<tspan x="0" dy="84">${safeTitle.slice(38, 76)}</tspan>` : ""}
+      <tspan x="0" dy="0">${rawTitle.length > 38 ? safeTitleLine1 : safeTitle}</tspan>
+      ${rawTitle.length > 38 ? `<tspan x="0" dy="84">${safeTitleLine2}</tspan>` : ""}
     </text>
   </g>
   <g transform="translate(80, 540)">

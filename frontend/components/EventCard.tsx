@@ -13,8 +13,10 @@
  */
 import { Calendar, MapPin, Users, Video } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { eventCategoryLabel } from "@/lib/taxonomy/category-labels";
 
 export interface EventCardProps {
   id: string;
@@ -33,6 +35,7 @@ export interface EventCardProps {
 }
 
 export function EventCard(props: EventCardProps) {
+  const { t } = useTranslation();
   const href = props.slug ? `/events/${props.slug}` : `/events/${props.id}`;
   const start = new Date(props.startAt);
   const dayLabel = start.toLocaleDateString(undefined, {
@@ -64,18 +67,20 @@ export function EventCard(props: EventCardProps) {
           )}
           <div className="absolute top-2 left-2 flex gap-1">
             {isCoffee ? (
-              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Coffee</Badge>
+              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+                {eventCategoryLabel("coffee", t)}
+              </Badge>
             ) : props.category ? (
-              <Badge variant="secondary" className="capitalize">{props.category}</Badge>
+              <Badge variant="secondary">{eventCategoryLabel(props.category, t)}</Badge>
             ) : null}
             {props.eventFormat === "remote" && (
-              <Badge variant="outline" className="bg-white">
+              <Badge variant="outline" className="bg-card">
                 <Video className="w-3 h-3 mr-1" />
                 Remote
               </Badge>
             )}
             {props.eventFormat === "hybrid" && (
-              <Badge variant="outline" className="bg-white">
+              <Badge variant="outline" className="bg-card">
                 Hybrid
               </Badge>
             )}
@@ -89,9 +94,9 @@ export function EventCard(props: EventCardProps) {
             {props.title}
           </h3>
           {props.description ? (
-            <p className="text-sm text-gray-600 line-clamp-2 mb-2">{props.description}</p>
+            <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{props.description}</p>
           ) : null}
-          <div className="flex items-center justify-between text-xs text-gray-500 mt-2">
+          <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
             {props.location ? (
               <span className="flex items-center gap-1 truncate">
                 <MapPin className="w-3 h-3 flex-shrink-0" />

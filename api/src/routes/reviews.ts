@@ -154,7 +154,7 @@ interface ResolvedSubject {
   };
 }
 
-async function resolveSubject(
+export async function resolveSubject(
   db: ReturnType<typeof getDb>,
   type: SubjectType,
   id: string,
@@ -302,6 +302,52 @@ async function resolveSubject(
     default:
       return null;
   }
+}
+
+/** Decision returned by the eligibility gate. `ok` means the reviewer may
+ *  proceed; otherwise it carries the HTTP status + error code + message the
+ *  handler should emit. Pure (no Hono context) so it's unit-testable. */
+/** A failure to enforce; `null` means eligible. Modelled as a nullable
+ *  object (not a discriminated `{ok}` union) because this repo compiles with
+ *  `strictNullChecks: false`, under which TS does NOT narrow a boolean
+ *  discriminant — `if (!d.ok)` would leave the failure fields inaccessible.
+ *  A nullable object needs no narrowing: the fields exist on the non-null
+ *  type and null is erased by the loose config. */
+export type EligibilityFailure = { status: 403 | 400; code: string; message: string };
+
+/** Enforce the descriptor's eligibility rule against a resolved subject.
+ *  This is the single source of truth for the owner_blocked / buyer_only
+ *  gate — the upsert handler delegates here so the same logic is exercised
+ *  in tests.
+ *
+ *  Critically, `buyer_only` fails CLOSED: a subject whose `buyerId` could
+ *  not be resolved (e.g. a `course` reviewer with no `course_enrollments`
+ *  row → `buyerId` undefined) is rejected, because `undefined !== uid`. */
+export function checkEligibility(
+  descriptor: SubjectDescriptor,
+  subject: ResolvedSubject,
+  reviewerId: string,
+): EligibilityFailure | null {
+  if (descriptor.eligibility === "owner_blocked" && subject.ownerId === reviewerId) {
+    return {
+      status: 403,
+      code: "FORBIDDEN",
+      message: `You cannot review your own ${descriptor.noun}`,
+    };
+  }
+  if (descriptor.eligibility === "buyer_only") {
+    if (subject.buyerId !== reviewerId) {
+      return { status: 403, code: "FORBIDDEN", message: "Only the buyer can review this" };
+    }
+    if (subject.requiredState && subject.requiredState.actual !== subject.requiredState.required) {
+      return {
+        status: 400,
+        code: "INVALID_STATE",
+        message: `${descriptor.noun} must be ${subject.requiredState.required} before reviewing (currently ${subject.requiredState.actual})`,
+      };
+    }
+  }
+  return null;
 }
 
 type ValidationResult = NormalizedReviewBody | { __validationError: unknown };
@@ -782,23 +828,11 @@ async function upsertHandler(c: any): Promise<Response> {
     return c.json(error("NOT_FOUND", `${descriptor.noun} not found`), 404);
   }
 
-  // Eligibility — owner_blocked / buyer_only.
-  if (descriptor.eligibility === "owner_blocked" && subject.ownerId === uid) {
-    return c.json(error("FORBIDDEN", `You cannot review your own ${descriptor.noun}`), 403);
-  }
-  if (descriptor.eligibility === "buyer_only") {
-    if (subject.buyerId !== uid) {
-      return c.json(error("FORBIDDEN", "Only the buyer can review this"), 403);
-    }
-    if (subject.requiredState && subject.requiredState.actual !== subject.requiredState.required) {
-      return c.json(
-        error(
-          "INVALID_STATE",
-          `${descriptor.noun} must be ${subject.requiredState.required} before reviewing (currently ${subject.requiredState.actual})`,
-        ),
-        400,
-      );
-    }
+  // Eligibility — owner_blocked / buyer_only. Single source of truth in
+  // checkEligibility (fails closed when buyerId is unresolved).
+  const eligibilityFailure = checkEligibility(descriptor, subject, uid);
+  if (eligibilityFailure) {
+    return c.json(error(eligibilityFailure.code, eligibilityFailure.message), eligibilityFailure.status);
   }
 
   const body = await c.req.json().catch(() => null);

@@ -304,7 +304,7 @@ class ErrorBoundaryClass extends Component<
             </div>
             {statusLine}
             {errorId && (
-              <p className="text-xs text-gray-400 mt-4">{t("labels.errorId", { id: errorId })}</p>
+              <p className="text-xs text-muted-foreground mt-4">{t("labels.errorId", { id: errorId })}</p>
             )}
           </div>
         </div>
@@ -333,7 +333,7 @@ class ErrorBoundaryClass extends Component<
             </div>
             {statusLine}
             {errorId && (
-              <p className="text-xs text-gray-400 mt-3">{t("labels.errorId", { id: errorId })}</p>
+              <p className="text-xs text-muted-foreground mt-3">{t("labels.errorId", { id: errorId })}</p>
             )}
           </div>
         </div>
@@ -377,16 +377,16 @@ class ErrorBoundaryClass extends Component<
     // Critical level - full page error
     if (level === "critical") {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="min-h-screen flex items-center justify-center bg-muted px-4">
           <div className="max-w-4xl w-full">
             <div className="text-center mb-6">
               <div className="mb-6">
                 <AlertTriangle className="mx-auto h-16 w-16 text-red-500" />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-4">
+              <h1 className="text-2xl font-bold text-foreground mb-4">
                 Application Error
               </h1>
-              <p className="text-gray-600 mb-6">
+              <p className="text-muted-foreground mb-6">
                 A critical error occurred. Please refresh the page or contact
                 support if the problem persists.
               </p>
@@ -404,14 +404,14 @@ class ErrorBoundaryClass extends Component<
                 </Button>
               </div>
               {errorId && (
-                <p className="text-xs text-gray-400 mt-4">Error ID: {errorId}</p>
+                <p className="text-xs text-muted-foreground mt-4">Error ID: {errorId}</p>
               )}
             </div>
 
             {/* Show detailed error information in development or always for debugging */}
-            <div className="bg-white rounded-lg shadow-lg p-6 text-left">
+            <div className="bg-card rounded-lg shadow-lg p-6 text-left">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4 gap-3">
-                <h3 className="text-lg font-semibold text-gray-900">Error Details</h3>
+                <h3 className="text-lg font-semibold text-foreground">Error Details</h3>
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
@@ -432,7 +432,7 @@ class ErrorBoundaryClass extends Component<
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Error Message:</label>
+                  <label className="text-sm font-medium text-foreground">Error Message:</label>
                   <pre className="mt-1 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-900 overflow-x-auto">
                     {error.message}
                   </pre>
@@ -440,8 +440,8 @@ class ErrorBoundaryClass extends Component<
 
                 {error.code && (
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Error Code:</label>
-                    <pre className="mt-1 p-3 bg-gray-50 border border-gray-200 rounded text-sm text-gray-900">
+                    <label className="text-sm font-medium text-foreground">Error Code:</label>
+                    <pre className="mt-1 p-3 bg-muted border border-border rounded text-sm text-foreground">
                       {error.code}
                     </pre>
                   </div>
@@ -449,8 +449,8 @@ class ErrorBoundaryClass extends Component<
 
                 {error.statusCode && (
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Status Code:</label>
-                    <pre className="mt-1 p-3 bg-gray-50 border border-gray-200 rounded text-sm text-gray-900">
+                    <label className="text-sm font-medium text-foreground">Status Code:</label>
+                    <pre className="mt-1 p-3 bg-muted border border-border rounded text-sm text-foreground">
                       {error.statusCode}
                     </pre>
                   </div>
@@ -458,8 +458,8 @@ class ErrorBoundaryClass extends Component<
 
                 {error.stack && (
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Stack Trace:</label>
-                    <pre className="mt-1 p-3 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700 overflow-x-auto max-h-64 overflow-y-auto">
+                    <label className="text-sm font-medium text-foreground">Stack Trace:</label>
+                    <pre className="mt-1 p-3 bg-muted border border-border rounded text-xs text-foreground overflow-x-auto max-h-64 overflow-y-auto">
                       {error.stack}
                     </pre>
                   </div>
@@ -467,8 +467,8 @@ class ErrorBoundaryClass extends Component<
 
                 {error.context && Object.keys(error.context).length > 0 && (
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Context:</label>
-                    <pre className="mt-1 p-3 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700 overflow-x-auto">
+                    <label className="text-sm font-medium text-foreground">Context:</label>
+                    <pre className="mt-1 p-3 bg-muted border border-border rounded text-xs text-foreground overflow-x-auto">
                       {JSON.stringify(error.context, null, 2)}
                     </pre>
                   </div>
@@ -476,18 +476,18 @@ class ErrorBoundaryClass extends Component<
 
                 {this.state.recentApiRequests.length > 0 && (
                   <div>
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-foreground">
                       Recent API Requests ({this.state.recentApiRequests.length}):
                     </label>
                     <div className="mt-1 space-y-2">
                       {this.state.recentApiRequests.map((req) => (
                         <div
                           key={req.id}
-                          className="p-3 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700"
+                          className="p-3 bg-muted border border-border rounded text-xs text-foreground"
                         >
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-semibold">{req.method}</span>
-                            <span className="text-gray-600 break-all">{req.url}</span>
+                            <span className="text-muted-foreground break-all">{req.url}</span>
                             {req.status != null && (
                               <span
                                 className={`ml-auto font-mono ${
@@ -500,7 +500,7 @@ class ErrorBoundaryClass extends Component<
                               </span>
                             )}
                             {req.durationMs != null && (
-                              <span className="text-gray-400">{req.durationMs}ms</span>
+                              <span className="text-muted-foreground">{req.durationMs}ms</span>
                             )}
                           </div>
                           {req.error && (
@@ -508,10 +508,10 @@ class ErrorBoundaryClass extends Component<
                           )}
                           {req.responseBody != null && (
                             <details className="mt-1">
-                              <summary className="cursor-pointer text-gray-500 hover:text-gray-700">
+                              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
                                 Response body
                               </summary>
-                              <pre className="mt-1 p-2 bg-white border border-gray-100 rounded overflow-x-auto max-h-48 overflow-y-auto">
+                              <pre className="mt-1 p-2 bg-card border border-border rounded overflow-x-auto max-h-48 overflow-y-auto">
                                 {JSON.stringify(req.responseBody, null, 2)}
                               </pre>
                             </details>
@@ -537,10 +537,10 @@ class ErrorBoundaryClass extends Component<
               <div className="mb-4">
                 <AlertTriangle className="mx-auto h-12 w-12 text-red-500" />
               </div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-3">
+              <h2 className="text-xl font-semibold text-foreground mb-3">
                 Page Error
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-muted-foreground mb-4">
                 Something went wrong loading this page.
               </p>
               <div className="flex justify-center gap-2 mb-4">
@@ -554,14 +554,14 @@ class ErrorBoundaryClass extends Component<
                 </Button>
               </div>
               {errorId && (
-                <p className="text-xs text-gray-400 mt-3">Error ID: {errorId}</p>
+                <p className="text-xs text-muted-foreground mt-3">Error ID: {errorId}</p>
               )}
             </div>
 
             {/* Show detailed error information */}
-            <div className="bg-white rounded-lg shadow-lg p-6 text-left">
+            <div className="bg-card rounded-lg shadow-lg p-6 text-left">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-3 gap-2">
-                <h3 className="text-base font-semibold text-gray-900">Error Details</h3>
+                <h3 className="text-base font-semibold text-foreground">Error Details</h3>
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
@@ -582,7 +582,7 @@ class ErrorBoundaryClass extends Component<
 
               <div className="space-y-3">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Error Message:</label>
+                  <label className="text-sm font-medium text-foreground">Error Message:</label>
                   <pre className="mt-1 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-900 overflow-x-auto">
                     {error.message}
                   </pre>
@@ -590,8 +590,8 @@ class ErrorBoundaryClass extends Component<
 
                 {error.code && (
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Error Code:</label>
-                    <pre className="mt-1 p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-900">
+                    <label className="text-sm font-medium text-foreground">Error Code:</label>
+                    <pre className="mt-1 p-2 bg-muted border border-border rounded text-sm text-foreground">
                       {error.code}
                     </pre>
                   </div>
@@ -599,8 +599,8 @@ class ErrorBoundaryClass extends Component<
 
                 {error.stack && (
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Stack Trace:</label>
-                    <pre className="mt-1 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700 overflow-x-auto max-h-48 overflow-y-auto">
+                    <label className="text-sm font-medium text-foreground">Stack Trace:</label>
+                    <pre className="mt-1 p-2 bg-muted border border-border rounded text-xs text-foreground overflow-x-auto max-h-48 overflow-y-auto">
                       {error.stack}
                     </pre>
                   </div>
@@ -608,18 +608,18 @@ class ErrorBoundaryClass extends Component<
 
                 {this.state.recentApiRequests.length > 0 && (
                   <div>
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-foreground">
                       Recent API Requests ({this.state.recentApiRequests.length}):
                     </label>
                     <div className="mt-1 space-y-2">
                       {this.state.recentApiRequests.map((req) => (
                         <div
                           key={req.id}
-                          className="p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700"
+                          className="p-2 bg-muted border border-border rounded text-xs text-foreground"
                         >
                           <div className="flex items-center gap-2">
                             <span className="font-semibold">{req.method}</span>
-                            <span className="text-gray-600 break-all">{req.url}</span>
+                            <span className="text-muted-foreground break-all">{req.url}</span>
                             {req.status != null && (
                               <span
                                 className={`ml-auto font-mono ${
@@ -678,7 +678,7 @@ class ErrorBoundaryClass extends Component<
         <div className="mt-3 space-y-2">
           <div>
             <label className="text-xs font-medium text-red-800">Error Message:</label>
-            <pre className="mt-1 p-2 bg-white border border-red-200 rounded text-xs text-red-900 overflow-x-auto">
+            <pre className="mt-1 p-2 bg-card border border-red-200 rounded text-xs text-red-900 overflow-x-auto">
               {error.message}
             </pre>
           </div>
@@ -686,7 +686,7 @@ class ErrorBoundaryClass extends Component<
           {error.stack && (
             <div>
               <label className="text-xs font-medium text-red-800">Stack Trace:</label>
-              <pre className="mt-1 p-2 bg-white border border-red-200 rounded text-xs text-red-700 overflow-x-auto max-h-32 overflow-y-auto">
+              <pre className="mt-1 p-2 bg-card border border-red-200 rounded text-xs text-red-700 overflow-x-auto max-h-32 overflow-y-auto">
                 {error.stack}
               </pre>
             </div>

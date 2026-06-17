@@ -6,7 +6,6 @@ import {
   timestamp,
   jsonb,
   integer,
-  boolean,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 import { companyProfiles } from "./companies.js";
@@ -38,13 +37,11 @@ export const videos = pgTable("videos", {
   privacyStatus: varchar("privacy_status", { length: 50 })
     .default("unlisted")
     .notNull(),
-  // SA-curated homepage hero. N>=0 rows may be is_featured=true — the
-  // singleton index from 0088 was dropped in 0090 once the product
-  // shifted to a multi-video carousel. Toggled via the SA-only PATCH
-  // /api/admin/studio/videos/:id/featured or
-  // /api/admin/studio/projects/:id/featured (the latter targets the
-  // project's linked video). Consumed by GET /api/studio/videos/featured.
-  isFeatured: boolean("is_featured").default(false).notNull(),
+  // The legacy `is_featured` flag was dropped in migration 0460 (gap
+  // #754). The homepage carousel now sources from
+  // `studio_projects.is_featured` (migration 0091) because v2-NLE
+  // projects render live off `timelineSpec` and never have a `videos`
+  // row. Featured rows feed GET /api/studio/videos/featured.
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

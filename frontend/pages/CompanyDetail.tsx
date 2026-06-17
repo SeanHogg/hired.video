@@ -164,15 +164,15 @@ export default function CompanyDetail() {
             <div className="pt-8 pb-16 px-4 sm:px-6 lg:px-8">
               <div>
                 <div className="animate-pulse">
-                  <div className="h-8 bg-gray-200 rounded w-1/4 mb-4" />
-                  <div className="h-64 bg-gray-200 rounded mb-6" />
+                  <div className="h-8 bg-muted rounded w-1/4 mb-4" />
+                  <div className="h-64 bg-muted rounded mb-6" />
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 space-y-6">
-                      <div className="h-32 bg-gray-200 rounded" />
-                      <div className="h-32 bg-gray-200 rounded" />
+                      <div className="h-32 bg-muted rounded" />
+                      <div className="h-32 bg-muted rounded" />
                     </div>
                     <div className="space-y-6">
-                      <div className="h-48 bg-gray-200 rounded" />
+                      <div className="h-48 bg-muted rounded" />
                     </div>
                   </div>
                 </div>
@@ -695,7 +695,7 @@ export default function CompanyDetail() {
                               {value ? (
                                 <CheckCircle className="h-4 w-4 text-green-600" />
                               ) : (
-                                <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
+                                <div className="w-4 h-4 rounded-full border-2 border-border" />
                               )}
                               <span
                                 className={`text-sm ${value ? "" : "text-muted-foreground"}`}

@@ -297,7 +297,7 @@ export default function ChromeExtension() {
           </section>
 
           {/* Job Seeker feature detail */}
-          <section className="py-16 px-6 bg-gray-50">
+          <section className="py-16 px-6 bg-muted">
             <div>
               <div className="text-center mb-12">
                 <Badge className="mb-3 bg-blue-100 text-blue-800 hover:bg-blue-100">
@@ -310,7 +310,7 @@ export default function ChromeExtension() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {jobSeekerDetails.map(({ id, icon: Icon, title, desc }) => (
-                  <div key={id} className="bg-white p-6 rounded-lg border">
+                  <div key={id} className="bg-card p-6 rounded-lg border">
                     <Icon className="h-8 w-8 text-blue-600 mb-3" />
                     <h3 className="font-semibold mb-2">{title}</h3>
                     <p className="text-sm text-muted-foreground">{desc}</p>
@@ -334,7 +334,7 @@ export default function ChromeExtension() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {recruiterDetails.map(({ id, icon: Icon, title, desc }) => (
-                  <div key={id} className="bg-gray-50 p-6 rounded-lg border">
+                  <div key={id} className="bg-muted p-6 rounded-lg border">
                     <Icon className="h-8 w-8 text-purple-600 mb-3" />
                     <h3 className="font-semibold mb-2">{title}</h3>
                     <p className="text-sm text-muted-foreground">{desc}</p>
@@ -345,7 +345,7 @@ export default function ChromeExtension() {
           </section>
 
           {/* Supported sites */}
-          <section className="py-16 px-6 bg-gray-50">
+          <section className="py-16 px-6 bg-muted">
             <div className="text-center">
               <h2 className="text-3xl font-bold mb-4">{t("headings.chromeExtension.supportedSites")}</h2>
               <p className="text-muted-foreground mb-8">

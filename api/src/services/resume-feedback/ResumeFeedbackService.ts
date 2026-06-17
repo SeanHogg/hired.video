@@ -270,7 +270,7 @@ export class ResumeFeedbackService {
   async acceptAnnotation(
     annotationId: string,
     ownerId: string,
-  ): Promise<{ annotation: ResumeReviewAnnotationDTO; appliedEdit: boolean }> {
+  ): Promise<{ annotation: ResumeReviewAnnotationDTO; appliedEdit: boolean; reviewerId: string | null }> {
     const { annotation, review, role } = await this.loadAnnotation(annotationId, ownerId);
     if (role !== "owner") {
       throw new ResumeFeedbackServiceError("FORBIDDEN", "Only the owner can accept a suggestion");
@@ -297,7 +297,14 @@ export class ResumeFeedbackService {
       resolvedAt: this.deps.now(),
     });
     invalidateCachedKey(annotationCacheKey(review.id));
-    return { annotation: this.toAnnotationDTO(updated!), appliedEdit };
+    // reviewerId lets the route credit gamification points to the reviewer
+    // who authored the accepted suggestion (#1952). Null for token-only
+    // external reviewers with no platform account.
+    return {
+      annotation: this.toAnnotationDTO(updated!),
+      appliedEdit,
+      reviewerId: review.reviewerId ?? null,
+    };
   }
 
   async deleteAnnotation(annotationId: string, actor: string): Promise<void> {

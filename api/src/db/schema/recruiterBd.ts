@@ -32,6 +32,11 @@ export const recruiterClients = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     recruiterUserId: uuid("recruiter_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    /** #1766 — agency-team sharing. When set, every member of this workspace
+     *  (company/agency) sees the client, not just the creating recruiter.
+     *  NULL = legacy owner-only. Reads fall through (workspaceId IN scope OR
+     *  recruiterUserId = caller). FK to the company/agency the recruiter acts for. */
+    workspaceId: uuid("workspace_id").references(() => companyProfiles.id, { onDelete: "set null" }),
     companyId: uuid("company_id").references(() => companyProfiles.id, { onDelete: "set null" }),
     clientName: varchar("client_name", { length: 255 }).notNull(),
     website: varchar("website", { length: 255 }),
@@ -44,7 +49,10 @@ export const recruiterClients = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("idx_recruiter_clients_recruiter").on(t.recruiterUserId, t.status)],
+  (t) => [
+    index("idx_recruiter_clients_recruiter").on(t.recruiterUserId, t.status),
+    index("idx_recruiter_clients_workspace").on(t.workspaceId),
+  ],
 );
 
 export type RecruiterClient = typeof recruiterClients.$inferSelect;
@@ -101,6 +109,9 @@ export const recruiterDeals = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     recruiterUserId: uuid("recruiter_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    /** #1766 — agency-team sharing (see recruiter_clients.workspaceId). NULL =
+     *  legacy owner-only; reads fall through workspaceId-in-scope OR owner. */
+    workspaceId: uuid("workspace_id").references(() => companyProfiles.id, { onDelete: "set null" }),
     clientId: uuid("client_id").references(() => recruiterClients.id, { onDelete: "set null" }),
     /** Optional FK to job_items. No FK constraint because jobs may live in
      *  a soft-deleted state we still want to keep deals against. */
@@ -130,6 +141,7 @@ export const recruiterDeals = pgTable(
     index("idx_recruiter_deals_recruiter").on(t.recruiterUserId, t.stageKey),
     index("idx_recruiter_deals_client").on(t.clientId),
     index("idx_recruiter_deals_owner").on(t.ownerUserId),
+    index("idx_recruiter_deals_workspace").on(t.workspaceId),
   ],
 );
 

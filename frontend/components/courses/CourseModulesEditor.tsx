@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Plus, Trash2, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,7 @@ interface CourseModulesEditorProps {
 }
 
 export default function CourseModulesEditor({ courseId, canEdit }: CourseModulesEditorProps) {
+  const { t } = useTranslation();
   const [modules, setModules] = useState<CourseModule[] | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -90,7 +92,7 @@ export default function CourseModulesEditor({ courseId, canEdit }: CourseModules
 
   const addModule = async () => {
     try {
-      const title = (await promptDialog({ title: "Add module", label: "Module title?" }))?.trim();
+      const title = (await promptDialog({ title: t("dialogs.courses.addModuleTitle"), label: t("dialogs.courses.addModuleLabel") }))?.trim();
       if (!title) return;
       await apiClient.post(`/api/courses/${encodeURIComponent(courseId)}/modules`, {
         title,
@@ -103,7 +105,7 @@ export default function CourseModulesEditor({ courseId, canEdit }: CourseModules
   };
 
   const addLesson = async (moduleId: string) => {
-    const title = (await promptDialog({ title: "Add lesson", label: "Lesson title?" }))?.trim();
+    const title = (await promptDialog({ title: t("dialogs.courses.addLessonTitle"), label: t("dialogs.courses.addLessonLabel") }))?.trim();
     if (!title) return;
     try {
       await apiClient.post(`/api/courses/${encodeURIComponent(courseId)}/lessons`, {
@@ -118,7 +120,7 @@ export default function CourseModulesEditor({ courseId, canEdit }: CourseModules
   };
 
   const deleteLesson = async (lessonId: string) => {
-    if (!(await confirmDialog({ title: "Delete lesson", description: "Delete this lesson?", confirmText: "Delete", destructive: true }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.courses.deleteLessonTitle"), description: t("dialogs.courses.deleteLessonSimpleBody"), confirmText: t("dialogs.courses.deleteConfirm"), destructive: true }))) return;
     try {
       await apiClient.delete(`/api/courses/lessons/${encodeURIComponent(lessonId)}`);
       await refresh();

@@ -44,12 +44,12 @@ export function RecruiterDashboard({
     return (
       <div className="space-y-4 sm:space-y-6">
         {/* Loading skeletons */}
-        <div className="h-24 sm:h-32 bg-gray-200 rounded-lg animate-pulse" />
+        <div className="h-24 sm:h-32 bg-muted rounded-lg animate-pulse" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="h-20 sm:h-24 bg-gray-200 rounded-lg animate-pulse"
+              className="h-20 sm:h-24 bg-muted rounded-lg animate-pulse"
             />
           ))}
         </div>
@@ -57,7 +57,7 @@ export function RecruiterDashboard({
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="h-48 sm:h-64 bg-gray-200 rounded-lg animate-pulse"
+              className="h-48 sm:h-64 bg-muted rounded-lg animate-pulse"
             />
           ))}
         </div>

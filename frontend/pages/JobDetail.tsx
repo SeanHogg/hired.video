@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import AddToListMenu from "@/components/lists/AddToListMenu";
+import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 import { useState, useEffect } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -416,6 +417,14 @@ export default function JobDetail() {
                 <Button variant="outline" size="icon">
                   <Share className="h-4 w-4" />
                 </Button>
+                {/* Report this listing — self-gates (hidden for the
+                    poster, bounces anon to /login). */}
+                <ReportAbuseButton
+                  entityType="job"
+                  entityId={job.id}
+                  entityOwnerId={job.userId}
+                  entityLabel="job listing"
+                />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="icon" aria-label="More actions">

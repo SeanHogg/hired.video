@@ -621,6 +621,7 @@ function WidgetBody({
         <ImageBody
           url={p.data.source.kind === "url" ? p.data.source.url : ""}
           fit={p.data.fit}
+          filterCss={filtersToCss(p.data.filters)}
         />
       );
     case "video":
@@ -631,6 +632,7 @@ function WidgetBody({
           chromaKey={p.data.chromaKey ?? null}
           clipTimeSec={clipTimeSec}
           isPlayback={isPlayback}
+          filterCss={filtersToCss(p.data.filters)}
         />
       );
     case "shape-rect":
@@ -1137,7 +1139,16 @@ function WebcamBody({
   );
 }
 
-function ImageBody({ url, fit }: { url: string; fit: "cover" | "contain" | "stretch" }) {
+function ImageBody({
+  url,
+  fit,
+  filterCss,
+}: {
+  url: string;
+  fit: "cover" | "contain" | "stretch";
+  /** #596/#806 — per-widget colour-grade CSS (`filtersToCss(...)`). */
+  filterCss?: string;
+}) {
   if (!url) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-muted/40 text-xs text-muted-foreground">
@@ -1151,7 +1162,7 @@ function ImageBody({ url, fit }: { url: string; fit: "cover" | "contain" | "stre
       alt=""
       draggable={false}
       className="h-full w-full"
-      style={{ objectFit: fit === "stretch" ? "fill" : fit }}
+      style={{ objectFit: fit === "stretch" ? "fill" : fit, filter: filterCss || undefined }}
     />
   );
 }
@@ -1162,6 +1173,7 @@ function VideoBody({
   chromaKey,
   clipTimeSec,
   isPlayback,
+  filterCss,
 }: {
   url: string;
   muted: boolean;
@@ -1170,6 +1182,8 @@ function VideoBody({
    *  + play/pause through `useVideoWidgetSync`. */
   clipTimeSec: number;
   isPlayback: boolean;
+  /** #596/#806 — per-widget colour-grade CSS (`filtersToCss(...)`). */
+  filterCss?: string;
 }) {
   // Sync the element to the editor's central playhead — play when the
   // editor is playing, pause when paused, seek when the user scrubs.
@@ -1196,6 +1210,7 @@ function VideoBody({
       src={url}
       muted={muted}
       className="h-full w-full object-cover"
+      style={{ filter: filterCss || undefined }}
       playsInline
       controls={false}
     />

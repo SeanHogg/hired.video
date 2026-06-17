@@ -96,7 +96,7 @@ export default function ForgotPassword() {
                   </div>
 
                   <div className="space-y-3">
-                    <p className="text-sm text-gray-600 text-center">
+                    <p className="text-sm text-muted-foreground text-center">
                       {t("messages.didNotReceiveHint")}
                     </p>
 
@@ -173,7 +173,7 @@ export default function ForgotPassword() {
                   </Button>
 
                   <div className="text-center space-y-2">
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted-foreground">
                       {t("prompts.rememberPassword")}{" "}
                       <Link
                         to="/login"
@@ -183,7 +183,7 @@ export default function ForgotPassword() {
                       </Link>
                     </p>
 
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted-foreground">
                       {t("prompts.noAccount")}{" "}
                       <Link
                         to="/signup"

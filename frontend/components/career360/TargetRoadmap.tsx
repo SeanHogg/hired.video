@@ -5,6 +5,7 @@
 // per-entity action menus, no prop-drilled feature flags.
 
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -38,28 +39,10 @@ interface Props {
   onCoachGap: (gap: Gap) => void;
 }
 
-const HORIZON_LABELS: Record<RoadmapStep["horizon"], string> = {
-  "30d": "Next 30 days",
-  "60d": "30–60 days",
-  "90d": "60–90 days",
-  "180d": "90–180 days",
-};
-
 const SEVERITY_STYLES: Record<Gap["severity"], string> = {
   high: "bg-red-100 text-red-800 border-red-200",
   medium: "bg-amber-100 text-amber-800 border-amber-200",
-  low: "bg-slate-100 text-slate-700 border-slate-200",
-};
-
-const CATEGORY_LABELS: Record<Gap["category"], string> = {
-  profile: "Profile",
-  resume: "Resume",
-  skills: "Skills",
-  experience: "Experience",
-  certifications: "Certifications",
-  narrative: "Narrative",
-  outreach: "Outreach",
-  salary: "Salary",
+  low: "bg-muted text-foreground border-border",
 };
 
 export function TargetRoadmap({
@@ -70,6 +53,7 @@ export function TargetRoadmap({
   onClear,
   onCoachGap,
 }: Props) {
+  const { t } = useTranslation();
   const orderedGaps = useMemo(
     () =>
       [...selected.gaps].sort((a, b) => {
@@ -101,7 +85,7 @@ export function TargetRoadmap({
               </div>
               <div>
                 <CardTitle className="text-lg">
-                  Target: {selected.title}
+                  {t("tools.career360.roadmap.targetPrefix")} {selected.title}
                   {selected.seniority && (
                     <Badge variant="secondary" className="ml-2 text-[10px]">
                       {selected.seniority}
@@ -121,7 +105,7 @@ export function TargetRoadmap({
                   )}${selected.seniority ? `&seniority=${encodeURIComponent(selected.seniority)}` : ""}`}
                 >
                   <ClipboardCheck className="mr-2 h-4 w-4" />
-                  Generate interview questions
+                  {t("tools.career360.roadmap.generateQuestions")}
                 </Link>
               </Button>
               <Button
@@ -135,7 +119,7 @@ export function TargetRoadmap({
                 ) : (
                   <RefreshCw className="mr-2 h-4 w-4" />
                 )}
-                Refresh plan
+                {t("tools.career360.roadmap.refreshPlan")}
               </Button>
               <Button
                 variant="ghost"
@@ -148,7 +132,7 @@ export function TargetRoadmap({
                 ) : (
                   <Trash2 className="mr-2 h-4 w-4" />
                 )}
-                Change target
+                {t("tools.career360.roadmap.changeTarget")}
               </Button>
             </div>
           </div>
@@ -157,7 +141,7 @@ export function TargetRoadmap({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide mb-2">
-                Must-have skills
+                {t("tools.career360.roadmap.mustHave")}
               </h4>
               <div className="flex flex-wrap gap-1.5">
                 {selected.rubric.mustHaveSkills.length === 0 ? (
@@ -173,7 +157,7 @@ export function TargetRoadmap({
             </div>
             <div>
               <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide mb-2">
-                Nice to have
+                {t("tools.career360.roadmap.niceToHave")}
               </h4>
               <div className="flex flex-wrap gap-1.5">
                 {selected.rubric.niceToHaveSkills.length === 0 ? (
@@ -198,7 +182,7 @@ export function TargetRoadmap({
                 {selected.rubric.expectedYearsExperience && (
                   <div>
                     <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide mb-1">
-                      Experience
+                      {t("tools.career360.roadmap.experience")}
                     </h4>
                     <p>{selected.rubric.expectedYearsExperience}</p>
                   </div>
@@ -206,7 +190,7 @@ export function TargetRoadmap({
                 {selected.rubric.expectedCertifications.length > 0 && (
                   <div>
                     <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide mb-1">
-                      Certifications
+                      {t("tools.career360.roadmap.certifications")}
                     </h4>
                     <p>{selected.rubric.expectedCertifications.join(", ")}</p>
                   </div>
@@ -214,7 +198,7 @@ export function TargetRoadmap({
                 {selected.rubric.narrativeHook && (
                   <div>
                     <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide mb-1">
-                      Narrative hook
+                      {t("tools.career360.roadmap.narrativeHook")}
                     </h4>
                     <p className="italic">{selected.rubric.narrativeHook}</p>
                   </div>
@@ -227,9 +211,9 @@ export function TargetRoadmap({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Gaps</CardTitle>
+          <CardTitle className="text-base">{t("tools.career360.roadmap.gaps")}</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Sorted by severity. Click any gap to open the AI Coach with that gap pre-loaded.
+            {t("tools.career360.roadmap.gapsHint")}
           </p>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -250,16 +234,16 @@ export function TargetRoadmap({
                         {gap.severity.toUpperCase()}
                       </Badge>
                       <Badge variant="secondary" className="text-[10px]">
-                        {CATEGORY_LABELS[gap.category]}
+                        {t(`tools.career360.roadmap.category.${gap.category}`)}
                       </Badge>
                       <span className="font-medium text-sm">{gap.label}</span>
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
                       <p>
-                        <span className="font-semibold">Today:</span> {gap.currentValue}
+                        <span className="font-semibold">{t("tools.career360.roadmap.today")}</span> {gap.currentValue}
                       </p>
                       <p>
-                        <span className="font-semibold">Target:</span> {gap.targetValue}
+                        <span className="font-semibold">{t("tools.career360.roadmap.targetPrefix")}</span> {gap.targetValue}
                       </p>
                     </div>
                     <ul className="mt-2 space-y-0.5 text-sm">
@@ -275,7 +259,7 @@ export function TargetRoadmap({
                     {tool && (
                       <Button asChild variant="outline" size="sm">
                         <Link to={tool.href}>
-                          Open {tool.title}
+                          {t("tools.career360.roadmap.open", { tool: tool.title })}
                           <ArrowRight className="ml-1 h-3.5 w-3.5" />
                         </Link>
                       </Button>
@@ -286,7 +270,7 @@ export function TargetRoadmap({
                       onClick={() => onCoachGap(gap)}
                     >
                       <Sparkles className="mr-1 h-3.5 w-3.5" />
-                      Coach me
+                      {t("tools.career360.roadmap.coachMe")}
                     </Button>
                   </div>
                 </div>
@@ -304,9 +288,9 @@ export function TargetRoadmap({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Roadmap</CardTitle>
+          <CardTitle className="text-base">{t("tools.career360.roadmap.title")}</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Ordered by horizon and leverage. Each step lists the gaps it closes.
+            {t("tools.career360.roadmap.hint")}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -316,7 +300,7 @@ export function TargetRoadmap({
             return (
               <div key={h}>
                 <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide mb-2">
-                  {HORIZON_LABELS[h]}
+                  {t(`tools.career360.roadmap.horizon.${h}`)}
                 </h4>
                 <ol className="space-y-2">
                   {steps.map((step) => (
@@ -325,8 +309,9 @@ export function TargetRoadmap({
                         <p className="font-medium text-sm">{step.title}</p>
                         {step.closesGapIds.length > 0 && (
                           <Badge variant="secondary" className="text-[10px] shrink-0">
-                            closes {step.closesGapIds.length} gap
-                            {step.closesGapIds.length === 1 ? "" : "s"}
+                            {t("tools.career360.roadmap.closesGaps", {
+                              count: step.closesGapIds.length,
+                            })}
                           </Badge>
                         )}
                       </div>

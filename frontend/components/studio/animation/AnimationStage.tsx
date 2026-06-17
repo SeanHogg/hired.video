@@ -314,7 +314,7 @@ export default function AnimationStage({
 
   return (
     <div className="flex h-full w-full flex-col">
-      <div className="flex flex-1 items-center justify-center overflow-auto bg-slate-100 p-6">
+      <div className="flex flex-1 items-center justify-center overflow-auto bg-muted p-6">
         <div
           className="relative shadow-lg"
           style={{ width: displayWidth, height: displayHeight }}

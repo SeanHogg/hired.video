@@ -212,6 +212,16 @@ jobRoutes.post("/", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const created = await jobService.createJob(parsed.data, userId);
+
+  // Gamification: credit the employer author for posting a job. The caller
+  // IS the author here, so withGamification (JWT role + userId) is correct.
+  // RefId = the new job id makes the award idempotent across retries.
+  // Best-effort — never blocks or fails the create.
+  const { withGamification } = await import("../domains/gamification/with-gamification.js");
+  await withGamification(c, "job-posted", (game, role, uidEarner) =>
+    game.onJobPosted({ userId: uidEarner, role, jobId: created.id }),
+  );
+
   return c.json(success(created), 201);
 });
 

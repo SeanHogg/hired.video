@@ -206,6 +206,20 @@ export function useCanvasHistory<T, S = void>(
   // Flush any pending commit on unmount so we don't leak the timer.
   useEffect(() => () => cancelPending(), [cancelPending]);
 
+  // #2108 — seed the checkpoint sidecar once with the selection present at
+  // load. commit() only snapshots the sidecar on the NEXT edit (line ~122),
+  // so without this seed the very first past entry carries an `undefined`
+  // sidecar and undoing back to the just-loaded state clears the user's
+  // selection instead of restoring it. The `=== undefined` guard means a
+  // real checkpoint (from an edit committed before this mount effect, or a
+  // reset()) is never clobbered.
+  useEffect(() => {
+    if (checkpointSidecarRef.current === undefined) {
+      checkpointSidecarRef.current = sidecarRef.current?.capture();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return {
     state: present,
     setState,

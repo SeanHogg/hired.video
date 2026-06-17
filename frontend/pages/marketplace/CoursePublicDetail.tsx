@@ -9,6 +9,7 @@
 // through the platform-wide `buildShareAction` helper.
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   Award,
@@ -37,6 +38,7 @@ import { buildImageUrl } from "@/lib/utils";
 import { useUgcSeo } from "@/lib/seo-ugc";
 import { toast } from "@/components/ui/use-toast";
 import { courseService, type CourseEnrollment } from "@/lib/services/course-service";
+import { courseCategoryLabel } from "@/lib/course-category";
 
 interface CourseAuthor {
   id: string;
@@ -136,6 +138,7 @@ export default function CoursePublicDetail() {
     courseSlug: string;
   }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuth();
   const [data, setData] = useState<CoursePublicResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -261,7 +264,9 @@ export default function CoursePublicDetail() {
       <Badge variant="outline" className="text-xs">
         <GraduationCap className="h-3 w-3 mr-1" /> Course
       </Badge>
-      {course.category && <Badge variant="secondary">{course.category}</Badge>}
+      {course.category && (
+        <Badge variant="secondary">{courseCategoryLabel(course.category, t)}</Badge>
+      )}
       {course.difficulty && (
         <Badge variant="outline" className="capitalize">
           {course.difficulty}

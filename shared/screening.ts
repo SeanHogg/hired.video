@@ -38,6 +38,11 @@ export const SCREENING_ITEM_TYPES = [
   "references",
   "tool_run",
   "application_questions",
+  // #1853 — recruiter-run conversational AI screen. The candidate completes a
+  // short chat with an AI screener (focused by `instructions`); the produced
+  // transcript + score land on the item's result_ref. Never pre-satisfiable
+  // (it's run fresh for this screen) — see the pitch-book resolver.
+  "ai_screening_chat",
 ] as const;
 
 export type ScreeningItemType = (typeof SCREENING_ITEM_TYPES)[number];
@@ -181,6 +186,15 @@ export const SCREENING_ITEM_CATALOG: ScreeningCatalogEntry[] = [
     needsRef: false,
     needsConfig: true,
   },
+  {
+    itemType: "ai_screening_chat",
+    title: "AI screening chat",
+    description:
+      "Candidate completes a short conversational AI screen; you get a transcript + score.",
+    alwaysRequired: false,
+    needsRef: false,
+    needsConfig: true,
+  },
 ];
 
 const CATALOG_BY_TYPE: Record<ScreeningItemType, ScreeningCatalogEntry> = Object.fromEntries(
@@ -249,6 +263,10 @@ export function validateScreeningItem(input: {
 
   if (input.itemType === "references" && config.minReferences == null) {
     config.minReferences = 2;
+  }
+
+  if (input.itemType === "ai_screening_chat" && !config.instructions?.trim()) {
+    throw new Error("Add screening instructions so the AI knows what to assess");
   }
 
   return config;

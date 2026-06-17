@@ -14,6 +14,8 @@ import { bumpSearchVersion } from "../utils/search-cache.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { withCacheHeaders } from "../utils/cache-headers.js";
 import { recordArtifactView, ipCountryFromCtx } from "../services/analytics/artifactView.js";
+import { buildApiDeps } from "../services/apiDeps.js";
+import { LocationService } from "../services/location/LocationService.js";
 
 const {
   companyProfiles,
@@ -179,6 +181,36 @@ function hashClientIp(c: any): string | null {
 }
 
 // Public company listing
+/** Fire-and-forget: tag a company's headquarters into `content_locations`
+ *  (kind "company") so the structured geo filter on /public can match it
+ *  (#1178). Resolves the display string through the same geocoder the rest of
+ *  search uses; never blocks the write. */
+function tagCompanyGeo(c: any, companyId: string, hq: unknown) {
+  const display = headquartersDisplay(hq as any);
+  if (!display) return;
+  (async () => {
+    try {
+      const svc = new LocationService(buildApiDeps((c.env ?? {}) as Record<string, string | undefined>));
+      const resolved = await svc.resolveFreeText(display);
+      if (resolved) {
+        await svc.setForEntity("company", companyId, {
+          origin: {
+            countryId: resolved.countryId ?? undefined,
+            stateId: resolved.stateId ?? undefined,
+            cityId: resolved.cityId ?? undefined,
+            latitude: resolved.latitude ?? undefined,
+            longitude: resolved.longitude ?? undefined,
+            label: display,
+          },
+          serves: [],
+        });
+      }
+    } catch (err) {
+      console.error("[company] geo tag failed:", err);
+    }
+  })();
+}
+
 companyRoutes.get("/public", async (c) => {
   const db = getDb();
   const page = Math.max(1, Number(c.req.query("page") ?? 1));
@@ -186,7 +218,32 @@ companyRoutes.get("/public", async (c) => {
   const search = c.req.query("search")?.trim();
   const offset = (page - 1) * limit;
 
-  const where = search ? or(ilike(companyProfiles.name, `%${search}%`), ilike(companyProfiles.description, `%${search}%`)) : undefined;
+  // Structured geo filter (#1178): mirror the unified-search pattern — resolve
+  // the (countryId/stateId/cityId/text/remote) filter to an allowlist of
+  // company ids via content_locations, then constrain the query. `null` = no
+  // geo filter; `[]` = filter set but nothing matched (→ empty page).
+  const geo = {
+    countryId: c.req.query("countryId") ? Number(c.req.query("countryId")) : undefined,
+    stateId: c.req.query("stateId") || undefined,
+    cityId: c.req.query("cityId") || undefined,
+    remote: c.req.query("isRemote") === "true" ? true : undefined,
+    text: c.req.query("location") || undefined,
+  };
+  const hasGeo =
+    geo.countryId != null || !!geo.stateId || !!geo.cityId || geo.remote || !!geo.text;
+  let geoAllow: string[] | null = null;
+  if (hasGeo) {
+    const svc = new LocationService(buildApiDeps((c.env ?? {}) as Record<string, string | undefined>));
+    geoAllow = await svc.applyLocationFilter("company", geo as any);
+  }
+
+  const searchWhere = search
+    ? or(ilike(companyProfiles.name, `%${search}%`), ilike(companyProfiles.description, `%${search}%`))
+    : undefined;
+  const where =
+    geoAllow != null
+      ? and(searchWhere, inArray(companyProfiles.id, geoAllow.length ? geoAllow : [""]))
+      : searchWhere;
 
   const [rows, [countRow]] = await Promise.all([
     db.select().from(companyProfiles).where(where).orderBy(desc(companyProfiles.createdAt)).limit(limit).offset(offset),
@@ -332,6 +389,7 @@ companyRoutes.post("/", async (c) => {
 
   servicesProcessor.meterEvent(c, "company_db_write", { id: row?.id });
   bumpSearchVersion();
+  if (row?.id) tagCompanyGeo(c, row.id, row.headquarters);
 
   return c.json(success(rowToCompanyMeta(row)), 201);
 });
@@ -436,6 +494,7 @@ companyRoutes.put("/:id", async (c) => {
   if ("name" in body) updates.name = body.name;
   const [row] = await db.update(companyProfiles).set(updates as any).where(eq(companyProfiles.id, access!.companyId)).returning();
   bumpSearchVersion();
+  if ("headquarters" in updates && row?.id) tagCompanyGeo(c, row.id, row.headquarters);
   return c.json(success(rowToCompanyMeta(row)), 200);
 });
 

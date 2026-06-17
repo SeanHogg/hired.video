@@ -229,7 +229,7 @@ export default function HiringOnboarding() {
   }
 
   async function deleteOffer(id: string) {
-    if (!(await confirmDialog({ title: "Delete offer", description: t("hiring.confirm.deleteOffer"), confirmText: "Delete", destructive: true }))) return;
+    if (!(await confirmDialog({ title: t("dialogs.hiring.deleteOfferTitle"), description: t("hiring.confirm.deleteOffer"), confirmText: t("dialogs.hiring.deleteOfferConfirm"), destructive: true }))) return;
     try {
       setBusyOfferId(id);
       await hiringService.deleteOffer(id);
@@ -543,7 +543,7 @@ export default function HiringOnboarding() {
             <DialogDescription>
               <Trans
                 i18nKey="hiring.dialog.offer.description"
-                components={[<span className="font-medium" />]}
+                components={[<span key="b" className="font-medium" />]}
               />
             </DialogDescription>
           </DialogHeader>

@@ -301,7 +301,19 @@ USER INTENT: The user wants help with: ${action.replace(/-/g, " ")}
 Engage conversationally to understand their needs and provide helpful guidance.`;
   }
 
-  return (basePrompt + contextInstructions + actionInstructions).trim();
+  // #971 — Pin durable hand-off priming (target role / seniority / style /
+  // source) into the system prompt so it survives server-side history
+  // compaction. Launched-from-a-tool sessions put it here instead of (or in
+  // addition to) the first user message, which gets sliced off after a few
+  // turns.
+  const primingInstructions = context.coachPriming
+    ? `
+
+SESSION CONTEXT (persists for the whole conversation — do NOT ask the user to repeat any of this):
+${context.coachPriming.trim()}`
+    : "";
+
+  return (basePrompt + contextInstructions + primingInstructions + actionInstructions).trim();
 }
 
 const BUILDERFORCE_URL = "https://builderforce.ai";
@@ -692,6 +704,13 @@ export default function AIChatPanel() {
       "quiz-me": "Quiz me on what I'm learning to check my understanding",
       "outline-course": "Help me outline a course on this topic",
       "write-lesson": "Help me draft a lesson for this course",
+
+      // Studio editor actions (#1910) — phrased so the studio context's
+      // system prompt maps them onto the matching studio_* tool.
+      "record-demo": "Record a demo of my screen",
+      "add-scene": "Add a new scene to my video",
+      "insert-cta": "Insert a call-to-action button into the current scene",
+      "generate-scene-image": "Generate an image and add it to the current scene",
     };
 
     return prompts[action] || `Help me with ${action.replace(/-/g, " ")}`;
