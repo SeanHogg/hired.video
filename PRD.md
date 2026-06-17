@@ -1,68 +1,53 @@
-> **PRD** — drafted by Coder Agent (V2) · task #55
+> **PRD** — drafted by Bob Developer (V2 (Container)) · task #90
 > _Each agent that updates this PRD signs its change below._
 
-# Product Requirements Document: Outlook Email Curation Plugin
+# Product Requirements Document: Fix Frontend Typecheck Build Error
 
 ## 1. Problem & Goal
 
-### 1.1 Problem
-Users of Microsoft Outlook often experience email overload, leading to critical messages being missed, important emails getting buried, and significant time spent manually sorting and prioritizing their inbox. The current native Outlook rules, while functional, lack a streamlined user experience for advanced curation and management.
+**Problem:** The frontend build pipeline is failing due to TypeScript errors related to incompatible `CanvasRenderingContext2D` types. Specifically, the `lib/timeline/effects/canvas-v2.ts` file is attempting to pass an `OffscreenCanvasRenderingContext2D` to a function expecting a `CanvasRenderingContext2D`. This prevents the CI/CD pipeline from completing successfully, potentially blocking deployments.
 
-### 1.2 Goal
-To provide Outlook users with an intuitive and powerful plugin that automates email organization and prioritization based on user-defined rules, thereby reducing inbox clutter, increasing efficiency, and ensuring important communications are highlighted.
+**Goal:** Resolve the TypeScript type errors in `lib/timeline/effects/canvas-v2.ts` to allow the frontend build to pass the typecheck stage and unblock the CI/CD pipeline.
 
 ## 2. Target Users / ICP Roles
 
-*   **Professionals with High Email Volume:** Individuals who receive hundreds of emails daily and struggle to keep their inbox manageable.
-*   **Project Managers / Team Leads:** Users who need to quickly identify and categorize project-related communications, status updates, or client requests.
-*   **Support & Operations Staff:** Those who rely on email for ticketing or operational alerts and need rapid classification and action.
-*   **General Power Users:** Anyone looking to gain more control over their email flow and improve their overall productivity within Outlook.
+This PRD is intended for:
+
+*   Frontend Engineers
+*   CI/CD Engineers
+*   Quality Assurance Engineers
 
 ## 3. Scope
 
-This project focuses on developing an Outlook Add-in (compatible with Outlook desktop and Outlook on the Web) that enables users to create, manage, and execute custom rules for email curation.
+**In Scope:**
+
+*   Analyzing the TypeScript errors in `lib/timeline/effects/canvas-v2.ts` at lines 586 and 645.
+*   Identifying the root cause of the type mismatch between `CanvasRenderingContext2D` and `OffscreenCanvasRenderingContext2D`.
+*   Implementing code changes in `lib/timeline/effects/canvas-v2.ts` to correctly handle the context types.
+*   Verifying that the `npm run typecheck` command passes successfully in a local development environment.
+*   Ensuring the fix does not introduce new TypeScript errors in the affected file or its dependencies.
 
 ## 4. Functional Requirements
 
-*   **FR1: Rule Creation Interface:** Users must be able to create new email curation rules via a dedicated plugin interface.
-*   **FR2: Rule Conditions:** Rules must support multiple conditions, including but not limited to:
-    *   Sender's email address (exact, contains, starts with, ends with)
-    *   Recipient's email address (To, CC, BCC)
-    *   Subject keywords (contains, exact match, regex)
-    *   Body keywords (contains, exact match, regex)
-    *   Attachment presence
-    *   Email age (e.g., older than X days)
-    *   Email importance (High, Normal, Low)
-    *   Email category
-*   **FR3: Rule Actions:** Rules must support multiple actions, including but not limited to:
-    *   Move email to a specified folder
-    *   Assign a specific Outlook category
-    *   Flag email for follow-up (with optional due date)
-    *   Mark email as read/unread
-    *   Delete email
-    *   Forward email to a specified address
-    *   Reply with a template
-*   **FR4: Rule Prioritization:** Users must be able to define the execution order of rules (e.g., drag-and-drop reordering).
-*   **FR5: Rule Management:** Users must be able to enable, disable, edit, and delete existing rules.
-*   **FR6: Real-time Processing:** The plugin must process incoming emails automatically based on enabled rules as they arrive in the inbox.
-*   **FR7: Manual Rule Execution:** Users must have the option to manually run selected rules against existing emails in a folder.
-*   **FR8: Conflict Resolution & Notifications:** The plugin must provide a mechanism to handle conflicting rules (e.g., stop processing after first match) and notify users of rule execution status or errors.
-*   **FR9: User Interface Integration:** The plugin must integrate seamlessly into the Outlook UI (e.g., via a ribbon button for access to rule management, and potentially a right-click context menu for quick rule creation from an email).
+1.  **Analyze Type Mismatch:** The developer must understand why `OffscreenCanvasRenderingContext2D` is being passed where `CanvasRenderingContext2D` is expected. This may involve inspecting the `getContext` calls and how the returned context is used.
+2.  **Implement Type Safe Solution:** The code must be modified to either:
+    *   Ensure only `CanvasRenderingContext2D` is passed to the problematic functions.
+    *   Adjust the functions to accept a union type (`CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D`) if both are valid inputs.
+    *   Leverage TypeScript's type guards or other mechanisms to safely differentiate between the two context types if their usage differs.
+3.  **Preserve Functionality:** The changes must not alter the intended rendering or behavior of the timeline effects.
+4.  **Pass Typecheck:** The `npm run typecheck` command must complete without any TypeScript errors related to the `canvas-v2.ts` file.
 
 ## 5. Acceptance Criteria
 
-*   **AC1: Installation & Compatibility:** The plugin installs successfully on Outlook Desktop (Windows/macOS) and Outlook on the Web, and is functional across supported versions.
-*   **AC2: Basic Rule Execution:** A user can create a rule to move emails from a specific sender (e.g., `newsletter@example.com`) to a designated folder (e.g., "Newsletters"), and subsequent incoming emails from that sender are automatically moved.
-*   **AC3: Complex Rule Execution:** A user can create a rule with multiple conditions (e.g., Subject contains "Urgent" AND Sender is from `client.com`) and multiple actions (e.g., Flag as "High Importance" AND assign "Client Task" category), and it executes correctly.
-*   **AC4: Rule Order Adherence:** When two enabled rules have conflicting actions for the same email, the rule with higher priority (as defined by the user) is executed first, and subsequent rules are handled according to the defined conflict resolution strategy.
-*   **AC5: Rule Management Usability:** Users can easily create, edit, enable/disable, and delete rules through an intuitive UI, with changes reflected immediately.
-*   **AC6: Performance Impact:** The plugin does not introduce noticeable latency or degradation to Outlook's general performance during regular use.
-*   **AC7: Error Handling:** The plugin gracefully handles scenarios like invalid folder names or missing categories without crashing, providing clear user feedback.
+*   The CI build successfully passes the `cd frontend && npm run typecheck` step.
+*   No `TS2345` errors related to `CanvasRenderingContext2D` or `OffscreenCanvasRenderingContext2D` are present in the build logs for `lib/timeline/effects/canvas-v2.ts`.
+*   The changes are reviewed and approved by a senior frontend engineer.
+*   (Optional but recommended) A small set of regression tests covering timeline rendering functionality passes.
 
 ## 6. Out of Scope
 
-*   **AI/ML-driven Email Classification:** The plugin will not use artificial intelligence or machine learning to suggest or automatically create rules; all rules are explicitly defined by the user.
-*   **Integration with non-Outlook Clients:** Support is limited to Microsoft Outlook desktop clients and Outlook on the Web; no integrations for other email platforms (e.g., Gmail, Apple Mail).
-*   **Advanced Workflow Automation:** Complex multi-step workflows involving external systems (e.g., pushing data to CRM, creating tasks in project management tools) are not within scope.
-*   **Mobile-Specific UI/Features:** While the add-in should function on Outlook Mobile if supported by the underlying platform, a dedicated mobile-optimized UI or features are not planned for this iteration.
-*   **Centralized Rule Management for Organizations:** No features for IT administrators to push or manage rules centrally for multiple users.
+*   Modifying other files outside of `lib/timeline/effects/canvas-v2.ts` unless directly required to fix the type error.
+*   Addressing any other build errors or warnings not related to the reported typecheck failure.
+*   Changes to the CI/CD pipeline configuration itself, beyond ensuring the fix allows the existing pipeline to pass.
+*   Performance optimizations or refactoring unrelated to resolving the type error.
+*   Migrating to different canvas implementations (e.g., WebGL).
