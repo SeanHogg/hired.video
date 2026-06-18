@@ -154,6 +154,7 @@ integrationsRoutes.delete("/:id", async (c) => {
   }
 });
 
-integrationsRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Integrations route not found" } }, 404),
-);
+// NB: no `.all("*")` catch-all here. This sub-app is mounted at the
+// `/api/integrations` PARENT prefix, which also owns `/api/integrations/email/*`
+// — a wildcard here would shadow those routes (the Hono parent-prefix gotcha).
+// Unmatched paths fall through to the app-level notFound handler.

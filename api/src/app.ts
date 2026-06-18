@@ -90,6 +90,7 @@ import { superadminRoutes } from "./routes/superadmin/index.js";
 import { paymentRoutes } from "./routes/payment.js";
 import { payoutRoutes } from "./routes/payouts.js";
 import { adminPayoutRoutes } from "./routes/admin-payouts.js";
+import { integrationsRoutes } from "./routes/integrations.js";
 import { outplacementRoutes } from "./routes/outplacement.js";
 import { boostCheckoutRoutes } from "./routes/boost-checkout.js";
 import { courseCheckoutRoutes } from "./routes/course-checkout.js";
@@ -719,6 +720,7 @@ export function createApp() {
   app.route("/api/notifications", notificationRoutes);
   app.route("/api/inbox", inboxRoutes);
   app.route("/api/integrations/email", emailIntegrationRoutes);
+  app.route("/api/integrations", integrationsRoutes); // generic vendor API-key registry (#261)
   app.route("/api/dashboard", dashboardRoutes);
   app.route("/api/userdashboard", dashboardRoutes); // legacy dashboard alias
   app.route("/api/search", searchRoutes);

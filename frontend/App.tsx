@@ -337,6 +337,7 @@ const ToolUsage = lazy(() => import("./pages/admin/ToolUsage"));
 const PageEmbeds = lazy(() => import("./pages/admin/PageEmbeds"));
 const HelpMappings = lazy(() => import("./pages/admin/HelpMappings"));
 const ExtensionTelemetry = lazy(() => import("./pages/admin/ExtensionTelemetry"));
+const AIVendors = lazy(() => import("./pages/admin/AIVendors"));
 const SystemSettings = lazy(() => import("./pages/admin/SystemSettings"));
 const ModerationQueue = lazy(() => import("./pages/admin/ModerationQueue"));
 const AdminAccountAnalytics = lazy(() => import("./pages/admin/AccountAnalytics"));
@@ -1148,6 +1149,7 @@ const App = () => (
                       <Route path="/admin/security"          element={<AdminLayout><Security /></AdminLayout>} />
                       <Route path="/admin/tool-usage"        element={<AdminLayout><ToolUsage /></AdminLayout>} />
                       <Route path="/admin/extension-telemetry" element={<AdminLayout><ExtensionTelemetry /></AdminLayout>} />
+                      <Route path="/admin/ai-vendors"        element={<AdminLayout><AIVendors /></AdminLayout>} />
                       <Route path="/admin/settings"          element={<AdminLayout><SystemSettings /></AdminLayout>} />
                       <Route path="/admin/moderation"        element={<AdminLayout><ModerationQueue /></AdminLayout>} />
                       <Route path="/admin/account-analytics" element={<AdminLayout><AdminAccountAnalytics /></AdminLayout>} />

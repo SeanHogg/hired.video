@@ -32,7 +32,8 @@ export type AdminResource =
   | "settings"
   | "moderation"
   | "accountAnalytics"
-  | "extensionTelemetry";
+  | "extensionTelemetry"
+  | "aiVendors";
 
 /** CRUD grants per role per admin resource */
 const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> = {
@@ -60,6 +61,9 @@ const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> =
     moderation: ["read", "update"],
     accountAnalytics: ["read"],
     extensionTelemetry: ["read"],
+    // SuperAdmin-only — gateway/vendor observability (model substitutions,
+    // use-case profiles, catalog drift, usage). Not granted to plain admins.
+    aiVendors: ["read"],
   },
   [USER_ROLES.ADMIN]: {
     dashboard: ["read"],
@@ -134,6 +138,7 @@ export const ADMIN_RESOURCES: AdminResource[] = [
   "moderation",
   "accountAnalytics",
   "extensionTelemetry",
+  "aiVendors",
 ];
 
 export const CRUD_LABELS: Record<CrudAction, string> = {
@@ -164,4 +169,5 @@ export const RESOURCE_LABELS: Record<AdminResource, string> = {
   moderation: "Moderation",
   accountAnalytics: "Account Analytics",
   extensionTelemetry: "Extension Telemetry",
+  aiVendors: "AI Vendors",
 };

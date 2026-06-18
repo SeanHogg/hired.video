@@ -107,6 +107,10 @@ import {
   type IUsageTrackingRepository,
 } from "./usageTrackingRepository.js";
 import {
+  TenantIntegrationsRepository,
+  type ITenantIntegrationsRepository,
+} from "./tenantIntegrationsRepository.js";
+import {
   SocialConnectionRepository,
   type ISocialConnectionRepository,
 } from "./socialConnectionRepository.js";
@@ -178,6 +182,8 @@ export interface Repos {
   roleFeatureAccess: IRoleFeatureAccessRepository;
   // usage sessions + events for presence/engagement (migration 0215)
   usageTracking: IUsageTrackingRepository;
+  // self-serve encrypted vendor API-key integrations (migration 0463)
+  tenantIntegrations: ITenantIntegrationsRepository;
   // social publishing connection layers: user + brand accounts (migration 0217)
   socialConnections: ISocialConnectionRepository;
 }
@@ -224,6 +230,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     emailConsent: new EmailConsentRepository(db, now),
     roleFeatureAccess: new RoleFeatureAccessRepository(db, now),
     usageTracking: new UsageTrackingRepository(db, now),
+    tenantIntegrations: new TenantIntegrationsRepository(db, now),
     socialConnections: new SocialConnectionRepository(db, now),
   };
 }
@@ -271,6 +278,7 @@ export type {
   IRoleFeatureAccessRepository,
   IUsageTrackingRepository,
   ISocialConnectionRepository,
+  ITenantIntegrationsRepository,
 };
 
 // ── Re-export row / insert / patch types ───────────────────────────────────
