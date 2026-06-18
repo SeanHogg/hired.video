@@ -55,7 +55,7 @@ describe("buildJobColumnPatch — wire → job_items columns (#878)", () => {
     assert.equal(patch.title, "Staff Engineer");
     assert.equal(patch.company, "Acme");
     assert.equal(patch.jobType, "contract"); // Contractor → contract
-    assert.equal(patch.experienceLevel, "Senior");
+    assert.equal(patch.experienceLevel, "senior"); // #2090 canonical lowercase
     assert.equal(patch.isRemote, true); // workSetting Remote
     assert.equal(patch.salaryMin, "180000"); // numeric column stores string
     assert.equal(patch.salaryMax, "220000");
@@ -165,7 +165,7 @@ describe("createJob → getJobById roundtrip (#878)", () => {
     assert.equal(read!.title, "Backend Engineer");
     assert.equal(read!.company, "Globex");
     assert.equal(read!.employmentType, "full-time");
-    assert.equal(read!.experienceLevel, "Mid");
+    assert.equal(read!.experienceLevel, "mid"); // #2090 canonical lowercase
     assert.equal(read!.salaryMin, 120000);
     assert.equal(read!.salaryMax, 150000);
     assert.equal(read!.isRemote, false); // Hybrid
