@@ -16,7 +16,7 @@ import {
   type SubscriptionSnapshot,
 } from "../domains/planOverride/resolver.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
-import { reclaimVideoR2 } from "../services/storage/reclaim-video-r2.js";
+import { reclaimVideoR2 } from "./storage/reclaim-video-r2.js";
 
 /** Deps this module actually needs. Services declare a narrow `Pick<ApiDeps, …>`
  *  so tests mock only the surface the function touches (ISP). Production

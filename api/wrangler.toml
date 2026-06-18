@@ -96,6 +96,10 @@ FRONTEND_URL = ""
 VITE_API_URL = "https://api.hired.video"
 BASE_URL = "https://api.hired.video"
 CDN_BASE_URL = "https://cdn.hired.video"
+# Reserved house user id (#986) — owns the platform's paid-media ad
+# connections for internal growth. Pin the id printed by
+# `node api/scripts/seedHouseWorkspace.mjs`; /superadmin/ads reads it.
+# HOUSE_USER_ID = ""
 YOUTUBE_REDIRECT_URI = "https://api.hired.video/api/videos/youtube/callback"
 EMAIL_FROM = "info@hired.video"
 PAYMENT_PROVIDER = "helcim"
@@ -164,6 +168,10 @@ FRONTEND_URL = ""
 VITE_API_URL = "https://api.hired.video"
 BASE_URL = "https://api.hired.video"
 CDN_BASE_URL = "https://cdn.hired.video"
+# Reserved house user id (#986) — owns the platform's paid-media ad
+# connections for internal growth. Pin the id printed by
+# `node api/scripts/seedHouseWorkspace.mjs`; /superadmin/ads reads it.
+# HOUSE_USER_ID = ""
 YOUTUBE_REDIRECT_URI = "https://api.hired.video/api/videos/youtube/callback"
 EMAIL_FROM = "info@hired.video"
 PAYMENT_PROVIDER = "helcim"

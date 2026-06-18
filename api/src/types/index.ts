@@ -82,6 +82,15 @@ export interface Env {
   PAID_MEDIA_KMS_KEY?: string;
   // Base URL of the API (used to build OAuth redirect URIs).
   BASE_URL?: string;
+  // House workspace user id (#986). A reserved, real hired.video user
+  // (users.is_system = true) that owns the platform's OWN paid-media ad
+  // connections used for internal growth marketing. The /superadmin/ads
+  // page binds this subject via a delegated workspace_grants row so a
+  // SuperAdmin acts ON BEHALF OF the house account instead of falling
+  // through to their PERSONAL ad connections. Seeded idempotently by
+  // api/scripts/seedHouseWorkspace.mjs. No new workspace kind is
+  // introduced — the existing `delegated` kind + canActFor() SSoT is reused.
+  HOUSE_USER_ID?: string;
   // ─── Social publishing connection layer (PRD §5.0) ──────────────────────
   // Layer-1 developer-app credentials, one pair per platform. YouTube +
   // LinkedIn + Meta reuse the keys declared above. TikTok's *organic*

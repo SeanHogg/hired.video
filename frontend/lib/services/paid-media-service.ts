@@ -213,6 +213,20 @@ function wsQuery(w: WorkspaceParam | null | undefined): string {
 
 // ─── Service ──────────────────────────────────────────────────────────────
 class PaidMediaService {
+  /** SA-only (#986). Returns the reserved house user id so /superadmin/ads
+   *  can bind the house workspace via a delegated forceWorkspace. The call
+   *  also lazily provisions an active workspace_grants row for the calling
+   *  SA against the house subject. `houseUserId` is null when HOUSE_USER_ID
+   *  is unset / the user isn't seeded — the page then falls back to the
+   *  personal-workspace behaviour. */
+  async getHouseConfig() {
+    const res = await apiClient.get(
+      "/api/paid-media/house-config",
+      z.object({ houseUserId: z.string().nullable(), granted: z.boolean() }),
+    );
+    return res.data;
+  }
+
   async listPlatforms() {
     const res = await apiClient.get<Array<z.infer<typeof PlatformInfoSchema>>>(
       "/api/paid-media/platforms",

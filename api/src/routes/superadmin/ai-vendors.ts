@@ -11,6 +11,7 @@
 // middleware is applied at the parent (see superadmin/index.ts).
 
 import { Hono } from "hono";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { BuilderforceClient } from "@seanhogg/builderforce-sdk";
 import type { Env, Variables, AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
@@ -21,6 +22,7 @@ import {
   type LLMUseCase,
 } from "../../services/adapters/providers.js";
 import { auditModelCatalog } from "../../services/adapters/model-catalog-audit.js";
+import { getDb, schema } from "../../db/index.js";
 
 export const aiVendorRoutes = new Hono<AppEnv>();
 
@@ -101,4 +103,56 @@ aiVendorRoutes.get("/usage", async (c) => {
       502,
     );
   }
+});
+
+// GET /substitutions — #515 (option b) — silent model-substitution alarm.
+// The gateway treats `model` as a HINT, not a hard pin, and may swap vendors
+// on cooldown / outage / plan mismatch. For latency-pinned use cases (e.g.
+// `match` requires Cerebras sub-200ms) a swap is an SLA breach. Every charged
+// AI call stamps `{ substituted, requestedModel, resolvedModel }` onto its
+// `usage_ledger` (event_type='ai_tokens') metadata when the resolved model
+// differs from the hint (token-ledger.charge → servicesProcessor.meter). This
+// reads that queryable projection back so SA can see substitution rate +
+// recent breaches without grepping logs. Default 7-day window.
+aiVendorRoutes.get("/substitutions", async (c) => {
+  const days = Number(c.req.query("days") ?? "7");
+  const since = new Date(Date.now() - (Number.isFinite(days) ? days : 7) * 86_400_000);
+  const db = getDb();
+  const { usageLedger } = schema;
+
+  const substitutedCond = and(
+    eq(usageLedger.eventType, "ai_tokens"),
+    gte(usageLedger.createdAt, since),
+    sql`${usageLedger.metadata}->>'substituted' = 'true'`,
+  );
+
+  // Grouped breach summary: requested hint → resolved model, with count +
+  // last-seen, so the worst SLA offenders (e.g. match → OpenRouter) surface.
+  const summary = await db
+    .select({
+      requestedModel: sql<string>`${usageLedger.metadata}->>'requestedModel'`,
+      resolvedModel: sql<string>`${usageLedger.metadata}->>'resolvedModel'`,
+      featureKey: sql<string>`${usageLedger.metadata}->>'featureKey'`,
+      count: sql<number>`count(*)::int`,
+      lastSeen: sql<string>`max(${usageLedger.createdAt})`,
+    })
+    .from(usageLedger)
+    .where(substitutedCond)
+    .groupBy(
+      sql`${usageLedger.metadata}->>'requestedModel'`,
+      sql`${usageLedger.metadata}->>'resolvedModel'`,
+      sql`${usageLedger.metadata}->>'featureKey'`,
+    )
+    .orderBy(desc(sql`count(*)`));
+
+  const totalSubstituted = summary.reduce((acc, r) => acc + Number(r.count), 0);
+
+  return c.json(
+    success({
+      windowDays: Number.isFinite(days) ? days : 7,
+      since: since.toISOString(),
+      totalSubstituted,
+      bySwap: summary,
+    }),
+  );
 });

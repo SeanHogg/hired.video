@@ -5,9 +5,13 @@
  * personal | company | delegated) and /superadmin/ads (house workspace
  * — hired.video's own ad accounts for growth marketing).
  *
- * Workspace is read from ?workspace= and falls back to "personal".
- * SuperAdmin route forces workspace=personal for the configured house
- * user id (set HOUSE_USER_ID in env to bind the house workspace).
+ * Workspace is read from ?workspace= and falls back to "personal", UNLESS
+ * a `forceWorkspace` prop is supplied. The /superadmin/ads wrapper
+ * (SuperAdminPaidMediaPage) passes forceWorkspace={{ kind: 'delegated',
+ * subjectUserId: HOUSE_USER_ID }} so the internal route binds hired.video's
+ * own house ad accounts instead of the calling SA's personal connections
+ * (#986). The house workspace reuses the existing `delegated` kind +
+ * canActFor SSoT — no 4th workspace kind.
  */
 
 import { useState } from "react";

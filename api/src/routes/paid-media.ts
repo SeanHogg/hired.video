@@ -57,6 +57,7 @@ import { encryptSecret } from "../services/paid-media/secrets.js";
 import { readClickIds } from "../middleware/clickIdCapture.js";
 import { WorkspaceForbiddenError } from "../services/studio/workspace.js";
 import { listAccessibleWorkspaces } from "../services/studio/workspace.js";
+import { isSuperAdmin } from "../middleware/superAdmin.js";
 
 export const paidMediaRoutes = new Hono<AppEnv>();
 
@@ -64,7 +65,7 @@ function uid(c: any): string {
   return c.var.user?.sub as string;
 }
 
-function env(c: any): PaidMediaEnv & { JWT_SECRET?: string; FRONTEND_URL?: string; BASE_URL?: string } {
+function env(c: any): PaidMediaEnv & { JWT_SECRET?: string; FRONTEND_URL?: string; BASE_URL?: string; HOUSE_USER_ID?: string } {
   return (c.env ?? process.env) as any;
 }
 
@@ -90,6 +91,82 @@ function withinErrorHandling<T>(c: any, fn: () => Promise<T>): Promise<Response>
 paidMediaRoutes.get("/platforms", (c) => {
   return c.json(success(listAdapters(env(c))));
 });
+
+// ─── House workspace config (#986) ──────────────────────────────────────────
+// SA-only. Surfaces HOUSE_USER_ID so the /superadmin/ads page can bind the
+// house workspace via forceWorkspace={{ kind:'delegated', subjectUserId }}
+// instead of falling through to the calling SA's PERSONAL ad connections.
+//
+// As a side effect it lazily ensures the calling SuperAdmin holds an active
+// `workspace_grants` row (scope 'studio') against the house subject, so
+// canActFor() authorizes the delegated workspace on every subsequent
+// paid-media write. The seed script does the same on first boot; this guards
+// the case where a NEW SA visits the page before the seed re-runs. We reuse
+// the existing `delegated` kind + canActFor SSoT — no 4th workspace kind.
+paidMediaRoutes.get("/house-config", async (c) => withinErrorHandling(c, async () => {
+  const actorUserId = uid(c);
+  if (!isSuperAdmin(c.var.user)) {
+    throw new WorkspaceForbiddenError("House workspace is SuperAdmin-only.");
+  }
+  const houseUserId = env(c).HOUSE_USER_ID ?? null;
+  if (!houseUserId) {
+    // Not configured — the page falls back to its personal-workspace
+    // behaviour. Surfacing null (not an error) keeps the SA ads page usable
+    // in environments where the house account hasn't been seeded yet.
+    return { houseUserId: null as string | null, granted: false };
+  }
+  const d = getDb();
+  // Confirm the reserved user actually exists before granting against it.
+  const [house] = await d
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.id, houseUserId))
+    .limit(1);
+  if (!house) {
+    return { houseUserId: null as string | null, granted: false };
+  }
+  // Idempotently ensure an active grant (subject=house, contributor=SA,
+  // scope='studio'). The unique partial index uq_workspace_grants_active
+  // makes the insert a no-op when the active grant already exists.
+  const granted = await ensureHouseGrant(d, houseUserId, actorUserId);
+  return { houseUserId, granted };
+}));
+
+/** Ensures the given contributor (a SuperAdmin) holds an active studio-scope
+ *  grant against the house subject. Idempotent: returns true without writing
+ *  when an active grant already exists. */
+async function ensureHouseGrant(
+  d: ReturnType<typeof getDb>,
+  houseUserId: string,
+  contributorUserId: string,
+): Promise<boolean> {
+  if (houseUserId === contributorUserId) return true; // SA is the house user — self-act.
+  const [existing] = await d
+    .select({ id: schema.workspaceGrants.id })
+    .from(schema.workspaceGrants)
+    .where(
+      and(
+        eq(schema.workspaceGrants.subjectUserId, houseUserId),
+        eq(schema.workspaceGrants.contributorUserId, contributorUserId),
+        eq(schema.workspaceGrants.scope, "studio"),
+        eq(schema.workspaceGrants.isActive, true),
+      ),
+    )
+    .limit(1);
+  if (existing) return true;
+  await d
+    .insert(schema.workspaceGrants)
+    .values({
+      subjectUserId: houseUserId,
+      contributorUserId,
+      grantedByUserId: contributorUserId,
+      role: "editor",
+      scope: "studio",
+      isActive: true,
+    })
+    .onConflictDoNothing();
+  return true;
+}
 
 // ─── OAuth ────────────────────────────────────────────────────────────────
 // POST /oauth/start — auth-required. SPA calls with workspace + platform,

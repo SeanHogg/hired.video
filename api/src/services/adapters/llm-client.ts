@@ -565,6 +565,7 @@ function normalizeUsage(
     completionTokens: raw?.completion_tokens ?? 0,
     totalTokens: raw?.total_tokens ?? 0,
     model: resolvedModel ?? requestedModel,
+    requestedModel,
     ...(traceId ? { traceId } : {}),
   };
 }
@@ -828,10 +829,19 @@ export function createLLMClient(
           // is only the silent gateway-side swap.
           attempts.length === 0
         ) {
+          const latencyMs = Date.now() - startedAt;
+          // Structured + greppable. The same substitution fact is also
+          // recorded on the queryable usage-ledger metadata downstream
+          // (token-ledger.charge → servicesProcessor.meter) so SA can
+          // dashboard SLA breaches, not just grep logs (gap #515 option b).
           console.warn(
-            `[llm-client ${correlationId}] substitution-alarm ${opts.useCase}: ` +
-              `requested=${profile.model}, gateway-resolved=${usage.model}. ` +
-              `Latency-pinned use cases will see SLA regressions.`,
+            `[llm-client ${correlationId}] substitution-alarm`,
+            JSON.stringify({
+              useCase: opts.useCase,
+              requestedModel: profile.model,
+              resolvedModel: usage.model,
+              latencyMs,
+            }),
           );
         }
         const finishReason =

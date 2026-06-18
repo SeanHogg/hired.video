@@ -137,6 +137,17 @@ export const tokenLedger: TokenLedger = {
       });
     }
 
+    // #515 — silent model-substitution alarm. The gateway treats `model`
+    // as a HINT and may swap vendors on cooldown / outage / plan mismatch.
+    // For latency-pinned use cases (e.g. `match` requires Cerebras sub-200ms)
+    // a swap is a ~50× latency hit / SLA breach. The resolved model lives on
+    // `usage.model`; the hint we asked for is `usage.requestedModel`. When
+    // they differ, stamp the substitution onto the usage-ledger metadata so
+    // SA can query/dashboard it (not just grep the llm-client log). Observability
+    // only — dispatch behaviour is unchanged.
+    const substituted =
+      Boolean(usage.requestedModel) && usage.model !== usage.requestedModel;
+
     // Write-through to the central usage ledger so the Usage Statement panel
     // + monthly close cron can see AI consumption next to every other gated
     // dimension. Best-effort — token accounting still lives in token_usage,
@@ -146,7 +157,15 @@ export const tokenLedger: TokenLedger = {
         userId,
         eventType: "ai_tokens",
         quantity: usage.totalTokens,
-        metadata: { featureKey, model: usage.model, toolRunId, sessionId },
+        metadata: {
+          featureKey,
+          model: usage.model,
+          toolRunId,
+          sessionId,
+          ...(substituted
+            ? { substituted: true, requestedModel: usage.requestedModel, resolvedModel: usage.model }
+            : {}),
+        },
       });
     } catch (err) {
       console.warn(`[token-ledger] failed to mirror ai_tokens to usage_ledger:`, err);

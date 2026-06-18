@@ -78,6 +78,7 @@ import RecruitSharingSettings from "@/components/recruit/RecruitSharingSettings"
 import PromoteWithoutAuthToggle from "@/components/settings/PromoteWithoutAuthToggle";
 import ConfidentialModeToggle from "@/components/settings/ConfidentialModeToggle";
 import ProfileSectionsSettingsCard from "@/components/settings/ProfileSectionsSettingsCard";
+import VendorIntegrationsCard from "@/components/settings/VendorIntegrationsCard";
 import { AccountAuditLogPanel } from "@/components/settings/AccountAuditLogPanel";
 import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
 import { useThemePreference, type ThemeChoice } from "@/lib/theme/use-theme-preference";
@@ -1476,6 +1477,10 @@ function SettingsContent() {
               </TabsContent>
 
               <TabsContent value="integrations" className="space-y-6">
+                {/* Generic self-serve API-key vendor registry (#261). Admin
+                    only — the card self-hides (returns null) on a 403. */}
+                <VendorIntegrationsCard />
+
                 {/* Social publishing connections (PRD §5.0, Lane B). The full
                     connect/disconnect surface lives at /settings/connections;
                     this card is the discoverable entry point. */}

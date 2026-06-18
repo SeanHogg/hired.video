@@ -107,6 +107,7 @@ const SearchPage = lazy(() => import("./pages/Search"));
 const Settings = lazy(() => import("./pages/Settings"));
 const EmailPreferences = lazy(() => import("./pages/EmailPreferences"));
 const PaidMediaPage = lazy(() => import("./pages/paid-media/PaidMediaPage"));
+const SuperAdminPaidMediaPage = lazy(() => import("./pages/paid-media/SuperAdminPaidMediaPage"));
 const ConnectionsPage = lazy(() => import("./pages/settings/Connections"));
 const SocialAccountsPage = lazy(() => import("./pages/admin/SocialAccounts"));
 const Contributors = lazy(() => import("./pages/Contributors"));
@@ -1159,7 +1160,7 @@ const App = () => (
                       <Route path="/settings" element={<Settings />} />
                       <Route path="/settings/ads"     element={<PaidMediaPage />} />
                       <Route path="/settings/connections" element={<ConnectionsPage />} />
-                      <Route path="/superadmin/ads"   element={<PaidMediaPage title="Paid Media (Internal Growth)" />} />
+                      <Route path="/superadmin/ads"   element={<SuperAdminPaidMediaPage />} />
                       <Route path="/contributors" element={<Contributors />} />
                       <Route path="/help" element={<Help />} />
                       <Route path="/help/:slug" element={<HelpArticle />} />
