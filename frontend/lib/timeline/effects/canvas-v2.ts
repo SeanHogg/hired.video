@@ -595,7 +595,7 @@ registerEffect({
  *  already set. Identity grades are a no-op, so existing widgets are
  *  unaffected. `ctx.restore()` (called by the applier) clears it. */
 function applyWidgetGrade(
-  ctx: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   params: Record<string, unknown>,
 ): void {
   const grade = filtersToCss(params.filters as VideoFilters | null | undefined);
