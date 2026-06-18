@@ -608,7 +608,13 @@ export class PointsRepository implements IPointsRepository {
       .select({ fp: sessions.deviceFingerprint })
       .from(sessions)
       .where(and(eq(sessions.userId, userId), isNotNull(sessions.deviceFingerprint)));
-    const fps = [...new Set(myRows.map((r) => r.fp).filter((f): f is string => Boolean(f)))];
+    const fps = [
+      ...new Set(
+        myRows
+          .map((r: { fp: string | null }) => r.fp)
+          .filter((f): f is string => Boolean(f)),
+      ),
+    ];
     if (fps.length === 0) return 0;
     const rows = await this.db
       .select({ uid: sessions.userId })

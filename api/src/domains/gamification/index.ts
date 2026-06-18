@@ -22,6 +22,7 @@ import {
 import { RedemptionEngine, type RedemptionOutcome } from "./redemption-engine.js";
 import { buildTremendousClient } from "../../services/tremendous/client.js";
 import { NotificationService } from "../../services/notifications/notificationService.js";
+import { getOrSetCached } from "../../utils/edge-cache.js";
 
 export interface AwardArgs {
   userId: string;

@@ -24,11 +24,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildFakeDb } from "../../../handlers/__testing__/fake-db.ts";
+import { buildFakeDb } from "../../../handlers/__testing__/fake-db.js";
 import { publishVideoToYouTube, PublishVideoError } from "../publishVideoUseCase.js";
 import { YouTubeAuthError } from "../youtubeOAuth.js";
 import { YouTubeUploadError } from "../youtubeUpload.js";
-import { V4_UUID, SYNTHETIC_V4_UUID } from "../../../../../shared/__tests__/uuid-fixtures.ts";
+import { V4_UUID, SYNTHETIC_V4_UUID } from "../../../../../shared/__tests__/uuid-fixtures.js";
 
 const USER = V4_UUID;
 const VIDEO_ID = SYNTHETIC_V4_UUID;
