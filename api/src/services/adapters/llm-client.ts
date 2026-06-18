@@ -134,6 +134,12 @@ export interface LLMUsage {
    *  model when the gateway substituted on cooldown / outage.
    *  SA-only telemetry — never echo to consumers (use `toClientUsage`). */
   model: string;
+  /** The model HINT we asked the gateway for on this attempt (the profile
+   *  model). Carried alongside the resolved `model` so the charge path can
+   *  detect silent gateway-side substitution (`model !== requestedModel`)
+   *  and stamp it onto the queryable usage-ledger metadata — gap #515.
+   *  SA-only telemetry; never echoed to consumers (`toClientUsage` strips it). */
+  requestedModel?: string;
   /** Gateway trace id (`llm-…`) for this call — `_builderforce.traceId`
    *  (Builderforce SDK ≥0.8.1). The ONLY diagnostic identifier safe to
    *  surface to consumers: quoting it to Builderforce support pulls up

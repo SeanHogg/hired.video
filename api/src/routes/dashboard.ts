@@ -9,6 +9,7 @@ import { getProfileStats } from "../services/profile/profileStats.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, checkAIUsage } from "../middleware/tierEnforcement.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { aiFailure } from "../services/adapters/llm-error.js";
 import { cacheMiddleware } from "../utils/cache-headers.js";
 import { etagMiddleware } from "../utils/etag.js";
 
@@ -539,13 +540,11 @@ Return JSON: { "headline": "<1-sentence summary>", "insights": ["<3-4 key observ
     );
 
     return c.json(success(data), 200);
-  } catch {
-    return c.json(success({
-      headline: "Your pipeline is active — here are ways to improve your outcomes.",
-      insights: [`${applications.length} applications submitted this month.`, `${interviewRate}% interview conversion rate.`],
-      recommendations: ["Follow up on pending applications.", "Update your profile to attract recruiters."],
-      riskFlags: [],
-    }), 200);
+  } catch (err) {
+    // Configured-but-threw: surface a typed AI_* envelope instead of
+    // returning canned insights as if the AI produced them. The no-key
+    // branch above remains the genuine static fallback.
+    return aiFailure(c, err, "[dashboard/ai-insights] LLM error");
   }
 });
 
@@ -640,16 +639,11 @@ Return JSON: {
     );
 
     return c.json(success(data), 200);
-  } catch {
-    const nextReviewDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-    return c.json(success({
-      summary: `Hi ${userName}! Keep up the momentum — ${appCount} applications this month is a great start.`,
-      actionItems: ["Follow up on pending applications.", "Update your resume with a recent achievement.", "Practice one interview question today.", "Share a career insight on the Feed."],
-      skillGaps: ["Consider adding a relevant certification to your profile.", "Strengthen your LinkedIn presence."],
-      marketSignals: ["Demand for your skills remains strong.", "Remote opportunities are expanding in your field."],
-      wins: appCount > 0 ? [`${appCount} applications submitted this month!`] : ["Your profile is live and recruiters can find you."],
-      nextReviewDate,
-    }), 200);
+  } catch (err) {
+    // Configured-but-threw: surface a typed AI_* envelope instead of
+    // returning a canned copilot plan as if the AI generated it. The
+    // no-key branch above remains the genuine static fallback.
+    return aiFailure(c, err, "[dashboard/career-copilot] LLM error");
   }
 });
 

@@ -10,6 +10,7 @@ import {
   type ToolCall,
   type ToolSpec,
 } from "../services/adapters/llm-client.js";
+import { aiFailure } from "../services/adapters/llm-error.js";
 import { BuilderforceClient } from "@seanhogg/builderforce-sdk";
 import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
@@ -273,11 +274,12 @@ aiRoutes.post("/chat", async (c) => {
       promptTokens = result.usage.promptTokens;
       completionTokens = result.usage.completionTokens;
       traceId = result.usage.traceId;
-    } catch {
-      const mock = generateMockResponse(userMessage || "");
-      responseMessage = mock.message;
-      promptTokens = mock.usage.promptTokens;
-      completionTokens = mock.usage.completionTokens;
+    } catch (err) {
+      // Configured-but-threw: surface a typed AI_* envelope (correlationId
+      // + upgrade banner on plan exhaustion) instead of silently serving a
+      // canned mock reply as if the assistant answered. The no-key branch
+      // below remains the genuine mock fallback.
+      return aiFailure(c, err, "[ai/chat] LLM error");
     }
   } else {
     const mock = generateMockResponse(userMessage || "");

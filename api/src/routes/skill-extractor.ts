@@ -4,6 +4,7 @@ import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { aiFailure } from "../services/adapters/llm-error.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import {
   extractSkills,
@@ -138,7 +139,16 @@ skillExtractorRoutes.post("/extract", async (c) => {
     };
   }
 
-  const result = await extractSkills(llm, extractInput);
+  let result: ExtractResponse;
+  try {
+    // Opt into throw-on-error: this is the user-facing tool surface, so a
+    // configured-but-failed LLM call must surface a typed AI_* envelope
+    // (gap #726) rather than silently returning the heuristic fallback.
+    // The no-key path keeps the fallback (llm === null above).
+    result = await extractSkills(llm, extractInput, { throwOnError: true });
+  } catch (err) {
+    return aiFailure(c, err, "[skill-extractor] LLM error");
+  }
 
   // For resume-json calls, resolve evidenceLabels to UUIDs and emit
   // `evidence` rows alongside the skills. The caller can persist these

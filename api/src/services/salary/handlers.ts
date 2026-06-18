@@ -349,12 +349,12 @@ export async function handleAnalyze(
       );
       return ok(projectLLMResponse(llmResult, input.industry));
     } catch (err) {
-      // Log + fall through to the deterministic stub. A salary tool
-      // returning *something* is better than a hard 500 — and the
-      // `fallback: true` flag tells callers what they're getting.
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[salary] LLM analyze failed, using fallback: ${msg.slice(0, 200)}`);
-      return ok(buildSalaryFallback(input));
+      // The LLM was configured (deps.llm present) but the CALL threw —
+      // do NOT leak the deterministic stub as if it were a real answer.
+      // Re-throw so the route boundary maps it through the shared
+      // aiFailure() seam (typed AI_* envelope + correlationId). The stub
+      // remains only the genuine "no LLM configured" fallback below.
+      throw err;
     }
   }
 
@@ -443,9 +443,9 @@ export async function handleNegotiationTips(
       );
       return ok(llmResult);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[salary] LLM negotiation failed, using fallback: ${msg.slice(0, 200)}`);
-      return ok(buildNegotiationFallback(input));
+      // Configured-but-threw: re-throw so the route maps it through the
+      // shared aiFailure() seam instead of leaking the canned stub.
+      throw err;
     }
   }
 

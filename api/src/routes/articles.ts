@@ -25,6 +25,7 @@ import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
+import { buildAIErrorEnvelope } from "../services/adapters/llm-error.js";
 import { getDb, schema } from "../db/index.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
 import { slugify } from "../../../shared/slugify.js";
@@ -428,6 +429,10 @@ articleRoutes.post("/:id/submit-for-review", async (c) => {
   try {
     classified = await runArticleClassifier(c, existing);
   } catch (e) {
+    // #529: an exhausted AI plan during classification surfaces the upgrade
+    // banner; genuine classifier faults keep the specific CLASSIFIER_FAILED code.
+    const envelope = buildAIErrorEnvelope(e);
+    if (envelope) return c.json(error(envelope.code, envelope.message, envelope.payload), envelope.status);
     return c.json(error("CLASSIFIER_FAILED", e instanceof Error ? e.message : String(e)), 502);
   }
   const { result, gate } = classified;
@@ -871,6 +876,9 @@ articleRoutes.post("/:id/classify", async (c) => {
     bumpSearchVersion();
     return c.json(success({ article: updated, findings: result }), 200);
   } catch (e) {
+    // #529: exhausted AI plan → upgrade banner; else specific classifier fault.
+    const envelope = buildAIErrorEnvelope(e);
+    if (envelope) return c.json(error(envelope.code, envelope.message, envelope.payload), envelope.status);
     return c.json(error("CLASSIFIER_FAILED", e instanceof Error ? e.message : String(e)), 500);
   }
 });

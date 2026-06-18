@@ -369,6 +369,19 @@ function buildExtractInput(input: SkillExtractInput): BuiltExtractInput {
 export async function extractSkills(
   llm: LLMClient | null,
   input: SkillExtractInput,
+  opts?: {
+    /** When true, a post-call LLM EXCEPTION re-throws instead of silently
+     *  degrading to the heuristic fallback. User-facing tool routes
+     *  (e.g. POST /api/skill-extractor/extract) opt in so the failure
+     *  surfaces as a typed AI_* envelope via the shared aiFailure() seam
+     *  rather than masquerading the heuristic as a real LLM result
+     *  (gap #726). Defaults to false so embedded callers (resume-parse,
+     *  interview question-gen) keep degrading gracefully — they must not
+     *  fail their whole flow on an AI hiccup. The genuine "no LLM
+     *  configured" path (`llm === null`) always returns the fallback
+     *  regardless of this flag. */
+    throwOnError?: boolean;
+  },
 ): Promise<ExtractResponse> {
   const built = buildExtractInput(input);
 
@@ -410,6 +423,11 @@ export async function extractSkills(
       summary: result.data.summary,
     };
   } catch (err) {
+    if (opts?.throwOnError) {
+      // User-facing tool surface — let the route map this to a typed
+      // AI_* envelope instead of leaking the heuristic as a real result.
+      throw err;
+    }
     console.error(
       "[skill-extraction] LLM error, falling back to heuristic:",
       err,

@@ -19,7 +19,9 @@ import {
   boolean,
   timestamp,
   jsonb,
+  integer,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { companyProfiles } from "./companies.js";
 import { studioProjects } from "./resumes.js";
@@ -94,7 +96,11 @@ export const videoCampaigns = pgTable(
     utmMedium:   text("utm_medium"),
     utmCampaign: text("utm_campaign"),
     status:      text("status").notNull().default("active"),   // active | paused | archived
-    projectIds:  jsonb("project_ids").notNull().default("[]"),  // studio_projects.id[] — renamed in 0085
+    // Project membership lives in `videoCampaignProjects` (junction) as of
+    // migration 0462 (gap #983) — was a `project_ids` jsonb array, which
+    // couldn't be queried ("campaigns featuring project X") or enforce
+    // referential integrity. The DTO still exposes `projectIds: string[]`,
+    // hydrated from the junction.
     stats:       jsonb("stats").notNull().default("{}"),        // cached rollup
     createdAt:   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt:   timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -102,5 +108,28 @@ export const videoCampaigns = pgTable(
   (t) => [
     index("idx_video_campaigns_user").on(t.userId),
     index("idx_video_campaigns_company").on(t.companyId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Video campaign ↔ project membership (junction). Many-to-many between
+// `video_campaigns` and `studio_projects`. Replaces the legacy
+// `video_campaigns.project_ids` jsonb array (gap #983, migration 0462):
+// the junction is queryable in both directions (the idx on project_id makes
+// "every campaign featuring project X" indexed) and the FKs guarantee
+// referential integrity (a deleted project/campaign cascades its rows away
+// instead of leaving dangling ids). `position` preserves ordering.
+// ---------------------------------------------------------------------------
+export const videoCampaignProjects = pgTable(
+  "video_campaign_projects",
+  {
+    campaignId: uuid("campaign_id").notNull().references(() => videoCampaigns.id, { onDelete: "cascade" }),
+    projectId:  uuid("project_id").notNull().references(() => studioProjects.id, { onDelete: "cascade" }),
+    position:   integer("position").notNull().default(0),
+    createdAt:  timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_video_campaign_projects").on(t.campaignId, t.projectId),
+    index("idx_video_campaign_projects_project").on(t.projectId),
   ],
 );

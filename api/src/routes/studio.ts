@@ -1,5 +1,5 @@
 import { Hono, type Context } from "hono";
-import { and, count, desc, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables, AppEnv } from "../types/index.js";
@@ -8,6 +8,7 @@ import { bumpSearchVersion } from "../utils/search-cache.js";
 import { tokenLedger } from "../domains/billing/token-ledger.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { createLLMClient } from "../services/adapters/llm-client.js";
+import { aiFailure, buildAIErrorEnvelope } from "../services/adapters/llm-error.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
 import { PageEmbedService } from "../services/studio/page-embed-service.js";
 import {
@@ -43,6 +44,7 @@ import { slugify, SLUG_PATTERN, isValidSlug } from "../../../shared/slugify.js";
 import { extractCtaHotzones } from "../../../shared/cta-hotzones.js";
 import type { Timeline } from "../../../shared/timeline.js";
 import { deleteR2Keys } from "../services/storage/r2-delete.js";
+import { reclaimVideoR2 } from "../services/storage/reclaim-video-r2.js";
 import { OptionalUrlSchema, UuidLikeSchema } from "../../../shared/validation.js";
 import {
   listPublications,
@@ -58,7 +60,7 @@ import {
 import { youtubeOAuthConfig } from "../services/youtube/youtubeOAuth.js";
 import { PUBLISH_DESTINATIONS } from "../../../shared/media-kinds.js";
 
-const { studioProjects, studioProjectSubjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns, resumeInformation } = schema;
+const { studioProjects, studioProjectSubjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns, videoCampaignProjects, resumeInformation } = schema;
 
 // Studio purpose enum lives in shared/studio-purposes.ts so the
 // frontend response validators can't drift away from the server's
@@ -1012,10 +1014,11 @@ studioRoutes.post("/storyboard", async (c) => {
       const { data } = await Promise.race([callPromise, timeoutPromise]);
       script = data;
     } catch (err) {
-      console.error("[studio/storyboard] LLM call failed, using mock:", err);
-      script = purpose === "resume"
-        ? buildMockVideoScript(resumeText, targetDuration, motion)
-        : buildMockAdVideoScript(resumeText, targetDuration, motion, purpose, ctaUrl, ctaText);
+      // Configured-but-threw (or timed out) — surface a typed AI_*
+      // envelope instead of silently serving a mock storyboard as if the
+      // AI generated it. The `basic` purpose above is a deliberate
+      // blank-starter template, not an error fallback.
+      return aiFailure(c, err, "[studio/storyboard] LLM call failed");
     }
   }
 
@@ -1250,6 +1253,13 @@ studioRoutes.post("/generate-comic", async (c) => {
 
     return c.json(ok({ spec, sourceKindResolved: resolvedSourceKind }), 201);
   } catch (err) {
+    // LLM dispatch failures get the typed AI_* envelope (correlationId +
+    // upgrade banner on plan exhaustion); genuine non-AI failures keep
+    // the GENERATION_FAILED shape.
+    const envelope = buildAIErrorEnvelope(err);
+    if (envelope) {
+      return c.json(fail(envelope.code, envelope.message, envelope.payload), envelope.status);
+    }
     console.error("[studio/generate-comic] scaffolder failed:", err);
     return c.json(
       fail(
@@ -1373,6 +1383,12 @@ studioRoutes.post("/generate-from-page", async (c) => {
     });
     return c.json(ok({ spec, sourcePath: page.pathname }), 201);
   } catch (err) {
+    // LLM dispatch failures get the typed AI_* envelope; genuine non-AI
+    // failures keep the GENERATION_FAILED shape.
+    const envelope = buildAIErrorEnvelope(err);
+    if (envelope) {
+      return c.json(fail(envelope.code, envelope.message, envelope.payload), envelope.status);
+    }
     console.error("[studio/generate-from-page] scaffolder failed:", err);
     return c.json(
       fail(
@@ -3301,6 +3317,43 @@ studioRoutes.delete("/projects/:projectId/subjects/:kind/:subjectId", async (c) 
   return c.json(ok({ projectId, subjects }));
 });
 
+// ─── DELETE /videos/:id ───────────────────────────────────────────────────────
+// Explicit per-video delete with R2 reclamation (gap #730). Reclaims the
+// video's R2 blob THEN drops the row, so the object isn't leaked the way the
+// `users` ON DELETE CASCADE leaks it. Authorized the same way every other
+// video write is: `assertCanWrite` against the row's real owner (personal,
+// company, or delegated grant) — admins/SA pass via canActFor's admin bypass.
+// 404 (not 403) on unreadable ids to avoid leaking existence.
+studioRoutes.delete("/videos/:id", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const db = getDb();
+
+  const [row] = await db
+    .select({
+      id: videos.id,
+      userId: videos.userId,
+      companyId: videos.companyId,
+      r2Key: videos.r2Key,
+    })
+    .from(videos)
+    .where(eq(videos.id, id))
+    .limit(1);
+  if (!row) return c.json(fail("NOT_FOUND", "Video not found"), 404);
+  try {
+    await assertCanWrite(user.sub, row.userId, row.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
+
+  // Reclaim the blob first so a crash between the two leaves an orphaned R2
+  // object (caught by the admin sweep) rather than a dangling DB row.
+  await reclaimVideoR2([row]);
+  await db.delete(videos).where(eq(videos.id, id));
+  return c.json(ok({ id }));
+});
+
 // ─── GET /videos/user/:userId ─────────────────────────────────────────────────
 // Returns published studio videos for a user (for profile display).
 // No auth required — returns public/published videos only.
@@ -4342,6 +4395,68 @@ const CampaignSchema = z.object({
   projectIds:  z.array(UuidLikeSchema).default([]),
 });
 
+/**
+ * Project membership now lives in the `video_campaign_projects` junction
+ * (gap #983, migration 0462) rather than a jsonb array on `video_campaigns`.
+ * These helpers keep that detail behind the campaign routes so the DTO still
+ * exposes a flat `projectIds: string[]` (the frontend contract is unchanged).
+ */
+
+/** Bulk-load ordered project ids for many campaigns in ONE query (no N+1). */
+async function loadCampaignProjectIds(
+  db: ReturnType<typeof getDb>,
+  campaignIds: string[],
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (campaignIds.length === 0) return map;
+  const rows = await db
+    .select({
+      campaignId: videoCampaignProjects.campaignId,
+      projectId: videoCampaignProjects.projectId,
+    })
+    .from(videoCampaignProjects)
+    .where(inArray(videoCampaignProjects.campaignId, campaignIds))
+    .orderBy(asc(videoCampaignProjects.campaignId), asc(videoCampaignProjects.position));
+  for (const r of rows) {
+    const list = map.get(r.campaignId) ?? [];
+    list.push(r.projectId);
+    map.set(r.campaignId, list);
+  }
+  return map;
+}
+
+/**
+ * Replace a campaign's project membership with `projectIds` (ordered).
+ * Idempotent: clears existing rows, then inserts the new set. Dangling ids
+ * (no matching studio_projects row) are filtered out so the FK can't fail —
+ * mirrors the legacy behaviour where the jsonb array could carry stale ids
+ * harmlessly. Runs inside the caller's request; one delete + one insert.
+ */
+async function setCampaignProjects(
+  db: ReturnType<typeof getDb>,
+  campaignId: string,
+  projectIds: string[],
+): Promise<void> {
+  await db.delete(videoCampaignProjects).where(eq(videoCampaignProjects.campaignId, campaignId));
+  const unique = Array.from(new Set(projectIds));
+  if (unique.length === 0) return;
+  const existing = await db
+    .select({ id: studioProjects.id })
+    .from(studioProjects)
+    .where(inArray(studioProjects.id, unique));
+  const valid = new Set(existing.map((r) => r.id));
+  const rows = unique
+    .filter((id) => valid.has(id))
+    .map((projectId, position) => ({ campaignId, projectId, position }));
+  if (rows.length === 0) return;
+  await db.insert(videoCampaignProjects).values(rows);
+}
+
+/** Shape the campaign DTO with its hydrated `projectIds` (junction-backed). */
+function toCampaignDto<T extends { id: string }>(campaign: T, projectIds: string[]) {
+  return { ...campaign, projectIds };
+}
+
 studioRoutes.get("/campaigns", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
@@ -4361,7 +4476,12 @@ studioRoutes.get("/campaigns", async (c) => {
     .from(videoCampaigns)
     .where(and(ownership, sql`${videoCampaigns.status} != 'archived'`))
     .orderBy(desc(videoCampaigns.createdAt));
-  return c.json(ok(campaigns));
+  // Bulk-hydrate junction membership so each DTO carries `projectIds` without
+  // N+1ing the join table (gap #983).
+  const projectIdsByCampaign = await loadCampaignProjectIds(db, campaigns.map((c) => c.id));
+  return c.json(ok(campaigns.map((campaign) =>
+    toCampaignDto(campaign, projectIdsByCampaign.get(campaign.id) ?? []),
+  )));
 });
 
 studioRoutes.post("/campaigns", async (c) => {
@@ -4378,16 +4498,18 @@ studioRoutes.post("/campaigns", async (c) => {
     throw e;
   }
   const db = getDb();
+  const { projectIds, ...campaignFields } = parsed.data;
   const [campaign] = await db
     .insert(videoCampaigns)
     .values({
-      ...parsed.data,
+      ...campaignFields,
       userId: target.ownerUserId,
       companyId: target.ownerCompanyId,
-      projectIds: parsed.data.projectIds,
     } as any)
     .returning();
-  return c.json(ok(campaign), 201);
+  // Membership lives in the junction (gap #983) — write the ordered set.
+  await setCampaignProjects(db, campaign.id, projectIds);
+  return c.json(ok(toCampaignDto(campaign, projectIds)), 201);
 });
 
 studioRoutes.patch("/campaigns/:id", async (c) => {
@@ -4414,14 +4536,19 @@ studioRoutes.patch("/campaigns/:id", async (c) => {
   if (typeof body.utmMedium === "string") updates.utmMedium = body.utmMedium;
   if (typeof body.utmCampaign === "string") updates.utmCampaign = body.utmCampaign;
   if (typeof body.status === "string") updates.status = body.status;
-  if (Array.isArray(body.projectIds)) updates.projectIds = body.projectIds;
+  const campaignId = c.req.param("id");
+  // Membership (gap #983) lives in the junction — replace it when provided.
+  if (Array.isArray(body.projectIds)) {
+    await setCampaignProjects(db, campaignId, body.projectIds as string[]);
+  }
   const [updated] = await db
     .update(videoCampaigns)
     .set(updates as any)
-    .where(eq(videoCampaigns.id, c.req.param("id")))
+    .where(eq(videoCampaigns.id, campaignId))
     .returning();
   if (!updated) return c.json(fail("NOT_FOUND", "Campaign not found"), 404);
-  return c.json(ok(updated));
+  const projectIdsByCampaign = await loadCampaignProjectIds(db, [campaignId]);
+  return c.json(ok(toCampaignDto(updated, projectIdsByCampaign.get(campaignId) ?? [])));
 });
 
 studioRoutes.delete("/campaigns/:id", async (c) => {
@@ -4463,7 +4590,9 @@ studioRoutes.get("/campaigns/:id/stats", async (c) => {
     if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
     throw e;
   }
-  const projectIds = (campaign.projectIds as string[]) ?? [];
+  // Membership comes from the junction (gap #983), not a jsonb column.
+  const projectIdsByCampaign = await loadCampaignProjectIds(db, [campaign.id]);
+  const projectIds = projectIdsByCampaign.get(campaign.id) ?? [];
   if (projectIds.length === 0) return c.json(ok({ views: 0, ctaClicks: 0, shares: 0, projectCount: 0 }));
   const rows = await db
     .select({ event: videoAnalytics.event, total: count() })

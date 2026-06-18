@@ -20,6 +20,7 @@ import {
   type ResumeAnalysis,
 } from "../../../shared/tool-schemas.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { aiFailure } from "../services/adapters/llm-error.js";
 import {
   rewriteHighlightsAsXyz,
   rewriteSkillsAsAts,
@@ -129,8 +130,10 @@ resumeOptimizerRoutes.post("/consolidate-highlights", requireTokenBudget(), asyn
     );
     return c.json(success(data));
   } catch (err) {
-    console.error("[resume/consolidate-highlights] LLM error:", err);
-    return c.json(success({ items: echoItems }));
+    // Configured-but-threw: surface a typed AI_* envelope rather than
+    // echoing the input back 1:1 as if consolidation succeeded. The
+    // no-key branch above remains the only fallback that returns echo.
+    return aiFailure(c, err, "[resume/consolidate-highlights] LLM error");
   }
 });
 
@@ -185,9 +188,10 @@ resumeOptimizerRoutes.post("/shorten-bullet", requireTokenBudget(), async (c) =>
     );
     return c.json(success(data));
   } catch (err) {
-    console.error("[resume/shorten-bullet] LLM error:", err);
-    const cap = maxChars ?? 180;
-    return c.json(success({ improved: original.slice(0, cap) }));
+    // Configured-but-threw: surface a typed AI_* envelope rather than
+    // truncating the input as if shortening succeeded. The no-key branch
+    // above remains the only fallback that returns the truncated bullet.
+    return aiFailure(c, err, "[resume/shorten-bullet] LLM error");
   }
 });
 
@@ -230,8 +234,8 @@ resumeOptimizerRoutes.post("/rewrite-xyz-highlights", requireTokenBudget(), asyn
     const { items } = await rewriteHighlightsAsXyz(highlights, context, llm);
     return c.json(success({ items }));
   } catch (err) {
-    console.error("[resume/rewrite-xyz-highlights] LLM error:", err);
-    return c.json(success({ items: echoItems }));
+    // Configured-but-threw: typed AI_* envelope, not a silent echo.
+    return aiFailure(c, err, "[resume/rewrite-xyz-highlights] LLM error");
   }
 });
 
@@ -278,8 +282,8 @@ resumeOptimizerRoutes.post("/rewrite-xyz-text", requireTokenBudget(), async (c) 
     }
     return c.json(success(safe.data));
   } catch (err) {
-    console.error("[resume/rewrite-xyz-text] LLM error:", err);
-    return c.json(success({ improved: original }));
+    // Configured-but-threw: typed AI_* envelope, not a silent echo.
+    return aiFailure(c, err, "[resume/rewrite-xyz-text] LLM error");
   }
 });
 
@@ -324,8 +328,8 @@ resumeOptimizerRoutes.post("/rewrite-skills", requireTokenBudget(), async (c) =>
     const { items } = await rewriteSkillsAsAts(skills, llm);
     return c.json(success({ items }));
   } catch (err) {
-    console.error("[resume/rewrite-skills] LLM error:", err);
-    return c.json(success({ items: echoItems }));
+    // Configured-but-threw: typed AI_* envelope, not a silent echo.
+    return aiFailure(c, err, "[resume/rewrite-skills] LLM error");
   }
 });
 

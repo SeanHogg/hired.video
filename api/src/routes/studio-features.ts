@@ -26,6 +26,7 @@ import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { bumpSearchVersion } from "../utils/search-cache.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { aiFailure, buildAIErrorEnvelope } from "../services/adapters/llm-error.js";
 import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { transcribeAudio, analyzeDelivery, generateSuggestions } from "../services/adapters/transcription.js";
 import {
@@ -525,8 +526,10 @@ studioFeaturesRoutes.post("/linkedin/generate-post", requirePro("LinkedIn AI Pos
     }, LinkedInPostSchema);
     return c.json(ok(data));
   } catch (err) {
-    console.error("[linkedin/generate-post] LLM error, falling back:", err);
-    return c.json(ok(buildLinkedInHeuristicPost(transcript, project.resumeText)));
+    // Configured-but-threw: surface a typed AI_* envelope instead of
+    // serving the heuristic post as if the AI wrote it. The no-key branch
+    // above remains the genuine heuristic fallback.
+    return aiFailure(c, err, "[linkedin/generate-post] LLM error");
   }
 });
 
@@ -1152,6 +1155,13 @@ Resume context: ${(parsed.data.resumeText ?? "").slice(0, 2000)}`,
     const script = JSON.parse(content.replace(/```json?\s*/g, "").replace(/```/g, ""));
     return c.json(ok(script));
   } catch (err) {
+    // LLM dispatch failures get the typed AI_* envelope (correlationId +
+    // upgrade banner); a JSON.parse / other non-AI failure keeps the
+    // SCRIPT_GENERATION_FAILED shape.
+    const envelope = buildAIErrorEnvelope(err);
+    if (envelope) {
+      return c.json(fail(envelope.code, envelope.message, envelope.payload), envelope.status);
+    }
     return c.json(fail("SCRIPT_GENERATION_FAILED", `Failed: ${err}`), 500);
   }
 });
@@ -2729,8 +2739,7 @@ studioFeaturesRoutes.post("/projects/:projectId/script/rewrite", async (c) => {
       userId: user.sub,
     }));
   } catch (err) {
-    console.error("[script/rewrite] error:", err);
-    return c.json(fail("AI_ERROR", `Script rewrite failed: ${err}`), 500);
+    return aiFailure(c, err, "[script/rewrite] LLM error");
   }
 });
 
@@ -3454,8 +3463,7 @@ studioFeaturesRoutes.post("/projects/:projectId/hook/optimize", async (c) => {
       retention: retentionDiagnosis,
     }));
   } catch (err) {
-    console.error("[hook/optimize] error:", err);
-    return c.json(fail("AI_ERROR", `Hook optimizer failed: ${err}`), 500);
+    return aiFailure(c, err, "[hook/optimize] LLM error");
   }
 });
 

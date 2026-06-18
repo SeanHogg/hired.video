@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { aiFailure } from "../services/adapters/llm-error.js";
 
 export const linkedInPostRoutes = new Hono<AppEnv>();
 
@@ -73,7 +74,12 @@ Return ONLY a JSON object: { hook, caption, hashtags: string[], fullPost }`;
       const llm = createLLMClient(c.env, c.var.user);
       const { data } = await llm.callJson("linkedin_post_share", { useCase: "linkedin_post", systemPrompt, userMessage }, LinkedInResponseSchema);
       post = data;
-    } catch { /* keep mock fallback */ }
+    } catch (err) {
+      // Configured-but-threw: surface a typed AI_* envelope instead of
+      // silently returning the canned mock post. The mock remains the
+      // genuine "no provider key configured" fallback only.
+      return aiFailure(c, err, "[linkedin-post] LLM error");
+    }
   }
 
   return c.json({ success: true, data: post, timestamp: new Date().toISOString() });

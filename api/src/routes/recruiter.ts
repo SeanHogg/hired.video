@@ -7,6 +7,7 @@ import { success, error } from "../types/index.js";
 import { withGamification } from "../domains/gamification/with-gamification.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { buildAIErrorEnvelope, type AIErrorEnvelope } from "../services/adapters/llm-error.js";
 import { TALENT_POOL_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import { NON_CANDIDATE_ROLES } from "../../../shared/user-roles.js";
 import { normalizeJobUrl, computeContentHash } from "../services/job/JobService.js";
@@ -1398,7 +1399,7 @@ async function extractProfileFromHtml(
 	opts: { html: string; sourceUrl: string; force?: boolean; recruiterId: string },
 ): Promise<
 	| { ok: true; profile: any; talentPoolCandidate: any; duplicate: boolean }
-	| { ok: false; code: string; message: string }
+	| { ok: false; code: string; message: string; envelope?: AIErrorEnvelope }
 > {
 	const { html, sourceUrl, force, recruiterId } = opts;
 	const db = getDb();
@@ -1427,7 +1428,15 @@ Return JSON: { "name": "...", "title": "...", "company": "...", "location": "...
 				ProfileExtractionResponseSchema,
 			);
 			extracted = data;
-		} catch {
+		} catch (err) {
+			// Preserve the structured AI envelope (correlationId +
+			// upgrade-banner code on plan exhaustion) so the single-profile
+			// route can surface it; the batch path just reads `.ok` and
+			// keeps tolerating per-item failures.
+			const envelope = buildAIErrorEnvelope(err);
+			if (envelope) {
+				return { ok: false, code: envelope.code, message: envelope.message, envelope };
+			}
 			return { ok: false, code: "AI_ERROR", message: "Failed to extract profile." };
 		}
 	} else {
@@ -1533,7 +1542,18 @@ recruiterRoutes.post("/extract-profile", async (c) => {
 		force: parsed.data.force,
 		recruiterId: user.sub,
 	});
-	if (result.ok === false) return c.json(error(result.code, result.message), 500);
+	if (result.ok === false) {
+		// Surface the structured AI envelope when the failure was an LLM
+		// dispatch error (correct HTTP code + correlationId + upgrade
+		// banner); otherwise keep the generic 500.
+		if (result.envelope) {
+			return c.json(
+				error(result.envelope.code, result.envelope.message, result.envelope.payload),
+				result.envelope.status,
+			);
+		}
+		return c.json(error(result.code, result.message), 500);
+	}
 	return c.json(
 		success({
 			profile: result.profile,

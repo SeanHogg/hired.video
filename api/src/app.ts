@@ -89,6 +89,7 @@ import { lmsOauthRoutes } from "./routes/lms-oauth.js";
 import { superadminRoutes } from "./routes/superadmin/index.js";
 import { paymentRoutes } from "./routes/payment.js";
 import { payoutRoutes } from "./routes/payouts.js";
+import { adminPayoutRoutes } from "./routes/admin-payouts.js";
 import { outplacementRoutes } from "./routes/outplacement.js";
 import { boostCheckoutRoutes } from "./routes/boost-checkout.js";
 import { courseCheckoutRoutes } from "./routes/course-checkout.js";
@@ -726,6 +727,7 @@ export function createApp() {
   app.route("/api/affiliate", affiliateRoutes); // legacy singular endpoint alias
   app.route("/api/payment", paymentRoutes);
   app.route("/api/payouts", payoutRoutes);
+  app.route("/api/admin/payouts", adminPayoutRoutes);
   app.route("/api/outplacement", outplacementRoutes);
   app.route("/api/boost-checkout", boostCheckoutRoutes);
   app.route("/api/course-checkout", courseCheckoutRoutes);

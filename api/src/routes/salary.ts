@@ -23,6 +23,7 @@ import {
   requirePro,
 } from "../middleware/tierEnforcement.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { aiFailure } from "../services/adapters/llm-error.js";
 import {
   handleAnalyze,
   handleNegotiationTips,
@@ -49,8 +50,15 @@ async function relay(
 ) {
   const limitError = await checkTokenBudget(c as any);
   if (limitError) return limitError;
-  const { status, body } = await handlerResult;
-  return c.json(body as any, status as any);
+  try {
+    const { status, body } = await handlerResult;
+    return c.json(body as any, status as any);
+  } catch (err) {
+    // A configured LLM call threw inside the handler — surface the typed
+    // AI_* envelope + correlationId instead of a generic 500. The
+    // "no LLM configured" path never throws (handler returns a stub).
+    return aiFailure(c, err, "[salary] LLM call failed");
+  }
 }
 
 // ---------------------------------------------------------------------------

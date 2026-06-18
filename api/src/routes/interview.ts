@@ -6,6 +6,7 @@ import type { Env, Variables, AppEnv } from "../types/index.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { aiFailure } from "../services/adapters/llm-error.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { getPrompt } from "../../../shared/ai-prompts/index.js";
@@ -198,7 +199,10 @@ interviewRoutes.post("/questions", async (c) => {
       const { data } = await llm.callJson("interview_questions", { useCase: "interview_questions", systemPrompt, userMessage: userContent }, QuestionsResponseSchema);
       return c.json(ok(data));
     } catch (err) {
-      console.error("[interview/questions] LLM call failed, using mock:", err);
+      // Configured-but-threw: surface a typed AI_* envelope instead of
+      // serving the canned mock questions as if they were generated. The
+      // mock below remains the genuine "no provider key" fallback only.
+      return aiFailure(c, err, "[interview/questions] LLM call failed");
     }
   }
 
@@ -404,8 +408,9 @@ Schema:
       const { data } = await llm.callJson("interview_analyze", { useCase: "interview_analyze", systemPrompt, userMessage: userContent }, FeedbackSchema);
       feedbackResult = data;
     } catch (err) {
-      console.error("[interview/analyze] LLM call failed, using mock:", err);
-      feedbackResult = buildMockFeedback(extra.data.question, extra.data.transcript);
+      // Configured-but-threw: surface a typed AI_* envelope instead of
+      // saving + returning canned mock feedback as if the AI scored it.
+      return aiFailure(c, err, "[interview/analyze] LLM call failed");
     }
   } else {
     feedbackResult = buildMockFeedback(extra.data.question, extra.data.transcript);

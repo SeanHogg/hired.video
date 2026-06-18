@@ -5,6 +5,7 @@ import { randomBytes } from "crypto";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { aiFailure } from "../services/adapters/llm-error.js";
 import { extractJson as extractJsonShared } from "../services/resume/parse.js";
 import { getPrompt } from "../../../shared/ai-prompts/index.js";
 
@@ -44,7 +45,13 @@ careerRoutes.post("/resilience-score", async (c) => {
       });
       const parsed = extractJson(content);
       if (parsed) reportJson = parsed;
-    } catch { /* keep fallback */ }
+    } catch (err) {
+      // Configured-but-threw: surface a typed AI_* envelope (with
+      // correlationId) instead of silently persisting + returning the
+      // heuristic fallback report as if it were the AI answer. The
+      // fallback above remains the genuine "no provider key" path only.
+      return aiFailure(c, err, "[career/resilience-score] LLM error");
+    }
   }
 
   const riskScore = reportJson.riskScore ?? fallbackScore;

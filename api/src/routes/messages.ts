@@ -5,6 +5,7 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { aiFailure } from "../services/adapters/llm-error.js";
 import { checkAIUsage, requirePro } from "../middleware/tierEnforcement.js";
 import {
   TIER_COPY,
@@ -179,17 +180,12 @@ Return JSON: { "subject": "<concise email subject line>", "body": "<2-3 paragrap
       body: `Hi ${recipientName},\n\n${data.body}\n\nBest regards,\n${senderName}`,
     };
     return c.json(success(proResponse), 200);
-  } catch {
-    // Fallback to template on LLM error
-    const rolePhrase = jobTitle ? ` regarding the ${jobTitle} opportunity` : "";
-    return c.json(
-      success({
-        tier: "basic",
-        subject: `Following up${rolePhrase}`,
-        body: `Hi ${recipientName},\n\nI wanted to reach out and connect with you${rolePhrase}. I believe there's a strong alignment between my background and what you're looking for.\n\nWould you be open to a quick conversation?\n\nBest regards,\n${senderName}`,
-      }),
-      200,
-    );
+  } catch (err) {
+    // Configured Pro path threw — surface a typed AI_* envelope (with
+    // correlationId) instead of silently downgrading to the basic
+    // template as if it were the personalized result. The genuine
+    // no-key / non-Pro fallback is the basic template returned above.
+    return aiFailure(c, err, "[messages/personalize] LLM error");
   }
 });
 

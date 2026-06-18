@@ -16,6 +16,7 @@ import {
   type SubscriptionSnapshot,
 } from "../domains/planOverride/resolver.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
+import { reclaimVideoR2 } from "../services/storage/reclaim-video-r2.js";
 
 /** Deps this module actually needs. Services declare a narrow `Pick<ApiDeps, …>`
  *  so tests mock only the surface the function touches (ISP). Production
@@ -579,7 +580,18 @@ export async function bulkDeleteUsers(
       inArray(schema.adminAuditLog.targetId, targets),
     ));
 
+  // Snapshot the doomed videos' R2 keys BEFORE the cascade drops the rows.
+  // `videos.userId references users(id) on delete cascade` wipes the DB rows
+  // but leaks the R2 blobs (gap #730), so reclaim them explicitly. Best-effort
+  // / idempotent — a failure here must not abort the purge.
+  const doomedVideos = await db
+    .select({ r2Key: schema.videos.r2Key })
+    .from(schema.videos)
+    .where(inArray(schema.videos.userId, targets));
+
   await db.delete(schema.users).where(inArray(schema.users.id, targets));
+
+  await reclaimVideoR2(doomedVideos);
 
   // Batched audit insert — one subrequest instead of N.
   await deps.audit.logBatch(

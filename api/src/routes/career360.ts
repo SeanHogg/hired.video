@@ -30,7 +30,7 @@ import {
   selectTarget,
   suggestTargets,
 } from "../services/career360/Career360Service.js";
-import { buildAIErrorEnvelope } from "../services/adapters/llm-error.js";
+import { aiFailure as sharedAiFailure } from "../services/adapters/llm-error.js";
 
 export const career360Routes = new Hono<AppEnv>();
 
@@ -138,20 +138,7 @@ function aiFailure(tag: string, err: unknown, c: any) {
   if (msg === "USER_NOT_FOUND") {
     return c.json(error("NOT_FOUND", "Your profile could not be loaded."), 404);
   }
-  console.error(tag, err);
-  // Structured-trail path: the LLM facade throws LLMDispatchError with
-  // every per-profile attempt, gateway requestId, classifier, etc.
-  // buildAIErrorEnvelope picks the right HTTP code (502 vs 503) by
-  // classification and returns a payload the support ticket can carry.
-  const envelope = buildAIErrorEnvelope(err);
-  if (envelope) {
-    return c.json(error(envelope.code, envelope.message, envelope.payload), envelope.status);
-  }
-  return c.json(
-    error(
-      "AI_UNAVAILABLE",
-      "AI providers are temporarily unavailable. Please try again in a minute.",
-    ),
-    503,
-  );
+  // Delegate the AI-failure shape (structured trail, correlationId,
+  // 429/502/503 selection) to the single shared seam.
+  return sharedAiFailure(c, err, tag);
 }

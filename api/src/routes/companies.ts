@@ -4,6 +4,7 @@ import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
+import { buildAIErrorEnvelope } from "../services/adapters/llm-error.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import type { CompanyBenefits } from "../db/schema/companies.js";
@@ -845,7 +846,11 @@ Return JSON: { "name": "...", "industry": "...", "size": "...", "location": "...
         CompanyExtractionResponseSchema,
       );
       extracted = data;
-    } catch {
+    } catch (err) {
+      // #529: surface the upgrade banner when our AI plan is exhausted; else
+      // keep the generic extract-failed message.
+      const envelope = buildAIErrorEnvelope(err);
+      if (envelope) return c.json(error(envelope.code, envelope.message, envelope.payload), envelope.status);
       return c.json(error("AI_ERROR", "Failed to extract company details. Please try again."), 500);
     }
   } else {

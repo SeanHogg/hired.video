@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { aiFailure } from "../services/adapters/llm-error.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { getPrompt } from "../../../shared/ai-prompts/index.js";
@@ -168,7 +169,11 @@ resumeRoastRoutes.post("/roast", async (c) => {
       servicesProcessor.meterEvent(c, "resume_roast");
       return c.json(ok(data));
     } catch (err) {
-      console.error("[resume/roast] LLM error, falling back to mock:", err);
+      // LLM was configured but the call threw — surface a typed AI_*
+      // envelope (with correlationId) instead of silently serving the
+      // canned mock roast as if it were a real result. The mock below
+      // remains the genuine "no provider key configured" fallback only.
+      return aiFailure(c, err, "[resume/roast] LLM error");
     }
   }
 

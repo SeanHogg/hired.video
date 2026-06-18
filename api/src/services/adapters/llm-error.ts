@@ -25,11 +25,13 @@
  * such surfaces use the LLM today).
  */
 
+import type { Context } from "hono";
 import {
   LLMDispatchError,
   type LLMDispatchAttempt,
   type LLMFailoverEvent,
 } from "./llm-client.js";
+import { error } from "../../types/index.js";
 
 export { LLMDispatchError } from "./llm-client.js";
 export type { LLMDispatchAttempt, LLMFailoverEvent } from "./llm-client.js";
@@ -223,4 +225,54 @@ export function buildAIErrorEnvelope(err: unknown): AIErrorEnvelope | null {
         payload,
       };
   }
+}
+
+/** Generic fallback message + code used when `err` is NOT an
+ *  `LLMDispatchError` (so no structured trail to surface) but the route
+ *  still wants to report an AI failure. */
+const GENERIC_AI_FAILURE = {
+  code: "AI_UNAVAILABLE",
+  message:
+    "AI providers are temporarily unavailable. Please try again in a minute.",
+  status: 503 as const,
+};
+
+/**
+ * THE single seam every LLM-bound route uses in its `catch` block so the
+ * try/catch error shape can never drift between routes (gaps #519/#529).
+ *
+ * It runs `buildAIErrorEnvelope(err)`:
+ *  - matched (an `LLMDispatchError`) → returns the typed AI envelope JSON
+ *    with the correct HTTP code (429 upgrade / 502 / 503) AND the
+ *    diagnostic `payload` attached under `error.details`. That payload
+ *    carries the `correlationId` the frontend `appendDiagnosticReference`
+ *    fishes out — so EVERY call site now surfaces the correlationId
+ *    inline, not just the three hand-updated ones (#519).
+ *  - unmatched (any other throwable) → falls through to a typed
+ *    `AI_UNAVAILABLE` 503. The diagnostic reference is a no-op here
+ *    because there's no dispatch trail, which the frontend handles
+ *    gracefully (its appendDiagnosticReference is a no-op when absent).
+ *
+ * Callers that need to special-case non-AI errors (USER_NOT_FOUND,
+ * VALIDATION_ERROR, …) should branch on those FIRST and only delegate
+ * the residual `catch` to this helper — see career360.ts.
+ *
+ * @param c     Hono context to emit the JSON response from.
+ * @param err   The caught error.
+ * @param tag   Optional log tag (e.g. "[resumes/optimize]") — logged
+ *              alongside `err` so SA can grep the correlationId line.
+ */
+export function aiFailure(c: Context, err: unknown, tag?: string) {
+  if (tag) console.error(tag, err);
+  const envelope = buildAIErrorEnvelope(err);
+  if (envelope) {
+    return c.json(
+      error(envelope.code, envelope.message, envelope.payload),
+      envelope.status,
+    );
+  }
+  return c.json(
+    error(GENERIC_AI_FAILURE.code, GENERIC_AI_FAILURE.message),
+    GENERIC_AI_FAILURE.status,
+  );
 }

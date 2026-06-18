@@ -297,12 +297,24 @@ authRoutes.post("/refresh", async (c) => {
     const secretKey = new TextEncoder().encode(getJwtSecret());
     const { payload } = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
 
+    // Re-read mutable claims from the DB rather than copying them from the
+    // old JWT. `sub`/`email` are stable and carried forward, but
+    // emailVerified / mustChangePassword / role can change in the DB after
+    // the token was minted, and a deactivated (isActive=false) or deleted
+    // account must NOT be able to refresh into a fresh 7-day token.
+    const db = getDb();
+    const [u] = await db.select().from(users).where(eq(users.id, payload.sub as string)).limit(1);
+    if (!u || !u.isActive) {
+      return c.json(error("UNAUTHORIZED", "Invalid or expired token"), 401);
+    }
+
     const newToken = await createJwt(
       {
         sub: payload.sub as string,
         email: payload["email"] as string,
-        
-        roles: (payload["roles"] as string[]) ?? [], emailVerified: (payload["emailVerified"] as boolean) ?? false, mustChangePassword: (payload["mustChangePassword"] as boolean) ?? false,
+        roles: [u.role],
+        emailVerified: u.emailVerified,
+        mustChangePassword: u.mustChangePassword,
       },
       getJwtSecret(),
     );
