@@ -217,7 +217,7 @@ export function compilePredicate(cond: unknown): Predicate {
   // Fell through — SQL expression we don't understand yet. Warn loudly so
   // tests that hit new operators extend this evaluator instead of silently
   // seeing "match all rows".
-  // eslint-disable-next-line no-console
+   
   console.warn(
     "[fake-db] unrecognised predicate — defaulting to match-all. chunks:",
     chunks.map((c) => (isSQL(c) ? "SQL{...}" : chunkText(c) || (c as any)?.constructor?.name)),

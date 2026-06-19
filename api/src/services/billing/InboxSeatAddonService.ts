@@ -136,7 +136,7 @@ export class InboxSeatAddonService {
   // ---------------------------------------------------------------------
   private async recordSyncEvent(userId: string, state: InboxAddonState, db: Db): Promise<void> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       await (db.insert(billingEvents) as any).values({
         userId,
         eventType: INBOX_SEAT_SYNC_EVENT,

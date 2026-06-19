@@ -596,7 +596,7 @@ async function saveMatchScore(
   } catch (err) {
     // Caching is a nice-to-have; the score is already returned to the
     // caller. Log and move on.
-    // eslint-disable-next-line no-console
+     
     console.warn("[match] saveMatchScore failed:", err instanceof Error ? err.message : err);
   }
 }
@@ -1070,7 +1070,7 @@ export async function handleTailor(
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
       lastErrorObj = err;
-      // eslint-disable-next-line no-console
+       
       console.warn("[match/tailor] LLM call failed:", lastError);
       // Hard LLM/schema failure — retry won't help when the provider
       // is the one breaking. Bail early.

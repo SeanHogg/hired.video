@@ -37,7 +37,7 @@ const {
   campaignDollarsTransactions,
 } = schema;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export type DbLike = any;
 
 export type PointsBalanceRow = typeof userPointsBalance.$inferSelect;

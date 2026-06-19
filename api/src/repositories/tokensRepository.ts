@@ -77,7 +77,7 @@ export class TokensRepository implements ITokensRepository {
    *  `deltaGranted` to their lifetime-granted counter. Used by both
    *  paid pack purchases (via stripe webhook) and SuperAdmin grants. */
   async upsertBalance(userId: string, deltaBalance: number, deltaGranted: number): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     await (this.db.insert(userTokenBalance) as any)
       .values({
         userId,
@@ -98,7 +98,7 @@ export class TokensRepository implements ITokensRepository {
   // ── purchases ─────────────────────────────────────────────────────────────
 
   async insertPurchase(input: TokenPackPurchaseInsert): Promise<TokenPackPurchaseRow> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const [created] = await (this.db.insert(tokenPackPurchases) as any).values(input).returning();
     return created as TokenPackPurchaseRow;
   }

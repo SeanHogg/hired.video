@@ -148,7 +148,7 @@ channelRoutes.patch("/me/profile-mode", async (c) => {
   const parsed = profileModeSchema.safeParse(await c.req.json());
   if (!parsed.success) return c.json(error("BAD_REQUEST", "Invalid profileMode"), 400);
   const db = getDb();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   await db.update(users).set({ profileMode: parsed.data.profileMode } as any).where(eq(users.id, userId));
   // Re-resolve so the caller sees the effective mode (not just the
   // setting). Cheap — the resolver short-circuits when setting != auto.

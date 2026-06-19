@@ -234,7 +234,7 @@ export class HelcimPaymentProvider implements PaymentProvider {
       throw new Error("Helcim customer creation did not return a customerCode");
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     await db.update(schema.users).set({ stripeCustomerId: customerCode } as any).where(eq(schema.users.id, userId));
     return customerCode;
   }
@@ -463,7 +463,7 @@ export class HelcimPaymentProvider implements PaymentProvider {
       throw new Error("Helcim webhook signature verification failed");
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const payload = JSON.parse(body) as Record<string, any>;
     const eventType: NormalizedEventType = HELCIM_EVENT_MAP[payload.eventType] ?? "unknown";
 

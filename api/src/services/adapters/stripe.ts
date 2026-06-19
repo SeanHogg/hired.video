@@ -63,7 +63,7 @@ export async function getOrCreateStripeCustomer(
 
   if (sub?.stripeCustomerId) {
     // Back-fill users table so future lookups are faster
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     await db.update(schema.users).set({ stripeCustomerId: sub.stripeCustomerId } as any).where(eq(schema.users.id, userId));
     return sub.stripeCustomerId;
   }
@@ -75,7 +75,7 @@ export async function getOrCreateStripeCustomer(
     metadata: { userId },
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   await db.update(schema.users).set({ stripeCustomerId: customer.id } as any).where(eq(schema.users.id, userId));
 
   return customer.id;

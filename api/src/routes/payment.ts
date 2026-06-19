@@ -239,7 +239,7 @@ paymentRoutes.post("/save-payment-method", async (c) => {
 
   // If setting as default, unset other defaults
   if (setDefault) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     await db.update(schema.paymentMethods).set({ isDefault: false } as any).where(eq(schema.paymentMethods.userId, userId));
   }
 
@@ -251,10 +251,10 @@ paymentRoutes.post("/save-payment-method", async (c) => {
     .limit(1);
 
   if (existing) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     await db.update(schema.paymentMethods).set({ isDefault: setDefault, updatedAt: new Date() } as any).where(eq(schema.paymentMethods.id, existing.id));
   } else {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     await (db.insert(schema.paymentMethods) as any).values({
       userId,
       stripePaymentMethodId: pm.providerPaymentMethodId, // column stores provider's PM ID
@@ -322,7 +322,7 @@ async function handleWebhook(c: Context<AppEnv>) {
   if (alreadyProcessed) return c.json({ received: true }, 200);
 
   // Record event
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   await (db.insert(schema.billingEvents) as any).values({
     stripeEventId: payload.eventId,  // column stores provider event ID generically
     eventType: payload.eventType,
@@ -331,7 +331,7 @@ async function handleWebhook(c: Context<AppEnv>) {
 
   try {
     await dispatchWebhookEvent(db, payload);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     await db.update(schema.billingEvents).set({ processedAt: new Date() } as any).where(eq(schema.billingEvents.stripeEventId, payload.eventId));
   } catch (err) {
     console.error(`[webhook] Failed to dispatch ${payload.eventType}:`, err);
@@ -363,7 +363,7 @@ async function dispatchWebhookEvent(
       const userId = await resolveUserId();
       if (!userId || !payload.providerSubscriptionId) break;
       // Sync subscription from raw Stripe object when available
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const raw = payload.raw as any;
       if (raw?.data?.object?.object === "subscription") {
         await billingService.syncStripeSubscription(userId, raw.data.object);
@@ -373,7 +373,7 @@ async function dispatchWebhookEvent(
 
     case "subscription.deleted": {
       if (!payload.providerSubscriptionId) break;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       await db.update(schema.subscriptions).set({ status: "canceled", canceledAt: new Date(), updatedAt: new Date() } as any).where(eq(schema.subscriptions.stripeSubscriptionId, payload.providerSubscriptionId));
       break;
     }
@@ -381,7 +381,7 @@ async function dispatchWebhookEvent(
     case "invoice.paid": {
       const userId = await resolveUserId();
       if (!userId) break;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const raw = payload.raw as any;
       if (raw?.data?.object?.object === "invoice") {
         await billingService.syncStripeInvoice(userId, raw.data.object);
@@ -404,7 +404,7 @@ async function dispatchWebhookEvent(
     case "invoice.payment_failed": {
       const userId = await resolveUserId();
       if (!userId) break;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const raw = payload.raw as any;
       if (raw?.data?.object?.object === "invoice") {
         await billingService.syncStripeInvoice(userId, raw.data.object);
@@ -420,14 +420,14 @@ async function dispatchWebhookEvent(
 
     case "payout.paid": {
       if (!payload.providerPayoutId) break;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       await db.update(schema.affiliatePayouts).set({ status: "paid", transactionId: payload.providerPayoutId, processedAt: new Date(), updatedAt: new Date() } as any).where(eq(schema.affiliatePayouts.transactionId, payload.providerPayoutId));
       break;
     }
 
     case "payout.failed": {
       if (!payload.providerPayoutId) break;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       await db.update(schema.affiliatePayouts).set({ status: "failed", transactionId: payload.providerPayoutId, updatedAt: new Date() } as any).where(eq(schema.affiliatePayouts.transactionId, payload.providerPayoutId));
       break;
     }
@@ -501,7 +501,7 @@ export async function recordAffiliateConversion(
   // UPDATE atomic, so exactly one webhook run wins the claim; the rest get
   // zero rows back and bail. Worst case on a mid-fan-out crash is one missed
   // credit (re-runnable), not a duplicate — the safe failure direction.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const claimed = await db
     .update(schema.affiliateReferrals)
     .set({ convertedAt: new Date() } as any)
@@ -512,7 +512,7 @@ export async function recordAffiliateConversion(
     .returning({ id: schema.affiliateReferrals.id });
   if (claimed.length === 0) return; // another run already credited this referral
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   await (db.insert(schema.affiliateConversions) as any).values({
     affiliateId: referral.affiliateId,
     referralId: referral.id,
@@ -526,7 +526,7 @@ export async function recordAffiliateConversion(
   // profile row (a prior bug indexed an already-destructured value, so
   // totalEarned was overwritten to a single commission each time).
   const newTotal = Number(profile.totalEarned ?? 0) + commission;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   await db.update(schema.affiliateProfiles).set({ totalEarned: String(newTotal), updatedAt: new Date() } as any).where(eq(schema.affiliateProfiles.id, referral.affiliateId));
 }
 

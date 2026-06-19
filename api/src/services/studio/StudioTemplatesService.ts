@@ -473,7 +473,7 @@ export class StudioTemplatesService {
     for (let i = 0; i < 5; i++) {
       const suffix = randomShortId();
       const candidate = `${base}-${suffix}`;
-      // eslint-disable-next-line no-await-in-loop
+       
       if (!(await this.deps.repos.studioTemplates.isSlugTaken(candidate))) return candidate;
     }
     // Fallback: append a longer suffix so collision odds are negligible.

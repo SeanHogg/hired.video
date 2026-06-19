@@ -132,13 +132,13 @@ profileRoutes.put("/billing-address", async (c) => {
   if (existing) {
     await db
       .update(schema.userProfiles)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       .set(cols as any)
       .where(eq(schema.userProfiles.userId, userId));
   } else {
     await db
       .insert(schema.userProfiles)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       .values({ userId, ...cols } as any);
   }
 

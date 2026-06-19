@@ -67,7 +67,7 @@ resumeScorerRoutes.post("/score", async (c) => {
   const upsell = standardAccessPolicy.getUpsellPayload("resume_scorer");
 
   if (payloadShape === "full") {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const blocked = await checkTokenBudget(c as any);
     if (blocked) return blocked;
   }

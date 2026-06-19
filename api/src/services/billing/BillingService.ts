@@ -375,7 +375,7 @@ export async function recordTokenUsage(args: {
 
   // If we billed against the pack, decrement the balance row atomically.
   if (source === "pack") {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     await (db.insert(userTokenBalance) as any)
       .values({
         userId: args.userId,
@@ -430,7 +430,7 @@ export async function grantTokenPack(args: {
   }
 
   // Audit row.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   await (db.insert(tokenPackPurchases) as any).values({
     userId: args.userId,
     packId: args.packId,
@@ -442,7 +442,7 @@ export async function grantTokenPack(args: {
   });
 
   // Increment balance.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   await (db.insert(userTokenBalance) as any)
     .values({
       userId: args.userId,
@@ -646,10 +646,10 @@ export async function syncStripeSubscription(
   };
 
   if (existing) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     await db.update(subscriptions).set(values as any).where(eq(subscriptions.id, existing.id));
   } else {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     await (db.insert(subscriptions) as any).values(values);
   }
 }
@@ -669,7 +669,7 @@ export async function syncStripeInvoice(
   // Resolve local subscription ID from stripeSubscriptionId
   // Stripe API 2026: subscription is nested under invoice.parent.subscription_details
   let localSubId: string | undefined;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const invAny = stripeInv as any;
   const stripeSubId: string | undefined =
     invAny.parent?.subscription_details?.subscription ??
@@ -707,10 +707,10 @@ export async function syncStripeInvoice(
   };
 
   if (existing) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     await db.update(invoices).set(vals as any).where(eq(invoices.id, existing.id));
   } else {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     await (db.insert(invoices) as any).values(vals);
   }
 }

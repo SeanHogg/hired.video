@@ -175,7 +175,7 @@ nleRoutes.post("/projects", async (c) => {
   const db = getDb();
   const [created] = await db
     .insert(studioProjects)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     .values({
       userId: target.ownerUserId,
       companyId: target.ownerCompanyId,
@@ -329,7 +329,7 @@ nleRoutes.patch("/projects/:id", async (c) => {
     throw e;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const patch: Record<string, any> = {
     timelineSpec: parsed.data.timelineSpec,
     userId: user.sub, // record the actual editor for attribution
@@ -545,7 +545,7 @@ nleRoutes.patch("/sources/:id", async (c) => {
     throw e;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const patch: Record<string, any> = {};
   if (parsed.data.binFolder !== undefined) patch.binFolder = parsed.data.binFolder;
   if (parsed.data.url !== undefined) patch.url = parsed.data.url;
@@ -569,7 +569,7 @@ nleRoutes.patch("/sources/:id", async (c) => {
     if (cleaned.length > 0) {
       await db
         .insert(nleMediaTags)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         .values(cleaned.map((tag) => ({ sourceId: id, tag })) as any);
     }
   }
@@ -668,7 +668,7 @@ nleRoutes.post("/sources", async (c) => {
 
   const [inserted] = await db
     .insert(nleMediaSources)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     .values({
       userId: target.ownerUserId,
       companyId: target.ownerCompanyId,
@@ -739,7 +739,7 @@ nleRoutes.post("/sources/:id/proxy", async (c) => {
 
   await db
     .update(nleMediaSources)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     .set({ proxyUrl } as any)
     .where(eq(nleMediaSources.id, id));
 

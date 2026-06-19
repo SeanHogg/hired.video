@@ -336,26 +336,22 @@ export async function handleAnalyze(
   }
 
   if (deps.llm) {
-    try {
-      const { data: llmResult } = await deps.llm.callJson(
-        "salary_analyze",
-        {
-          useCase: "salary_estimate",
-          systemPrompt: ANALYZE_SYSTEM_PROMPT,
-          userMessage: buildAnalyzeUserMessage(input),
-          responseFormat: "json_object",
-        },
-        SalaryAnalysisLLMSchema,
-      );
-      return ok(projectLLMResponse(llmResult, input.industry));
-    } catch (err) {
-      // The LLM was configured (deps.llm present) but the CALL threw —
-      // do NOT leak the deterministic stub as if it were a real answer.
-      // Re-throw so the route boundary maps it through the shared
-      // aiFailure() seam (typed AI_* envelope + correlationId). The stub
-      // remains only the genuine "no LLM configured" fallback below.
-      throw err;
-    }
+    // The LLM is configured (deps.llm present): if the CALL throws, let it
+    // propagate so the route boundary maps it through the shared aiFailure()
+    // seam (typed AI_* envelope + correlationId) instead of leaking the
+    // deterministic stub as if it were a real answer. The stub below remains
+    // only the genuine "no LLM configured" fallback.
+    const { data: llmResult } = await deps.llm.callJson(
+      "salary_analyze",
+      {
+        useCase: "salary_estimate",
+        systemPrompt: ANALYZE_SYSTEM_PROMPT,
+        userMessage: buildAnalyzeUserMessage(input),
+        responseFormat: "json_object",
+      },
+      SalaryAnalysisLLMSchema,
+    );
+    return ok(projectLLMResponse(llmResult, input.industry));
   }
 
   return ok(buildSalaryFallback(input));
@@ -430,23 +426,19 @@ export async function handleNegotiationTips(
   const input = parsed.data;
 
   if (deps.llm) {
-    try {
-      const { data: llmResult } = await deps.llm.callJson(
-        "salary_negotiation",
-        {
-          useCase: "salary_negotiation",
-          systemPrompt: NEGOTIATION_SYSTEM_PROMPT,
-          userMessage: buildNegotiationUserMessage(input),
-          responseFormat: "json_object",
-        },
-        NegotiationLLMSchema,
-      );
-      return ok(llmResult);
-    } catch (err) {
-      // Configured-but-threw: re-throw so the route maps it through the
-      // shared aiFailure() seam instead of leaking the canned stub.
-      throw err;
-    }
+    // Configured-but-threw: let the error propagate so the route maps it
+    // through the shared aiFailure() seam instead of leaking the canned stub.
+    const { data: llmResult } = await deps.llm.callJson(
+      "salary_negotiation",
+      {
+        useCase: "salary_negotiation",
+        systemPrompt: NEGOTIATION_SYSTEM_PROMPT,
+        userMessage: buildNegotiationUserMessage(input),
+        responseFormat: "json_object",
+      },
+      NegotiationLLMSchema,
+    );
+    return ok(llmResult);
   }
 
   return ok(buildNegotiationFallback(input));

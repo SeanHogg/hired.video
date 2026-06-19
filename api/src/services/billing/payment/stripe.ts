@@ -48,7 +48,7 @@ const STRIPE_EVENT_MAP: Record<string, NormalizedEventType> = {
 
 function normaliseStripeEvent(event: Stripe.Event): NormalizedWebhookPayload {
   const eventType: NormalizedEventType = STRIPE_EVENT_MAP[event.type] ?? "unknown";
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const obj = event.data.object as any;
 
   const customerId: string | undefined =
@@ -149,7 +149,7 @@ export class StripePaymentProvider implements PaymentProvider {
       .limit(1);
 
     if (sub?.stripeCustomerId && sub.stripeCustomerId.startsWith("cus_")) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       await db.update(schema.users).set({ stripeCustomerId: sub.stripeCustomerId } as any).where(eq(schema.users.id, userId));
       return sub.stripeCustomerId;
     }
@@ -162,7 +162,7 @@ export class StripePaymentProvider implements PaymentProvider {
       metadata: { userId },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     await db.update(schema.users).set({ stripeCustomerId: customer.id } as any).where(eq(schema.users.id, userId));
     return customer.id;
   }
@@ -233,7 +233,7 @@ export class StripePaymentProvider implements PaymentProvider {
       });
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const card = pm.type === "card" ? (pm as any).card : undefined;
     return {
       providerPaymentMethodId: pm.id,

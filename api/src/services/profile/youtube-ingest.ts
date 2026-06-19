@@ -104,7 +104,7 @@ export async function ingestYoutubeUrl(
   if (existing) {
     const [updated] = await db
       .update(creatorYoutubeIngests)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       .set({
         title: oembed?.title ?? existing.title,
         thumbnailUrl: oembed?.thumbnail_url ?? existing.thumbnailUrl,
@@ -119,7 +119,7 @@ export async function ingestYoutubeUrl(
 
   const [inserted] = await db
     .insert(creatorYoutubeIngests)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     .values({
       userId,
       youtubeVideoId: videoId,
@@ -161,7 +161,7 @@ export async function setIngestHidden(
 ): Promise<void> {
   await db
     .update(creatorYoutubeIngests)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     .set({ isHidden: hidden } as any)
     .where(
       and(
