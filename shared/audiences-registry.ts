@@ -115,11 +115,23 @@ const FEATURES = {
     blurb: "Filter by skills, location, video resume + AI-ranked matches.",
     href: "/recruit",
   } satisfies AudienceFocusFeature,
+  peopleOps: {
+    key: "people_ops",
+    label: "People Operations",
+    blurb: "Roster, org chart, 1:1s, and team-health analytics — the back-office after the hire.",
+    href: "/people/roster",
+  } satisfies AudienceFocusFeature,
   biddingMarketplace: {
     key: "bidding_marketplace",
     label: "Sourcing bids",
     blurb: "Bid on company-posted sourcing requests; get paid per qualified placement.",
     href: "/sourcing/browse",
+  } satisfies AudienceFocusFeature,
+  gigMarketplace: {
+    key: "gig_marketplace",
+    label: "Gig marketplace",
+    blurb: "Post or bid on freelance projects with milestone escrow — get paid as you deliver.",
+    href: "/services/gigs",
   } satisfies AudienceFocusFeature,
   profile: {
     key: "profile",
@@ -173,7 +185,7 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     thesis:
       "Hire faster, build employer brand, and run the back-office. One workspace for posts, candidates, and people-ops.",
     primaryRole: "employer",
-    focusFeatures: [FEATURES.jobPosting, FEATURES.candidateSearch, FEATURES.studio, FEATURES.articles],
+    focusFeatures: [FEATURES.jobPosting, FEATURES.candidateSearch, FEATURES.peopleOps, FEATURES.studio, FEATURES.articles],
     focusContentKinds: ["job", "article", "template", "learning_path"],
     ctaPrimary: { label: "Post a job", href: "/jobs/create" },
     ctaSecondary: { label: "Talk to sales", href: "/contact" },
@@ -275,13 +287,13 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     key: "gig_economy",
     label: "Gig Economy & Freelancers",
     thesis:
-      "Portfolio-led work — contract, freelance, fractional. Your profile is your channel; gigs come to you.",
+      "Portfolio-led work — contract, freelance, fractional. Bid on gigs, deliver against milestone escrow, and let your profile bring the next one in.",
     primaryRole: "job_seeker",
-    focusFeatures: [FEATURES.studio, FEATURES.profile, FEATURES.coffeeChats, FEATURES.outreach, FEATURES.jobBoard],
+    focusFeatures: [FEATURES.gigMarketplace, FEATURES.studio, FEATURES.profile, FEATURES.outreach, FEATURES.jobBoard],
     focusContentKinds: ["template", "video", "article", "job", "learning_path"],
     jobFilter: { employmentType: "contract" },
-    ctaPrimary: { label: "Build a portfolio reel", href: "/studio?audience=gig-economy" },
-    ctaSecondary: { label: "Find gigs", href: "/jobs?employmentType=contract" },
+    ctaPrimary: { label: "Browse the gig marketplace", href: "/services/gigs" },
+    ctaSecondary: { label: "Build a portfolio reel", href: "/studio?audience=gig-economy" },
   },
   {
     key: "international_job_seekers",

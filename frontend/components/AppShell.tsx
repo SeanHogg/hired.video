@@ -122,7 +122,6 @@ export function AppShell({
       <Sidebar
         isOpen={sidebarOpen}
         onClose={closeSidebar}
-        onCollapse={toggleSidebar}
         collapsed={sidebarCollapsed}
       />
       <div className={cn("min-w-0", sidebarCollapsed ? "lg:ml-16" : "lg:ml-80")}>

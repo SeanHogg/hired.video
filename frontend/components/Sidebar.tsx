@@ -157,8 +157,13 @@ export default function Sidebar({
         )}
       >
         <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-border">
+          {/* Header — drawer-only (below lg). On lg+ the sidebar is docked
+              beneath the full-width fixed Navigation bar (z-50), which already
+              renders the logo + a collapse toggle; this header would be hidden
+              behind it yet still consume vertical space, producing a dead gap
+              above the nav list. So it's suppressed on lg (content is offset
+              with `lg:pt-20` below to clear the 64px fixed nav instead). */}
+          <div className="flex items-center justify-between p-4 border-b border-border lg:hidden">
             <Link to="/" className="flex items-center space-x-2">
               <Video className="h-6 w-6 text-primary" />
               {!collapsed && (
@@ -167,36 +172,20 @@ export default function Sidebar({
                 </span>
               )}
             </Link>
-            {/* Mobile: dismiss the slide-out drawer entirely. */}
+            {/* Dismiss the slide-out drawer entirely. */}
             <Button
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="lg:hidden"
               aria-label={t("nav.closeMenu")}
             >
               <X className="h-5 w-5" />
             </Button>
-            {/* Desktop: the rail is docked and can't be hidden, so (X)
-                collapses it to the icon strip. Hidden once already
-                collapsed — the nav's menu button re-expands it. */}
-            {!collapsed && onCollapse && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onCollapse}
-                className="hidden lg:flex"
-                aria-label={t("nav.collapseSidebar")}
-                title={t("nav.collapseSidebar")}
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            )}
           </div>
 
           <div
             className={cn(
-              "flex-1 p-4 space-y-6",
+              "flex-1 p-4 space-y-6 lg:pt-20",
               collapsed ? "overflow-hidden" : "overflow-y-auto",
             )}
           >
