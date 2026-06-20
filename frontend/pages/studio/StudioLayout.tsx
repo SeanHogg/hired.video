@@ -174,7 +174,11 @@ function Landing() {
               {t("messages.studioLayout.heroSubtitle")}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <Link to="/signup">
+              {/* Anon adoption (#2100): drop visitors straight into the editor
+                  on a fresh video-resume draft — no account required. Save /
+                  Publish / Export prompt for sign-up in place (and keep their
+                  work) via the Studio conversion gate. */}
+              <Link to="/studio/new?contentTemplate=resume">
                 <Button
                   size="lg"
                   className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"

@@ -1,24 +1,9 @@
-import {
-  Eye,
-  EyeOff,
-  User,
-  Lock,
-  Users,
-  Briefcase,
-  Building2,
-  Check,
-} from "lucide-react";
+import { Check } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
-import { AuthCaptchaSlot } from "@/components/auth/AuthCaptchaSlot";
-import { EmailField } from "@/components/auth/EmailField";
-import { useTurnstile } from "@/lib/hooks/use-turnstile";
-import { mapAuthError } from "@/lib/services/auth-errors";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -26,56 +11,28 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import OAuthProviders from "@/components/OAuthProviders";
 import { RegisterGate } from "@/components/security/RegisterGate";
-import { useAuth, type UserRole, USER_ROLES } from "@/lib/auth";
-import { trackSignUp } from "@/lib/gtm";
-import { readRedirectParam, safeRedirectTo, withRedirectTo } from "@/lib/auth-redirect";
-import { readAttribution } from "@/lib/attribution";
+import SignupForm from "@/components/auth/SignupForm";
+import { type UserRole, USER_ROLES } from "@/lib/auth";
+import { readRedirectParam } from "@/lib/auth-redirect";
 
 export default function Signup() {
   const location = useLocation();
-  const { t, i18n } = useTranslation();
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const { t } = useTranslation();
+  // Role is owned by the page (not the form) only so the desktop marketing
+  // panel can react to the visitor's persona pick — SignupForm reports changes
+  // via onRoleChange. The form remains the source of truth for submit.
   const [role, setRole] = useState<UserRole>(USER_ROLES.JOB_SEEKER);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  const [referralCode, setReferralCode] = useState("");
-  const captcha = useTurnstile();
-
-  // Handle URL parameters for role pre-selection
-  useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const roleParam = searchParams.get("role");
-    if (roleParam === "recruiter") {
-      setRole(USER_ROLES.RECRUITER);
-    } else if (roleParam === "employer") {
-      setRole(USER_ROLES.EMPLOYER);
-    }
+  const initialRole = useMemo<UserRole>(() => {
+    const roleParam = new URLSearchParams(location.search).get("role");
+    if (roleParam === "recruiter") return USER_ROLES.RECRUITER;
+    if (roleParam === "employer") return USER_ROLES.EMPLOYER;
+    return USER_ROLES.JOB_SEEKER;
   }, [location.search]);
 
-  // Hydrate the visible referral-code field from the shared first-touch
-  // attribution store (cookie, 30-day TTL). The `useAttributionCapture`
-  // hook mounted in App.tsx is responsible for WRITING — this page only
-  // reads. Users can still type a code manually; the input is editable
-  // and `referralCode` (state) wins on submit if they've changed it.
-  useEffect(() => {
-    const stored = readAttribution().ref;
-    if (stored) setReferralCode(stored);
-  }, []);
+  const redirectTo = readRedirectParam(new URLSearchParams(location.search), "");
 
-  // SEO for signup page
   useSEO(location.pathname);
   useBreadcrumbs([{ name: t("actions.signUp"), url: "/signup" }]);
 
@@ -99,19 +56,8 @@ export default function Signup() {
     return () => { document.getElementById(id)?.remove(); };
   }, [signupFaq]);
 
+  const marketingKey = role === USER_ROLES.RECRUITER ? "recruiter" : role === USER_ROLES.EMPLOYER ? "employer" : "jobSeeker";
 
-  const { signup } = useAuth();
-  const navigate = useNavigate();
-
-  // Map persona role → marketing copy variant key in catalogue
-  const marketingKey = role === USER_ROLES.RECRUITER
-    ? "recruiter"
-    : role === USER_ROLES.EMPLOYER
-      ? "employer"
-      : "jobSeeker";
-
-  // Stat tiles per persona — keys live under signup.marketing.stats; we
-  // pick the right combination per role so translators only manage strings.
   const statTiles: { stat: string; desc: string }[] = useMemo(() => {
     if (role === USER_ROLES.RECRUITER) {
       return [
@@ -137,75 +83,7 @@ export default function Signup() {
     ];
   }, [role, t]);
 
-  // Feature lists are arrays in the catalogue — i18next returns them via
-  // returnObjects:true so we can map over them like normal data.
   const features = (t(`marketing.signUp.features.${marketingKey}`, { returnObjects: true }) as string[]) ?? [];
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError("");
-
-    // Validation
-    if (password !== confirmPassword) {
-      setError(t("prompts.passwordsMismatch"));
-      setIsLoading(false);
-      return;
-    }
-
-    if (password.length < 6) {
-      setError(t("errors.passwordTooShort"));
-      setIsLoading(false);
-      return;
-    }
-
-    if (!captcha.ready) {
-      setError(t("errors.captchaRequired"));
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      await signup(
-        email,
-        password,
-        firstName,
-        lastName,
-        role,
-        referralCode || undefined,
-        undefined,
-        captcha.token,
-        // Forward the active UI locale so the backend can seed
-        // account_preferences.language. The visitor's pick survives the
-        // signup → email-verify → first-render handshake instead of
-        // LocaleSync immediately overwriting it with the DB default.
-        i18n.language,
-      );
-      trackSignUp("email");
-      // Carry any ?redirectTo=<tool-path> (or legacy ?redirect=) forward so
-      // the user returns to the tool they were using when prompted to sign
-      // up. readRedirectParam sanitizes against open-redirects.
-      const search = new URLSearchParams(location.search);
-      const redirect = readRedirectParam(search, "");
-      const successParams = new URLSearchParams({
-        email,
-        firstName,
-        ...(redirect ? { redirectTo: redirect } : {}),
-      });
-      navigate(`/signup-success?${successParams.toString()}`);
-    } catch (err) {
-      const info = mapAuthError(err);
-      setError(t(info.messageKey));
-      // Turnstile tokens are one-shot: any submission that reached the
-      // captcha gate (or beyond) leaves the token spent, so the next retry
-      // would otherwise hit `timeout-or-duplicate` and surface as a fresh
-      // TURNSTILE_FAIL. Reset so the user gets a fresh challenge instead
-      // of being soft-locked.
-      captcha.reset();
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <AppShell>
@@ -218,238 +96,14 @@ export default function Signup() {
                 <CardTitle className="text-2xl">{t("headings.createFreeAccount")}</CardTitle>
                 <CardDescription>{t("headings.signupSubtitle")}</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                {/* OAuth sign-up */}
-                <OAuthProviders mode="signup" />
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <Separator className="w-full" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">{t("labels.signupWithEmail")}</span>
-                  </div>
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">{t("fields.firstName.label")}</Label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="firstName"
-                          type="text"
-                          placeholder={t("fields.firstName.placeholder")}
-                          value={firstName}
-                          onChange={(e) => setFirstName(e.target.value)}
-                          className="pl-10"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">{t("fields.lastName.label")}</Label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="lastName"
-                          type="text"
-                          placeholder={t("fields.lastName.placeholder")}
-                          value={lastName}
-                          onChange={(e) => setLastName(e.target.value)}
-                          className="pl-10"
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <EmailField
-                    id="email"
-                    value={email}
-                    onChange={setEmail}
-                    label={t("fields.email.label")}
-                    placeholder={t("fields.email.placeholder")}
-                    withIcon
-                  />
-
-                  {/* Persona selection */}
-                  <div className="space-y-2">
-                    <Label>{t("prompts.registerAs")}</Label>
-                    <div className="p-[2px] rounded-lg sm:rounded-full bg-gradient-to-r from-brand-purple to-brand-blue w-full">
-                      <div className="bg-background rounded-lg sm:rounded-full p-1">
-                        <ToggleGroup
-                          type="single"
-                          value={role}
-                          onValueChange={(v) => v && setRole(v as UserRole)}
-                          className="grid grid-cols-1 sm:grid-cols-3 gap-1 w-full"
-                        >
-                          <ToggleGroupItem
-                            value={USER_ROLES.JOB_SEEKER}
-                            className="rounded-lg sm:rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
-                          >
-                            <Users className="h-4 w-4 mr-2" /> {t("labels.jobSeeker")}
-                          </ToggleGroupItem>
-                          <ToggleGroupItem
-                            value={USER_ROLES.RECRUITER}
-                            className="rounded-lg sm:rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
-                          >
-                            <Briefcase className="h-4 w-4 mr-2" /> {t("labels.recruiter")}
-                          </ToggleGroupItem>
-                          <ToggleGroupItem
-                            value={USER_ROLES.EMPLOYER}
-                            className="rounded-lg sm:rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
-                          >
-                            <Building2 className="h-4 w-4 mr-2" /> {t("labels.employer")}
-                          </ToggleGroupItem>
-                        </ToggleGroup>
-                      </div>
-                    </div>
-                  </div>
-
-	                  {/* Specialized first-class roles (creator / affiliate) keep
-	                      their own create-account landing pages rather than
-	                      crowding the core 3-way picker — see #1996. Both register
-	                      the visitor with the matching `role` so growth reports
-	                      segment them cleanly. */}
-	                  <div className="space-y-1 text-sm text-muted-foreground">
-	                    <div>
-	                      {t("prompts.creator")}{" "}
-	                      <Link to="/services" className="text-primary hover:underline">
-	                        {t("actions.signUpCreator")}
-	                      </Link>.
-	                    </div>
-	                    <div>
-	                      {t("prompts.affiliate")}{" "}
-	                      <Link to="/affiliate-program" className="text-primary hover:underline">
-	                        {t("actions.signUpAffiliate")}
-	                      </Link>.
-	                    </div>
-	                  </div>
-
-
-                  {/* Referral code */}
-                  <div className="space-y-2">
-                    <Label htmlFor="referralCode">{t("fields.referralCode.label")}</Label>
-                    <Input
-                      id="referralCode"
-                      type="text"
-
-
-                      placeholder={t("fields.referralCode.placeholder")}
-                      value={referralCode}
-                      onChange={(e) => setReferralCode(e.target.value)}
-                    />
-                  </div>
-
-
-                  <div className="space-y-2">
-                    <Label htmlFor="password">{t("fields.password.label")}</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="password"
-
-
-                        type={showPassword ? "text" : "password"}
-                        placeholder={t("fields.password.createPlaceholder")}
-                        autoComplete="new-password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10 pr-10"
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">{t("fields.confirmPassword.label")}</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="confirmPassword"
-                        type={showConfirmPassword ? "text" : "password"}
-                        placeholder={t("fields.confirmPassword.placeholder")}
-                        autoComplete="new-password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="pl-10 pr-10"
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() =>
-                          setShowConfirmPassword(!showConfirmPassword)
-                        }
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <AuthCaptchaSlot captcha={captcha} />
-
-                  <Button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 min-h-[44px]"
-                    disabled={isLoading || !captcha.ready}
-                  >
-                    {isLoading ? t("status.creatingAccount") : t("actions.createAccount")}
-                  </Button>
-                </form>
-
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">
-                    {t("prompts.haveAccount")}{" "}
-                    <Link
-                      to={withRedirectTo(
-                        "/login",
-                        readRedirectParam(new URLSearchParams(location.search), ""),
-                      )}
-                      className="text-primary hover:underline font-medium"
-                    >
-                      {t("actions.signIn")}
-                    </Link>
-                  </p>
-                </div>
-
-                <div className="text-xs text-center text-muted-foreground">
-                  {t("labels.acceptTosPrefix")}{" "}
-                  <Link to="/terms" className="text-primary hover:underline">
-                    {t("labels.tos")}
-                  </Link>{" "}
-                  {t("labels.and")}{" "}
-                  <Link to="/privacy" className="text-primary hover:underline">
-                    {t("labels.privacyPolicy")}
-                  </Link>
-                </div>
+              <CardContent>
+                {/* Form body is shared with the Studio conversion gate — see
+                    [components/auth/SignupForm.tsx]. */}
+                <SignupForm
+                  initialRole={initialRole}
+                  redirectTo={redirectTo}
+                  onRoleChange={setRole}
+                />
               </CardContent>
             </Card>
             </RegisterGate>

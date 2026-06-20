@@ -65,6 +65,14 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import StudioLoadingShell from "../StudioLoadingShell";
 import { cn } from "@/lib/utils";
+import { useAuthGate } from "@/components/auth/useAuthGate";
+import {
+  CLAIM_PARAM,
+  clearPendingStudioClaim,
+  markPendingStudioClaim,
+  peekPendingStudioClaim,
+  trackStudioFunnel,
+} from "@/lib/studio/anon-conversion";
 
 import {
   type CanvasAudioMix,
@@ -1230,7 +1238,12 @@ export default function StudioEditorV2() {
     active: currentMediaKind === "document",
     hydrated: documentStateHydrated,
     serverState: persistedProject?.documentState as DocumentState | null | undefined,
-    seed: () => createBlankDocumentState("resume", () => crypto.randomUUID()),
+    // Prefer a locally-autosaved draft (a signed-out visitor's in-progress
+    // resume / job — #2100) before seeding a blank document, so their work
+    // survives a reload and the signup → verify round-trip.
+    seed: () =>
+      readLocalDocumentDraft(projectId) ??
+      createBlankDocumentState("resume", () => crypto.randomUUID()),
     hydrate: (next) => {
       resetDocumentHistory(next);
       setDocumentStateHydrated(true);
@@ -1508,17 +1521,128 @@ export default function StudioEditorV2() {
     };
   }, [studioTemplateSlug, projectId, toast, resetHistory, t]);
 
+  // ─── Anonymous adoption (#2100): let signed-out visitors USE the studio,
+  // gate only the value-capture actions (Save / Publish / Export), and claim
+  // their work-in-progress draft into a real owned project the moment they
+  // authenticate. The conversion funnel runs on the existing usage-tracking
+  // session (hv_visitor_id → usage_sessions), which already upserts user_id on
+  // auth — so the pre-signup → signup journey is linked server-side and we only
+  // emit studio-specific funnel events. See [lib/studio/anon-conversion.ts].
+  const isAnonVisitor = !user && !authLoading;
+  // Last gate-trigger reason — stamped onto the deferred-claim record + the
+  // convert funnel event so we can see which action drives the most sign-ups.
+  const lastGateReasonRef = useRef<string>("save");
+  // Post-verify return target for the signup branch. Preserves the URL params
+  // (notably ?contentTemplate=) so the rehydrated draft re-opens as the SAME
+  // media kind, plus ?claim=1 so the editor finishes the deferred claim.
+  const claimRedirect = useMemo(() => {
+    const params = new URLSearchParams(searchParams);
+    params.set(CLAIM_PARAM, "1");
+    return `/studio/${encodeURIComponent(projectId)}?${params.toString()}`;
+    // Mount-time snapshot only — later param edits shouldn't move the target.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const { requireAuth, gate } = useAuthGate({
+    redirectTo: claimRedirect,
+    title: t("studio.anon.gateTitle", { defaultValue: "Save your work" }),
+    onSignupSubmitted: () =>
+      markPendingStudioClaim({
+        projectId,
+        mediaKind: currentMediaKind,
+        reason: lastGateReasonRef.current,
+      }),
+  });
+
+  /** Gate a value-capture action behind auth. Returns true when the visitor is
+   *  already authenticated (caller proceeds inline); otherwise opens the
+   *  in-place auth panel, emits the `gate` funnel event, and returns false —
+   *  re-running `run` (and emitting `convert`) once they sign in. */
+  const gateAction = useCallback(
+    (reason: string, displayReason: string, run: () => void): boolean => {
+      lastGateReasonRef.current = reason;
+      const ok = requireAuth({
+        reason: displayReason,
+        onAuthed: () => {
+          trackStudioFunnel("convert", { mediaKind: currentMediaKind, reason });
+          run();
+        },
+      });
+      if (!ok) trackStudioFunnel("gate", { mediaKind: currentMediaKind, reason });
+      return ok;
+    },
+    [requireAuth, currentMediaKind],
+  );
+
+  // Funnel: "enter" once when a signed-out visitor opens the editor.
+  const enterTrackedRef = useRef(false);
+  useEffect(() => {
+    if (isAnonVisitor && !enterTrackedRef.current) {
+      enterTrackedRef.current = true;
+      trackStudioFunnel("enter", { mediaKind: currentMediaKind });
+    }
+  }, [isAnonVisitor, currentMediaKind]);
+  // Funnel: "edit" once when a signed-out visitor first mutates the canvas
+  // (set from the autosave effect, which fires on every content change).
+  const editTrackedRef = useRef(false);
+  const firstAutosaveRef = useRef(true);
+
+  // Claim-on-return: an authenticated visitor arriving with ?claim=1 (or a
+  // pending-claim record) and no server row yet → persist the rehydrated local
+  // draft into a real owned project, then drop the marker. Covers the signup →
+  // email-verify round-trip where claim couldn't complete inline.
+  const claimDoneRef = useRef(false);
+  useEffect(() => {
+    if (claimDoneRef.current || !user) return;
+    const wantsClaim =
+      searchParams.get(CLAIM_PARAM) === "1" ||
+      peekPendingStudioClaim()?.projectId === projectId;
+    if (!wantsClaim) return;
+    if (persistedProjectId) {
+      // A real project already exists (claimed inline) — just drop the marker.
+      claimDoneRef.current = true;
+      clearPendingStudioClaim();
+      return;
+    }
+    // Document drafts need their runtime hydrated before the save reads it;
+    // Timeline kinds seed `state` synchronously so they're always ready.
+    if (currentMediaKind === "document" && !documentStateHydrated) return;
+    claimDoneRef.current = true;
+    const reason = peekPendingStudioClaim()?.reason ?? "save";
+    void (async () => {
+      const saved = await handleSave();
+      if (saved) {
+        trackStudioFunnel("convert", { mediaKind: currentMediaKind, reason });
+        clearPendingStudioClaim();
+      } else {
+        // Let a later manual Save retry — un-latch so the user isn't stuck.
+        claimDoneRef.current = false;
+      }
+    })();
+    // handleSave is a hoisted function declaration closing over live state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, persistedProjectId, documentStateHydrated, currentMediaKind, projectId, searchParams]);
+
   // Local autosave so unsaved work survives reloads. The single effect
-  // covers BOTH the Timeline-kind `state` (CanvasState) and the
-  // image-kind `imageState` (#940 Phase 2 image autosave) — kind-aware
-  // snapshot keeps storage shape unified so the hydration step at
-  // `/studio/:id` knows which slice to rehydrate.
+  // covers the Timeline-kind `state` (CanvasState), the image-kind
+  // `imageState` (#940 Phase 2 image autosave), and the document-kind
+  // `documentState` (#2100 — so a signed-out resume / job draft survives the
+  // signup round-trip). Kind-aware snapshot keeps storage shape unified so the
+  // hydration step at `/studio/:id` knows which slice to rehydrate.
   useEffect(() => {
     if (typeof window === "undefined") return;
+    // First run is the seeded mount state, not a user edit — skip the edit
+    // funnel event but still persist (so a reload before any edit is safe).
+    if (firstAutosaveRef.current) {
+      firstAutosaveRef.current = false;
+    } else if (isAnonVisitor && !editTrackedRef.current) {
+      editTrackedRef.current = true;
+      trackStudioFunnel("edit", { mediaKind: currentMediaKind });
+    }
     const handle = window.setTimeout(() => {
       try {
         const snapshot: Record<string, unknown> = { title, state };
         if (currentMediaKind === "image") snapshot.imageState = imageState;
+        if (currentMediaKind === "document") snapshot.documentState = documentState;
         window.localStorage.setItem(
           LOCAL_STORAGE_PREFIX + projectId,
           JSON.stringify(snapshot),
@@ -1528,7 +1652,7 @@ export default function StudioEditorV2() {
       }
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(handle);
-  }, [projectId, title, state, imageState, currentMediaKind]);
+  }, [projectId, title, state, imageState, documentState, currentMediaKind, isAnonVisitor]);
 
   const fitZoom = useCallback(() => {
     const el = stageContainerRef.current;
@@ -2431,6 +2555,18 @@ export default function StudioEditorV2() {
    *  on demand (flattenImage for image kind, renderTimeline for the
    *  Timeline kinds). */
   async function handleExport() {
+    if (
+      !gateAction(
+        "export",
+        t("studio.anon.gateExport", {
+          defaultValue:
+            "Create a free account to export — your draft is saved to your account first.",
+        }),
+        () => void handleExport(),
+      )
+    ) {
+      return;
+    }
     // Document export is a browser print → Save as PDF of the read-only
     // DocumentView (#1912), not a Blob render — "preview === render === print".
     if (currentMediaKind === "document") {
@@ -2654,6 +2790,18 @@ export default function StudioEditorV2() {
   }
 
   async function handlePublishToProfile() {
+    if (
+      !gateAction(
+        "publish",
+        t("studio.anon.gatePublish", {
+          defaultValue:
+            "Create a free account to publish — we'll keep everything you've made.",
+        }),
+        () => void handlePublishToProfile(),
+      )
+    ) {
+      return;
+    }
     const isOnProfile = persistedProject?.status === "Published";
     // Publish-to-Profile is on-platform — the universal <StudioPlayer/>
     // hydrates from `timelineSpec` / `script` JSON and plays live, so
@@ -2735,6 +2883,21 @@ export default function StudioEditorV2() {
   // `ensureRendered`) can chain a follow-up upload without re-reading
   // through the async-state setters. Resolves to null on failure.
   async function handleSave(): Promise<StudioProject | null> {
+    // Anon adoption gate (#2100): signed-out visitors can build freely, but
+    // Save requires an account. The in-place panel opens and this same handler
+    // re-runs (and the draft persists) once they authenticate.
+    if (
+      !gateAction(
+        "save",
+        t("studio.anon.gateSave", {
+          defaultValue:
+            "Create a free account to save your work — your draft stays exactly as it is.",
+        }),
+        () => void handleSave(),
+      )
+    ) {
+      return null;
+    }
     setSaving(true);
     try {
       // Per the canvas-runtime extensibility model (#931 / PRD §1.2)
@@ -2900,7 +3063,11 @@ export default function StudioEditorV2() {
     return <StudioLoadingShell />;
   }
 
-  if (!user) {
+  // Anon adoption (#2100): a signed-out visitor may BUILD on a fresh `"new"`
+  // draft (Save / Publish / Export are gated below). An existing `/studio/:id`
+  // still requires sign-in — the project can only load for its owner, so there
+  // is nothing for an anonymous visitor to edit there.
+  if (!user && projectId !== "new") {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 px-6 text-center">
         <p className="text-lg font-medium">{t("studio.editor.signInPrompt")}</p>
@@ -2943,6 +3110,11 @@ export default function StudioEditorV2() {
 
   return (
     <div className="flex h-screen flex-col bg-background">
+      {/* Anon adoption (#2100): the in-place Sign in / Create account panel.
+          Opens when a signed-out visitor hits a gated Save / Publish / Export
+          and resumes that action once they authenticate — without leaving the
+          canvas. */}
+      {gate}
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -4832,4 +5004,22 @@ function hydrateInitialState(
   // `lib/studio/editor-v2/template-seeds.ts`. Unknown template ids fall
   // through to an empty canvas without throwing.
   return seedCanvasFromTemplate(templateHint);
+}
+
+/** Read a locally-autosaved `documentState` slice for a draft (#2100). Lets a
+ *  signed-out visitor's in-progress resume / job document survive a reload and
+ *  the signup → email-verify round-trip — mirrors `hydrateInitialState`'s
+ *  CanvasState path for the document runtime. */
+function readLocalDocumentDraft(projectId: string): DocumentState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(LOCAL_STORAGE_PREFIX + projectId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { documentState?: DocumentState };
+    const ds = parsed.documentState;
+    if (ds && Array.isArray(ds.pages) && ds.pages.length > 0) return ds;
+  } catch {
+    // Corrupt / private-mode — fall through to a blank seed.
+  }
+  return null;
 }

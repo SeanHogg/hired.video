@@ -2823,6 +2823,181 @@ BLOG_POSTS.push({
   ],
 });
 
+// ── Career 360 — target → gaps → roadmap ────────────────────────────────
+BLOG_POSTS.push({
+  slug: "build-a-career-roadmap-with-ai",
+  title: "How to Build a Career Roadmap with AI: Targets, Gaps, and a 90-Day Plan",
+  description:
+    "Turn a vague ambition into a dated plan. This guide shows how to pick a realistic target role, run an AI gap analysis across the eight signals recruiters actually read, and convert the gaps into a 30/60/90/180-day roadmap with Career 360.",
+  publishedAt: "2026-06-14",
+  updatedAt: "2026-06-14",
+  readingTime: 8,
+  author: "hired.video",
+  toolSlug: "career-360",
+  toolName: "Career 360",
+  toolUrl: "/tools/career-360",
+  keywords:
+    "career roadmap, AI career planner, career gap analysis, 90 day career plan, how to get promoted, career goals, next role planning, skills gap analysis, career development plan",
+  heroAlt:
+    "A radial career wheel scoring eight signals with a 30/60/90/180-day roadmap beneath it",
+  category: "Career Strategy",
+  sections: [
+    {
+      heading: "Why Most Career Goals Never Happen",
+      body: "\"I want to be a senior product manager\" is a wish, not a plan. It has no target you can measure against, no list of what's actually missing, and no dated steps. So nothing moves — you stay busy without getting closer.\n\nA career roadmap fixes all three. It starts with a *specific* target role, runs an honest gap analysis between where you are and where that role expects you to be, and then sequences the gaps into dated milestones. The difference between a wish and a roadmap is that a roadmap tells you what to do *this week*.\n\nThe hard part has always been the gap analysis. You can't see your own profile the way a recruiter does, and you don't know which of the dozen things you could improve actually move the needle for the role you want. That's the problem an AI career planner solves: it reads your profile the way a recruiter would, scores it against the target, and tells you which gaps matter most.",
+    },
+    {
+      heading: "Step 1 — Pick a Target You Can Actually Hit",
+      body: "Every roadmap starts with a destination. In [Career 360](/tools/career-360), the AI reads your profile and resume and proposes three grounded targets:\n\n- **A next step** — a believable move in the next 6–12 months.\n- **A stretch** — a more ambitious role on a 12–24 month horizon.\n- **A pivot** — a lateral move into an adjacent field, grounded in skills you already have.\n\nNothing is invented. Every suggestion ties back to a signal already on your profile, so you're not chasing a role you have no path into. If none fit, skip the suggestions and type your own — any title, seniority, and timeline. The same engine runs against whatever you enter.\n\nThe rule for a good target: it should feel slightly uncomfortable but not delusional. A target you're already qualified for produces an empty roadmap; a target three levels up produces a roadmap you'll abandon.",
+    },
+    {
+      heading: "Step 2 — Run the Gap Analysis (The Eight Signals)",
+      body: "Once you've set a target, Career 360 scores your readiness across the eight signals recruiters actually weigh when they evaluate a candidate:\n\n1. **Resume** — is it tailored, quantified, and ATS-readable for this role?\n2. **Profile** — is your public profile complete and aligned with the target?\n3. **Skills** — do you have (and visibly demonstrate) the skills the role requires?\n4. **Experience** — does your history show the scope and seniority expected?\n5. **Certifications** — do you hold the credentials that gate this role?\n6. **Narrative** — does your summary tell a coherent story toward this target?\n7. **Outreach** — are you visible to and in contact with the right people?\n8. **Salary** — is your compensation expectation calibrated to the market for this role?\n\nEach signal gets a score, and the wheel makes the gaps obvious at a glance — a short spoke is a gap, a full spoke is a strength. This is the part you can't do for yourself: it's an outside read of your candidacy, scored against the specific role you're aiming for rather than in the abstract.",
+    },
+    {
+      heading: "Step 3 — Turn Gaps into a 30/60/90/180-Day Plan",
+      body: "A gap you can see is still just a gap. The roadmap is what makes it actionable. Career 360 sequences your gaps into four horizons:\n\n- **30 days** — the quick wins. Usually resume and profile fixes: tailor your resume to the target, fill out the missing profile sections, rewrite your summary so the narrative points at the role you want. These move your scores fast.\n- **60 days** — the skill and credential work that takes a few weeks. Start a certification, build a portfolio piece, close a visible skills gap.\n- **90 days** — the outreach and positioning work. Start conversations with people in the target role, get visible in the right places, line up references.\n- **180 days** — the deeper experience gaps. The stretch assignment, the side project, the scope you need to demonstrate before the target is realistic.\n\nThe sequencing matters: quick wins first builds momentum and your scores climb early, which keeps you in the plan. Tackling the hardest experience gap on day one is how roadmaps die.",
+    },
+    {
+      heading: "Step 4 — Close Gaps and Watch the Scores Move",
+      body: "Each gap on your roadmap links to the specific tool that closes it — Resume Optimizer for the resume gap, Profile Audit for the profile gap, Skill Extractor for skills, and so on. You don't have to figure out *how* to close a gap; the roadmap hands you the tool.\n\nWhen you run a linked tool, your scores update. Career 360 plots every recorded run as a sparkline under the wheel — a running record of improvement over time. That feedback loop is what separates a roadmap from a to-do list: you can see the spoke that was short three weeks ago filling in, which tells you the work is paying off and keeps you moving to the next gap.\n\nRe-run the target analysis periodically. As you close gaps, your profile changes, and a target that was a stretch in month one may become a believable next step by month three — at which point you set a new, higher target and the roadmap regenerates.",
+    },
+  ],
+  faq: [
+    {
+      question: "What is a career roadmap?",
+      answer:
+        "A career roadmap is a dated plan that connects where you are now to a specific target role. It has three parts: a measurable target, a gap analysis showing what's missing between you and that role, and a sequence of dated milestones (typically 30/60/90/180 days) for closing those gaps. Career 360 generates all three from your profile.",
+    },
+    {
+      question: "How does the AI decide what my gaps are?",
+      answer:
+        "Career 360 reads your profile and resume and scores eight signals recruiters weigh — resume, profile, skills, experience, certifications, narrative, outreach, and salary — against the target role you picked. A low score on a signal is a gap; the roadmap then sequences those gaps into dated milestones, quick wins first.",
+    },
+    {
+      question: "Can I set my own target role instead of using the suggestions?",
+      answer:
+        "Yes. The AI proposes three grounded targets (a next step, a stretch, and a pivot), but you can skip them and type any title, seniority, and timeline. The same gap analysis and roadmap engine runs against whatever target you enter.",
+    },
+    {
+      question: "Is Career 360 free?",
+      answer:
+        "Yes. The full target picker, gap analysis, and 30/60/90/180-day roadmap are free. Pro unlocks unlimited target refreshes plus deeper coaching tools wired into each gap.",
+    },
+  ],
+});
+
+// ── Skill Extractor ─────────────────────────────────────────────────────
+BLOG_POSTS.push({
+  slug: "extract-skills-from-any-job-or-resume",
+  title: "How to Extract Every Skill from a Job Description or Resume with AI",
+  description:
+    "Stop reading job descriptions line by line. This guide shows how to pull every skill from any job posting or resume — grouped, deduplicated, and synonym-aware — and turn it into a skills-gap comparison with the AI Skill Extractor.",
+  publishedAt: "2026-06-09",
+  updatedAt: "2026-06-09",
+  readingTime: 6,
+  author: "hired.video",
+  toolSlug: "skill-extractor",
+  toolName: "Skill Extractor",
+  toolUrl: "/tools/skill-extractor",
+  keywords:
+    "extract skills from job description, skills gap analysis, resume skills extractor, AI skill extraction, job description skills, required vs preferred skills, skill matching",
+  heroAlt:
+    "A job description and a resume side by side with extracted skills grouped by category",
+  category: "Resume Tips",
+  sections: [
+    {
+      heading: "Why Manual Skill-Matching Fails",
+      body: "When you read a job description by hand, you miss things. A single posting can name 25–40 distinct skills scattered across the summary, the responsibilities, the requirements, and the \"nice to haves\" — and your eye glazes over half of them. Worse, you can't reliably tell which are deal-breakers and which are wish-list items.\n\nKeyword search doesn't save you either. It misses synonyms (\"k8s\" and \"Kubernetes\" are the same skill), conflates skills with company or product names, and can't distinguish a hard skill from a soft one. So you end up either over-claiming skills you don't have or, more often, under-selling because you didn't realize a requirement mapped to something already on your resume.\n\nAn AI skill extractor reads the source the way a recruiter does: it pulls every skill mentioned, collapses synonyms, drops the noise, and groups what's left so you can actually reason about it.",
+    },
+    {
+      heading: "How to Extract Skills (Step-by-Step)",
+      body: "With hired.video's [Skill Extractor](/tools/skill-extractor) it takes under a minute:\n\n1. **Open the Skill Extractor** — no signup required for a single source.\n2. **Paste the source** — a job description, an internal role brief, a LinkedIn post, even a Slack message. Or upload a PDF/Word resume; it's parsed client-side before extraction.\n3. **Run the extraction** — the AI returns every skill it finds, grouped by category: languages, frameworks, tools, soft skills, and certifications.\n4. **Read the grouped output** — synonyms are merged, noise is dropped, and where the source distinguishes them, required and preferred skills are surfaced separately.\n\nThe result is a clean, deduplicated list you can scan in seconds instead of a wall of prose you have to mine by hand.",
+    },
+    {
+      heading: "Turn Extraction into a Skills-Gap Comparison",
+      body: "Extracting one source is useful; comparing two is where it pays off. Extract the skills from a job you want, then extract the skills from your own resume, and the gap is immediate: the skills the job names that your resume doesn't is your to-do list.\n\nThat gap drives two actions. First, **add the skills you genuinely have but forgot to list** — these are free wins that instantly raise your match. Second, **identify the real gaps** — the skills you'd need to learn or demonstrate before you're a credible candidate, which feed directly into a development plan.\n\nSign in to save extractions, compare across multiple resumes, and run the skills-gap analysis as a repeatable step in every application rather than a one-off.",
+    },
+    {
+      heading: "Where Skill Extraction Fits Your Job Search",
+      body: "Skill extraction is the connective tissue between a job posting and the rest of your toolkit. The extracted skill list tells your [Resume Optimizer](/tools/resume-optimizer) exactly which keywords to mirror, feeds your [Career 360](/tools/career-360) gap analysis, and gives recruiters a precise read when they're matching a candidate to a role.\n\nFor recruiters and hiring managers, the same tool works in reverse: extract the skills from a candidate's resume and compare them against the role brief to see fit at a glance, without reading every bullet. One extractor, both sides of the table.",
+    },
+  ],
+  faq: [
+    {
+      question: "Is the Skill Extractor free?",
+      answer:
+        "Yes. The extractor is free with no signup required for a single source. Sign in to save extractions, compare across resumes, and run skills-gap analysis between a job and your resume.",
+    },
+    {
+      question: "Does it work for any job posting?",
+      answer:
+        "Yes. Job descriptions, internal role briefs, LinkedIn posts, even Slack messages — anything text-based works. PDF and Word resumes are parsed client-side before extraction.",
+    },
+    {
+      question: "How is this different from a keyword search?",
+      answer:
+        "Keyword search misses synonyms ('k8s' vs 'Kubernetes'), conflates skills with company names, and can't tell hard skills from soft ones. The AI groups synonyms, drops the noise, and surfaces required-vs-preferred skills when the source distinguishes them.",
+    },
+  ],
+});
+
+// ── Profile Sync (vendor-sync) ──────────────────────────────────────────
+BLOG_POSTS.push({
+  slug: "sync-your-resume-everywhere-without-copy-paste",
+  title:
+    "How to Sync One Master Resume to LinkedIn, Indeed, and Every Other Job Board",
+  description:
+    "Keep one master resume and push it everywhere without copy-paste drift. This guide shows how Profile Sync generates paste-ready blocks for nine vendors and uses the Chrome extension for safe two-way sync with LinkedIn, Indeed, and more.",
+  publishedAt: "2026-06-10",
+  updatedAt: "2026-06-10",
+  readingTime: 6,
+  author: "hired.video",
+  toolSlug: "vendor-sync",
+  toolName: "Profile Sync",
+  toolUrl: "/tools/vendor-sync",
+  keywords:
+    "sync resume to LinkedIn, update resume everywhere, master resume, profile sync, LinkedIn Indeed resume, keep profiles in sync, resume copy paste, job board profiles",
+  heroAlt:
+    "One master resume syncing out to LinkedIn, Indeed, Glassdoor, and other job boards",
+  category: "Job Search Strategy",
+  sections: [
+    {
+      heading: "The Hidden Cost of Profile Drift",
+      body: "Most job seekers maintain the same career story in six or seven places — LinkedIn, Indeed, Glassdoor, ZipRecruiter, a portfolio site — and every one of them slowly drifts out of date. You update LinkedIn, forget Indeed, and three months later a recruiter pulls up a profile with a stale headline and a job you left last year.\n\nProfile drift costs you in two ways. It makes you look careless to anyone who cross-references your profiles, and it means the strongest version of your story only lives in one place while the others quietly undersell you.\n\nThe fix is a single source of truth — one master resume — and a reliable way to push it everywhere. That's what Profile Sync does.",
+    },
+    {
+      heading: "Paste-Ready Blocks for Every Vendor",
+      body: "[Profile Sync](/tools/vendor-sync) supports nine vendors today: LinkedIn, Indeed, Glassdoor, ZipRecruiter, Monster, Wellfound, Dice, GitHub, and any personal portfolio site.\n\nFor every vendor, it generates **paste-ready blocks** shaped to that platform's fields — Headline, About / Summary / Highlights (the exact set depends on the vendor), Experience entries, and Skills. You don't need any browser extension for this: open the vendor's edit screen, copy the matching block, paste, save. The content is already formatted the way that platform expects, so there's no reformatting tax.\n\nBecause every block is generated from the same master resume, the story stays consistent everywhere — update the master once and regenerate.",
+    },
+    {
+      heading: "Two-Way Sync with the Chrome Extension",
+      body: "Install the hired.video Chrome extension and Profile Sync becomes two-way.\n\n**Pull-back:** when you've edited a profile directly on LinkedIn (or another supported vendor), the extension reads the profile pane on your tab and offers to merge those changes back into your master resume. You review a merge dialog and accept or reject each field — nothing touches your master until you say so.\n\n**Auto-fill:** on LinkedIn, Indeed, Glassdoor, ZipRecruiter, Wellfound, Dice, and Monster, you can auto-fill the Headline and About fields with one click. You open the vendor's edit modal yourself, click Auto-fill, review the value, and click Save on the vendor — the extension never auto-opens modals or auto-saves. It's the same envelope as a password manager: it fills, you confirm.",
+    },
+    {
+      heading: "Safe by Design",
+      body: "Two safety rails keep Profile Sync from ever surprising you. On pull-back, the merge dialog is opt-in per field — you approve every change before it reaches your master. On push, you stay in control of the vendor: you open the edit modal, you review the filled value, you click Save. Nothing happens behind your back.\n\nPrivacy is handled the same way. Toggle \"Don't share anonymous usage\" in the extension's Settings to opt out of telemetry entirely. When opt-in is on, the extension records event *types* (e.g. \"a capture happened on this host with N fields\") — never the literal field values or scraped page content. The only data that leaves your machine is the LLM extractor call, which is bound to your account.\n\nThe payoff: one master resume, consistent everywhere, updated in minutes instead of an afternoon of copy-paste — and you can even A/B which variant you posted where to see which version pulls the most callbacks.",
+    },
+  ],
+  faq: [
+    {
+      question: "Do I need the Chrome extension to use Profile Sync?",
+      answer:
+        "Only for two-way sync. Without the extension you still get paste-ready blocks for every vendor (Headline, About/Summary/Highlights, Experience, Skills). With the extension you can also pull profile edits back into your master and auto-fill the Headline and About fields on LinkedIn, Indeed, Glassdoor, ZipRecruiter, Wellfound, Dice, and Monster.",
+    },
+    {
+      question: "Will Profile Sync overwrite my LinkedIn without asking?",
+      answer:
+        "No. On pull-back you review a merge dialog and accept or reject each field before anything touches your master resume. On push you open the vendor's edit modal yourself, click Auto-fill, review the value, and click Save — it never auto-opens modals or auto-saves.",
+    },
+    {
+      question: "Can I sync different resume variants to different vendors?",
+      answer:
+        "Yes. Pick a master or any variant per vendor. Profile Sync remembers which variant you posted where, so you can A/B which version pulls the most callbacks.",
+    },
+  ],
+});
+
 export function getBlogPost(slug: string): BlogPost | undefined {
   return BLOG_POSTS.find((p) => p.slug === slug);
 }
