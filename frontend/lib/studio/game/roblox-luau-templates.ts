@@ -90,7 +90,7 @@ print("Score-target challenge wired; advance ${challenge.label} when player reac
 
 const HP_DAMAGE_TEMPLATE = `-- #1661 — Default HP + damage handler. Wires standard Humanoid health
 -- so weapon entities deal a configurable damage value on hit. Hooked
--- via tag: Parts tagged \"weapon\" deal \`damage\` on Touch.
+-- via tag: Parts tagged "weapon" deal \`damage\` on Touch.
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 

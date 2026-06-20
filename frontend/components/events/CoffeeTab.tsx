@@ -24,7 +24,7 @@ interface CoffeeRequestWithPeople extends CoffeeRequest {
   recipientAvatarUrl?: string | null;
 }
 
-export function CoffeeTab({ viewerUserId }: { viewerUserId: string }) {
+export function CoffeeTab({ viewerUserId: _viewerUserId }: { viewerUserId: string }) {
   const [incoming, setIncoming] = useState<CoffeeRequestWithPeople[]>([]);
   const [outgoing, setOutgoing] = useState<CoffeeRequestWithPeople[]>([]);
   const [loading, setLoading] = useState(true);
@@ -243,7 +243,6 @@ export function CoffeeTab({ viewerUserId }: { viewerUserId: string }) {
       )}
     </div>
   );
-  void viewerUserId;
 }
 
 function CoffeeStatusBadge({ status }: { status: CoffeeRequest["status"] }) {

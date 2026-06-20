@@ -135,7 +135,7 @@ function ensureDirSync(dir) {
   }
 }
 
-function setOrInsertMeta(html, { title, description, ogTitle, ogDescription, ogImage, canonical, twitterSite }) {
+function setOrInsertMeta(html, { title, description, ogTitle, ogDescription, ogImage, canonical }) {
   let out = html;
 
   // Title

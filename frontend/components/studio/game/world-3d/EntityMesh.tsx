@@ -293,6 +293,7 @@ function KindCollider({ kind, scale, sensor = false }: KindColliderProps) {
     // exhaustiveness against `World3DEntityKind`. If a user overrides
     // weapon physics to anything else, a Cuboid collider is a safe
     // bounding-box default.
+    // falls through
     case "weapon":
       return <CuboidCollider args={halfExtents} sensor={sensor} />;
   }

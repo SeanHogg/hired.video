@@ -117,11 +117,23 @@ beforeEach(() => {
   (globalThis as unknown as { AudioContext: typeof FakeAudioContext }).AudioContext =
     FakeAudioContext;
 
-  // requestAnimationFrame fires a single tick synchronously; the
-  // recorder uses it for the audio meter + canvas composite and
-  // doesn't care that it never re-fires in tests.
+  // requestAnimationFrame fires a single tick synchronously; the recorder uses
+  // it for the audio meter + canvas composite. Both loops re-schedule from
+  // INSIDE their callback (`tick` → rAF(tick), `draw` → rAF(draw)), so a naive
+  // synchronous mock re-enters itself forever and overflows the stack
+  // (`RangeError: Maximum call stack size exceeded`) — a test-only artifact
+  // since real rAF is async. The re-entrancy guard runs the first tick (so the
+  // meter/composite update once for assertions) but makes any rAF scheduled
+  // *during* that tick a no-op, breaking the synchronous recursion (#1870).
+  let rafReentrant = false;
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-    cb(0);
+    if (rafReentrant) return 1;
+    rafReentrant = true;
+    try {
+      cb(0);
+    } finally {
+      rafReentrant = false;
+    }
     return 1;
   });
   vi.stubGlobal("cancelAnimationFrame", vi.fn());

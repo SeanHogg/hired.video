@@ -45,11 +45,13 @@ export function DialogHost() {
 }
 
 function ActiveDialog({ request }: { request: DialogRequest }) {
+  // Hook must run unconditionally (rules-of-hooks) — call it before the
+  // prompt early-return.
+  const { t } = useTranslation();
   if (request.kind === "prompt") {
     return <PromptDialogView request={request} />;
   }
 
-  const { t } = useTranslation();
   const isConfirm = request.kind === "confirm";
   return (
     <AlertDialog

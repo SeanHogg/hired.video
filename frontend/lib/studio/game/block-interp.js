@@ -198,7 +198,7 @@ function executeOne(sprite, stmt, ctx) {
       return "ok";
 
     case "if": {
-      if (Boolean(evalExpr(stmt.condition, sprite, ctx))) {
+      if (evalExpr(stmt.condition, sprite, ctx)) {
         return executeStmts(sprite, stmt.thenBody, ctx);
       }
       return "ok";
@@ -233,7 +233,7 @@ function executeOne(sprite, stmt, ctx) {
     }
     case "repeat-until": {
       for (let i = 0; i < MAX_LOOP_ITERATIONS; i++) {
-        if (Boolean(evalExpr(stmt.condition, sprite, ctx))) return "ok";
+        if (evalExpr(stmt.condition, sprite, ctx)) return "ok";
         const r = executeStmts(sprite, stmt.body, ctx);
         if (r === "level-changed") return "level-changed";
       }

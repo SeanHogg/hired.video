@@ -518,7 +518,7 @@ export function runGame(canvas, state, opts) {
   // differ from the start level). Falls back to the runtime default
   // when not set or doesn't resolve. The export bundle never passes
   // this so the live game still mounts startLevelId as authored.
-  function resolveLevel(initial) {
+  function resolveLevel(_initial) {
     const editorLevel = opts && opts.activeLevelId
       ? state.levels.find(function (l) { return l.id === opts.activeLevelId; })
       : null;

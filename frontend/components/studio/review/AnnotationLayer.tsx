@@ -66,6 +66,51 @@ function resolveSection(node: Node | null, root: HTMLElement): { sectionKey: str
 
 const MAX_QUOTE = 280;
 
+/** Content anchor seed captured from a text selection. */
+interface ContentSeed {
+  sectionKey: string;
+  referenceId?: string;
+  quote: string;
+}
+
+/** An open inline composer — either dropping a sticky note at a canvas point or
+ *  commenting on a selected quote. Positioned in container-local px. */
+interface Composer {
+  mode: "sticky" | "highlight";
+  left: number;
+  top: number;
+  canvas?: { x: number; y: number };
+  content?: ContentSeed;
+}
+
+interface HighlightMark {
+  id: string;
+  color: string;
+  selected: boolean;
+  rects: { left: number; top: number; width: number; height: number }[];
+}
+
+/** First Range inside `root` whose text contains `quote` (within a single text
+ *  node — covers the common case; multi-node quotes are skipped). Powers the
+ *  persistent highlight marks. */
+function findQuoteRange(root: HTMLElement, quote: string): Range | null {
+  const needle = quote.trim().toLowerCase();
+  if (!needle) return null;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const text = node.textContent ?? "";
+    const idx = text.toLowerCase().indexOf(needle);
+    if (idx >= 0) {
+      const range = document.createRange();
+      range.setStart(node, idx);
+      range.setEnd(node, idx + quote.trim().length);
+      return range;
+    }
+  }
+  return null;
+}
+
 export default function AnnotationLayer({
   containerRef,
   annotations,
@@ -79,12 +124,46 @@ export default function AnnotationLayer({
   newColor,
 }: AnnotationLayerProps) {
   const [toolbar, setToolbar] = useState<SelectionToolbar | null>(null);
+  const [composer, setComposer] = useState<Composer | null>(null);
+  const [draft, setDraft] = useState("");
+  const [marks, setMarks] = useState<HighlightMark[]>([]);
   const composingRef = useRef(false);
 
   const canvasNotes = useMemo(
     () => annotations.filter((a) => a.anchor.type === "canvas"),
     [annotations],
   );
+
+  // ── Persistent highlight marks ──────────────────────────────────────────────
+  // Draw translucent overlays over each content annotation's quoted text. Pure
+  // overlay (pointer-events: none) so it never mutates the resume DOM or blocks
+  // selection; recomputed on annotation change + resize.
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+    const compute = () => {
+      const rootRect = root.getBoundingClientRect();
+      const next: HighlightMark[] = [];
+      for (const a of annotations) {
+        if (a.anchor.type !== "content" || !a.anchor.quote) continue;
+        if (a.status === "dismissed") continue;
+        const range = findQuoteRange(root, a.anchor.quote);
+        if (!range) continue;
+        const rects = Array.from(range.getClientRects()).map((r) => ({
+          left: r.left - rootRect.left,
+          top: r.top - rootRect.top,
+          width: r.width,
+          height: r.height,
+        }));
+        if (rects.length === 0) continue;
+        next.push({ id: a.id, color: a.color ?? "#fde68a", selected: a.id === selectedId, rects });
+      }
+      setMarks(next);
+    };
+    compute();
+    window.addEventListener("resize", compute);
+    return () => window.removeEventListener("resize", compute);
+  }, [annotations, containerRef, selectedId]);
 
   // ── Text-selection → highlight toolbar ──────────────────────────────────────
   useEffect(() => {
@@ -125,54 +204,101 @@ export default function AnnotationLayer({
     return () => document.removeEventListener("mouseup", onMouseUp);
   }, [canAnnotate, containerRef]);
 
-  // ── Sticky-note placement ───────────────────────────────────────────────────
+  const openComposer = useCallback((next: Composer) => {
+    composingRef.current = true;
+    setDraft("");
+    setComposer(next);
+  }, []);
+
+  const closeComposer = useCallback(() => {
+    composingRef.current = false;
+    setComposer(null);
+    setDraft("");
+    window.getSelection()?.removeAllRanges();
+  }, []);
+
+  // ── Sticky-note placement → inline composer ─────────────────────────────────
   const onCanvasClick = useCallback(
-    async (e: React.MouseEvent) => {
+    (e: React.MouseEvent) => {
       if (!placing) return;
       const root = containerRef.current;
       if (!root) return;
       const rect = root.getBoundingClientRect();
-      const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-      const y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
-      const body = window.prompt("Sticky note");
+      const localX = e.clientX - rect.left;
+      const localY = e.clientY - rect.top;
       onExitPlacing();
-      if (!body?.trim()) return;
-      await onCreate({
-        kind: "sticky_note",
-        body: body.trim(),
-        color: newColor,
-        anchor: { type: "canvas", pageId, x, y },
+      openComposer({
+        mode: "sticky",
+        left: Math.min(localX, rect.width - 240),
+        top: localY,
+        canvas: {
+          x: Math.min(1, Math.max(0, localX / rect.width)),
+          y: Math.min(1, Math.max(0, localY / rect.height)),
+        },
       });
     },
-    [placing, containerRef, pageId, newColor, onCreate, onExitPlacing],
+    [placing, containerRef, onExitPlacing, openComposer],
   );
 
-  const startHighlight = useCallback(async () => {
+  const startHighlight = useCallback(() => {
     if (!toolbar) return;
-    composingRef.current = true;
-    const body = window.prompt(`Comment on "${toolbar.quote.slice(0, 60)}…"`);
-    composingRef.current = false;
-    window.getSelection()?.removeAllRanges();
-    setToolbar(null);
-    if (!body?.trim()) return;
-    await onCreate({
-      kind: "highlight",
-      body: body.trim(),
-      anchor: {
-        type: "content",
-        sectionKey: toolbar.sectionKey,
-        referenceId: toolbar.referenceId,
-        quote: toolbar.quote,
-      },
+    openComposer({
+      mode: "highlight",
+      left: toolbar.left,
+      top: toolbar.top + 44,
+      content: { sectionKey: toolbar.sectionKey, referenceId: toolbar.referenceId, quote: toolbar.quote },
     });
-  }, [toolbar, onCreate]);
+    setToolbar(null);
+  }, [toolbar, openComposer]);
+
+  const submitComposer = useCallback(async () => {
+    const body = draft.trim();
+    if (!composer || !body) {
+      closeComposer();
+      return;
+    }
+    let input: CreateAnnotationInput | null = null;
+    if (composer.mode === "sticky" && composer.canvas) {
+      const { x, y } = composer.canvas;
+      input = { kind: "sticky_note", body, color: newColor, anchor: { type: "canvas", pageId, x, y } };
+    } else if (composer.mode === "highlight" && composer.content) {
+      const { sectionKey, referenceId, quote } = composer.content;
+      input = { kind: "highlight", body, anchor: { type: "content", sectionKey, referenceId, quote } };
+    }
+    closeComposer();
+    if (input) await onCreate(input);
+  }, [draft, composer, newColor, pageId, onCreate, closeComposer]);
 
   return (
     <div
       className="absolute inset-0"
-      style={{ pointerEvents: placing ? "auto" : "none", cursor: placing ? "crosshair" : "default" }}
+      style={{
+        pointerEvents: placing || composer ? "auto" : "none",
+        cursor: placing ? "crosshair" : "default",
+      }}
       onClick={onCanvasClick}
     >
+      {/* Persistent highlight marks (visual only) */}
+      {marks.map((m) =>
+        m.rects.map((r, i) => (
+          <div
+            key={`${m.id}-${i}`}
+            className="absolute rounded-sm"
+            style={{
+              left: r.left,
+              top: r.top,
+              width: r.width,
+              height: r.height,
+              backgroundColor: m.color,
+              opacity: m.selected ? 0.55 : 0.3,
+              outline: m.selected ? "1px solid rgba(124,58,237,0.7)" : "none",
+              pointerEvents: "none",
+              zIndex: 10,
+            }}
+          />
+        )),
+      )}
+
       {/* Placement banner */}
       {placing && (
         <div
@@ -213,7 +339,7 @@ export default function AnnotationLayer({
       })}
 
       {/* Selection → highlight toolbar */}
-      {toolbar && (
+      {toolbar && !composer && (
         <div
           className="absolute z-30 flex items-center gap-1"
           style={{ top: toolbar.top, left: toolbar.left, pointerEvents: "auto" }}
@@ -237,6 +363,51 @@ export default function AnnotationLayer({
           >
             <X className="h-3 w-3" />
           </button>
+        </div>
+      )}
+
+      {/* Inline composer (replaces the old window.prompt) */}
+      {composer && (
+        <div
+          className="absolute z-40 w-60 rounded-lg border bg-white p-2 shadow-lg"
+          style={{ left: composer.left, top: composer.top, pointerEvents: "auto" }}
+          onClick={(e) => e.stopPropagation()}
+          role="presentation"
+        >
+          {composer.mode === "highlight" && composer.content && (
+            <blockquote className="mb-1 line-clamp-2 border-l-2 border-amber-400 pl-2 text-[11px] italic text-slate-500">
+              “{composer.content.quote}”
+            </blockquote>
+          )}
+          <textarea
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submitComposer();
+              if (e.key === "Escape") closeComposer();
+            }}
+            placeholder={composer.mode === "sticky" ? "Sticky note…" : "Your comment…"}
+            rows={3}
+            className="w-full resize-y rounded border border-border px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
+          />
+          <div className="mt-1 flex justify-end gap-1">
+            <button
+              type="button"
+              className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+              onClick={closeComposer}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rounded bg-brand-purple px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+              disabled={!draft.trim()}
+              onClick={() => void submitComposer()}
+            >
+              Add
+            </button>
+          </div>
         </div>
       )}
     </div>
