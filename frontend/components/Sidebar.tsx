@@ -57,16 +57,12 @@ const NAV_ICONS: Record<string, typeof TrendingUp> = {
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Desktop-only: collapse the docked rail to its icon strip. The header
-   *  (X) uses this on `lg+` where the sidebar can't be dismissed entirely. */
-  onCollapse?: () => void;
   collapsed?: boolean;
 }
 
 export default function Sidebar({
   isOpen,
   onClose,
-  onCollapse,
   collapsed = false,
 }: SidebarProps) {
   const { isAuthenticated, user } = useAuth();

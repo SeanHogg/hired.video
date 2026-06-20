@@ -1170,6 +1170,37 @@ export default function Pricing() {
                         pro
                       />
 
+                      {/* People Operations — the embeddable CHRO back-office
+                          (roster auto-materialized from role associations,
+                          org chart, 1:1s, segment/team-health analytics).
+                          Employer-only + Pro: it's the paid post-hire product,
+                          so every row gates to the employer persona. */}
+                      <SectionRow label={t("marketing.pricing.section.peopleOps")} />
+                      <PersonaGatedRow
+                        icon={Users}
+                        label={t("marketing.pricing.feature.orgChart")}
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={MessageCircle}
+                        label={t("marketing.pricing.feature.oneOnOnesReviews")}
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={BarChart3}
+                        label={t("marketing.pricing.feature.peopleSegments")}
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+
                       {/* Communication & Outreach */}
                       <SectionRow label={t("marketing.pricing.section.commsOutreach")} />
                       <PersonaGatedRow
@@ -1281,6 +1312,12 @@ export default function Pricing() {
                       <FeatureRow
                         icon={Sparkles}
                         label={t("marketing.pricing.feature.creatorStudio")}
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Briefcase}
+                        label={t("marketing.pricing.feature.gigMarketplace")}
                         free
                         pro
                       />

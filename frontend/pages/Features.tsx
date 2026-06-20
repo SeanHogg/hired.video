@@ -88,6 +88,17 @@ const PILLARS: FeaturePillar[] = [
         to: "/studio",
         ctaKey: "features.studio.interactive.cta",
       },
+      {
+        titleKey: "features.studio.monetize.title",
+        descKey: "features.studio.monetize.desc",
+        bulletKeys: [
+          "features.studio.monetize.bullet1",
+          "features.studio.monetize.bullet2",
+          "features.studio.monetize.bullet3",
+        ],
+        to: "/services/gigs",
+        ctaKey: "features.studio.monetize.cta",
+      },
     ],
   },
   // ─── Learning ───────────────────────────────────────────────────────────
