@@ -76,7 +76,11 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     blurb:
       "AI writes the script and renders a polished 720p / 1080p video in 60 seconds. Job seekers, recruiters, and companies all use the same canvas — video resumes, job ads, company promos, sizzle reels.",
     icon: Film,
-    accentClass: "bg-slate-900/10 text-slate-900",
+    // Mid-tone slate so the icon mirrors the video badge's slate identity
+    // (`MediaKindBadge` uses bg-slate-900/85) while staying legible on BOTH
+    // the dark studio landing and light surfaces — `text-slate-900` rendered
+    // the flagship icon invisible against the dark "What you can make" grid.
+    accentClass: "bg-slate-500/10 text-slate-500",
     isShippable: true,
   },
   podcast: {
