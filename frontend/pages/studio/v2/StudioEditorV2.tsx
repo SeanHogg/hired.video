@@ -67,6 +67,10 @@ import StudioLoadingShell from "../StudioLoadingShell";
 import { cn } from "@/lib/utils";
 import { useAuthGate } from "@/components/auth/useAuthGate";
 import {
+  AnonGateContext,
+  type AnonGateValue,
+} from "@/lib/studio/anon-gate-context";
+import {
   CLAIM_PARAM,
   clearPendingStudioClaim,
   markPendingStudioClaim,
@@ -1572,6 +1576,17 @@ export default function StudioEditorV2() {
     [requireAuth, currentMediaKind],
   );
 
+  // Expose the gate to every server-touching descendant (AI generation,
+  // media upload, save-to-library …) so they self-gate without prop-drilling
+  // (#2214). No-op for authenticated users — `gateAction` returns true.
+  const anonGateValue = useMemo<AnonGateValue>(
+    () => ({
+      isAnon: isAnonVisitor,
+      requireAuth: (req) => gateAction(req.reason, req.displayReason, req.onAuthed),
+    }),
+    [isAnonVisitor, gateAction],
+  );
+
   // Funnel: "enter" once when a signed-out visitor opens the editor.
   const enterTrackedRef = useRef(false);
   useEffect(() => {
@@ -2741,6 +2756,18 @@ export default function StudioEditorV2() {
   }
 
   async function handlePublishToYouTube() {
+    if (
+      !gateAction(
+        "publish",
+        t("studio.anon.gatePublish", {
+          defaultValue:
+            "Create a free account to publish — we'll keep everything you've made.",
+        }),
+        () => void handlePublishToYouTube(),
+      )
+    ) {
+      return;
+    }
     const project = await ensureRendered();
     if (!project) return;
     setRepublishing("youtube");
@@ -2848,6 +2875,18 @@ export default function StudioEditorV2() {
   }
 
   async function handlePublishToLinkedIn() {
+    if (
+      !gateAction(
+        "publish",
+        t("studio.anon.gatePublish", {
+          defaultValue:
+            "Create a free account to publish — we'll keep everything you've made.",
+        }),
+        () => void handlePublishToLinkedIn(),
+      )
+    ) {
+      return;
+    }
     const project = await ensureRendered();
     if (!project) return;
     setLinkedInPublishOpen(true);
@@ -3107,11 +3146,12 @@ export default function StudioEditorV2() {
   }
 
   return (
+    <AnonGateContext.Provider value={anonGateValue}>
     <div className="flex h-screen flex-col bg-background">
       {/* Anon adoption (#2212): the in-place Sign in / Create account panel.
           Opens when a signed-out visitor hits a gated Save / Publish / Export
-          and resumes that action once they authenticate — without leaving the
-          canvas. */}
+          (or an AI / upload action via AnonGateContext) and resumes that action
+          once they authenticate — without leaving the canvas. */}
       {gate}
       <Sidebar
         isOpen={sidebarOpen}
@@ -4369,6 +4409,7 @@ export default function StudioEditorV2() {
         </div>
       )}
     </div>
+    </AnonGateContext.Provider>
   );
 }
 

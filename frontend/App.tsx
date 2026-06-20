@@ -192,6 +192,7 @@ const InterviewPractice = lazy(() => import("./pages/InterviewPractice"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 // /profile is now a redirect to the canonical /people/:id — see route below.
 const ResumeDetail = lazy(() => import("./pages/ResumeDetail"));
+const ResumeReviewPage = lazy(() => import("./pages/ResumeReviewPage"));
 const MarketplaceTemplatePreview = lazy(() => import("./pages/MarketplaceTemplatePreview"));
 const VoicePublicDetail = lazy(() => import("./pages/marketplace/VoicePublicDetail"));
 const CoursePublicDetail = lazy(() => import("./pages/marketplace/CoursePublicDetail"));
@@ -811,6 +812,11 @@ const App = () => (
                       <Route path="/resumes/sample" element={<LegacySampleRedirect />} />
                       <Route path="/resumes/:id" element={<ResumeDetail />} />
 	                      <Route path="/resume/:id" element={<ResumeDetail />} />
+                      {/* Resume feedback / review surface (#1947). Owner opens
+                          by review id; an invited reviewer opens the share link
+                          by token (works unauthenticated). */}
+                      <Route path="/resume-review/:reviewId" element={<ResumeReviewPage />} />
+                      <Route path="/r/:token" element={<ResumeReviewPage />} />
                       <Route path="/jobs" element={<Jobs />} />
                       <Route path="/sourcing/browse" element={<SourcingBrowse />} />
                       {/* Gigs folded into the My Services hub (/services/gigs);

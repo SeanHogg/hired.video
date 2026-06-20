@@ -30,8 +30,8 @@ export default function GigMarketplace() {
   const location = useLocation();
   const { t } = useTranslation();
   useSEO(location.pathname, {
-    title: "Gig Marketplace — hired.video",
-    description: "Browse open gigs and bid, or post a brief for content creators.",
+    title: t("gigs.marketplace.seoTitle"),
+    description: t("gigs.marketplace.seoDescription"),
   });
   const [view, setView] = useState<View>("browse");
   const [open, setOpen] = useState<GigProject[]>([]);

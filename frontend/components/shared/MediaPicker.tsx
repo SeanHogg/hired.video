@@ -33,6 +33,7 @@ import {
 } from "@/lib/services/upload-service";
 import { generateImage } from "@/lib/services/image-gen-engine";
 import { writeDragPayload } from "@/lib/studio/editor-v2/drag-protocol";
+import { useAnonGate } from "@/lib/studio/anon-gate-context";
 
 export interface PickedMedia {
   url: string;
@@ -291,6 +292,9 @@ function UploadTab({ accept, onPick }: { accept: MediaAccept; onPick: (a: Picked
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Uploads persist to R2 under the visitor's account, so an anonymous Studio
+  // visitor must sign up first. No-op for authenticated users (#2214).
+  const { requireAuth } = useAnonGate();
 
   const acceptAttr =
     accept === "video" ? "video/*" :
@@ -303,6 +307,16 @@ function UploadTab({ accept, onPick }: { accept: MediaAccept; onPick: (a: Picked
     "PNG, JPG, GIF, WebP";
 
   const handleFile = async (file: File) => {
+    if (
+      !requireAuth({
+        reason: "upload",
+        displayReason:
+          "Create a free account to upload media — your work is kept exactly as it is.",
+        onAuthed: () => void handleFile(file),
+      })
+    ) {
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -443,9 +457,22 @@ function AITab({ onPick }: { onPick: (a: PickedMedia) => void }) {
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // AI generation is token-metered → anonymous visitors sign up first. No-op
+  // for authenticated users (#2214).
+  const { requireAuth } = useAnonGate();
 
   const handleGenerate = async () => {
     if (prompt.trim().length < 3) return;
+    if (
+      !requireAuth({
+        reason: "ai",
+        displayReason:
+          "Create a free account to use AI tools — your work is kept exactly as it is.",
+        onAuthed: () => void handleGenerate(),
+      })
+    ) {
+      return;
+    }
     setBusy(true);
     setError(null);
     try {

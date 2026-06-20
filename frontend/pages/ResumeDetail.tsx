@@ -11,6 +11,7 @@ import {
   FileText,
   FileType,
   Lock,
+  MessageSquare,
   Monitor,
   Printer,
   RotateCcw,
@@ -56,6 +57,7 @@ import { useResumePermissions } from "@/hooks/use-resume-permissions";
 import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
 import { downloadResume } from "@/lib/resume-download";
 import { resumeService } from "@/lib/services/resume-service";
+import { resumeFeedbackService } from "@/lib/services/resume-feedback-service";
 import { useUgcSeo } from "@/lib/seo-ugc";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
 import { resumeEditorPath } from "@/lib/studio/resume-editor-link";
@@ -205,6 +207,7 @@ export default function ResumeDetail() {
   // first load and only re-skins when the user switches templates (#1883).
   const [layoutTemplateOverrideId, setLayoutTemplateOverrideId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [requestingFeedback, setRequestingFeedback] = useState(false);
   const [editorText, setEditorText] = useState<string>(() => JSON.stringify(DEFAULT_DESCRIPTOR, null, 2));
   const [editorError, setEditorError] = useState<string | null>(null);
 
@@ -582,6 +585,36 @@ export default function ResumeDetail() {
                     title={t("labels.resumeDetail.editResume")}
                   >
                     <Edit className="w-4 h-4" />
+                  </Button>
+                )}
+                {isOwner && resume && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1"
+                    disabled={requestingFeedback}
+                    title="Share this resume for feedback"
+                    onClick={async () => {
+                      setRequestingFeedback(true);
+                      try {
+                        const created = await resumeFeedbackService.createReview({
+                          resumeId: resume.id,
+                          source: "self_share",
+                        });
+                        navigate(`/resume-review/${created.id}`);
+                      } catch {
+                        toast({
+                          title: "Couldn't start a review",
+                          description: "Please try again.",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setRequestingFeedback(false);
+                      }
+                    }}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    Get feedback
                   </Button>
                 )}
                 {/* Listen-to-this-resume pill — slots inline with the

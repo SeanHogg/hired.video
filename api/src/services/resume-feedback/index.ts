@@ -10,7 +10,8 @@ export {
 export type {
   ResumeFeedbackServiceDeps,
   ResumeFeedbackErrorCode,
-  ReviewRole,
   ReviewDetail,
 } from "./ResumeFeedbackService.js";
+// `ReviewRole` / `ReviewDetail` shapes are the SSoT in the shared contract.
+export type { ReviewRole } from "../../../../shared/resume-feedback.js";
 export { defaultResumeFeedbackServiceDeps } from "./deps.js";

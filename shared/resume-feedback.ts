@@ -252,3 +252,24 @@ export interface ProposedDraftDTO {
   proposalStatus: ProposalStatus;
   createdAt: string;
 }
+
+/** Whether the caller is the resume owner or the invited reviewer. The studio
+ *  review surface gates owner-only actions (accept / dismiss / complete) on
+ *  this. */
+export type ReviewRole = "owner" | "reviewer";
+
+/**
+ * Full review payload returned by `GET /reviews/:id` (owner) and
+ * `GET /link/:token` (reviewer). The single contract the API emits and the
+ * frontend studio annotation layer consumes — kept here so neither side can
+ * redefine the shape and drift. `resume.content` is the opaque `ResumeContent`
+ * blob (the renderer narrows it); `shareToken` rides on `review` only for the
+ * owner so they can copy the invite link.
+ */
+export interface ResumeReviewDetailDTO {
+  role: ReviewRole;
+  review: ResumeReviewDTO;
+  resume: { id: string; title: string; content: unknown };
+  annotations: ResumeReviewAnnotationDTO[];
+  proposals: ProposedDraftDTO[];
+}

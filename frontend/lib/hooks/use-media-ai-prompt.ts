@@ -26,6 +26,7 @@ import {
   type ImageGenInput,
   type ImageGenResult,
 } from "@/lib/services/image-gen-engine";
+import { useAnonGate } from "@/lib/studio/anon-gate-context";
 
 export interface UseMediaAiPromptOptions {
   /** Called when generation finishes. Receives the result + the prompt
@@ -64,11 +65,25 @@ export function useMediaAiPrompt(opts: UseMediaAiPromptOptions): UseMediaAiPromp
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  // AI generation hits a token-metered server endpoint, so an anonymous Studio
+  // visitor must create an account first (no token balance otherwise). The
+  // gate is a no-op for authenticated users / surfaces with no provider (#2214).
+  const { requireAuth } = useAnonGate();
 
   const submit = useCallback(
     async (extra?: Omit<ImageGenInput, "prompt">) => {
       const trimmed = prompt.trim();
       if (trimmed.length < MIN_PROMPT_LENGTH || busy) return;
+      if (
+        !requireAuth({
+          reason: "ai",
+          displayReason:
+            "Create a free account to use AI tools — your work is kept exactly as it is.",
+          onAuthed: () => void submit(extra),
+        })
+      ) {
+        return;
+      }
       setBusy(true);
       setError(null);
       setProgress(0);
@@ -95,7 +110,7 @@ export function useMediaAiPrompt(opts: UseMediaAiPromptOptions): UseMediaAiPromp
         setProgress(0);
       }
     },
-    [prompt, busy, opts],
+    [prompt, busy, opts, requireAuth],
   );
 
   const clearError = useCallback(() => setError(null), []);

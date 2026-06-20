@@ -350,10 +350,9 @@ export default function Careers() {
             <section className="mb-12">
               <Card>
                 <CardHeader className="text-center">
-                  <CardTitle className="text-2xl">Our Hiring Process</CardTitle>
+                  <CardTitle className="text-2xl">{t("marketing.careers.process.title")}</CardTitle>
                   <CardDescription>
-                    We believe in a transparent and efficient hiring process
-                    that respects your time.
+                    {t("marketing.careers.process.subtitle")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -362,20 +361,18 @@ export default function Careers() {
                       <div className="w-12 h-12 bg-brand-purple/10 text-brand-purple rounded-full flex items-center justify-center mx-auto mb-3 text-lg font-bold">
                         1
                       </div>
-                      <h3 className="font-semibold mb-2">Application</h3>
+                      <h3 className="font-semibold mb-2">{t("marketing.careers.process.step1.title")}</h3>
                       <p className="text-sm text-muted-foreground">
-                        Submit your application with your resume and cover
-                        letter.
+                        {t("marketing.careers.process.step1.desc")}
                       </p>
                     </div>
                     <div className="text-center">
                       <div className="w-12 h-12 bg-brand-blue/10 text-brand-blue rounded-full flex items-center justify-center mx-auto mb-3 text-lg font-bold">
                         2
                       </div>
-                      <h3 className="font-semibold mb-2">Phone Screen</h3>
+                      <h3 className="font-semibold mb-2">{t("marketing.careers.process.step2.title")}</h3>
                       <p className="text-sm text-muted-foreground">
-                        Brief call with our recruiting team to discuss your
-                        background.
+                        {t("marketing.careers.process.step2.desc")}
                       </p>
                     </div>
                     <div className="text-center">
@@ -383,19 +380,19 @@ export default function Careers() {
                         3
                       </div>
                       <h3 className="font-semibold mb-2">
-                        Technical Interview
+                        {t("marketing.careers.process.step3.title")}
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        Technical discussion and problem-solving with the team.
+                        {t("marketing.careers.process.step3.desc")}
                       </p>
                     </div>
                     <div className="text-center">
                       <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-3 text-lg font-bold">
                         4
                       </div>
-                      <h3 className="font-semibold mb-2">Final Interview</h3>
+                      <h3 className="font-semibold mb-2">{t("marketing.careers.process.step4.title")}</h3>
                       <p className="text-sm text-muted-foreground">
-                        Meet with leadership and discuss culture fit and vision.
+                        {t("marketing.careers.process.step4.desc")}
                       </p>
                     </div>
                   </div>
@@ -405,28 +402,24 @@ export default function Careers() {
 
             <MarketingFAQ
               schemaId="careers"
-              subheading="Get answers to common questions about working at hired.video."
+              subheading={t("marketing.careers.faq.subheading")}
               className="mb-12"
               items={[
                 {
-                  question: "Is hired.video fully remote?",
-                  answer:
-                    "Yes! We're a remote-first company with team members across 15+ countries. We also have optional office spaces in major cities for those who prefer hybrid work.",
+                  question: t("marketing.careers.faq.remote.q"),
+                  answer: t("marketing.careers.faq.remote.a"),
                 },
                 {
-                  question: "What benefits do you offer?",
-                  answer:
-                    "We offer comprehensive health insurance, equity packages, unlimited PTO, learning budgets, wellness stipends, and flexible working hours.",
+                  question: t("marketing.careers.faq.benefits.q"),
+                  answer: t("marketing.careers.faq.benefits.a"),
                 },
                 {
-                  question: "How long is the hiring process?",
-                  answer:
-                    "Our hiring process typically takes 2-3 weeks from application to offer. We believe in being efficient while ensuring a great fit for both sides.",
+                  question: t("marketing.careers.faq.duration.q"),
+                  answer: t("marketing.careers.faq.duration.a"),
                 },
                 {
-                  question: "Do you sponsor work visas?",
-                  answer:
-                    "Yes, we sponsor work visas for exceptional candidates. We're committed to building a diverse, global team and will work with you on visa requirements.",
+                  question: t("marketing.careers.faq.visa.q"),
+                  answer: t("marketing.careers.faq.visa.a"),
                 },
               ]}
             />
@@ -436,21 +429,19 @@ export default function Careers() {
               <Card className="bg-gradient-to-r from-brand-purple/5 to-brand-blue/5 border-brand-purple/20">
                 <CardContent className="pt-8 pb-8">
                   <h2 className="text-2xl font-bold mb-4">
-                    Don't See the Perfect Role?
+                    {t("marketing.careers.cta.title")}
                   </h2>
                   <p className="text-muted-foreground mb-6">
-                    We're always looking for talented individuals who share our
-                    passion for innovation. Send us your resume and let us know
-                    how you'd like to contribute to our mission.
+                    {t("marketing.careers.cta.desc")}
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <Button size="lg" asChild>
                       <a href="mailto:careers@hired.video">
-                        Send Us Your Resume
+                        {t("marketing.careers.cta.sendResume")}
                       </a>
                     </Button>
                     <Button size="lg" variant="outline" asChild>
-                      <a href="/contact">Get in Touch</a>
+                      <a href="/contact">{t("headings.help.getInTouch")}</a>
                     </Button>
                   </div>
                 </CardContent>

@@ -636,7 +636,7 @@ export default function Career360() {
                 <div className="space-y-4">
                   <Card>
                     <CardContent className="p-4 space-y-3">
-                      <h3 className="font-semibold text-sm">Health legend</h3>
+                      <h3 className="font-semibold text-sm">{t("tools.career360.legendHeading")}</h3>
                       <div className="space-y-1.5 text-sm">
                         {(["good", "moderate", "poor", "unknown"] as const).map((h) => (
                           <div key={h} className="flex items-center justify-between gap-3">
@@ -655,7 +655,7 @@ export default function Career360() {
                       </div>
                       {!selected && (
                         <p className="text-xs text-muted-foreground">
-                          Pick a target below to color the wheel from your gap analysis.
+                          {t("tools.career360.legendPickTargetHint")}
                         </p>
                       )}
                     </CardContent>
@@ -664,9 +664,9 @@ export default function Career360() {
                   {history.length > 0 && (
                     <Card>
                       <CardContent className="p-4 space-y-3">
-                        <h3 className="font-semibold text-sm">Stamps of improvement</h3>
+                        <h3 className="font-semibold text-sm">{t("tools.career360.stampsHeading")}</h3>
                         <p className="text-xs text-muted-foreground">
-                          Every recorded run of a measured tool — points improve as you close gaps.
+                          {t("tools.career360.stampsCaption")}
                         </p>
                         <div className="space-y-3 pt-1">
                           {history.map((series: ScoreHistorySeries) => (
@@ -674,8 +674,7 @@ export default function Career360() {
                               <div className="flex items-center justify-between text-xs mb-1">
                                 <span className="font-medium">{series.label}</span>
                                 <span className="text-muted-foreground">
-                                  {series.points.length} run
-                                  {series.points.length === 1 ? "" : "s"}
+                                  {t("tools.career360.runCount", { count: series.points.length })}
                                 </span>
                               </div>
                               <ScoreHistorySparkline series={series} />

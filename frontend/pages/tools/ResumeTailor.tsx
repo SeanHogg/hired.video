@@ -177,11 +177,14 @@ export default function ResumeTailor() {
           ],
           recommendations: response.changes.map((change) => ({
             title: `${change.section}: ${change.before.slice(0, 60)}${change.before.length > 60 ? "…" : ""}`,
-            description: `${change.why}\n\nAfter: ${change.after}`,
+            description: `${change.why}\n\n${t("tools.resumeTailor.runChangeAfter", { after: change.after })}`,
           })),
           raw: response,
         },
-        summary: `Tailored ${Math.round(response.oldScore)}% → ${Math.round(response.newScore)}%`,
+        summary: t("tools.resumeTailor.runSummary", {
+          oldScore: Math.round(response.oldScore),
+          newScore: Math.round(response.newScore),
+        }),
         resumeId: selectedResumeId || undefined,
         jobDescription: jobSource === "saved" ? undefined : jobDescription,
       });
@@ -274,12 +277,12 @@ export default function ResumeTailor() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <FileText className="h-5 w-5" />
-                        Job Description
+                        {t("headings.jobDescription")}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="resume-select">Select Your Resume</Label>
+                        <Label htmlFor="resume-select">{t("labels.selectYourResume")}</Label>
                         {isAuthenticated ? (
                           <Select
                             value={selectedResumeId}
@@ -352,19 +355,18 @@ export default function ResumeTailor() {
                           <div className="border border-dashed rounded-md p-6 text-center space-y-3">
                             <Upload className="h-8 w-8 mx-auto text-muted-foreground/60" />
                             <div className="text-sm text-muted-foreground">
-                              Drop a <code>.txt</code>, <code>.md</code>, or <code>.html</code> file,
-                              or click below to choose.
+                              {t("messages.dropTextFileOrClick")}
                             </div>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => fileInputRef.current?.click()}
                             >
-                              Choose File
+                              {t("actions.chooseFile")}
                             </Button>
                             {uploadedFileName && (
                               <div className="text-xs text-green-700 dark:text-green-400">
-                                Loaded: <span className="font-mono">{uploadedFileName}</span>
+                                {t("tools.resumeTailor.loadedPrefix")} <span className="font-mono">{uploadedFileName}</span>
                               </div>
                             )}
                           </div>
@@ -408,7 +410,7 @@ export default function ResumeTailor() {
                             </Select>
                           ) : (
                             <p className="text-sm text-muted-foreground border border-dashed rounded-md p-3">
-                              Sign in to pick from jobs you've tracked.
+                              {t("messages.signInToPickTrackedJobs")}
                             </p>
                           )}
                         </TabsContent>

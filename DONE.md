@@ -858,7 +858,7 @@ This consolidates the **579 ✅ Done entries** from the Consolidated Gap Registe
 | 2203 | ✅ Done | Now | P1 | `bug` | **Build-breaking JSX syntax error in SalaryIndexPage (whole FE typecheck red)** (found + fixed 2026-06-16 during TK7 verification) | [SalaryIndexPage.tsx](hired.video/frontend/pages/seo/SalaryIndexPage.tsx) had a `{/* comment */}` placed directly as a ternary branch (`) : ( {/* */} <div>…`), which is invalid JSX — a parenthesised branch must be a single expression, so `{` opened an object literal and tsc cascaded 11 parse errors through the file, making `npx tsc --noEmit` fail for the ENTIRE frontend (masking all other results as false-cleans). Fix: moved the comment to be the first child INSIDE the `<div>`. Pre-existing (TK11/SEO file), surfaced because concurrent-tsc cache races were hiding it; repaired to unblock FE verification. FE typecheck clean after. |
 
 | 2210 | ✅ Done | Soon | P3 | `feature` | **SuperAdmin AI-Vendors dashboard — model-substitution tile + use-cases/catalog-audit/usage** (shipped 2026-06-16, TK9) | New [AIVendors.tsx](hired.video/frontend/pages/admin/AIVendors.tsx) — the first UI for the existing `ai-vendors.ts` endpoints: substitution tile (selectable window, `bySwap` table, red SLA-breach badge on latency-critical `match` swaps from #515) + use-case profiles/fallback chains + catalog-audit drift + live gateway models + usage (graceful `{configured:false}` state). React-query (`apiClient.get`, 60s staleTime — admin low-frequency reads, no new cache layer). Routed `/admin/ai-vendors` in App.tsx; `aiVendors` added to `ADMIN_RESOURCES`/`RESOURCE_LABELS` (SA-only grant) so AdminLayout shows the tab AND it auto-registers as `admin_tab:aiVendors` in the role-access manifest. tsc clean. |
-| 2217 | ✅ Done | Later | P3 | `quality` | **`features.*` + `/for` audience-page i18n keys backfilled into es.json / fr-CA.json (resolved 2026-06-20; renumbered from a duplicate #2212 → #2217 in the 2026-06-20 re-tier pass, since the active Anonymous-Studio-adoption gap owns the #2212–#2216 cluster)** | [Features.tsx](hired.video/frontend/pages/Features.tsx) (5 pillars × 3 cards) plus the `/for/:audience` landing pages were fully `t()`-driven but rendered English for es/fr-CA visitors because the catalogs held ZERO `features.*` keys and only label-level `audiences.*` / `audienceFeatures.*` keys (theses, CTAs, feature blurbs, FAQ all fell back to en). **Fixed:** 188 missing keys per locale (`features.*` 121, `audiences.*` 49, `audienceFeatures.*` 18) translated into es (formal "usted" register) + fr-CA and merged into `public/locales/{es,fr-CA}.json` — verified 0 remaining missing across all three namespaces, 0 placeholder-token mismatches, 0 English copies. The studio-monetize card + the gig-marketplace/people-ops audience features are localized in the same pass. Unblocks: fully-localized Features + /for marketing surfaces for the two shipped non-English markets. |
+| 2218 | ✅ Done | Later | P3 | `quality` | **`features.*` + `/for` audience-page i18n keys backfilled into es.json / fr-CA.json (resolved 2026-06-20; twice-renumbered to dodge id collisions — originally #2212 → #2217, then → #2218 once the active "i18n coverage detector" gap was confirmed to already hold #2217)** | [Features.tsx](hired.video/frontend/pages/Features.tsx) (5 pillars × 3 cards) plus the `/for/:audience` landing pages were fully `t()`-driven but rendered English for es/fr-CA visitors because the catalogs held ZERO `features.*` keys and only label-level `audiences.*` / `audienceFeatures.*` keys (theses, CTAs, feature blurbs, FAQ all fell back to en). **Fixed:** 188 missing keys per locale (`features.*` 121, `audiences.*` 49, `audienceFeatures.*` 18) translated into es (formal "usted" register) + fr-CA and merged into `public/locales/{es,fr-CA}.json` — verified 0 remaining missing across all three namespaces, 0 placeholder-token mismatches, 0 English copies. The studio-monetize card + the gig-marketplace/people-ops audience features are localized in the same pass. Unblocks: fully-localized Features + /for marketing surfaces for the two shipped non-English markets. |
 ### Resolved — Removed / Won't-fix / Superseded (15)
 
 | # | Status | Phase | Priority | Type | Gap | Notes |
@@ -1038,3 +1038,721 @@ Cross-checked every bullet on the employer FREE + paid-suite pricing copy agains
 - **#2016 — ATS webhook per-connection attribution** — inbound Greenhouse/Lever webhooks don't carry our connection id, so [ats.ts](api/src/routes/ats.ts) `/webhook/:provider` resolves the owner via the FIRST connection for that provider. A tenant running two connections of the same provider (two companies) would misattribute one's candidates to the other. Fixing it: mint a per-connection webhook URL with an embedded opaque token (`/webhook/:provider/:token`) and look the connection up by token. Unblocks correct multi-company webhook routing.
 
 - **#2017 — ATS webhook stage changes don't reach `job_applications`** — #2014 mirrors webhook candidates into `talent_pool_candidates` + `candidate_interactions`, but a stage-change event is not reflected on the internal `job_applications` pipeline because there is no external-job-id ↔ `job_items.id` mapping. Fixing it: add an `ats_job_map` table (provider + external job id → internal job) populated at connect/sync time, then upsert applications + stage on stage-change webhooks. Unblocks true ATS↔pipeline stage mirroring.
+
+## Implementation Status & Coverage Inventories (moved from README 2026-06-20)
+
+Shipped-capability matrices and implementation-status inventories relocated out of the README so it stays focused on architecture + open work. Open items referenced below remain tracked in the [README Consolidated Gap Register](README.md#consolidated-gap-register).
+### Video Studio Capability Assessment
+
+
+Evaluated against a feature specification for a fully browser-based general-purpose video editor comparable to Canva Video / CapCut. hired.video's studio is purpose-built for AI-driven video resume and employer content creation, not a traditional non-linear editor (NLE). The table below documents parity, partial coverage, and open gaps against that specification.
+
+**Summary: 31 ✅ fully implemented · 4 ⚠️ partial · 3 ❌ not implemented (38 capabilities total)**
+
+Open gaps against the Canva-Video / CapCut spec are tracked in the [Consolidated Gap Register](#consolidated-gap-register) as entries #124–#133. Net-new studio gaps beyond that spec (AI avatars, dubbing, audio enhancement, multi-platform publishing, in-video lead capture, chapters, thumbnails, hook optimizer, etc.) are tracked as #134–#145.
+
+#### Core Requirements
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Timeline-based editor | ✅ Done | `NLETimeline.tsx` — frame ruler with click-to-seek, draggable scene blocks, playhead, zoom (20–240 px/s). Mounted below the preview canvas in `StudioLayout.tsx`. | — |
+| Video, audio, image, and text tracks | ✅ Done | Scene blocks decompose into the existing canvas node graph (text/image/video). Multi-track audio mixer (#129) covers music + voiceover lanes. | — |
+| Clip trimming, splitting, merging, reordering | ✅ Done | `scene-ops.ts` — `trimScene`, `splitSceneAtTime`, `mergeWithNext` (seamless re-merge of contiguous trim points), `reorderScene`. Surfaced as drag handles + S/M/D/Del shortcuts in `NLETimeline.tsx`. | — |
+| Multi-layer editing with precision timing | ⚠️ Partial | `animation-graph.ts` supports per-node keyframe interpolation under the hood; visual keyframe editor not yet exposed. | — |
+
+#### Visual Editing Features
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Transitions and effects (fade, slide, zoom) | ✅ Done | Per-scene `transitionIn` field overrides the theme default. Transition picker dropdown badge on each scene block in `NLETimeline.tsx`. `frame-renderer.ts` resolves per-boundary: exit toward N+1 uses N+1's transition; entry from prev uses this scene's. | — |
+| Filters and color adjustments (brightness, contrast, saturation) | ✅ Done | `VideoFilters` in `types/video-script.ts` + `videoFiltersToCss()` applied to `StudioPreview` wrapper. 5-slider UI in `StudioSidebar` Theme section. | — |
+| Text overlays, subtitles, and animations | ✅ Done | `caption-renderer.ts` — 4 styles (standard, bold-pop, word-by-word, lower-thirds). Text scene nodes with animated entry/exit. `CaptionEditor.tsx` (571 lines). | — |
+| Canvas resizing (16:9, 9:16, 1:1, 4:3) | ✅ Done | `VideoAspect` extended in `types/video-script.ts`; compiler `ASPECT_MAP` covers all four. Switcher in `StudioSettings.tsx` re-renders preview canvas live. | — |
+
+#### Audio Capabilities
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Multi-track audio editing | ✅ Done | `AudioMixConfig` per-lane gain in `video-exporter.ts`; `AudioMixerDialog` exposes music + voiceover lanes plus master gain. | — |
+| Volume control and fade in/out | ✅ Done | Per-lane gain (0..200%) + fadeIn/fadeOut envelopes via `setValueAtTime` + `linearRampToValueAtTime` in `video-exporter.ts`. | — |
+| Voice-over recording | ✅ Done | `WebcamRecorder.tsx` (767 lines) — browser-native MediaRecorder. `VoiceoverPanel.tsx` — engine picker (Web Speech / Kokoro / Piper / VibeVoice), per-scene editable scripts, word-level timestamps, speed control, playback preview. `Teleprompter.tsx` — auto-scroll + WPM control. | — |
+| Background music and sound effects | ✅ Done | `ambient-player.ts` — background track playback + export mixing. `StudioSidebar.tsx` — music library selection. | — |
+
+#### AI-Powered Features
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Auto-generate subtitles/captions | ✅ Done | OpenAI Whisper transcription (`services/transcription.ts`). `POST /captions/generate`. 4 caption styles rendered by `caption-renderer.ts`. SRT/VTT export. | — |
+| Text-based editing via transcript | ❌ Not implemented | Whisper produces transcripts for coaching; no transcript-driven cut/edit workflow (Descript-style). | #126 |
+| Background removal (no green screen) | ❌ Not implemented | Not implemented. Would require MediaPipe Selfie Segmentation or similar WASM model. | #127 |
+| AI voiceovers | ✅ Done | 100% client-side WebGPU TTS via `lib/services/tts-engines.ts`. Four engines: Web Speech (built-in), Kokoro-82M, Piper, and VibeVoice (cloning). Per-scene generation. Voice cloning is a creator-owned asset with an in-product **Voice Marketplace** — see below. | — |
+| Voice Marketplace | ✅ Done | Creators upload a reference sample (`POST /api/studio/voice-clones`, private by default), set their own price, and toggle `Monetize` to publish (`PATCH /:id` with consent). Listings appear in the homepage `Voices` category and `VoiceMarketplaceCard` adds them to the shopping cart. Buyers receive a perpetual personal license (`studio_voice_clone_licenses`) with 95/5 creator/platform split + CC processing fee charged to the buyer (per #156). All synthesis runs in the buyer's browser via VibeVoice — the server never runs a model. Schema: `studio_voice_clones` (extended with `visibility`, `price_cents`, `platform_fee_bps`, `consent_*`), `studio_voice_clone_licenses`. Routes: `GET /voice-clones/library`, `GET /voice-clones/marketplace`, `PATCH /voice-clones/:id`, `POST /voice-clones/:id/claim`, `POST /voice-clones/cart-checkout`. Terms of Service §9a covers consent, ownership, and the revenue split. | — |
+
+#### Media & Assets
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| User uploads (video, audio, images) | ✅ Done | R2-backed upload routes (`routes/upload.ts`). `WebcamRecorder.tsx` supports file upload in addition to live recording. | — |
+| Stock media library integration | ✅ Done | Unsplash + Pexels + Pixabay aggregator (`services/stockmedia.ts`) with content-addressed dedup: one R2 object per `sha256(bytes)`, per-user picks tracked in `userStockMediaUsage`. `StockMediaPanel.tsx` in `StudioSidebar`. | — |
+| Template system for common formats | ✅ Done | 3 free (720p) + 5 Premium (1080p) templates. 12 scene types. 6 purposes (`resume`, `job_ad`, `company_promo`, `recruiter_brand`, `product_launch`, `personal_brand`). `studioBrandKits` for brand consistency. | — |
+
+#### Technical Stack
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Frontend: React / Next.js or similar | ✅ Done | React 18 + Vite. TypeScript throughout. Tailwind + shadcn/ui. | — |
+| Rendering: Canvas / WebGL / WebCodecs | ✅ Done | Canvas 2D (`frame-renderer.ts`), WebCodecs encoder (`video-exporter.ts`), Three.js / React Three Fiber for 3D elements. | — |
+| Media processing: FFmpeg WASM or server fallback | ✅ Done | WebCodecs API + `mp4-muxer` / `webm-muxer` — browser-native hardware-accelerated encoding without FFmpeg dependency. Superior performance profile. | — |
+| State management for timeline sync | ✅ Done | TanStack Query v5 for server state. `StudioLayout.tsx` (2,319 lines — needs decomposition, gap #1333) owns local project state. | — |
+| Optional backend for rendering/export | ✅ Done | Hono on Cloudflare Workers. Studio routes **7,413 lines** across `studio.ts` (4,015) + `studio-features.ts` (3,398) — see gaps #1331 / #1332. | — |
+
+#### Performance Requirements
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Smooth playback and scrubbing | ✅ Done | Canvas 2D `render(ctx, compiledVideo, time)` at target FPS. WebCodecs `VideoFrame` pipeline for encoding. | — |
+| Efficient memory handling for large files | ⚠️ Partial | WebCodecs streams frames without full decode into memory. No explicit documented chunking/pooling strategy for large uploads. | — |
+| Lazy loading and caching of media assets | ⚠️ Partial | Cloudflare R2 + CDN for assets. No explicit lazy-load or client-side LRU cache documented for timeline preview thumbnails. | — |
+
+#### Export & Sharing
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Export to MP4 (H.264) | ✅ Done | `video-exporter.ts` — WebCodecs `VideoEncoder` (H.264) + `mp4-muxer`. WebM fallback via `webm-muxer`. | — |
+| Multiple resolutions (720p, 1080p, 4K) | ✅ Done | All three resolutions in `RESOLUTION_MAP`. 4K (3840×2160) Premium-gated server-side via `POST /api/studio/upload` (rejects with 402 PREMIUM_REQUIRED for non-Premium). | — |
+| Direct sharing or download | ✅ Done | LinkedIn publish (`LinkedInPublisher.tsx`), ATS package shareable link (`ATSLandingPage.tsx`), visibility toggle (public/unlisted), embed code generation. | — |
+| Cloud save and project persistence | ✅ Done | `studioProjects` persists projects. `studioProjectVersions` snapshots autosave every 30 s; `VersionHistoryDialog` exposes restore + manual snapshot. 50-version cap, 30-day retention. | — |
+
+#### Collaboration (Optional)
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Real-time collaborative editing | ❌ Not implemented | Not implemented. SignalR hub infrastructure exists for notifications; studio state is single-user. | #130 |
+| Version history and autosave | ✅ Done | `studioProjectVersions` table + 4 routes; debounced 30 s autosave in `StudioLayout.tsx`; restore via `VersionHistoryDialog.tsx`. | — |
+
+#### Extensibility
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Plugin system for effects or tools | ❌ Not implemented | No hook or registry system for third-party studio plugins. | #132 |
+| API for integrations | ✅ Done | OpenAPI 3.1 spec at `GET /api/openapi.json`. YouTube, LinkedIn, ATS (Greenhouse/Lever/Workday), and calendar integrations live. | — |
+
+#### UX Goals
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Intuitive, beginner-friendly interface | ✅ Done | AI-driven storyboard generation from a single text prompt. 3-panel workspace. shadcn/ui component system. | — |
+| Fast load time, no installation required | ✅ Done | Vite bundle + Cloudflare Workers edge delivery. No desktop app required. | — |
+| Responsive design (desktop-first, tablet support) | ⚠️ Partial | Tailwind responsive utilities. Studio workspace is desktop-first; no documented tablet breakpoint layout for the editor panels. | — |
+
+---
+
+### SCORM / training-material authoring — already-shipped studio capabilities
+
+
+| Training need | Studio primitive (already shipped) | Reuse path |
+|---|---|---|
+| Lesson script generation | Storyboard generator with `purpose` enum (`resume` / `job_ad` / `company_promo` / `recruiter_brand` / `product_launch` / `personal_brand`) — see `studio.ts` | Add new `purpose: "course_lesson"` to the enum + a lesson-shaped scene template set. One-line schema delta. |
+| Lesson section structure (intro / explain / example / summary) | 12+ existing scene types (`intro`, `talking-head`, `content-reveal`, `demo`, `testimonial`, `cta`, etc.) | Add scene types: `learning_objective`, `concept`, `worked_example`, `knowledge_check`, `summary`. |
+| Narrated voiceover | `tts-engines.ts` (Web Speech / Kokoro / Piper / VibeVoice) + `VoiceoverPanel.tsx` per-scene script | Already complete. Voice clones can be re-used as "instructor voice" assets. |
+| Captions + accessibility | `caption-renderer.ts` (4 styles incl. word-by-word), Whisper transcription, SRT/VTT export, `studioCaptions` table | Already complete. WCAG AA compliance gap (#168) is keyboard-trap + colour-contrast audit on the player chrome. |
+| Branded chrome | `studioBrandKits` table + brand-kit CRUD + AI script injection of brand voice | Already complete. Becomes "Course brand kit" for L&D buyers without changing schema. |
+| Lesson navigation / TOC | `studioChapters` table + `ChapterEditor.tsx` (auto-seeds from scene boundaries, `mm:ss` parser, YouTube-format export) | Already complete. Lesson-internal sections become chapters; module-level navigation needs a thin parent layer. |
+| Lesson covers | `studioThumbnails` table + AI-scoring + `ThumbnailsDialog.tsx` (extracts 6 frames + LLM ranks) | Already complete. |
+| Engagement hooks | `HookOptimizerDialog.tsx` (#143) — analyses retention + suggests first-3-second variants | Already complete. The hardest part of training video is the first 3 seconds; we already optimise it. |
+| Knowledge checks embedded in video | `studioVideoForms` (#140) — gate playback, capture answers, mirror to `marketingLeads` for the unified inbox | Repurpose: `formType: "knowledge_check"` with answer keys + scoring instead of lead-capture. ~50 lines of schema additions. |
+| SME review workflow | `studioReviewComments` + `studioReviewLinks` (#145) — Frame.io-style threaded time-pinned comments, anonymous review via tokenized share link | Already complete. Becomes "instructional-designer review" workflow for L&D teams. |
+| Engagement analytics | `studio_video_heatmap` (#122) — per-second viewing data, drop-off detection, viewer reverse-lookup | Already complete. Course completion + drop-off-by-second is exactly the Sana / Synthesia analytics dashboard. |
+| Async assessments | `studioAsyncInterviews` + `studioAsyncResponses` (#98) — recorder + reviewer, transcription | Repurpose: webcam-based oral-exam assessments with rubric scoring. |
+| Skills demo videos | `studioSkillsDemos` (#120) — screen + webcam recording with AI-generated teleprompter | Already complete. Becomes "skill-practice" lesson type. |
+| Final assessment | `skillAssessments` + `assessmentAttempts` (#76) — timed attempts, AI grading for short-answer/code, badge issuance, public verify | Already complete. Becomes the "final exam" leading to certification. |
+
+### API Inventory & Implementation Status
+
+
+#### Middleware
+
+| File | Status | Notes |
+|------|--------|-------|
+| `auth.ts` | ✅ Complete | JWT verification, sets `c.var.user` |
+| `errorHandler.ts` | ✅ Complete | AppError hierarchy, Zod formatting, Sentry |
+| `rateLimiter.ts` | ✅ Complete | In-memory, 600 req/60s per authenticated user (JWT `sub`) or 100 req/60s per IP for anonymous traffic |
+| `emailVerified.ts` | ✅ Complete | Applied globally in `app.ts` to all authenticated routes |
+| `passwordChange.ts` | ✅ Complete | Applied globally in `app.ts` to all authenticated routes |
+| `requestLogger.ts` | ✅ Complete | HTTP request/response logging |
+
+#### Routes
+
+##### Authentication & Account Management
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `auth.ts` | POST /register, /login, /refresh, /logout, /forgot-password, /reset-password, /verify-email, /verify-2fa, /resend-2fa, /resend-email-verification; GET /verification-status, /me | ✅ Complete | Full auth flow implemented |
+| `account.ts` | GET /users, /available, /invitations/pending, /invitation/:id, /settings, /analytics, /invitation-analytics; POST /invite, /accept-invitation/:id, /switch, /bulk-invite, /deleteaccount; PUT /roles; DELETE /users/:id | ✅ Complete | Multi-tenant org management |
+| `users.ts` | GET /public, /:id, /check-slug/:slug, /me, /me/connections, /me/recommendations, /profile, /:id/resumes, /:id/stats, /:id/can-message; POST /connections; PUT /me, /profile, /connections/:id/accept; DELETE /account, /connections/:id; PATCH /slug | ✅ Complete | Profile + connections |
+| `settings.ts` | GET /account, /job-preferences, /notifications, /security, /privacy, /export; PUT /account, /job-preferences, /notifications, /privacy, /security; POST /security/2fa/enable, /disable | ✅ Complete | User preferences |
+| `password-management.ts` | GET /requirements; POST /validate-strength, /force-change | ✅ Complete | Password policy enforcement |
+
+##### Resume Features
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `resumes.ts` | GET /, /:id, /export, /metadata, /embedded/:id, /mastergroups, /public, /validateslug, /withownership; POST /, /clone, /createvariation, /promote, /publish, /setactive, /setmaster, /setprivacy, /createfromfile, /parse, /save, /watch/:id, /unwatch/:id; PUT /:id, /:id/metadata; DELETE /:id | ✅ Complete | Core resume CRUD + lifecycle |
+| `resume-scorer.ts` | POST /score, /category-breakdown, /recommendations | ✅ Complete | AI-powered scoring |
+| `resume-optimizer.ts` | POST /optimize, /ats-analysis, /keyword-suggestions | ✅ Complete | ATS optimization |
+| `resume-roast.ts` | POST /roast | ✅ Complete | AI feedback tool |
+| `sentiment.ts` | POST /sentimentprediction, /resume/sentimentprediction | ✅ Complete | Sentiment analysis |
+
+##### Video & Studio
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `video.ts` | GET /:id, /:id/status, /resume/:resumeId, /resume/:resumeId/active, /resume/:resumeId/can-generate, /user/all; POST /generate, /:id/cancel, /enhance-summary; DELETE /:id | ✅ Complete | Video generation lifecycle |
+| `studio.ts` | POST /save-draft, /publish, /storyboard, /generate-image, /edit-script, /upload, /brand-kits, /campaigns, /videos/:id/view, /videos/:id/cta-click; GET /projects, /public/:videoId, /videos/public, /videos/resume/:resumeId, /videos/user/:userId, /status/:projectId, /brand-kits, /ad-templates, /campaigns, /videos/:id/embed, /videos/:id/analytics; DELETE /projects/:projectId; PATCH /projects/:projectId/status, /projects/:projectId/visibility; POST /projects/:id/clone | ✅ Complete | 1,716 lines — largest route file |
+| `studio-features.ts` | GET /tts/voices, /captions/:projectId, /linkedin/auth-url, /linkedin/accounts, /coaching/:recordingId, /interview/questions, /interview/sessions, /skills-demos, /skills-demos/user/:userId, /voice-clones, /async-interviews, /async-interview/invite/:token, /async-interview/:id/responses, /analytics/:videoId; POST /tts/generate, /tts/generate-all, /captions/generate, /linkedin/callback, /linkedin/publish, /linkedin/post, /recording/upload, /recording/:id/transcribe, /coaching/analyze, /ats/generate, /interview/questions/seed, /interview/session, /skills-demo, /skills-demo/generate-script, /voice-clones, /async-interview, /async-interview/:id/respond, /async-interview/:id/submit, /analytics/track; PATCH /interview/session/:id, /skills-demo/:id; DELETE /voice-clones/:id; GET /ats/:slug | ✅ Complete | 1,451 lines — TTS, captions, LinkedIn, webcam, coaching, ATS, interview practice, skills demos, voice cloning, async interviews, heatmap analytics |
+
+##### Jobs & Matching
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `jobs.ts` | GET /, /:id, /public, /slug/:slug, /GetSummaryItems, /saved, /alerts, /applications, /user-jobs; POST /, /:id/apply, /:id/save, /createfromfile, /extract, /alerts; PUT /:id, /alerts/:id; DELETE /:id, /:id/save; PATCH /alerts/:id/toggle | ✅ Complete | Full job lifecycle + alerts |
+| `match.ts` | POST /, /analyze, /bycontent, /byid, /tailor | ✅ Complete | Resume-to-job matching |
+| `search.ts` | GET /public | ⚠️ Partial | Single endpoint; legacy has richer search — see Gap Register #10 |
+
+##### Companies
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `companies.ts` | GET /public, /:id, /:id/jobs, /:id/stats, /:id/following-status, /slug/:slug, /trending, /me/followed; POST /, /:id/follow; PUT /:id; DELETE /:id, /:id/follow | ✅ Complete | Company profiles + follow system |
+
+##### Recruiter Tools
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `recruiter.ts` | GET /talent-pool, /submissions, /placements, /placements/summary/commission, /interactions/:talentPoolId; POST /talent-pool, /submissions, /placements, /interactions; PUT /talent-pool/:id, /submissions/:id/status, /placements/:id/commission, /placements/:id/guarantee; DELETE /talent-pool/:id; POST /submissions/:id/withdraw | ✅ Complete | 618 lines |
+
+##### Communication
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `messages.ts` | POST /, /message | ⚠️ Partial | Minimal — direct messages only; no conversation threading, read receipts, or history — see Gap Register #45 |
+| `communication.ts` | GET /conversations, /messages, /email-templates, /email-campaigns, /tracking, /stats, /job-boards, /external-contacts; POST /conversations, /messages, /messages/mark-read, /email-templates, /email-campaigns, /email-campaigns/:id/send, /tracking, /job-boards/post, /external-contacts, /follow-ups; PUT /email-templates/:id, /external-contacts/:id; DELETE /email-templates/:id, /external-contacts/:id, /job-boards/postings/:id | ✅ Complete | 318 lines |
+
+##### AI Features
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `ai.ts` | POST /context, /chat, /chat/sessions, /chat/sessions/:id | ✅ Complete | Full AI chat with session persistence, history, usage tracking; `/chat` added after initial table |
+| `value-proposition.ts` | POST /generate/content, /generate/job-content-resume-id, /generate/job-id-resume-content, /generate/job-id-resume-id | ✅ Complete | 4 generation modes |
+| `salary.ts` | POST /analyze, /negotiation-tips | ✅ Complete | Salary calculator |
+| `interview.ts` | GET /sessions, /sessions/:id; POST /sessions, /sessions/:id/answers, /questions, /answers/:answerId/analyze; DELETE /sessions/:id; PATCH /sessions/:id/complete | ✅ Complete | 489 lines |
+
+##### Dashboard & Analytics
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `dashboard.ts` | GET /, /admin, /employer, /jobseeker, /recruiter; POST /activity, /engagement, /profile-view, /refresh | ✅ Complete | Role-specific dashboards |
+
+##### Social Feed
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `feed.ts` | GET /posts, /posts/:id, /posts/:id/comments, /search; POST /posts, /posts/:id/like, /comments, /link-preview; PUT /posts/:id, /comments/:id; DELETE /posts/:id, /posts/:id/like, /comments/:id | ✅ Complete | 389 lines |
+
+##### Billing & Payments
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `billing.ts` | GET /subscription, /payment-methods, /invoices, /ai-usage/month, /refund-policy, /refund-reasons, /refund-requests; POST /refund-request, /cancel-account | ✅ Complete | Real DB queries for subscriptions, invoices, payment methods, AI usage |
+| `payment.ts` | GET /public-key; POST /setup-intent, /save-payment-method, /stripe/webhook, /create-setup-session; DELETE /payment-methods/:id | ✅ Complete | Stripe fully wired — webhook verified, customer IDs persisted |
+
+##### Admin & Affiliates
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `admin.ts` | GET /, /affiliate-stats, /productdashboard/affiliate-stats, /export/:format, /refund-requests, /refund-stats, /cancellation-requests; POST /refund-requests/:id/approve, /reject, /cancellation-requests/:id/approve, /reject | ✅ Complete | Admin management panel |
+| `affiliates.ts` | GET /profile, /dashboard, /admin/all, /admin/:userId/details, /admin/pending-payouts; POST /payout/request, /admin/:userId/activate, /deactivate, /admin/payout/:payoutId/approve, /reject, /process | ✅ Complete | Full affiliate program |
+
+##### Integrations & Utilities
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `upload.ts` | POST /, /image, /single, /video; DELETE /:key | ✅ Complete | S3/R2 upload handling |
+| `youtube.ts` | GET /account, /auth-url, /company/auth-url, /company/status; POST /callback, /disconnect, /publish/:videoId | ✅ Complete | YouTube OAuth + publishing |
+| `linkedin-post.ts` | POST /linkedin-post | ✅ Complete | LinkedIn post generation; full OAuth flow now in `studio-features.ts` |
+| `locations.ts` | GET /countries, /states, /cities, /search | ✅ Complete | Reference data |
+| `og.ts` | GET /v/:videoId | ✅ Complete | Open Graph metadata |
+| `task.ts` | GET /, /:id; POST /save, /:id; DELETE /:id | ✅ Complete | Task management |
+| `featureflag.ts` | GET / | ✅ Complete | Orphaned duplicate `feature-flag.ts` deleted; static flag evaluation |
+| `hubs.ts` | GET/POST /notifications, POST /notifications/negotiate | ✅ Complete | SSE stream live; `POST /negotiate` returns transport descriptor |
+| `marketing.ts` | GET /campaigns, /leads; POST /campaigns, /leads | ✅ Complete | Real DB tables wired — see Gap Register #38 |
+
+##### Auth Extensions
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `oauth.ts` | GET /:provider, /:provider/callback; POST /magic-link; GET /magic-link/verify, /linked-accounts, /sessions; DELETE /unlink/:provider, /sessions/:id, /sessions; POST /add-password | ✅ Complete | Google, LinkedIn, GitHub, Microsoft OIDC flows; magic links; session management |
+| `passkeys.ts` | POST /register/begin, /register/complete, /login/begin, /login/complete; GET /credentials; DELETE /credentials/:id | ✅ Complete | Full FIDO2/WebAuthn — CBOR parsing, DER→raw sig conversion, clone detection |
+
+##### Notifications & Real-time
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `notifications.ts` | GET /, /unread-count, /smart; POST /mark-all-read, /:id/mark-read; DELETE /:id | ✅ Complete | Smart priority ranking (Premium) via `GET /smart` |
+
+##### Calendar & Scheduling
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `calendar.ts` | GET /events, /events/:id, /availability, /connections, /connect/:provider, /connect/:provider/callback; POST /events, /availability, /sync, /interview-slots, /book-interview; PATCH /events/:id; DELETE /events/:id, /availability/:id, /connections/:id | ✅ Complete | Google + Outlook OAuth; two-way calendar sync; interview slot generation |
+
+##### Outreach & Follow-ups
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `followups.ts` | GET /sequences, /sequences/:id, /enrollments; POST /sequences, /enroll, /trigger; PATCH /enrollments/:id/:action; DELETE /sequences/:id | ✅ Complete | Multi-step outreach sequences; behaviour-triggered enrollment |
+
+##### Assessments
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `assessments.ts` | GET /, /:slug, /me/results, /users/:userId/badges; POST /:slug/start, /attempts/:attemptId/submit | ✅ Complete | Timed skill tests with AI grading; public badge display |
+
+##### ATS & Integrations
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `ats.ts` | GET /connections; POST /connections, /sync/:connectionId, /webhook/:provider; DELETE /connections/:id | ⚠️ Partial | HMAC-verified webhook; provider API calls are stubs pending dev credentials |
+
+##### Performance Management
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `performance.ts` | GET /cycles, /cycles/:id, /reviews, /goals; POST /cycles, /reviews, /goals; PATCH /cycles/:id/complete, /reviews/:id/submit, /reviews/:id/acknowledge, /goals/:id, /goals/:id/progress; DELETE /goals/:id | ✅ Complete | OKRs, review cycles, employee sign-off |
+
+##### Onboarding & Hiring
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `onboarding-hiring.ts` | GET /offers, /offers/:id, /checklists, /checklists/:id; POST /offers, /offers/:id/send-for-signature, /offers/webhook/dropbox-sign; PATCH /offers/:id/send, /offers/:id/accept, /offers/:id/decline, /checklists/:id/tasks/:taskId/complete; DELETE /offers/:id | ✅ Complete | Offer letters + Dropbox Sign e-signature; HMAC-verified webhook |
+
+##### Discovery & Smart Job Board
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `discovery.ts` | GET /talent-feed, /talent-feed/:userId, /jobs, /jobs/:id/similar, /seo/resume-guide/:jobSlug, /seo/salary/:jobSlug, /creators/leaderboard, /creators/products; POST /creators/products | ✅ Complete | Algorithmic talent feed; NL job search; SEO content engine with 24h cache |
+
+##### White-label & B2B
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `whitelabel.ts` | GET /tenants, /tenants/:id, /portal/:subdomain, /tenants/:id/analytics, /roi-calculator; POST /tenants, /demo-request; PATCH /tenants/:id | ✅ Complete | Multi-tenant portals; ROI calculator; university/bootcamp tenant types |
+
+##### Ads & Analytics
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `ads.ts` | GET /config; POST /ads/impression | ✅ Complete | Ad-free flag for Premium; impression tracking |
+| `analytics.ts` | POST /beacon, /ads/impression; GET /usage, /time-to-hire, /hiring-metrics | ✅ Complete | DAU/WAU/MAU, feature adoption, ad CTR, time-to-hire (Premium) |
+
+##### API Keys & Exclusive Boards
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `apikeys.ts` | GET /; POST /; DELETE /:id; PATCH /:id | ✅ Complete | SHA-256 hashed keys shown once at creation; Premium tier |
+| `exclusive-boards.ts` | GET /exclusive, /exclusive/:id, /bids; POST /bids; DELETE /bids/:id; PATCH /bids/:id/accept, /bids/:id/reject | ✅ Complete | Premium exclusive job boards with bidding/auction |
+
+##### Auto-Apply & Job Scraper
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `auto-apply.ts` | POST /start; GET /matches | ✅ Complete | LLM tailors cover letter + resume per job; Premium-gated |
+| `jobscraper.ts` | Admin: GET /, POST /, PATCH /:id, DELETE /:id, POST /:id/sync, GET /:id/logs; User: GET /, POST /, PATCH /:id, DELETE /:id | ✅ Complete | RSS + JSON API sources; SHA-256 dedup; cron-driven sync |
+
+##### Apply Button & Community
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `apply-button.ts` | GET /snippet, /:jobId/meta; POST /track | ✅ Complete | Embeddable `<script>` tag; lead capture; public routes |
+| `community.ts` | GET /posts, /channels; POST /posts; DELETE /posts/:id | ✅ Complete | Company community feed with channel-based discussions |
+
+##### OpenAPI & Sitemap
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `openapi.ts` | GET /openapi.json, /docs | ✅ Complete | OpenAPI 3.1 spec; `/docs` redirects to Swagger UI |
+| `sitemap.ts` | GET /sitemap.xml | ✅ Complete | Dynamic XML sitemap for SEO |
+
+#### Services
+
+| Service | Lines | Status | Notes |
+|---------|-------|--------|-------|
+| `email.ts` | 576 | ✅ Complete | `EmailProvider` interface + SendPulse implementation; sends verification, reset, 2FA, resend emails |
+| `ai.ts` | 83 | ✅ Complete | `callLLM()` / `callLLMJson()` with Zod schema validation; OpenRouter wrapper |
+| `account.ts` | 300 | ✅ Complete | Organization/team management business logic |
+| `job.ts` | 278 | ✅ Complete | Job management: create, update, archive, search |
+| `company.ts` | 84 | ✅ Complete | Company CRUD, follow/unfollow, trending |
+| `settings.ts` | 76 | ✅ Complete | User preference read/write |
+| `billing.ts` | 378 | ✅ Complete | Real DB queries for subscriptions, invoices, payment methods, AI usage |
+| `jobscraper.ts` | 231 | ✅ Complete | RSS + JSON API scraper, SHA-256 dedup, sync scheduling |
+| `stripe.ts` | 106 | ✅ Complete | Top-level Stripe helper used by payment routes |
+| `payment/` | — | ✅ Complete | Strategy pattern: `types.ts` interface + `stripe.ts` (full) + `helcim.ts` (⚠️ stub) + `index.ts` factory |
+
+#### Database Schema (303 `pgTable()` declarations across 68 schema files in `/api/src/db/schema/`)
+
+All tables are defined and schema migrations managed via Drizzle Kit. (Was ~230/52 at last audit; the table below documents the canonical aggregates per domain — see the schema files for the full set including gamification, learning, sourcing, scorecards, paid-media, externalEmail, content-locations, geocoderCache, events, coffee, comics, NLE, and the studio v2 expansion.)
+
+| Domain | Tables |
+|--------|--------|
+| Users & Auth | `users`, `userProfiles`, `userRoles`, `roles`, `passwordHistory`, `twoFactorCodes`, `emailVerificationTokens`, `passwordResetTokens`, `refreshTokens`, `userConnections`, `magicLinkTokens`, `oauthAccounts`, `apiKeys` |
+| WebAuthn / Passkeys | `webauthnCredentials`, `webauthnChallenges` |
+| Companies & Orgs | `companyProfiles`, `userCompanyRoleAssociations`, `companyFollowers`, `accountInvitations`, `accountPreferences`, `companySubscriptions`, `employerBrandingPages` |
+| Resumes | `resumeInformation`, `resumeTemplates`, `watchedResumes`, `metaResumes` |
+| Jobs | `jobItems`, `jobPreferences`, `jobApplications`, `savedJobs`, `jobAlerts`, `jobWebsites`, `jobBoardSources`, `jobBoardSyncLog` |
+| Video & Studio | `videos`, `videoResumes`, `studioProjects`, `youtubeAccounts`, `studioBrandKits`, `videoAnalytics`, `videoCampaigns` |
+| Recruiter | `recruiterTalentPools`, `talentPoolCandidates`, `candidateInteractions`, `candidateSubmissions`, `placements`, `jobBoards`, `jobBoardPostings`, `recruiterAgentRuns`, `savedSearches`, `exclusiveBoards`, `boardBids` |
+| Messaging | `conversations`, `conversationParticipants`, `messages`, `messageReadReceipts`, `emailTemplates`, `emailCampaigns`, `emailCampaignRecipients`, `communicationTracking` |
+| Outreach & Follow-ups | `followUpSequences`, `followUpSteps`, `followUpEnrollments`, `followUpLogs` |
+| Social | `feedPosts`, `feedPostLikes`, `feedPostComments` |
+| Interviews | `interviewSessions`, `interviewAnswers`, `interviews`, `applicationNotes` |
+| Assessments | `skillAssessments`, `assessmentAttempts` |
+| Calendar & Scheduling | `calendarConnections`, `scheduledEvents`, `availabilitySlots` |
+| Onboarding & Hiring | `offerLetters`, `onboardingChecklists`, `onboardingTasks` |
+| Performance | `performanceCycles`, `performanceReviews`, `performanceGoals` |
+| ATS Integration | `atsConnections` |
+| Affiliate | `affiliateProfiles`, `affiliateReferrals`, `affiliateConversions`, `affiliatePayouts`, `affiliateTiers`, `affiliateLinkClicks` |
+| Billing | `subscriptionPlans`, `subscriptions`, `paymentMethods`, `invoices`, `invoiceLineItems`, `refundRequests`, `billingEvents`, `usageRecords` |
+| Analytics | `profileViews`, `activityLogs`, `requestLogs`, `dashboardMetrics`, `userEngagementMetrics`, `aiUsageRecords`, `aiChatSessions`, `aiChatMessages` |
+| Productivity | `tasks`, `boards`, `notifications`, `queueJobToResume`, `queueJobToProcess` |
+| Locations | `countries`, `stateProvinces`, `cities`, `postalZipCodes` |
+| White-label | `whitelabelTenants` |
+| System | `systemSettings`, `marketingLeads`, `featureFlags` |
+
+---
+
+### Legacy API Coverage Map
+
+
+This section documents every controller in `/myvideoresume-api` (31 C# controllers, ~200 endpoints), the business-logic service it calls, the DB tables it touches, and whether the TypeScript API has a matching implementation.
+
+**Coverage key:**
+✅ Fully covered — TypeScript API has equivalent endpoints with DB-backed logic
+⚠️ Partial — Routes exist but logic is stubbed, missing, or incomplete
+❌ Not covered — No equivalent in TypeScript API
+
+#### Authentication & User Management
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **AuthController** | `POST /api/auth/login` | UserManager.CheckPasswordSignInAsync, issues 2FA challenge token | AspNetUsers, PasswordHistory | ✅ `routes/auth.ts` |
+| | `POST /api/auth/register` | Creates user + roles + affiliate profile; sends verification email | AspNetUsers, AspNetUserRoles, AffiliateProfiles | ✅ |
+| | `POST /api/auth/verify-2fa` | Validates OTP; sends welcome email on first login; marketing email (30-day cooldown) | AspNetUsers, TwoFactorCodes | ✅ |
+| | `POST /api/auth/resend-2fa` | Resends 2FA code via email | TwoFactorCodes | ✅ |
+| | `POST /api/auth/refresh` | Issues new JWT + refresh token | RefreshTokens | ✅ |
+| | `POST /api/auth/logout` | Invalidates refresh token | RefreshTokens | ✅ |
+| | `GET /api/auth/me` | Returns current user from JWT | AspNetUsers | ✅ |
+| | `POST /api/auth/resend-email-verification` | Rate-limited (1/min, 5/24h); sends verification email | EmailVerificationTokens | ✅ |
+| | `GET /api/auth/verification-status` | Returns emailVerified flag | AspNetUsers | ✅ |
+| **AccountApiController** | `GET /api/account/users` | List users in account | AspNetUsers, UserRoles | ✅ `routes/account.ts` |
+| | `POST /api/account/invite` | Email invitation to join account | AccountInvitations | ✅ |
+| | `POST /api/account/bulk-invite` | Bulk team invite | AccountInvitations | ✅ |
+| | `POST /api/account/accept-invitation/:id` | Accept invite (no auth) | AccountInvitations, UserRoles | ✅ |
+| | `POST /api/account/switch` | Switch active account context | UserRoles | ✅ |
+| | `PUT /api/account/roles` | Update user role assignments | AspNetUserRoles | ✅ |
+| | `DELETE /api/account/users/:id` | Remove user from account | AspNetUserRoles | ✅ |
+| | `GET /api/account/analytics` | Invitation/account metrics | AccountInvitations | ✅ |
+| | `GET /api/account/invitation/:id` | Get invitation details (no auth) | AccountInvitations | ✅ |
+| | `POST /api/account/deleteaccount` | Soft-delete account | AspNetUsers | ✅ |
+| **ApplicationUsersController** | `odata/Identity` (5 endpoints) | UserManager via OData | AspNetUsers | ❌ OData not needed for edge runtime |
+| **ApplicationRolesController** | `odata/Identity` (4 endpoints) | RoleManager via OData | AspNetRoles | ❌ OData not needed for edge runtime |
+
+#### Resume Management
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **ResumeController** | `GET /api/resume/:id` | Privacy check + view tracking | ResumeInformation, ResumeViews | ✅ `routes/resumes.ts` |
+| | `GET /api/resume/embedded/:id` | Bypass auth/privacy for embed | ResumeInformation | ✅ |
+| | `GET /api/resume/public` | Paginated public resumes | ResumeInformation | ✅ |
+| | `GET /api/resume/GetResumesOwnedByAuthUser` | Master/variation hierarchy | ResumeInformation, MetaResume | ✅ |
+| | `POST /api/resume/Save` | Create/update resume JSON | ResumeInformation | ✅ |
+| | `POST /api/resume/Parse` | PDF/DOCX → structured JSON via AI | ResumeInformation | ✅ |
+| | `POST /api/resume/CreateFromFile` | Upload → parse → create + queue matching | ResumeInformation, QueueJobToResume | ⚠️ File parsing works; background queue not processed — see Gap Register #3 |
+| | `POST /api/resume/Summarize` | AI-generated summary via LLM | ResumeInformation | ✅ |
+| | `POST /api/resume/SentimentPrediction` | ML sentiment score | ResumeSentiment | ✅ (LLM-based instead of ML.NET) |
+| | `DELETE /api/resume/:id` | Owner-only delete | ResumeInformation | ✅ |
+| | `PUT /api/resume/:id` | Full update with master propagation | ResumeInformation, MetaResume | ✅ |
+| | `PUT /api/resume/:id/metadata` | Metadata-only update | MetaResume | ✅ |
+| | `POST /api/resume/:id/clone` | Duplicate resume | ResumeInformation | ✅ |
+| | `POST /api/resume/:id/setMaster` | Designate master resume | ResumeInformation | ✅ |
+| | `POST /api/resume/:id/setActive` | Set active resume | ResumeInformation | ✅ |
+| | `POST /api/resume/:id/setPrivacy` | Set visibility level | ResumeInformation | ✅ |
+| | `POST /api/resume/:id/createVariation` | Create variation from master | ResumeInformation | ✅ |
+| | `POST /api/resume/:id/promote` | Promote variation → master | ResumeInformation | ✅ |
+| | `GET /api/resume/masterGroups` | Master + variation groups | ResumeInformation, MetaResume | ✅ |
+| | `GET /api/resume/:id/diff` | Field-level diff vs master | ResumeInformation | ❌ Not implemented |
+| | `POST /api/resume/watch/:id` | Subscribe to resume updates | WatchedResumes | ✅ |
+| | `POST /api/resume/unwatch/:id` | Unsubscribe | WatchedResumes | ✅ |
+| | `POST /api/resume/:id/publish` | Publish resume publicly | ResumeInformation | ✅ |
+| | `GET /api/resume/validateSlug` | Check slug availability | ResumeInformation | ✅ |
+| **ResumeScorerController** | `POST /api/resumescorer/score` | 6-category scoring (content 25%, format 20%, keywords 20%, experience 15%, education 10%, appeal 10%) | — | ✅ `routes/resume-scorer.ts` |
+| | `POST /api/resumescorer/category-breakdown` | Detailed per-category scores | — | ✅ |
+| | `POST /api/resumescorer/recommendations` | Improvement suggestions | — | ✅ |
+| **ResumeOptimizerController** | `POST /api/resumeoptimizer/optimize` | ATS optimization pass | — | ✅ `routes/resume-optimizer.ts` |
+| | `POST /api/resumeoptimizer/ats-analysis` | ATS compatibility score | — | ✅ |
+| | `POST /api/resumeoptimizer/keyword-suggestions` | Industry keyword suggestions | — | ✅ |
+
+#### Jobs & Matching
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **JobController** | `GET /api/job/GetPublicJobs` | Paginated + filtered public jobs | Jobs | ✅ `routes/jobs.ts` |
+| | `GET /api/job/:id` | Job + view tracking | Jobs, JobViews | ✅ |
+| | `POST /api/job` | Create job posting | Jobs | ✅ |
+| | `PUT /api/job/:id` | Update job | Jobs | ✅ |
+| | `DELETE /api/job/:id` | Owner-only delete | Jobs | ✅ |
+| | `POST /api/job/Extract` | Web-scrape job from URL | Jobs | ✅ |
+| | `POST /api/job/CreateFromFile` | Upload → AI-extract → create | Jobs | ✅ |
+| | `POST /api/job/:id/apply` | Apply to job | JobApplications | ✅ |
+| | `POST /api/job/:id/save` | Bookmark job | SavedJobs | ✅ |
+| | `DELETE /api/job/:id/save` | Remove bookmark | SavedJobs | ✅ |
+| | `GET /api/job/saved` | User's saved jobs | SavedJobs | ✅ |
+| | `GET /api/job/applications` | User's applications | JobApplications | ✅ |
+| | `GET /api/job/alerts` | User's job alerts | JobAlerts | ✅ |
+| | `POST /api/job/alerts` | Create alert | JobAlerts | ✅ |
+| | `PUT /api/job/alerts/:id` | Update alert | JobAlerts | ✅ |
+| | `PATCH /api/job/alerts/:id/toggle` | Toggle alert on/off | JobAlerts | ✅ |
+| | `DELETE /api/job/alerts/:id` | Delete alert | JobAlerts | ✅ |
+| **MatchController** | `POST /api/match/analyze` | Job HTML vs resume match score + missing skills | — | ✅ `routes/match.ts` |
+| | `POST /api/match/tailor` | AI-rewrite resume for job (returns `tailoredResume` JSON + `changes[]` + `markdownResume`) | ResumeInformation | ✅ |
+| | `POST /api/match/byid` | Match by DB IDs | ResumeInformation, Jobs | ✅ |
+| | `POST /api/match/bycontent` | Match by raw text | — | ✅ |
+| | `POST /api/match/bestresume` | Find best-fit resume for job | ResumeInformation | ✅ |
+
+#### Video & Studio
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **VideoController** | `POST /api/video/generate` | AI video generation job | Videos, VideoGenerationJobs | ✅ `routes/video.ts` |
+| | `GET /api/video/:id` | Get video (owner) | Videos | ✅ |
+| | `GET /api/video/user/all` | All user videos | Videos | ✅ |
+| | `GET /api/video/resume/:resumeId` | Videos for resume | Videos | ✅ |
+| | `GET /api/video/:id/status` | Generation progress | Videos | ✅ |
+| | `POST /api/video/:id/cancel` | Cancel generation | Videos | ✅ |
+| | `DELETE /api/video/:id` | Delete video | Videos | ✅ |
+| | `POST /api/video/enhance-summary` | AI-enhanced summary | — | ✅ |
+| | `GET /api/video/resume/:id/can-generate` | Check generation eligibility | Videos, Subscriptions | ✅ |
+| | `GET /api/video/resume/:id/active` | Active generation | Videos | ✅ |
+
+#### Users, Connections & Social
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **UsersController** | `GET /api/users/public` | Paginated public profiles | UserProfiles | ✅ `routes/users.ts` |
+| | `GET /api/users/:id` | Profile by ID or slug | UserProfiles | ✅ |
+| | `GET /api/users/me` | Current user profile | UserProfiles | ✅ |
+| | `PUT /api/users/me` | Update profile | UserProfiles | ✅ |
+| | `POST /api/users/connections` | Send connection request | UserConnections | ✅ |
+| | `GET /api/users/me/connections` | Accepted connections | UserConnections | ✅ |
+| | `GET /api/users/me/connections/pending` | Pending requests | UserConnections | ✅ |
+| | `PUT /api/users/connections/:id/accept` | Accept request | UserConnections | ✅ |
+| | `DELETE /api/users/connections/:id` | Reject/remove connection | UserConnections | ✅ |
+| | `GET /api/users/:id/resumes` | User's public resumes | ResumeInformation | ✅ |
+| | `POST /api/users/me/avatar` | Avatar upload (max 5MB, jpg/png/gif/webp) | UserProfiles | ⚠️ Upload route exists; avatar-specific validation not confirmed — see Gap Register #46 |
+| **FeedController** | `GET /api/feed/posts` | Paginated feed | FeedPosts | ✅ `routes/feed.ts` |
+| | `POST /api/feed/posts` | Create post | FeedPosts | ✅ |
+| | `PUT /api/feed/posts/:id` | Edit post | FeedPosts | ✅ |
+| | `DELETE /api/feed/posts/:id` | Delete post | FeedPosts | ✅ |
+| | `POST /api/feed/posts/:id/like` | Like | FeedPostLikes | ✅ |
+| | `DELETE /api/feed/posts/:id/like` | Unlike | FeedPostLikes | ✅ |
+| | `POST /api/feed/comments` | Comment | FeedPostComments | ✅ |
+| | `PUT /api/feed/comments/:id` | Edit comment | FeedPostComments | ✅ |
+| | `DELETE /api/feed/comments/:id` | Delete comment | FeedPostComments | ✅ |
+| | `POST /api/feed/link-preview` | Fetch link metadata | — | ✅ |
+
+#### Companies
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **CompaniesController** | `GET /api/companies/public` | Public company listing | CompanyProfiles | ✅ `routes/companies.ts` |
+| | `GET /api/companies/:id` | Company detail + stats | CompanyProfiles | ✅ |
+| | `PUT /api/companies/:id` | Update (owner) | CompanyProfiles | ✅ |
+| | `DELETE /api/companies/:id` | Delete (owner) | CompanyProfiles | ✅ |
+| | `POST /api/companies/:id/follow` | Follow company | CompanyFollowers | ✅ |
+| | `DELETE /api/companies/:id/follow` | Unfollow | CompanyFollowers | ✅ |
+| | `GET /api/companies/:id/jobs` | Company's jobs | Jobs | ✅ |
+
+#### Recruiter Tools
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **RecruiterController** | `POST /api/recruiter/talent-pool` | Add candidate | RecruiterTalentPools, TalentPoolCandidates | ✅ `routes/recruiter.ts` |
+| | `GET /api/recruiter/talent-pool` | List pool (paginated, filtered) | RecruiterTalentPools | ✅ |
+| | `PUT /api/recruiter/talent-pool/:id` | Update candidate entry | TalentPoolCandidates | ✅ |
+| | `DELETE /api/recruiter/talent-pool/:id` | Remove from pool | TalentPoolCandidates | ✅ |
+| | `POST /api/recruiter/interactions` | Log interaction | CandidateInteractions | ✅ |
+| | `POST /api/recruiter/submissions` | Submit candidate for job | CandidateSubmissions | ✅ |
+| | `PUT /api/recruiter/submissions/:id/status` | Update submission status | CandidateSubmissions | ✅ |
+| | `POST /api/recruiter/submissions/:id/withdraw` | Withdraw submission | CandidateSubmissions | ✅ |
+| | `POST /api/recruiter/placements` | Record placement | Placements | ✅ |
+| | `GET /api/recruiter/placements/summary/commission` | Commission summary | Placements | ✅ |
+| | `POST /api/recruiter/talent-pool/bulk/*` | Bulk tag/status/delete | TalentPoolCandidates | ❌ Bulk operations not implemented in TS API |
+| | `GET /api/recruiter/talent-pool/export` | CSV export of talent pool | TalentPoolCandidates | ❌ Not implemented |
+
+#### Communication & Messaging
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **CommunicationController** | `GET /api/communication/conversations` | List conversations | Conversations, ConversationParticipants | ✅ `routes/communication.ts` |
+| | `POST /api/communication/conversations` | Create conversation | Conversations | ✅ |
+| | `GET /api/communication/conversations/:id` | Thread + messages | Conversations, Messages | ✅ |
+| | `POST /api/communication/messages` | Send message | Messages | ✅ |
+| | `POST /api/communication/messages/mark-read` | Mark as read | MessageReadReceipts | ✅ |
+| | `GET /api/communication/email-templates` | List templates | EmailTemplates | ✅ |
+| | `POST /api/communication/email-templates` | Create template | EmailTemplates | ✅ |
+| | `PUT /api/communication/email-templates/:id` | Update template | EmailTemplates | ✅ |
+| | `DELETE /api/communication/email-templates/:id` | Delete template | EmailTemplates | ✅ |
+| | `GET /api/communication/email-campaigns` | List campaigns | EmailCampaigns | ✅ |
+| | `POST /api/communication/email-campaigns/:id/send` | Execute campaign | EmailCampaigns, EmailCampaignRecipients | ✅ |
+| | `GET /api/communication/external-contacts` | List contacts | ExternalContacts | ✅ |
+| | `POST /api/communication/external-contacts` | Add contact | ExternalContacts | ✅ |
+| | `GET /api/communication/job-boards` | List job boards | JobBoards | ✅ |
+| | `POST /api/communication/job-boards/post` | Post job to board | JobBoardPostings | ✅ |
+| | `GET /api/communication/stats` | Campaign stats | CommunicationTracking | ✅ |
+| | `GET /api/communication/tracking` | Open/click events | CommunicationTracking | ✅ |
+
+#### Billing & Payments
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **BillingController** | `GET /api/billing/subscription` | Subscription summary | Subscriptions, SubscriptionPlans | ✅ `routes/billing.ts` (DB-backed) |
+| | `GET /api/billing/payment-methods` | Saved payment methods | PaymentMethods | ✅ |
+| | `GET /api/billing/invoices` | Invoice history | Invoices | ✅ |
+| | `GET /api/billing/ai-usage/month` | Monthly token usage | AIUsageRecords | ✅ |
+| | `POST /api/billing/refund-request` | Create refund request | RefundRequests | ✅ |
+| | `GET /api/billing/refund-requests` | List user's refunds | RefundRequests | ✅ |
+| | `POST /api/billing/cancel-account` | Account cancellation request | RefundRequests | ✅ |
+| **PaymentController** | `POST /api/payment/stripe/webhook` | Handle Stripe events (subscription updates, payment success/fail) | BillingEvents, Subscriptions | ✅ `routes/payment.ts` — signature verified; handles subscription lifecycle, invoice sync, affiliate conversions, payouts |
+| | `GET /api/payment/public-key` | Return Stripe publishable key | — | ✅ Returns `STRIPE_PUBLISHABLE_KEY` env var |
+| | `POST /api/payment/setup-intent` | Create Stripe SetupIntent | — | ✅ Creates SetupIntent, returns `clientSecret` |
+| | `POST /api/payment/save-payment-method` | Store Stripe payment method | PaymentMethods | ✅ Attaches PM to customer, upserts to DB, sets default |
+| | `POST /api/payment/create-setup-session` | Stripe checkout setup session | — | ✅ Stripe checkout session with redirect URLs |
+| | `DELETE /api/payment/payment-methods/:id` | Delete payment method | PaymentMethods | ✅ DB-delete with ownership check |
+
+#### AI Features
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **ChatController** | `POST /api/chat/message` | OpenRouter LLM with session + token tracking; AIRateLimit filter | AIUsageMetrics, AIChatSessions | ✅ `routes/ai.ts` `POST /api/ai/chat` |
+| **SalaryCalculatorController** | `POST /api/salarycalculator/analyze` | AI salary analysis (qwen3-coder; deterministic fallback on LLM outage) | — | ✅ `routes/salary.ts` → `services/salary/handlers.ts` |
+| | `POST /api/salarycalculator/negotiation-tips` | AI negotiation strategies (gemma-4-31b; canned fallback on LLM outage) | — | ✅ |
+| | `GET /api/salarycalculator/locations` | Supported locations | — | ✅ |
+| | `GET /api/salarycalculator/industries` | Supported industries | — | ✅ static catalog in `routes/salary.ts` |
+| **PromptController** | `POST /Prompt/summarize` | Summarize resume content | ResumeInformation | ✅ `POST /api/resumes/:id` summarize |
+| | `POST /Prompt/match` | Match document to job | — | ✅ via `routes/match.ts` |
+| | `POST /Prompt/parse` | Parse PDF to JSON | — | ✅ via `routes/resumes.ts` parse |
+| **SentimentController** | sentiment analysis endpoints | ML.NET model inference | ResumeSentiment | ✅ `routes/sentiment.ts` (LLM-based) |
+| **ValuePropositionController** | generate content endpoints | AI-generated value props | — | ✅ `routes/value-proposition.ts` |
+
+#### Dashboard & Admin
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **UserDashboardController** | `GET /api/userdashboard/jobseeker` | Role-specific metrics | JobApplications, SavedJobs | ✅ `routes/dashboard.ts` |
+| | `GET /api/userdashboard/recruiter` | Recruiter metrics | TalentPools, Submissions | ✅ |
+| | `GET /api/userdashboard/employer` | Employer metrics | Jobs, Applications | ✅ |
+| | `POST /api/userdashboard/profile-view` | Track profile view | ProfileViews | ✅ |
+| | `POST /api/userdashboard/activity` | Log user activity | ActivityLogs | ✅ |
+| | `GET /api/userdashboard/engagement` | Engagement metrics | UserEngagementMetrics | ✅ |
+| **ProductDashboardController** | `GET /api/productdashboard/saas-metrics` | MRR, churn, ARR | Subscriptions, Invoices | ⚠️ Admin routes exist; SaaS metrics calculation not confirmed — see Gap Register #39 |
+| | `GET /api/productdashboard/time-series/:metric` | Time-series analytics | ActivityLogs | ⚠️ Not confirmed implemented — see Gap Register #39 |
+| | `POST /api/productdashboard/refund-requests/:id/approve` | Admin approve refund | RefundRequests | ✅ `routes/admin.ts` |
+| | `POST /api/productdashboard/cancellation-requests/:id/approve` | Admin approve cancellation | RefundRequests | ✅ |
+| **AffiliateController** | `GET /api/affiliate/profile` | Affiliate profile | AffiliateProfiles | ✅ `routes/affiliates.ts` |
+| | `GET /api/affiliate/dashboard` | Earnings, referrals | AffiliateReferrals, AffiliateConversions | ✅ |
+| | `POST /api/affiliate/payout/request` | Request payout | AffiliatePayouts | ✅ |
+| | Admin endpoints | All affiliate admin actions | AffiliateProfiles, AffiliatePayouts | ✅ |
+
+#### Settings, Password & Utilities
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **SettingsController** | All settings CRUD | Notification, privacy, job, account, security prefs | AccountPreferences, JobPreferences | ✅ `routes/settings.ts` |
+| | `GET /api/settings/export` | GDPR data export | All user tables | ✅ Returns JSON bundle |
+| **PasswordManagementController** | `GET /api/passwordmanagement/requirements` | Password policy | — | ✅ `routes/password-management.ts` |
+| | `POST /api/passwordmanagement/validate-strength` | Strength check | — | ✅ |
+| | `POST /api/passwordmanagement/validate-history` | Check against past passwords | PasswordHistory | ❌ Not implemented in TS API |
+| | `GET /api/passwordmanagement/is-expired` | Check expiration | Users | ❌ Not implemented in TS API |
+| | `POST /api/passwordmanagement/force-change` | Admin force reset | Users | ✅ |
+| **TaskController** | Task CRUD | Create/update/delete tasks | Tasks | ✅ `routes/task.ts` |
+| **UploadController** | File uploads | S3/R2 upload with validation | — | ✅ `routes/upload.ts` |
+| **MarketingController** | `GET /api/marketing/campaigns` | Campaign listing | — | ⚠️ Stub in TS API — see Gap Register #38 |
+| | `POST /api/marketing/leads` | Capture lead | — | ⚠️ Stub in TS API — see Gap Register #38 |
+| **FeatureFlagController** | `GET /api/featureflag` | Feature flag states | — | ✅ `routes/featureflag.ts` (static) |
+| **SearchController** | `GET /api/search/public` | Multi-entity search | ResumeInformation, Jobs, UserProfiles, CompanyProfiles | ✅ `routes/search.ts` |
+| **YouTubeController** | YouTube OAuth + publish | YouTube API integration | YoutubeAccounts | ✅ `routes/youtube.ts` |
+| **ExportController** | `GET /api/export/csv` | CSV export | — | ❌ Not implemented (TS export returns JSON only) |
+| | `GET /api/export/excel` | Excel export via OpenXml | — | ❌ Not implemented |
+| **ChromeController** | `POST /api/chrome/createjobbestmatch` | **DEPRECATED** (marked Obsolete) | — | ✅ Replaced by `/api/match/*` |
+| **InterviewController** | Interview sessions CRUD | Session tracking, answer analysis | InterviewSessions, InterviewAnswers | ✅ `routes/interview.ts` |
+
+#### Coverage Summary
+
+| Domain | Legacy Endpoints | TS Covered | Partial | Missing |
+|--------|-----------------|------------|---------|---------|
+| Auth & Account | ~25 | 23 | 0 | 2 (OData only) |
+| Resume | ~30 | 27 | 1 | 2 (diff, bulk export) |
+| Jobs & Matching | ~20 | 20 | 0 | 0 |
+| Video & Studio | ~10 | 10 | 0 | 0 |
+| Users & Social | ~20 | 19 | 1 | 0 |
+| Companies | ~7 | 7 | 0 | 0 |
+| Recruiter | ~15 | 12 | 0 | 3 (bulk ops, CSV export) |
+| Communication | ~18 | 18 | 0 | 0 |
+| Billing | ~10 | 8 | 1 | 3 (Stripe webhook/intent/save) |
+| AI Features | ~20 | 18 | 0 | 2 (industries endpoint, AI rate limiter) |
+| Dashboard & Admin | ~20 | 16 | 4 | 0 |
+| Settings & Utilities | ~20 | 14 | 2 | 4 (password history, export CSV/xlsx, is-expired) |
+| **Total** | **~215** | **~192 (89%)** | **~9 (4%)** | **~14 (7%)** |
+
+#### Can the legacy project be removed?
+
+**Short answer: Not yet — Stripe is the blocker.**
+
+The TypeScript API covers ~89% of the legacy surface area. All remaining legacy-parity gaps are tracked in the [Consolidated Gap Register](#consolidated-gap-register) (`legacy-parity` type). The Stripe blocker items below have since been resolved.
+
+| Missing | Risk | Status |
+|---------|------|--------|
+| `POST /payment/stripe/webhook` | **🔴 High** | ✅ Implemented |
+| `GET /payment/public-key` | **🔴 High** | ✅ Implemented |
+| `POST /payment/setup-intent` | **🔴 High** | ✅ Implemented |
+| `POST /payment/save-payment-method` | **🔴 High** | ✅ Implemented |
+| `GET /api/export/csv` + `GET /api/export/excel` | 🟡 Medium | Open — see Gap Register #31 |
+| Recruiter bulk ops (`bulk/tags`, `bulk/status`, `bulk/delete`) | 🟡 Medium | Open — see Gap Register #32 |
+| `GET /api/recruiter/talent-pool/export` | 🟢 Low | Open — see Gap Register #33 |
+| `POST /api/passwordmanagement/validate-history` | 🟢 Low | Open — see Gap Register #34 |
+| `GET /api/passwordmanagement/is-expired` | 🟢 Low | Open — see Gap Register #35 |
+| `GET /api/resume/:id/diff` | 🟢 Low | Open — see Gap Register #36 |
+| Chrome extension endpoints (`ChromeController`) | ✅ None — marked `[Obsolete]` in legacy | Fully replaced by `/api/match/*` |
+| OData endpoints (ApplicationUsers/Roles) | ✅ None | Not needed for edge runtime |
+
+**Checklist to safely delete `/myvideoresume-api`:**
+
+- [x] ✅ `GET /api/payment/public-key` — returns `STRIPE_PUBLISHABLE_KEY` env var
+- [x] ✅ `POST /api/payment/setup-intent` — creates Stripe SetupIntent, returns `clientSecret`
+- [x] ✅ `POST /api/payment/save-payment-method` — attaches PM to customer, upserts to DB, sets default
+- [x] ✅ `POST /api/payment/stripe/webhook` — signature verified; handles `subscription.created/updated/deleted`, `invoice.payment_succeeded/failed`, `payment_method.attached/detached`, `payout.paid/failed`; records affiliate conversions
+- [ ] (Optional) Add CSV serialisation to `/api/settings/export`
+
+**The legacy project can now be safely deleted once Stripe secrets are configured.**
+
+Configure secrets:
+```bash
+wrangler secret put STRIPE_PUBLISHABLE_KEY    # pk_live_...
+wrangler secret put STRIPE_SECRET_KEY         # sk_live_...
+wrangler secret put STRIPE_WEBHOOK_SIGNING_KEY # whsec_...
+```
+
+Register webhook in Stripe dashboard → Developers → Webhooks:
+- **URL:** `https://api.hired.video/api/payment/stripe/webhook`
+- **Events:** `customer.subscription.*`, `invoice.payment_succeeded`, `invoice.payment_failed`, `payment_method.attached`, `payment_method.detached`, `payout.paid`, `payout.failed`
+
+---

@@ -27,6 +27,8 @@ import {
   type ResumeReviewDTO,
   type ResumeReviewAnnotationDTO,
   type ProposedDraftDTO,
+  type ResumeReviewDetailDTO,
+  type ReviewRole,
   type AnnotationAnchor,
   type SuggestedEdit,
 } from "../../../../shared/resume-feedback.js";
@@ -59,20 +61,14 @@ export class ResumeFeedbackServiceError extends Error {
   }
 }
 
-export type ReviewRole = "owner" | "reviewer";
-
 export interface ReviewAccess {
   review: ResumeReviewRow;
   role: ReviewRole;
 }
 
-export interface ReviewDetail {
-  role: ReviewRole;
-  review: ResumeReviewDTO;
-  resume: { id: string; title: string; content: unknown };
-  annotations: ResumeReviewAnnotationDTO[];
-  proposals: ProposedDraftDTO[];
-}
+/** Re-exported from the shared contract so callers keep importing `ReviewDetail`
+ *  from the service; the shape itself is the SSoT in `shared/resume-feedback`. */
+export type ReviewDetail = ResumeReviewDetailDTO;
 
 const ANNOTATION_CACHE_TTL = 120;
 const annotationCacheKey = (reviewId: string) => `resume-feedback:annotations:${reviewId}`;

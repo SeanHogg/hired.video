@@ -49,9 +49,11 @@ import { AppShell } from "@/components/AppShell";
 
 type DashboardTab = "activity" | "content";
 
-const DASHBOARD_TABS: TabStripItem<DashboardTab>[] = [
-  { key: "activity", label: "Activity", icon: Activity },
-  { key: "content", label: "Content", icon: BarChart3 },
+const buildDashboardTabs = (
+  t: (key: string) => string,
+): TabStripItem<DashboardTab>[] => [
+  { key: "activity", label: t("dashboard.tabs.activity"), icon: Activity },
+  { key: "content", label: t("dashboard.tabs.content"), icon: BarChart3 },
 ];
 
 export default function Dashboard() {
@@ -200,13 +202,13 @@ export default function Dashboard() {
         {!rolePermissions.isSuperAdmin && (
           <div className="px-1">
             <TabStrip<DashboardTab>
-              tabs={DASHBOARD_TABS}
+              tabs={buildDashboardTabs(t)}
               activeKey={activeTab}
               onChange={setActiveTab}
             />
           </div>
         )}
-        <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">Loading dashboard…</div>}>
+        <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">{t("status.loadingDashboard")}</div>}>
           {activeTab === "content" && !rolePermissions.isSuperAdmin ? (
             <CreatorDashboard />
           ) : (

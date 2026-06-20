@@ -671,10 +671,10 @@ function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingPro
     if (!render) return null;
     const body = render({ resume, props: block.props });
     if (!body) return null;
-    if (!block.title) return <section>{body}</section>;
+    if (!block.title) return <section data-annot-section={id}>{body}</section>;
     const Icon = ICONS[block.icon ?? "star"] ?? Star;
     const heading = <SectionHeading title={block.title} Icon={Icon} {...headingProps} showIcon={showIconInHeading} action={editAction} collapsible={collapsible} />;
-    return <section>{heading}{(isPrint || expanded) && body}</section>;
+    return <section data-annot-section={id}>{heading}{(isPrint || expanded) && body}</section>;
   }
 
   // Section block — data-backed slice of the resume.
@@ -689,7 +689,7 @@ function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingPro
 
   if (isPrint) {
     return (
-      <section>
+      <section data-annot-section={id}>
         {heading}
         {sectionBody}
       </section>
@@ -697,7 +697,7 @@ function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingPro
   }
 
   return (
-    <section>
+    <section data-annot-section={id}>
       {heading}
       {expanded && (
         <Card className={cardClass(cardStyle)}>

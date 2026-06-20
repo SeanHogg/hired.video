@@ -745,107 +745,7 @@ From `schema/videos.ts`, `schema/studioadvertising.ts`, `schema/studiofeatures.t
 
 ## Video Studio Capability Assessment
 
-Evaluated against a feature specification for a fully browser-based general-purpose video editor comparable to Canva Video / CapCut. hired.video's studio is purpose-built for AI-driven video resume and employer content creation, not a traditional non-linear editor (NLE). The table below documents parity, partial coverage, and open gaps against that specification.
-
-**Summary: 31 ✅ fully implemented · 4 ⚠️ partial · 3 ❌ not implemented (38 capabilities total)**
-
-Open gaps against the Canva-Video / CapCut spec are tracked in the [Consolidated Gap Register](#consolidated-gap-register) as entries #124–#133. Net-new studio gaps beyond that spec (AI avatars, dubbing, audio enhancement, multi-platform publishing, in-video lead capture, chapters, thumbnails, hook optimizer, etc.) are tracked as #134–#145.
-
-### Core Requirements
-
-| Capability | Status | Implementation | Gap Register |
-|---|---|---|---|
-| Timeline-based editor | ✅ Done | `NLETimeline.tsx` — frame ruler with click-to-seek, draggable scene blocks, playhead, zoom (20–240 px/s). Mounted below the preview canvas in `StudioLayout.tsx`. | — |
-| Video, audio, image, and text tracks | ✅ Done | Scene blocks decompose into the existing canvas node graph (text/image/video). Multi-track audio mixer (#129) covers music + voiceover lanes. | — |
-| Clip trimming, splitting, merging, reordering | ✅ Done | `scene-ops.ts` — `trimScene`, `splitSceneAtTime`, `mergeWithNext` (seamless re-merge of contiguous trim points), `reorderScene`. Surfaced as drag handles + S/M/D/Del shortcuts in `NLETimeline.tsx`. | — |
-| Multi-layer editing with precision timing | ⚠️ Partial | `animation-graph.ts` supports per-node keyframe interpolation under the hood; visual keyframe editor not yet exposed. | — |
-
-### Visual Editing Features
-
-| Capability | Status | Implementation | Gap Register |
-|---|---|---|---|
-| Transitions and effects (fade, slide, zoom) | ✅ Done | Per-scene `transitionIn` field overrides the theme default. Transition picker dropdown badge on each scene block in `NLETimeline.tsx`. `frame-renderer.ts` resolves per-boundary: exit toward N+1 uses N+1's transition; entry from prev uses this scene's. | — |
-| Filters and color adjustments (brightness, contrast, saturation) | ✅ Done | `VideoFilters` in `types/video-script.ts` + `videoFiltersToCss()` applied to `StudioPreview` wrapper. 5-slider UI in `StudioSidebar` Theme section. | — |
-| Text overlays, subtitles, and animations | ✅ Done | `caption-renderer.ts` — 4 styles (standard, bold-pop, word-by-word, lower-thirds). Text scene nodes with animated entry/exit. `CaptionEditor.tsx` (571 lines). | — |
-| Canvas resizing (16:9, 9:16, 1:1, 4:3) | ✅ Done | `VideoAspect` extended in `types/video-script.ts`; compiler `ASPECT_MAP` covers all four. Switcher in `StudioSettings.tsx` re-renders preview canvas live. | — |
-
-### Audio Capabilities
-
-| Capability | Status | Implementation | Gap Register |
-|---|---|---|---|
-| Multi-track audio editing | ✅ Done | `AudioMixConfig` per-lane gain in `video-exporter.ts`; `AudioMixerDialog` exposes music + voiceover lanes plus master gain. | — |
-| Volume control and fade in/out | ✅ Done | Per-lane gain (0..200%) + fadeIn/fadeOut envelopes via `setValueAtTime` + `linearRampToValueAtTime` in `video-exporter.ts`. | — |
-| Voice-over recording | ✅ Done | `WebcamRecorder.tsx` (767 lines) — browser-native MediaRecorder. `VoiceoverPanel.tsx` — engine picker (Web Speech / Kokoro / Piper / VibeVoice), per-scene editable scripts, word-level timestamps, speed control, playback preview. `Teleprompter.tsx` — auto-scroll + WPM control. | — |
-| Background music and sound effects | ✅ Done | `ambient-player.ts` — background track playback + export mixing. `StudioSidebar.tsx` — music library selection. | — |
-
-### AI-Powered Features
-
-| Capability | Status | Implementation | Gap Register |
-|---|---|---|---|
-| Auto-generate subtitles/captions | ✅ Done | OpenAI Whisper transcription (`services/transcription.ts`). `POST /captions/generate`. 4 caption styles rendered by `caption-renderer.ts`. SRT/VTT export. | — |
-| Text-based editing via transcript | ❌ Not implemented | Whisper produces transcripts for coaching; no transcript-driven cut/edit workflow (Descript-style). | #126 |
-| Background removal (no green screen) | ❌ Not implemented | Not implemented. Would require MediaPipe Selfie Segmentation or similar WASM model. | #127 |
-| AI voiceovers | ✅ Done | 100% client-side WebGPU TTS via `lib/services/tts-engines.ts`. Four engines: Web Speech (built-in), Kokoro-82M, Piper, and VibeVoice (cloning). Per-scene generation. Voice cloning is a creator-owned asset with an in-product **Voice Marketplace** — see below. | — |
-| Voice Marketplace | ✅ Done | Creators upload a reference sample (`POST /api/studio/voice-clones`, private by default), set their own price, and toggle `Monetize` to publish (`PATCH /:id` with consent). Listings appear in the homepage `Voices` category and `VoiceMarketplaceCard` adds them to the shopping cart. Buyers receive a perpetual personal license (`studio_voice_clone_licenses`) with 95/5 creator/platform split + CC processing fee charged to the buyer (per #156). All synthesis runs in the buyer's browser via VibeVoice — the server never runs a model. Schema: `studio_voice_clones` (extended with `visibility`, `price_cents`, `platform_fee_bps`, `consent_*`), `studio_voice_clone_licenses`. Routes: `GET /voice-clones/library`, `GET /voice-clones/marketplace`, `PATCH /voice-clones/:id`, `POST /voice-clones/:id/claim`, `POST /voice-clones/cart-checkout`. Terms of Service §9a covers consent, ownership, and the revenue split. | — |
-
-### Media & Assets
-
-| Capability | Status | Implementation | Gap Register |
-|---|---|---|---|
-| User uploads (video, audio, images) | ✅ Done | R2-backed upload routes (`routes/upload.ts`). `WebcamRecorder.tsx` supports file upload in addition to live recording. | — |
-| Stock media library integration | ✅ Done | Unsplash + Pexels + Pixabay aggregator (`services/stockmedia.ts`) with content-addressed dedup: one R2 object per `sha256(bytes)`, per-user picks tracked in `userStockMediaUsage`. `StockMediaPanel.tsx` in `StudioSidebar`. | — |
-| Template system for common formats | ✅ Done | 3 free (720p) + 5 Premium (1080p) templates. 12 scene types. 6 purposes (`resume`, `job_ad`, `company_promo`, `recruiter_brand`, `product_launch`, `personal_brand`). `studioBrandKits` for brand consistency. | — |
-
-### Technical Stack
-
-| Capability | Status | Implementation | Gap Register |
-|---|---|---|---|
-| Frontend: React / Next.js or similar | ✅ Done | React 18 + Vite. TypeScript throughout. Tailwind + shadcn/ui. | — |
-| Rendering: Canvas / WebGL / WebCodecs | ✅ Done | Canvas 2D (`frame-renderer.ts`), WebCodecs encoder (`video-exporter.ts`), Three.js / React Three Fiber for 3D elements. | — |
-| Media processing: FFmpeg WASM or server fallback | ✅ Done | WebCodecs API + `mp4-muxer` / `webm-muxer` — browser-native hardware-accelerated encoding without FFmpeg dependency. Superior performance profile. | — |
-| State management for timeline sync | ✅ Done | TanStack Query v5 for server state. `StudioLayout.tsx` (2,319 lines — needs decomposition, gap #1333) owns local project state. | — |
-| Optional backend for rendering/export | ✅ Done | Hono on Cloudflare Workers. Studio routes **7,413 lines** across `studio.ts` (4,015) + `studio-features.ts` (3,398) — see gaps #1331 / #1332. | — |
-
-### Performance Requirements
-
-| Capability | Status | Implementation | Gap Register |
-|---|---|---|---|
-| Smooth playback and scrubbing | ✅ Done | Canvas 2D `render(ctx, compiledVideo, time)` at target FPS. WebCodecs `VideoFrame` pipeline for encoding. | — |
-| Efficient memory handling for large files | ⚠️ Partial | WebCodecs streams frames without full decode into memory. No explicit documented chunking/pooling strategy for large uploads. | — |
-| Lazy loading and caching of media assets | ⚠️ Partial | Cloudflare R2 + CDN for assets. No explicit lazy-load or client-side LRU cache documented for timeline preview thumbnails. | — |
-
-### Export & Sharing
-
-| Capability | Status | Implementation | Gap Register |
-|---|---|---|---|
-| Export to MP4 (H.264) | ✅ Done | `video-exporter.ts` — WebCodecs `VideoEncoder` (H.264) + `mp4-muxer`. WebM fallback via `webm-muxer`. | — |
-| Multiple resolutions (720p, 1080p, 4K) | ✅ Done | All three resolutions in `RESOLUTION_MAP`. 4K (3840×2160) Premium-gated server-side via `POST /api/studio/upload` (rejects with 402 PREMIUM_REQUIRED for non-Premium). | — |
-| Direct sharing or download | ✅ Done | LinkedIn publish (`LinkedInPublisher.tsx`), ATS package shareable link (`ATSLandingPage.tsx`), visibility toggle (public/unlisted), embed code generation. | — |
-| Cloud save and project persistence | ✅ Done | `studioProjects` persists projects. `studioProjectVersions` snapshots autosave every 30 s; `VersionHistoryDialog` exposes restore + manual snapshot. 50-version cap, 30-day retention. | — |
-
-### Collaboration (Optional)
-
-| Capability | Status | Implementation | Gap Register |
-|---|---|---|---|
-| Real-time collaborative editing | ❌ Not implemented | Not implemented. SignalR hub infrastructure exists for notifications; studio state is single-user. | #130 |
-| Version history and autosave | ✅ Done | `studioProjectVersions` table + 4 routes; debounced 30 s autosave in `StudioLayout.tsx`; restore via `VersionHistoryDialog.tsx`. | — |
-
-### Extensibility
-
-| Capability | Status | Implementation | Gap Register |
-|---|---|---|---|
-| Plugin system for effects or tools | ❌ Not implemented | No hook or registry system for third-party studio plugins. | #132 |
-| API for integrations | ✅ Done | OpenAPI 3.1 spec at `GET /api/openapi.json`. YouTube, LinkedIn, ATS (Greenhouse/Lever/Workday), and calendar integrations live. | — |
-
-### UX Goals
-
-| Capability | Status | Implementation | Gap Register |
-|---|---|---|---|
-| Intuitive, beginner-friendly interface | ✅ Done | AI-driven storyboard generation from a single text prompt. 3-panel workspace. shadcn/ui component system. | — |
-| Fast load time, no installation required | ✅ Done | Vite bundle + Cloudflare Workers edge delivery. No desktop app required. | — |
-| Responsive design (desktop-first, tablet support) | ⚠️ Partial | Tailwind responsive utilities. Studio workspace is desktop-first; no documented tablet breakpoint layout for the editor panels. | — |
-
----
+The full studio capability matrix (every shipped feature assessed against the Canva-Video / CapCut spec — 31 ✅ / 4 ⚠️ / 3 ❌) now lives in **[DONE.md](DONE.md)**. Open studio gaps remain in the [Consolidated Gap Register](#consolidated-gap-register) (#124–#145).
 
 ## Training Materials & SCORM — Build Strategy
 
@@ -853,22 +753,7 @@ Per the platform's HR-vertical-marketing positioning, corporate L&D and indie co
 
 ### Studio capabilities that map directly to training-material authoring
 
-| Training need | Studio primitive (already shipped) | Reuse path |
-|---|---|---|
-| Lesson script generation | Storyboard generator with `purpose` enum (`resume` / `job_ad` / `company_promo` / `recruiter_brand` / `product_launch` / `personal_brand`) — see `studio.ts` | Add new `purpose: "course_lesson"` to the enum + a lesson-shaped scene template set. One-line schema delta. |
-| Lesson section structure (intro / explain / example / summary) | 12+ existing scene types (`intro`, `talking-head`, `content-reveal`, `demo`, `testimonial`, `cta`, etc.) | Add scene types: `learning_objective`, `concept`, `worked_example`, `knowledge_check`, `summary`. |
-| Narrated voiceover | `tts-engines.ts` (Web Speech / Kokoro / Piper / VibeVoice) + `VoiceoverPanel.tsx` per-scene script | Already complete. Voice clones can be re-used as "instructor voice" assets. |
-| Captions + accessibility | `caption-renderer.ts` (4 styles incl. word-by-word), Whisper transcription, SRT/VTT export, `studioCaptions` table | Already complete. WCAG AA compliance gap (#168) is keyboard-trap + colour-contrast audit on the player chrome. |
-| Branded chrome | `studioBrandKits` table + brand-kit CRUD + AI script injection of brand voice | Already complete. Becomes "Course brand kit" for L&D buyers without changing schema. |
-| Lesson navigation / TOC | `studioChapters` table + `ChapterEditor.tsx` (auto-seeds from scene boundaries, `mm:ss` parser, YouTube-format export) | Already complete. Lesson-internal sections become chapters; module-level navigation needs a thin parent layer. |
-| Lesson covers | `studioThumbnails` table + AI-scoring + `ThumbnailsDialog.tsx` (extracts 6 frames + LLM ranks) | Already complete. |
-| Engagement hooks | `HookOptimizerDialog.tsx` (#143) — analyses retention + suggests first-3-second variants | Already complete. The hardest part of training video is the first 3 seconds; we already optimise it. |
-| Knowledge checks embedded in video | `studioVideoForms` (#140) — gate playback, capture answers, mirror to `marketingLeads` for the unified inbox | Repurpose: `formType: "knowledge_check"` with answer keys + scoring instead of lead-capture. ~50 lines of schema additions. |
-| SME review workflow | `studioReviewComments` + `studioReviewLinks` (#145) — Frame.io-style threaded time-pinned comments, anonymous review via tokenized share link | Already complete. Becomes "instructional-designer review" workflow for L&D teams. |
-| Engagement analytics | `studio_video_heatmap` (#122) — per-second viewing data, drop-off detection, viewer reverse-lookup | Already complete. Course completion + drop-off-by-second is exactly the Sana / Synthesia analytics dashboard. |
-| Async assessments | `studioAsyncInterviews` + `studioAsyncResponses` (#98) — recorder + reviewer, transcription | Repurpose: webcam-based oral-exam assessments with rubric scoring. |
-| Skills demo videos | `studioSkillsDemos` (#120) — screen + webcam recording with AI-generated teleprompter | Already complete. Becomes "skill-practice" lesson type. |
-| Final assessment | `skillAssessments` + `assessmentAttempts` (#76) — timed attempts, AI grading for short-answer/code, badge issuance, public verify | Already complete. Becomes the "final exam" leading to certification. |
+The shipped-capability mapping table (existing studio features that already serve SCORM / training authoring) now lives in **[DONE.md](DONE.md)**. The net-new gaps, competitive positioning, and phasing below remain the forward-looking build strategy.
 
 ### What's actually net-new for SCORM / training (the real gap)
 
@@ -1047,591 +932,11 @@ Allows superadmins to impersonate any user for debugging. Implementation in `ser
 
 ## API Inventory & Implementation Status
 
-### Middleware
-
-| File | Status | Notes |
-|------|--------|-------|
-| `auth.ts` | ✅ Complete | JWT verification, sets `c.var.user` |
-| `errorHandler.ts` | ✅ Complete | AppError hierarchy, Zod formatting, Sentry |
-| `rateLimiter.ts` | ✅ Complete | In-memory, 600 req/60s per authenticated user (JWT `sub`) or 100 req/60s per IP for anonymous traffic |
-| `emailVerified.ts` | ✅ Complete | Applied globally in `app.ts` to all authenticated routes |
-| `passwordChange.ts` | ✅ Complete | Applied globally in `app.ts` to all authenticated routes |
-| `requestLogger.ts` | ✅ Complete | HTTP request/response logging |
-
-### Routes
-
-#### Authentication & Account Management
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `auth.ts` | POST /register, /login, /refresh, /logout, /forgot-password, /reset-password, /verify-email, /verify-2fa, /resend-2fa, /resend-email-verification; GET /verification-status, /me | ✅ Complete | Full auth flow implemented |
-| `account.ts` | GET /users, /available, /invitations/pending, /invitation/:id, /settings, /analytics, /invitation-analytics; POST /invite, /accept-invitation/:id, /switch, /bulk-invite, /deleteaccount; PUT /roles; DELETE /users/:id | ✅ Complete | Multi-tenant org management |
-| `users.ts` | GET /public, /:id, /check-slug/:slug, /me, /me/connections, /me/recommendations, /profile, /:id/resumes, /:id/stats, /:id/can-message; POST /connections; PUT /me, /profile, /connections/:id/accept; DELETE /account, /connections/:id; PATCH /slug | ✅ Complete | Profile + connections |
-| `settings.ts` | GET /account, /job-preferences, /notifications, /security, /privacy, /export; PUT /account, /job-preferences, /notifications, /privacy, /security; POST /security/2fa/enable, /disable | ✅ Complete | User preferences |
-| `password-management.ts` | GET /requirements; POST /validate-strength, /force-change | ✅ Complete | Password policy enforcement |
-
-#### Resume Features
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `resumes.ts` | GET /, /:id, /export, /metadata, /embedded/:id, /mastergroups, /public, /validateslug, /withownership; POST /, /clone, /createvariation, /promote, /publish, /setactive, /setmaster, /setprivacy, /createfromfile, /parse, /save, /watch/:id, /unwatch/:id; PUT /:id, /:id/metadata; DELETE /:id | ✅ Complete | Core resume CRUD + lifecycle |
-| `resume-scorer.ts` | POST /score, /category-breakdown, /recommendations | ✅ Complete | AI-powered scoring |
-| `resume-optimizer.ts` | POST /optimize, /ats-analysis, /keyword-suggestions | ✅ Complete | ATS optimization |
-| `resume-roast.ts` | POST /roast | ✅ Complete | AI feedback tool |
-| `sentiment.ts` | POST /sentimentprediction, /resume/sentimentprediction | ✅ Complete | Sentiment analysis |
-
-#### Video & Studio
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `video.ts` | GET /:id, /:id/status, /resume/:resumeId, /resume/:resumeId/active, /resume/:resumeId/can-generate, /user/all; POST /generate, /:id/cancel, /enhance-summary; DELETE /:id | ✅ Complete | Video generation lifecycle |
-| `studio.ts` | POST /save-draft, /publish, /storyboard, /generate-image, /edit-script, /upload, /brand-kits, /campaigns, /videos/:id/view, /videos/:id/cta-click; GET /projects, /public/:videoId, /videos/public, /videos/resume/:resumeId, /videos/user/:userId, /status/:projectId, /brand-kits, /ad-templates, /campaigns, /videos/:id/embed, /videos/:id/analytics; DELETE /projects/:projectId; PATCH /projects/:projectId/status, /projects/:projectId/visibility; POST /projects/:id/clone | ✅ Complete | 1,716 lines — largest route file |
-| `studio-features.ts` | GET /tts/voices, /captions/:projectId, /linkedin/auth-url, /linkedin/accounts, /coaching/:recordingId, /interview/questions, /interview/sessions, /skills-demos, /skills-demos/user/:userId, /voice-clones, /async-interviews, /async-interview/invite/:token, /async-interview/:id/responses, /analytics/:videoId; POST /tts/generate, /tts/generate-all, /captions/generate, /linkedin/callback, /linkedin/publish, /linkedin/post, /recording/upload, /recording/:id/transcribe, /coaching/analyze, /ats/generate, /interview/questions/seed, /interview/session, /skills-demo, /skills-demo/generate-script, /voice-clones, /async-interview, /async-interview/:id/respond, /async-interview/:id/submit, /analytics/track; PATCH /interview/session/:id, /skills-demo/:id; DELETE /voice-clones/:id; GET /ats/:slug | ✅ Complete | 1,451 lines — TTS, captions, LinkedIn, webcam, coaching, ATS, interview practice, skills demos, voice cloning, async interviews, heatmap analytics |
-
-#### Jobs & Matching
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `jobs.ts` | GET /, /:id, /public, /slug/:slug, /GetSummaryItems, /saved, /alerts, /applications, /user-jobs; POST /, /:id/apply, /:id/save, /createfromfile, /extract, /alerts; PUT /:id, /alerts/:id; DELETE /:id, /:id/save; PATCH /alerts/:id/toggle | ✅ Complete | Full job lifecycle + alerts |
-| `match.ts` | POST /, /analyze, /bycontent, /byid, /tailor | ✅ Complete | Resume-to-job matching |
-| `search.ts` | GET /public | ⚠️ Partial | Single endpoint; legacy has richer search — see Gap Register #10 |
-
-#### Companies
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `companies.ts` | GET /public, /:id, /:id/jobs, /:id/stats, /:id/following-status, /slug/:slug, /trending, /me/followed; POST /, /:id/follow; PUT /:id; DELETE /:id, /:id/follow | ✅ Complete | Company profiles + follow system |
-
-#### Recruiter Tools
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `recruiter.ts` | GET /talent-pool, /submissions, /placements, /placements/summary/commission, /interactions/:talentPoolId; POST /talent-pool, /submissions, /placements, /interactions; PUT /talent-pool/:id, /submissions/:id/status, /placements/:id/commission, /placements/:id/guarantee; DELETE /talent-pool/:id; POST /submissions/:id/withdraw | ✅ Complete | 618 lines |
-
-#### Communication
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `messages.ts` | POST /, /message | ⚠️ Partial | Minimal — direct messages only; no conversation threading, read receipts, or history — see Gap Register #45 |
-| `communication.ts` | GET /conversations, /messages, /email-templates, /email-campaigns, /tracking, /stats, /job-boards, /external-contacts; POST /conversations, /messages, /messages/mark-read, /email-templates, /email-campaigns, /email-campaigns/:id/send, /tracking, /job-boards/post, /external-contacts, /follow-ups; PUT /email-templates/:id, /external-contacts/:id; DELETE /email-templates/:id, /external-contacts/:id, /job-boards/postings/:id | ✅ Complete | 318 lines |
-
-#### AI Features
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `ai.ts` | POST /context, /chat, /chat/sessions, /chat/sessions/:id | ✅ Complete | Full AI chat with session persistence, history, usage tracking; `/chat` added after initial table |
-| `value-proposition.ts` | POST /generate/content, /generate/job-content-resume-id, /generate/job-id-resume-content, /generate/job-id-resume-id | ✅ Complete | 4 generation modes |
-| `salary.ts` | POST /analyze, /negotiation-tips | ✅ Complete | Salary calculator |
-| `interview.ts` | GET /sessions, /sessions/:id; POST /sessions, /sessions/:id/answers, /questions, /answers/:answerId/analyze; DELETE /sessions/:id; PATCH /sessions/:id/complete | ✅ Complete | 489 lines |
-
-#### Dashboard & Analytics
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `dashboard.ts` | GET /, /admin, /employer, /jobseeker, /recruiter; POST /activity, /engagement, /profile-view, /refresh | ✅ Complete | Role-specific dashboards |
-
-#### Social Feed
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `feed.ts` | GET /posts, /posts/:id, /posts/:id/comments, /search; POST /posts, /posts/:id/like, /comments, /link-preview; PUT /posts/:id, /comments/:id; DELETE /posts/:id, /posts/:id/like, /comments/:id | ✅ Complete | 389 lines |
-
-#### Billing & Payments
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `billing.ts` | GET /subscription, /payment-methods, /invoices, /ai-usage/month, /refund-policy, /refund-reasons, /refund-requests; POST /refund-request, /cancel-account | ✅ Complete | Real DB queries for subscriptions, invoices, payment methods, AI usage |
-| `payment.ts` | GET /public-key; POST /setup-intent, /save-payment-method, /stripe/webhook, /create-setup-session; DELETE /payment-methods/:id | ✅ Complete | Stripe fully wired — webhook verified, customer IDs persisted |
-
-#### Admin & Affiliates
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `admin.ts` | GET /, /affiliate-stats, /productdashboard/affiliate-stats, /export/:format, /refund-requests, /refund-stats, /cancellation-requests; POST /refund-requests/:id/approve, /reject, /cancellation-requests/:id/approve, /reject | ✅ Complete | Admin management panel |
-| `affiliates.ts` | GET /profile, /dashboard, /admin/all, /admin/:userId/details, /admin/pending-payouts; POST /payout/request, /admin/:userId/activate, /deactivate, /admin/payout/:payoutId/approve, /reject, /process | ✅ Complete | Full affiliate program |
-
-#### Integrations & Utilities
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `upload.ts` | POST /, /image, /single, /video; DELETE /:key | ✅ Complete | S3/R2 upload handling |
-| `youtube.ts` | GET /account, /auth-url, /company/auth-url, /company/status; POST /callback, /disconnect, /publish/:videoId | ✅ Complete | YouTube OAuth + publishing |
-| `linkedin-post.ts` | POST /linkedin-post | ✅ Complete | LinkedIn post generation; full OAuth flow now in `studio-features.ts` |
-| `locations.ts` | GET /countries, /states, /cities, /search | ✅ Complete | Reference data |
-| `og.ts` | GET /v/:videoId | ✅ Complete | Open Graph metadata |
-| `task.ts` | GET /, /:id; POST /save, /:id; DELETE /:id | ✅ Complete | Task management |
-| `featureflag.ts` | GET / | ✅ Complete | Orphaned duplicate `feature-flag.ts` deleted; static flag evaluation |
-| `hubs.ts` | GET/POST /notifications, POST /notifications/negotiate | ✅ Complete | SSE stream live; `POST /negotiate` returns transport descriptor |
-| `marketing.ts` | GET /campaigns, /leads; POST /campaigns, /leads | ✅ Complete | Real DB tables wired — see Gap Register #38 |
-
-#### Auth Extensions
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `oauth.ts` | GET /:provider, /:provider/callback; POST /magic-link; GET /magic-link/verify, /linked-accounts, /sessions; DELETE /unlink/:provider, /sessions/:id, /sessions; POST /add-password | ✅ Complete | Google, LinkedIn, GitHub, Microsoft OIDC flows; magic links; session management |
-| `passkeys.ts` | POST /register/begin, /register/complete, /login/begin, /login/complete; GET /credentials; DELETE /credentials/:id | ✅ Complete | Full FIDO2/WebAuthn — CBOR parsing, DER→raw sig conversion, clone detection |
-
-#### Notifications & Real-time
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `notifications.ts` | GET /, /unread-count, /smart; POST /mark-all-read, /:id/mark-read; DELETE /:id | ✅ Complete | Smart priority ranking (Premium) via `GET /smart` |
-
-#### Calendar & Scheduling
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `calendar.ts` | GET /events, /events/:id, /availability, /connections, /connect/:provider, /connect/:provider/callback; POST /events, /availability, /sync, /interview-slots, /book-interview; PATCH /events/:id; DELETE /events/:id, /availability/:id, /connections/:id | ✅ Complete | Google + Outlook OAuth; two-way calendar sync; interview slot generation |
-
-#### Outreach & Follow-ups
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `followups.ts` | GET /sequences, /sequences/:id, /enrollments; POST /sequences, /enroll, /trigger; PATCH /enrollments/:id/:action; DELETE /sequences/:id | ✅ Complete | Multi-step outreach sequences; behaviour-triggered enrollment |
-
-#### Assessments
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `assessments.ts` | GET /, /:slug, /me/results, /users/:userId/badges; POST /:slug/start, /attempts/:attemptId/submit | ✅ Complete | Timed skill tests with AI grading; public badge display |
-
-#### ATS & Integrations
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `ats.ts` | GET /connections; POST /connections, /sync/:connectionId, /webhook/:provider; DELETE /connections/:id | ⚠️ Partial | HMAC-verified webhook; provider API calls are stubs pending dev credentials |
-
-#### Performance Management
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `performance.ts` | GET /cycles, /cycles/:id, /reviews, /goals; POST /cycles, /reviews, /goals; PATCH /cycles/:id/complete, /reviews/:id/submit, /reviews/:id/acknowledge, /goals/:id, /goals/:id/progress; DELETE /goals/:id | ✅ Complete | OKRs, review cycles, employee sign-off |
-
-#### Onboarding & Hiring
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `onboarding-hiring.ts` | GET /offers, /offers/:id, /checklists, /checklists/:id; POST /offers, /offers/:id/send-for-signature, /offers/webhook/dropbox-sign; PATCH /offers/:id/send, /offers/:id/accept, /offers/:id/decline, /checklists/:id/tasks/:taskId/complete; DELETE /offers/:id | ✅ Complete | Offer letters + Dropbox Sign e-signature; HMAC-verified webhook |
-
-#### Discovery & Smart Job Board
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `discovery.ts` | GET /talent-feed, /talent-feed/:userId, /jobs, /jobs/:id/similar, /seo/resume-guide/:jobSlug, /seo/salary/:jobSlug, /creators/leaderboard, /creators/products; POST /creators/products | ✅ Complete | Algorithmic talent feed; NL job search; SEO content engine with 24h cache |
-
-#### White-label & B2B
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `whitelabel.ts` | GET /tenants, /tenants/:id, /portal/:subdomain, /tenants/:id/analytics, /roi-calculator; POST /tenants, /demo-request; PATCH /tenants/:id | ✅ Complete | Multi-tenant portals; ROI calculator; university/bootcamp tenant types |
-
-#### Ads & Analytics
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `ads.ts` | GET /config; POST /ads/impression | ✅ Complete | Ad-free flag for Premium; impression tracking |
-| `analytics.ts` | POST /beacon, /ads/impression; GET /usage, /time-to-hire, /hiring-metrics | ✅ Complete | DAU/WAU/MAU, feature adoption, ad CTR, time-to-hire (Premium) |
-
-#### API Keys & Exclusive Boards
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `apikeys.ts` | GET /; POST /; DELETE /:id; PATCH /:id | ✅ Complete | SHA-256 hashed keys shown once at creation; Premium tier |
-| `exclusive-boards.ts` | GET /exclusive, /exclusive/:id, /bids; POST /bids; DELETE /bids/:id; PATCH /bids/:id/accept, /bids/:id/reject | ✅ Complete | Premium exclusive job boards with bidding/auction |
-
-#### Auto-Apply & Job Scraper
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `auto-apply.ts` | POST /start; GET /matches | ✅ Complete | LLM tailors cover letter + resume per job; Premium-gated |
-| `jobscraper.ts` | Admin: GET /, POST /, PATCH /:id, DELETE /:id, POST /:id/sync, GET /:id/logs; User: GET /, POST /, PATCH /:id, DELETE /:id | ✅ Complete | RSS + JSON API sources; SHA-256 dedup; cron-driven sync |
-
-#### Apply Button & Community
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `apply-button.ts` | GET /snippet, /:jobId/meta; POST /track | ✅ Complete | Embeddable `<script>` tag; lead capture; public routes |
-| `community.ts` | GET /posts, /channels; POST /posts; DELETE /posts/:id | ✅ Complete | Company community feed with channel-based discussions |
-
-#### OpenAPI & Sitemap
-
-| Route File | Endpoints | Status | Notes |
-|-----------|-----------|--------|-------|
-| `openapi.ts` | GET /openapi.json, /docs | ✅ Complete | OpenAPI 3.1 spec; `/docs` redirects to Swagger UI |
-| `sitemap.ts` | GET /sitemap.xml | ✅ Complete | Dynamic XML sitemap for SEO |
-
-### Services
-
-| Service | Lines | Status | Notes |
-|---------|-------|--------|-------|
-| `email.ts` | 576 | ✅ Complete | `EmailProvider` interface + SendPulse implementation; sends verification, reset, 2FA, resend emails |
-| `ai.ts` | 83 | ✅ Complete | `callLLM()` / `callLLMJson()` with Zod schema validation; OpenRouter wrapper |
-| `account.ts` | 300 | ✅ Complete | Organization/team management business logic |
-| `job.ts` | 278 | ✅ Complete | Job management: create, update, archive, search |
-| `company.ts` | 84 | ✅ Complete | Company CRUD, follow/unfollow, trending |
-| `settings.ts` | 76 | ✅ Complete | User preference read/write |
-| `billing.ts` | 378 | ✅ Complete | Real DB queries for subscriptions, invoices, payment methods, AI usage |
-| `jobscraper.ts` | 231 | ✅ Complete | RSS + JSON API scraper, SHA-256 dedup, sync scheduling |
-| `stripe.ts` | 106 | ✅ Complete | Top-level Stripe helper used by payment routes |
-| `payment/` | — | ✅ Complete | Strategy pattern: `types.ts` interface + `stripe.ts` (full) + `helcim.ts` (⚠️ stub) + `index.ts` factory |
-
-### Database Schema (303 `pgTable()` declarations across 68 schema files in `/api/src/db/schema/`)
-
-All tables are defined and schema migrations managed via Drizzle Kit. (Was ~230/52 at last audit; the table below documents the canonical aggregates per domain — see the schema files for the full set including gamification, learning, sourcing, scorecards, paid-media, externalEmail, content-locations, geocoderCache, events, coffee, comics, NLE, and the studio v2 expansion.)
-
-| Domain | Tables |
-|--------|--------|
-| Users & Auth | `users`, `userProfiles`, `userRoles`, `roles`, `passwordHistory`, `twoFactorCodes`, `emailVerificationTokens`, `passwordResetTokens`, `refreshTokens`, `userConnections`, `magicLinkTokens`, `oauthAccounts`, `apiKeys` |
-| WebAuthn / Passkeys | `webauthnCredentials`, `webauthnChallenges` |
-| Companies & Orgs | `companyProfiles`, `userCompanyRoleAssociations`, `companyFollowers`, `accountInvitations`, `accountPreferences`, `companySubscriptions`, `employerBrandingPages` |
-| Resumes | `resumeInformation`, `resumeTemplates`, `watchedResumes`, `metaResumes` |
-| Jobs | `jobItems`, `jobPreferences`, `jobApplications`, `savedJobs`, `jobAlerts`, `jobWebsites`, `jobBoardSources`, `jobBoardSyncLog` |
-| Video & Studio | `videos`, `videoResumes`, `studioProjects`, `youtubeAccounts`, `studioBrandKits`, `videoAnalytics`, `videoCampaigns` |
-| Recruiter | `recruiterTalentPools`, `talentPoolCandidates`, `candidateInteractions`, `candidateSubmissions`, `placements`, `jobBoards`, `jobBoardPostings`, `recruiterAgentRuns`, `savedSearches`, `exclusiveBoards`, `boardBids` |
-| Messaging | `conversations`, `conversationParticipants`, `messages`, `messageReadReceipts`, `emailTemplates`, `emailCampaigns`, `emailCampaignRecipients`, `communicationTracking` |
-| Outreach & Follow-ups | `followUpSequences`, `followUpSteps`, `followUpEnrollments`, `followUpLogs` |
-| Social | `feedPosts`, `feedPostLikes`, `feedPostComments` |
-| Interviews | `interviewSessions`, `interviewAnswers`, `interviews`, `applicationNotes` |
-| Assessments | `skillAssessments`, `assessmentAttempts` |
-| Calendar & Scheduling | `calendarConnections`, `scheduledEvents`, `availabilitySlots` |
-| Onboarding & Hiring | `offerLetters`, `onboardingChecklists`, `onboardingTasks` |
-| Performance | `performanceCycles`, `performanceReviews`, `performanceGoals` |
-| ATS Integration | `atsConnections` |
-| Affiliate | `affiliateProfiles`, `affiliateReferrals`, `affiliateConversions`, `affiliatePayouts`, `affiliateTiers`, `affiliateLinkClicks` |
-| Billing | `subscriptionPlans`, `subscriptions`, `paymentMethods`, `invoices`, `invoiceLineItems`, `refundRequests`, `billingEvents`, `usageRecords` |
-| Analytics | `profileViews`, `activityLogs`, `requestLogs`, `dashboardMetrics`, `userEngagementMetrics`, `aiUsageRecords`, `aiChatSessions`, `aiChatMessages` |
-| Productivity | `tasks`, `boards`, `notifications`, `queueJobToResume`, `queueJobToProcess` |
-| Locations | `countries`, `stateProvinces`, `cities`, `postalZipCodes` |
-| White-label | `whitelabelTenants` |
-| System | `systemSettings`, `marketingLeads`, `featureFlags` |
-
----
+The per-route / per-service / schema implementation-status inventory now lives in **[DONE.md](DONE.md)**. Open items are tracked in the [Consolidated Gap Register](#consolidated-gap-register).
 
 ## Legacy API Coverage Map
 
-This section documents every controller in `/myvideoresume-api` (31 C# controllers, ~200 endpoints), the business-logic service it calls, the DB tables it touches, and whether the TypeScript API has a matching implementation.
-
-**Coverage key:**
-✅ Fully covered — TypeScript API has equivalent endpoints with DB-backed logic
-⚠️ Partial — Routes exist but logic is stubbed, missing, or incomplete
-❌ Not covered — No equivalent in TypeScript API
-
-### Authentication & User Management
-
-| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
-|-------------------|-------|---------------|-----------|-------------|
-| **AuthController** | `POST /api/auth/login` | UserManager.CheckPasswordSignInAsync, issues 2FA challenge token | AspNetUsers, PasswordHistory | ✅ `routes/auth.ts` |
-| | `POST /api/auth/register` | Creates user + roles + affiliate profile; sends verification email | AspNetUsers, AspNetUserRoles, AffiliateProfiles | ✅ |
-| | `POST /api/auth/verify-2fa` | Validates OTP; sends welcome email on first login; marketing email (30-day cooldown) | AspNetUsers, TwoFactorCodes | ✅ |
-| | `POST /api/auth/resend-2fa` | Resends 2FA code via email | TwoFactorCodes | ✅ |
-| | `POST /api/auth/refresh` | Issues new JWT + refresh token | RefreshTokens | ✅ |
-| | `POST /api/auth/logout` | Invalidates refresh token | RefreshTokens | ✅ |
-| | `GET /api/auth/me` | Returns current user from JWT | AspNetUsers | ✅ |
-| | `POST /api/auth/resend-email-verification` | Rate-limited (1/min, 5/24h); sends verification email | EmailVerificationTokens | ✅ |
-| | `GET /api/auth/verification-status` | Returns emailVerified flag | AspNetUsers | ✅ |
-| **AccountApiController** | `GET /api/account/users` | List users in account | AspNetUsers, UserRoles | ✅ `routes/account.ts` |
-| | `POST /api/account/invite` | Email invitation to join account | AccountInvitations | ✅ |
-| | `POST /api/account/bulk-invite` | Bulk team invite | AccountInvitations | ✅ |
-| | `POST /api/account/accept-invitation/:id` | Accept invite (no auth) | AccountInvitations, UserRoles | ✅ |
-| | `POST /api/account/switch` | Switch active account context | UserRoles | ✅ |
-| | `PUT /api/account/roles` | Update user role assignments | AspNetUserRoles | ✅ |
-| | `DELETE /api/account/users/:id` | Remove user from account | AspNetUserRoles | ✅ |
-| | `GET /api/account/analytics` | Invitation/account metrics | AccountInvitations | ✅ |
-| | `GET /api/account/invitation/:id` | Get invitation details (no auth) | AccountInvitations | ✅ |
-| | `POST /api/account/deleteaccount` | Soft-delete account | AspNetUsers | ✅ |
-| **ApplicationUsersController** | `odata/Identity` (5 endpoints) | UserManager via OData | AspNetUsers | ❌ OData not needed for edge runtime |
-| **ApplicationRolesController** | `odata/Identity` (4 endpoints) | RoleManager via OData | AspNetRoles | ❌ OData not needed for edge runtime |
-
-### Resume Management
-
-| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
-|-------------------|-------|---------------|-----------|-------------|
-| **ResumeController** | `GET /api/resume/:id` | Privacy check + view tracking | ResumeInformation, ResumeViews | ✅ `routes/resumes.ts` |
-| | `GET /api/resume/embedded/:id` | Bypass auth/privacy for embed | ResumeInformation | ✅ |
-| | `GET /api/resume/public` | Paginated public resumes | ResumeInformation | ✅ |
-| | `GET /api/resume/GetResumesOwnedByAuthUser` | Master/variation hierarchy | ResumeInformation, MetaResume | ✅ |
-| | `POST /api/resume/Save` | Create/update resume JSON | ResumeInformation | ✅ |
-| | `POST /api/resume/Parse` | PDF/DOCX → structured JSON via AI | ResumeInformation | ✅ |
-| | `POST /api/resume/CreateFromFile` | Upload → parse → create + queue matching | ResumeInformation, QueueJobToResume | ⚠️ File parsing works; background queue not processed — see Gap Register #3 |
-| | `POST /api/resume/Summarize` | AI-generated summary via LLM | ResumeInformation | ✅ |
-| | `POST /api/resume/SentimentPrediction` | ML sentiment score | ResumeSentiment | ✅ (LLM-based instead of ML.NET) |
-| | `DELETE /api/resume/:id` | Owner-only delete | ResumeInformation | ✅ |
-| | `PUT /api/resume/:id` | Full update with master propagation | ResumeInformation, MetaResume | ✅ |
-| | `PUT /api/resume/:id/metadata` | Metadata-only update | MetaResume | ✅ |
-| | `POST /api/resume/:id/clone` | Duplicate resume | ResumeInformation | ✅ |
-| | `POST /api/resume/:id/setMaster` | Designate master resume | ResumeInformation | ✅ |
-| | `POST /api/resume/:id/setActive` | Set active resume | ResumeInformation | ✅ |
-| | `POST /api/resume/:id/setPrivacy` | Set visibility level | ResumeInformation | ✅ |
-| | `POST /api/resume/:id/createVariation` | Create variation from master | ResumeInformation | ✅ |
-| | `POST /api/resume/:id/promote` | Promote variation → master | ResumeInformation | ✅ |
-| | `GET /api/resume/masterGroups` | Master + variation groups | ResumeInformation, MetaResume | ✅ |
-| | `GET /api/resume/:id/diff` | Field-level diff vs master | ResumeInformation | ❌ Not implemented |
-| | `POST /api/resume/watch/:id` | Subscribe to resume updates | WatchedResumes | ✅ |
-| | `POST /api/resume/unwatch/:id` | Unsubscribe | WatchedResumes | ✅ |
-| | `POST /api/resume/:id/publish` | Publish resume publicly | ResumeInformation | ✅ |
-| | `GET /api/resume/validateSlug` | Check slug availability | ResumeInformation | ✅ |
-| **ResumeScorerController** | `POST /api/resumescorer/score` | 6-category scoring (content 25%, format 20%, keywords 20%, experience 15%, education 10%, appeal 10%) | — | ✅ `routes/resume-scorer.ts` |
-| | `POST /api/resumescorer/category-breakdown` | Detailed per-category scores | — | ✅ |
-| | `POST /api/resumescorer/recommendations` | Improvement suggestions | — | ✅ |
-| **ResumeOptimizerController** | `POST /api/resumeoptimizer/optimize` | ATS optimization pass | — | ✅ `routes/resume-optimizer.ts` |
-| | `POST /api/resumeoptimizer/ats-analysis` | ATS compatibility score | — | ✅ |
-| | `POST /api/resumeoptimizer/keyword-suggestions` | Industry keyword suggestions | — | ✅ |
-
-### Jobs & Matching
-
-| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
-|-------------------|-------|---------------|-----------|-------------|
-| **JobController** | `GET /api/job/GetPublicJobs` | Paginated + filtered public jobs | Jobs | ✅ `routes/jobs.ts` |
-| | `GET /api/job/:id` | Job + view tracking | Jobs, JobViews | ✅ |
-| | `POST /api/job` | Create job posting | Jobs | ✅ |
-| | `PUT /api/job/:id` | Update job | Jobs | ✅ |
-| | `DELETE /api/job/:id` | Owner-only delete | Jobs | ✅ |
-| | `POST /api/job/Extract` | Web-scrape job from URL | Jobs | ✅ |
-| | `POST /api/job/CreateFromFile` | Upload → AI-extract → create | Jobs | ✅ |
-| | `POST /api/job/:id/apply` | Apply to job | JobApplications | ✅ |
-| | `POST /api/job/:id/save` | Bookmark job | SavedJobs | ✅ |
-| | `DELETE /api/job/:id/save` | Remove bookmark | SavedJobs | ✅ |
-| | `GET /api/job/saved` | User's saved jobs | SavedJobs | ✅ |
-| | `GET /api/job/applications` | User's applications | JobApplications | ✅ |
-| | `GET /api/job/alerts` | User's job alerts | JobAlerts | ✅ |
-| | `POST /api/job/alerts` | Create alert | JobAlerts | ✅ |
-| | `PUT /api/job/alerts/:id` | Update alert | JobAlerts | ✅ |
-| | `PATCH /api/job/alerts/:id/toggle` | Toggle alert on/off | JobAlerts | ✅ |
-| | `DELETE /api/job/alerts/:id` | Delete alert | JobAlerts | ✅ |
-| **MatchController** | `POST /api/match/analyze` | Job HTML vs resume match score + missing skills | — | ✅ `routes/match.ts` |
-| | `POST /api/match/tailor` | AI-rewrite resume for job (returns `tailoredResume` JSON + `changes[]` + `markdownResume`) | ResumeInformation | ✅ |
-| | `POST /api/match/byid` | Match by DB IDs | ResumeInformation, Jobs | ✅ |
-| | `POST /api/match/bycontent` | Match by raw text | — | ✅ |
-| | `POST /api/match/bestresume` | Find best-fit resume for job | ResumeInformation | ✅ |
-
-### Video & Studio
-
-| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
-|-------------------|-------|---------------|-----------|-------------|
-| **VideoController** | `POST /api/video/generate` | AI video generation job | Videos, VideoGenerationJobs | ✅ `routes/video.ts` |
-| | `GET /api/video/:id` | Get video (owner) | Videos | ✅ |
-| | `GET /api/video/user/all` | All user videos | Videos | ✅ |
-| | `GET /api/video/resume/:resumeId` | Videos for resume | Videos | ✅ |
-| | `GET /api/video/:id/status` | Generation progress | Videos | ✅ |
-| | `POST /api/video/:id/cancel` | Cancel generation | Videos | ✅ |
-| | `DELETE /api/video/:id` | Delete video | Videos | ✅ |
-| | `POST /api/video/enhance-summary` | AI-enhanced summary | — | ✅ |
-| | `GET /api/video/resume/:id/can-generate` | Check generation eligibility | Videos, Subscriptions | ✅ |
-| | `GET /api/video/resume/:id/active` | Active generation | Videos | ✅ |
-
-### Users, Connections & Social
-
-| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
-|-------------------|-------|---------------|-----------|-------------|
-| **UsersController** | `GET /api/users/public` | Paginated public profiles | UserProfiles | ✅ `routes/users.ts` |
-| | `GET /api/users/:id` | Profile by ID or slug | UserProfiles | ✅ |
-| | `GET /api/users/me` | Current user profile | UserProfiles | ✅ |
-| | `PUT /api/users/me` | Update profile | UserProfiles | ✅ |
-| | `POST /api/users/connections` | Send connection request | UserConnections | ✅ |
-| | `GET /api/users/me/connections` | Accepted connections | UserConnections | ✅ |
-| | `GET /api/users/me/connections/pending` | Pending requests | UserConnections | ✅ |
-| | `PUT /api/users/connections/:id/accept` | Accept request | UserConnections | ✅ |
-| | `DELETE /api/users/connections/:id` | Reject/remove connection | UserConnections | ✅ |
-| | `GET /api/users/:id/resumes` | User's public resumes | ResumeInformation | ✅ |
-| | `POST /api/users/me/avatar` | Avatar upload (max 5MB, jpg/png/gif/webp) | UserProfiles | ⚠️ Upload route exists; avatar-specific validation not confirmed — see Gap Register #46 |
-| **FeedController** | `GET /api/feed/posts` | Paginated feed | FeedPosts | ✅ `routes/feed.ts` |
-| | `POST /api/feed/posts` | Create post | FeedPosts | ✅ |
-| | `PUT /api/feed/posts/:id` | Edit post | FeedPosts | ✅ |
-| | `DELETE /api/feed/posts/:id` | Delete post | FeedPosts | ✅ |
-| | `POST /api/feed/posts/:id/like` | Like | FeedPostLikes | ✅ |
-| | `DELETE /api/feed/posts/:id/like` | Unlike | FeedPostLikes | ✅ |
-| | `POST /api/feed/comments` | Comment | FeedPostComments | ✅ |
-| | `PUT /api/feed/comments/:id` | Edit comment | FeedPostComments | ✅ |
-| | `DELETE /api/feed/comments/:id` | Delete comment | FeedPostComments | ✅ |
-| | `POST /api/feed/link-preview` | Fetch link metadata | — | ✅ |
-
-### Companies
-
-| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
-|-------------------|-------|---------------|-----------|-------------|
-| **CompaniesController** | `GET /api/companies/public` | Public company listing | CompanyProfiles | ✅ `routes/companies.ts` |
-| | `GET /api/companies/:id` | Company detail + stats | CompanyProfiles | ✅ |
-| | `PUT /api/companies/:id` | Update (owner) | CompanyProfiles | ✅ |
-| | `DELETE /api/companies/:id` | Delete (owner) | CompanyProfiles | ✅ |
-| | `POST /api/companies/:id/follow` | Follow company | CompanyFollowers | ✅ |
-| | `DELETE /api/companies/:id/follow` | Unfollow | CompanyFollowers | ✅ |
-| | `GET /api/companies/:id/jobs` | Company's jobs | Jobs | ✅ |
-
-### Recruiter Tools
-
-| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
-|-------------------|-------|---------------|-----------|-------------|
-| **RecruiterController** | `POST /api/recruiter/talent-pool` | Add candidate | RecruiterTalentPools, TalentPoolCandidates | ✅ `routes/recruiter.ts` |
-| | `GET /api/recruiter/talent-pool` | List pool (paginated, filtered) | RecruiterTalentPools | ✅ |
-| | `PUT /api/recruiter/talent-pool/:id` | Update candidate entry | TalentPoolCandidates | ✅ |
-| | `DELETE /api/recruiter/talent-pool/:id` | Remove from pool | TalentPoolCandidates | ✅ |
-| | `POST /api/recruiter/interactions` | Log interaction | CandidateInteractions | ✅ |
-| | `POST /api/recruiter/submissions` | Submit candidate for job | CandidateSubmissions | ✅ |
-| | `PUT /api/recruiter/submissions/:id/status` | Update submission status | CandidateSubmissions | ✅ |
-| | `POST /api/recruiter/submissions/:id/withdraw` | Withdraw submission | CandidateSubmissions | ✅ |
-| | `POST /api/recruiter/placements` | Record placement | Placements | ✅ |
-| | `GET /api/recruiter/placements/summary/commission` | Commission summary | Placements | ✅ |
-| | `POST /api/recruiter/talent-pool/bulk/*` | Bulk tag/status/delete | TalentPoolCandidates | ❌ Bulk operations not implemented in TS API |
-| | `GET /api/recruiter/talent-pool/export` | CSV export of talent pool | TalentPoolCandidates | ❌ Not implemented |
-
-### Communication & Messaging
-
-| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
-|-------------------|-------|---------------|-----------|-------------|
-| **CommunicationController** | `GET /api/communication/conversations` | List conversations | Conversations, ConversationParticipants | ✅ `routes/communication.ts` |
-| | `POST /api/communication/conversations` | Create conversation | Conversations | ✅ |
-| | `GET /api/communication/conversations/:id` | Thread + messages | Conversations, Messages | ✅ |
-| | `POST /api/communication/messages` | Send message | Messages | ✅ |
-| | `POST /api/communication/messages/mark-read` | Mark as read | MessageReadReceipts | ✅ |
-| | `GET /api/communication/email-templates` | List templates | EmailTemplates | ✅ |
-| | `POST /api/communication/email-templates` | Create template | EmailTemplates | ✅ |
-| | `PUT /api/communication/email-templates/:id` | Update template | EmailTemplates | ✅ |
-| | `DELETE /api/communication/email-templates/:id` | Delete template | EmailTemplates | ✅ |
-| | `GET /api/communication/email-campaigns` | List campaigns | EmailCampaigns | ✅ |
-| | `POST /api/communication/email-campaigns/:id/send` | Execute campaign | EmailCampaigns, EmailCampaignRecipients | ✅ |
-| | `GET /api/communication/external-contacts` | List contacts | ExternalContacts | ✅ |
-| | `POST /api/communication/external-contacts` | Add contact | ExternalContacts | ✅ |
-| | `GET /api/communication/job-boards` | List job boards | JobBoards | ✅ |
-| | `POST /api/communication/job-boards/post` | Post job to board | JobBoardPostings | ✅ |
-| | `GET /api/communication/stats` | Campaign stats | CommunicationTracking | ✅ |
-| | `GET /api/communication/tracking` | Open/click events | CommunicationTracking | ✅ |
-
-### Billing & Payments
-
-| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
-|-------------------|-------|---------------|-----------|-------------|
-| **BillingController** | `GET /api/billing/subscription` | Subscription summary | Subscriptions, SubscriptionPlans | ✅ `routes/billing.ts` (DB-backed) |
-| | `GET /api/billing/payment-methods` | Saved payment methods | PaymentMethods | ✅ |
-| | `GET /api/billing/invoices` | Invoice history | Invoices | ✅ |
-| | `GET /api/billing/ai-usage/month` | Monthly token usage | AIUsageRecords | ✅ |
-| | `POST /api/billing/refund-request` | Create refund request | RefundRequests | ✅ |
-| | `GET /api/billing/refund-requests` | List user's refunds | RefundRequests | ✅ |
-| | `POST /api/billing/cancel-account` | Account cancellation request | RefundRequests | ✅ |
-| **PaymentController** | `POST /api/payment/stripe/webhook` | Handle Stripe events (subscription updates, payment success/fail) | BillingEvents, Subscriptions | ✅ `routes/payment.ts` — signature verified; handles subscription lifecycle, invoice sync, affiliate conversions, payouts |
-| | `GET /api/payment/public-key` | Return Stripe publishable key | — | ✅ Returns `STRIPE_PUBLISHABLE_KEY` env var |
-| | `POST /api/payment/setup-intent` | Create Stripe SetupIntent | — | ✅ Creates SetupIntent, returns `clientSecret` |
-| | `POST /api/payment/save-payment-method` | Store Stripe payment method | PaymentMethods | ✅ Attaches PM to customer, upserts to DB, sets default |
-| | `POST /api/payment/create-setup-session` | Stripe checkout setup session | — | ✅ Stripe checkout session with redirect URLs |
-| | `DELETE /api/payment/payment-methods/:id` | Delete payment method | PaymentMethods | ✅ DB-delete with ownership check |
-
-### AI Features
-
-| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
-|-------------------|-------|---------------|-----------|-------------|
-| **ChatController** | `POST /api/chat/message` | OpenRouter LLM with session + token tracking; AIRateLimit filter | AIUsageMetrics, AIChatSessions | ✅ `routes/ai.ts` `POST /api/ai/chat` |
-| **SalaryCalculatorController** | `POST /api/salarycalculator/analyze` | AI salary analysis (qwen3-coder; deterministic fallback on LLM outage) | — | ✅ `routes/salary.ts` → `services/salary/handlers.ts` |
-| | `POST /api/salarycalculator/negotiation-tips` | AI negotiation strategies (gemma-4-31b; canned fallback on LLM outage) | — | ✅ |
-| | `GET /api/salarycalculator/locations` | Supported locations | — | ✅ |
-| | `GET /api/salarycalculator/industries` | Supported industries | — | ✅ static catalog in `routes/salary.ts` |
-| **PromptController** | `POST /Prompt/summarize` | Summarize resume content | ResumeInformation | ✅ `POST /api/resumes/:id` summarize |
-| | `POST /Prompt/match` | Match document to job | — | ✅ via `routes/match.ts` |
-| | `POST /Prompt/parse` | Parse PDF to JSON | — | ✅ via `routes/resumes.ts` parse |
-| **SentimentController** | sentiment analysis endpoints | ML.NET model inference | ResumeSentiment | ✅ `routes/sentiment.ts` (LLM-based) |
-| **ValuePropositionController** | generate content endpoints | AI-generated value props | — | ✅ `routes/value-proposition.ts` |
-
-### Dashboard & Admin
-
-| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
-|-------------------|-------|---------------|-----------|-------------|
-| **UserDashboardController** | `GET /api/userdashboard/jobseeker` | Role-specific metrics | JobApplications, SavedJobs | ✅ `routes/dashboard.ts` |
-| | `GET /api/userdashboard/recruiter` | Recruiter metrics | TalentPools, Submissions | ✅ |
-| | `GET /api/userdashboard/employer` | Employer metrics | Jobs, Applications | ✅ |
-| | `POST /api/userdashboard/profile-view` | Track profile view | ProfileViews | ✅ |
-| | `POST /api/userdashboard/activity` | Log user activity | ActivityLogs | ✅ |
-| | `GET /api/userdashboard/engagement` | Engagement metrics | UserEngagementMetrics | ✅ |
-| **ProductDashboardController** | `GET /api/productdashboard/saas-metrics` | MRR, churn, ARR | Subscriptions, Invoices | ⚠️ Admin routes exist; SaaS metrics calculation not confirmed — see Gap Register #39 |
-| | `GET /api/productdashboard/time-series/:metric` | Time-series analytics | ActivityLogs | ⚠️ Not confirmed implemented — see Gap Register #39 |
-| | `POST /api/productdashboard/refund-requests/:id/approve` | Admin approve refund | RefundRequests | ✅ `routes/admin.ts` |
-| | `POST /api/productdashboard/cancellation-requests/:id/approve` | Admin approve cancellation | RefundRequests | ✅ |
-| **AffiliateController** | `GET /api/affiliate/profile` | Affiliate profile | AffiliateProfiles | ✅ `routes/affiliates.ts` |
-| | `GET /api/affiliate/dashboard` | Earnings, referrals | AffiliateReferrals, AffiliateConversions | ✅ |
-| | `POST /api/affiliate/payout/request` | Request payout | AffiliatePayouts | ✅ |
-| | Admin endpoints | All affiliate admin actions | AffiliateProfiles, AffiliatePayouts | ✅ |
-
-### Settings, Password & Utilities
-
-| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
-|-------------------|-------|---------------|-----------|-------------|
-| **SettingsController** | All settings CRUD | Notification, privacy, job, account, security prefs | AccountPreferences, JobPreferences | ✅ `routes/settings.ts` |
-| | `GET /api/settings/export` | GDPR data export | All user tables | ✅ Returns JSON bundle |
-| **PasswordManagementController** | `GET /api/passwordmanagement/requirements` | Password policy | — | ✅ `routes/password-management.ts` |
-| | `POST /api/passwordmanagement/validate-strength` | Strength check | — | ✅ |
-| | `POST /api/passwordmanagement/validate-history` | Check against past passwords | PasswordHistory | ❌ Not implemented in TS API |
-| | `GET /api/passwordmanagement/is-expired` | Check expiration | Users | ❌ Not implemented in TS API |
-| | `POST /api/passwordmanagement/force-change` | Admin force reset | Users | ✅ |
-| **TaskController** | Task CRUD | Create/update/delete tasks | Tasks | ✅ `routes/task.ts` |
-| **UploadController** | File uploads | S3/R2 upload with validation | — | ✅ `routes/upload.ts` |
-| **MarketingController** | `GET /api/marketing/campaigns` | Campaign listing | — | ⚠️ Stub in TS API — see Gap Register #38 |
-| | `POST /api/marketing/leads` | Capture lead | — | ⚠️ Stub in TS API — see Gap Register #38 |
-| **FeatureFlagController** | `GET /api/featureflag` | Feature flag states | — | ✅ `routes/featureflag.ts` (static) |
-| **SearchController** | `GET /api/search/public` | Multi-entity search | ResumeInformation, Jobs, UserProfiles, CompanyProfiles | ✅ `routes/search.ts` |
-| **YouTubeController** | YouTube OAuth + publish | YouTube API integration | YoutubeAccounts | ✅ `routes/youtube.ts` |
-| **ExportController** | `GET /api/export/csv` | CSV export | — | ❌ Not implemented (TS export returns JSON only) |
-| | `GET /api/export/excel` | Excel export via OpenXml | — | ❌ Not implemented |
-| **ChromeController** | `POST /api/chrome/createjobbestmatch` | **DEPRECATED** (marked Obsolete) | — | ✅ Replaced by `/api/match/*` |
-| **InterviewController** | Interview sessions CRUD | Session tracking, answer analysis | InterviewSessions, InterviewAnswers | ✅ `routes/interview.ts` |
-
-### Coverage Summary
-
-| Domain | Legacy Endpoints | TS Covered | Partial | Missing |
-|--------|-----------------|------------|---------|---------|
-| Auth & Account | ~25 | 23 | 0 | 2 (OData only) |
-| Resume | ~30 | 27 | 1 | 2 (diff, bulk export) |
-| Jobs & Matching | ~20 | 20 | 0 | 0 |
-| Video & Studio | ~10 | 10 | 0 | 0 |
-| Users & Social | ~20 | 19 | 1 | 0 |
-| Companies | ~7 | 7 | 0 | 0 |
-| Recruiter | ~15 | 12 | 0 | 3 (bulk ops, CSV export) |
-| Communication | ~18 | 18 | 0 | 0 |
-| Billing | ~10 | 8 | 1 | 3 (Stripe webhook/intent/save) |
-| AI Features | ~20 | 18 | 0 | 2 (industries endpoint, AI rate limiter) |
-| Dashboard & Admin | ~20 | 16 | 4 | 0 |
-| Settings & Utilities | ~20 | 14 | 2 | 4 (password history, export CSV/xlsx, is-expired) |
-| **Total** | **~215** | **~192 (89%)** | **~9 (4%)** | **~14 (7%)** |
-
-### Can the legacy project be removed?
-
-**Short answer: Not yet — Stripe is the blocker.**
-
-The TypeScript API covers ~89% of the legacy surface area. All remaining legacy-parity gaps are tracked in the [Consolidated Gap Register](#consolidated-gap-register) (`legacy-parity` type). The Stripe blocker items below have since been resolved.
-
-| Missing | Risk | Status |
-|---------|------|--------|
-| `POST /payment/stripe/webhook` | **🔴 High** | ✅ Implemented |
-| `GET /payment/public-key` | **🔴 High** | ✅ Implemented |
-| `POST /payment/setup-intent` | **🔴 High** | ✅ Implemented |
-| `POST /payment/save-payment-method` | **🔴 High** | ✅ Implemented |
-| `GET /api/export/csv` + `GET /api/export/excel` | 🟡 Medium | Open — see Gap Register #31 |
-| Recruiter bulk ops (`bulk/tags`, `bulk/status`, `bulk/delete`) | 🟡 Medium | Open — see Gap Register #32 |
-| `GET /api/recruiter/talent-pool/export` | 🟢 Low | Open — see Gap Register #33 |
-| `POST /api/passwordmanagement/validate-history` | 🟢 Low | Open — see Gap Register #34 |
-| `GET /api/passwordmanagement/is-expired` | 🟢 Low | Open — see Gap Register #35 |
-| `GET /api/resume/:id/diff` | 🟢 Low | Open — see Gap Register #36 |
-| Chrome extension endpoints (`ChromeController`) | ✅ None — marked `[Obsolete]` in legacy | Fully replaced by `/api/match/*` |
-| OData endpoints (ApplicationUsers/Roles) | ✅ None | Not needed for edge runtime |
-
-**Checklist to safely delete `/myvideoresume-api`:**
-
-- [x] ✅ `GET /api/payment/public-key` — returns `STRIPE_PUBLISHABLE_KEY` env var
-- [x] ✅ `POST /api/payment/setup-intent` — creates Stripe SetupIntent, returns `clientSecret`
-- [x] ✅ `POST /api/payment/save-payment-method` — attaches PM to customer, upserts to DB, sets default
-- [x] ✅ `POST /api/payment/stripe/webhook` — signature verified; handles `subscription.created/updated/deleted`, `invoice.payment_succeeded/failed`, `payment_method.attached/detached`, `payout.paid/failed`; records affiliate conversions
-- [ ] (Optional) Add CSV serialisation to `/api/settings/export`
-
-**The legacy project can now be safely deleted once Stripe secrets are configured.**
-
-Configure secrets:
-```bash
-wrangler secret put STRIPE_PUBLISHABLE_KEY    # pk_live_...
-wrangler secret put STRIPE_SECRET_KEY         # sk_live_...
-wrangler secret put STRIPE_WEBHOOK_SIGNING_KEY # whsec_...
-```
-
-Register webhook in Stripe dashboard → Developers → Webhooks:
-- **URL:** `https://api.hired.video/api/payment/stripe/webhook`
-- **Events:** `customer.subscription.*`, `invoice.payment_succeeded`, `invoice.payment_failed`, `payment_method.attached`, `payment_method.detached`, `payout.paid`, `payout.failed`
-
----
+The full legacy-parity coverage map (every `/myvideoresume-api` controller → TS route/service/table, ~89% covered, plus the "can the legacy project be removed?" analysis) now lives in **[DONE.md](DONE.md)**. Remaining legacy-parity gaps are tracked in the [Consolidated Gap Register](#consolidated-gap-register) (`legacy` type).
 
 ## Payment Provider Abstraction
 
@@ -2541,7 +1846,7 @@ Dispatch guide for running **multiple agents concurrently** without them touchin
 
 **How to dispatch:** give each agent ONE track + its own worktree, then tell it: own track <TKn>, edit only files under its Owned paths, take the next migration number from its reserved block, pick work by filtering the Consolidated Gap Register for the track keywords, and update only your own rows. The keyword/path filter - not a frozen ID list - is the source of truth.
 
-**Columns:** *Active* = open gaps left · *Done* = archived ✅ items classified to the track · **% Complete = Done / (Done + Active)** (how far along the track is, NOT a share-of-remaining). Recomputed 2026-06-20 (the re-tier pass re-classified every active **and** archived row with one keyword/path/anchor pass, so Active comes from the register's `### TKn` groups and Done from the same classifier over [DONE.md](DONE.md); reconciles exactly to the machine-counted 722 active / 579 done); all gap IDs globally unique.
+**Columns:** *Active* = open gaps left · *Done* = archived ✅ items classified to the track · **% Complete = Done / (Done + Active)** (how far along the track is, NOT a share-of-remaining). Recomputed 2026-06-20 (the re-tier pass re-classified every active **and** archived row with one keyword/path/anchor pass, so Active comes from the register's `### TKn` groups and Done from the same classifier over [DONE.md](DONE.md); reconciles exactly to the machine-counted 723 active / 579 done); all gap IDs globally unique.
 
 | ID | Track | Active | Done | % Complete | Reserved migrations | Owned paths | Themes / keyword filter |
 |----|-------|-------:|-----:|-----------:|---------------------|-------------|--------------------------|
@@ -2555,8 +1860,8 @@ Dispatch guide for running **multiple agents concurrently** without them touchin
 | **TK8** | **people-social** - People, Profile, Social & CHRO | 44 | 30 | 41% | `0440-0459` | `api/src/routes/people*`, `api/src/services/people/**`, `api/src/services/social*/**`, `api/src/services/feed/**`, `api/src/services/location/**`, `frontend/pages/People*`, `frontend/components/feed/**` | people/profile sections, social feed/posts, connections, CHRO roster/org-chart/1:1, geo tagging |
 | **TK9** | **admin-rbac** - Admin, RBAC & SuperAdmin | 18 | 37 | 67% | `0460-0479` | `api/src/routes/superadmin*`, `api/src/routes/admin*`, `api/src/services/admin/**`, `api/src/services/access/**`, `frontend/pages/admin/**` | superadmin tools, role-feature-access manifest, impersonation/permission debugger, usage tracking |
 | **TK10** | **integrations-comms** - Integrations, Email & Notifications | 67 | 35 | 34% | `0480-0499` | `api/src/services/email*/**`, `api/src/services/messaging/**`, `api/src/services/notifications/**`, `api/src/routes/push*`, `api/src/services/enrichment/**`, `api/src/services/workforce/connectors/**` | email sync (Gmail/Outlook), push/notifications, inbox processors, e-sign/Xero/enrichment connectors |
-| **TK11** | **frontend-ux-i18n** - Frontend Chrome, SEO & i18n | 22 | 18 | 45% | `0500-0519` | `frontend/components/ui/**`, `frontend/components/layout/**`, `frontend/lib/seo.ts`, `frontend/public/locales/**`, `shared/i18n.ts` (NOT domain pages - those belong to their domain track) | page-chrome (AppShell/useSEO/breadcrumbs), i18n/locale catalogs, dashboard shells, mobile nav |
-| | **TOTAL** | **722** | **579** | **45%** | | | |
+| **TK11** | **frontend-ux-i18n** - Frontend Chrome, SEO & i18n | 23 | 18 | 44% | `0500-0519` | `frontend/components/ui/**`, `frontend/components/layout/**`, `frontend/lib/seo.ts`, `frontend/public/locales/**`, `shared/i18n.ts` (NOT domain pages - those belong to their domain track) | page-chrome (AppShell/useSEO/breadcrumbs), i18n/locale catalogs, dashboard shells, mobile nav |
+| | **TOTAL** | **723** | **579** | **45%** | | | |
 
 **Where to find each track's gaps:** as of the 2026-06-20 re-tier pass the Consolidated Gap Register below is **physically grouped by these tracks** — every active gap lives under its `### TKn` heading, with its prior revenue tier preserved in the `Rev` column. To pick up a track, read its section in the register directly (no keyword filtering needed); the per-track counts in the table above are the authoritative active/done split.
 
@@ -2585,7 +1890,7 @@ Touched by many tracks. An agent that must edit one should **append only** (neve
 
 <!-- gap-register-totals:START -->
 <!-- AUTO-GENERATED by api/scripts/recount-gap-register.mjs — run `--write` to refresh; do not hand-edit. -->
-**Automated register totals:** 722 active — 699 Open · 23 Partial · 0 Done · 0 Removed · 0 Wontfix · 722 rows · 0 duplicate id(s)
+**Automated register totals:** 718 active — 695 Open · 23 Partial · 1 Done · 0 Removed · 0 Wontfix · 719 rows · 0 duplicate id(s)
 <!-- gap-register-totals:END -->
 
 Single source of truth for **open + partial** items. Add a new entry to the bottom of the value tier it belongs to (see **Ordering** below); status changes happen in place — when an item ships, move its row to the Resolved archive in **[DONE.md](DONE.md)**. The shipped-capability summary and every `✅ Done` / Removed / Won't-fix / Superseded row now live in **[DONE.md](DONE.md)** (gap IDs stay globally unique across both files, so `#NNNN` references still resolve).
@@ -2596,7 +1901,7 @@ Single source of truth for **open + partial** items. Add a new entry to the bott
 
 **Ordering (re-tiered 2026-06-20):** active entries are now grouped by **isolation track** — **TK1 platform-infra … TK11 frontend-ux-i18n** (see the Isolation Tracks table above for each track's owned paths + reserved migration block) — then sorted within each track by Priority → Phase → id. This makes the top-level groups **actionable and file-disjoint**: an agent can take one `### TKn` section and work it in its own worktree without colliding with another track. The old revenue tier (T1 Direct Revenue · T2 Conversion · T3 Retention · T4 Cost/Quality) is preserved per-row in the **`Rev`** column so prioritisation by revenue is still possible (sort/filter on `Rev`). Resolved items (✅ Done / Removed / Won't-fix / Superseded) live in [DONE.md](DONE.md). Both the track and the Rev tier are heuristic (type + title + path keywords); move a row by editing its `### TKn` placement or `Rev` cell if a call is wrong.
 
-**Current totals (re-tiered 2026-06-20): 722 active, now grouped by isolation track — TK1 62 · TK2 50 · TK3 92 · TK4 241 · TK5 44 · TK6 41 · TK7 41 · TK8 44 · TK9 18 · TK10 67 · TK11 22 — plus 579 ✅ Done and 15 closed/superseded archived in [DONE.md](DONE.md). Overall completion = Done / (Done + active) = 579/1301 = 45%**. Per-track % Complete (Done/(Done+Active), reconciled against [DONE.md](DONE.md)): TK1 52% · TK2 47% · TK3 43% · TK4 35% · TK5 41% · TK6 66% · TK7 45% · TK8 41% · TK9 67% · TK10 34% · TK11 45%. (2026-06-20 re-tier pass: replaced the four revenue tiers as the register's primary grouping with the TK1–TK11 disjoint-path tracks so each top-level group is independently actionable; revenue tier preserved per-row in the new `Rev` column; classified all 722 active + 579 done rows in one keyword/path/anchor pass; un-glued 6 gap rows that were concatenated into adjacent note cells and therefore invisible to the old line-based recount (the ✅ #1176 row was archived to [DONE.md](DONE.md); the other 5 were active Tier-2 rows, so the true active count rose 717 → 722 and the old `Tier 2 — 68 items` heading was really 73); taught `recount-gap-register.mjs` to find the status cell after the new `Rev` column. Earlier 2026-06-20 pass had extracted the Resolved archive + shipped-capability summary into [DONE.md](DONE.md).) All gap IDs are globally unique; the Done archive is sorted by id ascending.
+**Current totals (re-tiered 2026-06-20): 723 active, now grouped by isolation track — TK1 62 · TK2 50 · TK3 92 · TK4 241 · TK5 44 · TK6 41 · TK7 41 · TK8 44 · TK9 18 · TK10 67 · TK11 23 — plus 579 ✅ Done and 15 closed/superseded archived in [DONE.md](DONE.md). Overall completion = Done / (Done + active) = 579/1302 = 45%**. Per-track % Complete (Done/(Done+Active), reconciled against [DONE.md](DONE.md)): TK1 52% · TK2 47% · TK3 43% · TK4 35% · TK5 41% · TK6 66% · TK7 45% · TK8 41% · TK9 67% · TK10 34% · TK11 44%. (2026-06-20 re-tier pass: replaced the four revenue tiers as the register's primary grouping with the TK1–TK11 disjoint-path tracks so each top-level group is independently actionable; revenue tier preserved per-row in the new `Rev` column; classified all 723 active + 579 done rows in one keyword/path/anchor pass; surfaced 7 previously-hidden gap rows that had been concatenated into adjacent note cells and so were invisible to the old line-based recount (the ✅ #1176 row was archived to [DONE.md](DONE.md); 5 were active Tier-2 rows — so the old `Tier 2 — 68 items` heading was really 73 — and #2217 surfaced when the README was re-saved, lifting the true active count 717 → 723); taught `recount-gap-register.mjs` to find the status cell after the new `Rev` column. Earlier 2026-06-20 pass had extracted the Resolved archive + shipped-capability summary into [DONE.md](DONE.md).) All gap IDs are globally unique; the Done archive is sorted by id ascending.
 
 
 ### TK1 — platform-infra — Platform, Migrations, Perf & Arch (COORDINATOR) — 62 active
@@ -2857,7 +2162,7 @@ Single source of truth for **open + partial** items. Add a new entry to the bott
 | 890 | T3 | 🔲 Open | Now | P2 | `feature` | **Templates Creator Program shipped (#890), but there is still no user-facing "create a resume / job template" surface — opting in lights up the marketplace pitch, not an authoring tool** (opened 2026-05-20 — surfaced wiring the new `templates_active` flag in migration 0098) | New 6th Creator Program (`templates`, [shared/creator-programs.ts](hired.video/shared/creator-programs.ts), terms doc + `templates_active` column in [0098_templates_creator_program.sql](hired.video/api/drizzle/0098_templates_creator_program.sql), program card on `/services/creator`, exposed on `creatorPrograms.templates` from `GET /api/users/:id`). Toggling it on currently lands the user on `/search?category=templates` (the consumer-side marketplace) because there's no `/templates/mine` manager today. Studio video templates can be published via [PublishAsTemplateDialog](hired.video/frontend/components/studio/PublishAsTemplateDialog.tsx) inside `/studio`, but resume + job templates — which is what the user copy promises — have no authoring entry point at all. Fix: (a) build a `/templates/mine` page listing the user's resume + job + studio templates (one screen, three kinds via the existing `template_licenses.templateKind` discriminator), (b) "New template" CTAs that route into the existing resume + job builders with a `mode=template` query param so the save path writes a marketplace row instead of a personal draft, (c) flip `CREATOR_PROGRAM_HOME.templates` from `/search?category=templates` to `/templates/mine` once the page lands. Unblocks: the new opt-in actually leads somewhere creators can publish. Pairs with #866 (resume templates aren't surfaced on the public profile either). |
 | 891 | T4 | 🔲 Open | Now | P2 | `bug` | **`PublishAsTemplateDialog` + `StudioTemplatesService.assertCreatorVideoActive` still gate the studio-template publish path on `videoActive` instead of the new `templatesActive` program flag** (opened 2026-05-20 — surfaced wiring the templates program in #890) | The studio-template marketplace was originally folded into the Video Promo program because there was no dedicated Templates program. With #890's Templates program landed, the gate should move: [`StudioTemplatesService.assertCreatorVideoActive`](hired.video/api/src/services/studio/StudioTemplatesService.ts) (and its caller in [PublishAsTemplateDialog](hired.video/frontend/components/studio/PublishAsTemplateDialog.tsx) — `isVideoCreator = profile?.videoActive === true`) need to read `templatesActive` instead, and the "Become a creator — Video" pitch copy needs to flip to "Enable the Templates program". Renamed helper: `assertCreatorTemplatesActive`. Migration shape: backfill `templates_active = video_active` for any existing creator-row in a follow-up SQL so today's video creators don't lose template publishing on the cutover. Holding the gate flip until the manager from #890 exists so users have somewhere to opt-in from outside the dialog. Unblocks: clean separation between "I sell promo videos" and "I publish templates" — the two product lines diverge on every other axis already. |
 | 1917 | T3 | ⚠️ Partial | Now | P2 | `feature` | **Studio landing becomes the single entry point for ALL content (document entities added to the catalog)** (opened 2026-06-06 with #1912) | [StudioLanding](hired.video/frontend/pages/studio/StudioLanding.tsx) + the [TEMPLATE_CATALOG](hired.video/frontend/components/studio/templates/catalog.tsx) today list only media kinds (video/podcast/comic/…). Add the `document` entities (resume / job / article / blog) as creatables so the landing shows everything a user can make; selecting one routes into the document canvas seeded with that entity's input template (#1916) — and for resume, a template pick + master/variant selection. Supersedes the narrower "Resume creatable" note in #1912. Unblocks: discoverability of the unified create flow + the "all edit goes to studio" redirect targets (#1915). **Landed 2026-06-06 (user report: "studio lets me create jobs/resumes but doesn't show the available resume/job templates"):** (1) `TemplateDef` gained `documentEntityKind?` and `template-dispatch` now seeds `DocumentState.entityKind` from it (was hard-coded `"resume"`); (2) NEW `job_doc` catalog entry (mediaKind `document`, entity `job`, audiences recruiter/employer) so a JOB POSTING is creatable as a document — distinct from the `job_ad` VIDEO; (3) the **design-template galleries are now surfaced INSIDE the editor**: [document-templates.ts](hired.video/frontend/lib/studio/editor-v2/document-templates.ts) normalizes both the resume ([resume-template.ts](hired.video/frontend/types/resume-template.ts)) and job ([job-template.ts](hired.video/frontend/types/job-template.ts)) descriptor families to ONE `DocumentTemplateOption` (the common spine #1914c wants) + `applyDocumentTemplate()` (structure-only: swaps page-0 flow blocks + theme, preserves entityId/overlays/content); [DocumentTemplatePicker](hired.video/frontend/components/studio/document/DocumentTemplatePicker.tsx) (self-gating dialog — renders nothing for article/blog which have no descriptor library) mounted in the [DocumentStage](hired.video/frontend/components/studio/document/DocumentStage.tsx) toolbar; (4) the "Add block" palette is now entity-aware via `blockPresetsForEntity()` in [document-edit.ts](hired.video/frontend/lib/studio/editor-v2/document-edit.ts) (job sections for jobs, no longer always resume sections). Unit tests in [document-templates.test.ts](hired.video/frontend/lib/studio/editor-v2/__tests__/document-templates.test.ts) (8, green); tsc clean. **Deferred (logged, not done this pass):** (a) applying a template adopts theme + sections but the minimal `DocumentStage` renderer only reflects the FONT, not the theme COLORS / heading style / card style / density — full-fidelity needs the generalized `DeclarativeResumeRenderer` (#1912); (b) `descriptor.layout.columns`/`sidebar` (the 2-column print layouts) is NOT applied — all blocks land in the single flow plane; mapping sidebar blocks to absolute/column boxes is follow-on; (c) template pick is IN-EDITOR only — not yet offered at creation time on StudioLanding (the "+ master/variant selection" part of this gap); (d) job documents apply STATIC frontend descriptors only — no `template_licenses` DB rows / publish path for jobs (#1914b); (e) with `entityContent` still null (#1920), applied resume/job sections render "No <section> yet" placeholders until content-binding lands. |
-| 1947 | T1 | 🔲 Open | Now | P2 | `feature` | **Resume-feedback in-studio annotation layer (frontend)** (opened 2026-06-07 with #1946) | The backend is live but nothing renders it. Build the studio review surface against the document canvas: a sticky-note overlay layer (positioned via the same 0..1 `WidgetPosition` math, anchored by `CanvasAnchor`), text-highlight selection → `ContentAnchor` (sectionKey + stable item `referenceId` + quote), a review sidebar (annotation thread, filter by status, accept/dismiss/resolve), suggested-edit accept (calls `POST /api/resume-feedback/annotations/:aid/accept`), and a proposed-draft diff/accept view. Reviewer entry via `GET /api/resume-feedback/link/:token`. Annotations are a SEPARATE review layer over the resume, NOT `DocumentOverlay` widgets (those print). Unblocks the entire user-visible feature. |
+| 1947 | T1 | ⚠️ Partial | Now | P2 | `feature` | **Resume-feedback in-studio annotation layer (frontend)** (opened 2026-06-07 with #1946) | The backend is live but nothing renders it. Build the studio review surface against the document canvas: a sticky-note overlay layer (positioned via the same 0..1 `WidgetPosition` math, anchored by `CanvasAnchor`), text-highlight selection → `ContentAnchor` (sectionKey + stable item `referenceId` + quote), a review sidebar (annotation thread, filter by status, accept/dismiss/resolve), suggested-edit accept (calls `POST /api/resume-feedback/annotations/:aid/accept`), and a proposed-draft diff/accept view. Reviewer entry via `GET /api/resume-feedback/link/:token`. Annotations are a SEPARATE review layer over the resume, NOT `DocumentOverlay` widgets (those print). Unblocks the entire user-visible feature. **Landed 2026-06-20 (TK4 unified-document-canvas pass):** full vertical slice wired end-to-end — (1) SSoT `ResumeReviewDetailDTO`/`ReviewRole` added to [shared/resume-feedback.ts](hired.video/shared/resume-feedback.ts); backend `ReviewDetail` aliased to it (no drift); (2) frontend [resume-feedback-service.ts](hired.video/frontend/lib/services/resume-feedback-service.ts) covering ALL `/api/resume-feedback/*` endpoints (reviews/annotations/proposals, `?token=` for share-link guests) + shared [use-resume-review.ts](hired.video/frontend/hooks/use-resume-review.ts) hook (loads by id OR token, every mutation refetches the detail so the surface never goes stale); (3) [AnnotationLayer](hired.video/frontend/components/studio/review/AnnotationLayer.tsx) — separate overlay plane (never prints): sticky-note pins placed at 0..1 `CanvasAnchor` fractions, text-selection→`ContentAnchor` (sectionKey resolved from the new `data-annot-section` attrs the canonical [DeclarativeResumeRenderer](hired.video/frontend/components/resume-renderer/DeclarativeResumeRenderer.tsx) now emits, + quote), `flashQuoteInContainer` TreeWalker locate-on-click; (4) [ReviewSidebar](hired.video/frontend/components/studio/review/ReviewSidebar.tsx) — thread list + status filter, owner accept/dismiss/resolve, **suggested-edit diff + accept** (applies to the resume), proposed-draft **accept/reject**, general-comment composer, lifecycle (reviewer Submit / owner Complete·Cancel), owner copy-reviewer-link; (5) [ResumeReviewPage](hired.video/frontend/pages/ResumeReviewPage.tsx) renders the resume read-only through the ONE canonical renderer (preview === review) with the overlay + rail; routes `/resume-review/:reviewId` (owner) + `/r/:token` (reviewer, unauth-capable) in [App.tsx](hired.video/frontend/App.tsx); owner entry = a "Get feedback" button on [ResumeDetail](hired.video/frontend/pages/ResumeDetail.tsx) that self-shares + opens the review. tsc + eslint clean both projects. **Remaining (logged):** (a) annotation body entry for sticky/highlight uses `window.prompt` — replace with an inline popover composer (no-alert); (b) reviewer cannot AUTHOR a structured `suggestedEdit` (sectionKey+fieldPath+after) from the UI yet — owner-side accept works, but nothing on the frontend creates one, so suggested-edit accept only fires on edits seeded elsewhere; (c) reviewer cannot author a full **proposed draft** (no in-review editor) — owner accept/reject of proposals works, but the proposal has no DIFF view of the draft content vs current; (d) highlights store the quote but draw no PERSISTENT visual highlight mark over the matched text (only a flash-on-click) — needs DOM range marking that survives re-render; (e) NOT runtime-verified in a browser (no live DB harness this pass). |
 | 274 | T3 | 🔲 Open | Soon | P2 | `feature` | **Company page InteractiveCanvas integration** | Add `interactive?: InteractiveCanvas` to `companyProfiles.description` adjacent metadata + drop `<InteractiveCanvasEditor>` into `CompanyEditForm` and `<InteractiveCanvasView>` into `CompanyDetail`. Lets employers embed an interactive demographics chart, welcome webcam, etc. on the public company page. Permission: company-owner-only edit. |
 | 275 | T3 | 🔲 Open | Soon | P2 | `feature` | **Profile + Job page InteractiveCanvas integration** | Same drop-in pattern for `userProfiles` (per-section: About / Skills / Headline) editable via existing `EditAboutDialog` etc., and for `jobItems.description` editable via `JobEditForm`. Owner-gated. Closes the cross-host rollout opened by #272. |
 | 374 | T4 | 🔲 Open | Soon | P2 | `quality` | **Resume analyzer LLM emits free-form `category` strings — frontend has to keyword-match to pick a wand** (2026-05-05) | The merged `services/resume/analyze.ts` system prompt asks the LLM for `{ severity, category, title, description, impact }` per recommendation. Categories are free text ("ats" / "keywords" / "format" / "content" / "impact" / "structure"); no structured `{ actionId, args }` is emitted alongside. Consequence: `frontend/lib/tools/find-wand-for-recommendation.ts` has to keyword-match `title + description` to dispatch the right wand (`consolidate_section_highlights`, `standardize_resume_dates`, `shorten_bullet`), so action coverage is fragile and depends on the LLM phrasing the imperative consistently. Fix: extend `ResumeRecommendationSchema` (`shared/tool-schemas.ts`) with optional `actionId: z.enum([...registered tool ids])` + `actionArgs: z.record(z.unknown())`; update the analyzer prompt to emit them when the recommendation maps to a known wand; resolver becomes `rec.actionId ?? findWandForRecommendation(...)`. Unblocks: Action button works for *every* category covered by a registered wand without prompt-tuning the keyword matcher. Identified 2026-05-05 during the Scorer/Optimizer collapse. |
@@ -2895,11 +2200,7 @@ Single source of truth for **open + partial** items. Add a new entry to the bott
 | 1996 | T4 | 🔲 Open | Soon | P2 | `feature` | **Voice-clone consent attestation + provenance disclosure + publish moderation** (opened 2026-06-13, PRD §5) | `POST /voice-clones` requires an explicit "my voice / I have permission" attestation → persist `consent_attested_at` + `consent_text_version` on `studio_voice_clones` (ToS §9a). Public listings route through `moderationService` before going live (impersonation = takedown category); cloned-voice exports carry an AI-generated disclosure. Legal/abuse gate before GA. |
 | 2050 | T2 | 🔲 Open | Soon | P2 | `bug` | **`PublishDestinationId` for `tiktok`/`youtube-shorts`/`instagram-reels`/`instagram-feed`/`x-post`/`facebook-page` are not in the registry, and the `studio_project_publications.destination` CHECK must be ALTERed to admit them** (found 2026-06-13 during the social-publishing PRD pass, #2043) | [shared/media-kinds.ts](hired.video/shared/media-kinds.ts) `PUBLISH_DESTINATIONS` stops at YouTube/LinkedIn/profile + per-kind niche destinations — no social-short surfaces exist, so the Studio publish menu can't even *render* a TikTok/Reels row. Fixing requires (a) extending the `PublishDestinationId` union + array, and (b) an idempotent ALTER of the `studio_project_publications` destination CHECK constraint (per #1625) so publication rows for the new ids persist. Bundled into Phase 2 (#2045) but logged separately as the concrete schema-drift item. |
 | 2101 | T2 | 🔲 Open | Soon | P2 | `feature` | **Resume canvas EDITING surface still edits in single-column fields — declarative columns only show in preview/view/print** (opened 2026-06-07 with the render-engine unification) | The studio preview, the `/resumes/:id` view, and the PDF export now all render resumes through ONE engine — `DeclarativeResumeRenderer` (columns, themes, hero, per-section layout) — via the new `DocumentState`→descriptor bridge ([resume-document-descriptor.ts](hired.video/frontend/lib/studio/document/resume-document-descriptor.ts) + [ResumeDocumentView.tsx](hired.video/frontend/components/studio/document/ResumeDocumentView.tsx); [DocumentPagedView](hired.video/frontend/components/studio/document/DocumentPagedView.tsx) delegates resume docs to it, [exportDocument](hired.video/frontend/lib/studio/document/export-document.ts) routes resume print through the in-app declarative PDF route, and [ResumeDetail.tsx](hired.video/frontend/pages/ResumeDetail.tsx) renders one declarative path). This closes "preview doesn't look like the viewer." **Residuals not done this pass:** (1) the EDITING canvas ([DocumentStage](hired.video/frontend/components/studio/document/DocumentStage.tsx) "One Page" mode) is still the generic single-column field editor — it does NOT show the two-column declarative layout WHILE editing, so edit≠preview for columned templates (the original #1912/#1916 "full-fidelity inline section rendering" goal — see DocumentStage header comment). (2) **Free-form canvas blocks (`text`/`image`/`divider`/`spacer`) the user adds on a RESUME doc are dropped from the declarative render** — the bridge only maps section/component blocks (the descriptor model has no free blocks). Resumes are structured so this is acceptable, but it IS render-time data loss to record. (3) The "One Page | Individual Pages" toggle is now a no-op for resumes (the declarative render is a responsive flow, not a fixed sheet), so true per-page (multi-page) preview/zoom of a resume is gone — the windowing engine only slices the generic `DocumentView`. Unblocks: true WYSIWYG columned editing + multi-page resume preview + custom block support inside the declarative engine. |
-| 2212 | T2 | ⚠️ Partial | Now | P2 | `feature` | **Anonymous Studio adoption + in-place conversion gate (let signed-out visitors create, gate Save/Publish/Export, claim the draft on auth)** (shipped 2026-06-20) | Adoption play: unauthenticated visitors can now BUILD in [StudioEditorV2](hired.video/frontend/pages/studio/v2/StudioEditorV2.tsx) on the `/studio/new` draft (the marketing Landing CTAs route there with `?contentTemplate=resume`), with only the value-capture actions gated. New reusable seam: [useAuthGate](hired.video/frontend/components/auth/useAuthGate.tsx) + [AuthGatePanel](hired.video/frontend/components/auth/AuthGatePanel.tsx) host the SAME [LoginForm](hired.video/frontend/components/auth/LoginForm.tsx)/[SignupForm](hired.video/frontend/components/auth/SignupForm.tsx) cores the `/login`+`/signup` pages were refactored onto (DRY). `handleSave`/`handlePublishToProfile`/`handleExport` call `gateAction(...)`; on Sign-in the same handler re-runs in place (authedRef latch) and the draft persists into a real owned project; on Sign-up the [anon-conversion](hired.video/frontend/lib/studio/anon-conversion.ts) module stamps a pending claim + `?claim=1` redirect so the editor finishes the claim after the email-verify round-trip. Funnel (enter/edit/gate/convert) rides the existing `usage_sessions` (hv_visitor_id→user_id auto-links on auth) tagged `studio.anon-create`. documentState now autosaves so anon resume/job drafts survive too. tsc clean. **Residuals: #2213–#2216 below.** |
-| 2213 | T2 | 🔲 Open | Soon | P2 | `feature` | **Anon Studio funnel + visitor→user claim-link both depend on analytics consent** (opened 2026-06-20 with #2212) | The conversion funnel events AND the `hv_visitor_id` that links the pre-signup session to the new account are gated on stored analytics consent ([usage-tracker.ts](hired.video/frontend/lib/usage-tracker.ts) `consented()` + GPC). A visitor who never accepted analytics cookies generates no `usage_sessions` row, so the "session we then help convert" the product asked for is invisible for them (the in-localStorage draft + claim still work; only the server-side funnel/attribution is missing). Fix: surface a lightweight consent prompt on Studio entry, OR record a consent-independent minimal anon-create funnel (count only, no visitor id) so adoption is measurable regardless. Unblocks: complete funnel coverage + visitor→user attribution for non-consenting visitors. |
-| 2214 | T2 | 🔲 Open | Soon | P3 | `bug` | **In-editor server-touching actions are NOT behind the anon gate — they error instead of prompting sign-up** (opened 2026-06-20 with #2212) | #2212 gates Save/Publish/Export, but the Studio editor has many other actions that call authed endpoints (AI image/scene generation, résumé upload/import, voiceover/TTS, stock-media, save-image-to-library). For a signed-out visitor these now fire and fail with a 401/error toast rather than opening the [useAuthGate](hired.video/frontend/components/auth/useAuthGate.tsx) panel. Fix: route every server-mutating action in [StudioEditorV2](hired.video/frontend/pages/studio/v2/StudioEditorV2.tsx) through `gateAction(...)` (or disable/annotate them while anon). Unblocks: a coherent "everything that needs an account prompts for one" experience instead of ad-hoc failures. |
-| 2215 | T2 | 🔲 Open | Later | P3 | `feature` | **Off-platform publishes fall through the generic Save gate — resumed action only saves, not the full publish** (opened 2026-06-20 with #2212) | YouTube/LinkedIn/Download for a signed-out visitor reach the gate via `ensureRendered()`→`handleSave()`, so the panel shows the "save" reason and the post-auth resume runs `handleSave` (saves the draft) rather than the original publish/download. Fix: wrap `handlePublishToYouTube`/`handlePublishToLinkedIn`/`handleDownloadLocal`/`ensureRendered` in their own `gateAction("publish"/"export", …)` so the resumed action completes the intended destination. Low priority (Save/Publish-to-profile are the primary anon CTAs). Unblocks: off-platform publish completing in one post-auth step. |
-| 2216 | T2 | 🔲 Open | Later | P3 | `quality` | **Anon Studio: reuse useAuthGate on other entry points + verify editor chrome for signed-out users + single-draft slot** (opened 2026-06-20 with #2212) | Follow-ups to the #2212 seam: (1) the [useAuthGate](hired.video/frontend/components/auth/useAuthGate.tsx) hook is generic — wire it into other "try then convert" surfaces (AI tools, interview practice) beyond the studio editor; (2) the editor mounts `<Navigation/>`+`<Sidebar/>` (app chrome built for authed users) for anon now — needs real-browser verification that no signed-out affordance breaks (per [feedback_verify_dont_overclaim]); (3) an anon draft uses the single `studio.v2.draft.new` localStorage slot, so starting a second anon creation overwrites the first unclaimed draft. Fix per item as prioritized. Unblocks: broader anon-adoption coverage + verified signed-out UX. |
+| 2212 | T2 | ✅ Done | Now | P2 | `feature` | **Anonymous Studio adoption + in-place conversion gate (let signed-out visitors create, gate every value-capture action, claim the draft on auth)** (shipped 2026-06-20) | Adoption play: unauthenticated visitors BUILD in [StudioEditorV2](hired.video/frontend/pages/studio/v2/StudioEditorV2.tsx) on the `/studio/new` draft (marketing Landing CTAs route there with `?contentTemplate=resume`); only value-capture is gated. Reusable seam: [useAuthGate](hired.video/frontend/components/auth/useAuthGate.tsx) + [AuthGatePanel](hired.video/frontend/components/auth/AuthGatePanel.tsx) host the SAME [LoginForm](hired.video/frontend/components/auth/LoginForm.tsx)/[SignupForm](hired.video/frontend/components/auth/SignupForm.tsx) cores the `/login`+`/signup` pages were refactored onto (DRY). On Sign-in the gated handler re-runs in place (authedRef latch) and the draft persists into a real owned project; on Sign-up the [anon-conversion](hired.video/frontend/lib/studio/anon-conversion.ts) module stamps a pending claim + `?claim=1` redirect so the editor finishes the claim after the email-verify round-trip. **Full gate coverage:** Save/Publish-to-profile/Export + off-platform YouTube/LinkedIn gate at their own handlers (resumed action completes the real destination, not just a save); AI generation (the shared [use-media-ai-prompt](hired.video/frontend/lib/hooks/use-media-ai-prompt.ts) hook) + media upload/AI-tab ([MediaPicker](hired.video/frontend/components/shared/MediaPicker.tsx)) self-gate via the new [AnonGateContext](hired.video/frontend/lib/studio/anon-gate-context.tsx) (no-op for authed users / no provider — DRY, no prop-drill); recording stays a client-side blob until the (gated) Save, stock-media just sets a URL. Funnel (enter/edit/gate/convert) rides the existing `usage_sessions` (hv_visitor_id→user_id auto-links on auth) tagged `studio.anon-create`. documentState now autosaves so anon resume/job drafts survive. Sidebar/Navigation verified anon-safe (`isAuthenticated && user` guard, line 301). tsc + lint clean. **By-design limits (not bugs):** (a) the funnel + visitor→user attribution are intentionally gated on stored analytics consent (GDPR/GPC) — the *conversion itself* (localStorage draft + claim) is consent-independent and always works, only the analytics is consent-scoped; (b) one anon draft at a time (single `studio.v2.draft.new` slot) — a second anon creation overwrites the first unclaimed draft, acceptable for a single-tab conversion funnel. |
 | 2128 | T3 | 🔲 Open | Soon | P2 | `feature` | **Editor & resume-detail surfaces don't capture CTA-hotzone clicks** (opened 2026-05-17 — surfaced fixing the `/v/[slug]` analytics gap) | The shared [CtaHotzonesOverlay](hired.video/frontend/components/video/CtaHotzonesOverlay.tsx) now self-fires `POST /api/studio/projects/:id/cta-click` whenever an `analyticsProjectId` is supplied, and the three public-watch branches in [StudioVideoSurface.tsx](hired.video/frontend/components/studio/StudioVideoSurface.tsx) (`PublicStudioCanvas` / `RawVideoPlayback` / `BakedVideo`) all pass it through. The editor preview ([StudioPlayerCanvas](hired.video/frontend/components/studio/StudioPlayerCanvas.tsx)) deliberately omits it so author rehearsal doesn't pollute the dashboard, but [ResumeDetail.tsx](hired.video/frontend/pages/ResumeDetail.tsx) (in-platform watch surface) and any other consumer that mounts `StudioPlayer` directly also skip it — clicks on those surfaces never reach the rollup. Spec: decide whether in-platform on-platform watches count as CTA clicks; if yes, plumb `analyticsProjectId` into the StudioPlayer mount points outside `/v/[slug]`. Unblocks: full-funnel CTR for owners who share the in-platform link instead of the public URL. |
 | 2153 | T3 | 🔲 Open | Soon | P2 | `feature` | **Preserve resume interactivity (`content.metaData` media + `content.skillEvidence`) through the document-canvas authoring path** (opened 2026-06-06 with #1912) | Resumes are interactive: section items carry attached media via `content.metaData[]` (`ResumeSectionMeta` bound to an item by stable `referenceId`) and skills carry `content.skillEvidence[]`. The document canvas must keep this data in the ENTITY content (never copy it into `DocumentState`) and let a dragged-on overlay image carry a `mediaBinding` ([document-state.ts](hired.video/frontend/lib/studio/editor-v2/document-state.ts)) that writes back a `metaData` row for the bound item — so dropping a studio-made image onto an experience card makes it interactive and survives section reorder (binding by id, not index). Renderer keeps driving `ItemMediaStrip` + `enrichSkillsWithEvidence` unchanged. Needs: the drop→metaData-upsert handler in `<DocumentStage>`, and round-trip tests with real seed-derived fixtures (per [feedback_tests_with_real_fixtures]). Unblocks: interactive resumes authored visually instead of via the metadata modal. |
 | 2201 | T1 | 🔲 Open | Soon | P2 | `quality` | **Dark-mode color audit — components with hardcoded Tailwind colors don't adapt** (opened 2026-06-16 with the "Soft Slate" / "Midnight" theme rollout) | Dark mode (palette D "Midnight") is now reachable app-wide via next-themes + the `.dark` token block in [global.css](hired.video/frontend/global.css) (toggle in [Navigation.tsx](hired.video/frontend/components/Navigation.tsx) + the Settings appearance select, both applied through the single [use-theme-preference.ts](hired.video/frontend/lib/theme/use-theme-preference.ts) seam; server preference synced via [ThemeSync.tsx](hired.video/frontend/components/theme/ThemeSync.tsx) off the shared account-settings cache; no-FOUC bootstrap in [index.html](hired.video/frontend/index.html)). Components styled via **semantic tokens** (`bg-background`/`bg-card`/`text-foreground`/`text-muted-foreground`/`bg-primary`…) adapt automatically. But any component using **hardcoded** Tailwind palette classes (`bg-white`, `text-gray-700`, `bg-green-50`, `border-slate-200`, etc.) stays light under `.dark` → low-contrast / broken surfaces. [Settings.tsx](hired.video/frontend/pages/Settings.tsx) already models the correct pattern (status cards pair `bg-green-50 dark:bg-green-950`), but most pages predate dark mode and have no `dark:` variants. Fix: sweep `frontend/{pages,components}/**` for raw color utilities and either swap to semantic tokens or add `dark:` variants; consider an ESLint guard against bare `bg-white`/`text-gray-*` in app surfaces. Unblocks: a visually-correct dark theme on every surface, not just token-based UI. The light default ("Soft Slate", palette A) needs no such audit — it only softened the canvas; cards stay white. |
@@ -3369,12 +2670,13 @@ Single source of truth for **open + partial** items. Add a new entry to the bott
 | 1253 | T3 | 🔲 Open | Later | P4 | `feature` | **DEFERRED — Mailchimp / Slack / Zapier event integrations** (opened 2026-05-25 alongside #1240). Tracked for completeness; existing webhooks + Zapier-via-public-API path suffice for v1. Revisit if a partner ask lands. |
 | 1806 | T4 | 🔲 Open | Later | P4 | `quality` | **Inbox deep-link (`/outreach?tab=inbox&item=e-<id>`) only auto-opens the detail sheet for emails present on page 1 of the feed** (opened 2026-05-30 alongside the popover row-click fix). [InboxTab.tsx](hired.video/frontend/components/outreach/tabs/InboxTab.tsx) resolves the `item` param against `hub.items` and opens `InboxDetailSheet` for a matching `external_email`; if the linked email only exists on an un-loaded page 2+ (rare — the seeded first page is large), the row isn't found, the param is stripped, and nothing opens (the email is still clickable in the list). Also: notifications/connection-requests carry no detail view today, so deep-linking those kinds just lands on the tab with the row visible inline. To close: when the `item` param targets an `external_email` not in the current feed, fetch it directly via `GET /api/inbox/external-emails/:id` (already used by the sheet) and open the sheet from that, independent of list pagination. Low priority — the common case (page-1 email from the header popover) works. |
 
-### TK11 — frontend-ux-i18n — Frontend Chrome, SEO & i18n — 22 active
+### TK11 — frontend-ux-i18n — Frontend Chrome, SEO & i18n — 23 active
 
 **Owned paths:** `frontend/components/{ui,layout}/**`, `frontend/lib/seo.ts`, `frontend/public/locales/**`, `shared/i18n.ts`
 
 | # | Rev | Status | Phase | Priority | Type | Gap | Notes |
 |---|-----|--------|-------|----------|------|-----|-------|
+| 2217 | T4 | 🔲 Open | Mid | P3 | `quality` | **i18n coverage detector over-counts TypeScript generics + proper nouns as "hardcoded", so a literal 100% is unreachable on high-coverage pages** (opened 2026-06-20 during the ≥80% completion sweep) | [scripts/i18n-coverage.cjs](hired.video/frontend/scripts/i18n-coverage.cjs)'s JSX-text heuristic `>([^<>{}]*)<` matches TS generic/arrow syntax (`useState<JobAlert>(null)`, `z.infer<typeof …>`, `React.ChangeEvent<…>`, ternaries `) : (`) as if it were visible copy, and its `isNoise` filter doesn't strip brand/proper nouns or contact emails (hired.video, info@hired.video, security@hired.video, SCORM, testimonial names). Net effect: the ~39 pages already at ≥80% that this sweep touched report 2–30 residual "hardcoded" flags that are **100% false positives** — verified via `--json` `samples` (e.g. Jobs.tsx h=24, Outreach.tsx h=21, PrivacyPolicy.tsx h=30 are all code/brand, not copy). To close: (a) strip generic/JSX-expression spans before the text-node scan (drop matches containing `=>`, `<typeof`, `) :`, or lowercase-only single-token identifiers); (b) add a brand/proper-noun + email allowlist to `isNoise`. Unblocks: the coverage % becomes a trustworthy completion signal (today it floors ~73% and cannot reach 100% even when every real string is localized). Until then, inspect `samples` before assuming a high-coverage page has a real leak. |
 | 1507 | T3 | 🔲 Open | Soon | P1 | `feature` | **Article editor page mount + Tiptap `npm install`** (opened 2026-05-26 during #170 close). `frontend/package.json` carries the Tiptap deps; running `npm install` resolves them. Then mount `/articles/edit/:id` page that imports [ArticleEditor.tsx](hired.video/frontend/components/articles/ArticleEditor.tsx), wires `onAutosave` to `POST /api/articles/:id/versions { isAutosave: true }`, and renders the publish CTA → calls `/api/articles/:id/classify` (#175) → `/submit-for-review`. AppShell + useSEO + useBreadcrumbs wrap per the new-page checklist. |
 | 1658 | T4 | 🔲 Open | Now | P2 | `bug` | **Homepage `/` appears blank for authenticated users** (opened 2026-05-26 from user report alongside #1657). Index.tsx looks structurally sound — AppShell + hero + UnifiedSearch + TemplateGallery + JobTemplateGallery + FeaturedTools + LatestGuides + LinkedIn-feed-style sections. The user reports `/` rendering blank; needs reproduction. Likely culprits to investigate: (a) one of the child components (HeroVideoSpotlight, UnifiedSearch, TemplateGallery, JobTemplateGallery, FeaturedTools, LatestGuides) throws on a code path that triggers a global error boundary; (b) an i18n key returns "" so the visible text disappears but the layout collapses; (c) AppShell's `showAppChrome` predicate is mis-classifying the route and rendering MinimalShell with no content; (d) a recent Suspense boundary in App.tsx swallows a rejected lazy import. **Investigation plan**: load `/` in DevTools with the console open, capture the error stack; if no JS errors, inspect the DOM tree under `<AppShell>` for a swallowed `<section>`. **Unblocks**: marketing front door for un-authed visitors. |
 | 1837 | T3 | 🔲 Open | Now | P2 | `bug` | **In-flight breadcrumbs codemod left parse errors across multiple pages** (observed 2026-05-31). A codemod adding `useDefaultBreadcrumbs()` is injecting the call into the middle of the adjacent `useSEO(...)` call (e.g. `useSEO(\n  useDefaultBreadcrumbs();\n  location.pathname,`) and mangling import lines, producing TS1003/TS1005/TS1109 parse errors. Fixed in passing for 6 pages adjacent to the community-resources work (ForIndex, SitemapLocations, CompAnalyzer, AudienceLandingPage, TemplateLandingPage, LocationLandingPage) by moving the call to its own statement before `useSEO`. STILL BROKEN at observation: CompanyDetail, CookiePolicy, JobDetail, ResumeDetail (+ others the codemod was still processing). Fix: correct the codemod's insertion point (statement before `useSEO`, not inside its arg list) and re-run, or hand-fix the remaining pages. Unblocks: frontend `tsc`/build green. |
