@@ -15,7 +15,8 @@ const README = join(ROOT, "README.md");
 const WRITE = process.argv.includes("--write");
 
 const raw = readFileSync(README, "utf8");
-const lines = raw.split("\n");
+const EOL = raw.includes("\r\n") ? "\r\n" : "\n";
+const lines = raw.split(/\r?\n/); // strip CR so per-row regex edits aren't defeated by a trailing \r
 
 const startIdx = lines.findIndex((l) => l.startsWith("## Consolidated Gap Register"));
 const firstTierIdx = lines.findIndex((l, i) => i > startIdx && /^### Tier 1\b/.test(l));
@@ -199,8 +200,7 @@ for (const tk of ORDER) {
 }
 out.push("");
 
-const newBody = out.join("\n");
-const newReadme = [...lines.slice(0, firstTierIdx), ...newBody.split("\n"), ...tail].join("\n");
+const newReadme = [...lines.slice(0, firstTierIdx), ...out, ...tail].join(EOL);
 
 // ---- report ----
 console.log("== Active rows re-grouped:", rows.length, " Done pulled out:", doneRows.length);
@@ -216,6 +216,38 @@ for (const tier of ["T1","T2","T3","T4"]) {
 console.log("== Low-confidence classifications:", lowConf.length);
 for (const x of lowConf.slice(0, 60)) console.log("   #" + x.id, "->", x.tk, x.fallback ? "(FALLBACK)" : "score=" + x.score);
 console.log("== Done rows pulled to DONE.md:", doneRows.map((r) => "#" + r.id).join(", "));
+
+// ---- classify DONE.md ✅ rows with the SAME logic for honest per-track % ----
+const DONE = join(ROOT, "DONE.md");
+const doneLines = readFileSync(DONE, "utf8").split("\n");
+const doneByTrack = Object.fromEntries(ORDER.map((t) => [t, 0]));
+// the stray #1176 we are about to add to DONE.md counts too
+const extraDone = doneRows.map((r) => ({ id: r.id, status: r.status, type: r.type, tier: r.tier, line: r.line }));
+let doneTotal = 0;
+for (const line of [...doneLines, ...extraDone.map((r) => r.line)]) {
+  const m = line.match(/^\|\s*(\d+)\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|/u);
+  if (!m || !m[2].trim().startsWith("✅")) continue;
+  const row = { id: Number(m[1]), status: m[2].trim(), type: m[5].trim().replace(/`/g, ""), tier: null, line };
+  doneByTrack[classify(row).tk]++;
+  doneTotal++;
+}
+console.log("\n== Per-track DONE (classified) / Active / % Complete:");
+let aT = 0, dT = 0;
+for (const tk of ORDER) {
+  const a = byTrack[tk].length, d = doneByTrack[tk];
+  aT += a; dT += d;
+  const pct = d + a ? Math.round((d / (d + a)) * 100) : 0;
+  console.log(`   ${tk.padEnd(5)} active=${String(a).padStart(4)}  done=${String(d).padStart(4)}  ${String(pct).padStart(3)}%`);
+}
+console.log(`   TOTAL active=${aT} done=${dT}  ${Math.round((dT/(dT+aT))*100)}%   (doneTotal parsed=${doneTotal})`);
+if (process.argv.includes("--titles")) {
+  const want = process.argv[process.argv.indexOf("--titles") + 1] || "TK4";
+  console.log(`\n== ${want} titles:`);
+  for (const r of byTrack[want]) {
+    const m = r.line.match(/\*\*(.+?)\*\*/);
+    console.log("  #" + r.id, "[" + r.tier + "]", m ? m[1].slice(0, 90) : "(no title)");
+  }
+}
 
 if (WRITE) {
   writeFileSync(README, newReadme);

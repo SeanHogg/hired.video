@@ -73,16 +73,23 @@ export function sectionLines(allLines) {
 
 /** Classify a gap-register table row. Returns { id, status } or null. */
 export function parseRow(line) {
-  // A gap row is `| <digits> | <status cell> | …`. The leading-digits guard
+  // A gap row is `| <digits> | … | <status cell> | …`. The leading-digits guard
   // skips the `| # | Status |` header, `|---|` separators, and the many
-  // non-gap `| label | value |` rows elsewhere in the file.
-  const m = line.match(/^\|\s*(\d+)\s*\|([^|]*)\|/u);
+  // non-gap `| label | value |` rows elsewhere in the file. Since the
+  // 2026-06-20 re-tier-by-track pass the schema is `| # | Rev | Status | … |`
+  // (Rev = the old revenue tier, T1–T4), so the status no longer sits in a
+  // fixed column. We scan the first few cells and take the first one that
+  // begins with a status glyph — backward-compatible with the old
+  // `| # | Status | … |` layout where status was cell 2.
+  const m = line.match(/^\|\s*(\d+)\s*\|/u);
   if (!m) return null;
   const id = Number(m[1]);
-  const cell = m[2].trim();
-  const status = STATUSES.find((s) => cell.startsWith(s.emoji));
-  if (!status) return null;
-  return { id, status: status.key };
+  const cells = line.slice(m[0].length).split("|").map((c) => c.trim());
+  for (const cell of cells.slice(0, 3)) {
+    const status = STATUSES.find((s) => cell.startsWith(s.emoji));
+    if (status) return { id, status: status.key };
+  }
+  return null;
 }
 
 export function tally(lines) {

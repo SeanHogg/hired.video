@@ -463,7 +463,7 @@ function Landing() {
             {t("messages.studioLayout.finalCtaDesc")}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/signup">
+            <Link to="/studio/new?contentTemplate=resume">
               <Button
                 size="lg"
                 className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
@@ -1784,7 +1784,6 @@ export default function StudioLayout() {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        onCollapse={() => setSidebarCollapsed((c) => !c)}
         collapsed={sidebarCollapsed}
       />
       <div className={cn("transition-all duration-500", sidebarCollapsed ? "lg:ml-16" : "lg:ml-80")}>
