@@ -1239,7 +1239,7 @@ export default function StudioEditorV2() {
     hydrated: documentStateHydrated,
     serverState: persistedProject?.documentState as DocumentState | null | undefined,
     // Prefer a locally-autosaved draft (a signed-out visitor's in-progress
-    // resume / job — #2100) before seeding a blank document, so their work
+    // resume / job — #2212) before seeding a blank document, so their work
     // survives a reload and the signup → verify round-trip.
     seed: () =>
       readLocalDocumentDraft(projectId) ??
@@ -1521,7 +1521,7 @@ export default function StudioEditorV2() {
     };
   }, [studioTemplateSlug, projectId, toast, resetHistory, t]);
 
-  // ─── Anonymous adoption (#2100): let signed-out visitors USE the studio,
+  // ─── Anonymous adoption (#2212): let signed-out visitors USE the studio,
   // gate only the value-capture actions (Save / Publish / Export), and claim
   // their work-in-progress draft into a real owned project the moment they
   // authenticate. The conversion funnel runs on the existing usage-tracking
@@ -1540,7 +1540,6 @@ export default function StudioEditorV2() {
     params.set(CLAIM_PARAM, "1");
     return `/studio/${encodeURIComponent(projectId)}?${params.toString()}`;
     // Mount-time snapshot only — later param edits shouldn't move the target.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const { requireAuth, gate } = useAuthGate({
     redirectTo: claimRedirect,
@@ -1619,13 +1618,12 @@ export default function StudioEditorV2() {
       }
     })();
     // handleSave is a hoisted function declaration closing over live state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, persistedProjectId, documentStateHydrated, currentMediaKind, projectId, searchParams]);
 
   // Local autosave so unsaved work survives reloads. The single effect
   // covers the Timeline-kind `state` (CanvasState), the image-kind
   // `imageState` (#940 Phase 2 image autosave), and the document-kind
-  // `documentState` (#2100 — so a signed-out resume / job draft survives the
+  // `documentState` (#2212 — so a signed-out resume / job draft survives the
   // signup round-trip). Kind-aware snapshot keeps storage shape unified so the
   // hydration step at `/studio/:id` knows which slice to rehydrate.
   useEffect(() => {
@@ -2883,7 +2881,7 @@ export default function StudioEditorV2() {
   // `ensureRendered`) can chain a follow-up upload without re-reading
   // through the async-state setters. Resolves to null on failure.
   async function handleSave(): Promise<StudioProject | null> {
-    // Anon adoption gate (#2100): signed-out visitors can build freely, but
+    // Anon adoption gate (#2212): signed-out visitors can build freely, but
     // Save requires an account. The in-place panel opens and this same handler
     // re-runs (and the draft persists) once they authenticate.
     if (
@@ -3063,7 +3061,7 @@ export default function StudioEditorV2() {
     return <StudioLoadingShell />;
   }
 
-  // Anon adoption (#2100): a signed-out visitor may BUILD on a fresh `"new"`
+  // Anon adoption (#2212): a signed-out visitor may BUILD on a fresh `"new"`
   // draft (Save / Publish / Export are gated below). An existing `/studio/:id`
   // still requires sign-in — the project can only load for its owner, so there
   // is nothing for an anonymous visitor to edit there.
@@ -3110,7 +3108,7 @@ export default function StudioEditorV2() {
 
   return (
     <div className="flex h-screen flex-col bg-background">
-      {/* Anon adoption (#2100): the in-place Sign in / Create account panel.
+      {/* Anon adoption (#2212): the in-place Sign in / Create account panel.
           Opens when a signed-out visitor hits a gated Save / Publish / Export
           and resumes that action once they authenticate — without leaving the
           canvas. */}
@@ -5005,7 +5003,7 @@ function hydrateInitialState(
   return seedCanvasFromTemplate(templateHint);
 }
 
-/** Read a locally-autosaved `documentState` slice for a draft (#2100). Lets a
+/** Read a locally-autosaved `documentState` slice for a draft (#2212). Lets a
  *  signed-out visitor's in-progress resume / job document survive a reload and
  *  the signup → email-verify round-trip — mirrors `hydrateInitialState`'s
  *  CanvasState path for the document runtime. */

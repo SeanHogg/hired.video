@@ -317,14 +317,12 @@ export default function ForRecruiters() {
           {/* Cross-link to /for-agencies for staffing-back-office buyers (#1349). */}
           <div className="px-4 py-8">
             <div className="border rounded-lg p-6 bg-muted/30 text-center">
-              <h3 className="text-xl font-semibold mb-2">Running a staffing agency?</h3>
+              <h3 className="text-xl font-semibold mb-2">{t("marketing.recruiters.agencyCrossLink.title")}</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Placements, timesheets, invoice + contractor pay derivation,
-                desk-margin reporting, compliance doc vault — Bullhorn-class
-                back-office at $9.95 per active employee.
+                {t("marketing.recruiters.agencyCrossLink.desc")}
               </p>
               <Link to="/for-agencies" className="inline-flex items-center text-primary font-medium hover:underline">
-                See the agency back-office <ArrowRight className="h-4 w-4 ml-1" />
+                {t("marketing.recruiters.agencyCrossLink.cta")} <ArrowRight className="h-4 w-4 ml-1" />
               </Link>
             </div>
           </div>

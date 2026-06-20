@@ -223,7 +223,7 @@ export default function InterviewQuestions() {
   function handleCopyAll() {
     if (questions.length === 0) return;
     const text = questions
-      .map((q, i) => `${i + 1}. ${q.text}${q.maxDurationSec ? ` (max ${q.maxDurationSec}s)` : ""}`)
+      .map((q, i) => `${i + 1}. ${q.text}${q.maxDurationSec ? ` ${t("messages.interviewQuestions.copyMaxSeconds", { count: q.maxDurationSec })}` : ""}`)
       .join("\n");
     void navigator.clipboard.writeText(text).then(
       () => toast.success(t("messages.interviewQuestions.copiedAll")),
@@ -518,7 +518,7 @@ export default function InterviewQuestions() {
                     <div className="flex-1 min-w-[260px]">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <Badge variant="outline" className="text-[10px]">
-                          Q{i + 1}
+                          {t("labels.interview.qShort", { number: i + 1 })}
                         </Badge>
                         <Badge variant="secondary" className="text-[10px]">
                           {q.category}

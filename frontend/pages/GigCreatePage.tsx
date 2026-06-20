@@ -26,13 +26,13 @@ const blankItem = (): ItemDraft => ({ title: "", description: "", amount: "" });
 
 export default function GigCreatePage() {
   const location = useLocation();
+  const { t } = useTranslation();
   useSEO(location.pathname, {
-    title: "Post a Gig — hired.video",
-    description: "Post a brief with deliverables for content creators to bid on.",
+    title: t("gigs.create.seoTitle"),
+    description: t("gigs.create.seoDescription"),
   });
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { t } = useTranslation();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");

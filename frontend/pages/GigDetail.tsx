@@ -42,10 +42,10 @@ const DISPUTABLE = new Set(["in_progress", "submitted", "approved"]);
 export default function GigDetail() {
   const { id = "" } = useParams();
   const location = useLocation();
-  useSEO(location.pathname, { title: "Gig — hired.video", description: "Gig brief, deliverables and bids." });
+  const { t } = useTranslation();
+  useSEO(location.pathname, { title: t("gigs.detail.seoTitle"), description: t("gigs.detail.seoDescription") });
   const { user, isSuperAdmin } = useAuth();
   const { toast } = useToast();
-  const { t } = useTranslation();
 
   const [project, setProject] = useState<GigProject | null>(null);
   const [milestones, setMilestones] = useState<GigMilestone[]>([]);

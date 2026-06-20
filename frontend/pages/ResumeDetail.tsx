@@ -765,7 +765,7 @@ export default function ResumeDetail() {
                     entityType="resume"
                     entityId={resume.id}
                     entityOwnerId={resume.userId}
-                    entityLabel="resume"
+                    entityLabel={t("resumeDetail.reportEntityLabel")}
                     triggerVariant="outline"
                   />
                 )}

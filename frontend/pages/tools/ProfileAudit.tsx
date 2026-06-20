@@ -75,15 +75,15 @@ export default function ProfileAudit() {
           strengths: passes.map((c) => `${c.label}: ${c.detail}`),
           weaknesses: issues.map((c) => `${c.label}: ${c.detail}`),
           recommendations: [
-            { title: t("tools.profileAudit.recHeadline"), description: `${data.rationales.headline}\n\nProposed: ${data.proposed.headline}` },
-            { title: t("tools.profileAudit.recSummary"), description: `${data.rationales.summary}\n\nProposed: ${data.proposed.summary}` },
+            { title: t("tools.profileAudit.recHeadline"), description: `${data.rationales.headline}\n\n${t("tools.profileAudit.proposedLabel", { value: data.proposed.headline })}` },
+            { title: t("tools.profileAudit.recSummary"), description: `${data.rationales.summary}\n\n${t("tools.profileAudit.proposedLabel", { value: data.proposed.summary })}` },
             ...(data.proposed.currentRole && data.proposed.currentRole !== data.current.currentRole
-              ? [{ title: t("tools.profileAudit.recCurrentRole"), description: `Proposed: ${data.proposed.currentRole}` }]
+              ? [{ title: t("tools.profileAudit.recCurrentRole"), description: t("tools.profileAudit.proposedLabel", { value: data.proposed.currentRole }) }]
               : []),
           ],
           raw: data,
         },
-        summary: `Profile audit — score ${data.score}/100. Top fix: ${data.rationales.topFix}`,
+        summary: t("tools.profileAudit.runSummary", { score: data.score, topFix: data.rationales.topFix }),
       });
     } catch (err: any) {
       const code = err?.context?.serverCode ?? err?.code;

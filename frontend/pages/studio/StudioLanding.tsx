@@ -1595,7 +1595,7 @@ function OwnedTemplateCard({
           className="absolute right-2 top-2 z-10 hidden items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold text-slate-900 shadow-md backdrop-blur transition hover:bg-white group-hover:flex group-focus-within:flex"
         >
           <Eye className="h-3.5 w-3.5" />
-          Preview
+          {t("actions.preview")}
         </button>
       )}
     </div>

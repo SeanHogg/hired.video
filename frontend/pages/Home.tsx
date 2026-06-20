@@ -291,7 +291,7 @@ function HomeMarketingPage() {
                   to="/learning"
                   className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
                 >
-                  Plus: built-in Learning Library — AI, RAG, prompt engineering, must-have skills. No separate license.
+                  {t("marketing.home.learningLibraryTeaser")}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
@@ -827,6 +827,7 @@ function MarketingTemplateStrip() {
 // (poster video) and resume (scaled document). Each card links to the
 // per-template SEO page that owns the Use / Preview CTAs.
 function MarketingTemplateCard({ meta }: { meta: TemplateMeta }) {
+  const { t } = useTranslation();
   return (
     <Link
       to={`/marketplace/templates/${encodeURIComponent(meta.slug)}`}
@@ -837,7 +838,7 @@ function MarketingTemplateCard({ meta }: { meta: TemplateMeta }) {
         <div className="absolute inset-0 flex items-end justify-end p-3 opacity-0 transition-opacity group-hover:opacity-100">
           <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold text-slate-900 shadow">
             <Eye className="h-3.5 w-3.5" />
-            Preview
+            {t("actions.preview")}
           </span>
         </div>
       </div>

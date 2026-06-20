@@ -97,8 +97,8 @@ export default function SharedCandidateResume() {
   // Shared reviewer links should never be indexed — the "shareToken"
   // adapter in [lib/seo-ugc.ts] hard-pins `robots: noindex, nofollow`.
   useUgcSeo("shareToken", {
-    title: "Candidate Resume",
-    description: "Shared candidate resume — review via hired.video agency tooling.",
+    title: t("sharedCandidateResume.seo.title"),
+    description: t("sharedCandidateResume.seo.description"),
   });
 
   useEffect(() => {

@@ -109,35 +109,22 @@ interface Task extends TaskUIState {}
 
 // Events FAQ lifted from the deleted /events page. Lives on the Discover
 // surface so the marketing copy stays public (events are public per the
-// consolidation decision — see [project_gap_register]).
-const EVENTS_FAQ = [
-  {
-    question: "Who can host an event?",
-    answer:
-      "Any hired.video member can host. There's no upgrade — create unlimited free events, invite your network, and accept RSVPs.",
-  },
-  {
-    question: "Is hosting events free?",
-    answer:
-      "Yes. Public RSVPs, waitlists, capacity, co-hosts, attendee matchmaking, reminder cadence — all included. Paid ticketing is on the roadmap; we'll never gate the free hosting flow behind a subscription.",
-  },
-  {
-    question: "What kinds of events work best?",
-    answer:
-      "In-person meetups, online workshops, panels, career fairs, study groups, hackathons, demos, mixers, talks. Every event automatically gets the AI matchmaking layer so attendees see the people they should meet.",
-  },
-  {
-    question: "How does attendee matchmaking work?",
-    answer:
-      "Default-on. We use the skill graph + skill evidence from members' profiles to suggest who each attendee should meet, ranked 0-100 with a one-line reason. Hosts can disable it per event.",
-  },
+// consolidation decision — see [project_gap_register]). Built from a factory
+// so the copy localizes (t can't be called at module scope).
+const buildEventsFaq = (t: (key: string) => string) => [
+  { question: t("faq.events.host.q"), answer: t("faq.events.host.a") },
+  { question: t("faq.events.free.q"), answer: t("faq.events.free.a") },
+  { question: t("faq.events.kinds.q"), answer: t("faq.events.kinds.a") },
+  { question: t("faq.events.matchmaking.q"), answer: t("faq.events.matchmaking.a") },
 ];
 
 export default function Tasks() {
   const { t } = useTranslation();  const { isAuthenticated, user } = useAuth();
 
   useSEO("/tasks");
-  useBreadcrumbs([{ name: "Tasks, Events & Timesheet", url: "/tasks" }]);
+  useBreadcrumbs([{ name: t("messages.tasksEventsTimesheet"), url: "/tasks" }]);
+
+  const EVENTS_FAQ = buildEventsFaq(t);
 
   // View axis lives in the URL so the page-level breadcrumb tabs are
   // shareable + back-button friendly. `?tab=` controls the Tasks-view
@@ -194,10 +181,10 @@ export default function Tasks() {
         {availableSurfaces.map((key) => {
           const active = currentSurface === key;
           const label =
-            key === "tasks" ? "Tasks" :
-            key === "my-events" ? "My events & coffee" :
-            key === "timesheet" ? "Timesheet" :
-            "Discover";
+            key === "tasks" ? t("labels.tasks") :
+            key === "my-events" ? t("labels.myEventsCoffee") :
+            key === "timesheet" ? t("labels.timesheet") :
+            t("labels.discover");
           return (
             <button
               key={key}
@@ -423,7 +410,7 @@ export default function Tasks() {
         {SurfaceTabsStrip}
         <div className="p-4 md:p-6">
           <div className="space-y-12">
-            <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">Loading map…</div>}>
+            <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">{t("messages.loadingMap")}</div>}>
               <EventDiscoveryPanel />
             </Suspense>
             <MarketingFAQ items={EVENTS_FAQ} schemaId="events" />

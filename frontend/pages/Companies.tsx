@@ -61,7 +61,7 @@ export default function Companies() {
   const location = useLocation();
   // SEO for companies page
   useSEO(location.pathname);
-  useBreadcrumbs([{ name: "Companies", url: "/companies" }]);
+  useBreadcrumbs([{ name: t("labels.companies"), url: "/companies" }]);
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();

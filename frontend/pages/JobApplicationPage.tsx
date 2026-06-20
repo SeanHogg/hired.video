@@ -191,14 +191,16 @@ export default function JobApplicationPage() {
             <CardTitle className="flex items-center gap-2 text-base">
               <Video className="h-5 w-5 text-brand-purple" />
               {screening.screeningRequired === "required"
-                ? "Step 2: Video screening (required)"
-                : "Optional video screening after you apply"}
+                ? t("jobApplication.screening.titleRequired")
+                : t("jobApplication.screening.titleOptional")}
             </CardTitle>
             <CardDescription>
-              After you submit, you'll be sent directly to a {screening.questionCount}-question screening
-              interview {screening.expectedMinutes ? `(~${screening.expectedMinutes} min)` : ""}.
+              {t("jobApplication.screening.intro", {
+                count: screening.questionCount,
+                duration: screening.expectedMinutes ? t("jobApplication.screening.duration", { minutes: screening.expectedMinutes }) : "",
+              })}
               {screening.proctoringOn
-                ? " It's lightly proctored — keep this tab in focus while answering."
+                ? t("jobApplication.screening.proctoredNote")
                 : ""}
             </CardDescription>
           </CardHeader>
@@ -207,26 +209,25 @@ export default function JobApplicationPage() {
               {typeof screening.prepTimeSec === "number" && (
                 <Badge variant="outline" className="gap-1">
                   <Clock className="h-3 w-3" />
-                  {screening.prepTimeSec}s prep per question
+                  {t("jobApplication.screening.prepPerQuestion", { seconds: screening.prepTimeSec })}
                 </Badge>
               )}
               {typeof screening.maxRetakes === "number" && screening.maxRetakes > 0 && (
-                <Badge variant="outline">{screening.maxRetakes} retakes allowed</Badge>
+                <Badge variant="outline">{t("jobApplication.screening.retakesAllowed", { count: screening.maxRetakes })}</Badge>
               )}
-              <Badge variant="outline">Text or video answers</Badge>
+              <Badge variant="outline">{t("jobApplication.screening.textOrVideo")}</Badge>
             </div>
             {screening.screeningRequired === "required" && (
               <Alert>
                 <AlertDescription className="text-xs">
-                  This employer requires the screening to consider your application. You can
-                  practise the question style with our AI Coach first if you want.
+                  {t("jobApplication.screening.requiredNote")}
                 </AlertDescription>
               </Alert>
             )}
             <Button asChild variant="ghost" size="sm" className="gap-1 -ml-2">
               <a href="/ai-coach">
                 <MessageSquare className="h-3.5 w-3.5" />
-                Warm up with AI Coach
+                {t("jobApplication.screening.warmUpCoach")}
               </a>
             </Button>
           </CardContent>

@@ -68,6 +68,18 @@ test("parseRow classifies each status and ignores non-gap rows", () => {
   assert.equal(parseRow("not a table line"), null);
 });
 
+test("parseRow finds the status after the re-tier `Rev` column", () => {
+  // Since the 2026-06-20 re-tier-by-track pass the schema is
+  // `| # | Rev | Status | … |` — the status moved from cell 2 to cell 3.
+  assert.deepEqual(parseRow("| 10 | T1 | 🔲 Open | x |"), { id: 10, status: "Open" });
+  assert.deepEqual(parseRow("| 11 | T3 | ⚠️ Partial | x |"), { id: 11, status: "Partial" });
+  assert.deepEqual(parseRow("| 12 | T2 | ✅ Done | x |"), { id: 12, status: "Done" });
+  // a trailing CRLF carriage return must not defeat the match (the README is CRLF)
+  assert.deepEqual(parseRow("| 13 | T4 | 🔲 Open | x |\r"), { id: 13, status: "Open" });
+  // the Rev cell itself is never a status, so it is skipped, not misread
+  assert.equal(parseRow("| 14 | T2 | plain | no status anywhere |"), null);
+});
+
 test("sectionLines scopes strictly to the register section", () => {
   const { lines } = sectionLines(README_FIXTURE.split("\n"));
   const joined = lines.join("\n");

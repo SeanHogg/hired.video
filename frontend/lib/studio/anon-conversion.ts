@@ -1,5 +1,5 @@
 /**
- * Anonymous → signed-up conversion plumbing for the Studio editor (#2100).
+ * Anonymous → signed-up conversion plumbing for the Studio editor (#2212).
  *
  * Adoption play: let UNAUTHENTICATED visitors actually USE the studio
  * (create a video resume / resume / job posting on the canvas) and gate only

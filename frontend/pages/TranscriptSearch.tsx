@@ -60,8 +60,8 @@ export default function TranscriptSearch() {
   const location = useLocation();
   const { t } = useTranslation();
   useSEO(location.pathname, {
-    title: "Video Transcript Search — hired.video",
-    description: "Search across candidate video resume transcripts and async interview responses.",
+    title: t("transcriptSearch.seo.title"),
+    description: t("transcriptSearch.seo.description"),
   });  const { toast } = useToast();
 
   const [query, setQuery] = useState("");

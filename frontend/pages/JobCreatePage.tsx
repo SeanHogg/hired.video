@@ -267,12 +267,9 @@ export default function JobCreatePage() {
   // four call sites don't drift in what they send to the model.
   type AIPrimingTask = "open" | "description" | "requirements";
   const PRIMING_MESSAGES: Record<AIPrimingTask, string> = {
-    open:
-      "I'm working on this job posting. Look at the form values you can see and help me complete it — call apply_job_draft with whatever fields make sense.",
-    description:
-      "Draft a compelling job description for this role using the form values you can see. Call apply_job_draft with the description field.",
-    requirements:
-      "Suggest a clean, well-structured list of requirements for this role using the form values you can see. Call apply_job_draft with the requirements field (one item per line, no bullet glyphs).",
+    open: t("messages.jobCreate.aiPriming.open"),
+    description: t("messages.jobCreate.aiPriming.description"),
+    requirements: t("messages.jobCreate.aiPriming.requirements"),
   };
   const openAIForTask = (task: AIPrimingTask) => {
     const context = createJobContext(

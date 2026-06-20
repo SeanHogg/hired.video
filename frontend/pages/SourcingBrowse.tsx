@@ -32,8 +32,8 @@ export default function SourcingBrowse() {
   const { t } = useTranslation();
   const location = useLocation();
   useSEO(location.pathname, {
-    title: "Sourcing Marketplace — hired.video",
-    description: "Browse jobs accepting recruiter sourcing bids and place a proposal.",
+    title: t("messages.sourcing.seoTitle"),
+    description: t("messages.sourcing.seoDescription"),
   });
 
   const { toast } = useToast();

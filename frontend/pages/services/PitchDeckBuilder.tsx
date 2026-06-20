@@ -886,6 +886,7 @@ function SlideEditor({
     >,
   ) => void;
 }) {
+  const { t } = useTranslation();
   const [fitSummary, setFitSummary] = useState(slide.fitSummary ?? "");
   const [matchScore, setMatchScore] = useState<string>(
     slide.matchScore == null ? "" : String(slide.matchScore),
@@ -903,14 +904,14 @@ function SlideEditor({
   };
 
   const defaultLabel = deckDefaultProfileId
-    ? companyProfiles.find((p) => p.id === deckDefaultProfileId)?.name ?? "deck default"
-    : "deck default";
+    ? companyProfiles.find((p) => p.id === deckDefaultProfileId)?.name ?? t("headings.pitchDeck.deckDefault")
+    : t("headings.pitchDeck.deckDefault");
 
   return (
     <div className="border-t px-3 py-3 space-y-3 bg-muted/20 text-xs">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="space-y-1 md:col-span-2">
-          <Label className="text-xs">Fit summary (shown on reviewer slide)</Label>
+          <Label className="text-xs">{t("labels.pitchDeck.fitSummary")}</Label>
           <Textarea
             value={fitSummary}
             onChange={(e) => {
@@ -918,12 +919,12 @@ function SlideEditor({
               setDirty(true);
             }}
             rows={2}
-            placeholder="Why this candidate fits the role in 1–2 sentences."
+            placeholder={t("labels.pitchDeck.fitSummaryPlaceholder")}
             className="text-xs"
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Match score (0–100)</Label>
+          <Label className="text-xs">{t("labels.pitchDeck.matchScoreLabel")}</Label>
           <Input
             type="number"
             min={0}
@@ -938,7 +939,7 @@ function SlideEditor({
         </div>
       </div>
       <div className="space-y-1">
-        <Label className="text-xs">Recruiter notes (internal)</Label>
+        <Label className="text-xs">{t("labels.pitchDeck.recruiterNotes")}</Label>
         <Textarea
           value={recruiterNotes}
           onChange={(e) => {
@@ -946,13 +947,13 @@ function SlideEditor({
             setDirty(true);
           }}
           rows={2}
-          placeholder="Only visible to your team. Skipped on the reviewer slide."
+          placeholder={t("labels.pitchDeck.recruiterNotesPlaceholder")}
           className="text-xs"
         />
       </div>
       <div className="flex items-center justify-between gap-3">
         <div className="space-y-1 flex-1">
-          <Label className="text-xs">Redaction override</Label>
+          <Label className="text-xs">{t("labels.pitchDeck.redactionOverride")}</Label>
           <Select
             value={slide.redactionProfileId ?? NONE}
             onValueChange={(v) =>
@@ -963,7 +964,7 @@ function SlideEditor({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NONE}>Inherit {defaultLabel}</SelectItem>
+              <SelectItem value={NONE}>{t("labels.pitchDeck.inheritProfile", { profile: defaultLabel })}</SelectItem>
               {companyProfiles.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.name}
@@ -975,7 +976,7 @@ function SlideEditor({
         {dirty && (
           <Button size="sm" onClick={save} className="self-end h-8">
             <Save className="w-3 h-3 mr-1" />
-            Save
+            {t("actions.save")}
           </Button>
         )}
       </div>

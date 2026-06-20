@@ -89,7 +89,6 @@ export default function LoginForm({
       }
       if (typeof result === "object" && result && (result as any).requiresTwoFactor) {
         setTwoFactor(result as any);
-        return;
       }
     } catch (err) {
       setError(t(mapAuthError(err).messageKey));

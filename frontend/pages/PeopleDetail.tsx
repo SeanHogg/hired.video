@@ -160,11 +160,11 @@ function PeopleDetailContent() {
 
   const joinedText = useMemo(() => {
     const iso = profile?.createdAt;
-    if (!iso) return "Joined";
+    if (!iso) return t("labels.joined");
     const d = new Date(iso);
-    if (isNaN(d.getTime())) return "Joined";
-    return `Joined ${d.toLocaleString(undefined, { month: "long", year: "numeric" })}`;
-  }, [profile?.createdAt]);
+    if (isNaN(d.getTime())) return t("labels.joined");
+    return t("labels.joinedMonthYear", { date: d.toLocaleString(undefined, { month: "long", year: "numeric" }) });
+  }, [profile?.createdAt, t]);
 
   const memberSince = useMemo(() => {
     const iso = profile?.createdAt;
@@ -539,12 +539,12 @@ function PeopleDetailContent() {
               detailsSlot={
                 <ArtifactDetailsSheet
                   permission={{ kind: "profile", entity: profile ? { id: profile.id } : null }}
-                  title={fullName || "Profile"}
+                  title={fullName || t("headings.profile")}
                   activity={{
                     createdAt: profile?.createdAt ?? undefined,
                     updatedAt: profile?.updatedAt ?? undefined,
                     extra: lastActive
-                      ? [{ label: "Last active", value: lastActive }]
+                      ? [{ label: t("labels.lastActive"), value: lastActive }]
                       : undefined,
                   }}
                 />
@@ -645,7 +645,7 @@ function PeopleDetailContent() {
                     title={
                       isOwner
                         ? t("headings.skillNetwork", { defaultValue: "Skill Network" })
-                        : `${firstName || t("messages.thisUserFallback")}'s Skill Network`
+                        : t("messages.skillNetworkPossessive", { name: firstName || t("messages.thisUserFallback") })
                     }
                   />
 

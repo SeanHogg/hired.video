@@ -1488,16 +1488,15 @@ function SettingsContent() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Share2 className="h-5 w-5" />
-                      Social publishing
+                      {t("headings.socialPublishing")}
                     </CardTitle>
                     <CardDescription>
-                      Connect your TikTok, YouTube, Instagram, LinkedIn, Facebook, or X
-                      accounts to publish your Studio content directly to them.
+                      {t("messages.socialPublishingDesc")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <Button asChild variant="outline">
-                      <Link to="/settings/connections">Manage connected accounts</Link>
+                      <Link to="/settings/connections">{t("actions.manageConnectedAccounts")}</Link>
                     </Button>
                   </CardContent>
                 </Card>

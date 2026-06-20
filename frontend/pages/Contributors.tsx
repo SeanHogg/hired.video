@@ -146,7 +146,7 @@ function InvitedByMeSection() {
             <Input
               id="invite-email"
               type="email"
-              placeholder="contributor@email.com"
+              placeholder={t("labels.contributors.emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

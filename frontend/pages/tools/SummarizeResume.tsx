@@ -53,8 +53,8 @@ export default function SummarizeResume() {
       score: null,
       result: { summary: summaryText },
       summary: summaryText
-        ? `Summary generated (${summaryText.length} chars)`
-        : "Resume summary generated",
+        ? t("tools.summarizeResume.runSummary", { count: summaryText.length })
+        : t("tools.summarizeResume.runSummaryEmpty"),
       ...refs,
     });
     clear();

@@ -172,7 +172,7 @@ export default function VideoPitchLab() {
   }
 
   function aiCoachReviewHref(): string {
-    const prompt = `Please give me feedback on this elevator pitch I wrote (target length ${length}s, tone ${tone}). Score it 0–10 on hook, clarity, value-proposition, and call to action, then suggest a punchier rewrite.\n\nPitch:\n${script}`;
+    const prompt = t("tools.videoPitchLab.aiCoachPrompt", { length, tone, script });
     return `/ai-coach?q=${encodeURIComponent(prompt)}`;
   }
 

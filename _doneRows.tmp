@@ -1,9 +1,0 @@
-[
-  {
-    "id": 1176,
-    "status": "✅ Done",
-    "type": "feature",
-    "tier": "T3",
-    "line": "| 1176 | ✅ Done | Soon | P2 | `feature` | **LocationFilter freeform-typing fallback missing** (opened 2026-05-24 alongside the unified-search/header-filter consolidation) — [`LocationFilter.tsx`](hired.video/frontend/components/location/LocationFilter.tsx) only fires `onChange` when the user picks an autocomplete hit (`accept(hit)`) or hits Clear; freeform typing without picking never propagates to URL. Pre-existing on Jobs / People / Companies; previously masked on the global HeaderSearch because the old plain `<Input/>` did fire on every keystroke. After the 2026-05-24 sweep replaced that input with `<LocationFilter/>`, freeform typing in the global Advanced popover no longer fills `?location=`. To close: extend LocationFilter to fire `onChange({...value, text})` debounced on keystroke when no hit is accepted, so the `location` text query param feeds server-side string match endpoints (companies, articles) even without geocoder coverage. |"
-  }
-]

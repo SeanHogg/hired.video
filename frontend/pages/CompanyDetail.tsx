@@ -266,7 +266,7 @@ export default function CompanyDetail() {
                               {company.data.name}
                             </h1>
                             <Badge className={getStatusColor(company.status)}>
-                              {String(company.status)}
+                              {t(`status.companyStatus.${company.status}`, { defaultValue: String(company.status) })}
                             </Badge>
                             <ArtifactDetailsSheet
                               permission={{
@@ -278,7 +278,7 @@ export default function CompanyDetail() {
                               }}
                               title={company.data.name}
                               chips={
-                                <Badge variant="secondary">{String(company.status)}</Badge>
+                                <Badge variant="secondary">{t(`status.companyStatus.${company.status}`, { defaultValue: String(company.status) })}</Badge>
                               }
                               activity={{
                                 viewCount: (company as any).viewCount ?? undefined,

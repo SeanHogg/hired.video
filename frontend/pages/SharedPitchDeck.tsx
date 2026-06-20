@@ -101,8 +101,8 @@ export default function SharedPitchDeck() {
   const [slideIndex, setSlideIndex] = useState(0);
 
   useUgcSeo("shareToken", {
-    title: "Candidate Pitch Deck",
-    description: "Curated candidate shortlist shared via hired.video.",
+    title: t("sharedPitchDeck.seo.title"),
+    description: t("sharedPitchDeck.seo.description"),
   });
 
   useEffect(() => {

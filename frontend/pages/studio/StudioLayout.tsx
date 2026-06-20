@@ -174,7 +174,7 @@ function Landing() {
               {t("messages.studioLayout.heroSubtitle")}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              {/* Anon adoption (#2100): drop visitors straight into the editor
+              {/* Anon adoption (#2212): drop visitors straight into the editor
                   on a fresh video-resume draft — no account required. Save /
                   Publish / Export prompt for sign-up in place (and keep their
                   work) via the Studio conversion gate. */}

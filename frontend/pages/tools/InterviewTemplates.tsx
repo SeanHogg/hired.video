@@ -218,7 +218,7 @@ export default function InterviewTemplates() {
                   <div className="flex gap-2 flex-wrap">
                     <Button size="sm" variant="outline" onClick={() => setEditing(s)} className="gap-1">
                       <Eye className="h-3.5 w-3.5" />
-                      Open
+                      {t("actions.open")}
                     </Button>
                     <Button
                       size="sm"
@@ -228,7 +228,7 @@ export default function InterviewTemplates() {
                       className="gap-1 text-muted-foreground"
                     >
                       <Archive className="h-3.5 w-3.5" />
-                      Archive
+                      {t("actions.archive")}
                     </Button>
                   </div>
                 </CardContent>
@@ -239,9 +239,10 @@ export default function InterviewTemplates() {
 
         <Alert>
           <AlertDescription className="text-xs">
-            Attach a template to a job from the{" "}
-            <Link to="/jobs" className="underline">Jobs page</Link> → Edit → Video screening, or send
-            ad-hoc invites from <Link to="/tools/interview-questions" className="underline">Interview Questions</Link>.
+            {t("messages.interviewTemplates.attachHintPrefix")}{" "}
+            <Link to="/jobs" className="underline">{t("messages.interviewTemplates.attachHintJobsLink")}</Link>{" "}
+            {t("messages.interviewTemplates.attachHintMiddle")}{" "}
+            <Link to="/tools/interview-questions" className="underline">{t("messages.interviewTemplates.attachHintQuestionsLink")}</Link>.
           </AlertDescription>
         </Alert>
       </div>
@@ -510,7 +511,7 @@ function TemplateEditorDialog({
             <div className="space-y-2">
               {questions.map((q, i) => (
                 <div key={q.id} className="rounded-md border p-2 flex items-start gap-2">
-                  <span className="text-xs text-muted-foreground pt-1">Q{i + 1}</span>
+                  <span className="text-xs text-muted-foreground pt-1">{t("labels.interview.qShort", { number: i + 1 })}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm">{q.text}</p>
                     <div className="flex gap-1.5 mt-1 flex-wrap">

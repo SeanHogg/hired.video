@@ -238,7 +238,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
         ...script,
         scenes: script.scenes.map((s) =>
           s.id === focusedSceneId
-            ? { ...s, sceneAudio: cdnUrl, sceneAudioLabel: "Stock audio" }
+            ? { ...s, sceneAudio: cdnUrl, sceneAudioLabel: t("studio.sidebar.stockAudioLabel") }
             : s,
         ),
       });
@@ -1199,7 +1199,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
             </div>
           )}
           <p className="text-[10px] text-muted-foreground mt-1.5 leading-tight">
-            Music plays during preview and is mixed during export.
+            {t("studio.sidebar.musicHint")}
           </p>
           </>}
         </section>

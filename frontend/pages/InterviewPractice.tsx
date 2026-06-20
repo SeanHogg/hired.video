@@ -184,7 +184,7 @@ function QuestionsPreviewStep({
     <div className="space-y-6">
       <div>
         <div className="flex items-center gap-2 mb-2">
-          <Badge variant="outline" className="capitalize">{interviewType}</Badge>
+          <Badge variant="outline" className="capitalize">{t(`labels.interview.typeName.${interviewType}`)}</Badge>
           <span className="text-sm text-muted-foreground">
             {t("labels.interview.questionsCountMins", { count: questions.length, minutes: totalMinutes })}
           </span>
