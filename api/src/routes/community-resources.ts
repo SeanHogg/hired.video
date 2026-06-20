@@ -22,6 +22,7 @@ import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
+import { resolveGeoSlugs } from "../services/location/resolve-geo-slugs.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
 import { withGamification } from "../domains/gamification/with-gamification.js";
 import {
@@ -60,11 +61,24 @@ export const SubmitSchema = z
 communityResourceRoutes.get("/", async (c) => {
   const country = c.req.query("country");
   if (!country) return c.json(error("VALIDATION_ERROR", "country is required"), 400);
-  const repos = buildRepos(getDb());
+  const db = getDb();
+  const repos = buildRepos(db);
+  // Resolve the request slugs to canonical geo ids so the directory matches on
+  // identity, not slug form (#1833) — falls back to slug matching when the geo
+  // doesn't resolve (e.g. a country/state not in the reference tables).
+  const resolved = await resolveGeoSlugs(db, {
+    country,
+    state: c.req.query("state"),
+    city: c.req.query("city"),
+  });
+  const geo = resolved.geo;
   const rows = await repos.communityResources.listApproved({
     countryCode: slug(country),
     stateCode: c.req.query("state") ? slug(c.req.query("state")!) : null,
     citySlug: c.req.query("city") ? slug(c.req.query("city")!) : null,
+    countryGeoId: geo?.country.id ?? null,
+    stateGeoId: geo?.state?.id ?? null,
+    cityGeoId: geo?.city?.id ?? null,
     audience: c.req.query("audience") ?? null,
     category: c.req.query("category") ?? null,
   });
@@ -79,7 +93,17 @@ communityResourceRoutes.post("/", async (c) => {
     return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
   }
   const d = parsed.data;
-  const repos = buildRepos(getDb());
+  const db = getDb();
+  const repos = buildRepos(db);
+  // Resolve the submitted geo to canonical ids (#1833) so this row matches the
+  // /in directory query regardless of whether the submitter typed "tx" or
+  // "texas". Best-effort: an un-resolvable geo stores null ids + keeps slugs.
+  const resolved = await resolveGeoSlugs(db, {
+    country: d.countryCode,
+    state: d.stateCode,
+    city: d.citySlug,
+  });
+  const geo = resolved.geo;
   const row = await repos.communityResources.insert({
     submittedBy: userId,
     title: d.title,
@@ -91,6 +115,9 @@ communityResourceRoutes.post("/", async (c) => {
     countryCode: slug(d.countryCode),
     stateCode: d.stateCode ? slug(d.stateCode) : null,
     citySlug: d.citySlug ? slug(d.citySlug) : null,
+    countryGeoId: geo?.country.id ?? null,
+    stateGeoId: geo?.state?.id ?? null,
+    cityGeoId: geo?.city?.id ?? null,
     status: "pending",
   });
 

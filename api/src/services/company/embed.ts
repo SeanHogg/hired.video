@@ -95,6 +95,10 @@ export interface CreateEmbedKeyInput {
   scopes: string[];
   allowedOrigins: string[];
   createdBy: string;
+  /** Optional expiry (#1828) — when set, the key auto-rejects after this many
+   *  days (`resolveEmbedRequest` already enforces `expiresAt`). Omit for a
+   *  non-expiring key. */
+  expiresInDays?: number | null;
 }
 
 /** Create a key; the full plaintext key is returned ONCE and never stored. */
@@ -103,6 +107,10 @@ export async function createEmbedKey(
   db = getDb(),
 ): Promise<{ key: string; view: EmbedKeyView }> {
   const { key, prefix, hash } = await generateEmbedKey();
+  const expiresAt =
+    input.expiresInDays && input.expiresInDays > 0
+      ? new Date(Date.now() + input.expiresInDays * 24 * 60 * 60 * 1000)
+      : null;
   const [row] = await db
     .insert(companyEmbedKeys)
     .values({
@@ -113,9 +121,44 @@ export async function createEmbedKey(
       scopes: input.scopes,
       allowedOrigins: input.allowedOrigins,
       createdBy: input.createdBy,
+      expiresAt,
     })
     .returning();
   return { key, view: toKeyView(row as EmbedKeyRow) };
+}
+
+/** Rotate a key (#1828): revoke the old one and mint a fresh key inheriting its
+ *  label / scopes / allowed origins, so an embed can roll its secret without
+ *  reconfiguring. Company-scoped; returns null when the key isn't found. */
+export async function rotateEmbedKey(
+  companyId: string,
+  keyId: string,
+  createdBy: string,
+  expiresInDays: number | null = null,
+  db = getDb(),
+): Promise<{ key: string; view: EmbedKeyView } | null> {
+  const [old] = await db
+    .select()
+    .from(companyEmbedKeys)
+    .where(and(eq(companyEmbedKeys.id, keyId), eq(companyEmbedKeys.companyId, companyId)))
+    .limit(1);
+  if (!old) return null;
+  await db
+    .update(companyEmbedKeys)
+    .set({ isActive: false })
+    .where(and(eq(companyEmbedKeys.id, keyId), eq(companyEmbedKeys.companyId, companyId)));
+  const o = old as EmbedKeyRow;
+  return createEmbedKey(
+    {
+      companyId,
+      label: o.label,
+      scopes: o.scopes as string[],
+      allowedOrigins: o.allowedOrigins as string[],
+      createdBy,
+      expiresInDays,
+    },
+    db,
+  );
 }
 
 /** Soft-revoke (isActive=false) — scoped to the company so a key can't be

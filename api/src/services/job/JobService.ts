@@ -8,6 +8,8 @@ import { normalizeSeniority } from "../../../../shared/seniority.js";
 import type { LLMClient } from "../adapters/llm-client.js";
 import { canViewerManageJob } from "../jobs/jobOwnership.js";
 import { bumpSearchVersion } from "../../utils/search-cache.js";
+import { invalidateCachedKey } from "../../utils/edge-cache.js";
+import { c360FunnelCacheKey } from "../career360/cache-keys.js";
 
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
 
@@ -1607,6 +1609,10 @@ export async function updateSavedJobStatus(jobId: string, userId: string, status
     } as any)
     .where(and(eq(savedJobs.userId, userId), eq(savedJobs.jobId, jobId)))
     .returning();
+  // Cross-track: a saved-job stage change moves the Career 360 inner-ring
+  // funnel — drop its cached aggregate so the ring refreshes immediately
+  // instead of waiting out the 120s TTL (#2129b).
+  if (updated) invalidateCachedKey(c360FunnelCacheKey(userId));
   return !!updated;
 }
 
@@ -1620,6 +1626,9 @@ export async function applyToJob(jobId: string, userId: string, application: App
     coverLetter: application.coverLetter,
     status: "applied",
   } as any).returning({ id: jobApplications.id });
+  // Applications fold into the Career 360 funnel's applied denominator — bust
+  // its cached aggregate so the inner ring reflects the new apply at once (#2129b).
+  invalidateCachedKey(c360FunnelCacheKey(userId));
   return { applicationId: created!.id };
 }
 

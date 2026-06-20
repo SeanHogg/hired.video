@@ -68,6 +68,12 @@ export type LLMUseCase =
   | "resume_merge"
   | "resume_summary"
   | "resume_consolidate_highlights"
+  // Resume image OCR (#gap — mobile photo/scan upload). VISION use case:
+  // the user message carries an `image_url` content block, so the model
+  // MUST be vision-capable. Keep it OUT of INTERACTIVE_USE_CASES — the
+  // paid terminal pool (cerebras/anthropic-haiku) is text-only and would
+  // be useless here; the route guards on empty OCR output instead.
+  | "resume_ocr"
   | "studio_misc"
   | "profile_audit"
   | "career_360"
@@ -299,6 +305,21 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
     ],
   },
   resume_merge: { model: "qwen/qwen3-coder:free", temperature: 0.2 },
+  // Vision OCR for resume images (phone photos / scans). gpt-4o-mini is a
+  // reliable, cheap vision model and the primary so OCR quality is good on
+  // the one-shot, user-initiated upload; a free vision model is the explicit
+  // fallback so a gpt outage doesn't 503 the upload. temp 0 — transcription,
+  // not generation. The text-only free pool auto-appended by withFallbackChain
+  // is only reached if BOTH vision models fail, in which case it produces no
+  // usable text and the /parse route returns a clear 422.
+  resume_ocr: {
+    model: "openai/gpt-4o-mini",
+    temperature: 0.0,
+    maxTokens: 4000,
+    fallbacks: [
+      { model: "meta-llama/llama-3.2-11b-vision-instruct:free", temperature: 0.0, maxTokens: 4000 },
+    ],
+  },
   resume_summary: { model: "google/gemma-4-31b-it:free", temperature: 0.5 },
   resume_consolidate_highlights: { model: "qwen/qwen3-coder:free", temperature: 0.4, maxTokens: 1200 },
   studio_misc: { model: "google/gemma-4-26b-a4b-it:free", temperature: 0.5 },
@@ -422,6 +443,7 @@ export const FEATURE_KEY_USE_CASE: Record<string, LLMUseCase> = {
   recruiter_match_score_jobs: "recruiter_match",
   recruiter_outreach: "recruiter_outreach",
   resume_consolidate_highlights: "resume_consolidate_highlights",
+  resume_image_ocr: "resume_ocr",
   resume_parse_ai: "resume_optimize",
   resume_roast: "resume_roast",
   resume_shorten_bullet: "resume_consolidate_highlights",

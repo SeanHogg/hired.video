@@ -16,30 +16,14 @@
  * verify side both call into this module — no duplicated parsing.
  */
 
+import { getAuthSecret, hmacHex } from "./signing.js";
+
 const TRUST_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-
-function getSecret(): string {
-  return process.env.JWT_SECRET || (globalThis as any).__ENV?.JWT_SECRET || "";
-}
-
-async function hmacHex(message: string, secret: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
-  return Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
 
 export async function mintTrustedDeviceCookie(userId: string): Promise<string> {
   const expiry = Date.now() + TRUST_TTL_MS;
   const payload = `${userId}.${expiry}`;
-  const sig = await hmacHex(payload, getSecret());
+  const sig = await hmacHex(payload, getAuthSecret());
   return `${payload}.${sig}`;
 }
 
@@ -88,7 +72,7 @@ export async function verifyTrustedDeviceCookieAsync(
   const [userId, expiryStr, sig] = parts;
   const expiry = parseInt(expiryStr!, 10);
   if (!Number.isFinite(expiry) || expiry < Date.now()) return { ok: false };
-  const expected = await hmacHex(`${userId}.${expiry}`, getSecret());
+  const expected = await hmacHex(`${userId}.${expiry}`, getAuthSecret());
   if (sig !== expected) return { ok: false };
   return { ok: true, userId };
 }

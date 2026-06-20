@@ -44,9 +44,17 @@ const providers = [
 interface OAuthProvidersProps {
   mode: "login" | "signup";
   redirect?: string;
+  /** Persona to create the account as when this is a signup surface. Forwarded
+   *  as `?role=` and validated server-side; only applied to NEW OAuth accounts
+   *  (existing users keep their role). Lets the affiliate / creator landing
+   *  pages offer "Continue with Google" that lands on the right role. */
+  role?: string;
+  /** When true, the new OAuth account also gets an affiliate profile minted —
+   *  parity with the password register's `enableAffiliate`. */
+  enableAffiliate?: boolean;
 }
 
-export default function OAuthProviders({ mode, redirect = "/dashboard" }: OAuthProvidersProps) {
+export default function OAuthProviders({ mode, redirect = "/dashboard", role, enableAffiliate }: OAuthProvidersProps) {
   const { t } = useTranslation();
   const verb = mode === "login" ? t("auth.oauth.continueWith") : t("auth.oauth.signupWith");
 
@@ -65,6 +73,10 @@ export default function OAuthProviders({ mode, redirect = "/dashboard" }: OAuthP
             // (gap #1683). The API signs these into the OAuth state.
             const attr = readAttribution();
             const params = new URLSearchParams({ redirect });
+            // Signup intent — only meaningful on signup surfaces; the API
+            // ignores it for existing accounts and validates the role.
+            if (mode === "signup" && role) params.set("role", role);
+            if (mode === "signup" && enableAffiliate) params.set("affiliate", "1");
             if (attr.ref) params.set("ref", attr.ref);
             if (attr.utmSource) params.set("utm_source", attr.utmSource);
             if (attr.utmMedium) params.set("utm_medium", attr.utmMedium);

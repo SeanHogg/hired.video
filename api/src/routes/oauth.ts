@@ -6,8 +6,10 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { sendMagicLinkEmail } from "../services/adapters/email.js";
 import { recordReferralAttribution } from "../services/auth/attribution.js";
+import { createAffiliateProfileForUser } from "../services/auth/affiliate.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { markUserLogin } from "./auth.js";
+import { isPublicSignupRole } from "../../../shared/user-roles.js";
 import {
   createSession,
   getActiveSessions,
@@ -129,13 +131,35 @@ function sanitizeAttribution(a: OAuthAttribution | undefined): OAuthAttribution 
   return hasAny ? out : undefined;
 }
 
-async function createOAuthState(redirect: string, linkUserId?: string, attribution?: OAuthAttribution): Promise<string> {
+/** Signup intent forwarded by the affiliate / creator landing pages so a
+ *  "Continue with Google" signup lands on the right role + auto-creates the
+ *  affiliate profile — the OAuth analogue of the password register's
+ *  `role` + `enableAffiliate` fields. Signed into the HMAC state so it can't
+ *  be swapped between start and callback. Only consulted on NEW-user creation;
+ *  an existing user logging in via OAuth keeps their stored role. */
+interface SignupIntent {
+  role?: string;
+  enableAffiliate?: boolean;
+}
+
+/** Keep only a whitelisted role; drop anything else (incl. `employee`/`admin`)
+ *  so a tampered start URL can't self-assign a privileged role. */
+function sanitizeIntent(i: SignupIntent | undefined): SignupIntent | undefined {
+  if (!i) return undefined;
+  const role = isPublicSignupRole(i.role) ? i.role : undefined;
+  const enableAffiliate = i.enableAffiliate === true ? true : undefined;
+  if (!role && !enableAffiliate) return undefined;
+  return { ...(role ? { role } : {}), ...(enableAffiliate ? { enableAffiliate } : {}) };
+}
+
+async function createOAuthState(redirect: string, linkUserId?: string, attribution?: OAuthAttribution, intent?: SignupIntent): Promise<string> {
   const secret = getJwtSecret();
   const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
   const attr = sanitizeAttribution(attribution);
-  const payload = JSON.stringify({ nonce, redirect: redirect || "/dashboard", ts: Date.now(), ...(linkUserId ? { linkUserId } : {}), ...(attr ? { attr } : {}) });
+  const intentClean = sanitizeIntent(intent);
+  const payload = JSON.stringify({ nonce, redirect: redirect || "/dashboard", ts: Date.now(), ...(linkUserId ? { linkUserId } : {}), ...(attr ? { attr } : {}), ...(intentClean ? { intent: intentClean } : {}) });
   const key = await crypto.subtle.importKey(
     "raw", new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
@@ -145,7 +169,7 @@ async function createOAuthState(redirect: string, linkUserId?: string, attributi
   return btoa(payload + "|" + sigHex);
 }
 
-async function verifyOAuthState(state: string): Promise<{ redirect: string; linkUserId?: string; attr?: OAuthAttribution } | null> {
+async function verifyOAuthState(state: string): Promise<{ redirect: string; linkUserId?: string; attr?: OAuthAttribution; intent?: SignupIntent } | null> {
   try {
     const secret = getJwtSecret();
     const decoded = atob(state);
@@ -159,9 +183,9 @@ async function verifyOAuthState(state: string): Promise<{ redirect: string; link
     const sigBytes = new Uint8Array(sigHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
     const valid = await crypto.subtle.verify("HMAC", key, sigBytes, new TextEncoder().encode(payload));
     if (!valid) return null;
-    const { redirect, ts, linkUserId, attr } = JSON.parse(payload);
+    const { redirect, ts, linkUserId, attr, intent } = JSON.parse(payload);
     if (Date.now() - ts > 10 * 60 * 1000) return null;
-    return { redirect: redirect || "/dashboard", linkUserId, attr };
+    return { redirect: redirect || "/dashboard", linkUserId, attr, intent: sanitizeIntent(intent) };
   } catch {
     return null;
   }
@@ -331,7 +355,17 @@ oauthRoutes.get("/:provider", async (c) => {
     landingReferrer: c.req.query("landing_referrer") || undefined,
   };
 
-  const state = await createOAuthState(redirect, linkUserId, attribution);
+  // Signup intent forwarded by the affiliate / creator landing pages (or any
+  // signup surface that passes ?role=). Validated + signed into the state so
+  // a NEW account created through this handshake lands on the right role and
+  // (for affiliates) gets its affiliate profile minted — parity with the
+  // password register's role + enableAffiliate fields.
+  const intent: SignupIntent = {
+    role: c.req.query("role") || undefined,
+    enableAffiliate: c.req.query("affiliate") === "1" || c.req.query("affiliate") === "true",
+  };
+
+  const state = await createOAuthState(redirect, linkUserId, attribution, intent);
   const callbackUrl = `${getApiBase()}/api/auth/oauth/${name}/callback`;
 
   const params = new URLSearchParams({
@@ -426,12 +460,19 @@ oauthRoutes.get("/:provider/callback", async (c) => {
       userId = existing.id;
     } else {
       const attr = stateData.attr;
+      // Honour the signed signup intent so OAuth signups from the affiliate /
+      // creator landing pages land on the right role (parity with password
+      // register). Defaults to job_seeker for organic "Continue with X".
+      const signupRole = stateData.intent?.role ?? "job_seeker";
       const [newUser] = await db.insert(users).values({
         email: providerUser.email!.toLowerCase(),
         name: providerUser.name,
         passwordHash: null,
         emailVerified: true,
-        role: "job_seeker",
+        role: signupRole,
+        // Creator signups land in channel-mode immediately so their /people
+        // profile renders as a channel from day one (mirrors handleRegister).
+        ...(signupRole === "creator" ? { profileMode: "channel" } : {}),
         // Pin the signup network attribution to the user row so spam
         // investigation works the same for password and OAuth signups.
         signupIp: extractClientIp(c),
@@ -462,9 +503,27 @@ oauthRoutes.get("/:provider/callback", async (c) => {
         { referralCode: attr?.ref, userId, ipAddress: extractClientIp(c), userAgent: extractUserAgent(c) },
         db,
       );
-      // Seed onboarding tasks for the new user (fire-and-forget)
+      // Auto-create the affiliate profile when the signup intent opted in
+      // (the affiliate landing page's "Continue with X"). Same code shape +
+      // commission defaults as the password path via the shared helper.
+      if (stateData.intent?.enableAffiliate) {
+        try {
+          await createAffiliateProfileForUser(db, {
+            userId,
+            name: providerUser.name,
+            randomHex: (bytes) =>
+              Array.from(crypto.getRandomValues(new Uint8Array(bytes)))
+                .map((b) => b.toString(16).padStart(2, "0"))
+                .join(""),
+          });
+        } catch (err) {
+          console.error("[oauth] Failed to create affiliate profile:", err);
+        }
+      }
+      // Seed onboarding tasks for the new user with their actual role so a
+      // creator / affiliate gets the right starter checklist (fire-and-forget).
       c.executionCtx.waitUntil(
-        seedOnboardingTasks(userId, "job_seeker").catch((err) =>
+        seedOnboardingTasks(userId, signupRole).catch((err) =>
           console.error("[oauth] Failed to seed onboarding tasks:", err),
         ),
       );

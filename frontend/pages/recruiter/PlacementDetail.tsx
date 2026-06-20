@@ -17,6 +17,7 @@ import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { useToast } from "@/components/ui/use-toast";
 import { apiClient, standardAuthHeaders } from "@/lib/api-client";
@@ -155,7 +156,7 @@ export default function PlacementDetail() {
         <div className="hidden">{/* Use anchor-style tabs but switch via local state below */}</div>
         <TabSwitcher activeTab={activeTab} onChange={setActiveTab} />
 
-        {activeTab === "overview" && <OverviewTab placement={placement} />}
+        {activeTab === "overview" && <OverviewTab placement={placement} onUpdated={setPlacement} toast={toast} />}
         {activeTab === "documents" && <DocumentsTab placementId={placement.id} toast={toast} />}
         {activeTab === "timesheets" && <TimesheetsTab placementId={placement.id} candidateId={placement.candidateId} toast={toast} />}
         {activeTab === "margin" && <MarginTab placementId={placement.id} toast={toast} />}
@@ -189,54 +190,159 @@ function TabSwitcher({ activeTab, onChange }: { activeTab: TabKey; onChange: (t:
   );
 }
 
-function OverviewTab({ placement }: { placement: PlacementRow }) {
+/** Editable back-office axis (invoice / payable / payroll) — #229. Read-only
+ *  grid by default; "Edit" reveals an inline form that PUTs the whitelisted
+ *  fields to `/api/recruiter/placements/:id` (same sanitizer as create) and
+ *  lifts the refreshed row back to the page. */
+function OverviewTab({
+  placement,
+  onUpdated,
+  toast,
+}: {
+  placement: PlacementRow;
+  onUpdated: (p: PlacementRow) => void;
+  toast: ReturnType<typeof useToast>["toast"];
+}) {
   const { t } = useTranslation();
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<Partial<PlacementRow>>({});
+
   const fmtRate = (rate: string | null) =>
     rate
       ? new Intl.NumberFormat(undefined, { style: "currency", currency: placement.currency ?? "USD" })
           .format(Number(rate))
       : "—";
 
+  const startEdit = () => {
+    setForm({
+      placementKind: placement.placementKind,
+      billRateHourly: placement.billRateHourly,
+      payRateHourly: placement.payRateHourly,
+      currency: placement.currency,
+      poNumber: placement.poNumber,
+      msaRef: placement.msaRef,
+      endDate: placement.endDate ? placement.endDate.slice(0, 10) : null,
+    });
+    setEditing(true);
+  };
+
+  const set = (key: keyof PlacementRow, value: string) =>
+    setForm((f) => ({ ...f, [key]: value === "" ? null : value }));
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const res = await apiClient.put<PlacementRow>(`/api/recruiter/placements/${placement.id}`, form);
+      onUpdated(res.data);
+      setEditing(false);
+      toast({ title: t("messages.saved", { defaultValue: "Saved" }) });
+    } catch (e) {
+      toast({
+        title: t("messages.saveFailed", { defaultValue: "Couldn't save" }),
+        description: String((e as Error).message),
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{t("headings.placement.engagementDetails")}</CardTitle>
+        {!editing ? (
+          <Button size="sm" variant="outline" onClick={startEdit}>
+            {t("actions.edit", { defaultValue: "Edit" })}
+          </Button>
+        ) : (
+          <div className="flex gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={saving}>
+              {t("actions.cancel", { defaultValue: "Cancel" })}
+            </Button>
+            <Button size="sm" onClick={save} disabled={saving}>
+              {t("actions.save", { defaultValue: "Save" })}
+            </Button>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-          <div>
-            <div className="text-muted-foreground text-xs">{t("labels.placement.billRate")}</div>
-            <div className="font-mono tabular-nums">{fmtRate(placement.billRateHourly)} / h</div>
+        {editing ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <label className="space-y-1">
+              <span className="text-muted-foreground text-xs">{t("labels.placement.kind", { defaultValue: "Engagement type" })}</span>
+              <select
+                value={(form.placementKind as string) ?? ""}
+                onChange={(e) => set("placementKind", e.target.value)}
+                className="w-full rounded border border-border px-2 py-1 text-sm"
+              >
+                <option value="">—</option>
+                <option value="contract">Contract</option>
+                <option value="direct_hire">Direct hire</option>
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-muted-foreground text-xs">{t("labels.placement.billRate")}</span>
+              <Input type="number" value={(form.billRateHourly as string) ?? ""} onChange={(e) => set("billRateHourly", e.target.value)} />
+            </label>
+            <label className="space-y-1">
+              <span className="text-muted-foreground text-xs">{t("labels.placement.payRate")}</span>
+              <Input type="number" value={(form.payRateHourly as string) ?? ""} onChange={(e) => set("payRateHourly", e.target.value)} />
+            </label>
+            <label className="space-y-1">
+              <span className="text-muted-foreground text-xs">{t("fields.currency.label")}</span>
+              <Input value={(form.currency as string) ?? ""} onChange={(e) => set("currency", e.target.value)} placeholder="USD" />
+            </label>
+            <label className="space-y-1">
+              <span className="text-muted-foreground text-xs">{t("labels.placement.end")}</span>
+              <Input type="date" value={(form.endDate as string) ?? ""} onChange={(e) => set("endDate", e.target.value)} />
+            </label>
+            <label className="space-y-1">
+              <span className="text-muted-foreground text-xs">{t("labels.placement.poNumber")}</span>
+              <Input value={(form.poNumber as string) ?? ""} onChange={(e) => set("poNumber", e.target.value)} />
+            </label>
+            <label className="space-y-1">
+              <span className="text-muted-foreground text-xs">{t("labels.placement.msaRef")}</span>
+              <Input value={(form.msaRef as string) ?? ""} onChange={(e) => set("msaRef", e.target.value)} />
+            </label>
           </div>
-          <div>
-            <div className="text-muted-foreground text-xs">{t("labels.placement.payRate")}</div>
-            <div className="font-mono tabular-nums">{fmtRate(placement.payRateHourly)} / h</div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <div className="text-muted-foreground text-xs">{t("labels.placement.billRate")}</div>
+              <div className="font-mono tabular-nums">{fmtRate(placement.billRateHourly)} / h</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">{t("labels.placement.payRate")}</div>
+              <div className="font-mono tabular-nums">{fmtRate(placement.payRateHourly)} / h</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">{t("fields.currency.label")}</div>
+              <div>{placement.currency ?? "USD"}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">{t("labels.start")}</div>
+              <div>{placement.startDate ? new Date(placement.startDate).toLocaleDateString() : "—"}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">{t("labels.placement.end")}</div>
+              <div>{placement.endDate ? new Date(placement.endDate).toLocaleDateString() : "—"}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">{t("labels.recruiter")}</div>
+              <div>{placement.recruiterName}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">{t("labels.placement.poNumber")}</div>
+              <div>{placement.poNumber ?? "—"}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">{t("labels.placement.msaRef")}</div>
+              <div>{placement.msaRef ?? "—"}</div>
+            </div>
           </div>
-          <div>
-            <div className="text-muted-foreground text-xs">{t("fields.currency.label")}</div>
-            <div>{placement.currency ?? "USD"}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground text-xs">{t("labels.start")}</div>
-            <div>{placement.startDate ? new Date(placement.startDate).toLocaleDateString() : "—"}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground text-xs">{t("labels.placement.end")}</div>
-            <div>{placement.endDate ? new Date(placement.endDate).toLocaleDateString() : "—"}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground text-xs">{t("labels.recruiter")}</div>
-            <div>{placement.recruiterName}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground text-xs">{t("labels.placement.poNumber")}</div>
-            <div>{placement.poNumber ?? "—"}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground text-xs">{t("labels.placement.msaRef")}</div>
-            <div>{placement.msaRef ?? "—"}</div>
-          </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

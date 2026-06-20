@@ -21,6 +21,7 @@ import {
   listEmbedKeys,
   createEmbedKey,
   revokeEmbedKey,
+  rotateEmbedKey,
   buildEmbedSnippet,
 } from "../services/company/embed.js";
 import { EMBED_VIEWS, EMBED_VIEW_KEYS, EMBED_ROADMAP } from "../../../shared/embed.js";
@@ -32,6 +33,8 @@ const CreateKeySchema = z.object({
   label: z.string().min(1).max(255),
   scopes: z.array(z.string().max(64)).max(20).default([]),
   allowedOrigins: z.array(z.string().url().max(255)).max(20).default([]),
+  // Optional expiry in days (#1828); omit / null = non-expiring.
+  expiresInDays: z.number().int().positive().max(3650).optional().nullable(),
 });
 
 /** GET — the full embed settings payload for the company settings UI. */
@@ -98,9 +101,24 @@ companyEmbedRoutes.post("/keys", async (c) => {
     scopes,
     allowedOrigins: parsed.data.allowedOrigins,
     createdBy: userId,
+    expiresInDays: parsed.data.expiresInDays ?? null,
   });
   // The full key is returned exactly once.
   return c.json(success({ key, keyInfo: view }), 201);
+});
+
+/** POST keys/:keyId/rotate — revoke the old key + mint a fresh one inheriting
+ *  its label / scopes / origins (#1828). Returns the new plaintext key once. */
+companyEmbedRoutes.post("/keys/:keyId/rotate", async (c) => {
+  const { denied, access } = await requireCompanyOwner(c, c.req.param("companyId"));
+  if (denied) return denied;
+  const userId = c.var.user!.sub;
+  const body = await c.req.json().catch(() => ({}));
+  const expiresInDays =
+    typeof body?.expiresInDays === "number" && body.expiresInDays > 0 ? body.expiresInDays : null;
+  const result = await rotateEmbedKey(access!.companyId, c.req.param("keyId"), userId, expiresInDays);
+  if (!result) return c.json(error("NOT_FOUND", "Key not found"), 404);
+  return c.json(success({ key: result.key, keyInfo: result.view }), 201);
 });
 
 /** DELETE keys/:keyId — revoke (soft). */

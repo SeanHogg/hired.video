@@ -124,6 +124,20 @@ function HomeMarketingPage() {
       border: "border-primary/20 hover:border-primary/40",
       iconColor: "text-primary",
     },
+    {
+      // #2009 — surface the platform's full breadth below the fold, not just
+      // the job-seeker story: recruiting/ATS, the creator economy, learning.
+      icon: Users,
+      title: t("marketing.home.feature.platform.title"),
+      description: t("marketing.home.feature.platform.desc"),
+      bullets: [
+        t("marketing.home.feature.platform.bullet1"),
+        t("marketing.home.feature.platform.bullet2"),
+        t("marketing.home.feature.platform.bullet3"),
+      ],
+      border: "border-brand-blue/20 hover:border-brand-blue/40",
+      iconColor: "text-brand-blue",
+    },
   ];
 
   const HOME_HOW_IT_WORKS = [
@@ -221,7 +235,7 @@ function HomeMarketingPage() {
               <p className="text-center text-muted-foreground mb-12">
                 {t("marketing.home.featuresSubtitle")}
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 {HOME_FEATURES.map(
                   ({ icon: Icon, title, description, bullets, border, iconColor }) => (
                     <Card

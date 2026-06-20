@@ -21,8 +21,7 @@ import PeopleCard from "@/components/PeopleCard";
 import { getSamplePersonById } from "@/lib/sample-people";
 import BlogStudioTemplateRow from "@/components/blog/BlogStudioTemplateRow";
 import { AppShell } from "@/components/AppShell";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import Markdown from "@/components/Markdown";
 import TextNarrator from "@/components/audio/TextNarrator";
 import { textFromFAQ } from "@/lib/audio/narrator-text";
 
@@ -262,11 +261,9 @@ export default function BlogPost() {
           {post.sections.map((section, i) => (
             <section key={i} className="mb-8">
               <h2 className="text-2xl font-semibold mb-3">{section.heading}</h2>
-              <div className="prose prose-gray dark:prose-invert max-w-none text-base leading-relaxed">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {section.body}
-                </ReactMarkdown>
-              </div>
+              <Markdown className="prose prose-gray dark:prose-invert max-w-none text-base leading-relaxed">
+                {section.body}
+              </Markdown>
             </section>
           ))}
 

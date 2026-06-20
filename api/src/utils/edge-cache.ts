@@ -25,6 +25,15 @@ function getKv(): KVNamespace | undefined {
   return (globalThis as any).__ENV?.KV_CACHE as KVNamespace | undefined;
 }
 
+/** The shared Workers KV binding (`KV_CACHE`). Exported so other primitives
+ *  that legitimately need raw KV — e.g. the best-effort rate limiter
+ *  ([rate-limit.ts](./rate-limit.ts)) — reach it through ONE accessor instead
+ *  of re-reading `globalThis.__ENV` (DRY). Returns undefined in dev/tests
+ *  where the binding isn't present. */
+export function getKvNamespace(): KVNamespace | undefined {
+  return getKv();
+}
+
 export interface EdgeCacheOptions<T> {
   /** Stable, namespaced key. Prefix per use case (e.g. `plan:`, `seat:`). */
   key: string;

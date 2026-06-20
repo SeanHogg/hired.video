@@ -21,6 +21,7 @@ import { getDb, schema } from "../../db/index.js";
 import { createLLMClient, defineLenientIngest } from "../adapters/llm-client.js";
 import { recordTokenUsage } from "../billing/BillingService.js";
 import { getOrSetCached } from "../../utils/edge-cache.js";
+import { c360FunnelCacheKey } from "./cache-keys.js";
 import {
   CareerTargetDocSchema,
   EvaluateRequestSchema,
@@ -747,7 +748,7 @@ export interface FunnelCounts {
  *  a per-row fan-out. */
 async function loadFunnelCounts(userId: string): Promise<FunnelCounts> {
   return getOrSetCached<FunnelCounts>({
-    key: `c360:funnel:${userId}`,
+    key: c360FunnelCacheKey(userId),
     ttlSeconds: OUTCOMES_CACHE_TTL_SECONDS,
     loader: () => computeFunnelCounts(userId),
   });

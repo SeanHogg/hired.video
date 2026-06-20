@@ -370,6 +370,8 @@ export default function ServicesManagement() {
                 register={registerCreator}
                 onSuccess={goToSignupSuccess}
                 isLoading={authLoading}
+                oauthRole={USER_ROLES.CREATOR}
+                oauthRedirect="/services/creator"
               />
             </div>
           </section>

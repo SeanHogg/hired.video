@@ -116,6 +116,9 @@ export default function AffiliateProgram() {
                   register={registerAffiliate}
                   onSuccess={goToSuccess}
                   isLoading={isLoading}
+                  oauthRole={USER_ROLES.AFFILIATE}
+                  oauthEnableAffiliate
+                  oauthRedirect="/services?tab=dashboard"
                 />
               )}
             </div>

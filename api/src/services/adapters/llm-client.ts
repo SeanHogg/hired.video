@@ -32,6 +32,7 @@ import {
   BuilderforceApiError,
   type ChatMessage,
   type ChatCompletionResponse,
+  type ContentPart,
   type JsonSchemaSpec,
   type ResponseFormat,
 } from "@seanhogg/builderforce-sdk";
@@ -74,12 +75,18 @@ export interface ToolCall {
   function: { name: string; arguments: string };
 }
 
+/** Vision/multimodal content block. Re-exported from the gateway SDK so
+ *  call sites (resume image OCR, future vision features) can build
+ *  `image_url` parts without importing the SDK directly. A `ContentPart[]`
+ *  message mixes `{ type: "text" }` and `{ type: "image_url" }` blocks. */
+export type LLMContentPart = ContentPart;
+
 export interface LLMMessage {
   role: "system" | "user" | "assistant" | "tool";
-  /** Plain string for text-only messages. (Vision content blocks are
-   *  supported by the gateway via `ContentPart[]`, but we keep our
-   *  internal API string-only until a vision call site lands.) */
-  content: string;
+  /** Plain string for text-only messages, or `ContentPart[]` for vision
+   *  (text + image_url blocks). The first vision call site is resume image
+   *  OCR (`callMessages` with `useCase: "resume_ocr"`). */
+  content: string | LLMContentPart[];
   /** Set on assistant messages that returned tool_calls. Replay
    *  verbatim when continuing a tool-calling conversation. */
   tool_calls?: ToolCall[];

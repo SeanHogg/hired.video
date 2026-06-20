@@ -34,6 +34,13 @@ import {
 } from "../domains/people-ops/peopleOpsService.js";
 import { EMBED_VIEW_KEYS } from "../../../shared/embed.js";
 import { computeTeamHealth } from "../domains/people-ops/teamHealth.js";
+import { checkRateLimit } from "../utils/rate-limit.js";
+
+/** Per-key soft rate limit on the public embed data API (#1828) — 120 reads
+ *  per key per minute is generous for a live dashboard refresh while capping
+ *  scraping/abuse of an unauthenticated, key-only surface. */
+const EMBED_RATE_LIMIT = 120;
+const EMBED_RATE_WINDOW_SECONDS = 60;
 
 function readKey(c: { req: { header: (n: string) => string | undefined; query: (n: string) => string | undefined } }): string {
   return c.req.header("x-hired-embed-key") || c.req.query("key") || "";
@@ -73,7 +80,19 @@ embedApiRoutes.get("/v1/:view", async (c) => {
     return c.json(error("NOT_FOUND", "Unknown embed view"), 404);
   }
   try {
-    const { scope } = await resolveEmbedRequest(readKey(c), view, {
+    const embedKey = readKey(c);
+    // Per-key soft rate limit (#1828) — key on the unguessable prefix + view so
+    // one key hammering one surface is throttled without affecting other keys.
+    const rl = await checkRateLimit(
+      `embed:${embedKey.slice(0, 16)}:${view}`,
+      EMBED_RATE_LIMIT,
+      EMBED_RATE_WINDOW_SECONDS,
+    );
+    if (!rl.allowed) {
+      c.header("Retry-After", String(rl.retryAfterSeconds));
+      return c.json(error("RATE_LIMITED", "Too many requests for this embed key"), 429);
+    }
+    const { scope } = await resolveEmbedRequest(embedKey, view, {
       origin: c.req.header("origin") ?? null,
     });
     const svc = buildService();

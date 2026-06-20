@@ -42,6 +42,7 @@ import {
   markUserLogin,
 } from "../../routes/auth.js";
 import { createSession, bumpSessionVersion, revokeAllSessionsForUser } from "./sessions.js";
+import { mintTwoFactorApproveToken } from "./twoFactorApprove.js";
 import { isAccountLocked } from "./lock.js";
 import { validateSignupRequest, captchaSoftCheck } from "./signupGuard.js";
 import { recordBotBlock } from "./botBlock.js";
@@ -50,10 +51,11 @@ import { scoreLoginRisk } from "./risk.js";
 import { detectCountry } from "./geo.js";
 import { checkEmailRateLimit } from "./emailRateLimit.js";
 import { recordReferralAttribution } from "./attribution.js";
+import { createAffiliateProfileForUser } from "./affiliate.js";
 import { getDefaultProfileSections } from "../../../../shared/profile-sections.js";
 import { isLocale, type Locale } from "../../../../shared/i18n.js";
 
-const { users, userProfiles, accountPreferences, passwordResetTokens, emailVerificationTokens, twoFactorCodes, affiliateProfiles, loginEvents } = schema;
+const { users, userProfiles, accountPreferences, passwordResetTokens, emailVerificationTokens, twoFactorCodes, loginEvents } = schema;
 
 // ---------------------------------------------------------------------------
 // recordLoginEvent — fire-and-forget insert into login_events. Awaited so
@@ -98,7 +100,7 @@ export interface EmailerPort {
   sendVerification(to: string, name: string, token: string): Promise<void>;
   sendResendVerification(to: string, name: string, token: string): Promise<void>;
   sendPasswordReset(to: string, name: string, token: string): Promise<void>;
-  sendTwoFactor(to: string, name: string, code: string): Promise<void>;
+  sendTwoFactor(to: string, name: string, code: string, approveToken?: string): Promise<void>;
   sendMagicLink(to: string, name: string, token: string): Promise<void>;
 }
 
@@ -408,15 +410,11 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
 
   if (enableAffiliate) {
     try {
-      const base = name.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6).padEnd(4, "X");
-      const rand = deps.randomHex(2).toUpperCase(); // deterministic in tests
-      const referralCode = `${base}${rand}`;
-      await deps.db.insert(affiliateProfiles).values({
+      await createAffiliateProfileForUser(deps.db as any, {
         userId: user.id,
-        referralCode,
-        commissionRate: "0.10",
-        status: "active",
-      } as any);
+        name,
+        randomHex: deps.randomHex, // deterministic in tests
+      });
     } catch (err) {
       console.error("[register] Failed to create affiliate profile:", err);
     }
@@ -613,8 +611,18 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
       .values({ userId: user.id, code, expiresAt, used: false } as any)
       .returning();
 
+    // One-tap approve link (gap #2225) — a signed, stateless token bound
+    // to this challenge row. Best-effort: a signing/secret failure just
+    // omits the button and the user falls back to typing the code.
+    let approveToken: string | undefined;
     try {
-      await deps.email.sendTwoFactor(user.email, user.name, entry.code);
+      approveToken = (await mintTwoFactorApproveToken(entry.id)) ?? undefined;
+    } catch (err) {
+      console.error("[login] Failed to mint 2FA approve token:", err);
+    }
+
+    try {
+      await deps.email.sendTwoFactor(user.email, user.name, entry.code, approveToken);
     } catch (err) {
       console.error("[login] Failed to send 2FA email:", err);
     }

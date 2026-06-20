@@ -31,6 +31,26 @@ export const USER_ROLES = {
 
 export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES];
 
+/** Roles a logged-out visitor may pick at signup — the public persona set.
+ *  Single SSoT shared by the password register schema posture and the OAuth
+ *  start route, which validates the inbound `?role=` before signing it into
+ *  the handshake state (so "Continue with Google" from the affiliate /
+ *  creator landing pages mints the right role). Deliberately excludes
+ *  `employee` (invite-only workforce), `admin` / `super_admin` (platform
+ *  staff — never self-served). */
+export const PUBLIC_SIGNUP_ROLES: readonly UserRole[] = [
+  "job_seeker",
+  "recruiter",
+  "employer",
+  "creator",
+  "affiliate",
+] as const;
+
+export function isPublicSignupRole(role: string | null | undefined): role is UserRole {
+  if (!role) return false;
+  return (PUBLIC_SIGNUP_ROLES as readonly string[]).includes(role);
+}
+
 /** Roles that can earn gamification points. Admin / super_admin are
  *  intentionally excluded. Employee is also excluded — they're invite-only
  *  workforce members, not earners on the gamification surface (see

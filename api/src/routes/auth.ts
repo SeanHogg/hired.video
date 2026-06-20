@@ -18,6 +18,7 @@ import {
 import { verifyTotp } from "../services/auth/totp.js";
 import { consumeBackupCode } from "../services/auth/backupCodes.js";
 import { mintTrustedDeviceCookie } from "../services/auth/trustedDevice.js";
+import { mintTwoFactorApproveToken, verifyTwoFactorApproveToken } from "../services/auth/twoFactorApprove.js";
 import { and, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, JwtPayload, AppEnv } from "../types/index.js";
@@ -162,6 +163,50 @@ async function consumeTwoFactorEntry(tempAuthToken: string) {
 
   await db.update(twoFactorCodes).set({ used: true } as any).where(eq(twoFactorCodes.id, entry.id));
   return entry;
+}
+
+/**
+ * Finalize a passed 2FA challenge into a real session. Single source of
+ * truth shared by the code-entry route (`/verify-2fa`) and the one-tap
+ * email approve link (`/verify-2fa-link`, gap #2225): create the session
+ * row (with the 3-device cap), optionally mint the trusted-device cookie,
+ * issue the JWT, and stamp lastLoginAt. The caller has already proven the
+ * second factor and consumed the challenge row.
+ */
+async function completeTwoFactorSession(
+  c: { req: { header: (k: string) => string | undefined }; header: (k: string, v: string, opts?: { append?: boolean }) => void },
+  db: ReturnType<typeof getDb>,
+  user: { id: string; email: string; name: string; role: string; emailVerified?: boolean | null },
+  opts: { trusted: boolean },
+): Promise<{ user: { id: string; email: string; name: string; role: string }; token: string; refreshToken: string; expiresAt: string }> {
+  const ipAddress = c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? null;
+  const userAgent = c.req.header("user-agent") ?? null;
+  const { session, refreshToken } = await createSession({
+    db,
+    userId: user.id,
+    ipAddress,
+    userAgent,
+    trusted: opts.trusted,
+  });
+  if (opts.trusted) {
+    const cookie = await mintTrustedDeviceCookie(user.id);
+    c.header(
+      "Set-Cookie",
+      `hv_trusted_device=${encodeURIComponent(cookie)}; Path=/; Max-Age=${30 * 24 * 60 * 60}; HttpOnly; Secure; SameSite=Lax`,
+      { append: true },
+    );
+  }
+  const token = await createJwt(
+    { sub: user.id, email: user.email, roles: [user.role], emailVerified: !!user.emailVerified, mustChangePassword: false, sid: session.id },
+    getJwtSecret(),
+  );
+  await markUserLogin(db, user.id);
+  return {
+    user: { id: user.id, email: user.email, name: user.name, role: user.role },
+    token,
+    refreshToken,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+  };
 }
 
 // ============================================================================
@@ -461,45 +506,47 @@ authRoutes.post("/verify-2fa", async (c) => {
     .where(eq(twoFactorCodes.id, pending.id));
 
   // 2FA-completion is the canonical "this is really the user" moment.
-  // The 3-device cap and trusted-device flags get applied via
-  // createSession. trustDevice=true also marks the session row as
-  // trusted AND mints the HMAC-signed cookie that skips MFA on future
-  // logins from this browser.
-  const ipAddress = c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? null;
-  const userAgent = c.req.header("user-agent") ?? null;
-  const wantTrust = parsed.data.trustDevice === true;
-  const { session, refreshToken } = await createSession({
-    db,
-    userId: user.id,
-    ipAddress,
-    userAgent,
-    trusted: wantTrust,
-  });
-  if (wantTrust) {
-    const cookie = await mintTrustedDeviceCookie(user.id);
-    c.header(
-      "Set-Cookie",
-      `hv_trusted_device=${encodeURIComponent(cookie)}; Path=/; Max-Age=${30 * 24 * 60 * 60}; HttpOnly; Secure; SameSite=Lax`,
-      { append: true },
-    );
+  // trustDevice=true marks the session row trusted AND mints the
+  // HMAC-signed cookie that skips MFA on future logins from this browser.
+  const payload = await completeTwoFactorSession(c, db, user, { trusted: parsed.data.trustDevice === true });
+
+  return c.json(success(payload), 200);
+});
+
+/** GET /api/auth/verify-2fa-link?token= — one-tap 2FA approve (gap #2225).
+ *  The signed token in the email link recovers + finalizes the pending
+ *  challenge into a session, so mobile users never type the 6-digit code.
+ *  Proves mailbox control exactly like the code does; the row's
+ *  used/expired flags are the replay guard. trustDevice isn't offered
+ *  here (no checkbox in an email), so the session is untrusted. */
+authRoutes.get("/verify-2fa-link", async (c) => {
+  const token = c.req.query("token");
+  if (!token) return c.json(error("VALIDATION_ERROR", "token is required"), 400);
+
+  const verified = await verifyTwoFactorApproveToken(token);
+  if (!verified.ok || !verified.challengeId) {
+    return c.json(error("UNAUTHORIZED", "Invalid or expired sign-in link"), 401);
   }
 
-  const token = await createJwt(
-    { sub: user.id, email: user.email, roles: [user.role], emailVerified: !!user.emailVerified, mustChangePassword: false, sid: session.id },
-    getJwtSecret(),
-  );
+  const db = getDb();
+  const [pending] = await db
+    .select()
+    .from(twoFactorCodes)
+    .where(eq(twoFactorCodes.id, verified.challengeId))
+    .limit(1);
+  if (!pending || pending.used || new Date(pending.expiresAt) <= new Date()) {
+    return c.json(error("UNAUTHORIZED", "Invalid or expired sign-in link"), 401);
+  }
 
-  await markUserLogin(db, user.id);
+  const [user] = await db.select().from(users).where(eq(users.id, pending.userId)).limit(1);
+  if (!user) return c.json(error("NOT_FOUND", "User not found"), 404);
+  if (!user.isActive) return c.json(error("UNAUTHORIZED", "Account is disabled"), 401);
 
-  return c.json(
-    success({
-      user: { id: user.id, email: user.email, name: user.name, role: user.role },
-      token,
-      refreshToken,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    }),
-    200,
-  );
+  // Consume the challenge — same single-use guarantee as code entry.
+  await db.update(twoFactorCodes).set({ used: true } as any).where(eq(twoFactorCodes.id, pending.id));
+
+  const payload = await completeTwoFactorSession(c, db, user, { trusted: false });
+  return c.json(success({ ...payload, redirect: "/dashboard" }), 200);
 });
 
 /** POST /api/auth/resend-2fa */
@@ -532,8 +579,9 @@ authRoutes.post("/resend-2fa", async (c) => {
     .where(eq(users.id, existing.userId))
     .limit(1);
   if (userForEmail) {
+    const approveToken = (await mintTwoFactorApproveToken(entry.id).catch(() => null)) ?? undefined;
     c.executionCtx.waitUntil(
-      sendTwoFactorEmail(userForEmail.email, userForEmail.name, entry.code).catch((err) =>
+      sendTwoFactorEmail(userForEmail.email, userForEmail.name, entry.code, 10, approveToken).catch((err) =>
         console.error("[resend-2fa] Failed to send 2FA email:", err),
       ),
     );

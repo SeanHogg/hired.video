@@ -569,6 +569,35 @@ recruiterRoutes.post("/placements", async (c) => {
 	return c.json(responseEnvelope(rowToPlacement(placement)));
 });
 
+// PUT /placements/:id — edit the back-office axis (invoice / payable / payroll)
+// POST-create (#229). Owner-scoped (recruiterId = caller); reuses the SAME
+// `sanitizePlacementBackOffice` whitelist+coercer as the create route so the
+// edit path can't inject arbitrary columns either (DRY). `notes` is editable
+// here too. Distinct path from `/:id/commission` + `/:id/guarantee` (extra
+// segment), so no route collision.
+recruiterRoutes.put("/placements/:id", async (c) => {
+	const user = c.get("user");
+	const id = c.req.param("id");
+	const body = await c.req.json();
+	const db = getDb();
+	const [updated] = await db
+		.update(schema.placements)
+		.set({
+			...sanitizePlacementBackOffice(body),
+			...(body.notes !== undefined ? { notes: body.notes } : {}),
+			updatedAt: new Date(),
+		} as any)
+		.where(
+			and(
+				eq(schema.placements.id, id),
+				eq(schema.placements.recruiterId, user.sub),
+			),
+		)
+		.returning();
+	if (!updated) return c.json(responseEnvelope(null), 404);
+	return c.json(responseEnvelope(rowToPlacement(updated)));
+});
+
 // #225 — Bulk save: N placements against (potentially) one job in a
 // single round-trip. Each row is independent — splits, fees, and
 // placement_type can vary row-by-row. The endpoint is owner-scoped

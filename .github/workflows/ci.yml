@@ -190,7 +190,16 @@ jobs:
           fi
 
       - name: Push DB schema
-        run: cd api && npm run db:push
+        # `set -e` + explicit exit-code propagation so a drizzle-kit push
+        # failure is FATAL here (#1220) — it must not be silently swallowed,
+        # because the SQL-migrations step below runs `if: always()` and would
+        # otherwise apply onto a half-bootstrapped DB and fail downstream with
+        # cryptic FK errors that look like the migration's fault.
+        run: |
+          set -e
+          cd api
+          npm run db:push
+          echo "db:push completed (exit $?)"
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 

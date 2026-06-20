@@ -4,10 +4,13 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { AuthCaptchaSlot } from "@/components/auth/AuthCaptchaSlot";
 import { EmailField } from "@/components/auth/EmailField";
+import OAuthProviders from "@/components/OAuthProviders";
 import { useTurnstile } from "@/lib/hooks/use-turnstile";
 import { mapAuthError } from "@/lib/services/auth-errors";
+import type { UserRole } from "@shared/user-roles";
 
 export interface ProgramSignupFields {
   firstName: string;
@@ -33,6 +36,15 @@ interface Props {
   onSuccess?: (fields: ProgramSignupFields) => void;
   /** Disable the form while the parent's auth call is in flight. */
   isLoading?: boolean;
+  /** Persona the "Continue with Google / LinkedIn / …" buttons create the
+   *  account as (affiliate page → affiliate, creator /services page →
+   *  creator). When set, the OAuth block renders above the email form so the
+   *  third-party signup lands on the same role as the password path. */
+  oauthRole?: UserRole;
+  /** Mint an affiliate profile for OAuth signups too (affiliate landing). */
+  oauthEnableAffiliate?: boolean;
+  /** Where to send the visitor after a successful OAuth signup. */
+  oauthRedirect?: string;
 }
 
 /**
@@ -52,6 +64,9 @@ export default function ProgramSignupForm({
   register,
   onSuccess,
   isLoading = false,
+  oauthRole,
+  oauthEnableAffiliate = false,
+  oauthRedirect = "/dashboard",
 }: Props) {
   const { t } = useTranslation();
   const captcha = useTurnstile();
@@ -96,6 +111,17 @@ export default function ProgramSignupForm({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
+        {oauthRole && (
+          <div className="space-y-6 mb-6">
+            <OAuthProviders mode="signup" role={oauthRole} enableAffiliate={oauthEnableAffiliate} redirect={oauthRedirect} />
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center"><Separator className="w-full" /></div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">{t("labels.signupWithEmail")}</span>
+              </div>
+            </div>
+          </div>
+        )}
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
             <label className="text-sm font-medium">{t("fields.firstName.label")}</label>

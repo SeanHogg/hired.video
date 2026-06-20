@@ -533,6 +533,15 @@ export function createApp() {
   // session links to user_id, retaining the pre-signup journey.
   const USAGE_TRACK_ROUTE = /^\/api\/usage\/track$/;
 
+  // Context-aware help meta reads (#2001) — GET /contexts, /resolve, /search
+  // serve mapping + search META only (never content) and the handlers never
+  // read c.var.user. The HelpDrawer renders for anonymous visitors on public
+  // pages, so without this carve-out the global authMiddleware 401'd them
+  // before the handler ran. GET-only: SuperAdmin curation (/mappings,
+  // /reindex) stays authenticated via the default branch and is excluded by
+  // the explicit slug alternation here.
+  const HELP_PUBLIC_READ_ROUTE = /^\/api\/help\/(?:contexts|resolve|search)(?:$|\?)/;
+
   // ─── Single source of truth: access mode per request ────────────────
   // Replaces the three parallel exemption lists that previously sat in
   // front of authMiddleware / emailVerifiedMiddleware / passwordChange-
@@ -558,6 +567,7 @@ export function createApp() {
     if (EMAIL_OAUTH_PUBLIC_ROUTE.test(path)) return "public";
     if (ACCOUNT_INVITE_PUBLIC_ROUTE.test(path)) return "public";
     if (COURSES_SCORM_ASSET_ROUTE.test(path)) return "public";
+    if (method === "GET" && HELP_PUBLIC_READ_ROUTE.test(path)) return "public";
 
     if (STUDIO_PUBLIC_ROUTE.test(path)) return "optional-auth";
     if (SCREENING_PORTAL_ROUTE.test(path)) return "optional-auth";

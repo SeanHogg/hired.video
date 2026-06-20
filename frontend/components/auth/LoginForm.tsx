@@ -25,6 +25,7 @@ import { Separator } from "@/components/ui/separator";
 import OAuthProviders from "@/components/OAuthProviders";
 import { AuthCaptchaSlot } from "@/components/auth/AuthCaptchaSlot";
 import { EmailField } from "@/components/auth/EmailField";
+import { OneTimeCodeInput } from "@/components/auth/OneTimeCodeInput";
 import { useAuth } from "@/lib/auth";
 import { useTurnstile } from "@/lib/hooks/use-turnstile";
 import { mapAuthError } from "@/lib/services/auth-errors";
@@ -98,16 +99,22 @@ export default function LoginForm({
     }
   };
 
-  const handleVerifySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!twoFactor) return;
+  const submitCode = async (value: string) => {
+    if (!twoFactor || isVerifying) return;
+    const candidate = value.trim();
+    if (candidate.length < 6) return;
     setIsVerifying(true);
     setError("");
     try {
-      const ok = await verifyTwoFactor(code.trim(), trustDevice);
+      const ok = await verifyTwoFactor(candidate, trustDevice);
       if (ok) { onAuthenticated(); } else { setError(t("errors.invalidCode")); }
     } catch { setError(t("errors.verificationFailed")); }
     finally { setIsVerifying(false); }
+  };
+
+  const handleVerifySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void submitCode(code);
   };
 
   const handleResend = async () => {
@@ -209,10 +216,16 @@ export default function LoginForm({
       ) : (
         <form onSubmit={handleVerifySubmit} className="space-y-4">
           <div className="text-sm text-muted-foreground">{t("messages.code2faIntro", { email: twoFactor.email })}</div>
-          <div className="space-y-2">
-            <Label htmlFor="code">{t("fields.verificationCode.label")}</Label>
-            <Input id="code" inputMode="numeric" autoComplete="one-time-code" placeholder={t("fields.verificationCode.placeholder")} value={code} onChange={(e) => setCode(e.target.value)} required />
-          </div>
+          <OneTimeCodeInput
+            id="code"
+            label={t("fields.verificationCode.label")}
+            placeholder={t("fields.verificationCode.placeholder")}
+            value={code}
+            onChange={setCode}
+            onComplete={submitCode}
+            disabled={isVerifying}
+          />
+          <p className="text-xs text-muted-foreground">{t("messages.code2faAutofillHint")}</p>
           <div className="flex items-center gap-2">
             <Checkbox id="trustDevice" checked={trustDevice} onCheckedChange={(v) => setTrustDevice(v === true)} />
             <Label htmlFor="trustDevice" className="text-sm font-normal cursor-pointer">{t("labels.trustThisDevice")}</Label>

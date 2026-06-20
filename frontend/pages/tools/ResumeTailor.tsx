@@ -37,7 +37,7 @@ import {
   type JobTailorResponse,
 } from "@/lib/services/match-service";
 import { useQuery } from "@tanstack/react-query";
-import ReactMarkdown from "react-markdown";
+import Markdown from "@/components/Markdown";
 import { toast } from "sonner";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
@@ -547,9 +547,9 @@ export default function ResumeTailor() {
                             <CardTitle>{t("tools.resumeTailor.recommendations")}</CardTitle>
                           </CardHeader>
                           <CardContent>
-                            <div className="prose prose-sm max-w-none dark:prose-invert">
-                              <ReactMarkdown>{result.summaryRecommendations}</ReactMarkdown>
-                            </div>
+                            <Markdown className="prose prose-sm max-w-none dark:prose-invert">
+                              {result.summaryRecommendations}
+                            </Markdown>
                           </CardContent>
                         </Card>
                       )}

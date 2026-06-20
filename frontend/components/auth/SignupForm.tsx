@@ -141,7 +141,7 @@ export default function SignupForm({
         </Alert>
       )}
 
-      <OAuthProviders mode="signup" />
+      <OAuthProviders mode="signup" role={role} redirect={redirectTo || undefined} />
 
       <div className="relative">
         <div className="absolute inset-0 flex items-center"><Separator className="w-full" /></div>

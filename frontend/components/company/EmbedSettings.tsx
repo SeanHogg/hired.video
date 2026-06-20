@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, KeyRound, ShieldAlert, Trash2, Code2 } from "lucide-react";
+import { Copy, KeyRound, ShieldAlert, Trash2, Code2, RotateCw } from "lucide-react";
 
 interface EmbedKeyView {
   id: string;
@@ -18,6 +18,7 @@ interface EmbedKeyView {
   allowedOrigins: string[];
   isActive: boolean;
   createdAt: string;
+  expiresAt: string | null;
 }
 interface EmbedViewWithSnippet {
   key: string;
@@ -49,6 +50,7 @@ export default function EmbedSettings({ companyId }: { companyId: string }) {
   const [busy, setBusy] = useState(false);
   const [newKeyLabel, setNewKeyLabel] = useState("");
   const [newKeyOrigin, setNewKeyOrigin] = useState("");
+  const [newKeyExpiry, setNewKeyExpiry] = useState("");
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [activeView, setActiveView] = useState("roster");
 
@@ -88,13 +90,16 @@ export default function EmbedSettings({ companyId }: { companyId: string }) {
     setBusy(true);
     setCreatedKey(null);
     try {
+      const expiresInDays = newKeyExpiry.trim() ? Number(newKeyExpiry.trim()) : null;
       const res = await apiClient.post<{ key: string }>(`${base}/keys`, {
         label: newKeyLabel.trim(),
         allowedOrigins: newKeyOrigin.trim() ? [newKeyOrigin.trim()] : [],
+        expiresInDays: expiresInDays && expiresInDays > 0 ? expiresInDays : null,
       });
       setCreatedKey(res.data.key);
       setNewKeyLabel("");
       setNewKeyOrigin("");
+      setNewKeyExpiry("");
       await load();
     } catch {
       toast({ title: "Couldn't create key", variant: "destructive" });
@@ -110,6 +115,21 @@ export default function EmbedSettings({ companyId }: { companyId: string }) {
       await load();
     } catch {
       toast({ title: "Couldn't revoke key", variant: "destructive" });
+    }
+  };
+
+  const rotateKey = async (id: string) => {
+    if (!window.confirm("Rotate this key? A new key is issued and the old one stops working immediately.")) return;
+    setBusy(true);
+    setCreatedKey(null);
+    try {
+      const res = await apiClient.post<{ key: string }>(`${base}/keys/${id}/rotate`, {});
+      setCreatedKey(res.data.key);
+      await load();
+    } catch {
+      toast({ title: "Couldn't rotate key", variant: "destructive" });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -178,7 +198,7 @@ export default function EmbedSettings({ companyId }: { companyId: string }) {
                 </Alert>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
                 <div>
                   <Label>Key label</Label>
                   <Input value={newKeyLabel} onChange={(e) => setNewKeyLabel(e.target.value)} placeholder="Production" />
@@ -187,25 +207,49 @@ export default function EmbedSettings({ companyId }: { companyId: string }) {
                   <Label>Allowed origin (optional)</Label>
                   <Input value={newKeyOrigin} onChange={(e) => setNewKeyOrigin(e.target.value)} placeholder="https://acme.com" />
                 </div>
+                <div>
+                  <Label>Expires (days, optional)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={newKeyExpiry}
+                    onChange={(e) => setNewKeyExpiry(e.target.value)}
+                    placeholder="Never"
+                  />
+                </div>
                 <Button onClick={createKey} disabled={busy || !newKeyLabel.trim()}>Create key</Button>
               </div>
 
               {data.keys.length > 0 && (
                 <div className="space-y-2">
-                  {data.keys.map((k) => (
-                    <div key={k.id} className="flex items-center justify-between rounded border p-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{k.label}</span>
-                        <code className="text-xs text-muted-foreground">{k.keyPrefix}…</code>
-                        {!k.isActive && <Badge variant="secondary">Revoked</Badge>}
+                  {data.keys.map((k) => {
+                    const expired = k.expiresAt != null && new Date(k.expiresAt).getTime() < Date.now();
+                    return (
+                      <div key={k.id} className="flex items-center justify-between rounded border p-2 text-sm">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{k.label}</span>
+                          <code className="text-xs text-muted-foreground">{k.keyPrefix}…</code>
+                          {!k.isActive && <Badge variant="secondary">Revoked</Badge>}
+                          {k.isActive && expired && <Badge variant="secondary">Expired</Badge>}
+                          {k.isActive && !expired && k.expiresAt && (
+                            <span className="text-xs text-muted-foreground">
+                              expires {new Date(k.expiresAt).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                        {k.isActive && (
+                          <div className="flex items-center gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => rotateKey(k.id)} disabled={busy} title="Rotate key">
+                              <RotateCw className="h-3 w-3" />
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => revokeKey(k.id)} title="Revoke key">
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                      {k.isActive && (
-                        <Button size="sm" variant="ghost" onClick={() => revokeKey(k.id)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

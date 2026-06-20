@@ -29,6 +29,13 @@ export interface CommunityResourceDirectoryFilter {
   /** When set, narrows to that city's resources PLUS state-wide ones
    *  (city_slug IS NULL). When omitted, returns all rows for the state. */
   citySlug?: string | null;
+  /** Canonical geo ids the request slug resolved to (#1833). When present, rows
+   *  are matched by id (robust to abbrev-vs-full-name / international slug
+   *  forms); rows with a NULL id (legacy / un-resolvable) fall back to slug
+   *  matching so nothing is dropped. */
+  countryGeoId?: number | null;
+  stateGeoId?: string | null;
+  cityGeoId?: string | null;
   audience?: string | null;
   category?: string | null;
 }
@@ -57,18 +64,44 @@ export class CommunityResourcesRepository implements ICommunityResourcesReposito
   constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}
 
   async listApproved(filter: CommunityResourceDirectoryFilter): Promise<CommunityResource[]> {
-    const clauses = [
-      eq(communityResources.status, "approved"),
-      eq(communityResources.countryCode, filter.countryCode),
-    ];
-    if (filter.stateCode) clauses.push(eq(communityResources.stateCode, filter.stateCode));
+    const clauses = [eq(communityResources.status, "approved")];
+
+    // Country — id-match when resolved (robust to slug form), with a legacy
+    // slug fallback for rows submitted before #1833 (#1833).
+    if (filter.countryGeoId != null) {
+      clauses.push(
+        sql`(${communityResources.countryGeoId} = ${filter.countryGeoId}
+             OR (${communityResources.countryGeoId} IS NULL AND ${communityResources.countryCode} = ${filter.countryCode}))`,
+      );
+    } else {
+      clauses.push(eq(communityResources.countryCode, filter.countryCode));
+    }
+
+    if (filter.stateCode) {
+      if (filter.stateGeoId != null) {
+        clauses.push(
+          sql`(${communityResources.stateGeoId} = ${filter.stateGeoId}
+               OR (${communityResources.stateGeoId} IS NULL AND ${communityResources.stateCode} = ${filter.stateCode}))`,
+        );
+      } else {
+        clauses.push(eq(communityResources.stateCode, filter.stateCode));
+      }
+    }
     if (filter.category) clauses.push(eq(communityResources.category, filter.category));
     // City pages show city-specific resources PLUS state-wide ones (no
     // city). State pages (no citySlug) show everything in the state.
     if (filter.citySlug) {
-      clauses.push(
-        sql`(${communityResources.citySlug} = ${filter.citySlug} OR ${communityResources.citySlug} IS NULL)`,
-      );
+      if (filter.cityGeoId != null) {
+        clauses.push(
+          sql`(${communityResources.cityGeoId} = ${filter.cityGeoId}
+               OR (${communityResources.cityGeoId} IS NULL AND ${communityResources.citySlug} = ${filter.citySlug})
+               OR ${communityResources.citySlug} IS NULL)`,
+        );
+      } else {
+        clauses.push(
+          sql`(${communityResources.citySlug} = ${filter.citySlug} OR ${communityResources.citySlug} IS NULL)`,
+        );
+      }
     }
     // `both` resources surface to either audience, so an audience filter
     // matches the requested audience OR `both`.

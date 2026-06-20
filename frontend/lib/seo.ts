@@ -94,11 +94,11 @@ export const PAGE_SEO: Record<string, SEOData> = {
   },
   "/": {
     title:
-      "AI Video Resumes, Resume Builder & AI Job Search — hired.video",
+      "AI Video Resumes, Resume Builder & Talent Platform — hired.video",
     description:
-      "Create an AI-generated video resume in 60 seconds, tailor your resume to every job with AI, and get matched with recruiters who are actively hiring. Free to start.",
+      "Create an AI-generated video resume in 60 seconds and tailor your resume to every job with AI — or hire faster with AI matching, recruiting, and screening. Plus creator tools, learning pathways, and gamified growth. Free to start.",
     keywords:
-      "AI video resume, video resume maker, resume builder, AI resume scorer, AI job matching, resume tailoring, career development, professional networking",
+      "AI video resume, video resume maker, resume builder, AI resume scorer, AI job matching, resume tailoring, career development, professional networking, recruiting software, ATS, candidate screening, creator platform, online learning",
     structuredData: {
       "@context": "https://schema.org",
       "@graph": [

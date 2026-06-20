@@ -15,6 +15,7 @@ import {
   uuid,
   text,
   varchar,
+  integer,
   timestamp,
   index,
 } from "drizzle-orm/pg-core";
@@ -37,6 +38,13 @@ export const communityResources = pgTable(
     countryCode: varchar("country_code", { length: 8 }).notNull(),
     stateCode: varchar("state_code", { length: 16 }),
     citySlug: varchar("city_slug", { length: 96 }),
+    // Canonical geo ids resolved from the slugs on submit (#1833) so an
+    // abbrev-vs-full-name / non-US slug mismatch can't hide a row from the
+    // /in directory query. Nullable: legacy rows + un-resolvable geo fall back
+    // to slug matching. `countries.id` is serial (int); state/city are uuid.
+    countryGeoId: integer("country_geo_id"),
+    stateGeoId: uuid("state_geo_id"),
+    cityGeoId: uuid("city_geo_id"),
     status: varchar("status", { length: 16 }).default("pending").notNull(),
     reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),

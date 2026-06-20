@@ -217,6 +217,13 @@ export function buildInviteUrl(token: string): string {
   return `${getBaseUrl()}/accept-invitation?token=${encodeURIComponent(token)}`;
 }
 
+/** One-tap "approve sign-in" link target for the email-2FA step-up
+ *  (gap #2225). Lands on the frontend verifier page, which exchanges the
+ *  signed token for a session via GET /api/auth/verify-2fa-link. */
+export function buildTwoFactorApproveUrl(token: string): string {
+  return `${getBaseUrl()}/auth/2fa-approve?token=${encodeURIComponent(token)}`;
+}
+
 // ============================================================================
 // EMAIL LAYOUT + TEMPLATES
 // ============================================================================
@@ -475,6 +482,13 @@ const PASSWORD_RESET_BODY = `
               </table>`;
 
 const TWO_FACTOR_BODY = `
+              <!-- Preheader: the digits show in the mobile notification /
+                   inbox preview line so the recipient can read the code
+                   without opening the email. Hidden from the rendered body. -->
+              <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#ffffff;">
+                Your hired.video verification code is {{TwoFactorCode}}
+              </div>
+
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;">
                 <tr>
                   <td align="center">
@@ -492,10 +506,9 @@ const TWO_FACTOR_BODY = `
                 <tr>
                   <td style="color:#111827;padding-bottom:8px;">Hi {{RecipientName}},</td>
                 </tr>
-                <tr>
-                  <td style="color:#374151;padding-bottom:16px;">Enter the following one-time code:</td>
-                </tr>
               </table>
+
+              {{ApproveBlock}}
 
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:24px 0;">
                 <tr>
@@ -505,6 +518,19 @@ const TWO_FACTOR_BODY = `
                         <td style="font-size:28px;letter-spacing:6px;font-weight:bold;color:#111827;background-color:#f3f4f6;padding:12px 20px;border-radius:8px;font-family:Courier New,monospace;">{{TwoFactorCode}}</td>
                       </tr>
                     </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Plain-text restatement with the code adjacent to the word
+                   "code". This is what lets iOS Mail / Android surface the
+                   one-time-code AutoFill suggestion above the keyboard, so
+                   the recipient taps once instead of copy/pasting on a phone
+                   (the login field declares autoComplete="one-time-code"). -->
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td align="center" style="color:#374151;font-size:15px;padding-bottom:16px;">
+                    Your hired.video verification code is {{TwoFactorCode}}
                   </td>
                 </tr>
               </table>
@@ -611,15 +637,48 @@ export async function sendTwoFactorEmail(
   recipientName: string,
   code: string,
   expiryMinutes = 10,
+  /** When supplied, a one-tap "approve sign-in" button is rendered above
+   *  the code (gap #2225) — tapping it completes the login server-side so
+   *  mobile users never type the code. Omit to fall back to code-only. */
+  approveToken?: string,
 ): Promise<void> {
   const provider = getEmailProvider();
   if (!provider) return;
-  const html = render(TWO_FACTOR_BODY, {
+  // ApproveBlock is injected raw (its href is a server-built, signed URL),
+  // so it goes in BEFORE render() — which would otherwise escape the URL.
+  const approveBlock = approveToken
+    ? `
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:8px 0 4px;">
+                <tr>
+                  <td style="color:#374151;padding-bottom:16px;">Tap below to finish signing in on this device:</td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-bottom:8px;">
+                    <a href="${buildTwoFactorApproveUrl(approveToken)}" style="display:inline-block;padding:14px 28px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-size:16px;font-weight:600;">Approve sign-in</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="color:#9ca3af;font-size:13px;padding-bottom:8px;">Didn't start this? Ignore this email and your account stays locked.</td>
+                </tr>
+                <tr>
+                  <td style="color:#374151;padding-top:8px;">Or enter this code on the sign-in screen:</td>
+                </tr>
+              </table>`
+    : `
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td style="color:#374151;padding-bottom:16px;">Enter the following one-time code:</td>
+                </tr>
+              </table>`;
+  const html = render(TWO_FACTOR_BODY.replace("{{ApproveBlock}}", approveBlock), {
     RecipientName: recipientName,
     TwoFactorCode: code,
     CodeExpiryMinutes: String(expiryMinutes),
   });
-  await provider.send({ to, subject: "Your verification code – hired.video", html });
+  // Lead the subject with the code so it lands in the phone's lock-screen
+  // notification + inbox preview — the recipient can read it (and iOS can
+  // offer it as a one-tap AutoFill) without opening the email.
+  await provider.send({ to, subject: `${code} is your hired.video verification code`, html });
 }
 
 const MAGIC_LINK_BODY = `
