@@ -10,6 +10,7 @@ import {
   Check,
   Wrench,
   HelpCircle,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -167,12 +168,22 @@ export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) 
   const [datePosted, setDatePosted] = useState("all");
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  // Mobile-only: the docked input is replaced by a compact search icon
+  // that expands into a full-width top overlay on tap (the header had no
+  // room for the input + context chip + right-hand controls on a phone).
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   // Keep the input in sync with the URL so deep-links / back-nav show the
   // active query rather than an empty box.
   useEffect(() => {
     setQuery(searchParams.get("q") ?? "");
   }, [searchParams]);
+
+  // Collapse the mobile search overlay whenever the route changes (a
+  // submit navigates, but so can a context pick that deep-links elsewhere).
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
 
   // Seed local form state from the URL whenever the popover opens, so it
   // reflects the canonical filter values rather than stale local state.
@@ -350,57 +361,125 @@ export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) 
     );
   };
 
+  // Context-picker dropdown — identical in the desktop docked input and
+  // the mobile overlay, so it's built once here and rendered in both
+  // (returns fresh JSX per call; both hosts can coexist in the DOM).
+  const renderContextDropdown = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 gap-1 text-xs font-medium"
+          aria-label={t("search.searchType")}
+          title={t("search.searchingLabel", { label: t(current.labelKey) })}
+        >
+          <CurrentIcon className="h-3.5 w-3.5" />
+          <span className="hidden lg:inline">{t(current.labelKey)}</span>
+          <Filter className="h-3 w-3 opacity-60" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        {CONTEXT_OPTIONS.map((opt) => {
+          const Icon = opt.icon;
+          const selected = opt.value === context;
+          return (
+            <DropdownMenuItem
+              key={opt.value}
+              onSelect={() => handleContextSelect(opt.value)}
+              className={cn("gap-2", selected && "font-medium")}
+            >
+              <Icon className="h-4 w-4" />
+              <span className="flex-1">{t(opt.labelKey)}</span>
+              {selected && <Check className="h-3.5 w-3.5" />}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  // Shared input wiring (value + live onChange) reused by both inputs so
+  // the global-query state stays the single source of truth.
+  const queryInputBase = {
+    value: query,
+    placeholder: t(current.placeholderKey),
+    "aria-label": t("search.ariaSearch"),
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      setQuery(e.target.value);
+      onQueryChange?.(e.target.value);
+    },
+  };
+
   return (
-    <div className="flex items-center gap-1.5 w-full">
+    <>
+      {/* Mobile (< md): a compact search icon that expands into a top
+       *  overlay. Keeps the phone header uncluttered (icon only) while the
+       *  full input + context picker live in the expanded sheet. */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="md:hidden h-9 w-9 shrink-0"
+        onClick={() => setMobileOpen(true)}
+        aria-label={t("search.ariaSearch")}
+      >
+        <Search className="h-5 w-5" />
+      </Button>
+
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-[60]" role="dialog" aria-modal="true">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setMobileOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="absolute top-0 inset-x-0 flex items-center gap-2 h-16 px-3 bg-background border-b border-border">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                {...queryInputBase}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    submit();
+                    setMobileOpen(false);
+                  } else if (e.key === "Escape") {
+                    setMobileOpen(false);
+                  }
+                }}
+                className="pl-9 pr-24 h-10"
+              />
+              <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center">
+                {renderContextDropdown()}
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={() => setMobileOpen(false)}
+              aria-label={t("actions.close")}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Desktop (md+): the docked input with the advanced-filters popover. */}
+      <div className="hidden md:flex items-center gap-1.5 w-full">
       <Popover open={advancedOpen} onOpenChange={setAdvancedOpen}>
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              onQueryChange?.(e.target.value);
-            }}
+            {...queryInputBase}
             onKeyDown={(e) => {
               if (e.key === "Enter") submit();
             }}
-            placeholder={t(current.placeholderKey)}
             className="pl-9 pr-24 lg:pr-36 xl:pr-52 h-9"
-            aria-label={t("search.ariaSearch")}
           />
           <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 gap-1 text-xs font-medium"
-                  aria-label={t("search.searchType")}
-                  title={t("search.searchingLabel", { label: t(current.labelKey) })}
-                >
-                  <CurrentIcon className="h-3.5 w-3.5" />
-                  <span className="hidden lg:inline">{t(current.labelKey)}</span>
-                  <Filter className="h-3 w-3 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                {CONTEXT_OPTIONS.map((opt) => {
-                  const Icon = opt.icon;
-                  const selected = opt.value === context;
-                  return (
-                    <DropdownMenuItem
-                      key={opt.value}
-                      onSelect={() => handleContextSelect(opt.value)}
-                      className={cn("gap-2", selected && "font-medium")}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span className="flex-1">{t(opt.labelKey)}</span>
-                      {selected && <Check className="h-3.5 w-3.5" />}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {renderContextDropdown()}
             <div className="w-px h-4 bg-border mx-0.5 hidden md:block" />
             <PopoverTrigger asChild>
               <Button
@@ -470,6 +549,7 @@ export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) 
           </div>
         </PopoverContent>
       </Popover>
-    </div>
+      </div>
+    </>
   );
 }

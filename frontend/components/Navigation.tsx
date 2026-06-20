@@ -164,7 +164,7 @@ export default function Navigation({
            * search slot, so we keep the global one to preserve the SEO funnel. Keep this list in sync
            * with the pages that pass `search={<HeaderSearch />}` to PageHeader. */}
           {location.pathname !== "/" && !(isAuthenticated && pathIsInlineHeaderSearch(location.pathname)) && (
-            <div className="flex-1 max-w-md mx-2 sm:mx-4 min-w-0">
+            <div className="flex-none md:flex-1 md:max-w-md mx-1 sm:mx-4 min-w-0">
               <HeaderSearch />
             </div>
           )}
