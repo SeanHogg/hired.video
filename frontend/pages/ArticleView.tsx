@@ -87,10 +87,10 @@ export default function ArticleView() {
   const trail =
     article && authorSlug
       ? [
-          { name: "Articles", url: "/articles" },
+          { name: t("search.category.articles"), url: "/articles" },
           { name: article.title, url: `/articles/${authorSlug}/${article.slug}` },
         ]
-      : [{ name: "Articles", url: "/articles" }];
+      : [{ name: t("search.category.articles"), url: "/articles" }];
 
   const coverUrl = article ? articleCoverImageUrl(article) : null;
 
@@ -129,7 +129,7 @@ export default function ArticleView() {
                     viewCount: article.viewCount,
                     createdAt: article.publishedAt,
                     extra: [
-                      { label: "Read time", value: `${article.readMinutes} min` },
+                      { label: t("labels.readTime"), value: t("labels.minutesValue", { count: article.readMinutes }) },
                     ],
                   }}
                 />
@@ -166,7 +166,7 @@ export default function ArticleView() {
               <TextNarrator
                 text={`${article.title}. ${article.summary ?? ""}\n\n${article.bodyMd}`}
                 preferenceKey={`article.${article.id}`}
-                label="Listen to this article"
+                label={t("articleView.listenLabel")}
                 onListenProgress={(elapsedSeconds) => {
                   // Read-aloud listening is a real consumption signal (#1577) —
                   // feed it into the same engagement telemetry as scroll reads.

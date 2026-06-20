@@ -180,6 +180,7 @@ import {
 import type { ResumeData, ResumeUploadResponse } from "@/types/resume";
 import { getEmptyResumeData, mapContentToResumeData } from "@/lib/resume-shape";
 import { exportDocument } from "@/lib/studio/document/export-document";
+import { validateDocumentContent } from "@/lib/studio/document/field-validation";
 import { articleService } from "@/lib/services/article-service";
 import { documentToArticle } from "@/lib/studio/document/document-to-article";
 import AttachToCourseDialog from "@/components/creator/AttachToCourseDialog";
@@ -610,7 +611,7 @@ export default function StudioEditorV2() {
     (kind: import("@shared/image-state").LayerKind) => {
       setImageState((prev) => {
         let layer: import("@shared/image-state").ImageLayer;
-        const baseLabel = `Layer ${prev.layers.length + 1}`;
+        const baseLabel = t("studio.editorV2.layerLabel", { number: prev.layers.length + 1 });
         if (kind === "vector") {
           layer = makeVectorLayer(baseLabel);
         } else if (kind === "text") {
@@ -635,7 +636,7 @@ export default function StudioEditorV2() {
       });
       imageCommit();
     },
-    [setImageState, imageCommit],
+    [setImageState, imageCommit, t],
   );
   const handleImageDeleteLayer = useCallback(
     (layerId: string) => {
@@ -954,7 +955,9 @@ export default function StudioEditorV2() {
         // transparent flag annotates the label so the user can tell
         // background-removed layers apart at a glance.
         const newLayerId = `layer-${Math.random().toString(36).slice(2, 10)}`;
-        const labelPrefix = options.hadTransparentIntent ? "AI · cut-out" : "AI";
+        const labelPrefix = options.hadTransparentIntent
+          ? t("studio.editorV2.layerPrefixAiCutout")
+          : t("studio.editorV2.layerPrefixAi");
         setImageState((prev) => ({
           ...prev,
           layers: [
@@ -976,7 +979,7 @@ export default function StudioEditorV2() {
       }
       imageCommit();
     },
-    [imageState.width, imageState.height, setImageState, imageCommit],
+    [imageState.width, imageState.height, setImageState, imageCommit, t],
   );
 
   // AI-result animation-frame insert — overwrites the active frame's
@@ -1350,9 +1353,9 @@ export default function StudioEditorV2() {
   const handleResumeUploaded = useCallback(
     (response: ResumeUploadResponse) => {
       bindResumeToCanvas(response.id, response.content);
-      toast({ title: "Résumé imported", description: response.message });
+      toast({ title: t("studio.editorV2.resumeImported"), description: response.message });
     },
-    [bindResumeToCanvas, toast],
+    [bindResumeToCanvas, toast, t],
   );
 
   // In-editor Version History (#1935). Since the editor's Undo only covers
@@ -1377,7 +1380,7 @@ export default function StudioEditorV2() {
         await resumeService.restoreVersion(id, versionId);
         const r = await resumeService.getResumeById(id);
         bindResumeToCanvas(id, mapContentToResumeData(r.content));
-        toast({ title: "Version restored" });
+        toast({ title: t("messages.versionRestoredTitle") });
       },
     };
   }, [currentMediaKind, documentState.entityKind, documentState.entityId, bindResumeToCanvas, t, toast]);
@@ -1754,10 +1757,10 @@ export default function StudioEditorV2() {
     // Mint the scene OUTSIDE the updater so the id is stable under
     // strict-mode's double-invoke (mirrors duplicateScene) — the bridge
     // + AI tool need the returned id to reference the new scene.
-    const next = emptyScene(`Scene ${stateRef.current.scenes.length + 1}`);
+    const next = emptyScene(t("studio.editorV2.sceneLabel", { number: stateRef.current.scenes.length + 1 }));
     setState((prev) => ({ ...prev, scenes: [...prev.scenes, next] }));
     return next.id;
-  }, []);
+  }, [t]);
 
   const deleteScene = useCallback(
     (sceneId: string) => {
@@ -1796,7 +1799,7 @@ export default function StudioEditorV2() {
       const source = state.scenes.find((s) => s.id === sceneId);
       if (!source) return;
       const next = cloneSceneWithNewIds(source);
-      next.label = `${source.label} (copy)`;
+      next.label = t("studio.editorV2.sceneCopyLabel", { label: source.label });
       setState((prev) => {
         const idx = prev.scenes.findIndex((s) => s.id === sceneId);
         if (idx < 0) return prev;
@@ -1807,7 +1810,7 @@ export default function StudioEditorV2() {
       setActiveSceneId(next.id);
       setSelection({ kind: "scene", sceneId: next.id });
     },
-    [state.scenes],
+    [state.scenes, t],
   );
 
   const reorderScenes = useCallback((nextOrderIds: string[]) => {
@@ -2395,10 +2398,10 @@ export default function StudioEditorV2() {
     (url: string, durationSeconds: number) => {
       const label =
         openAction === "webcam"
-          ? "Webcam recording"
+          ? t("studio.editorV2.recordingWebcam")
           : openAction === "screen-pip"
-            ? "Screen + webcam"
-            : "Screen recording";
+            ? t("studio.editorV2.recordingScreenPip")
+            : t("studio.editorV2.recordingScreen");
       const scene = makeRecordingScene(label, url, durationSeconds);
       setState((prev) => {
         const idx = prev.scenes.findIndex(
@@ -2411,7 +2414,7 @@ export default function StudioEditorV2() {
       setActiveSceneId(scene.id);
       setSelection({ kind: "scene", sceneId: scene.id });
     },
-    [openAction],
+    [openAction, t],
   );
 
   // Register this editor with the studio-editor bridge so the AI CHRO's
@@ -2586,8 +2589,8 @@ export default function StudioEditorV2() {
       const ok = await exportDocument(documentState, documentEntityContent, title);
       if (!ok) {
         toast({
-          title: "Couldn't open the print view",
-          description: "Allow pop-ups for this site, then try Export again.",
+          title: t("studio.editorV2.printViewFailedTitle"),
+          description: t("studio.editorV2.printViewFailedDesc"),
           variant: "destructive",
         });
       }
@@ -2693,7 +2696,7 @@ export default function StudioEditorV2() {
           title,
           projectRow?.id ?? persistedProjectId ?? undefined,
         );
-        if (!uploadRes.data) throw new Error("Upload failed");
+        if (!uploadRes.data) throw new Error(t("studio.editorV2.uploadFailed"));
         projectRow = uploadRes.data;
         setPersistedProjectId(projectRow.id);
         setPersistedProject(projectRow);
@@ -2747,10 +2750,10 @@ export default function StudioEditorV2() {
     if (!url) return undefined;
     return (
       <ToastAction
-        altText="View where it was published"
+        altText={t("studio.editorV2.viewPublishedAlt")}
         onClick={() => window.open(url, url.startsWith("http") ? "_blank" : "_self")}
       >
-        View
+        {t("studio.editorV2.viewAction")}
       </ToastAction>
     );
   }
@@ -2785,7 +2788,7 @@ export default function StudioEditorV2() {
       await refreshPublications();
       toast({
         title: t("messages.publishedYouTubeTitle"),
-        description: url ? "Your video is live on YouTube." : t("studio.editor.videoLiveDesc"),
+        description: url ? t("studio.editorV2.videoLiveYouTubeDesc") : t("studio.editor.videoLiveDesc"),
         action: viewAction(url),
       });
     } catch (err) {
@@ -2794,11 +2797,11 @@ export default function StudioEditorV2() {
         // Distinct, actionable path: send the user to Settings to link a
         // channel rather than a generic "publish failed".
         toast({
-          title: "Connect YouTube first",
-          description: "Link your YouTube channel in Settings, then publish.",
+          title: t("studio.editorV2.connectYouTubeTitle"),
+          description: t("studio.editorV2.connectYouTubeDesc"),
           action: (
-            <ToastAction altText="Open settings" onClick={() => navigate("/settings")}>
-              Settings
+            <ToastAction altText={t("studio.editorV2.openSettingsAlt")} onClick={() => navigate("/settings")}>
+              {t("headings.settings")}
             </ToastAction>
           ),
         });
@@ -2974,6 +2977,24 @@ export default function StudioEditorV2() {
       // exists in that entity's system (resume / articles).
       let documentStateForSave = documentState;
       if (currentMediaKind === "document") {
+        // Field-validation gate (#1916): block the save when the content has a
+        // genuinely invalid value (bad email/URL, out-of-range number, end-date
+        // before start). Same `validateDocumentContent` the inline editor shows
+        // red, so what the user sees flagged is exactly what stops the save.
+        // Only present-but-wrong values fail — an empty/partial draft still saves.
+        const contentIssues = validateDocumentContent(
+          documentState.entityKind,
+          documentEntityContent as Record<string, unknown> | null,
+        );
+        if (contentIssues.length > 0) {
+          toast({
+            title: t("studio.editorV2.fixFieldsBeforeSaving"),
+            description: contentIssues.slice(0, 4).join(" · "),
+            variant: "destructive",
+          });
+          setSaving(false);
+          return null;
+        }
         try {
           if (documentState.entityKind === "resume" && documentEntityContent) {
             // Resume: content lives in `resume_information`. Snapshot the canvas
@@ -3935,7 +3956,7 @@ export default function StudioEditorV2() {
             {usesTimelineChrome && (
             <CollapsiblePanel
               side="bottom"
-              label="Timeline"
+              label={t("studio.editorV2.panelTimeline")}
               storageKey="studio.v2.panel.timeline"
             >
               <TimelineDock
@@ -3996,7 +4017,7 @@ export default function StudioEditorV2() {
           {usesTimelineChrome ? (
           <CollapsiblePanel
             side="right"
-            label="Properties"
+            label={t("studio.editorV2.panelProperties")}
             storageKey="studio.v2.panel.right"
             expandedClassName="w-72 flex-1 overflow-y-auto"
           >
@@ -4043,7 +4064,7 @@ export default function StudioEditorV2() {
               }}
               onSelectCodec={(preset) => {
                 setState((prev) => ({ ...prev, codec: preset.id }));
-                toast({ title: `Export codec: ${preset.label}` });
+                toast({ title: t("studio.editorV2.codecToast", { label: preset.label }) });
               }}
               onSelectMotion={(preset) =>
                 setState((prev) => ({ ...prev, motion: preset.id }))
@@ -4066,7 +4087,7 @@ export default function StudioEditorV2() {
             <>
               <CollapsiblePanel
                 side="right"
-                label="Properties"
+                label={t("studio.editorV2.panelProperties")}
                 storageKey="studio.v2.panel.right"
                 expandedClassName="w-72"
               >
@@ -4101,7 +4122,7 @@ export default function StudioEditorV2() {
               {gameState.engine === "world-3d" && (
                 <CollapsiblePanel
                   side="right"
-                  label="Challenges"
+                  label={t("studio.editorV2.panelChallenges")}
                   storageKey="studio.v2.panel.right.challenges"
                   expandedClassName="w-72"
                   defaultOpen={false}
@@ -4115,7 +4136,7 @@ export default function StudioEditorV2() {
           ) : currentMediaKind === "image" ? (
             <CollapsiblePanel
               side="right"
-              label="AI Prompt"
+              label={t("studio.editorV2.panelAiPrompt")}
               storageKey="studio.v2.panel.right"
               expandedClassName="w-72"
             >
@@ -4149,7 +4170,7 @@ export default function StudioEditorV2() {
           {currentMediaKind !== "image" && (
             <CollapsiblePanel
               side="right"
-              label="AI"
+              label={t("studio.editorV2.panelAi")}
               storageKey="studio.v2.panel.right.ai"
               expandedClassName="w-72"
               defaultOpen={false}
@@ -4170,7 +4191,7 @@ export default function StudioEditorV2() {
                 ) : (
                   <MediaAiPromptPanel
                     kindNoun="sprite"
-                    placeholder="A pixel-art hero sprite, side view…"
+                    placeholder={t("studio.editorV2.aiPromptPlaceholderSprite")}
                     onGenerated={(result, prompt) =>
                       handleGameAiGenerated(result, prompt)
                     }
@@ -4179,7 +4200,7 @@ export default function StudioEditorV2() {
               ) : currentMediaKind === "animation" ? (
                 <MediaAiPromptPanel
                   kindNoun="frame"
-                  placeholder="A bouncing ball, current frame mid-arc…"
+                  placeholder={t("studio.editorV2.aiPromptPlaceholderFrame")}
                   onGenerated={(result) =>
                     void handleAnimationAiGenerated(result)
                   }
@@ -4187,7 +4208,7 @@ export default function StudioEditorV2() {
               ) : (
                 <MediaAiPromptPanel
                   kindNoun="image"
-                  placeholder="A clean studio backdrop, soft warm lighting…"
+                  placeholder={t("studio.editorV2.aiPromptPlaceholderImage")}
                   onGenerated={(result) => {
                     // Timeline kinds (video/podcast/voice/comic): drop
                     // the generated image into the active scene as a
@@ -4210,19 +4231,19 @@ export default function StudioEditorV2() {
           {currentMediaKind === "document" && documentState.entityKind === "resume" && (
             <CollapsiblePanel
               side="right"
-              label="Upload"
+              label={t("studio.editorV2.panelUpload")}
               storageKey="studio.v2.panel.right.upload"
               expandedClassName="w-80"
               defaultOpen={false}
             >
               <div className="p-3 text-sm">
                 <p className="mb-3 text-xs text-muted-foreground">
-                  Import an existing résumé (PDF / DOCX / TXT) to fill the canvas.
+                  {t("studio.editorV2.uploadResumeHint")}
                 </p>
                 <ResumeUpload
                   compact
                   minimal
-                  submitLabel="Convert & import"
+                  submitLabel={t("studio.editorV2.convertImport")}
                   targetResumeId={documentState.entityId ?? undefined}
                   onUploadSuccess={handleResumeUploaded}
                 />
@@ -4237,7 +4258,7 @@ export default function StudioEditorV2() {
                     onClick={() => setResumeVersionHistoryOpen(true)}
                   >
                     <History className="mr-1.5 h-4 w-4" />
-                    Version history
+                    {t("studio.editorV2.versionHistory")}
                   </Button>
                 )}
               </div>
@@ -4252,14 +4273,14 @@ export default function StudioEditorV2() {
             documentState.entityId && (
               <CollapsiblePanel
                 side="right"
-                label="Screening"
+                label={t("studio.editorV2.panelScreening")}
                 storageKey="studio.v2.panel.right.job-screening"
                 expandedClassName="w-72"
                 defaultOpen={false}
               >
                 <div className="p-3 text-sm">
                   <p className="mb-3 text-xs text-muted-foreground">
-                    Attach a video screening interview candidates complete when they apply.
+                    {t("studio.editorV2.screeningHint")}
                   </p>
                   <Button
                     variant="outline"
@@ -4268,7 +4289,7 @@ export default function StudioEditorV2() {
                     onClick={() => navigate(`/jobs/${documentState.entityId}/screening`)}
                   >
                     <ClipboardCheck className="mr-1.5 h-4 w-4" />
-                    Screening setup
+                    {t("studio.editorV2.screeningSetup")}
                   </Button>
                 </div>
               </CollapsiblePanel>
@@ -4280,7 +4301,7 @@ export default function StudioEditorV2() {
         <EntityVersionHistoryDialog
           open={resumeVersionHistoryOpen}
           onOpenChange={setResumeVersionHistoryOpen}
-          entityLabel="Resume"
+          entityLabel={t("labels.resume")}
           canSnapshot
           adapter={resumeVersionAdapter}
         />
@@ -4343,13 +4364,13 @@ export default function StudioEditorV2() {
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
           <div className="bg-card border rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 py-4 border-b">
-              <h2 className="font-semibold">Publish to LinkedIn</h2>
+              <h2 className="font-semibold">{t("actions.publishToLinkedIn")}</h2>
               <button
                 type="button"
                 onClick={() => setLinkedInPublishOpen(false)}
                 className="text-muted-foreground hover:text-foreground"
               >
-                <span className="sr-only">Close</span>
+                <span className="sr-only">{t("actions.close")}</span>
                 <svg
                   className="w-5 h-5"
                   fill="none"
@@ -4369,7 +4390,7 @@ export default function StudioEditorV2() {
               <Suspense
                 fallback={
                   <div className="text-center py-8 text-muted-foreground text-sm">
-                    Loading…
+                    {t("status.loading")}
                   </div>
                 }
               >
@@ -4398,7 +4419,7 @@ export default function StudioEditorV2() {
                         .catch(() => undefined);
                     }
                     toast({
-                      title: "Published to LinkedIn!",
+                      title: t("messages.publishedLinkedInTitle"),
                       action: viewAction(postUrl),
                     });
                   }}
@@ -4526,6 +4547,7 @@ function EditorHeader({
    *  full-history surface refreshes after a publish triggered elsewhere. */
   onPublicationsChange: () => void;
 }) {
+  const { t } = useTranslation();
   const fmt = (s: number) => {
     const m = Math.floor(s / 60);
     const r = Math.floor(s % 60);
@@ -4547,7 +4569,7 @@ function EditorHeader({
           size="sm"
           onClick={onBack}
           className="gap-1 px-2"
-          aria-label="Back to studio"
+          aria-label={t("studio.editorV2.backToStudio")}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -4597,7 +4619,7 @@ function EditorHeader({
             variant="ghost"
             size="sm"
             onClick={() => playback.seek(0)}
-            aria-label="Back to start"
+            aria-label={t("studio.editorV2.backToStart")}
             className="h-8 w-8 p-0"
           >
             <SkipBack className="h-4 w-4" />
@@ -4606,7 +4628,7 @@ function EditorHeader({
             variant="secondary"
             size="sm"
             onClick={playback.toggle}
-            aria-label={playback.isPlaying ? "Pause preview" : "Play preview"}
+            aria-label={playback.isPlaying ? t("studio.editorV2.pausePreview") : t("studio.editorV2.playPreview")}
             className="h-8 w-8 p-0"
           >
             {playback.isPlaying ? (
@@ -4623,7 +4645,7 @@ function EditorHeader({
             value={playback.playhead}
             onChange={(e) => playback.seek(Number(e.target.value))}
             className="h-1 w-40 cursor-pointer accent-brand-purple"
-            aria-label="Playhead"
+            aria-label={t("studio.editorV2.playhead")}
           />
           <span className="min-w-[5.5rem] text-center text-[10px] tabular-nums text-muted-foreground">
             {fmt(playback.playhead)} / {fmt(playback.duration)}
@@ -4658,7 +4680,7 @@ function EditorHeader({
             onClick={onOpenDocumentPreview}
           >
             <Eye className="h-4 w-4" />
-            Preview
+            {t("actions.preview")}
           </Button>
         )}
         <PreviewLayoutGroup
@@ -4680,12 +4702,12 @@ function EditorHeader({
             {gamePlaying ? (
               <>
                 <Pause className="h-4 w-4" />
-                Stop
+                {t("studio.editorV2.stop")}
               </>
             ) : (
               <>
                 <Play className="h-4 w-4" />
-                Playtest
+                {t("studio.editorV2.playtest")}
               </>
             )}
           </Button>
@@ -4701,17 +4723,17 @@ function EditorHeader({
             size="sm"
             className="h-8 gap-1"
             onClick={onToggleAnimationPlay}
-            aria-label={animationPlaying ? "Pause animation" : "Play animation"}
+            aria-label={animationPlaying ? t("studio.editorV2.pauseAnimation") : t("studio.editorV2.playAnimation")}
           >
             {animationPlaying ? (
               <>
                 <Pause className="h-4 w-4" />
-                Pause
+                {t("narrator.pause")}
               </>
             ) : (
               <>
                 <Play className="h-4 w-4" />
-                Play
+                {t("narrator.play")}
               </>
             )}
           </Button>
@@ -4727,7 +4749,7 @@ function EditorHeader({
             onClick={onOpenInvite}
           >
             <UserPlus className="h-4 w-4" />
-            Invite
+            {t("actions.contributors.invite")}
           </Button>
         )}
         {/* Export to Roblox — generates a `.rbxlx` place file from the
@@ -4739,10 +4761,10 @@ function EditorHeader({
             size="sm"
             className="h-8 gap-1"
             onClick={onExportRoblox}
-            title="Export as Roblox place file (.rbxlx)"
+            title={t("studio.editorV2.robloxExportTitle")}
           >
             <Download className="h-4 w-4" />
-            Roblox
+            {t("studio.editorV2.roblox")}
           </Button>
         )}
         {/* SuperAdmin "Embed" (#1860) — self-gates on the optional handler,
@@ -4753,10 +4775,10 @@ function EditorHeader({
             size="sm"
             className="h-8 gap-1"
             onClick={onEmbedOnPage}
-            title="Embed this video on a page"
+            title={t("studio.editorV2.embedTitle")}
           >
             <Code2 className="h-4 w-4" />
-            Embed
+            {t("studio.editorV2.embed")}
           </Button>
         )}
         {/* Single split-button for the whole project: Save (primary —
@@ -4820,8 +4842,8 @@ function EditorHeader({
 // format / export) now lives in the right inspector under the "Canvas"
 // section group — selecting nothing on the canvas surfaces it there.
 const LEFT_TABS = [
-  { id: "widgets", label: "Widgets" },
-  { id: "actions", label: "Actions" },
+  { id: "widgets" },
+  { id: "actions" },
 ] as const;
 type LeftTabId = (typeof LEFT_TABS)[number]["id"];
 
@@ -4836,9 +4858,16 @@ function LeftTabs({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation();
+  // Tab labels resolved at render (t can't be called at module scope) —
+  // keyed off the stable LEFT_TABS id so the React keys stay stable.
+  const tabLabel: Record<LeftTabId, string> = {
+    widgets: t("studio.editorV2.tabWidgets"),
+    actions: t("studio.editorV2.tabActions"),
+  };
   return (
     <div className="flex items-stretch border-y border-border">
-      {LEFT_TABS.map(({ id, label }) => (
+      {LEFT_TABS.map(({ id }) => (
         <button
           key={id}
           type="button"
@@ -4855,13 +4884,13 @@ function LeftTabs({
               : "border-b-2 border-transparent text-muted-foreground hover:text-foreground",
           )}
         >
-          {label}
+          {tabLabel[id]}
         </button>
       ))}
       <button
         type="button"
         onClick={onToggle}
-        aria-label={expanded ? "Collapse widgets/actions" : "Expand widgets/actions"}
+        aria-label={expanded ? t("studio.editorV2.collapseWidgetsActions") : t("studio.editorV2.expandWidgetsActions")}
         className="flex h-9 w-9 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground"
       >
         {expanded ? (
@@ -4909,6 +4938,7 @@ function TimelineDock({
   onMusicChange: (patch: import("@/components/studio/v2/AdvancedTimeline").AudioPatch) => void;
   onAudioCommit: () => void;
 }) {
+  const { t } = useTranslation();
   const total = totalDurationSeconds(state);
   const selectedWidgetId =
     selection.kind === "widget" ? selection.widgetId : null;
@@ -4936,16 +4966,16 @@ function TimelineDock({
       )}
       <div className="px-4 py-3">
         <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
-          <span>Timeline</span>
+          <span>{t("labels.studioLayout.timeline")}</span>
           <div className="flex items-center gap-3">
-            <span>Total {total.toFixed(1)}s</span>
+            <span>{t("studio.editorV2.totalSeconds", { seconds: total.toFixed(1) })}</span>
             <button
               type="button"
               onClick={onToggleAdvanced}
               className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label={advancedOpen ? "Hide advanced timeline" : "Show advanced timeline"}
+              aria-label={advancedOpen ? t("studio.editorV2.hideAdvancedTimeline") : t("studio.editorV2.showAdvancedTimeline")}
             >
-              Advanced
+              {t("search.advanced")}
               {advancedOpen ? (
                 <ChevronDown className="h-3 w-3" />
               ) : (
@@ -4991,6 +5021,7 @@ function TimelineDock({
 // ───────────────────────────────────────────────────────────────────────────
 
 function AudioTimelineRow({ state }: { state: CanvasState }) {
+  const { t } = useTranslation();
   const music = resolveMusic(state.musicSource);
   if (!music && state.voiceovers.length === 0) return null;
   return (
@@ -4998,7 +5029,7 @@ function AudioTimelineRow({ state }: { state: CanvasState }) {
       {music && (
         <div className="flex h-7 items-center gap-2 rounded border border-emerald-500/40 bg-emerald-500/10 px-2 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
           <Music className="h-3 w-3" />
-          <span className="truncate">Music · {music.label}</span>
+          <span className="truncate">{t("studio.editorV2.musicLabel", { label: music.label })}</span>
         </div>
       )}
       {state.voiceovers.map((vo) => (
@@ -5008,7 +5039,7 @@ function AudioTimelineRow({ state }: { state: CanvasState }) {
         >
           <Mic className="h-3 w-3" />
           <span className="truncate">
-            Voiceover · {vo.label} ({vo.durationSeconds.toFixed(1)}s)
+            {t("studio.editorV2.voiceoverLabel", { label: vo.label, seconds: vo.durationSeconds.toFixed(1) })}
           </span>
         </div>
       ))}

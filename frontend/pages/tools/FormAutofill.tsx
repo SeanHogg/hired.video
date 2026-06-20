@@ -245,7 +245,7 @@ export default function FormAutofill() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <FileText className="h-5 w-5" />
-                      Application Form
+                      {t("headings.applicationForm")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -258,7 +258,7 @@ export default function FormAutofill() {
                         size="sm"
                         onClick={() => setInputMode("questions")}
                       >
-                        Paste Questions
+                        {t("actions.pasteQuestions")}
                       </Button>
                       <Button
                         variant={inputMode === "url" ? "default" : "outline"}
@@ -266,7 +266,7 @@ export default function FormAutofill() {
                         onClick={() => setInputMode("url")}
                       >
                         <Link2 className="h-4 w-4 mr-1" />
-                        From URL
+                        {t("actions.fromUrl")}
                       </Button>
                     </div>
 
@@ -284,11 +284,11 @@ export default function FormAutofill() {
                     ) : (
                       <div className="space-y-2">
                         <Label htmlFor="raw-questions">
-                          Application Questions (one per line)
+                          {t("tools.formAutofill.questionsLabel")}
                         </Label>
                         <Textarea
                           id="raw-questions"
-                          placeholder={`What is your first name?\nWhat is your email address?\nWhy are you interested in this role?\nWhat is your expected salary?\nAre you authorized to work in the US?`}
+                          placeholder={t("tools.formAutofill.questionsPlaceholder")}
                           rows={8}
                           value={rawQuestions}
                           onChange={(e) => setRawQuestions(e.target.value)}
@@ -304,10 +304,10 @@ export default function FormAutofill() {
                       {isAnalyzing ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Analyzing...
+                          {t("status.analyzing")}
                         </>
                       ) : (
-                        "Analyze Form"
+                        t("actions.analyzeForm")
                       )}
                     </Button>
                   </CardContent>
@@ -317,7 +317,7 @@ export default function FormAutofill() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-sm">
-                      Job Context (Optional)
+                      {t("headings.jobContextOptional")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -380,7 +380,7 @@ export default function FormAutofill() {
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <CardTitle className="flex items-center gap-2 text-sm">
-                          Detected Fields
+                          {t("headings.detectedFields")}
                           <Badge variant="secondary">{fields.length}</Badge>
                           {atsProvider && (
                             <Badge variant="outline">
@@ -397,12 +397,12 @@ export default function FormAutofill() {
                           {isGenerating ? (
                             <>
                               <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                              Generating...
+                              {t("status.generating")}
                             </>
                           ) : (
                             <>
                               <Sparkles className="h-4 w-4 mr-1" />
-                              Generate Answers
+                              {t("actions.generateAnswers")}
                             </>
                           )}
                         </Button>
@@ -517,8 +517,8 @@ export default function FormAutofill() {
                               ) : (
                                 <p className="text-sm text-muted-foreground italic">
                                   {field.type === "file"
-                                    ? "File upload — manual action required"
-                                    : "Click 'Generate Answers' to fill"}
+                                    ? t("messages.fileUploadManualAction")
+                                    : t("messages.clickGenerateAnswersToFill")}
                                 </p>
                               )}
                             </div>
@@ -542,12 +542,12 @@ export default function FormAutofill() {
                           {copied ? (
                             <>
                               <CheckCircle2 className="h-4 w-4 mr-2" />
-                              Copied!
+                              {t("labels.copiedExclaim")}
                             </>
                           ) : (
                             <>
                               <Copy className="h-4 w-4 mr-2" />
-                              Copy All
+                              {t("actions.copyAll")}
                             </>
                           )}
                         </Button>
@@ -561,7 +561,7 @@ export default function FormAutofill() {
                           ) : (
                             <Save className="h-4 w-4 mr-2" />
                           )}
-                          Save to History
+                          {t("actions.saveToHistory")}
                         </Button>
                       </div>
                     </CardContent>

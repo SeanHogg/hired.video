@@ -62,6 +62,20 @@ function enumFieldOptions(
   return opts.map((o) => ({ value: String(o.value), label: o.label }));
 }
 
+/** Declarative validation a field carries so render + edit + save-gate share
+ *  ONE rule set (#1916). Checks only fire on a NON-empty value (so they never
+ *  block saving an empty draft); emptiness/required gating is deliberately not
+ *  modelled here — see the `required`-tier note on gap #1916. */
+export interface FieldValidation {
+  /** Well-known string format. */
+  format?: "email" | "url";
+  /** Numeric bounds (number fields). */
+  min?: number;
+  max?: number;
+  /** Character cap (text / textarea). */
+  maxLength?: number;
+}
+
 export interface SectionFieldDef {
   key: string;
   label: string;
@@ -71,6 +85,8 @@ export interface SectionFieldDef {
   /** Store the value as a number, not a string — for `number` fields and
    *  enum `select`s backed by numeric columns (job workSetting / status). */
   numeric?: boolean;
+  /** Optional value-format/range validation. */
+  validate?: FieldValidation;
 }
 
 /** Whether a section maps onto a repeating list or a single object. */
@@ -89,6 +105,10 @@ export interface DocumentSectionSchema {
    *  content root object itself (the flat job record). Ignored for arrays. */
   objectPath?: string;
   fields: SectionFieldDef[];
+  /** Cross-field date order check: when BOTH dates are present the `end` must
+   *  not precede the `start` (string compare works for YYYY-MM / YYYY-MM-DD).
+   *  The error surfaces on the `end` field. */
+  dateRange?: { start: string; end: string };
   /** Mint a blank array item with a stable id + empty fields. */
   newItem: () => Record<string, unknown>;
 }
@@ -104,8 +124,9 @@ function arraySchema(
   label: string,
   itemNoun: string,
   fields: SectionFieldDef[],
+  dateRange?: { start: string; end: string },
 ): DocumentSectionSchema {
-  return { sectionKey, label, itemNoun, shape: "array", fields, newItem: () => blank(fields) };
+  return { sectionKey, label, itemNoun, shape: "array", fields, dateRange, newItem: () => blank(fields) };
 }
 
 function objectSchema(
@@ -113,6 +134,7 @@ function objectSchema(
   label: string,
   fields: SectionFieldDef[],
   objectPath?: string,
+  dateRange?: { start: string; end: string },
 ): DocumentSectionSchema {
   return {
     sectionKey,
@@ -120,6 +142,7 @@ function objectSchema(
     itemNoun: "field",
     shape: "object",
     objectPath,
+    dateRange,
     fields,
     newItem: () => blank(fields),
   };
@@ -132,9 +155,9 @@ function objectSchema(
 export const BASICS_FIELDS: SectionFieldDef[] = [
   { key: "name", label: "Full name", type: "text" },
   { key: "label", label: "Title", type: "text" },
-  { key: "email", label: "Email", type: "text" },
+  { key: "email", label: "Email", type: "text", validate: { format: "email" } },
   { key: "phone", label: "Phone", type: "text" },
-  { key: "url", label: "Website", type: "text" },
+  { key: "url", label: "Website", type: "text", validate: { format: "url" } },
   { key: "summary", label: "Summary", type: "textarea" },
 ];
 
@@ -156,10 +179,12 @@ const EDUCATION_FIELDS: SectionFieldDef[] = [
   { key: "score", label: "Score", type: "text" },
 ];
 
+const DATE_RANGE = { start: "startDate", end: "endDate" } as const;
+
 const RESUME_SECTION_SCHEMAS: Record<string, DocumentSectionSchema> = {
   basics: objectSchema("basics", "Basics", BASICS_FIELDS, "basics"),
-  work: arraySchema("work", "Work Experience", "role", WORK_FIELDS),
-  education: arraySchema("education", "Education", "school", EDUCATION_FIELDS),
+  work: arraySchema("work", "Work Experience", "role", WORK_FIELDS, DATE_RANGE),
+  education: arraySchema("education", "Education", "school", EDUCATION_FIELDS, DATE_RANGE),
   volunteer: arraySchema("volunteer", "Volunteer", "role", [
     { key: "organization", label: "Organization", type: "text" },
     { key: "position", label: "Role", type: "text" },
@@ -167,11 +192,11 @@ const RESUME_SECTION_SCHEMAS: Record<string, DocumentSectionSchema> = {
     { key: "endDate", label: "End", type: "date" },
     { key: "summary", label: "Summary", type: "textarea" },
     { key: "highlights", label: "Highlights", type: "list" },
-  ]),
+  ], DATE_RANGE),
   projects: arraySchema("projects", "Projects", "project", [
     { key: "name", label: "Name", type: "text" },
     { key: "description", label: "Description", type: "textarea" },
-    { key: "url", label: "URL", type: "text" },
+    { key: "url", label: "URL", type: "text", validate: { format: "url" } },
     { key: "highlights", label: "Highlights", type: "list" },
   ]),
   skills: arraySchema("skills", "Skills", "skill", [
@@ -189,13 +214,13 @@ const RESUME_SECTION_SCHEMAS: Record<string, DocumentSectionSchema> = {
     { key: "name", label: "Name", type: "text" },
     { key: "date", label: "Date", type: "date" },
     { key: "issuer", label: "Issuer", type: "text" },
-    { key: "url", label: "URL", type: "text" },
+    { key: "url", label: "URL", type: "text", validate: { format: "url" } },
   ]),
   publications: arraySchema("publications", "Publications", "publication", [
     { key: "name", label: "Title", type: "text" },
     { key: "publisher", label: "Publisher", type: "text" },
     { key: "releaseDate", label: "Date", type: "date" },
-    { key: "url", label: "URL", type: "text" },
+    { key: "url", label: "URL", type: "text", validate: { format: "url" } },
     { key: "summary", label: "Summary", type: "textarea" },
   ]),
   languages: arraySchema("languages", "Languages", "language", [
@@ -234,22 +259,28 @@ const JOB_SECTION_SCHEMAS: Record<string, DocumentSectionSchema> = {
     { key: "requirements", label: "Requirements", type: "list" },
   ]),
   compensation: objectSchema("compensation", "Compensation", [
-    { key: "salary", label: "Salary (annual)", type: "number" },
-    { key: "bonus", label: "Bonus", type: "number" },
-    { key: "equity", label: "Equity %", type: "number" },
+    { key: "salary", label: "Salary (annual)", type: "number", validate: { min: 0 } },
+    { key: "bonus", label: "Bonus", type: "number", validate: { min: 0 } },
+    { key: "equity", label: "Equity %", type: "number", validate: { min: 0, max: 100 } },
   ]),
   details: objectSchema("details", "Role details", [
     { key: "employmentType", label: "Employment type", type: "multiselect", numeric: true, options: enumFieldOptions(EMPLOYMENT_TYPE_OPTIONS) },
     { key: "workSetting", label: "Work setting", type: "select", numeric: true, options: enumFieldOptions(WORK_SETTING_OPTIONS) },
     { key: "status", label: "Status", type: "select", numeric: true, options: enumFieldOptions(JOB_STATUS_OPTIONS) },
-    { key: "hiringTarget", label: "Openings", type: "number" },
+    { key: "hiringTarget", label: "Openings", type: "number", validate: { min: 1 } },
   ]),
-  publishing: objectSchema("publishing", "Publishing & apply", [
-    { key: "privacy_ShowJob", label: "Visibility", type: "select", numeric: true, options: enumFieldOptions(DISPLAY_PRIVACY_OPTIONS) },
-    { key: "goLiveDate", label: "Go-live date", type: "day" },
-    { key: "expirationDate", label: "Expires", type: "day" },
-    { key: "atsApplyUrl", label: "Application URL", type: "text" },
-  ]),
+  publishing: objectSchema(
+    "publishing",
+    "Publishing & apply",
+    [
+      { key: "privacy_ShowJob", label: "Visibility", type: "select", numeric: true, options: enumFieldOptions(DISPLAY_PRIVACY_OPTIONS) },
+      { key: "goLiveDate", label: "Go-live date", type: "day" },
+      { key: "expirationDate", label: "Expires", type: "day" },
+      { key: "atsApplyUrl", label: "Application URL", type: "text", validate: { format: "url" } },
+    ],
+    undefined,
+    { start: "goLiveDate", end: "expirationDate" },
+  ),
 };
 
 // ── Registry ─────────────────────────────────────────────────────────────────
@@ -274,4 +305,12 @@ export function documentSectionSchema(
 ): DocumentSectionSchema | null {
   if (!sectionKey) return null;
   return DOCUMENT_SECTION_SCHEMAS[entityKind]?.[sectionKey] ?? null;
+}
+
+/** Every field-editable section schema for an entity — used to validate the
+ *  whole content blob on save (#1916). */
+export function documentSectionSchemasFor(
+  entityKind: DocumentEntityKind,
+): DocumentSectionSchema[] {
+  return Object.values(DOCUMENT_SECTION_SCHEMAS[entityKind] ?? {});
 }

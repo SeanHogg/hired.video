@@ -9,12 +9,14 @@
  * (Letter/Legal/A4 × orientation, scaled by the editor zoom) and lets the
  * user compose the STRUCTURE: add / remove / reorder section + primitive
  * blocks, detach a block to an absolute bounding box, and (resume only) pick
- * the page size + orientation. Section blocks render a live summary of the
- * bound entity content when it's available.
+ * the page size + orientation. Section blocks are inline-editable (#1916) when
+ * content + an `onContentChange` are bound; otherwise they render through the
+ * SHARED read renderer (`DocumentView`'s `BlockView`) — the same one the PDF
+ * export uses — so the on-canvas WYSIWYG and the export never drift.
  *
- * Still to land (tracked in the register): full-fidelity section rendering via
- * the generalized DeclarativeResumeRenderer, inline field editing (#1916),
- * interactive media overlays (#1913), and a left-rail drag-drop palette.
+ * Still to land (tracked in the register): 2-column / sidebar print layouts
+ * (#1917b — all blocks render in one flow plane today), interactive media
+ * overlays (#1913), and a left-rail drag-drop palette.
  */
 import { useLayoutEffect, useRef, useState } from "react";
 import { AlignLeft, ArrowDown, ArrowUp, Maximize2, Trash2 } from "lucide-react";
@@ -46,6 +48,7 @@ import DocumentPagedView, {
   DocumentViewModeToggle,
   type DocumentViewMode,
 } from "@/components/studio/document/DocumentPagedView";
+import { BlockView } from "@/components/studio/document/DocumentView";
 
 interface DocumentStageProps {
   state: DocumentState;
@@ -59,31 +62,6 @@ interface DocumentStageProps {
   /** When supplied, section blocks become inline-editable (#1916) and edits
    *  flow back through here; the host owns persistence. */
   onContentChange?: (next: DocumentEntityContent) => void;
-}
-
-/** Compact display lines for a section block — a primary label per item.
- *  Lightweight by design; full-fidelity rendering is the renderer
- *  generalization tracked in #1912. */
-function sectionItemLabels(
-  content: DocumentEntityContent | null | undefined,
-  sectionKey: string | undefined,
-): string[] {
-  if (!content || !sectionKey) return [];
-  const rows = (content as Record<string, unknown>)[sectionKey];
-  if (!Array.isArray(rows)) return [];
-  return rows.slice(0, 6).map((row) => {
-    const r = row as Record<string, unknown>;
-    const label =
-      r.position ??
-      r.name ??
-      r.institution ??
-      r.title ??
-      r.organization ??
-      r.language ??
-      r.area ??
-      "Item";
-    return String(label);
-  });
 }
 
 export default function DocumentStage({
@@ -469,61 +447,63 @@ function BlockBody({
   }
   // section / component. Inline the null/schema checks (not a hoisted bool) so
   // TS narrows entityContent + onContentChange to non-null in the edit branch.
-  return (
-    <div>
-      <h3
-        className="mb-1 pb-0.5 text-sm font-semibold"
-        style={{
-          color: theme.accent,
-          textTransform: theme.headingDecoration.textTransform,
-          letterSpacing: theme.headingDecoration.letterSpacing,
-          borderBottom: theme.headingDecoration.borderBottom,
-          paddingBottom: theme.headingDecoration.paddingBottom,
-        }}
-      >
-        {block.title ?? block.sectionKey ?? "Section"}
-      </h3>
-      {onContentChange && entityContent && documentSectionSchema(entityKind, block.sectionKey) ? (
+  if (onContentChange && entityContent && documentSectionSchema(entityKind, block.sectionKey)) {
+    return (
+      <div>
+        <h3
+          className="mb-1 pb-0.5 text-sm font-semibold"
+          style={{
+            color: theme.accent,
+            textTransform: theme.headingDecoration.textTransform,
+            letterSpacing: theme.headingDecoration.letterSpacing,
+            borderBottom: theme.headingDecoration.borderBottom,
+            paddingBottom: theme.headingDecoration.paddingBottom,
+          }}
+        >
+          {block.title ?? block.sectionKey ?? "Section"}
+        </h3>
         <SectionEditor
           entityKind={entityKind}
           sectionKey={block.sectionKey as string}
           content={entityContent}
           onChange={onContentChange}
         />
-      ) : (
-        <SectionSummary content={entityContent} sectionKey={block.sectionKey} />
-      )}
-    </div>
-  );
+      </div>
+    );
+  }
+  // Non-editable (no content bound / no edit callback) → the SAME canonical
+  // read renderer the PDF/export view uses, so on-canvas WYSIWYG and the export
+  // never drift (#1912/#2152 — full theme + item fidelity, not a label list).
+  if (!entityContent || !sectionHasContent(entityKind, entityContent, block.sectionKey)) {
+    return (
+      <p className="text-xs italic text-slate-400">No {block.sectionKey ?? "content"} yet</p>
+    );
+  }
+  return <BlockView block={block} entityKind={entityKind} content={entityContent} theme={theme} />;
 }
 
-/** Read-only fallback when a section block isn't editable (no content bound,
- *  or no edit callback — e.g. the viewer / PDF path). */
-function SectionSummary({
-  content,
-  sectionKey,
-}: {
-  content?: DocumentEntityContent | null;
-  sectionKey: string | undefined;
-}) {
-  const labels = sectionItemLabels(content, sectionKey);
-  return (
-    <>
-      {labels.length > 0 ? (
-        <ul className="space-y-0.5 text-sm text-slate-700">
-          {labels.map((l, i) => (
-            <li key={i} className="truncate">
-              {l}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-xs italic text-slate-400">
-          No {sectionKey ?? "content"} yet
-        </p>
-      )}
-    </>
-  );
+/** Schema-aware "does this section have anything to render?" — array sections
+ *  need ≥1 item; object sections (resume basics by `objectPath`, jobs at the
+ *  flat root) need ≥1 set field. Drives the "No X yet" placeholder. */
+function sectionHasContent(
+  entityKind: DocumentEntityKind,
+  content: DocumentEntityContent,
+  sectionKey: string | undefined,
+): boolean {
+  const schema = documentSectionSchema(entityKind, sectionKey);
+  if (!schema) return false;
+  const root = content as Record<string, unknown>;
+  if (schema.shape === "array") {
+    const rows = root[schema.sectionKey];
+    return Array.isArray(rows) && rows.length > 0;
+  }
+  const obj = schema.objectPath ? root[schema.objectPath] : root;
+  if (!obj || typeof obj !== "object") return false;
+  const o = obj as Record<string, unknown>;
+  return schema.fields.some((f) => {
+    const v = o[f.key];
+    return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
+  });
 }
 
 function OverlayView({ overlay }: { overlay: import("@/lib/studio/editor-v2/document-state").DocumentOverlay }) {

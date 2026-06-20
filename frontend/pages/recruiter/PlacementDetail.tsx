@@ -280,10 +280,10 @@ function DocumentsTab({ placementId, toast }: { placementId: string; toast: Retu
         credentials: "include",
       });
       if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
-      toast({ title: "Uploaded", description: file.name });
+      toast({ title: t("messages.placement.uploaded"), description: file.name });
       await refresh();
     } catch (e) {
-      toast({ title: "Upload failed", description: String((e as Error).message), variant: "destructive" });
+      toast({ title: t("messages.placement.uploadFailed"), description: String((e as Error).message), variant: "destructive" });
     } finally {
       setUploadingId(null);
     }
@@ -292,10 +292,10 @@ function DocumentsTab({ placementId, toast }: { placementId: string; toast: Retu
   const handleMarkSigned = async (docId: string) => {
     try {
       await apiClient.post(`/api/workforce/documents/${docId}/mark-signed`, {});
-      toast({ title: "Marked signed" });
+      toast({ title: t("messages.placement.markedSigned") });
       await refresh();
     } catch (e) {
-      toast({ title: "Failed", description: String((e as Error).message), variant: "destructive" });
+      toast({ title: t("status.failed"), description: String((e as Error).message), variant: "destructive" });
     }
   };
 
@@ -304,16 +304,16 @@ function DocumentsTab({ placementId, toast }: { placementId: string; toast: Retu
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5" />
-          Documents
+          {t("labels.placement.documents")}
           {!loading && <Badge variant="secondary">{docs.length}</Badge>}
         </CardTitle>
-        <CardDescription>Placement-scoped compliance artefacts. Upload a file to attach + then mark signed.</CardDescription>
+        <CardDescription>{t("messages.placement.documentsDesc")}</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="text-sm text-muted-foreground">Loading…</div>
+          <div className="text-sm text-muted-foreground">{t("status.loading")}</div>
         ) : docs.length === 0 ? (
-          <div className="text-sm text-muted-foreground">No placement-scoped documents yet.</div>
+          <div className="text-sm text-muted-foreground">{t("messages.placement.noDocuments")}</div>
         ) : (
           <div className="space-y-2">
             {docs.map((d) => (
@@ -321,14 +321,14 @@ function DocumentsTab({ placementId, toast }: { placementId: string; toast: Retu
                 <div>
                   <div className="font-medium uppercase text-xs">{d.kind}</div>
                   <div className="text-xs text-muted-foreground">
-                    {d.filePath ? "file uploaded" : "no file"} · {d.status}
-                    {d.expiresAt ? ` · expires ${new Date(d.expiresAt).toLocaleDateString()}` : ""}
+                    {d.filePath ? t("labels.placement.fileUploaded") : t("labels.placement.noFile")} · {d.status}
+                    {d.expiresAt ? ` · ${t("labels.placement.expires", { date: new Date(d.expiresAt).toLocaleDateString() })}` : ""}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="cursor-pointer inline-flex items-center gap-1 border px-3 py-1.5 rounded-md text-sm hover:bg-muted">
                     {uploadingId === d.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                    {d.filePath ? "Replace" : "Upload"}
+                    {d.filePath ? t("actions.replace") : t("actions.upload")}
                     <input
                       type="file"
                       className="hidden"
@@ -342,7 +342,7 @@ function DocumentsTab({ placementId, toast }: { placementId: string; toast: Retu
                   {d.status !== "signed" && (
                     <Button size="sm" variant="outline" onClick={() => handleMarkSigned(d.id)}>
                       <CheckCircle2 className="h-4 w-4 mr-1" />
-                      Mark signed
+                      {t("actions.placement.markSigned")}
                     </Button>
                   )}
                 </div>
@@ -365,6 +365,7 @@ interface PlacementTimesheetRow {
 }
 
 function TimesheetsTab({ candidateId, toast }: { placementId: string; candidateId: string; toast: ReturnType<typeof useToast>["toast"] }) {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<PlacementTimesheetRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -387,36 +388,36 @@ function TimesheetsTab({ candidateId, toast }: { placementId: string; candidateI
             totalBillableHours: r.timesheet.totalBillableHours,
           })));
       } catch (e) {
-        toast({ title: "Failed to load timesheets", description: String((e as Error).message), variant: "destructive" });
+        toast({ title: t("messages.placement.timesheetsLoadFailed"), description: String((e as Error).message), variant: "destructive" });
       } finally {
         setLoading(false);
       }
     })();
-  }, [candidateId, toast]);
+  }, [candidateId, toast, t]);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ClipboardCheck className="h-5 w-5" />
-          Timesheets
+          {t("labels.placement.timesheets")}
           {!loading && <Badge variant="secondary">{rows.length}</Badge>}
         </CardTitle>
-        <CardDescription>Submitted weekly timesheets for the placed employee.</CardDescription>
+        <CardDescription>{t("messages.placement.timesheetsDesc")}</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="text-sm text-muted-foreground">Loading…</div>
+          <div className="text-sm text-muted-foreground">{t("status.loading")}</div>
         ) : rows.length === 0 ? (
-          <div className="text-sm text-muted-foreground">No submitted timesheets yet for this placement.</div>
+          <div className="text-sm text-muted-foreground">{t("messages.placement.noTimesheets")}</div>
         ) : (
           <div className="space-y-2">
             {rows.map((r) => (
               <div key={r.id} className="border rounded-md p-3 flex items-center justify-between text-sm">
                 <div>
-                  <div className="font-medium">Week of {r.periodStart}</div>
+                  <div className="font-medium">{t("labels.placement.weekOf", { date: r.periodStart })}</div>
                   <div className="text-xs text-muted-foreground">
-                    {r.totalHours}h total · {r.totalBillableHours}h billable
+                    {t("labels.placement.hoursSummary", { total: r.totalHours, billable: r.totalBillableHours })}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -426,7 +427,7 @@ function TimesheetsTab({ candidateId, toast }: { placementId: string; candidateI
                     variant="outline"
                     onClick={() => window.open(`/api/workforce/timesheets/${r.id}/print`, "_blank", "noopener")}
                   >
-                    <Printer className="h-4 w-4 mr-1" /> Print
+                    <Printer className="h-4 w-4 mr-1" /> {t("actions.print")}
                   </Button>
                 </div>
               </div>
@@ -439,6 +440,7 @@ function TimesheetsTab({ candidateId, toast }: { placementId: string; candidateI
 }
 
 function MarginTab({ placementId, toast }: { placementId: string; toast: ReturnType<typeof useToast>["toast"] }) {
+  const { t } = useTranslation();
   const [row, setRow] = useState<DeskMarginRow | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -449,12 +451,12 @@ function MarginTab({ placementId, toast }: { placementId: string; toast: ReturnT
         const r = await workforceService.getDeskMargin();
         setRow(r.rows.find((m) => m.placementId === placementId) ?? null);
       } catch (e) {
-        toast({ title: "Failed to load margin", description: String((e as Error).message), variant: "destructive" });
+        toast({ title: t("messages.placement.marginLoadFailed"), description: String((e as Error).message), variant: "destructive" });
       } finally {
         setLoading(false);
       }
     })();
-  }, [placementId, toast]);
+  }, [placementId, toast, t]);
 
   const fmt = (cents: number, currency = "USD") =>
     new Intl.NumberFormat(undefined, { style: "currency", currency }).format(cents / 100);
@@ -464,34 +466,34 @@ function MarginTab({ placementId, toast }: { placementId: string; toast: ReturnT
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <DollarSign className="h-5 w-5" />
-          Desk margin YTD
+          {t("headings.placement.deskMarginYtd")}
         </CardTitle>
-        <CardDescription>Aggregated from approved-timesheet derivations.</CardDescription>
+        <CardDescription>{t("messages.placement.marginDesc")}</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="text-sm text-muted-foreground">Loading…</div>
+          <div className="text-sm text-muted-foreground">{t("status.loading")}</div>
         ) : !row ? (
-          <div className="text-sm text-muted-foreground">No margin data yet — approve a timesheet for this placement to start populating.</div>
+          <div className="text-sm text-muted-foreground">{t("messages.placement.noMargin")}</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             <div className="border rounded-md p-3">
-              <div className="text-muted-foreground text-xs">Revenue YTD</div>
+              <div className="text-muted-foreground text-xs">{t("labels.placement.revenueYtd")}</div>
               <div className="font-mono tabular-nums text-lg">{fmt(row.revenueCents, row.currency)}</div>
             </div>
             <div className="border rounded-md p-3">
-              <div className="text-muted-foreground text-xs">Contractor pay YTD</div>
+              <div className="text-muted-foreground text-xs">{t("labels.placement.contractorPayYtd")}</div>
               <div className="font-mono tabular-nums text-lg">{fmt(row.payoutCents, row.currency)}</div>
             </div>
             <div className="border rounded-md p-3">
-              <div className="text-muted-foreground text-xs">Gross margin YTD</div>
+              <div className="text-muted-foreground text-xs">{t("labels.placement.grossMarginYtd")}</div>
               <div className={`font-mono tabular-nums text-lg ${row.grossMarginCents >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {fmt(row.grossMarginCents, row.currency)}
               </div>
             </div>
             <div className="sm:col-span-3 text-xs text-muted-foreground mt-2">
-              {row.approvedTimesheetCount} approved timesheet{row.approvedTimesheetCount === 1 ? "" : "s"} ·
-              {" "}{row.billableHoursYTD}h billable
+              {t("labels.placement.approvedTimesheets", { count: row.approvedTimesheetCount })} ·
+              {" "}{t("labels.placement.billableHoursYtd", { hours: row.billableHoursYTD })}
             </div>
           </div>
         )}

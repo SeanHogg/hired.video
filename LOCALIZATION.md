@@ -19,9 +19,10 @@ node scripts/i18n-coverage.cjs --staff     # include admin/superadmin
 - **Legal bodies** ([TermsOfService.tsx](hired.video/frontend/pages/TermsOfService.tsx) #1200, plus already-extracted Privacy/Cookie) get structurally localized here, but the es/fr-CA copy is competent working-knowledge and still needs **certified legal-translator review before CA/MX launch** (gap #1202).
 - **Components scope (tracked separately):** `components/*` carries another ~5,600 hardcoded strings across ~656 files at ~26% coverage. Highest-leverage shared components ([SearchBar.tsx](hired.video/frontend/components/SearchBar.tsx), [ResumeViewer.tsx](hired.video/frontend/components/ResumeViewer.tsx), studio panels) are pulled in alongside the pages that render them.
 
-**Headline (user-facing pages, regenerated 2026-06-20 after the ≥80% + 60–79% completion sweeps):** **73% localized · 1,993 hardcoded strings remaining across 187 files · 20 hardcoded-free (24 rows round to ✅ 100%).** (Baseline at catalog creation: 34% / 3,820 / 173 files.) Total project surface incl. components ≈ 9,800 hardcoded strings. **Caveat:** on pages already ≥80%, the residual count is dominated by detector false positives (TypeScript generics/arrow code read as JSX text — `useState<T>(null)`, `z.infer<typeof>`, ternaries `) : (` — plus brand/proper nouns and contact emails), **not** raw-key leaks. Use the count for triage of *low*-coverage pages; for high-coverage pages inspect the `--json` `samples` before assuming a leak.
+**Headline (user-facing pages, regenerated 2026-06-20 after the ≥80% / 60–79% / 40–59% completion sweeps):** **74% localized · 1,935 hardcoded strings remaining across 187 files · 20 hardcoded-free (24 rows round to ✅ 100%).** (Baseline at catalog creation: 34% / 3,820 / 173 files.) Total project surface incl. components ≈ 9,800 hardcoded strings. **Caveat:** on pages already ≥80%, the residual count is dominated by detector false positives (TypeScript generics/arrow code read as JSX text — `useState<T>(null)`, `z.infer<typeof>`, ternaries `) : (` — plus brand/proper nouns and contact emails), **not** raw-key leaks. Use the count for triage of *low*-coverage pages; for high-coverage pages inspect the `--json` `samples` before assuming a leak.
 
 **Progress log** (newest first — update when a page reaches ✅ 100%):
+- 2026-06-20 **40–59% band sweep** — 3 parallel agents, per-page `.tsx` edits + central merge (**91 new keys × 3 locales** at parity, zero collisions). All 4 band files improved: [StudioEditorV2.tsx](hired.video/frontend/pages/studio/v2/StudioEditorV2.tsx) (50→79%; **62 strings** across the 5,060-line V2 canvas editor — toolbar/panel labels, dialogs, toasts, a11y attrs, dynamic scene/layer labels; added `useTranslation` to 4 sub-components, `LEFT_TABS` copy resolved at render; also added the 4 `studio.anon.gate*` keys that were referenced with `defaultValue` but absent from the catalogue → anon gate now localizes), [PlacementDetail.tsx](hired.video/frontend/pages/recruiter/PlacementDetail.tsx) (40→88%; Documents/Timesheets/Margin tabs, `useTranslation` added to 2 tab sub-components, manual `+s` → `_one`/`_other` plural), [FormAutofill.tsx](hired.video/frontend/pages/tools/FormAutofill.tsx) (57→82%), [ArticleView.tsx](hired.video/frontend/pages/ArticleView.tsx) (56→77%; reused `search.category.articles` + `labels.minutesValue`). `tsc` clean; raw-key scan zero new leaks. StudioEditorV2's residual 40 flags were dumped and verified **100% code** (TS generics `useRef<X>`/`Promise<X>`/`ReturnType<X>`, `useState<X>(…)` inits, ternary JSX-branch boundaries) — the #2217 false-positive pattern, no real copy left. Overall 73%→74%, hardcoded 1,999→1,935.
 - 2026-06-20 **60–79% band sweep** — same per-page-`.tsx`-edit + central-merge pattern via 4 parallel agents (**34 new keys × 3 locales** at en/es/fr-CA parity, zero collisions). Real copy localized: [Careers.tsx](hired.video/frontend/pages/Careers.tsx) (68→95%; Hiring-Process + FAQ + CTA sections, module arrays → `t`-factories), [ResumeTailor.tsx](hired.video/frontend/pages/tools/ResumeTailor.tsx) (72→90%; job-desc/resume-picker labels + run-history strings), [Career360.tsx](hired.video/frontend/pages/tools/Career360.tsx) (74→92%; legend/stamps copy + `_one`/`_other` plural), [Dashboard.tsx](hired.video/frontend/pages/Dashboard.tsx) (69→74%; `buildDashboardTabs(t)` factory), [GigMarketplace.tsx](hired.video/frontend/pages/GigMarketplace.tsx) (70→72%; `useSEO` title/desc). The other 6 band files — [ResumeConsolidator.tsx](hired.video/frontend/pages/tools/ResumeConsolidator.tsx), [VendorSync.tsx](hired.video/frontend/pages/tools/VendorSync.tsx), [PredictiveAssessments.tsx](hired.video/frontend/pages/tools/PredictiveAssessments.tsx), [VerifyEmail.tsx](hired.video/frontend/pages/VerifyEmail.tsx), [ValueProposition.tsx](hired.video/frontend/pages/tools/ValueProposition.tsx), [JobResumeMatch.tsx](hired.video/frontend/pages/tools/JobResumeMatch.tsx) — were **already fully localized**; their 4–18 residual flags are 100% detector false positives (`useState<T>(null)` generics read as JSX text, per gap #2217), verified via `--json` `samples`. `tsc` clean; raw-key scan confirms zero new leaks. Overall hardcoded 2,023→1,993.
 - 2026-06-20 **≥80% completion sweep** — drove every user-facing page already at **≥80% coverage** to its genuine ceiling via 11 parallel agents (per-page `.tsx` edits, **107 new keys × 3 locales** merged centrally at en/es/fr-CA parity, zero collisions; `w` derives automatically). Genuine English leaks wrapped across **18 pages** — highlights: [PitchDeckBuilder.tsx](hired.video/frontend/pages/services/PitchDeckBuilder.tsx) (86→93%, whole `SlideEditor` sub-component had no i18n), [InterviewTemplates.tsx](hired.video/frontend/pages/tools/InterviewTemplates.tsx) (86→94%), [JobApplicationPage.tsx](hired.video/frontend/pages/JobApplicationPage.tsx) (83→93%, screening preview block w/ `_one`/`_other` plurals), [Home.tsx](hired.video/frontend/pages/Home.tsx) (96→98%), [Settings.tsx](hired.video/frontend/pages/Settings.tsx) (97→98%, Social-publishing card), [Contributors.tsx](hired.video/frontend/pages/Contributors.tsx) (92→96%), [Resumes.tsx](hired.video/frontend/pages/Resumes.tsx) (93→94%, MarketingFAQ block), [Tasks.tsx](hired.video/frontend/pages/Tasks.tsx) (91→93%, `buildEventsFaq(t)` factory), plus Companies/CompanyDetail status badges, StudioLanding/StudioSidebar, ProfileAudit/VideoPitchLab/SummarizeResume run-history + AI-coach strings, and SEO `useSEO`/`useUgcSeo` titles on Gig*/SourcingBrowse/TranscriptSearch/SharedCandidateResume/SharedPitchDeck. [ForRecruiters.tsx](hired.video/frontend/pages/ForRecruiters.tsx) reached ✅ 100%. `tsc` clean. Overall 72%→73%, 19→20 hardcoded-free pages (ForRecruiters newly zero-leak); also fixed two pre-existing raw-key leaks in JobCreatePage (`labels.sector`, `labels.unspecified` had no catalogue entry → rendered the raw key). **Key finding:** the other ~39 ≥80% pages had **no genuine leaks left** — their flags are detector false positives (TS generics/arrow code as JSX text + brand/proper nouns/emails like hired.video, info@hired.video, SCORM, testimonial names). Reaching a literal 100% there would mean wrapping non-copy or breaking code, so they were left as-is. Detector refinement (strip generics, brand allowlist) logged as a gap.
 - 2026-06-12 **studio/services/recruit wave** — localized the next 5 high-leverage 0%-coverage pages in parallel (per-page `.tsx` edits, 320 keys merged centrally at en/es/fr-CA parity, zero collisions): [StudioLayout.tsx](hired.video/frontend/pages/studio/StudioLayout.tsx) (0%→🟡 93%; full landing/hero/features/how-it-works/9-item FAQ + ~80 toast/dialog/onboarding strings, all control arrays → `t`-taking factories), [StudioLanding.tsx](hired.video/frontend/pages/studio/StudioLanding.tsx) (0%→🟡 85%; template grid + project cards + empty/provenance states, reused `actions.{edit,delete,preview,use,retry}` + `labels.{public,private,name,type,updated}` + `fields.visibility.label`), [PaidMediaPage.tsx](hired.video/frontend/pages/paid-media/PaidMediaPage.tsx) (0%→🟡 89%; connections/campaigns/pixels/reporting tabs — **fixed a key collision the localizer introduced**: the platform-name fallback and the "Platform" column header had been collapsed onto one `labels.paidMedia.platform` key → split the fallback into `labels.paidMedia.platformFallback`), [ScreeningTemplates.tsx](hired.video/frontend/pages/services/ScreeningTemplates.tsx) (0%→🟡 91%), [LiveScreens.tsx](hired.video/frontend/pages/recruit/LiveScreens.tsx) (0%→🟡 91%; replaced ad-hoc `+ "s"` pluralization with proper i18next plurals). **320 new keys × 3 locales**, including **10 i18next `_one`/`_other` plural entries** (5 `{{count}}` keys: liveScreens invite/candidate counts + auto-matched, studioLayout script-rewritten + voiceover-added). `tsc` clean across all 5. Overall 68%→72%, –199 hardcoded. Residual 4–14 flags per file are heuristic over-counts (enum/status values, data-URL placeholders, em-dashes), not raw-key leaks.
@@ -38,7 +39,7 @@ node scripts/i18n-coverage.cjs --staff     # include admin/superadmin
 | File | t()+Trans | Hardcoded | Coverage |
 |------|----------:|----------:|---------:|
 | [pages/TermsOfService.tsx](hired.video/frontend/pages/TermsOfService.tsx) | 0 | 390 | 🔴 0% |
-| [pages/studio/v2/StudioEditorV2.tsx](hired.video/frontend/pages/studio/v2/StudioEditorV2.tsx) | 78 | 77 | 🔴 50% |
+| [pages/studio/v2/StudioEditorV2.tsx](hired.video/frontend/pages/studio/v2/StudioEditorV2.tsx) | 149 | 40 | 🟡 79% |
 | [pages/tools/SkillExtractor.tsx](hired.video/frontend/pages/tools/SkillExtractor.tsx) | 11 | 36 | 🔴 23% |
 | [pages/bookings/BookingsHost.tsx](hired.video/frontend/pages/bookings/BookingsHost.tsx) | 12 | 34 | 🔴 26% |
 | [pages/PrivacyPolicy.tsx](hired.video/frontend/pages/PrivacyPolicy.tsx) | 252 | 30 | 🟡 89% |
@@ -58,13 +59,11 @@ node scripts/i18n-coverage.cjs --staff     # include admin/superadmin
 | [pages/EventManage.tsx](hired.video/frontend/pages/EventManage.tsx) | 3 | 22 | 🔴 12% |
 | [pages/PrivacyOptOut.tsx](hired.video/frontend/pages/PrivacyOptOut.tsx) | 0 | 21 | 🔴 0% |
 | [pages/studio/StudioActions.tsx](hired.video/frontend/pages/studio/StudioActions.tsx) | 0 | 21 | 🔴 0% |
-| [pages/recruiter/PlacementDetail.tsx](hired.video/frontend/pages/recruiter/PlacementDetail.tsx) | 14 | 21 | 🔴 40% |
 | [pages/Outreach.tsx](hired.video/frontend/pages/Outreach.tsx) | 149 | 21 | 🟡 88% |
 | [pages/guides/VideoBestPractices.tsx](hired.video/frontend/pages/guides/VideoBestPractices.tsx) | 0 | 20 | 🔴 0% |
 | [pages/PivotExplorer.tsx](hired.video/frontend/pages/PivotExplorer.tsx) | 0 | 20 | 🔴 0% |
 | [pages/SectorLanding.tsx](hired.video/frontend/pages/SectorLanding.tsx) | 0 | 20 | 🔴 0% |
 | [pages/seo/SalaryPage.tsx](hired.video/frontend/pages/seo/SalaryPage.tsx) | 0 | 20 | 🔴 0% |
-| [pages/tools/FormAutofill.tsx](hired.video/frontend/pages/tools/FormAutofill.tsx) | 26 | 20 | 🔴 57% |
 | [pages/tools/ResumeConsolidator.tsx](hired.video/frontend/pages/tools/ResumeConsolidator.tsx) | 69 | 18 | 🟡 79% |
 | [pages/bookings/ReservationPage.tsx](hired.video/frontend/pages/bookings/ReservationPage.tsx) | 0 | 17 | 🔴 0% |
 | [pages/bookings/BookPage.tsx](hired.video/frontend/pages/bookings/BookPage.tsx) | 0 | 16 | 🔴 0% |
@@ -102,6 +101,7 @@ node scripts/i18n-coverage.cjs --staff     # include admin/superadmin
 | [pages/TakeHomeAssignment.tsx](hired.video/frontend/pages/TakeHomeAssignment.tsx) | 0 | 9 | 🔴 0% |
 | [pages/WarmIntros.tsx](hired.video/frontend/pages/WarmIntros.tsx) | 0 | 9 | 🔴 0% |
 | [pages/tools/VendorSync.tsx](hired.video/frontend/pages/tools/VendorSync.tsx) | 21 | 9 | 🟡 70% |
+| [pages/tools/FormAutofill.tsx](hired.video/frontend/pages/tools/FormAutofill.tsx) | 42 | 9 | 🟡 82% |
 | [pages/EventNew.tsx](hired.video/frontend/pages/EventNew.tsx) | 44 | 9 | 🟡 83% |
 | [pages/paid-media/PaidMediaPage.tsx](hired.video/frontend/pages/paid-media/PaidMediaPage.tsx) | 70 | 9 | 🟡 89% |
 | [pages/MyInterviewAssignments.tsx](hired.video/frontend/pages/MyInterviewAssignments.tsx) | 86 | 9 | 🟡 91% |
@@ -116,6 +116,7 @@ node scripts/i18n-coverage.cjs --staff     # include admin/superadmin
 | [pages/tools/PredictiveAssessments.tsx](hired.video/frontend/pages/tools/PredictiveAssessments.tsx) | 31 | 8 | 🟡 79% |
 | [pages/CourseLearner.tsx](hired.video/frontend/pages/CourseLearner.tsx) | 43 | 8 | 🟡 84% |
 | [pages/people/PeopleRoster.tsx](hired.video/frontend/pages/people/PeopleRoster.tsx) | 53 | 8 | 🟡 87% |
+| [pages/ResumeDetail.tsx](hired.video/frontend/pages/ResumeDetail.tsx) | 75 | 8 | 🟡 90% |
 | [pages/Tasks.tsx](hired.video/frontend/pages/Tasks.tsx) | 101 | 8 | 🟡 93% |
 | [pages/HiringManagerPortal.tsx](hired.video/frontend/pages/HiringManagerPortal.tsx) | 0 | 7 | 🔴 0% |
 | [pages/landing/AudienceLandingPage.tsx](hired.video/frontend/pages/landing/AudienceLandingPage.tsx) | 0 | 7 | 🔴 0% |
@@ -134,10 +135,10 @@ node scripts/i18n-coverage.cjs --staff     # include admin/superadmin
 | [pages/studio/StudioEditor.tsx](hired.video/frontend/pages/studio/StudioEditor.tsx) | 0 | 6 | 🔴 0% |
 | [pages/ForIndex.tsx](hired.video/frontend/pages/ForIndex.tsx) | 1 | 6 | 🔴 14% |
 | [pages/AffiliateDashboard.tsx](hired.video/frontend/pages/AffiliateDashboard.tsx) | 40 | 6 | 🟡 87% |
+| [pages/recruiter/PlacementDetail.tsx](hired.video/frontend/pages/recruiter/PlacementDetail.tsx) | 46 | 6 | 🟡 88% |
 | [pages/tools/ProfileAudit.tsx](hired.video/frontend/pages/tools/ProfileAudit.tsx) | 49 | 6 | 🟡 89% |
 | [pages/services/ScreeningTemplates.tsx](hired.video/frontend/pages/services/ScreeningTemplates.tsx) | 55 | 6 | 🟡 90% |
 | [pages/tools/ResumeTailor.tsx](hired.video/frontend/pages/tools/ResumeTailor.tsx) | 52 | 6 | 🟡 90% |
-| [pages/ResumeDetail.tsx](hired.video/frontend/pages/ResumeDetail.tsx) | 75 | 6 | 🟡 93% |
 | [pages/tools/InterviewQuestions.tsx](hired.video/frontend/pages/tools/InterviewQuestions.tsx) | 86 | 6 | 🟡 93% |
 | [pages/guides/JobSearchStrategies.tsx](hired.video/frontend/pages/guides/JobSearchStrategies.tsx) | 0 | 5 | 🔴 0% |
 | [pages/PersonaSelection.tsx](hired.video/frontend/pages/PersonaSelection.tsx) | 0 | 5 | 🔴 0% |
@@ -152,9 +153,9 @@ node scripts/i18n-coverage.cjs --staff     # include admin/superadmin
 | [pages/guides/NetworkingTips.tsx](hired.video/frontend/pages/guides/NetworkingTips.tsx) | 0 | 4 | 🔴 0% |
 | [pages/JobEmbed.tsx](hired.video/frontend/pages/JobEmbed.tsx) | 0 | 4 | 🔴 0% |
 | [pages/PlaceholderPage.tsx](hired.video/frontend/pages/PlaceholderPage.tsx) | 0 | 4 | 🔴 0% |
+| [pages/ResumeReviewPage.tsx](hired.video/frontend/pages/ResumeReviewPage.tsx) | 0 | 4 | 🔴 0% |
 | [pages/SectorsIndex.tsx](hired.video/frontend/pages/SectorsIndex.tsx) | 0 | 4 | 🔴 0% |
 | [pages/ToolDetail.tsx](hired.video/frontend/pages/ToolDetail.tsx) | 1 | 4 | 🔴 20% |
-| [pages/ArticleView.tsx](hired.video/frontend/pages/ArticleView.tsx) | 5 | 4 | 🔴 56% |
 | [pages/tools/JobResumeMatch.tsx](hired.video/frontend/pages/tools/JobResumeMatch.tsx) | 15 | 4 | 🟡 79% |
 | [pages/GigDetail.tsx](hired.video/frontend/pages/GigDetail.tsx) | 24 | 4 | 🟡 86% |
 | [pages/recruit/LiveScreens.tsx](hired.video/frontend/pages/recruit/LiveScreens.tsx) | 43 | 4 | 🟡 91% |
@@ -166,6 +167,7 @@ node scripts/i18n-coverage.cjs --staff     # include admin/superadmin
 | [pages/guides/GettingStarted.tsx](hired.video/frontend/pages/guides/GettingStarted.tsx) | 0 | 3 | 🔴 0% |
 | [pages/guides/Tutorials.tsx](hired.video/frontend/pages/guides/Tutorials.tsx) | 0 | 3 | 🔴 0% |
 | [pages/JobScreeningPage.tsx](hired.video/frontend/pages/JobScreeningPage.tsx) | 0 | 3 | 🔴 0% |
+| [pages/ArticleView.tsx](hired.video/frontend/pages/ArticleView.tsx) | 10 | 3 | 🟡 77% |
 | [pages/ServiceInquiries.tsx](hired.video/frontend/pages/ServiceInquiries.tsx) | 23 | 3 | 🟡 88% |
 | [pages/SourcingBrowse.tsx](hired.video/frontend/pages/SourcingBrowse.tsx) | 27 | 3 | 🟡 90% |
 | [pages/GigCreatePage.tsx](hired.video/frontend/pages/GigCreatePage.tsx) | 33 | 3 | 🟡 92% |

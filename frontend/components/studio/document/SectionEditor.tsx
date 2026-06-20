@@ -20,6 +20,7 @@ import {
   documentSectionSchema,
   type DocumentSectionSchema,
 } from "@/lib/studio/document/document-field-schema";
+import { validateDateRange } from "@/lib/studio/document/field-validation";
 
 interface SectionEditorProps {
   entityKind: DocumentEntityKind;
@@ -109,6 +110,7 @@ function ArrayEditor({
             fields={schema.fields}
             values={item}
             onChange={(key, value) => setItem(idx, key, value)}
+            crossFieldErrors={validateDateRange(schema, item)}
             className="pr-6"
           />
         </div>
@@ -150,5 +152,12 @@ function ObjectEditor({
       onChange({ ...root, [key]: value });
     }
   };
-  return <FieldGroupEditor fields={schema.fields} values={obj} onChange={setField} />;
+  return (
+    <FieldGroupEditor
+      fields={schema.fields}
+      values={obj}
+      onChange={setField}
+      crossFieldErrors={validateDateRange(schema, obj)}
+    />
+  );
 }

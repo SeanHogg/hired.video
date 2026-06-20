@@ -23,8 +23,30 @@ import {
 } from "@/lib/studio/editor-v2/document-theme";
 import {
   documentSectionSchema,
+  type DocumentSectionSchema,
   type SectionFieldDef,
 } from "@/lib/studio/document/document-field-schema";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2019-03" / "2019-03-21" → "Mar 2019"; anything else passes through. */
+export function formatDocDate(raw: unknown): string {
+  if (typeof raw !== "string" || !raw.trim()) return "";
+  const m = /^(\d{4})-(\d{2})(?:-\d{2})?$/.exec(raw.trim());
+  if (!m) return raw.trim();
+  const month = MONTHS[Number(m[2]) - 1];
+  return month ? `${month} ${m[1]}` : raw.trim();
+}
+
+/** A formatted "Start – End" range, "Start – Present" when the end is blank. */
+export function formatDateRange(start: unknown, end: unknown): string {
+  const s = formatDocDate(start);
+  const e = formatDocDate(end);
+  if (!s && !e) return "";
+  if (s && !e) return `${s} – Present`;
+  if (!s && e) return e;
+  return `${s} – ${e}`;
+}
 
 interface DocumentViewProps {
   state: DocumentState;
@@ -108,7 +130,10 @@ export default function DocumentView({ state, content, forPrint }: DocumentViewP
   );
 }
 
-function BlockView({
+/** Read-only render of ONE document block (heading + content) — the canonical
+ *  read renderer. Reused by `DocumentStage` so the on-canvas non-edit view and
+ *  the PDF/export view never drift (DRY). */
+export function BlockView({
   block,
   entityKind,
   content,
@@ -324,12 +349,7 @@ function SectionView({
     <section style={{ marginBottom: theme.sectionGap }}>
       <SectionHeading title={block.title ?? block.sectionKey ?? "Section"} theme={theme} />
       {items.map((item, i) => (
-        <ItemView
-          key={(item.id as string) ?? i}
-          item={item}
-          fields={schema?.fields ?? []}
-          theme={theme}
-        />
+        <ItemView key={(item.id as string) ?? i} item={item} schema={schema} theme={theme} />
       ))}
     </section>
   );
@@ -337,31 +357,48 @@ function SectionView({
 
 function ItemView({
   item,
-  fields,
+  schema,
   theme,
 }: {
   item: Record<string, unknown>;
-  fields: SectionFieldDef[];
+  schema: DocumentSectionSchema | null;
   theme: ResolvedDocumentTheme;
 }) {
-  // Heuristic faithful render from the schema: first text field = bold primary;
-  // remaining text/date fields = a muted meta line; list fields = bullets;
-  // textarea fields = paragraphs.
-  const textFields = fields.filter((f) => f.type === "text" || f.type === "date");
-  const listFields = fields.filter((f) => f.type === "list");
-  const proseFields = fields.filter((f) => f.type === "textarea");
+  // Schema-faithful entry render: first text field = bold primary; the section's
+  // `dateRange` pair renders as a right-aligned, formatted "Start – End"; other
+  // text + standalone date fields = a muted meta line; textarea = paragraphs;
+  // list = bullets. Dates are humanized ("2019-03" → "Mar 2019").
+  const fields: SectionFieldDef[] = schema?.fields ?? [];
+  const range = schema?.dateRange;
+  const rangeKeys = new Set([range?.start, range?.end].filter(Boolean) as string[]);
   const val = (k: string) => (typeof item[k] === "string" ? (item[k] as string) : "");
 
+  const textFields = fields.filter((f) => f.type === "text");
+  const standaloneDates = fields.filter(
+    (f) => (f.type === "date" || f.type === "day") && !rangeKeys.has(f.key),
+  );
+  const listFields = fields.filter((f) => f.type === "list" || f.type === "chips");
+  const proseFields = fields.filter((f) => f.type === "textarea");
+
   const primary = textFields[0] ? val(textFields[0].key) : "";
-  const meta = textFields
-    .slice(1)
-    .map((f) => val(f.key))
+  const meta = [
+    ...textFields.slice(1).map((f) => val(f.key)),
+    ...standaloneDates.map((f) => formatDocDate(item[f.key])),
+  ]
     .filter(Boolean)
     .join("  ·  ");
+  const rangeText = range ? formatDateRange(item[range.start], item[range.end]) : "";
 
   return (
     <div style={{ marginBottom: theme.entryGap }}>
-      {primary && <div style={{ fontSize: 13, fontWeight: 600, color: theme.heading }}>{primary}</div>}
+      {(primary || rangeText) && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+          {primary && <div style={{ fontSize: 13, fontWeight: 600, color: theme.heading }}>{primary}</div>}
+          {rangeText && (
+            <div style={{ fontSize: 11.5, color: theme.muted, whiteSpace: "nowrap" }}>{rangeText}</div>
+          )}
+        </div>
+      )}
       {meta && <div style={{ fontSize: 12, color: theme.muted }}>{meta}</div>}
       {proseFields.map((f) =>
         val(f.key) ? (
