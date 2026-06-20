@@ -1,7 +1,7 @@
 import { Upload, Loader2, X, AlertTriangle } from "lucide-react";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { extractTextFromFile, parseJsonResumeFile } from "@/lib/extract-text";
+import { parseJsonResumeFile, isResumeImageFile } from "@/lib/extract-text";
 import { useIsFirstResumeUpload } from "@/hooks/useIsFirstResumeUpload";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -126,6 +126,8 @@ export default function ResumeUpload({
 
   function isFileAllowed(file: File): boolean {
     if (allowedTypes.includes(file.type)) return true;
+    // Images (phone photos / scans) — parsed server-side via vision OCR.
+    if (isResumeImageFile(file)) return true;
     const ext = "." + file.name.split(".").pop()?.toLowerCase();
     return allowedExtensions.includes(ext);
   }
@@ -172,7 +174,7 @@ export default function ResumeUpload({
         setFile(droppedFile);
         void populateNameFromFile(droppedFile);
       } else {
-        setError("Please upload a PDF, Word document, Markdown, JSON, or text file.");
+        setError("Please upload a PDF, Word document, photo (JPG/PNG), Markdown, JSON, or text file.");
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -351,24 +353,15 @@ export default function ResumeUpload({
         return;
       }
 
-      // If it's a JSON Resume export, parse structure client-side and
-      // send as `parsedContent` — preserves dates + highlights exactly
-      // as authored, skipping the lossy text->AI roundtrip.
-      const jsonResume = await parseJsonResumeFile(file);
-
-      const savedResume = jsonResume
-        ? await resumeService.createResume({
-            title: name.trim(),
-            parsedContent: jsonResume,
-            privacy,
-            isMaster,
-          })
-        : await resumeService.createResume({
-            title: name.trim(),
-            rawText: await extractTextFromFile(file),
-            privacy,
-            isMaster,
-          });
+      // Robust file → resume path (handles JSON exports verbatim, PDF/DOCX/text
+      // via client-or-server extraction, and phone photos/scans via server-side
+      // vision OCR). Never sends binary garbage — a failed extraction surfaces
+      // as a thrown error rather than a silently-empty resume.
+      const savedResume = await resumeService.createResumeFromFile(file, {
+        title: name.trim(),
+        privacy,
+        isMaster,
+      });
 
       // Canonical Resume shape post-2026-04-20 refactor: `content` IS the
       // JSON-Resume document directly (no `metaResume` envelope). Map the
@@ -411,6 +404,7 @@ export default function ResumeUpload({
   const getFileIcon = (file: File) => {
     if (file.type.includes("pdf")) return "📄";
     if (file.type.includes("word")) return "📝";
+    if (isResumeImageFile(file)) return "🖼️";
     return "📄";
   };
 
@@ -435,11 +429,11 @@ export default function ResumeUpload({
                 Drop your resume here, or click to browse
               </p>
               <p className="text-sm text-muted-foreground mb-4">
-                Supports PDF, Word (.doc, .docx), markdown, JSON, and text files
+                Supports PDF, Word (.doc, .docx), photos (JPG/PNG), markdown, JSON, and text files
               </p>
               <Input
                 type="file"
-                accept=".pdf,.doc,.docx,.txt,.md,.json"
+                accept="image/*,.pdf,.doc,.docx,.txt,.md,.json"
                 onChange={handleFileSelect}
                 className="hidden"
                 id="file-upload"

@@ -28,6 +28,7 @@ vi.mock("@/lib/services/resume-service", () => ({
 vi.mock("@/lib/extract-text", () => ({
   parseJsonResumeFile: parseJsonResumeFileMock,
   extractTextFromFile: extractTextFromFileMock,
+  isResumeImageFile: (file: File) => file.type.startsWith("image/"),
 }));
 
 import ResumeUpload from "@/components/ResumeUpload";

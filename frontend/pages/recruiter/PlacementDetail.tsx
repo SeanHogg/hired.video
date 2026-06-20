@@ -273,7 +273,7 @@ function OverviewTab({
             <label className="space-y-1">
               <span className="text-muted-foreground text-xs">{t("labels.placement.kind", { defaultValue: "Engagement type" })}</span>
               <select
-                value={(form.placementKind as string) ?? ""}
+                value={(form.placementKind) ?? ""}
                 onChange={(e) => set("placementKind", e.target.value)}
                 className="w-full rounded border border-border px-2 py-1 text-sm"
               >
@@ -284,27 +284,27 @@ function OverviewTab({
             </label>
             <label className="space-y-1">
               <span className="text-muted-foreground text-xs">{t("labels.placement.billRate")}</span>
-              <Input type="number" value={(form.billRateHourly as string) ?? ""} onChange={(e) => set("billRateHourly", e.target.value)} />
+              <Input type="number" value={(form.billRateHourly) ?? ""} onChange={(e) => set("billRateHourly", e.target.value)} />
             </label>
             <label className="space-y-1">
               <span className="text-muted-foreground text-xs">{t("labels.placement.payRate")}</span>
-              <Input type="number" value={(form.payRateHourly as string) ?? ""} onChange={(e) => set("payRateHourly", e.target.value)} />
+              <Input type="number" value={(form.payRateHourly) ?? ""} onChange={(e) => set("payRateHourly", e.target.value)} />
             </label>
             <label className="space-y-1">
               <span className="text-muted-foreground text-xs">{t("fields.currency.label")}</span>
-              <Input value={(form.currency as string) ?? ""} onChange={(e) => set("currency", e.target.value)} placeholder="USD" />
+              <Input value={(form.currency) ?? ""} onChange={(e) => set("currency", e.target.value)} placeholder="USD" />
             </label>
             <label className="space-y-1">
               <span className="text-muted-foreground text-xs">{t("labels.placement.end")}</span>
-              <Input type="date" value={(form.endDate as string) ?? ""} onChange={(e) => set("endDate", e.target.value)} />
+              <Input type="date" value={(form.endDate) ?? ""} onChange={(e) => set("endDate", e.target.value)} />
             </label>
             <label className="space-y-1">
               <span className="text-muted-foreground text-xs">{t("labels.placement.poNumber")}</span>
-              <Input value={(form.poNumber as string) ?? ""} onChange={(e) => set("poNumber", e.target.value)} />
+              <Input value={(form.poNumber) ?? ""} onChange={(e) => set("poNumber", e.target.value)} />
             </label>
             <label className="space-y-1">
               <span className="text-muted-foreground text-xs">{t("labels.placement.msaRef")}</span>
-              <Input value={(form.msaRef as string) ?? ""} onChange={(e) => set("msaRef", e.target.value)} />
+              <Input value={(form.msaRef) ?? ""} onChange={(e) => set("msaRef", e.target.value)} />
             </label>
           </div>
         ) : (

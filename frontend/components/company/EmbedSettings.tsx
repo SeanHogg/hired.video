@@ -62,7 +62,7 @@ export default function EmbedSettings({ companyId }: { companyId: string }) {
       const res = await apiClient.get<EmbedSettingsPayload>(base);
       setData(res.data);
       if (res.data.views[0]) setActiveView(res.data.views[0].key);
-    } catch (e) {
+    } catch {
       toast({ title: "Couldn't load embed settings", variant: "destructive" });
     } finally {
       setLoading(false);

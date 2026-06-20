@@ -10,7 +10,12 @@ import { ResumeSchema } from "@shared/resume";
 import { CARD_FIELDS_BY_KIND, serializeListFields } from "@shared/projection";
 import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta, MergeAnalysis, MergeRequest, MergeResult, FileMergeAnalysis, MergePreview, ResumeToResumeAnalysis, ConsolidateBulletsRequest, ConsolidateBulletsResult } from "@/types/resume";
 import { mapDisplayPrivacyToResumePrivacy } from "@/lib/privacy";
-import { extractTextFromFile, parseJsonResumeFile } from "@/lib/extract-text";
+import {
+  extractTextFromFile,
+  parseJsonResumeFile,
+  isResumeImageFile,
+  isUsableResumeText,
+} from "@/lib/extract-text";
 
 // ============================================================================
 // SCHEMAS
@@ -347,30 +352,106 @@ export class ResumeService {
   }
 
   /**
+   * Create a new resume from an uploaded file (PDF/DOCX/text/JSON/image).
+   *
+   * Single robust entry point for the "upload to create" flow: JSON Resume
+   * exports persist their structure verbatim; everything else (including phone
+   * photos / scans) goes through {@link parseResumeFromFile}, which uses
+   * client-side extraction when it works and falls back to server-side
+   * extraction / vision OCR when it doesn't. The parsed structured content is
+   * then persisted via {@link createResume} — so a failed/garbage extraction
+   * surfaces as a thrown error (clear message) instead of an empty resume.
+   */
+  async createResumeFromFile(
+    file: File,
+    opts: { title: string; privacy?: string; isMaster?: boolean },
+  ): Promise<Resume> {
+    // JSON Resume export — preserve dates/highlights exactly, skip the AI roundtrip.
+    const jsonResume = await parseJsonResumeFile(file);
+    if (jsonResume) {
+      return this.createResume({
+        title: opts.title,
+        parsedContent: jsonResume,
+        privacy: opts.privacy,
+        isMaster: opts.isMaster,
+      });
+    }
+
+    const { data } = await this.parseResumeFromFile(file);
+    return this.createResume({
+      title: opts.title,
+      parsedContent: data as unknown as Record<string, unknown>,
+      privacy: opts.privacy,
+      isMaster: opts.isMaster,
+    });
+  }
+
+  /**
    * Parse resume from file upload (without saving)
    */
+  /**
+   * Build the `/api/resumes/parse` request for a file, choosing the most
+   * robust transport:
+   *   1. JSON Resume export → send structured `parsedContent` (exact, no AI).
+   *   2. Image (phone photo / scan) → multipart raw file; server runs vision OCR.
+   *   3. PDF/DOCX/text → try fast client-side text extraction; if it yields
+   *      usable text send that, else upload the raw file so the server's
+   *      robust extractor + binary guard handles it.
+   *
+   * The key fix for mobile: when client-side pdfjs extraction fails (common on
+   * phones), we NEVER send the old binary-garbage fallback — we send the raw
+   * file instead, so parsing actually works. DRY: both the parse-in-place and
+   * create-from-file flows go through here.
+   */
+  private async buildParseRequest(
+    file: File,
+  ): Promise<{ method: "POST"; body: FormData | string; headers?: Record<string, string>; timeout?: number }> {
+    const jsonResume = await parseJsonResumeFile(file);
+    if (jsonResume) {
+      return {
+        method: "POST",
+        body: JSON.stringify({ parsedContent: jsonResume }),
+        headers: { "Content-Type": "application/json" },
+      };
+    }
+
+    const uploadRaw = (): { method: "POST"; body: FormData; timeout: number } => {
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      // Vision OCR + multi-page extraction can exceed the 30s default.
+      return { method: "POST", body: fd, timeout: 120_000 };
+    };
+
+    if (isResumeImageFile(file)) return uploadRaw();
+
+    let text = "";
+    try {
+      text = await extractTextFromFile(file);
+    } catch {
+      text = "";
+    }
+    if (isUsableResumeText(text)) {
+      return {
+        method: "POST",
+        body: JSON.stringify({ content: text }),
+        headers: { "Content-Type": "application/json" },
+      };
+    }
+    // Client extraction failed / produced binary → let the server extract.
+    return uploadRaw();
+  }
+
   async parseResumeFromFile(file: File): Promise<{
     data: ResumeData;
     confidence: number;
   }> {
-    // Prefer structured JSON Resume parsing when possible. Falls back to
-    // client-side text extraction (pdfjs-dist / jszip) for PDF/DOCX so
-    // the CF Worker receives plain text instead of binary it can't parse.
-    const jsonResume = await parseJsonResumeFile(file);
-    const payload: Record<string, unknown> = jsonResume
-      ? { parsedContent: jsonResume }
-      : { content: await extractTextFromFile(file) };
-
+    const init = await this.buildParseRequest(file);
     const response = await apiClient.request<{
       result: string;
       errorMessage?: string;
     }>(
       "/api/resumes/parse",
-      {
-        method: "POST",
-        body: JSON.stringify(payload),
-        headers: { "Content-Type": "application/json" },
-      },
+      init,
       z.object({
         result: z.string(),
         errorMessage: z.string().optional(),
@@ -506,27 +587,6 @@ export class ResumeService {
       };
       return { data: emptyData, confidence: 0 };
     }
-  }
-
-  /**
-   * Create resume from file upload (saves immediately)
-   */
-  async createResumeFromFile(file: File): Promise<Resume> {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    // Note: This will need special handling for FormData
-    const response = await apiClient.request<Resume>(
-      "/api/resumes/createfromfile",
-      {
-        method: "POST",
-        body: formData,
-        headers: {}, // Remove Content-Type to let browser set it for FormData
-      },
-      ResumeSchema,
-    );
-
-    return response.data;
   }
 
   /**

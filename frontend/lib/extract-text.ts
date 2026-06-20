@@ -87,10 +87,54 @@ export async function extractTextFromPdf(file: File): Promise<string> {
     // Collapse runs of 3+ blank lines but preserve single/double line breaks and bullet structure
     return pages.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
   } catch (err) {
-    // Fallback: return raw bytes as text so the UI shows something instead of remaining blank.
-    const bytes = await file.arrayBuffer();
-    return new TextDecoder().decode(bytes).slice(0, 3000);
+    // pdfjs failed (common on mobile — worker load / memory limits / module
+    // worker support). Return "" rather than the old "decode raw bytes as
+    // text" fallback, which produced binary GARBAGE that silently flowed to
+    // the AI parser and broke parsing. An empty string is honest: resume
+    // callers detect it (isUsableResumeText) and fall back to uploading the
+    // raw file for robust server-side extraction.
+    console.warn("PDF text extraction failed:", err instanceof Error ? err.message : err);
+    return "";
   }
+}
+
+/** Resume image file extensions (phone photos / scans). iOS Safari usually
+ *  transcodes HEIC → JPEG on upload, but we accept the raw types too so the
+ *  user is never blocked at selection; server-side vision OCR handles them. */
+export const RESUME_IMAGE_EXTENSIONS = [
+  ".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".gif", ".bmp", ".tif", ".tiff",
+] as const;
+
+/** True when the file is an image (by MIME type or extension). Images have no
+ *  text layer, so resume upload routes them to server-side vision OCR rather
+ *  than attempting client-side text extraction. */
+export function isResumeImageFile(file: File): boolean {
+  if (file.type.startsWith("image/")) return true;
+  const ext = "." + (file.name.split(".").pop()?.toLowerCase() ?? "");
+  return (RESUME_IMAGE_EXTENSIONS as readonly string[]).includes(ext);
+}
+
+/** Heuristic: is this extracted string usable resume text, or undecoded
+ *  binary / an empty/failed extraction? Mirrors the backend `looksLikeBinaryText`
+ *  guard so the client can decide whether to send the extracted text or fall
+ *  back to uploading the raw file for server-side extraction. */
+export function isUsableResumeText(text: string): boolean {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (trimmed.length < 20) return false;          // too short to be a resume
+  if (trimmed.includes("\u0000")) return false;   // NUL → binary
+  const head = trimmed.slice(0, 8);
+  if (head.startsWith("PK")) return false;         // zip (docx) bytes
+  if (head.startsWith("%PDF")) return false;       // raw PDF bytes leaked through
+  // Control-char ratio over a head sample — binary decoded as text is dense
+  // with C0 control bytes; real resume text is overwhelmingly printable.
+  const sample = trimmed.slice(0, 1000);
+  let control = 0;
+  for (let i = 0; i < sample.length; i++) {
+    const code = sample.charCodeAt(i);
+    if ((code < 32 && code !== 9 && code !== 10 && code !== 13) || code === 127) control++;
+  }
+  return control / sample.length <= 0.1;
 }
 
 export async function extractTextFromFile(file: File): Promise<string> {

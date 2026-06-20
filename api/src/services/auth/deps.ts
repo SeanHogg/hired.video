@@ -26,7 +26,10 @@ const emailer: EmailerPort = {
   sendVerification: sendVerificationEmail,
   sendResendVerification: sendResendVerificationEmail,
   sendPasswordReset: sendPasswordResetEmail,
-  sendTwoFactor: sendTwoFactorEmail,
+  // Adapt the email fn's (…, expiryMinutes, approveToken) shape to the
+  // port's (…, approveToken) — the port stays free of the 10-min expiry
+  // impl detail, and the one-tap approve token threads through.
+  sendTwoFactor: (to, name, code, approveToken) => sendTwoFactorEmail(to, name, code, 10, approveToken),
   sendMagicLink: sendMagicLinkEmail,
 };
 

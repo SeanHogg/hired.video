@@ -24,6 +24,8 @@ import {
   parseResumeWithRegex as parseResumeWithRegexUtil,
   normalizeJsonResume,
   tryParseJsonResume,
+  looksLikeBinaryText,
+  stripResumeControlChars,
 } from "../services/resume/parse.js";
 import {
   extractSkills,
@@ -471,6 +473,79 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
   return merged;
 }
 
+/** Image MIME / extension matcher for resume uploads. Phone users very
+ *  commonly photograph their resume or pick a JPG/PNG/HEIC from Photos;
+ *  these have no extractable text layer, so they route to vision OCR. */
+const RESUME_IMAGE_EXT_RE = /\.(jpe?g|png|webp|heic|heif|gif|bmp|tiff?)$/i;
+function isResumeImageFile(file: File): boolean {
+  if (typeof file.type === "string" && file.type.startsWith("image/")) return true;
+  return RESUME_IMAGE_EXT_RE.test(file.name ?? "");
+}
+
+/** Base64-encode bytes in fixed chunks. `btoa(String.fromCharCode(...bytes))`
+ *  blows the call-stack on multi-MB phone photos, so build the binary string
+ *  in 32KB slices first. Worker runtime provides `btoa`. */
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Vision OCR for resume images (phone photos / scans). Sends the image to a
+ * vision-capable model (see the `resume_ocr` profile) and returns the
+ * transcribed plain text, which then flows through the SAME
+ * `parseResumeTextWithAI` pipeline as PDFs/DOCX — so dates, skills, and
+ * section grouping all reuse the existing extraction + regex-fallback logic.
+ *
+ * Throws when no LLM provider is configured; the caller turns a thrown error
+ * or an empty transcription into a clear 422 rather than storing junk.
+ */
+async function ocrResumeImage(c: any, file: File): Promise<string> {
+  if (!hasAnyLLMProviderKey(c.env)) {
+    throw new Error("No AI provider available for image OCR");
+  }
+  const llm = createLLMClient(c.env, c.var.user);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const mime =
+    typeof file.type === "string" && file.type.startsWith("image/")
+      ? file.type
+      : "image/jpeg";
+  const dataUrl = `data:${mime};base64,${bytesToBase64(bytes)}`;
+
+  const { content } = await llm.callMessages("resume_image_ocr", {
+    useCase: "resume_ocr",
+    responseFormat: "text",
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a precise OCR engine for resumes. Transcribe ALL text from " +
+          "the image verbatim. Preserve section headers, job titles, company " +
+          "names, dates, and bullet points, each on its own line. Do not " +
+          "summarise, reorder, infer, or add commentary — output only the " +
+          "transcribed text exactly as it appears.",
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text:
+              "Transcribe every word of this resume image to plain text, " +
+              "keeping the original line/section structure.",
+          },
+          { type: "image_url", image_url: { url: dataUrl, detail: "high" } },
+        ],
+      },
+    ],
+  });
+  return (content ?? "").trim();
+}
+
 /** Walk every evidence-bindable section and stamp a fresh UUID on any
  *  item that's missing `id`. Idempotent — items that already have an id
  *  are left untouched so existing evidence stays bound. */
@@ -889,7 +964,10 @@ resumeRoutes.post("/parse", attachTokenBudget(), async (c) => {
   let resumeText = "";
   let preParsed: Record<string, unknown> | null = null;
 
-  // Multipart path — file upload
+  // Multipart path — file upload. Used by the web/mobile UI whenever
+  // client-side text extraction can't run (images) or failed/produced
+  // binary (a PDF the browser's pdfjs choked on — common on mobile), and
+  // by the Chrome extension. Robust server-side extraction lives here.
   if (contentType.includes("multipart/form-data")) {
     const form = await c.req.formData().catch(() => null);
     const file = form?.get("file") as File | null;
@@ -901,6 +979,29 @@ resumeRoutes.post("/parse", attachTokenBudget(), async (c) => {
         const raw = await file.text().catch(() => "");
         preParsed = tryParseJsonResume(raw);
         if (!preParsed) resumeText = raw;
+      } else if (isResumeImageFile(file)) {
+        // Phone photo / scan — no text layer. Vision OCR → text, then the
+        // shared AI parse pipeline below. A vision failure (no provider,
+        // unsupported format like HEIC on some vendors) yields empty text,
+        // which the guard below turns into a clear 422.
+        try {
+          resumeText = await ocrResumeImage(c, file);
+        } catch (err) {
+          console.warn(
+            "[parse] image OCR failed:",
+            err instanceof Error ? err.message : err,
+          );
+          resumeText = "";
+        }
+        if (!resumeText || resumeText.trim().length < 20) {
+          return c.json(
+            fail(
+              "PARSE_FAILED",
+              "Couldn't read text from that image. Try a clearer, well-lit photo (JPG or PNG), or upload a PDF / Word file instead.",
+            ),
+            422,
+          );
+        }
       } else if (isPdf) {
         const bytes = await file.arrayBuffer().catch(() => null);
         if (bytes) {
@@ -927,6 +1028,21 @@ resumeRoutes.post("/parse", attachTokenBudget(), async (c) => {
   if (!preParsed && !resumeText) {
     return c.json(fail("PARSE_FAILED", "Could not extract text from the uploaded file. Try a text-based PDF, DOCX, or paste the text directly."), 422);
   }
+
+  // Binary guard: never let undecoded bytes (a PDF/DOCX/image read as text by
+  // a fragile client-side extractor, or a stray binary upload) reach the AI
+  // parser or JSONB. Reject with a clear, actionable message instead of
+  // burning tokens on garbage that returns an empty resume.
+  if (!preParsed && looksLikeBinaryText(resumeText)) {
+    return c.json(
+      fail(
+        "PARSE_FAILED",
+        "Couldn't read that file — it looks like a scan or an unsupported encoding. Try a text-based PDF, a Word (.docx) export, a clear photo (JPG/PNG), or paste the text directly.",
+      ),
+      422,
+    );
+  }
+  if (!preParsed) resumeText = stripResumeControlChars(resumeText);
 
   // Prefer structured JSON Resume over AI parsing when available — this
   // preserves dates, highlights, and grouping exactly as authored.
@@ -968,6 +1084,26 @@ resumeRoutes.post("/createfromfile", async (c) => {
     const raw = await file.text().catch(() => "");
     structured = tryParseJsonResume(raw);
     if (!structured) resumeText = raw;
+  } else if (isResumeImageFile(file)) {
+    // Phone photo / scan — vision OCR to text, then the shared AI parse below.
+    try {
+      resumeText = await ocrResumeImage(c, file);
+    } catch (err) {
+      console.warn(
+        "[createfromfile] image OCR failed:",
+        err instanceof Error ? err.message : err,
+      );
+      resumeText = "";
+    }
+    if (!resumeText || resumeText.trim().length < 20) {
+      return c.json(
+        fail(
+          "PARSE_FAILED",
+          "Couldn't read text from that image. Try a clearer, well-lit photo (JPG or PNG), or upload a PDF / Word file instead.",
+        ),
+        422,
+      );
+    }
   } else if (isPdf) {
     const buf = await file.arrayBuffer().catch(() => null);
     if (buf) resumeText = await extractPdfText(new Uint8Array(buf));
@@ -991,20 +1127,18 @@ resumeRoutes.post("/createfromfile", async (c) => {
   if (structured) {
     content = structured;
   } else if (resumeText) {
-    // Reject anything still looking like raw binary before it reaches JSONB.
-    if (resumeText.includes("\u0000") || resumeText.startsWith("PK\u0003\u0004")) {
+    // Reject anything still looking like raw binary before it reaches JSONB
+    // (shared guard — same rule as /parse).
+    if (looksLikeBinaryText(resumeText)) {
       return c.json(
         fail(
           "INVALID_RESUME_TEXT",
-          "Couldn't read that file — it looks like raw binary. Try PDF, DOCX, TXT, or JSON.",
+          "Couldn't read that file — it looks like raw binary. Try PDF, DOCX, TXT, a clear photo (JPG/PNG), or JSON.",
         ),
         422,
       );
     }
-    // Strip the C0 control range (minus tabs/newlines) before the text reaches
-    // JSONB; there is no non-control way to express this character class.
-    // eslint-disable-next-line no-control-regex
-    const cleaned = resumeText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+    const cleaned = stripResumeControlChars(resumeText);
     const jsonFromText = tryParseJsonResume(cleaned);
     if (jsonFromText) {
       content = jsonFromText;
