@@ -283,7 +283,7 @@ export default function CandidateDetail() {
   return (
     <AppShell bgClassName="bg-background">
         <div>
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             <ServicesNav />
 
             <div className="mb-4">

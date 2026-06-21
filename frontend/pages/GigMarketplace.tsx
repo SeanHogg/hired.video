@@ -73,7 +73,7 @@ export default function GigMarketplace() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <div className="p-4 md:p-8 w-full space-y-5">
+      <div className="p-4 md:p-6 w-full space-y-5">
         <ServicesNav />
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
