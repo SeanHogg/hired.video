@@ -14,12 +14,16 @@ import { cn } from "@/lib/utils";
 export function FilterPillRow({
   label,
   children,
+  className,
 }: {
   label: string;
   children: ReactNode;
+  /** Overrides the default `mb-2` spacing — pass `""` when composing the
+   *  row inline with other controls (e.g. on one action-bar line). */
+  className?: string;
 }) {
   return (
-    <div className="mb-2 flex flex-wrap items-center gap-2">
+    <div className={cn("flex flex-wrap items-center gap-2", className ?? "mb-2")}>
       <span className="mr-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
         {label}
       </span>

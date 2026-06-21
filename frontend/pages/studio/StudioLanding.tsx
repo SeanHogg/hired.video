@@ -106,7 +106,7 @@ import WizardLauncher from "@/components/studio/shared/WizardLauncher";
 import NewVideoSplitButton from "@/components/studio/shared/NewVideoSplitButton";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
-import { ACTION_BAR_SURFACE } from "@/lib/ui/action-bar";
+import { ACTION_BAR_SURFACE, ACTION_BAR_STICKY } from "@/lib/ui/action-bar";
 import { selectionToQuery, useWorkspace } from "@/lib/hooks/useWorkspace";
 import { useCreateStudioDraft } from "@/lib/studio/use-create-studio-draft";
 
@@ -620,8 +620,15 @@ export default function StudioLanding() {
 
   return (
     <AppShell>
-    <div className="px-4 py-8 sm:px-6 lg:px-8">
-      <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    {/* Page padding is `p-4 md:p-6` so the action-bar bleed (`-mx-4 md:-mx-6`)
+        cancels it exactly — the bands span the content column edge-to-edge
+        with no side gap. */}
+    <div className="p-4 md:p-6">
+      {/* The search header IS the page's action panel and the single sticky
+          band — it pins under the top nav as the user scrolls past the two
+          sections below. The section bars (templates / my content) carry the
+          same SURFACE tone but don't stick, so they never fight for the top. */}
+      <header className={cn(ACTION_BAR_STICKY, ACTION_BAR_SURFACE, "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between")}>
         {/* Site-wide search relocated inline (was docked in the top bar;
             users routinely missed it there). Page title + description are
             dropped — the chooser body labels itself with the "Templates"
@@ -650,31 +657,36 @@ export default function StudioLanding() {
 
       <section className="mb-12">
         <div className={ACTION_BAR_SURFACE}>
-        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+        {/* One row: title + description on the left, the condensed Type /
+            Use-for dropdowns and the view toggle aligned to the far right.
+            The two filter axes used to render as ~23 wrapping pills which
+            overwhelmed the chooser — now two compact dropdowns. */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
             <h2 className="text-lg font-medium">{t("headings.studioLanding.templates")}</h2>
             <p className="mt-1 text-xs text-muted-foreground">
               {t("messages.studioLanding.templatesDescription")}
             </p>
           </div>
-          <ViewModeToggle
-            value={templatesView}
-            onChange={setTemplatesView}
-            modes={BROWSE_VIEW_MODES}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Type + Use-for filters — shared with the New-project Wizard
+                via `<TemplateCatalogFilters>`. `includeOwnedPills` adds the
+                "Created" / "Purchased" options the wizard hides (it only
+                authors fresh built-in templates). */}
+            <TemplateCatalogFilters
+              kindFilter={kindFilter}
+              onKindFilterChange={setKindFilter}
+              useForFilter={useForFilter}
+              onUseForFilterChange={setUseForFilter}
+              includeOwnedPills
+            />
+            <ViewModeToggle
+              value={templatesView}
+              onChange={setTemplatesView}
+              modes={BROWSE_VIEW_MODES}
+            />
+          </div>
         </div>
-
-        {/* Type + Use-for filter rows — shared with the New-project
-            Wizard via `<TemplateCatalogFilters>`. `includeOwnedPills`
-            adds the "Created" / "Purchased" pills the wizard hides
-            (the wizard only authors fresh built-in templates). */}
-        <TemplateCatalogFilters
-          kindFilter={kindFilter}
-          onKindFilterChange={setKindFilter}
-          useForFilter={useForFilter}
-          onUseForFilterChange={setUseForFilter}
-          includeOwnedPills
-        />
         </div>
 
         <UnifiedTemplateCarousel
@@ -699,8 +711,32 @@ export default function StudioLanding() {
             "My projects" (was "My videos" pre-#894) because the studio
             now hosts every media kind, not just video. */}
         <div className={ACTION_BAR_SURFACE}>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-medium">{t("headings.studioLanding.myContent")}</h2>
+        {/* One row: title + visibility filter on the left, the view toggle
+            and workspace switcher aligned to the far right — the visibility
+            axis no longer takes a second line of its own. */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <h2 className="text-lg font-medium">{t("headings.studioLanding.myContent")}</h2>
+            {/* Visibility axis — gates the grid below by `isPublic`. Reuses
+                the shared FilterPillRow so the visual matches the chooser. */}
+            <FilterPillRow label={t("fields.visibility.label")} className="">
+              <CategoryPill
+                label={t("labels.allShort")}
+                active={visibilityFilter === "all"}
+                onClick={() => setVisibilityFilter("all")}
+              />
+              <CategoryPill
+                label={t("labels.public")}
+                active={visibilityFilter === "public"}
+                onClick={() => setVisibilityFilter("public")}
+              />
+              <CategoryPill
+                label={t("labels.private")}
+                active={visibilityFilter === "private"}
+                onClick={() => setVisibilityFilter("private")}
+              />
+            </FilterPillRow>
+          </div>
           <div className="flex items-center gap-3">
             <ViewModeToggle
               value={contentView}
@@ -710,26 +746,6 @@ export default function StudioLanding() {
             <WorkspaceSwitcher />
           </div>
         </div>
-        {/* Visibility axis — gates the grid below by `isPublic`. Reuses
-            the templates-section FilterPillRow so the visual matches
-            the Type / Use-for rows above. */}
-        <FilterPillRow label={t("fields.visibility.label")}>
-          <CategoryPill
-            label={t("labels.allShort")}
-            active={visibilityFilter === "all"}
-            onClick={() => setVisibilityFilter("all")}
-          />
-          <CategoryPill
-            label={t("labels.public")}
-            active={visibilityFilter === "public"}
-            onClick={() => setVisibilityFilter("public")}
-          />
-          <CategoryPill
-            label={t("labels.private")}
-            active={visibilityFilter === "private"}
-            onClick={() => setVisibilityFilter("private")}
-          />
-        </FilterPillRow>
         </div>
         {loading ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">

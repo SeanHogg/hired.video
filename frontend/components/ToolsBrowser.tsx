@@ -18,6 +18,8 @@ import { CategoryFilterBar } from "@/components/CategoryFilterBar";
 import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
 import { useViewMode } from "@/lib/hooks/useViewMode";
 import { HorizontalScroller } from "@/components/HorizontalScroller";
+import { cn } from "@/lib/utils";
+import { ACTION_BAR_SURFACE } from "@/lib/ui/action-bar";
 import { courseService } from "@/lib/services/course-service";
 import {
   TOOLS_CATALOG,
@@ -106,10 +108,16 @@ export function ToolsBrowser({
   roleGated = true,
   weaveCourses = false,
   courseLimit = 12,
+  framedFilters = false,
 }: {
   roleGated?: boolean;
   weaveCourses?: boolean;
   courseLimit?: number;
+  /** On the authenticated /tools tab the filter + view row reads as part of
+   *  the page action panel — give it the action-bar tone, full-bleed, flush
+   *  under the sticky search header above. The signed-out marketing page
+   *  leaves it off (different container padding, no action bar above). */
+  framedFilters?: boolean;
 } = {}) {
   const { t } = useTranslation();
   const effectiveRole = useEffectiveRole();
@@ -255,8 +263,16 @@ export function ToolsBrowser({
           rules, with the Scroll/Grid/Table view switcher pinned at the
           end. Counts are elided on the audience + tier groups (those axes
           are small enums where counts would be noise); the category group
-          keeps live counts and drops zero-match chips. */}
-      <div className="mb-4 flex items-center gap-3">
+          keeps live counts and drops zero-match chips.
+          `framedFilters` lifts the whole row into the page action panel —
+          action-bar tone, full-bleed, pulled flush (`-mt-4`) under the
+          sticky search header so the two read as one toolbar. */}
+      <div
+        className={cn(
+          "flex items-center gap-3",
+          framedFilters ? cn(ACTION_BAR_SURFACE, "-mt-4") : "mb-4",
+        )}
+      >
         <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto pb-1">
           <CategoryFilterBar
             inline

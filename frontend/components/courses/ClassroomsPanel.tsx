@@ -13,6 +13,11 @@ import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { HorizontalScroller } from "@/components/HorizontalScroller";
+import { TABLE_SURFACE, TABLE_HEAD } from "@/lib/ui/table-surface";
+import { BROWSE_VIEW_MODES, type ViewMode } from "@/components/ViewModeToggle";
+import { useViewMode } from "@/lib/hooks/useViewMode";
+import { cn } from "@/lib/utils";
 import { courseService } from "@/lib/services/course-service";
 import {
   listManageableCohorts, getCohort, createCohort, updateCohort,
@@ -35,7 +40,20 @@ const STATUS_META: Record<string, { label: string; cls: string; Icon: typeof Che
   not_linked: { label: "No account", cls: "text-muted-foreground/60", Icon: CircleDashed },
 };
 
-export default function ClassroomsPanel() {
+export default function ClassroomsPanel({
+  view: viewProp,
+}: {
+  /** Cohort-browse layout (Scroll / Grid / Table). Controlled from the
+   *  /tools PageHeader action panel; falls back to an internal persisted
+   *  toggle when mounted standalone so the component stays self-contained. */
+  view?: ViewMode;
+} = {}) {
+  const [internalView] = useViewMode(
+    "tools.classrooms",
+    "grid",
+    BROWSE_VIEW_MODES,
+  );
+  const view = viewProp ?? internalView;
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
@@ -65,55 +83,146 @@ export default function ClassroomsPanel() {
   };
 
   return (
-    <div className="mt-2 grid gap-6 lg:grid-cols-[280px_1fr]">
-      {/* Cohort list + create */}
-      <aside className="space-y-3">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">New classroom</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Fall Cohort A" />
-            <Button onClick={handleCreate} disabled={!newName.trim()} className="w-full" size="sm">
-              <Plus className="h-4 w-4 mr-1" /> Create
-            </Button>
-            {createErr && <p className="text-xs text-destructive">{createErr}</p>}
-          </CardContent>
-        </Card>
+    <div className="mt-2 space-y-6">
+      {/* Inline "new classroom" create row — name + Create button. The
+          cohort list below is the content surface and honours the
+          Scroll / Grid / Table toggle in the page action panel, like every
+          other content surface on /tools. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") void handleCreate(); }}
+          placeholder="New classroom — e.g. Fall Cohort A"
+          className="max-w-xs"
+        />
+        <Button onClick={handleCreate} disabled={!newName.trim()} size="sm">
+          <Plus className="h-4 w-4 mr-1" /> Create
+        </Button>
+        {createErr && <p className="text-xs text-destructive">{createErr}</p>}
+      </div>
 
-        {loading ? (
-          <p className="text-sm text-muted-foreground px-1">Loading…</p>
-        ) : cohorts.length === 0 ? (
-          <p className="text-sm text-muted-foreground px-1">No classrooms yet. Create one to get started.</p>
-        ) : (
-          <ul className="space-y-1">
-            {cohorts.map((c) => (
-              <li key={c.id}>
-                <button
-                  onClick={() => setSelectedId(c.id)}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition ${selectedId === c.id ? "bg-primary/10 font-medium" : "hover:bg-muted"}`}
-                >
-                  {c.name}
-                  <span className="block text-xs text-muted-foreground">
-                    {c.memberCount ?? 0} {(c.memberCount ?? 0) === 1 ? "member" : "members"}
-                    {c.status === "archived" ? " · archived" : ""}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </aside>
+      {/* Cohort browse — Scroll / Grid / Table over the manageable cohorts. */}
+      {loading ? (
+        <p className="text-sm text-muted-foreground px-1">Loading…</p>
+      ) : cohorts.length === 0 ? (
+        <Card><CardContent className="p-10 text-center text-muted-foreground">
+          No classrooms yet. Create one above to get started.
+        </CardContent></Card>
+      ) : (
+        <CohortBrowse
+          cohorts={cohorts}
+          view={view}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+        />
+      )}
 
       {/* Selected cohort detail */}
-      <section>
-        {selectedId ? (
-          <CohortDetail key={selectedId} cohortId={selectedId} onChanged={loadCohorts} />
-        ) : (
-          <Card><CardContent className="p-10 text-center text-muted-foreground">
-            Select a classroom, or create one, to manage members and assignments.
-          </CardContent></Card>
-        )}
-      </section>
+      {selectedId && (
+        <CohortDetail key={selectedId} cohortId={selectedId} onChanged={loadCohorts} />
+      )}
     </div>
+  );
+}
+
+/** Cohort list rendered in the active browse layout (Scroll / Grid / Table).
+ *  Picking a cohort opens its management detail below — the selected card /
+ *  row stays highlighted so the user keeps their place. */
+function CohortBrowse({
+  cohorts,
+  view,
+  selectedId,
+  onSelect,
+}: {
+  cohorts: Cohort[];
+  view: ViewMode;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  if (view === "table") {
+    return (
+      <div className={TABLE_SURFACE}>
+        <table className="w-full text-left text-sm">
+          <thead className={TABLE_HEAD}>
+            <tr>
+              <th className="px-3 py-2 font-medium">Classroom</th>
+              <th className="px-3 py-2 font-medium">Members</th>
+              <th className="px-3 py-2 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cohorts.map((c) => (
+              <tr
+                key={c.id}
+                onClick={() => onSelect(c.id)}
+                className={cn(
+                  "cursor-pointer border-b border-border last:border-0 hover:bg-muted/30",
+                  selectedId === c.id && "bg-primary/10",
+                )}
+              >
+                <td className="px-3 py-2 font-medium">{c.name}</td>
+                <td className="px-3 py-2 text-muted-foreground">{c.memberCount ?? 0}</td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {c.status === "archived" ? "Archived" : "Active"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+  const renderCard = (c: Cohort) => (
+    <CohortCard
+      key={c.id}
+      cohort={c}
+      selected={selectedId === c.id}
+      onSelect={() => onSelect(c.id)}
+    />
+  );
+  if (view === "scroll") {
+    return (
+      <HorizontalScroller itemCount={cohorts.length}>
+        {cohorts.map(renderCard)}
+      </HorizontalScroller>
+    );
+  }
+  return (
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+      {cohorts.map(renderCard)}
+    </div>
+  );
+}
+
+/** Single cohort card for the Scroll / Grid browse layouts. */
+function CohortCard({
+  cohort,
+  selected,
+  onSelect,
+}: {
+  cohort: Cohort;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "flex h-full w-full flex-col items-start gap-1 rounded-lg border bg-card p-4 text-left transition hover:border-brand-purple hover:shadow-md",
+        selected ? "border-brand-purple ring-1 ring-brand-purple" : "border-border",
+      )}
+    >
+      <span className="flex items-center gap-2 font-medium">
+        <Users className="h-4 w-4 text-brand-purple" />
+        {cohort.name}
+      </span>
+      <span className="text-xs text-muted-foreground">
+        {cohort.memberCount ?? 0} {(cohort.memberCount ?? 0) === 1 ? "member" : "members"}
+        {cohort.status === "archived" ? " · archived" : ""}
+      </span>
+    </button>
   );
 }
 

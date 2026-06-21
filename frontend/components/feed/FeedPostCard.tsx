@@ -706,8 +706,8 @@ export default function FeedPostCard({ post, onReact, onComment, onDelete, onEdi
         {/* Post Content — article posts (gap #1828) render long-form with
             roomier type + line height; everything else stays compact. */}
         {post.content && (
-          <div className="prose prose-sm max-w-none">
-            <p className={`whitespace-pre-wrap ${post.kind === 'article' ? 'text-[15px] leading-7' : ''}`}>
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <p className={`whitespace-pre-wrap text-card-foreground ${post.kind === 'article' ? 'text-[15px] leading-7' : 'leading-relaxed'}`}>
               {post.content}
             </p>
           </div>

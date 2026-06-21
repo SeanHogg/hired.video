@@ -19,7 +19,13 @@ import {
   MEDIA_KIND_UI,
   type MediaKind,
 } from "@shared/media-kinds";
-import { CategoryPill, FilterPillRow } from "@/components/studio/shared/FilterPills";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   TEMPLATE_CATEGORIES,
   type TemplateCategory,
@@ -54,57 +60,63 @@ export default function TemplateCatalogFilters({
   onUseForFilterChange,
   includeOwnedPills = false,
 }: Props) {
+  // Both axes used to render as two wrapping rows of pills (~12 + ~11
+  // buttons) — overwhelming on the chooser. Collapsed into two compact
+  // dropdowns (#studio-filters): the selected value reads on the trigger,
+  // the full option set lives one click away. Same two axes, same AND
+  // predicate, far less visual noise. The Wizard mounts this too, so the
+  // condensed control rolls out to both surfaces (DRY).
   return (
-    <div>
+    <div className="flex flex-wrap items-center gap-2">
       {/* Type axis — MediaKind. Reads MEDIA_KINDS so adding a kind
           (#894 phases 4/5) doesn't touch the consumer files. */}
-      <FilterPillRow label="Type">
-        <CategoryPill
-          label="All"
-          active={kindFilter === "all"}
-          onClick={() => onKindFilterChange("all")}
-        />
-        {MEDIA_KINDS.map((kind) => (
-          <CategoryPill
-            key={kind}
-            label={MEDIA_KIND_UI[kind].badgeLabel}
-            active={kindFilter === kind}
-            onClick={() => onKindFilterChange(kind)}
-          />
-        ))}
-      </FilterPillRow>
-      {/* Use-for axis — category + (optional) owned pills. AND'd with
-          the Type axis above so picking Podcast + Promote shows podcast
+      <Select
+        value={kindFilter}
+        onValueChange={(v) => onKindFilterChange(v as TemplateKindFilter)}
+      >
+        <SelectTrigger className="h-9 w-auto min-w-[7.5rem] gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Type
+          </span>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All</SelectItem>
+          {MEDIA_KINDS.map((kind) => (
+            <SelectItem key={kind} value={kind}>
+              {MEDIA_KIND_UI[kind].badgeLabel}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {/* Use-for axis — category + (optional) owned options. AND'd with
+          the Type axis so picking Podcast + Promote shows podcast
           templates in the promote bucket only. */}
-      <FilterPillRow label="Use for">
-        <CategoryPill
-          label="All"
-          active={useForFilter === "all"}
-          onClick={() => onUseForFilterChange("all")}
-        />
-        {TEMPLATE_CATEGORIES.map((c) => (
-          <CategoryPill
-            key={c.id}
-            label={c.label}
-            active={useForFilter === c.id}
-            onClick={() => onUseForFilterChange(c.id)}
-          />
-        ))}
-        {includeOwnedPills && (
-          <>
-            <CategoryPill
-              label="Created"
-              active={useForFilter === "created"}
-              onClick={() => onUseForFilterChange("created")}
-            />
-            <CategoryPill
-              label="Purchased"
-              active={useForFilter === "purchased"}
-              onClick={() => onUseForFilterChange("purchased")}
-            />
-          </>
-        )}
-      </FilterPillRow>
+      <Select
+        value={useForFilter}
+        onValueChange={(v) => onUseForFilterChange(v as TemplateUseForFilter)}
+      >
+        <SelectTrigger className="h-9 w-auto min-w-[7.5rem] gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Use for
+          </span>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All</SelectItem>
+          {TEMPLATE_CATEGORIES.map((c) => (
+            <SelectItem key={c.id} value={c.id}>
+              {c.label}
+            </SelectItem>
+          ))}
+          {includeOwnedPills && (
+            <>
+              <SelectItem value="created">Created</SelectItem>
+              <SelectItem value="purchased">Purchased</SelectItem>
+            </>
+          )}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

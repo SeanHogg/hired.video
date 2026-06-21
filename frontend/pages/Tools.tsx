@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { ToolsBrowser } from "@/components/ToolsBrowser";
-import ViewModeToggle from "@/components/ViewModeToggle";
+import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
 import { useViewMode } from "@/lib/hooks/useViewMode";
 import LearningPanel, { LEARNING_VIEW_MODES } from "@/components/courses/LearningPanel";
 import ClassroomsPanel from "@/components/courses/ClassroomsPanel";
@@ -44,6 +44,15 @@ export default function Tools() {
     "tools.learning",
     "grid",
     LEARNING_VIEW_MODES,
+  );
+  // Classrooms sub-tab's cohort-browse layout switcher. Lifted up here for
+  // the same reason as `learningView` — the Scroll / Grid / Table toggle
+  // renders in the PageHeader action panel while ClassroomsPanel consumes
+  // the controlled state. Every content surface carries this control.
+  const [classroomsView, setClassroomsView] = useViewMode(
+    "tools.classrooms",
+    "grid",
+    BROWSE_VIEW_MODES,
   );
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -416,6 +425,12 @@ export default function Tools() {
                     onChange={setLearningView}
                     modes={LEARNING_VIEW_MODES}
                   />
+                ) : tabParam === "classrooms" ? (
+                  <ViewModeToggle
+                    value={classroomsView}
+                    onChange={setClassroomsView}
+                    modes={BROWSE_VIEW_MODES}
+                  />
                 ) : undefined
               }
             />
@@ -423,9 +438,9 @@ export default function Tools() {
             {tabParam === "learning" ? (
               <LearningPanel view={learningView} onViewChange={setLearningView} />
             ) : tabParam === "classrooms" ? (
-              <ClassroomsPanel />
+              <ClassroomsPanel view={classroomsView} />
             ) : (
-              <ToolsBrowser />
+              <ToolsBrowser framedFilters />
             )}
           </div>
         </div>
