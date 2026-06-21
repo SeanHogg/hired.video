@@ -27,7 +27,7 @@ export default function Footer() {
   const { user } = useAuth();
   const expanded = !user;
   return (
-    <footer className="bg-background border-t border-border">
+    <footer className="bg-sidebar border-t border-sidebar-border">
       <div id="footer-wrapper" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className={`grid grid-cols-1 gap-8 ${expanded ? "md:grid-cols-7" : "md:grid-cols-5"}`}>
           {/* Logo + tagline */}

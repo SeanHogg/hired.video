@@ -406,14 +406,6 @@ export interface DashboardResponse<T> {
   message?: string;
 }
 
-// Profile view recording request
-export interface RecordProfileViewRequest {
-  profileUserId: string;
-  viewType?: string;
-  itemId?: string;
-  viewDurationSeconds?: number;
-}
-
 // Activity recording request
 export interface RecordActivityRequest {
   activityType: string;
@@ -743,27 +735,6 @@ export class DashboardService {
           error instanceof Error
             ? error.message
             : "Failed to fetch affiliate dashboard data",
-      };
-    }
-  }
-
-  /**
-   * Record a profile view for analytics
-   */
-  async recordProfileView(
-    request: RecordProfileViewRequest,
-  ): Promise<DashboardResponse<void>> {
-    try {
-      await apiClient.post("/api/userdashboard/profile-view", request);
-      return { success: true };
-    } catch (error) {
-      console.error("Error recording profile view:", error);
-      return {
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to record profile view",
       };
     }
   }

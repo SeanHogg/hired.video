@@ -306,6 +306,25 @@ export const ResendTwoFactorSchema = z.object({
   tempAuthToken: z.string().min(1),
 });
 
+/**
+ * Decide whether a /resend-2fa request may proceed, given the challenge row the
+ * supplied tempAuthToken resolved to (or undefined if the id matched nothing).
+ *
+ * The WHOLE POINT of resend is to recover a login when the prior code is
+ * expired or already consumed — so neither `expired` nor `used` may block a
+ * resend (gating on them locks the user out exactly when they need a new code).
+ * The only true failure is a token id that maps to no challenge at all, since
+ * then we have no userId to email a fresh code to.
+ *
+ * Exported + pinned by unit tests so this gate cannot silently regress back to
+ * rejecting expired/used tokens.
+ */
+export function canResendTwoFactor(
+  existing: { userId: string; used?: boolean; expiresAt?: Date | string } | undefined | null,
+): boolean {
+  return Boolean(existing && existing.userId);
+}
+
 // ============================================================================
 // ROUTES
 // ============================================================================
@@ -564,12 +583,14 @@ authRoutes.post("/resend-2fa", async (c) => {
     .where(eq(twoFactorCodes.id, parsed.data.tempAuthToken))
     .limit(1);
 
-  if (!existing || existing.used || new Date(existing.expiresAt) <= new Date()) {
+  // Resend must succeed even when the prior code is expired or used — see
+  // canResendTwoFactor. Reject only a token id that maps to no challenge at all.
+  if (!canResendTwoFactor(existing)) {
     return c.json(error("INVALID_TOKEN", "Invalid or expired two-factor token"), 400);
   }
 
-  // Create a new code and invalidate the old one.
-  await db.update(twoFactorCodes).set({ used: true } as any).where(eq(twoFactorCodes.id, existing.id));
+  // Mint a fresh code. createTwoFactorEntry already invalidates every pending
+  // code for this user, so the prior entry (including `existing`) is retired.
   const entry = await createTwoFactorEntry(existing.userId);
 
   // Look up user email/name to send the new code

@@ -8,8 +8,16 @@
  *   - the host has no active bookings program,
  *   - the host has no active offerings.
  *
- * No prop-drilled `canBookSessions` boolean. The consumer never needs to
- * know whether the user is a bookings host.
+ * `bookingsActive` is a cheap enrollment flag the profile DTO already
+ * carries (creator_profiles.bookings_active). When it is explicitly false
+ * we short-circuit BEFORE the network call, so the overwhelming majority of
+ * (non-host) profile views no longer fire a guaranteed-404 round-trip. When
+ * it is undefined (caller didn't supply it) we fall back to the fetch so the
+ * component stays self-gating for any consumer. The offerings list still
+ * comes from the endpoint — the flag only gates whether we bother asking.
+ *
+ * No prop-drilled `canBookSessions` boolean: `bookingsActive` is a passed-
+ * through data field, and the visibility decision (return null) lives here.
  *
  * Reference: gap #1648.
  */
@@ -26,14 +34,19 @@ interface Props {
   /** The viewed user's external_public_handle. Empty string / null is fine —
    *  the component handles the no-handle case. */
   handle: string | null | undefined;
+  /** Cheap enrollment flag from the profile DTO. When explicitly `false`,
+   *  the component skips the public-host fetch entirely. `undefined` means
+   *  "unknown" → fall back to fetching (preserves self-gating for callers
+   *  that don't carry the flag). */
+  bookingsActive?: boolean;
 }
 
-export function BookingsSection({ handle }: Props) {
+export function BookingsSection({ handle, bookingsActive }: Props) {
   const [host, setHost] = useState<PublicHostProfileDTO | null>(null);
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    if (!handle) {
+    if (!handle || bookingsActive === false) {
       setDone(true);
       return;
     }
@@ -45,7 +58,7 @@ export function BookingsSection({ handle }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [handle]);
+  }, [handle, bookingsActive]);
 
   if (!done) return null;
   if (!host) return null;

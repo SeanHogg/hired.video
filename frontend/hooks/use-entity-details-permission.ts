@@ -100,10 +100,15 @@ export function useEntityDetailsPermission(
     case "service": return { canViewStats: service.isOwner || canViewAsAdmin };
     case "video": return { canViewStats: video.isOwner || canViewAsAdmin };
     case "post": {
+      // Posts are OWNER-ONLY for the [🌐 Details] insights drawer — unlike
+      // other artifacts, even a super-admin doesn't get the button on
+      // someone else's post (product decision: post insights are the
+      // author's private surface). The backing endpoint still allows
+      // super-admin for support tooling, but the UI button is owner-strict.
       const isOwner = Boolean(
         args.entity?.userId && user?.id && args.entity.userId === user.id,
       );
-      return { canViewStats: isOwner || canViewAsAdmin };
+      return { canViewStats: isOwner };
     }
   }
 }

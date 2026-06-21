@@ -12,7 +12,7 @@ import {
   MapPin,
   Briefcase,
 } from "lucide-react";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { Fragment, useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
@@ -388,9 +388,9 @@ export default function Companies() {
           ) : viewMode === "scroll" ? (
             <HorizontalScroller itemCount={browseCompanies.length}>
               {browseCompanies.map((company) => (
-                <div key={company.id} className="w-72 shrink-0 snap-start">
+                <Fragment key={company.id}>
                   {renderCompanyCard(company)}
-                </div>
+                </Fragment>
               ))}
             </HorizontalScroller>
           ) : (

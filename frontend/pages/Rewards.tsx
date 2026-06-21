@@ -367,11 +367,20 @@ function CashoutColumn({
 }) {
   const { t } = useTranslation();
   if (items.length === 0) return null;
+  // A column is "coming soon" when none of its SKUs are currently
+  // redeemable (e.g. gift cards while we onboard a new provider). The
+  // `available` flag is the catalog SSoT — no per-kind branching here.
+  const comingSoon = items.every((sku) => sku.available === false);
   return (
-    <Card className="p-5 h-full">
+    <Card className={`p-5 h-full ${comingSoon ? "opacity-70" : ""}`}>
       <div className="flex items-center gap-2 mb-1">
         {icon}
         <h3 className="font-semibold">{title}</h3>
+        {comingSoon && (
+          <span className="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+            {t("labels.rewards.comingSoon")}
+          </span>
+        )}
       </div>
       <p className="text-xs text-muted-foreground mb-4">{subtitle}</p>
       <ul className="space-y-2">

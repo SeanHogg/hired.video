@@ -707,12 +707,9 @@ export default function UnifiedSearch({
               ) : viewMode === "scroll" ? (
                 <HorizontalScroller itemCount={resultCards.length}>
                   {resultCards.map((card, i) => (
-                    <div
-                      key={(card as any)?.key ?? i}
-                      className="w-72 shrink-0 snap-start"
-                    >
+                    <React.Fragment key={(card as any)?.key ?? i}>
                       {card}
-                    </div>
+                    </React.Fragment>
                   ))}
                 </HorizontalScroller>
               ) : (

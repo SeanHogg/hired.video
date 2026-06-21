@@ -22,8 +22,8 @@ export interface ViewModeListProps {
  * Shared layout shell for a card list that can render as a horizontal
  * `scroll` carousel, a `grid`, or a vertical `list`. Centralises the
  * container-className branching that every Outreach browse tab used to
- * repeat, and is the single place the `scroll` carousel wiring lives
- * (each card is auto-wrapped in a fixed-width snap track item).
+ * repeat. In `scroll` mode it hands the cards to `HorizontalScroller`,
+ * which wraps each one in its own fixed-width snap cell.
  *
  * Cards keep owning their own per-mode inner layout (e.g. the `list` row
  * vs the `grid`/`scroll` card body) — this only owns the outer container.
@@ -34,11 +34,11 @@ export function ViewModeList({
   children,
 }: ViewModeListProps): JSX.Element {
   if (viewMode === "scroll") {
+    // The scroller wraps each child in its own fixed-width snap cell, so
+    // pass the cards straight through.
     return (
       <HorizontalScroller itemCount={Children.count(children)}>
-        {Children.map(children, (child) => (
-          <div className="w-72 shrink-0 snap-start">{child}</div>
-        ))}
+        {children}
       </HorizontalScroller>
     );
   }

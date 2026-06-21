@@ -13,6 +13,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import GlobalErrorHandler from "@/components/GlobalErrorHandler";
 import GlobalAIUsageBanner from "@/components/GlobalAIUsageBanner";
 import { BadgeUnlockToaster } from "@/components/badges/BadgeUnlockToaster";
+import { CelebrationOverlay } from "@/components/points/CelebrationOverlay";
 import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
 import PWAUpdatePrompt from "@/components/PWAUpdatePrompt";
 import { DialogHost } from "@/components/ui/DialogHost";
@@ -681,6 +682,7 @@ const App = () => (
                   <GlobalErrorHandler />
                   <GlobalAIUsageBanner />
                   <BadgeUnlockToaster />
+                  <CelebrationOverlay />
                   <CookieConsentBanner />
                   <PWAUpdatePrompt />
                   <HeaderFiltersProvider>

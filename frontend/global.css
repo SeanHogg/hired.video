@@ -57,7 +57,7 @@ body[data-print-mode] [data-print-hide] {
    * white cards/popovers visibly float instead of dissolving into a pure-white
    * page (the "too much white" complaint). Brand purple is unchanged. */
   :root {
-    --background: 220 23% 96.5%;
+    --background: 220 30% 97.5%;
     --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
@@ -87,16 +87,18 @@ body[data-print-mode] [data-print-hide] {
 
     --radius: 0.75rem;
 
-    /* Sidebar reads as a panel one shade off the canvas. Kept LIGHT on purpose:
-     * Sidebar.tsx renders on `bg-background`/`text-foreground`, and several nav
-     * items use neutral grays — a dark sidebar here would drop their contrast. */
-    --sidebar-background: 220 24% 94%;
+    /* Chrome (Sidebar + top Navigation) renders on `bg-sidebar` so the
+     * exterior frame sits a clear shade below the bright content canvas
+     * (--background). Kept a light recessed grey — not dark — so neutral
+     * nav-item text (muted-foreground) stays legible on the rail, while
+     * hover uses --sidebar-accent for a visible darker highlight. */
+    --sidebar-background: 220 18% 91%;
     --sidebar-foreground: 222 30% 25%;
     --sidebar-primary: 262 83% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 18% 90%;
+    --sidebar-accent: 220 16% 87%;
     --sidebar-accent-foreground: 222 30% 18%;
-    --sidebar-border: 220 16% 86%;
+    --sidebar-border: 220 14% 83%;
     --sidebar-ring: 262 83% 58%;
 
     /* Brand specific colors */
@@ -143,13 +145,13 @@ body[data-print-mode] [data-print-hide] {
     --input: 223 20% 26%;
     --ring: 262 83% 66%;
 
-    --sidebar-background: 225 38% 9%;
+    --sidebar-background: 225 40% 8%;
     --sidebar-foreground: 220 16% 78%;
     --sidebar-primary: 262 83% 66%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 224 26% 18%;
     --sidebar-accent-foreground: 220 16% 92%;
-    --sidebar-border: 224 26% 18%;
+    --sidebar-border: 224 22% 22%;
     --sidebar-ring: 262 83% 66%;
 
     /* Brand specific colors for dark mode */

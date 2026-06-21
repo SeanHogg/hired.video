@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   GraduationCap,
   Loader2,
@@ -391,9 +391,7 @@ function LearningItemsView({
     return (
       <HorizontalScroller itemCount={items.length}>
         {items.map((item) => (
-          <div key={item.key} className="w-72 shrink-0 snap-start">
-            {card(item)}
-          </div>
+          <Fragment key={item.key}>{card(item)}</Fragment>
         ))}
       </HorizontalScroller>
     );

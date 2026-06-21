@@ -27,7 +27,17 @@ export interface FeedPostLike {
   userId: string;
   userName: string;
   userAvatar?: string;
+  // Professional reaction type (shared/feed-reactions.ts). Optional for
+  // back-compat with payloads predating reactions.
+  reactionType?: string;
   createdAt?: string;
+}
+
+// One bucket of a reaction rollup — mirrors `ReactionCount` in
+// shared/feed-reactions.ts.
+export interface ReactionCount {
+  type: string;
+  count: number;
 }
 
 export interface FeedPostComment {
@@ -37,6 +47,10 @@ export interface FeedPostComment {
   userName: string;
   userAvatar?: string;
   content: string;
+  // Comment reactions — same professional set as posts.
+  reactions?: ReactionCount[];
+  reactionCount?: number;
+  currentUserReaction?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -90,6 +104,11 @@ export interface FeedPost {
   likes: FeedPostLike[];
   comments: FeedPostComment[];
   likeCount: number;
+  // Professional reaction rollup (per-type counts, display-sorted) + the
+  // current viewer's own reaction. `likeCount` is the total across all
+  // reaction types; `isLikedByCurrentUser` === (currentUserReaction != null).
+  reactions?: ReactionCount[];
+  currentUserReaction?: string | null;
   commentCount: number;
   isLikedByCurrentUser: boolean;
   // Reshare. `repostCount` = times this post was reposted; `repostOf` = the
@@ -156,6 +175,23 @@ export interface GetFeedPostsRequest {
 export interface TrendingTag {
   tag: string;
   postCount: number;
+}
+
+// Trending post — a public post ranked by recent engagement (weighted
+// reactions + reposts + comments). Compact shape for the sidebar; clicking
+// a row deep-links to /feed/:id.
+export interface TrendingPost {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  excerpt: string;
+  kind: 'text' | 'video' | 'article';
+  createdAt: string;
+  reactionCount: number;
+  commentCount: number;
+  repostCount: number;
+  score: number;
 }
 
 export interface FeedPostsResponse {

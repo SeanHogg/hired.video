@@ -315,6 +315,70 @@ export function buildRecruiterGauge(d: RecruiterInputs, t: GaugeT): GaugeModel {
   };
 }
 
+const PLATFORM_LEVELS: readonly LevelDef[] = [
+  ["dashboard.gauge.level.critical", 0],
+  ["dashboard.gauge.level.stabilizing", 35],
+  ["dashboard.gauge.level.healthy", 65],
+  ["dashboard.gauge.level.thriving", 90],
+];
+
+/** Normalized platform-health inputs — each surface (ProductDashboard /
+ *  AdminDashboard) maps its own payload shape to these primitives, so the
+ *  scoring lives here once rather than in each admin component. */
+export interface PlatformInputs {
+  totalUsers?: number;
+  activeUsers?: number;
+  /** Monthly churn, percent. */
+  churnRate?: number;
+  /** Paid/trial-to-paid conversion, percent. */
+  conversionRate?: number;
+  /** Uptime, percent. */
+  uptimePercentage?: number;
+}
+
+/**
+ * Platform-health dial for admins / the owner — the "Your Score / Org
+ * Avg"-style overview the reference design shows. Blends active-user
+ * engagement, paid conversion, retention (inverse churn) and uptime,
+ * renormalized over whichever signals the surface actually provides so a
+ * missing metric doesn't unfairly tank the score.
+ */
+export function buildPlatformGauge(d: PlatformInputs, t: GaugeT): GaugeModel {
+  const clamp = (v: number) => Math.max(0, Math.min(100, v));
+  const parts: { w: number; v: number }[] = [];
+  if (typeof d.totalUsers === "number" && d.totalUsers > 0 && typeof d.activeUsers === "number") {
+    parts.push({ w: 0.35, v: clamp((d.activeUsers / d.totalUsers) * 100) });
+  }
+  if (typeof d.conversionRate === "number") parts.push({ w: 0.25, v: clamp(d.conversionRate) });
+  if (typeof d.churnRate === "number") parts.push({ w: 0.2, v: clamp(100 - d.churnRate) });
+  if (typeof d.uptimePercentage === "number") parts.push({ w: 0.2, v: clamp(d.uptimePercentage) });
+
+  const totalW = parts.reduce((s, p) => s + p.w, 0);
+  const score = totalW > 0 ? clampScore(parts.reduce((s, p) => s + p.w * p.v, 0) / totalW) : 0;
+
+  const engagement =
+    typeof d.totalUsers === "number" && d.totalUsers > 0 && typeof d.activeUsers === "number"
+      ? d.activeUsers / d.totalUsers
+      : 1;
+  const hintKey =
+    typeof d.churnRate === "number" && d.churnRate > 5
+      ? "dashboard.gauge.platform.hint.churn"
+      : engagement < 0.3
+        ? "dashboard.gauge.platform.hint.engage"
+        : "dashboard.gauge.platform.hint.healthy";
+
+  return {
+    title: t("dashboard.gauge.platform.title"),
+    score,
+    benchmark: 75,
+    benchmarkLabel: t("dashboard.gauge.benchmark.healthy"),
+    levels: levels(t, PLATFORM_LEVELS),
+    caption: t("dashboard.gauge.platform.caption"),
+    hint: t(hintKey),
+    action: { label: t("dashboard.gauge.action.viewActiveUsers"), href: "/admin/active-users" },
+  };
+}
+
 const REWARDS_LEVELS: readonly LevelDef[] = [
   ["dashboard.gauge.level.savingUp", 0],
   ["dashboard.gauge.level.halfway", 50],

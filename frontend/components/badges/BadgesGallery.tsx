@@ -7,7 +7,7 @@
  * surface so the gallery is the single source of "what badges look like".
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import {
   Tooltip,
   TooltipContent,
@@ -16,6 +16,12 @@ import {
 } from "@/components/ui/tooltip";
 import { Card } from "@/components/ui/card";
 import { Trophy } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  getGlowSnapshot,
+  registerCelebrationTarget,
+  subscribeGlow,
+} from "@/lib/points/celebration";
 import { BadgeIcon, type BadgeTier } from "./BadgeIcon";
 
 export interface BadgeGalleryItem {
@@ -65,8 +71,20 @@ export function BadgesGallery({
     [badges, earnedOnly],
   );
 
+  // Freshly-earned badges throb once the celebration artwork lands here.
+  const glowing = useSyncExternalStore(subscribeGlow, getGlowSnapshot, getGlowSnapshot);
+
+  // Register this gallery as the "shrink into the badges section" target
+  // for CelebrationOverlay. Showcase galleries (marketing /rewards) opt
+  // out — there's no real earn there to fly into.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (showcaseMode) return;
+    return registerCelebrationTarget(() => rootRef.current?.getBoundingClientRect() ?? null);
+  }, [showcaseMode]);
+
   const body = (
-    <div>
+    <div ref={rootRef}>
       {title && (
         <h2 className="font-semibold mb-3 flex items-center gap-2">
           <Trophy className="h-4 w-4" /> {title}
@@ -84,7 +102,12 @@ export function BadgesGallery({
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {visible.map((b) => (
-            <BadgeCard key={b.id} badge={b} showcaseMode={showcaseMode} />
+            <BadgeCard
+              key={b.id}
+              badge={b}
+              showcaseMode={showcaseMode}
+              glowing={glowing.has(b.id)}
+            />
           ))}
         </div>
       )}
@@ -97,27 +120,43 @@ export function BadgesGallery({
 function BadgeCard({
   badge,
   showcaseMode,
+  glowing = false,
 }: {
   badge: BadgeGalleryItem;
   showcaseMode: boolean;
+  glowing?: boolean;
 }) {
   const shouldShowHistory = badge.isRepeatable && badge.earnCount > 1;
   const renderEarned = showcaseMode ? true : badge.earned;
+  // Streak / repeatable badges advertise how many times they've paid out
+  // ("a 1x or 2x reward recipient") — shown on every earned repeatable
+  // badge, including the first earn.
+  const showMultiplier = !showcaseMode && badge.earned && badge.isRepeatable && badge.earnCount >= 1;
   return (
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            className={`p-3 rounded-lg border ${
-              renderEarned ? "border-primary/30 bg-primary/5" : "border-border opacity-60"
-            } flex flex-col items-center gap-2 text-center cursor-default`}
+            className={cn(
+              "p-3 rounded-lg border flex flex-col items-center gap-2 text-center cursor-default transition-shadow",
+              renderEarned ? "border-primary/30 bg-primary/5" : "border-border opacity-60",
+              glowing && "animate-badge-throb border-amber-400",
+            )}
+            style={glowing ? ({ "--badge-glow": "rgba(251,191,36,0.6)" } as React.CSSProperties) : undefined}
           >
-            <BadgeIcon
-              iconKey={badge.iconKey}
-              tier={badge.tier}
-              earned={renderEarned}
-              size="md"
-            />
+            <div className="relative">
+              <BadgeIcon
+                iconKey={badge.iconKey}
+                tier={badge.tier}
+                earned={renderEarned}
+                size="md"
+              />
+              {showMultiplier && (
+                <span className="absolute -top-1.5 -right-1.5 rounded-full bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 shadow tabular-nums">
+                  ×{badge.earnCount}
+                </span>
+              )}
+            </div>
             <div className="font-medium text-sm leading-tight">{badge.name}</div>
             <div className="text-[11px] text-muted-foreground leading-tight">
               {badge.description}

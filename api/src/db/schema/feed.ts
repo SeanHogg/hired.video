@@ -70,10 +70,16 @@ export const feedPostLikes = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     feedPostId: uuid("feed_post_id").notNull().references(() => feedPosts.id, { onDelete: "cascade" }),
     userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    // Professional reaction type (migration 0218). A plain "like" was casual;
+    // the feed now supports a richer set (like / celebrate / support /
+    // insightful / curious / funny) defined in shared/feed-reactions.ts.
+    // Default 'like' so legacy rows read as a Like. One reaction per
+    // (post, user) — changing your reaction UPDATEs this row.
+    reactionType: varchar("reaction_type", { length: 24 }).default("like").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
-    // One like per (post, user). DB-enforced so the optimistic UI dedup
+    // One reaction per (post, user). DB-enforced so the optimistic UI dedup
     // can't be defeated by concurrent double-clicks.
     uniqueIndex("uq_feed_post_likes_post_user").on(t.feedPostId, t.userId),
   ],
@@ -81,6 +87,26 @@ export const feedPostLikes = pgTable(
 
 export type FeedPostLike = typeof feedPostLikes.$inferSelect;
 export type NewFeedPostLike = typeof feedPostLikes.$inferInsert;
+
+// Comment reactions (migration 0218) — same professional reaction set as
+// posts (shared/feed-reactions.ts), one reaction per (comment, user).
+export const feedCommentReactions = pgTable(
+  "feed_comment_reactions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    commentId: uuid("comment_id").notNull().references(() => feedPostComments.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    reactionType: varchar("reaction_type", { length: 24 }).default("like").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("uq_feed_comment_reactions_comment_user").on(t.commentId, t.userId),
+    index("idx_feed_comment_reactions_comment").on(t.commentId),
+  ],
+);
+
+export type FeedCommentReaction = typeof feedCommentReactions.$inferSelect;
+export type NewFeedCommentReaction = typeof feedCommentReactions.$inferInsert;
 
 export const feedPostComments = pgTable(
   "feed_post_comments",

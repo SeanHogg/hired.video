@@ -1,13 +1,32 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Children, type ReactNode, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
+ * Canonical snap-cell className for a full-size card inside a
+ * {@link HorizontalScroller}. The scroller applies this to every child
+ * automatically, so this is the ONE place card width is defined for every
+ * browse surface's Scroll view (Tools, Jobs, People, Companies, Resumes,
+ * Studio, Search, Services, Learning) — callers pass bare cards, not
+ * pre-wrapped snap cells.
+ *
+ * On mobile the card spans ~82% of the viewport (capped at 20rem) so it
+ * reads wide-and-short with a peek of the next card — the previous fixed
+ * `w-72` (288px) looked narrow-and-tall on a phone. From `sm:` up it
+ * reverts to the fixed `w-72` track cell the desktop grid expects.
+ */
+export const SCROLL_CELL_CLASS =
+  "w-[82vw] max-w-xs shrink-0 snap-start sm:w-72 sm:max-w-none";
+
+/**
  * Horizontal "scroll" carousel with overflow arrow controls — the shared
  * primitive behind every browse surface's Scroll view (Studio, Resumes,
- * Jobs, People, Companies, Tools, Search, Services). Children must carry
- * `shrink-0 snap-start` plus a fixed width (e.g. `w-72`) so they don't
- * collapse inside the flex track.
+ * Jobs, People, Companies, Tools, Search, Services).
+ *
+ * Pass bare card elements as children — the scroller wraps each one in a
+ * fixed-width snap cell ({@link SCROLL_CELL_CLASS}) itself, so card sizing
+ * lives in exactly one place. Surfaces that need a non-default cell width
+ * (e.g. the narrower Studio "row" rail) override via `cellClassName`.
  *
  * `itemCount` is the only signal the scroller needs to re-check its
  * overflow bounds when the visible cards change.
@@ -15,10 +34,13 @@ import { cn } from "@/lib/utils";
 export function HorizontalScroller({
   itemCount,
   className,
+  cellClassName,
   children,
 }: {
   itemCount: number;
   className?: string;
+  /** Per-cell width override; defaults to {@link SCROLL_CELL_CLASS}. */
+  cellClassName?: string;
   children: ReactNode;
 }): JSX.Element {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -66,7 +88,11 @@ export function HorizontalScroller({
           className,
         )}
       >
-        {children}
+        {Children.map(children, (child) =>
+          child == null || child === false ? null : (
+            <div className={cn(cellClassName ?? SCROLL_CELL_CLASS)}>{child}</div>
+          ),
+        )}
       </div>
     </div>
   );

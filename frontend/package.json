@@ -39,6 +39,7 @@
     "@fontsource/montserrat": "^5.2.8",
     "@fontsource/playfair-display": "^5.2.8",
     "@fontsource/roboto": "^5.2.10",
+    "@mediapipe/tasks-vision": "^0.10.17",
     "@marsidev/react-turnstile": "^1.5.2",
     "@react-three/drei": "^9.114.0",
     "@react-three/fiber": "^8.17.10",

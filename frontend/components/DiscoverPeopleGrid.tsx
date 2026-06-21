@@ -7,6 +7,7 @@
  * a prop-drilled boolean.
  */
 
+import { Fragment } from "react";
 import { Eye, MapPin } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -166,9 +167,7 @@ export default function DiscoverPeopleGrid({
       ) : viewMode === "scroll" ? (
         <HorizontalScroller itemCount={visiblePeople.length}>
           {visiblePeople.map((person) => (
-            <div key={person.id} className="w-72 shrink-0 snap-start">
-              {renderPersonCard(person)}
-            </div>
+            <Fragment key={person.id}>{renderPersonCard(person)}</Fragment>
           ))}
         </HorizontalScroller>
       ) : (

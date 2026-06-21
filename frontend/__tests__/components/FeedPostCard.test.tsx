@@ -1,7 +1,7 @@
 /**
  * Tests for FeedPostCard's social actions — the wiring added in the
  * social-feed pass:
- *   • like → likeFeedPost
+ *   • react → reactToFeedPost (professional reactions)
  *   • expand comments → getPostComments (lazy thread load)
  *   • Repost button → reveals the reshare composer
  *   • a repost renders its embedded original + the "reposted" attribution
@@ -21,8 +21,11 @@ vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock("@/components/feed/PostStatsSheet", () => ({ default: () => null }));
 vi.mock("@/components/feed/FeedReviewEmbed", () => ({ FeedReviewEmbed: () => <div /> }));
 vi.mock("@/lib/services/feed-service", () => ({
-  likeFeedPost: vi.fn().mockResolvedValue({}),
-  unlikeFeedPost: vi.fn().mockResolvedValue(undefined),
+  reactToFeedPost: vi.fn().mockResolvedValue({}),
+  removeFeedPostReaction: vi.fn().mockResolvedValue(undefined),
+  reactToComment: vi.fn().mockResolvedValue(undefined),
+  removeCommentReaction: vi.fn().mockResolvedValue(undefined),
+  applyReactionToComment: vi.fn((c) => c),
   createComment: vi.fn().mockResolvedValue({}),
   getPostComments: vi.fn().mockResolvedValue([]),
   resharePost: vi.fn().mockResolvedValue({}),
@@ -56,7 +59,7 @@ function renderCard(overrides: Record<string, unknown> = {}) {
   return renderWithProviders(
     <FeedPostCard
       post={{ ...basePost, ...overrides }}
-      onLike={noop}
+      onReact={noop}
       onComment={noop}
       onDelete={noop}
       onEdit={noop}
@@ -79,10 +82,10 @@ describe("FeedPostCard", () => {
     expect(screen.getByText("Hello world")).toBeTruthy();
   });
 
-  it("likes via the service when the like button is clicked", async () => {
+  it("reacts via the service when the reaction button is clicked", async () => {
     renderCard();
-    fireEvent.click(screen.getByRole("button", { name: "3" }));
-    await waitFor(() => expect(feedService.likeFeedPost).toHaveBeenCalledWith("p1"));
+    fireEvent.click(screen.getByRole("button", { name: /React/i }));
+    await waitFor(() => expect(feedService.reactToFeedPost).toHaveBeenCalledWith("p1", "like"));
   });
 
   it("lazy-loads the comment thread when comments are expanded", async () => {

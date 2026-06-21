@@ -19,6 +19,7 @@ import { ArtifactAnalyticsDashboard } from "@/components/analytics";
 import { Badge } from "@/components/ui/badge";
 import { useEntityDetailsPermission } from "@/hooks/use-entity-details-permission";
 import { formatDate } from "@/lib/utils";
+import { reactionDef } from "@shared/feed-reactions";
 import type { FeedPost } from "@/types/feed";
 
 interface Props {
@@ -79,24 +80,50 @@ export default function PostStatsSheet({ post }: Props) {
       key: "activity",
       label: "Activity",
       render: () => (
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <dt className="text-muted-foreground flex items-center gap-1">
-            <Heart className="w-3.5 h-3.5" /> Likes
-          </dt>
-          <dd className="tabular-nums">{post.likeCount}</dd>
-          <dt className="text-muted-foreground flex items-center gap-1">
-            <MessageCircle className="w-3.5 h-3.5" /> Comments
-          </dt>
-          <dd className="tabular-nums">{post.commentCount}</dd>
-          <dt className="text-muted-foreground flex items-center gap-1">
-            <Repeat2 className="w-3.5 h-3.5" /> Reshares
-          </dt>
-          <dd className="tabular-nums">{post.repostCount}</dd>
-          <dt className="text-muted-foreground flex items-center gap-1">
-            <Eye className="w-3.5 h-3.5" /> Posted
-          </dt>
-          <dd>{formatDate(post.createdAt)}</dd>
-        </dl>
+        <div className="space-y-4">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <dt className="text-muted-foreground flex items-center gap-1">
+              <Heart className="w-3.5 h-3.5" /> Reactions
+            </dt>
+            <dd className="tabular-nums">{post.likeCount}</dd>
+            <dt className="text-muted-foreground flex items-center gap-1">
+              <MessageCircle className="w-3.5 h-3.5" /> Comments
+            </dt>
+            <dd className="tabular-nums">{post.commentCount}</dd>
+            <dt className="text-muted-foreground flex items-center gap-1">
+              <Repeat2 className="w-3.5 h-3.5" /> Reposts
+            </dt>
+            <dd className="tabular-nums">{post.repostCount}</dd>
+            <dt className="text-muted-foreground flex items-center gap-1">
+              <Eye className="w-3.5 h-3.5" /> Posted
+            </dt>
+            <dd>{formatDate(post.createdAt)}</dd>
+          </dl>
+
+          {/* Reaction breakdown by professional type. Self-gates: hidden
+              until the post has reactions. */}
+          {post.reactions && post.reactions.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">
+                Reaction breakdown
+              </p>
+              <ul className="space-y-1.5">
+                {post.reactions.map((b) => {
+                  const def = reactionDef(b.type);
+                  return (
+                    <li key={b.type} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <span aria-hidden>{def.emoji}</span>
+                        {def.label}
+                      </span>
+                      <span className="tabular-nums text-muted-foreground">{b.count}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
       ),
     },
   ];

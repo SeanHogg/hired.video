@@ -528,6 +528,88 @@ export function WebcamRecorder({
     [],
   );
 
+  // ---- Webcam-only background composite (#127 follow-up) ----
+  // The PiP path (startCanvasComposite) was the ONLY place background
+  // replacement was actually applied, so blur/colour silently did
+  // nothing in plain `webcam` mode (e.g. Video Pitch Lab). This routes
+  // the raw webcam frames through the same applyBackgroundReplacement
+  // compositor and captures the canvas as the stream used for BOTH the
+  // live preview and recording, so the chosen background shows on screen
+  // and is baked into the clip. The draw loop reads bgReplacementRef each
+  // frame, so switching blur↔colour needs no rebuild.
+  const startWebcamComposite = useCallback(
+    (webcamStream: MediaStream): MediaStream => {
+      const canvas = document.createElement("canvas");
+      canvasRef.current = canvas;
+
+      const track = webcamStream.getVideoTracks()[0];
+      const settings = track?.getSettings() ?? {};
+      canvas.width = settings.width || 1280;
+      canvas.height = settings.height || 720;
+
+      const ctx = canvas.getContext("2d")!;
+
+      const camVideo = document.createElement("video");
+      camVideo.srcObject = webcamStream;
+      camVideo.muted = true;
+      camVideo.play();
+
+      const draw = async () => {
+        await applyBackgroundReplacement({
+          ctx,
+          source: camVideo,
+          width: canvas.width,
+          height: canvas.height,
+          mode: bgReplacementRef.current,
+        });
+        canvasAnimFrameRef.current = requestAnimationFrame(() => {
+          void draw();
+        });
+      };
+      void draw();
+
+      const canvasStream = canvas.captureStream(30);
+      // Audio tracks are SHARED (addTrack copies the reference, it does
+      // not move the track), so the raw webcam stream keeps its mic —
+      // teardownCompositeKeepCam relies on that and must not stop these.
+      webcamStream.getAudioTracks().forEach((t) => canvasStream.addTrack(t));
+
+      compositeStreamRef.current = canvasStream;
+      return canvasStream;
+    },
+    [],
+  );
+
+  // Tear down a webcam composite while preserving the raw webcam stream.
+  // Only the canvas-captured VIDEO track is ours to stop; the audio
+  // tracks belong to webcamStreamRef and were merely shared in.
+  const teardownCompositeKeepCam = useCallback(() => {
+    stopCanvasComposite();
+    compositeStreamRef.current?.getVideoTracks().forEach((t) => t.stop());
+    compositeStreamRef.current = null;
+  }, [stopCanvasComposite]);
+
+  // Attach a (re)acquired webcam stream to the live preview, rebuilding
+  // the background composite when an effect is active so resolution /
+  // camera flips keep the chosen background instead of dropping to raw.
+  const attachWebcamToPreview = useCallback(
+    (stream: MediaStream) => {
+      const el = videoPreviewRef.current;
+      if (bgReplacementRef.current.kind !== "none") {
+        teardownCompositeKeepCam();
+        const composite = startWebcamComposite(stream);
+        if (el) {
+          el.srcObject = composite;
+          el.play().catch(() => {});
+        }
+      } else if (el) {
+        el.srcObject = stream;
+        el.play().catch(() => {});
+      }
+    },
+    [teardownCompositeKeepCam, startWebcamComposite],
+  );
+
   // ---- Start preview ----
   const startPreview = useCallback(async () => {
     setError(null);
@@ -610,6 +692,41 @@ export function WebcamRecorder({
       }
     }
   }, [recordingState, isPipMode]);
+
+  // Webcam-only background replacement (#127). PiP composites already;
+  // plain webcam mode has no canvas, so build one the moment a background
+  // is picked during preview and tear it down when it's cleared. Blur↔
+  // colour switches need no rebuild — the draw loop reads bgReplacementRef
+  // each frame. Screen-only mode has no camera to segment, so it's skipped
+  // here AND the picker is hidden from its settings panel.
+  useEffect(() => {
+    if (mode !== "webcam" || recordingState !== "previewing") return;
+    const rawCam = webcamStreamRef.current;
+    if (!rawCam) return;
+    const wantsComposite = bgReplacement.kind !== "none";
+    const hasComposite = !!compositeStreamRef.current;
+    if (wantsComposite && !hasComposite) {
+      const composite = startWebcamComposite(rawCam);
+      const el = videoPreviewRef.current;
+      if (el) {
+        el.srcObject = composite;
+        el.play().catch(() => {});
+      }
+    } else if (!wantsComposite && hasComposite) {
+      teardownCompositeKeepCam();
+      const el = videoPreviewRef.current;
+      if (el) {
+        el.srcObject = rawCam;
+        el.play().catch(() => {});
+      }
+    }
+  }, [
+    mode,
+    recordingState,
+    bgReplacement.kind,
+    startWebcamComposite,
+    teardownCompositeKeepCam,
+  ]);
 
   // Auto-arm on mount when caller asks (Tool Promo template,
   // extension `?capture=screen` handoff). Fires once — guarded by the
@@ -739,10 +856,7 @@ export function WebcamRecorder({
       webcamStreamRef.current?.getTracks().forEach((t) => t.stop());
       try {
         const stream = await acquireWebcam(resolution, next);
-        if (videoPreviewRef.current) {
-          videoPreviewRef.current.srcObject = stream;
-          videoPreviewRef.current.play().catch(() => {});
-        }
+        attachWebcamToPreview(stream);
         startAudioAnalysis(stream);
       } catch {
         setError("Failed to switch camera.");
@@ -753,6 +867,7 @@ export function WebcamRecorder({
     recordingState,
     resolution,
     acquireWebcam,
+    attachWebcamToPreview,
     startAudioAnalysis,
   ]);
 
@@ -779,9 +894,16 @@ export function WebcamRecorder({
         webcamStreamRef.current?.getTracks().forEach((t) => t.stop());
         try {
           const stream = await acquireWebcam(res, facingMode);
-          if (videoPreviewRef.current) {
-            videoPreviewRef.current.srcObject = stream;
-            videoPreviewRef.current.play().catch(() => {});
+          if (isScreenMode) {
+            // Screen / PiP modes drive the main preview from the screen
+            // composite — the webcam-only background compositor must not
+            // touch it. Preserve the prior direct-attach behavior here.
+            if (videoPreviewRef.current) {
+              videoPreviewRef.current.srcObject = stream;
+              videoPreviewRef.current.play().catch(() => {});
+            }
+          } else {
+            attachWebcamToPreview(stream);
           }
           startAudioAnalysis(stream);
         } catch {
@@ -789,7 +911,7 @@ export function WebcamRecorder({
         }
       }
     },
-    [recordingState, facingMode, acquireWebcam, startAudioAnalysis],
+    [recordingState, isScreenMode, facingMode, acquireWebcam, attachWebcamToPreview, startAudioAnalysis],
   );
 
   // ---- Max duration remaining ----
@@ -916,33 +1038,38 @@ export function WebcamRecorder({
             </div>
           )}
 
-          {/* #127 — Background replacement picker. Mode buttons let the
-              user toggle none / blur / colour. MediaPipe segmentation
-              loads lazily on first non-none selection. */}
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-xs font-medium text-muted-foreground">Background</span>
-            <div className="flex gap-1">
-              {([
-                { kind: "none" as const, label: "None" },
-                { kind: "blur" as const, label: "Blur", sigmaPx: 18 },
-                { kind: "color" as const, label: "Color", hex: "#0b1020" },
-              ]).map((opt) => (
-                <Button
-                  key={opt.kind}
-                  variant={bgReplacement.kind === opt.kind ? "default" : "outline"}
-                  size="sm"
-                  disabled={recordingState === "recording"}
-                  onClick={() => {
-                    if (opt.kind === "none") setBgReplacement({ kind: "none" });
-                    else if (opt.kind === "blur") setBgReplacement({ kind: "blur", sigmaPx: opt.sigmaPx });
-                    else setBgReplacement({ kind: "color", hex: opt.hex });
-                  }}
-                >
-                  {opt.label}
-                </Button>
-              ))}
+          {/* #127 — Background replacement picker. Segmentation needs a
+              person, so it's only shown for camera-bearing modes (webcam +
+              screen+webcam PiP), never screen-only. Selecting blur/colour
+              routes frames through the canvas compositor (startWebcam-
+              Composite for webcam, startCanvasComposite for PiP); MediaPipe
+              segmentation loads lazily on the first non-none selection. */}
+          {mode !== "screen" && (
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-xs font-medium text-muted-foreground">Background</span>
+              <div className="flex gap-1">
+                {([
+                  { kind: "none" as const, label: "None" },
+                  { kind: "blur" as const, label: "Blur", sigmaPx: 18 },
+                  { kind: "color" as const, label: "Color", hex: "#0b1020" },
+                ]).map((opt) => (
+                  <Button
+                    key={opt.kind}
+                    variant={bgReplacement.kind === opt.kind ? "default" : "outline"}
+                    size="sm"
+                    disabled={recordingState === "recording"}
+                    onClick={() => {
+                      if (opt.kind === "none") setBgReplacement({ kind: "none" });
+                      else if (opt.kind === "blur") setBgReplacement({ kind: "blur", sigmaPx: opt.sigmaPx });
+                      else setBgReplacement({ kind: "color", hex: opt.hex });
+                    }}
+                  >
+                    {opt.label}
+                  </Button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 

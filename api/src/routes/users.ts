@@ -241,6 +241,7 @@ function toUserProfileDto(
   creator?: {
     isActive: boolean | null;
     endedAt: Date | string | null;
+    bookingsActive: boolean | null;
     videoActive: boolean | null;
     voiceActive: boolean | null;
     servicesActive: boolean | null;
@@ -347,6 +348,18 @@ function toUserProfileDto(
     updatedAt: new Date(profileUpdatedAt).toISOString(),
     // Booking host handle (#1902) — lets the profile mount <BookingsSection/>.
     externalPublicHandle: row.externalPublicHandle ?? null,
+    // Cheap enrollment flag so <BookingsSection/> can self-gate WITHOUT a
+    // guaranteed-404 round-trip on every non-host profile view. SSoT is
+    // creator_profiles.bookings_active (same source findHostByHandle reads).
+    // Tri-state: `creator === undefined` means the caller (e.g. /me) didn't
+    // load creator data → emit null so the client falls back to fetching
+    // rather than wrongly hiding the section. When creator data WAS loaded
+    // (the public :id detail path), an absent/inactive row is a definitive
+    // "not a bookings host" → false, which is what enables the optimization.
+    bookingsActive:
+      creator === undefined
+        ? null
+        : creator?.bookingsActive === true && creator?.endedAt == null,
   };
 }
 
@@ -1133,6 +1146,7 @@ userRoutes.get("/:id", async (c) => {
     db.select({
       isActive: creatorProfiles.isActive,
       endedAt: creatorProfiles.endedAt,
+      bookingsActive: creatorProfiles.bookingsActive,
       videoActive: creatorProfiles.videoActive,
       voiceActive: creatorProfiles.voiceActive,
       servicesActive: creatorProfiles.servicesActive,

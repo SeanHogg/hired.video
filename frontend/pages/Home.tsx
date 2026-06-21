@@ -27,9 +27,8 @@ import { AppShell } from "@/components/AppShell";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { ToolCard } from "@/components/ToolCard";
 import { getToolsForHome } from "@/data/tools-catalog";
-import TemplatePreview from "@/components/templates/TemplatePreview";
+import TemplateCard from "@/components/resume-renderer/TemplateCard";
 import { useTemplates } from "@/lib/templates/registry";
-import type { TemplateMeta } from "@/lib/templates/types";
 
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -55,7 +54,7 @@ import OnboardingProgress from "@/components/dashboard/shared/OnboardingProgress
 import WelcomeHero from "@/components/dashboard/shared/WelcomeHero";
 
 // Feed data + components (reused from Feed.tsx)
-import { getFeedPosts, searchFeedPosts } from "@/lib/services/feed-service";
+import { getFeedPosts, searchFeedPosts, applyReactionToPost } from "@/lib/services/feed-service";
 import type {
   FeedPost,
   FeedPostsResponse,
@@ -588,18 +587,10 @@ export default function Home() {
     loadFeedPosts(1, false);
   }, [loadFeedPosts]);
 
-  const handlePostLike = useCallback((postId: string) => {
+  const handlePostReact = useCallback((postId: string, reactionType: string | null) => {
     setPosts((prev) =>
       prev.map((post) =>
-        post.id === postId
-          ? {
-              ...post,
-              isLikedByCurrentUser: !post.isLikedByCurrentUser,
-              likeCount: post.isLikedByCurrentUser
-                ? post.likeCount - 1
-                : post.likeCount + 1,
-            }
-          : post,
+        post.id === postId ? applyReactionToPost(post, reactionType) : post,
       ),
     );
   }, []);
@@ -748,7 +739,7 @@ export default function Home() {
                       <FeedPostCard
                         key={post.id}
                         post={post}
-                        onLike={handlePostLike}
+                        onReact={handlePostReact}
                         onComment={() => {}}
                         onDelete={handlePostDelete}
                         onEdit={handlePostEdit}
@@ -819,51 +810,30 @@ function MarketingTemplateStrip() {
       <p className="text-center text-muted-foreground mb-12">
         {t("marketing.home.templatesSubtitle")}
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+      {/* Row cards (details left, preview right) — a wider 2-up grid so the
+          design *type* reads first and the preview sits alongside it. Reuses
+          the shared marketplace TemplateCard so the homepage strip, search,
+          and marketplace all share one card (DRY) — including the bold
+          name hover-link, Preview action button, and "Get started" CTA that
+          opens the studio/editor via the shared apply() handler. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {visible.map((meta) => (
-          <MarketingTemplateCard key={`${meta.kind}:${meta.slug}`} meta={meta} />
+          <TemplateCard
+            key={`${meta.kind}:${meta.slug}`}
+            meta={meta}
+            orientation="row"
+            primaryCtaLabel={t("actions.getStarted")}
+          />
         ))}
         {loading && visible.length === 0
-          ? Array.from({ length: 6 }).map((_, i) => (
+          ? Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={`skel-${i}`}
-                className="aspect-[4/3] animate-pulse rounded-xl bg-muted/40"
+                className="h-56 animate-pulse rounded-xl bg-muted/40"
               />
             ))
           : null}
       </div>
     </div>
-  );
-}
-
-// Per-card renderer — kind-agnostic via the shared <TemplatePreview/>
-// which already handles studio-builtin (TemplateThumb), studio-creator
-// (poster video) and resume (scaled document). Each card links to the
-// per-template SEO page that owns the Use / Preview CTAs.
-function MarketingTemplateCard({ meta }: { meta: TemplateMeta }) {
-  const { t } = useTranslation();
-  return (
-    <Link
-      to={`/marketplace/templates/${encodeURIComponent(meta.slug)}`}
-      className="group flex flex-col overflow-hidden rounded-xl border bg-card transition hover:border-brand-purple hover:shadow-md"
-    >
-      <div className="relative aspect-video w-full overflow-hidden border-b bg-muted/30">
-        <TemplatePreview meta={meta} compact />
-        <div className="absolute inset-0 flex items-end justify-end p-3 opacity-0 transition-opacity group-hover:opacity-100">
-          <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold text-slate-900 shadow">
-            <Eye className="h-3.5 w-3.5" />
-            {t("actions.preview")}
-          </span>
-        </div>
-      </div>
-      <div className="p-4">
-        <h3 className="text-base font-semibold leading-tight">{meta.name}</h3>
-        {meta.blurb && (
-          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-            {meta.blurb}
-          </p>
-        )}
-      </div>
-    </Link>
   );
 }

@@ -54,7 +54,15 @@ function build(opts: { tremendous?: "ok" | "down" | "missing"; orderStatus?: str
     } as never;
   };
 
-  const engine = new RedemptionEngine({ repos, buildTremendous, now: () => NOW });
+  // Allow gift cards in the fulfillment-path tests below. Production gates
+  // them off via the catalog SSoT (Tremendous denied us); the dedicated
+  // "disabled" test exercises that default.
+  const engine = new RedemptionEngine({
+    repos,
+    buildTremendous,
+    isKindAvailable: () => true,
+    now: () => NOW,
+  });
   return { engine, points, fakes };
 }
 
@@ -190,6 +198,31 @@ describe("redemption-engine — gift_card", () => {
     assert.equal((await points.findBalance(user))?.balance, 5_000);
     const redemption = points.redemptions[0];
     assert.equal(redemption.status, "failed");
+  });
+});
+
+describe("redemption-engine — gift cards disabled (default gate)", () => {
+  it("rejects gift_card with vendor_unavailable and does NOT debit points", async () => {
+    // Real default gate (no isKindAvailable override) — production state
+    // while we onboard a replacement gift-card provider.
+    const points = new FakePointsRepo(() => NOW);
+    const repos = { points } as unknown as Repos;
+    const engine = new RedemptionEngine({
+      repos,
+      buildTremendous: () => null,
+      now: () => NOW,
+    });
+    const user = uid();
+    await fund(points, user, 5_000);
+    const out = await engine.redeem({
+      skuId: "gift_card_5",
+      user: { userId: user, recipientName: "Ada", recipientEmail: "ada@x.com" },
+    });
+    assert.equal(out.status, "rejected");
+    if (out.status === "rejected") assert.equal(out.reason, "vendor_unavailable");
+    // Balance untouched — guard runs before any debit.
+    assert.equal((await points.findBalance(user))?.balance, 5_000);
+    assert.equal(points.redemptions.length, 0);
   });
 });
 

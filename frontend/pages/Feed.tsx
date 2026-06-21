@@ -17,6 +17,9 @@ import {
   Search,
   ChevronRight,
   Building2,
+  TrendingUp,
+  MessageCircle,
+  Repeat2,
 } from "lucide-react";
 
 import { AppShell } from "@/components/AppShell";
@@ -36,13 +39,20 @@ import {
 import { Separator } from "@/components/ui/separator";
 
 import { useAuth } from "@/lib/auth";
-import { getFeedPosts, searchFeedPosts, getTrendingTags } from "@/lib/services/feed-service";
+import {
+  getFeedPosts,
+  searchFeedPosts,
+  getTrendingTags,
+  getTrendingPosts,
+  applyReactionToPost,
+} from "@/lib/services/feed-service";
 import type {
   FeedPost,
   FeedPostsResponse,
   GetFeedPostsRequest,
   FeedFilters,
   TrendingTag,
+  TrendingPost,
 } from "@/types/feed";
 
 import FeedPostCard from "@/components/feed/FeedPostCard";
@@ -185,6 +195,70 @@ export function PostComposerBar({
   );
 }
 
+// ─── Trending posts — ranked by recent engagement ─────────────────────────────
+// Real data from /api/feed/trending-posts (weighted reactions + reposts +
+// comments). Each row deep-links to the post detail page. Self-gates: renders
+// nothing until there are trending posts to show. Reused by Home + Feed via
+// FeedRightPanel.
+export function TrendingPostsCard() {
+  const [posts, setPosts] = useState<TrendingPost[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const trending = await getTrendingPosts(5);
+        if (!cancelled) setPosts(Array.isArray(trending) ? trending : []);
+      } catch {
+        if (!cancelled) setPosts([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (posts.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2 pt-4 px-4">
+        <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+          <TrendingUp className="h-4 w-4 text-primary" />
+          Trending
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-2 pb-2">
+        <ul className="divide-y">
+          {posts.map((p) => (
+            <li key={p.id}>
+              <Link
+                to={`/feed/${p.id}`}
+                className="block rounded-md px-2 py-2 hover:bg-muted/60 transition-colors"
+              >
+                <p className="text-xs text-muted-foreground mb-0.5">{p.userName}</p>
+                <p className="text-sm line-clamp-2 leading-snug">
+                  {p.excerpt || "View post"}
+                </p>
+                <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground tabular-nums">
+                  <span className="flex items-center gap-1">
+                    <Heart className="h-3 w-3" /> {p.reactionCount}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <MessageCircle className="h-3 w-3" /> {p.commentCount}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Repeat2 className="h-3 w-3" /> {p.repostCount}
+                  </span>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Right sidebar — suggestions & trending ───────────────────────────────────
 export function FeedRightPanel({
   activeTag,
@@ -217,6 +291,10 @@ export function FeedRightPanel({
     <div className="space-y-4">
       {/* Sharpen Your Edge with Tools */}
       <ToolsCTA variant="compact" />
+
+      {/* Trending posts — ranked by engagement; click-through to detail. */}
+      <TrendingPostsCard />
+
 
       {/* Add to your feed */}
       <Card>
@@ -398,16 +476,10 @@ export default function Feed() {
     loadFeedPosts(1, false);
   }, [loadFeedPosts]);
 
-  const handlePostLike = useCallback((postId: string) => {
+  const handlePostReact = useCallback((postId: string, reactionType: string | null) => {
     setPosts((prev) =>
       prev.map((post) =>
-        post.id === postId
-          ? {
-              ...post,
-              isLikedByCurrentUser: !post.isLikedByCurrentUser,
-              likeCount: post.isLikedByCurrentUser ? post.likeCount - 1 : post.likeCount + 1,
-            }
-          : post,
+        post.id === postId ? applyReactionToPost(post, reactionType) : post,
       ),
     );
   }, []);
@@ -560,7 +632,7 @@ export default function Feed() {
                       <FeedPostCard
                         key={post.id}
                         post={post}
-                        onLike={handlePostLike}
+                        onReact={handlePostReact}
                         onComment={() => {}}
                         onDelete={handlePostDelete}
                         onEdit={handlePostEdit}

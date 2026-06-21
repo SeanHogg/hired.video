@@ -25,7 +25,7 @@ import {
   Edit,
   Eye,
 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { Fragment, useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
@@ -882,9 +882,7 @@ export default function Jobs() {
                     ) : viewMode === "scroll" ? (
                       <HorizontalScroller itemCount={displayedJobs.length}>
                         {displayedJobs.map((job) => (
-                          <div key={job.id} className="w-72 shrink-0 snap-start">
-                            {renderJobCard(job)}
-                          </div>
+                          <Fragment key={job.id}>{renderJobCard(job)}</Fragment>
                         ))}
                       </HorizontalScroller>
                     ) : (

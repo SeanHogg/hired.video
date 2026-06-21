@@ -51,6 +51,16 @@ export class ScrollTracker {
   attach(scrollRoot?: HTMLElement | null): () => void {
     this.startTime = Date.now();
 
+    // A view is a view even if the visitor never scrolls — landing on the
+    // artifact means they saw the top of it. Seed bucket 0 so a zero-scroll
+    // impression still flushes a real view. Without this, send()'s
+    // "highestBucket === 0" guard silently dropped every non-scrolling
+    // profile / resume / article / company / job view — the dominant case
+    // for short pages and quick glances — so the unified artifact_views
+    // table (and everything that reads it: the Metrics drawer, profileStats,
+    // the creator rollup) under-counted views to zero.
+    this.buckets[0] = 1;
+
     const onScroll = () => {
       const pct = computeScrollPercent(scrollRoot ?? null);
       if (pct <= this.highestBucket) return;
@@ -87,7 +97,6 @@ export class ScrollTracker {
 
   private send(): void {
     if (this.sent) return;
-    if (this.highestBucket === 0) return;
 
     const dwellSec = Math.round((Date.now() - this.startTime) / 1000);
     const reached = this.buckets.filter((b) => b === 1).length;

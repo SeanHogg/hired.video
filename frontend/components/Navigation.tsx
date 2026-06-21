@@ -114,7 +114,7 @@ export default function Navigation({
       ? "bg-amber-50/95 border-amber-300"
       : emulationStyle === "blue"
       ? "bg-blue-50/95 border-blue-300"
-      : "bg-background/80 backdrop-blur-md border-border",
+      : "bg-sidebar/80 backdrop-blur-md border-sidebar-border",
   );
 
   return (

@@ -95,6 +95,10 @@ const CatalogRedemptionSchema = z.object({
   kind: z.enum(["ai_credits", "premium_month", "gift_card", "campaign_dollars"]),
   label: z.string(),
   pointsCost: z.number(),
+  /** False = surfaced in the catalog but not yet redeemable (e.g. gift
+   *  cards while we onboard a new provider). Absent (older payloads) is
+   *  treated as available — consumers gate on `available === false`. */
+  available: z.boolean().optional(),
 });
 
 const CatalogSchema = z.object({

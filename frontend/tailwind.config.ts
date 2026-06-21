@@ -96,10 +96,37 @@ export default {
             height: "0",
           },
         },
+        // Gamification (points + badges). Shared by StreakFlame,
+        // BadgesGallery (freshly-earned throb) and CelebrationOverlay.
+        "flame-flicker": {
+          "0%, 100%": { transform: "scale(1) rotate(-1.5deg)", opacity: "0.92" },
+          "50%": { transform: "scale(1.12) rotate(1.5deg)", opacity: "1" },
+        },
+        "badge-throb": {
+          "0%, 100%": { boxShadow: "0 0 0 0 var(--badge-glow, rgba(251,191,36,0))" },
+          "50%": { boxShadow: "0 0 18px 5px var(--badge-glow, rgba(251,191,36,0.55))" },
+        },
+        "celebrate-in": {
+          "0%": { transform: "scale(0.3) rotate(-12deg)", opacity: "0" },
+          "55%": { transform: "scale(1.18) rotate(4deg)", opacity: "1" },
+          "100%": { transform: "scale(1) rotate(0deg)", opacity: "1" },
+        },
+        "confetti-fall": {
+          "0%": { transform: "translate3d(0,0,0) rotate(0deg)", opacity: "1" },
+          "100%": {
+            transform:
+              "translate3d(var(--confetti-x, 0), var(--confetti-y, 120px), 0) rotate(var(--confetti-r, 360deg))",
+            opacity: "0",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "flame-flicker": "flame-flicker 1.4s ease-in-out infinite",
+        "badge-throb": "badge-throb 1.6s ease-in-out infinite",
+        "celebrate-in": "celebrate-in 0.6s cubic-bezier(.2,.85,.25,1) both",
+        "confetti-fall": "confetti-fall 1.1s ease-out forwards",
       },
     },
   },

@@ -87,7 +87,6 @@ export default function OAuthProviders({ mode, redirect = "/dashboard", role, en
           }}
         >
           {p.icon}
-          <span className="hidden sm:inline">{verb} </span>
           {p.name}
         </Button>
       ))}

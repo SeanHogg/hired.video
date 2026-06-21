@@ -7,7 +7,13 @@
 // `openCreate` is exposed via ref so the parent (CreatorWorkspace) can
 // trigger the Add-Service dialog from buttons rendered in the tabs row.
 
-import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import {
+  Fragment,
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
   AlertCircle,
@@ -342,9 +348,7 @@ const OfferingsPanel = forwardRef<OfferingsPanelHandle, Props>(function Offering
               ) : viewMode === "scroll" ? (
                 <HorizontalScroller itemCount={services.length}>
                   {services.map((s) => (
-                    <div key={s.id} className="w-72 shrink-0 snap-start">
-                      {renderServiceCard(s)}
-                    </div>
+                    <Fragment key={s.id}>{renderServiceCard(s)}</Fragment>
                   ))}
                 </HorizontalScroller>
               ) : (

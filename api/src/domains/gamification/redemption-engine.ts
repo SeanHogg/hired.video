@@ -23,7 +23,12 @@
 
 import type { Repos } from "../../repositories/index.js";
 import type { PointRedemptionRow } from "../../repositories/pointsRepository.js";
-import { getRedemptionSku, type RedemptionSku } from "./rules.js";
+import {
+  getRedemptionSku,
+  isRedemptionKindAvailable,
+  type RedemptionKind,
+  type RedemptionSku,
+} from "./rules.js";
 import { TremendousClient, TremendousError } from "../../services/tremendous/client.js";
 
 /** 1099-MISC reporting threshold. IRS treats gift cards as taxable
@@ -57,14 +62,21 @@ export interface RedemptionEngineDeps {
    *  disabled (sandbox / dev) — the engine surfaces `vendor_unavailable`
    *  on `gift_card` kinds in that case but still serves the other kinds. */
   buildTremendous: () => TremendousClient | null;
+  /** Predicate gating which kinds may be redeemed. Defaults to the
+   *  catalog SSoT `isRedemptionKindAvailable` (gift cards off while we
+   *  migrate off Tremendous). Injected so the retained gift-card
+   *  fulfillment path stays exercisable in tests once a provider returns. */
+  isKindAvailable?: (kind: RedemptionKind) => boolean;
   now?: () => Date;
 }
 
 export class RedemptionEngine {
   private readonly now: () => Date;
+  private readonly isKindAvailable: (kind: RedemptionKind) => boolean;
 
   constructor(private readonly deps: RedemptionEngineDeps) {
     this.now = deps.now ?? (() => new Date());
+    this.isKindAvailable = deps.isKindAvailable ?? isRedemptionKindAvailable;
   }
 
   async redeem(args: {
@@ -77,6 +89,19 @@ export class RedemptionEngine {
         status: "rejected",
         reason: "unknown_sku",
         message: `Unknown SKU: ${args.skuId}`,
+      };
+    }
+
+    // Server-side guard mirroring the catalog's `available` flag — gift
+    // cards are catalogued but parked until a replacement provider is
+    // wired (Tremendous denied us). Reject before touching points so a
+    // crafted request can't redeem a disabled kind.
+    if (!this.isKindAvailable(sku.kind)) {
+      return {
+        status: "rejected",
+        reason: "vendor_unavailable",
+        message:
+          "Gift cards are temporarily unavailable while we onboard a new provider. Your points are safe — try AI credits, Pro time, or Campaign $ in the meantime.",
       };
     }
 

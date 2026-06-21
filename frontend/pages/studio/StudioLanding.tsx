@@ -22,7 +22,14 @@
  * gone. UI-state seeds that the editor still reads from the URL
  * (`?capture=`) are forwarded along on the destination URL.
  */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -1056,9 +1063,7 @@ function StudioContentView({
     return (
       <HorizontalScroller itemCount={projects.length}>
         {projects.map((project) => (
-          <div key={project.id} className="w-72 shrink-0 snap-start">
-            {renderCard(project)}
-          </div>
+          <Fragment key={project.id}>{renderCard(project)}</Fragment>
         ))}
       </HorizontalScroller>
     );
@@ -1292,11 +1297,12 @@ function UnifiedTemplateCarousel({
     return <TemplateGrid rows={rows} rowKey={rowKey} renderCard={renderCard} />;
   }
   return (
-    <HorizontalScroller itemCount={rows.length}>
+    <HorizontalScroller
+      itemCount={rows.length}
+      cellClassName="w-[72vw] max-w-[15rem] shrink-0 snap-start sm:w-60 sm:max-w-none"
+    >
       {rows.map((row) => (
-        <div key={rowKey(row)} className="w-60 shrink-0 snap-start">
-          {renderCard(row)}
-        </div>
+        <Fragment key={rowKey(row)}>{renderCard(row)}</Fragment>
       ))}
     </HorizontalScroller>
   );

@@ -24,6 +24,10 @@ export type ApplyAction = "use" | "buy" | "claim" | "sign-in";
 export interface UseApplyTemplateResult {
   /** Imperative trigger — caller wires this to the primary CTA's onClick. */
   apply: () => Promise<void> | void;
+  /** The resolved next action. Exposed so CTAs can safely override the label
+   *  only on the free "use"/"claim" path (and never replace "Buy" / "Sign
+   *  in", where a generic label would mislead the user). */
+  action: ApplyAction;
   /** Localized button label that reflects the next action the user takes. */
   ctaLabel: string;
   /** True when the visitor already owns this template and can use it now. */
@@ -206,12 +210,13 @@ export function useApplyTemplate(meta: TemplateMeta | null): UseApplyTemplateRes
   }
 
   if (!meta) {
-    return { apply, ctaLabel: "Use this template", isOwned: false, isPaid: false, busy: false };
+    return { apply, action: "use", ctaLabel: "Use this template", isOwned: false, isPaid: false, busy: false };
   }
 
   const action = nextAction(meta, { isAuthed: isAuthenticated, isOwned: owned });
   return {
     apply,
+    action,
     ctaLabel: ctaLabelFor(action, meta),
     isOwned: owned,
     isPaid: meta.priceCents > 0 && !owned,

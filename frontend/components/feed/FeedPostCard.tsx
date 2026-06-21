@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Heart,
   MessageCircle,
   Repeat2,
   MoreHorizontal,
@@ -32,8 +31,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import {
-  likeFeedPost,
-  unlikeFeedPost,
+  reactToFeedPost,
+  removeFeedPostReaction,
+  reactToComment,
+  removeCommentReaction,
+  applyReactionToComment,
   createComment,
   getPostComments,
   resharePost,
@@ -45,6 +47,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { FeedPost, FeedPostComment, FeedRepostPreview } from "@/types/feed";
 import { FeedReviewEmbed } from "./FeedReviewEmbed";
 import PostStatsSheet from "./PostStatsSheet";
+import ReactionPicker, { ReactionSummaryChips } from "./ReactionPicker";
 import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 
 // Sub-components
@@ -190,7 +193,7 @@ const FeedRepostEmbed = ({ original }: { original: FeedRepostPreview }) => (
 
 const FeedPostActions = ({
   post,
-  onLike,
+  onReact,
   onComment,
   onDelete,
   onEdit,
@@ -198,7 +201,8 @@ const FeedPostActions = ({
   onReshare,
 }: {
   post: FeedPost;
-  onLike: (postId: string) => void;
+  // Reaction change: `reactionType` is the new reaction, or null when removed.
+  onReact: (postId: string, reactionType: string | null) => void;
   onComment: (postId: string) => void;
   onDelete: (postId: string) => void;
   onEdit: (postId: string, updatedPost: FeedPost) => void;
@@ -207,7 +211,7 @@ const FeedPostActions = ({
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [liking, setLiking] = useState(false);
+  const [reacting, setReacting] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -231,21 +235,50 @@ const FeedPostActions = ({
 
   const commentCount = commentsLoaded ? comments.length : post.commentCount;
 
-  const handleLike = async () => {
+  // React (or change reaction). Optimistic: tell the parent first, then
+  // persist; roll back to the previous reaction on failure.
+  const handleReact = async (reactionType: string) => {
     if (!user) return;
-
-    setLiking(true);
+    const prev = post.currentUserReaction ?? null;
+    setReacting(true);
+    onReact(post.id, reactionType);
     try {
-      if (post.isLikedByCurrentUser) {
-        await unlikeFeedPost(post.id);
-      } else {
-        await likeFeedPost(post.id);
-      }
-      onLike(post.id);
-    } catch (error) {
-      console.error('Failed to toggle like:', error);
+      await reactToFeedPost(post.id, reactionType);
+    } catch {
+      onReact(post.id, prev);
+      toast({ title: "Could not save your reaction", description: "Please try again.", variant: "destructive" });
     } finally {
-      setLiking(false);
+      setReacting(false);
+    }
+  };
+
+  const handleRemoveReaction = async () => {
+    if (!user) return;
+    const prev = post.currentUserReaction ?? null;
+    setReacting(true);
+    onReact(post.id, null);
+    try {
+      await removeFeedPostReaction(post.id);
+    } catch {
+      onReact(post.id, prev);
+      toast({ title: "Could not remove your reaction", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setReacting(false);
+    }
+  };
+
+  // Per-comment reaction handling — updates the locally-held comment thread
+  // via the shared optimistic helper, then persists.
+  const handleCommentReact = async (commentId: string, reactionType: string | null) => {
+    if (!user) return;
+    setComments((prev) =>
+      prev.map((cmt) => (cmt.id === commentId ? applyReactionToComment(cmt, reactionType) : cmt)),
+    );
+    try {
+      if (reactionType) await reactToComment(commentId, reactionType);
+      else await removeCommentReaction(commentId);
+    } catch {
+      toast({ title: "Could not save your reaction", description: "Please try again.", variant: "destructive" });
     }
   };
 
@@ -406,25 +439,35 @@ const FeedPostActions = ({
         </div>
       )}
 
+      {/* Engagement summary — reaction mix + counts, LinkedIn-style above
+          the action bar. Self-gates: hidden until there's engagement. */}
+      {(post.likeCount > 0 || commentCount > 0 || post.repostCount > 0) && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground border-b pb-2">
+          <ReactionSummaryChips summary={post.reactions} totalCount={post.likeCount} />
+          <div className="flex items-center gap-3">
+            {commentCount > 0 && (
+              <span>{commentCount} {commentCount === 1 ? "comment" : "comments"}</span>
+            )}
+            {post.repostCount > 0 && (
+              <span>{post.repostCount} {post.repostCount === 1 ? "repost" : "reposts"}</span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLike}
-            disabled={liking}
-            className={`text-muted-foreground hover:text-red-500 ${
-              post.isLikedByCurrentUser ? 'text-red-500' : ''
-            }`}
-          >
-            <Heart
-              className={`h-4 w-4 mr-2 ${
-                post.isLikedByCurrentUser ? 'fill-current' : ''
-              }`}
-            />
-            {post.likeCount}
-          </Button>
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          {/* Professional reactions — quick-tap to Like, hover/long-press to
+              pick Celebrate / Support / Insightful / Curious / Funny. */}
+          <ReactionPicker
+            currentReaction={post.currentUserReaction}
+            totalCount={post.likeCount}
+            onReact={handleReact}
+            onRemove={handleRemoveReaction}
+            disabled={reacting || !user}
+            showCount={false}
+          />
 
           <Button
             variant="ghost"
@@ -502,9 +545,20 @@ const FeedPostActions = ({
                     <p className="text-sm font-medium">{comment.userName}</p>
                     <p className="text-sm">{comment.content}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
-                  </p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <p className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                    </p>
+                    {/* Comment reactions — same professional set as posts. */}
+                    <ReactionPicker
+                      size="sm"
+                      currentReaction={comment.currentUserReaction}
+                      totalCount={comment.reactionCount ?? 0}
+                      onReact={(type) => handleCommentReact(comment.id, type)}
+                      onRemove={() => handleCommentReact(comment.id, null)}
+                      disabled={!user}
+                    />
+                  </div>
                 </div>
               </div>
             ))
@@ -553,7 +607,8 @@ const FeedPostActions = ({
 
 interface FeedPostCardProps {
   post: FeedPost;
-  onLike: (postId: string) => void;
+  // Reaction change: `reactionType` is the new reaction, or null when removed.
+  onReact: (postId: string, reactionType: string | null) => void;
   onComment: (postId: string) => void;
   onDelete: (postId: string) => void;
   onEdit: (postId: string, updatedPost: FeedPost) => void;
@@ -562,9 +617,12 @@ interface FeedPostCardProps {
   onSelectTag?: (tag: string) => void;
   // Reshare: the parent prepends the new repost to its timeline.
   onReshare?: (newPost: FeedPost) => void;
+  // When true, the author/timestamp deep-link to the post detail page
+  // (/feed/:id). Off on the detail page itself to avoid a self-link.
+  linkToDetail?: boolean;
 }
 
-export default function FeedPostCard({ post, onLike, onComment, onDelete, onEdit, onHide, onSelectTag, onReshare }: FeedPostCardProps) {
+export default function FeedPostCard({ post, onReact, onComment, onDelete, onEdit, onHide, onSelectTag, onReshare, linkToDetail = true }: FeedPostCardProps) {
   const isRepost = Boolean(post.repostOfId);
   const getPrivacyIcon = () => {
     switch (post.privacy) {
@@ -620,7 +678,15 @@ export default function FeedPostCard({ post, onLike, onComment, onDelete, onEdit
                 )}
               </div>
               <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                <span>{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
+                {/* Timestamp deep-links to the post detail page so any post
+                    (incl. trending) opens its permalink on click. */}
+                {linkToDetail ? (
+                  <Link to={`/feed/${post.id}`} className="hover:text-primary hover:underline">
+                    {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
+                  </Link>
+                ) : (
+                  <span>{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
+                )}
                 <span>•</span>
                 <div className="flex items-center space-x-1">
                   {getPrivacyIcon()}
@@ -680,7 +746,7 @@ export default function FeedPostCard({ post, onLike, onComment, onDelete, onEdit
         {/* Actions */}
         <FeedPostActions
           post={post}
-          onLike={onLike}
+          onReact={onReact}
           onComment={onComment}
           onDelete={onDelete}
           onEdit={onEdit}

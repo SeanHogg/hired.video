@@ -206,7 +206,10 @@ export const FEED_POST_LIST_FIELDS = [
   "createdAt",
   "likeCount",
   "commentCount",
+  "repostCount",
   "isLikedByMe",
+  "reactions",
+  "currentUserReaction",
   "tags",
 ] as const;
 

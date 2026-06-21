@@ -765,6 +765,22 @@ export function getRedemptionSku(id: string): RedemptionSku | null {
   return REDEMPTION_CATALOG.find((s) => s.id === id) ?? null;
 }
 
+/**
+ * Redemption kinds that are catalogued but NOT currently fulfillable.
+ * Tremendous (our gift-card rail) denied our account 2026-06-21, so gift
+ * cards are surfaced as "coming soon" in the catalog and hard-rejected at
+ * redeem time until a replacement provider is wired (see Gap Register).
+ * Single SSoT — the catalog endpoint and the redemption engine both read
+ * this so the UI promise and the server guard can never drift.
+ */
+export const UNAVAILABLE_REDEMPTION_KINDS: ReadonlySet<RedemptionKind> = new Set<RedemptionKind>([
+  "gift_card",
+]);
+
+export function isRedemptionKindAvailable(kind: RedemptionKind): boolean {
+  return !UNAVAILABLE_REDEMPTION_KINDS.has(kind);
+}
+
 export function getRule(action: string): PointsRule | null {
   return (POINTS_CATALOG as Record<string, PointsRule>)[action] ?? null;
 }

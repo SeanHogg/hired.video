@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
 import type { ApiSuccessResponse } from "@shared/api";
+import { FEED_REACTIONS } from "@shared/feed-reactions";
 import type {
   FeedPost,
   FeedPostsResponse,
@@ -19,6 +20,7 @@ import type {
   LinkPreviewRequest,
   LinkPreviewResponse,
   TrendingTag,
+  TrendingPost,
 } from "../../types/feed";
 
 // ============================================================================
@@ -52,7 +54,14 @@ export const FeedPostLikeSchema = z.object({
   userId: z.string(),
   userName: z.string(),
   userAvatar: z.string().optional(),
+  reactionType: z.string().optional(),
   createdAt: z.string().optional(),
+});
+
+// One reaction-count bucket — mirrors `ReactionCount` (shared/feed-reactions.ts).
+export const ReactionCountSchema = z.object({
+  type: z.string(),
+  count: z.number(),
 });
 
 export const FeedPostCommentSchema = z.object({
@@ -62,6 +71,9 @@ export const FeedPostCommentSchema = z.object({
   userName: z.string(),
   userAvatar: z.string().optional(),
   content: z.string(),
+  reactions: z.array(ReactionCountSchema).optional(),
+  reactionCount: z.number().optional(),
+  currentUserReaction: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -110,6 +122,8 @@ export const FeedPostSchema = z.object({
   likes: z.array(FeedPostLikeSchema),
   comments: z.array(FeedPostCommentSchema),
   likeCount: z.number(),
+  reactions: z.array(ReactionCountSchema).optional(),
+  currentUserReaction: z.string().nullable().optional(),
   commentCount: z.number(),
   // Reshare count (how many times this post was reposted) + the embedded
   // original when this post IS a repost (gap social-feed pass).
@@ -277,21 +291,44 @@ export async function deleteFeedPost(postId: string): Promise<void> {
 }
 
 /**
- * Like a feed post
+ * React to a feed post with a professional reaction (like / celebrate /
+ * support / insightful / curious / funny — see shared/feed-reactions.ts).
+ * Idempotent per (post, viewer): calling again with a different type changes
+ * the reaction. Defaults to a plain "like" for a quick tap.
  */
-export async function likeFeedPost(postId: string): Promise<FeedPostLike> {
+export async function reactToFeedPost(
+  postId: string,
+  reactionType = "like",
+): Promise<FeedPostLike> {
   const response = await apiClient.post<ApiSuccessResponse<FeedPostLike>>(
-    `/api/feed/posts/${postId}/like`
+    `/api/feed/posts/${postId}/react`,
+    { reactionType },
   );
-
   return FeedPostLikeSchema.parse(response.data);
 }
 
 /**
- * Unlike a feed post
+ * Remove the viewer's reaction from a feed post.
  */
-export async function unlikeFeedPost(postId: string): Promise<void> {
-  await apiClient.delete(`/api/feed/posts/${postId}/like`);
+export async function removeFeedPostReaction(postId: string): Promise<void> {
+  await apiClient.delete(`/api/feed/posts/${postId}/react`);
+}
+
+/**
+ * React to a comment with a professional reaction (same set as posts).
+ */
+export async function reactToComment(
+  commentId: string,
+  reactionType = "like",
+): Promise<void> {
+  await apiClient.post(`/api/feed/comments/${commentId}/react`, { reactionType });
+}
+
+/**
+ * Remove the viewer's reaction from a comment.
+ */
+export async function removeCommentReaction(commentId: string): Promise<void> {
+  await apiClient.delete(`/api/feed/comments/${commentId}/react`);
 }
 
 /**
@@ -413,6 +450,106 @@ export async function getTrendingTags(limit = 8): Promise<TrendingTag[]> {
 }
 
 /**
+ * Trending posts — public posts ranked by recent engagement (weighted
+ * reactions + reposts + comments). Powers the "Trending" sidebar; selecting
+ * one deep-links to /feed/:id.
+ */
+export const TrendingPostSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  userName: z.string(),
+  userAvatar: z.string().nullable().optional(),
+  excerpt: z.string().nullable().optional(),
+  kind: z.enum(["text", "video", "article"]).default("text"),
+  createdAt: z.string(),
+  // Raw SQL aggregates arrive as numbers (or numeric strings via KV JSON);
+  // coerce so the sidebar always gets numbers.
+  reactionCount: z.coerce.number().default(0),
+  commentCount: z.coerce.number().default(0),
+  repostCount: z.coerce.number().default(0),
+  score: z.coerce.number().default(0),
+});
+
+export async function getTrendingPosts(limit = 5): Promise<TrendingPost[]> {
+  const response = await apiClient.get<ApiSuccessResponse<unknown[]>>(
+    `/api/feed/trending-posts?limit=${limit}`,
+  );
+  const parsed = z.array(TrendingPostSchema).safeParse(response.data);
+  if (!parsed.success) {
+    console.warn("[feed] Trending-posts validation warning:", parsed.error.issues);
+    return [];
+  }
+  return parsed.data.map((r) => ({
+    id: r.id,
+    userId: r.userId,
+    userName: r.userName,
+    userAvatar: r.userAvatar ?? undefined,
+    excerpt: r.excerpt ?? "",
+    kind: r.kind,
+    createdAt: r.createdAt,
+    reactionCount: r.reactionCount,
+    commentCount: r.commentCount,
+    repostCount: r.repostCount,
+    score: r.score,
+  }));
+}
+
+// ============================================================================
+// OPTIMISTIC REACTION STATE HELPERS (pure)
+// ============================================================================
+// Shared by every feed surface (Home, Feed, PostDetail) so the optimistic
+// update after a react/unreact is computed in ONE place — no duplicated
+// "decrement old bucket / increment new bucket / adjust count" logic.
+
+function rebuildSummary(counts: Map<string, number>): { type: string; count: number }[] {
+  return FEED_REACTIONS.map((r) => ({ type: r.type, count: counts.get(r.type) ?? 0 })).filter(
+    (b) => b.count > 0,
+  );
+}
+
+/** Apply a reaction change (or removal — `null`) to a post, returning a new
+ *  post object with `reactions`, `currentUserReaction`, `likeCount`, and
+ *  `isLikedByCurrentUser` all kept in sync. */
+export function applyReactionToPost(post: FeedPost, reactionType: string | null): FeedPost {
+  const prev = post.currentUserReaction ?? null;
+  if (prev === reactionType) return post;
+
+  const counts = new Map((post.reactions ?? []).map((b) => [b.type, b.count]));
+  if (prev) counts.set(prev, Math.max(0, (counts.get(prev) ?? 0) - 1));
+  if (reactionType) counts.set(reactionType, (counts.get(reactionType) ?? 0) + 1);
+
+  const likeDelta = (reactionType ? 1 : 0) - (prev ? 1 : 0);
+  return {
+    ...post,
+    reactions: rebuildSummary(counts),
+    currentUserReaction: reactionType,
+    isLikedByCurrentUser: reactionType != null,
+    likeCount: Math.max(0, post.likeCount + likeDelta),
+  };
+}
+
+/** Apply a reaction change (or removal) to a comment. */
+export function applyReactionToComment(
+  comment: FeedPostComment,
+  reactionType: string | null,
+): FeedPostComment {
+  const prev = comment.currentUserReaction ?? null;
+  if (prev === reactionType) return comment;
+
+  const counts = new Map((comment.reactions ?? []).map((b) => [b.type, b.count]));
+  if (prev) counts.set(prev, Math.max(0, (counts.get(prev) ?? 0) - 1));
+  if (reactionType) counts.set(reactionType, (counts.get(reactionType) ?? 0) + 1);
+
+  const delta = (reactionType ? 1 : 0) - (prev ? 1 : 0);
+  return {
+    ...comment,
+    reactions: rebuildSummary(counts),
+    currentUserReaction: reactionType,
+    reactionCount: Math.max(0, (comment.reactionCount ?? 0) + delta),
+  };
+}
+
+/**
  * Get link preview for a URL
  */
 export async function getLinkPreview(request: LinkPreviewRequest): Promise<LinkPreviewResponse> {
@@ -435,20 +572,20 @@ export async function getLinkPreview(request: LinkPreviewRequest): Promise<LinkP
  * This could be expanded for optimistic updates, caching, etc.
  */
 export function useFeedInteractions() {
-  const likePost = async (postId: string) => {
+  const reactToPost = async (postId: string, reactionType = "like") => {
     try {
-      return await likeFeedPost(postId);
+      return await reactToFeedPost(postId, reactionType);
     } catch (error) {
-      console.error("Failed to like post:", error);
+      console.error("Failed to react to post:", error);
       throw error;
     }
   };
 
-  const unlikePost = async (postId: string) => {
+  const unreactPost = async (postId: string) => {
     try {
-      await unlikeFeedPost(postId);
+      await removeFeedPostReaction(postId);
     } catch (error) {
-      console.error("Failed to unlike post:", error);
+      console.error("Failed to remove reaction:", error);
       throw error;
     }
   };
@@ -463,8 +600,8 @@ export function useFeedInteractions() {
   };
 
   return {
-    likePost,
-    unlikePost,
+    reactToPost,
+    unreactPost,
     addComment,
   };
 }

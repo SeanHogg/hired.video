@@ -19,7 +19,6 @@ import { Link } from "react-router-dom";
 import {
   Calendar,
   CreditCard,
-  Flame,
   Gift,
   HelpCircle,
   Loader2,
@@ -50,6 +49,9 @@ import {
   type PointsSummary,
 } from "@/lib/services/points-service";
 import { BadgesGallery, type BadgeGalleryItem } from "@/components/badges/BadgesGallery";
+import { StreakFlame } from "@/components/points/StreakFlame";
+import { resolveStreakTier, nextStreakMilestone } from "@/lib/points/streak-tier";
+import { celebrate } from "@/lib/points/celebration";
 import { pointsCategoryLabel } from "@/lib/taxonomy/category-labels";
 
 export interface PointsHubProps {
@@ -157,22 +159,7 @@ function KpiRow({ data }: { data: PointsSummary }) {
           </>
         }
       />
-      <KpiCard
-        icon={<Flame className="h-3.5 w-3.5" />}
-        label="Streak"
-        value={
-          <>
-            {data.streak.current}{" "}
-            <span className="text-base font-normal text-muted-foreground">days</span>
-          </>
-        }
-        footer={
-          <>
-            Longest: {data.streak.longest} days · Last active:{" "}
-            {data.streak.lastActivityDate ?? "—"}
-          </>
-        }
-      />
+      <StreakCard streak={data.streak} />
       <KpiCard
         icon={<Trophy className="h-3.5 w-3.5" />}
         label="Badges"
@@ -244,6 +231,42 @@ function UserTaskGateRow({ gate }: { gate: PointsSummary["userTaskGate"] }) {
   );
 }
 
+/** Streak tile — the animated, colour-progressing flame replaces the
+ *  static KPI icon so the user sees how hot their streak is at a glance,
+ *  with the heat-tier label + progress to the next milestone. */
+function StreakCard({ streak }: { streak: PointsSummary["streak"] }) {
+  const { t } = useTranslation();
+  const tier = resolveStreakTier(streak.current);
+  const next = nextStreakMilestone(streak.current);
+  return (
+    <Card className="p-5 flex items-center gap-4">
+      <StreakFlame days={streak.current} size="lg" />
+      <div className="min-w-0">
+        <div className="text-xs uppercase text-muted-foreground tracking-wide">
+          {t("labels.rewards.streakLabel")}
+        </div>
+        <div className="text-3xl font-bold tabular-nums leading-tight">
+          {streak.current}{" "}
+          <span className="text-base font-normal text-muted-foreground">
+            {t("labels.rewards.days")}
+          </span>
+        </div>
+        <div className={`text-xs font-medium ${tier.color}`}>{t(tier.labelKey)}</div>
+        <div className="text-[11px] text-muted-foreground mt-1">
+          {next
+            ? t("messages.rewards.streakToNext", {
+                count: next.remaining,
+                label: t(next.labelKey),
+              })
+            : t("messages.rewards.streakTopTier")}
+          {" · "}
+          {t("labels.rewards.longest", { count: streak.longest })}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 // ── Redemption ──────────────────────────────────────────────────────
 
 function RedemptionGrid({
@@ -255,6 +278,7 @@ function RedemptionGrid({
   balance: number;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { user } = useAuth();
   const [redeeming, setRedeeming] = useState<string | null>(null);
@@ -272,6 +296,13 @@ function RedemptionGrid({
       });
       if (res.status === "fulfilled") {
         toast.success("Redemption fulfilled.");
+        celebrate({
+          kind: "reward",
+          title: t("messages.rewards.rewardRedeemedTitle"),
+          description: t("messages.rewards.rewardRedeemedBody"),
+          iconKey: "gift",
+          tier: "gold",
+        });
       } else if (res.status === "queued") {
         toast.success("Gift card on the way.", {
           description: "Tremendous will deliver to your email within minutes.",
@@ -293,6 +324,7 @@ function RedemptionGrid({
   }
 
   function handleRedeemClick(sku: PointsRedemption) {
+    if (sku.available === false) return; // coming soon — not redeemable yet
     if (sku.kind === "gift_card") {
       setGiftCardSku(sku);
     } else {
@@ -317,8 +349,7 @@ function RedemptionGrid({
         <CreditCard className="h-4 w-4" /> Cash out
       </h2>
       <p className="text-xs text-muted-foreground mb-4">
-        Convert points to AI credits, a free month of Pro, a Tremendous gift card, or
-        Campaign $ to boost your posts.
+        {t("messages.rewards.cashoutHubDesc")}
       </p>
       <div className="space-y-5">
         {groups.map(({ kind, label, icon: Icon }) => {
@@ -331,26 +362,36 @@ function RedemptionGrid({
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {items.map((sku) => {
+                  const comingSoon = sku.available === false;
                   const affordable = balance >= sku.pointsCost;
                   return (
                     <div
                       key={sku.id}
                       className={`p-3 rounded-lg border ${
-                        affordable ? "border-border" : "border-border opacity-60"
+                        !comingSoon && affordable ? "border-border" : "border-border opacity-60"
                       }`}
                     >
-                      <div className="font-medium text-sm">{sku.label}</div>
+                      <div className="font-medium text-sm flex items-center justify-between gap-2">
+                        {sku.label}
+                        {comingSoon && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground whitespace-nowrap">
+                            {t("labels.rewards.comingSoon")}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground tabular-nums mt-1">
                         {sku.pointsCost.toLocaleString()} pts
                       </div>
                       <Button
                         size="sm"
-                        variant={affordable ? "default" : "outline"}
+                        variant={!comingSoon && affordable ? "default" : "outline"}
                         className="mt-2 w-full"
-                        disabled={disabled || !affordable || redeeming === sku.id}
+                        disabled={disabled || comingSoon || !affordable || redeeming === sku.id}
                         onClick={() => handleRedeemClick(sku)}
                       >
-                        {redeeming === sku.id ? (
+                        {comingSoon ? (
+                          t("labels.rewards.comingSoon")
+                        ) : redeeming === sku.id ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
                           "Redeem"

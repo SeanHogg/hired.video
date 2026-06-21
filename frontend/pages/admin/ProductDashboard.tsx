@@ -39,6 +39,8 @@ import { apiClient } from "@/lib/api-client";
 import { AffiliateService, type AffiliateAdminStats } from "@/lib/services/affiliate-service";
 import { AffiliateManagementPanel } from "@/components/admin/AffiliateManagementPanel";
 import { PayoutProcessingPanel } from "@/components/admin/PayoutProcessingPanel";
+import { GaugeCard } from "@/components/dashboard/gauge/GaugeCard";
+import { buildPlatformGauge } from "@/lib/dashboard/gauge";
 
 import {
   LineChart,
@@ -353,6 +355,21 @@ export default function ProductDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Platform-health speedometer — at-a-glance owner score, mirrors
+          the "Your Score / Org Avg" overview from the reference design. */}
+      <GaugeCard
+        className="lg:max-w-md"
+        model={buildPlatformGauge(
+          {
+            totalUsers: dashboardData.userMetrics.totalUsers,
+            activeUsers: dashboardData.userMetrics.activeUsers,
+            churnRate: dashboardData.saasMetrics?.churnRate,
+            conversionRate: dashboardData.saasMetrics?.conversionRate,
+          },
+          t,
+        )}
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
         {/* Mobile: Scrollable horizontal tabs, Desktop: Grid layout */}

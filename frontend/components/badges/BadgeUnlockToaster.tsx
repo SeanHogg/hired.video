@@ -1,8 +1,12 @@
 /**
  * Mount once globally (in App.tsx next to other root-level providers).
- * Polls the points summary and fires a toast for each newly-earned
- * badge — both first-time earns and repeatable re-earns (e.g. rebuilt
- * 7-day streak → another "On Fire" toast).
+ * Polls the points summary and fires a full-screen CELEBRATION for each
+ * newly-earned badge — both first-time earns and repeatable re-earns
+ * (e.g. rebuilt 7-day streak → another "On Fire", now with its ×N
+ * multiplier). Detection lives here; the party lives in
+ * [CelebrationOverlay](../points/CelebrationOverlay.tsx) via the shared
+ * [celebration bus](../../lib/points/celebration.ts) so this stays the
+ * single "what's newly earned?" diff.
  *
  * Self-gates on eligibility so the poll is a no-op for non-scoring
  * roles. Stores the last-seen earn-count map in `localStorage` keyed by
@@ -12,7 +16,6 @@
 
 import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import {
   isPointsEligible,
@@ -21,7 +24,7 @@ import {
   type PointsSummary,
 } from "@/lib/services/points-service";
 import { BADGE_REFRESH_EVENT } from "@/lib/badges/refresh";
-import { BadgeIcon } from "./BadgeIcon";
+import { celebrate } from "@/lib/points/celebration";
 
 const STORAGE_KEY_PREFIX = "hv.badge-earn-snapshot:";
 const POLL_MS = 60_000;
@@ -83,13 +86,13 @@ export function BadgeUnlockToaster() {
     const prev = seenRef.current ?? loadSnapshot(userId);
 
     if (prev) {
-      // Diff: any badge whose count went up triggers a toast per delta.
+      // Diff: any badge whose count went up celebrates. For repeatable
+      // re-earns we fire once with the NEW total so the streak shows its
+      // ×N multiplier rather than N identical pop-ups.
       for (const b of data.badges) {
         const prevCount = prev[b.id] ?? 0;
-        const newEarns = (next[b.id] ?? 0) - prevCount;
-        if (newEarns > 0) {
-          for (let i = 0; i < newEarns; i += 1) showBadgeToast(b);
-        }
+        const newCount = next[b.id] ?? 0;
+        if (newCount > prevCount) celebrateBadge(b, newCount);
       }
     }
 
@@ -100,17 +103,21 @@ export function BadgeUnlockToaster() {
   return null;
 }
 
-function showBadgeToast(badge: PointsBadge) {
-  toast.success(`Badge unlocked: ${badge.name}`, {
+/** A streak milestone badge (on_fire / streak_*) is a repeatable flame —
+ *  surface it as a "streak" celebration so the overlay renders the ×N
+ *  multiplier. Everything else is a plain badge unlock. */
+function isStreakBadge(badge: PointsBadge): boolean {
+  return badge.iconKey === "flame" || badge.slug === "on_fire" || badge.slug.startsWith("streak_");
+}
+
+function celebrateBadge(badge: PointsBadge, earnCount: number) {
+  celebrate({
+    kind: isStreakBadge(badge) ? "streak" : "badge",
+    title: badge.name,
     description: badge.description,
-    icon: (
-      <BadgeIcon
-        iconKey={badge.iconKey}
-        tier={badge.tier}
-        earned
-        size="sm"
-      />
-    ),
-    duration: 6000,
+    iconKey: badge.iconKey,
+    tier: badge.tier,
+    badgeId: badge.id,
+    earnCount,
   });
 }

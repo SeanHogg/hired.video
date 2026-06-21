@@ -16,6 +16,7 @@ import {
   REDEMPTION_CATALOG,
   getRedemptionSku,
   getRule,
+  isRedemptionKindAvailable,
   type ActionKey,
   type RedemptionSku,
 } from "./rules.js";
@@ -707,6 +708,7 @@ export class GamificationService {
         kind: s.kind,
         label: s.label,
         pointsCost: s.pointsCost,
+        available: isRedemptionKindAvailable(s.kind),
       })),
     };
   }

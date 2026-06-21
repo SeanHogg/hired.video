@@ -20,6 +20,7 @@ import {
   buildHiringGauge,
   buildRecruiterGauge,
   buildGamificationGauge,
+  buildPlatformGauge,
   type GaugeLevel,
   type GaugeT,
 } from "../gauge";
@@ -242,6 +243,43 @@ describe("buildRecruiterGauge", () => {
     expect(g.score).toBe(100);
     expect(currentLevel(g.score, g.levels).name).toBe("dashboard.gauge.level.thriving");
     expect(g.action?.label).toBe("dashboard.gauge.action.reviewPipeline");
+  });
+});
+
+describe("buildPlatformGauge", () => {
+  it("renormalizes over present signals (engagement only → that score)", () => {
+    const g = buildPlatformGauge({ totalUsers: 1000, activeUsers: 800 }, t);
+    expect(g.score).toBe(80); // 800/1000, no other signals → renormalized to 100% weight
+    expect(g.action).toEqual({
+      label: "dashboard.gauge.action.viewActiveUsers",
+      href: "/admin/active-users",
+    });
+  });
+
+  it("blends engagement, conversion, retention and uptime", () => {
+    const g = buildPlatformGauge(
+      { totalUsers: 100, activeUsers: 90, conversionRate: 90, churnRate: 10, uptimePercentage: 90 },
+      t,
+    );
+    // engagement 90(.35) + conversion 90(.25) + retention 90(.20) + uptime 90(.20) = 90
+    expect(g.score).toBe(90);
+    expect(currentLevel(g.score, g.levels).name).toBe("dashboard.gauge.level.thriving");
+  });
+
+  it("flags high churn in the hint", () => {
+    const g = buildPlatformGauge({ totalUsers: 100, activeUsers: 90, churnRate: 12 }, t);
+    expect(g.hint).toBe("dashboard.gauge.platform.hint.churn");
+  });
+
+  it("flags low engagement when churn is fine", () => {
+    const g = buildPlatformGauge({ totalUsers: 100, activeUsers: 10, churnRate: 2 }, t);
+    expect(g.hint).toBe("dashboard.gauge.platform.hint.engage");
+  });
+
+  it("reads 0 with no signals rather than throwing", () => {
+    const g = buildPlatformGauge({}, t);
+    expect(g.score).toBe(0);
+    expect(currentLevel(g.score, g.levels).name).toBe("dashboard.gauge.level.critical");
   });
 });
 

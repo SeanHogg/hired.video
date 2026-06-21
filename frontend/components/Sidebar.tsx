@@ -148,7 +148,7 @@ export default function Sidebar({
           // z-[60] keeps the mobile drawer (and its close X header) above the
           // top Navigation bar (z-50); lg:z-auto drops it back to the docked
           // rail's normal stacking on desktop where there's no overlay.
-          "fixed top-0 left-0 h-full bg-background border-r border-border z-[60] transform transition-all duration-500 ease-in-out",
+          "fixed top-0 left-0 h-full bg-sidebar border-r border-sidebar-border z-[60] transform transition-all duration-500 ease-in-out",
           collapsed ? "w-16 overflow-hidden" : "w-[90%] lg:w-80 overflow-y-auto",
           // Mobile: hidden by default, show when isOpen
           isOpen ? "translate-x-0" : "-translate-x-full",
@@ -163,7 +163,7 @@ export default function Sidebar({
               behind it yet still consume vertical space, producing a dead gap
               above the nav list. So it's suppressed on lg (content is offset
               with `lg:pt-20` below to clear the 64px fixed nav instead). */}
-          <div className="flex items-center justify-between p-4 border-b border-border lg:hidden">
+          <div className="flex items-center justify-between p-4 border-b border-sidebar-border lg:hidden">
             <Link to="/" className="flex items-center space-x-2">
               <Video className="h-6 w-6 text-primary" />
               {!collapsed && (
@@ -206,7 +206,7 @@ export default function Sidebar({
                       collapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
                       isMenuItemActive(item)
                         ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                        : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
                     )}
                     onClick={onClose}
                     title={collapsed ? item.name : undefined}
@@ -236,7 +236,7 @@ export default function Sidebar({
                       collapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
                       location.pathname.startsWith("/admin")
                         ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                        : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
                     )}
                     onClick={onClose}
                     title={collapsed ? t("labels.adminPanel") : undefined}
@@ -266,7 +266,7 @@ export default function Sidebar({
                         collapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
                         isMenuItemActive(item)
                           ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                          : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
                       )}
                       onClick={onClose}
                       title={collapsed ? item.name : undefined}
@@ -283,7 +283,7 @@ export default function Sidebar({
           </div>
 
           {/* Footer */}
-          <div className="border-t border-border p-4 space-y-2">
+          <div className="border-t border-sidebar-border p-4 space-y-2">
             {/* AI Token Budget Pill — self-gates on auth: shows a free-tier
                 teaser linking to /pricing for signed-out visitors so the
                 marketing surface is always reachable from the sidebar. */}
@@ -364,7 +364,7 @@ export default function Sidebar({
                     collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
                     isMenuItemActive({ href: "/wishlist", exactMatch: false })
                       ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                      : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
                   )}
                   onClick={onClose}
                   title={collapsed ? t("labels.wishlist", { defaultValue: "Wishlist" }) : undefined}
@@ -381,7 +381,7 @@ export default function Sidebar({
                     collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
                     isMenuItemActive({ href: "/settings", exactMatch: false })
                       ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                      : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
                   )}
                   onClick={onClose}
                   title={collapsed ? t("labels.accountSettings") : undefined}
@@ -412,7 +412,7 @@ export default function Sidebar({
                     collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
                     isMenuItemActive({ href: "/settings", exactMatch: false })
                       ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                      : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
                   )}
                   onClick={onClose}
                   title={collapsed ? t("labels.accountSettings") : undefined}
@@ -427,7 +427,7 @@ export default function Sidebar({
                     collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
                     isMenuItemActive({ href: "/help", exactMatch: false })
                       ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                      : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
                   )}
                   onClick={onClose}
                   title={collapsed ? t("labels.helpSupport") : undefined}

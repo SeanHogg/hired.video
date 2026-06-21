@@ -11,7 +11,7 @@ import { AppShell } from "@/components/AppShell";
 import { usePageChrome } from "@/lib/seo";
 import { Button } from "@/components/ui/button";
 import FeedPostCard from "@/components/feed/FeedPostCard";
-import { getFeedPost } from "@/lib/services/feed-service";
+import { getFeedPost, applyReactionToPost } from "@/lib/services/feed-service";
 import type { FeedPost } from "@/types/feed";
 
 export default function PostDetail() {
@@ -63,7 +63,10 @@ export default function PostDetail() {
         ) : (
           <FeedPostCard
             post={post}
-            onLike={() => void load()}
+            linkToDetail={false}
+            onReact={(_id, reactionType) =>
+              setPost((p) => (p ? applyReactionToPost(p, reactionType) : p))
+            }
             onComment={() => undefined}
             onDelete={() => navigate("/")}
             onHide={() => navigate("/")}

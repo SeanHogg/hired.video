@@ -64,6 +64,9 @@ export const UserProfileSchema = z.object({
   // Creator program enrollment — drives the per-program tab strip on the
   // public profile. SSoT is `creator_profiles.*_active`.
   isCreator: nullableBoolean(),
+  // Bookings-host enrollment (#1902). Lets <BookingsSection/> skip its
+  // public-host fetch entirely for non-hosts instead of eating a 404.
+  bookingsActive: nullableBoolean(),
   creatorPrograms: z
     .object({
       video: z.boolean(),
@@ -193,6 +196,9 @@ export const PublicUserSchema = z.object({
   isVerified: nullableBoolean(),
   profileViews: nullableNumber(),
   isCreator: nullableBoolean(),
+  // Bookings-host enrollment (#1902) — declared so Zod doesn't strip it,
+  // which would force <BookingsSection/> back to its guaranteed-404 probe.
+  bookingsActive: nullableBoolean(),
   creatorPrograms: z
     .object({
       video: z.boolean(),
@@ -366,6 +372,7 @@ export class UserService {
       // just "Profile" even for fully-enrolled creators because the
       // PeopleDetail filter reads `profile.creatorPrograms?.[p]`.
       isCreator: payload.isCreator ?? undefined,
+      bookingsActive: payload.bookingsActive ?? undefined,
       creatorPrograms: payload.creatorPrograms ?? undefined,
       creatorProfile: payload.creatorProfile ?? undefined,
       profileSections: payload.profileSections ?? undefined,

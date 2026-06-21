@@ -9,6 +9,14 @@ import { cacheMiddleware } from "../utils/cache-headers.js";
 import { etagMiddleware } from "../utils/etag.js";
 import { FEED_POST_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import { recordArtifactView, ipCountryFromCtx } from "../services/analytics/artifactView.js";
+import {
+  FEED_REACTIONS,
+  normalizeReaction,
+  reactionDef,
+  summarizeReactions,
+  type ReactionCount,
+} from "../../../shared/feed-reactions.js";
+import { getOrSetCached } from "../utils/edge-cache.js";
 
 // ─── Privacy / visibility helpers ────────────────────────────────────────────
 // Feed post privacy mirrors resume privacy (KISS): Public | Recruiter | Connections | Private.
@@ -71,7 +79,7 @@ function feedVisibilityCondition(currentUserId: string, isRecruiter: boolean) {
   return sql`${privacyClause} AND ${excludeCommunity}`;
 }
 
-const { feedPosts, feedPostLikes, feedPostComments, feedPostReports, users, userProfiles } = schema;
+const { feedPosts, feedPostLikes, feedPostComments, feedPostReports, feedCommentReactions, users, userProfiles } = schema;
 
 // ─── Tag helpers ─────────────────────────────────────────────────────────────
 
@@ -133,6 +141,68 @@ async function createMentionNotifications(
   );
 }
 
+/** Notify a post's author that someone reacted (fire-and-forget). Skips
+ *  self-reactions. `feed_reaction` has no preference category, so it goes
+ *  out as an in-app notification under the channel-level gate. */
+async function notifyPostReaction(
+  postId: string,
+  reactorId: string,
+  reactionType: string,
+  db: ReturnType<typeof getDb>,
+) {
+  const [post] = await db
+    .select({ userId: feedPosts.userId })
+    .from(feedPosts)
+    .where(eq(feedPosts.id, postId))
+    .limit(1);
+  if (!post || post.userId === reactorId) return;
+
+  const repos = buildRepos(db);
+  const { actor, actorName } = await resolveActor({ repos }, reactorId);
+  const def = reactionDef(reactionType);
+  await emitNotification(
+    { repos },
+    {
+      recipientIds: [post.userId],
+      type: "feed_reaction",
+      actor,
+      title: `${actorName} reacted to your post`,
+      message: `${actorName} reacted ${def.emoji} ${def.label} to your post`,
+      target: { id: postId, type: "feed_post" },
+    },
+  );
+}
+
+/** Notify a comment's author that someone reacted to their comment. */
+async function notifyCommentReaction(
+  commentId: string,
+  reactorId: string,
+  reactionType: string,
+  db: ReturnType<typeof getDb>,
+) {
+  const [comment] = await db
+    .select({ userId: feedPostComments.userId, feedPostId: feedPostComments.feedPostId })
+    .from(feedPostComments)
+    .where(eq(feedPostComments.id, commentId))
+    .limit(1);
+  if (!comment || comment.userId === reactorId) return;
+
+  const repos = buildRepos(db);
+  const { actor, actorName } = await resolveActor({ repos }, reactorId);
+  const def = reactionDef(reactionType);
+  await emitNotification(
+    { repos },
+    {
+      recipientIds: [comment.userId],
+      type: "feed_reaction",
+      actor,
+      title: `${actorName} reacted to your comment`,
+      message: `${actorName} reacted ${def.emoji} ${def.label} to your comment`,
+      target: { id: comment.feedPostId, type: "feed_post" },
+    },
+  );
+}
+
 export const feedRoutes = new Hono<AppEnv>();
 
 // Feed reads are visibility-filtered per-user (privacy + recruiter role +
@@ -150,7 +220,12 @@ feedRoutes.use("/*", etagMiddleware());
 interface PostDtoSupport {
   authorName: string;
   authorAvatar: string | null;
-  likes: Array<{ id: string; userId: string }>;
+  likes: Array<{ id: string; userId: string; reactionType: string }>;
+  // Professional reaction rollup (count-per-type, display-sorted) + the
+  // current viewer's own reaction, so the picker can render its selected
+  // state without a second round-trip.
+  reactions: ReactionCount[];
+  currentUserReaction: string | null;
   commentCount: number;
   repostCount: number;
 }
@@ -163,7 +238,7 @@ function toPostDto(
   // return-type cycle; it's the same DTO shape with repostOf already null.
   repostOf: Record<string, unknown> | null,
 ) {
-  const { authorName, authorAvatar, likes, commentCount, repostCount } = support;
+  const { authorName, authorAvatar, likes, reactions, currentUserReaction, commentCount, repostCount } = support;
   return {
     id: post.id,
     userId: post.userId,
@@ -180,12 +255,16 @@ function toPostDto(
     updatedAt: new Date(post.updatedAt).toISOString(),
     media: post.media ?? [],
     tags: post.tags ?? [],
-    likes: likes.map((l) => ({ id: l.id, feedPostId: post.id, userId: l.userId, userName: "" })),
+    likes: likes.map((l) => ({ id: l.id, feedPostId: post.id, userId: l.userId, userName: "", reactionType: l.reactionType })),
     comments: [],
+    // `likeCount` stays the total reaction count (back-compat); `reactions`
+    // is the per-type breakdown and `currentUserReaction` the viewer's pick.
     likeCount: likes.length,
+    reactions,
+    currentUserReaction,
     commentCount,
     repostCount,
-    isLikedByCurrentUser: likes.some((l) => l.userId === currentUserId),
+    isLikedByCurrentUser: currentUserReaction != null,
     // Polymorphic surfacing — when set, the renderer mounts the
     // canonical card for `subjectType` (e.g. <ReviewCard>) instead
     // of the default text/link card. `embedPayload` carries the
@@ -207,6 +286,7 @@ function toPostDto(
 async function loadSupport(
   rows: Array<typeof feedPosts.$inferSelect>,
   db: ReturnType<typeof getDb>,
+  currentUserId: string,
 ): Promise<Map<string, PostDtoSupport>> {
   const out = new Map<string, PostDtoSupport>();
   if (rows.length === 0) return out;
@@ -220,7 +300,12 @@ async function loadSupport(
       .from(userProfiles)
       .where(inArray(userProfiles.userId, authorIds)),
     db
-      .select({ id: feedPostLikes.id, feedPostId: feedPostLikes.feedPostId, userId: feedPostLikes.userId })
+      .select({
+        id: feedPostLikes.id,
+        feedPostId: feedPostLikes.feedPostId,
+        userId: feedPostLikes.userId,
+        reactionType: feedPostLikes.reactionType,
+      })
       .from(feedPostLikes)
       .where(inArray(feedPostLikes.feedPostId, postIds)),
     db
@@ -237,10 +322,14 @@ async function loadSupport(
 
   const authorMap = new Map(authorRows.map((a) => [a.id, a.name]));
   const avatarMap = new Map(profileRows.map((p) => [p.userId, p.avatarUrl ?? null]));
-  const likesByPost = new Map<string, Array<{ id: string; userId: string }>>();
+  const likesByPost = new Map<string, Array<{ id: string; userId: string; reactionType: string }>>();
   for (const like of likeRows) {
     if (!likesByPost.has(like.feedPostId)) likesByPost.set(like.feedPostId, []);
-    likesByPost.get(like.feedPostId)!.push({ id: like.id, userId: like.userId });
+    likesByPost.get(like.feedPostId)!.push({
+      id: like.id,
+      userId: like.userId,
+      reactionType: normalizeReaction(like.reactionType),
+    });
   }
   const commentCountMap = new Map(commentCounts.map((c) => [c.feedPostId, c.count]));
   const repostCountMap = new Map(
@@ -248,10 +337,14 @@ async function loadSupport(
   );
 
   for (const post of rows) {
+    const likes = likesByPost.get(post.id) ?? [];
     out.set(post.id, {
       authorName: authorMap.get(post.userId) ?? "Unknown",
       authorAvatar: avatarMap.get(post.userId) ?? null,
-      likes: likesByPost.get(post.id) ?? [],
+      likes,
+      reactions: summarizeReactions(likes),
+      currentUserReaction:
+        likes.find((l) => l.userId === currentUserId)?.reactionType ?? null,
       commentCount: commentCountMap.get(post.id) ?? 0,
       repostCount: repostCountMap.get(post.id) ?? 0,
     });
@@ -285,7 +378,7 @@ async function fetchPostDtos(
       ? await db.select().from(feedPosts).where(inArray(feedPosts.id, originalIds))
       : [];
 
-  const support = await loadSupport([...postRows, ...originalRows], db);
+  const support = await loadSupport([...postRows, ...originalRows], db, currentUserId);
 
   const originalDtoById = new Map<string, Record<string, unknown>>();
   for (const row of [...postRows, ...originalRows]) {
@@ -527,26 +620,42 @@ feedRoutes.delete("/posts/:postId", async (c) => {
   return c.json(success(true), 200);
 });
 
-/** POST /api/feed/posts/:postId/like */
-feedRoutes.post("/posts/:postId/like", async (c) => {
+/** POST /api/feed/posts/:postId/react — add or change a professional
+ *  reaction (like / celebrate / support / insightful / curious / funny).
+ *  Idempotent per (post, user): a second react UPDATEs the reaction_type. */
+feedRoutes.post("/posts/:postId/react", async (c) => {
   const postId = c.req.param("postId");
   const userId = c.var.user.sub;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const reactionType = normalizeReaction(body.reactionType);
   const db = getDb();
 
-  const [existing] = await db
-    .select({ id: feedPostLikes.id })
+  // Was the viewer already reacting? Drives the new-reaction notification
+  // (we only notify the author on a NEW reaction, not on a switch).
+  const [prior] = await db
+    .select({ id: feedPostLikes.id, postUserId: feedPosts.userId })
     .from(feedPostLikes)
     .where(and(eq(feedPostLikes.feedPostId, postId), eq(feedPostLikes.userId, userId)))
     .limit(1);
 
-  if (existing) return c.json(success({ id: existing.id, feedPostId: postId, userId }), 200);
+  const [reaction] = await db
+    .insert(feedPostLikes)
+    .values({ feedPostId: postId, userId, reactionType })
+    .onConflictDoUpdate({
+      target: [feedPostLikes.feedPostId, feedPostLikes.userId],
+      set: { reactionType },
+    })
+    .returning();
 
-  const [like] = await db.insert(feedPostLikes).values({ feedPostId: postId, userId }).returning();
-  return c.json(success({ id: like.id, feedPostId: postId, userId }), 200);
+  if (!prior) {
+    c.executionCtx?.waitUntil(notifyPostReaction(postId, userId, reactionType, db));
+  }
+
+  return c.json(success({ id: reaction.id, feedPostId: postId, userId, reactionType }), 200);
 });
 
-/** DELETE /api/feed/posts/:postId/like */
-feedRoutes.delete("/posts/:postId/like", async (c) => {
+/** DELETE /api/feed/posts/:postId/react — remove the viewer's reaction. */
+feedRoutes.delete("/posts/:postId/react", async (c) => {
   const postId = c.req.param("postId");
   const userId = c.var.user.sub;
   const db = getDb();
@@ -558,9 +667,64 @@ feedRoutes.delete("/posts/:postId/like", async (c) => {
   return c.json(success(true), 200);
 });
 
+/** Batch-load author name/avatar + reaction rollups for a set of comment
+ *  rows (no N+1) and shape them into the comment DTO. Shared by the thread
+ *  GET and the single-comment create/react responses. */
+async function buildCommentDtos(
+  rows: Array<typeof feedPostComments.$inferSelect>,
+  currentUserId: string,
+  db: ReturnType<typeof getDb>,
+) {
+  if (rows.length === 0) return [];
+  const commentIds = rows.map((r) => r.id);
+  const authorIds = [...new Set(rows.map((r) => r.userId))];
+
+  const [authorRows, profileRows, reactionRows] = await Promise.all([
+    db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, authorIds)),
+    db
+      .select({ userId: userProfiles.userId, avatarUrl: userProfiles.avatarUrl })
+      .from(userProfiles)
+      .where(inArray(userProfiles.userId, authorIds)),
+    db
+      .select({
+        commentId: feedCommentReactions.commentId,
+        userId: feedCommentReactions.userId,
+        reactionType: feedCommentReactions.reactionType,
+      })
+      .from(feedCommentReactions)
+      .where(inArray(feedCommentReactions.commentId, commentIds)),
+  ]);
+
+  const nameMap = new Map(authorRows.map((a) => [a.id, a.name]));
+  const avatarMap = new Map(profileRows.map((p) => [p.userId, p.avatarUrl ?? undefined]));
+  const reactionsByComment = new Map<string, Array<{ userId: string; reactionType: string }>>();
+  for (const r of reactionRows) {
+    if (!reactionsByComment.has(r.commentId)) reactionsByComment.set(r.commentId, []);
+    reactionsByComment.get(r.commentId)!.push({ userId: r.userId, reactionType: normalizeReaction(r.reactionType) });
+  }
+
+  return rows.map((r) => {
+    const rx = reactionsByComment.get(r.id) ?? [];
+    return {
+      id: r.id,
+      feedPostId: r.feedPostId,
+      userId: r.userId,
+      userName: nameMap.get(r.userId) ?? "Unknown",
+      userAvatar: avatarMap.get(r.userId),
+      content: r.content,
+      reactions: summarizeReactions(rx),
+      reactionCount: rx.length,
+      currentUserReaction: rx.find((x) => x.userId === currentUserId)?.reactionType ?? null,
+      createdAt: new Date(r.createdAt).toISOString(),
+      updatedAt: new Date(r.updatedAt).toISOString(),
+    };
+  });
+}
+
 /** GET /api/feed/posts/:postId/comments */
 feedRoutes.get("/posts/:postId/comments", async (c) => {
   const postId = c.req.param("postId");
+  const currentUserId = c.var.user?.sub ?? "";
   const db = getDb();
 
   const rows = await db
@@ -569,20 +733,7 @@ feedRoutes.get("/posts/:postId/comments", async (c) => {
     .where(eq(feedPostComments.feedPostId, postId))
     .orderBy(desc(feedPostComments.createdAt));
 
-  return c.json(
-    success(
-      rows.map((r) => ({
-        id: r.id,
-        feedPostId: r.feedPostId,
-        userId: r.userId,
-        userName: "",
-        content: r.content,
-        createdAt: new Date(r.createdAt).toISOString(),
-        updatedAt: new Date(r.updatedAt).toISOString(),
-      })),
-    ),
-    200,
-  );
+  return c.json(success(await buildCommentDtos(rows, currentUserId, db)), 200);
 });
 
 /** POST /api/feed/comments */
@@ -598,18 +749,8 @@ feedRoutes.post("/comments", async (c) => {
     .values({ feedPostId: postId, userId, content })
     .returning();
 
-  return c.json(
-    success({
-      id: comment.id,
-      feedPostId: comment.feedPostId,
-      userId: comment.userId,
-      userName: "",
-      content: comment.content,
-      createdAt: new Date(comment.createdAt).toISOString(),
-      updatedAt: new Date(comment.updatedAt).toISOString(),
-    }),
-    201,
-  );
+  const [dto] = await buildCommentDtos([comment], userId, db);
+  return c.json(success(dto), 201);
 });
 
 /** PUT /api/feed/comments/:commentId */
@@ -636,18 +777,52 @@ feedRoutes.put("/comments/:commentId", async (c) => {
     .where(eq(feedPostComments.id, commentId))
     .returning();
 
-  return c.json(
-    success({
-      id: updated.id,
-      feedPostId: updated.feedPostId,
-      userId: updated.userId,
-      userName: "",
-      content: updated.content,
-      createdAt: new Date(updated.createdAt).toISOString(),
-      updatedAt: new Date(updated.updatedAt).toISOString(),
-    }),
-    200,
-  );
+  const [dto] = await buildCommentDtos([updated], userId, db);
+  return c.json(success(dto), 200);
+});
+
+/** POST /api/feed/comments/:commentId/react — add/change a reaction to a
+ *  comment (same professional set as posts). Idempotent per (comment, user). */
+feedRoutes.post("/comments/:commentId/react", async (c) => {
+  const commentId = c.req.param("commentId");
+  const userId = c.var.user.sub;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const reactionType = normalizeReaction(body.reactionType);
+  const db = getDb();
+
+  const [prior] = await db
+    .select({ id: feedCommentReactions.id })
+    .from(feedCommentReactions)
+    .where(and(eq(feedCommentReactions.commentId, commentId), eq(feedCommentReactions.userId, userId)))
+    .limit(1);
+
+  const [reaction] = await db
+    .insert(feedCommentReactions)
+    .values({ commentId, userId, reactionType })
+    .onConflictDoUpdate({
+      target: [feedCommentReactions.commentId, feedCommentReactions.userId],
+      set: { reactionType },
+    })
+    .returning();
+
+  if (!prior) {
+    c.executionCtx?.waitUntil(notifyCommentReaction(commentId, userId, reactionType, db));
+  }
+
+  return c.json(success({ id: reaction.id, commentId, userId, reactionType }), 200);
+});
+
+/** DELETE /api/feed/comments/:commentId/react — remove the viewer's reaction. */
+feedRoutes.delete("/comments/:commentId/react", async (c) => {
+  const commentId = c.req.param("commentId");
+  const userId = c.var.user.sub;
+  const db = getDb();
+
+  await db
+    .delete(feedCommentReactions)
+    .where(and(eq(feedCommentReactions.commentId, commentId), eq(feedCommentReactions.userId, userId)));
+
+  return c.json(success(true), 200);
 });
 
 /** DELETE /api/feed/comments/:commentId */
@@ -713,6 +888,86 @@ feedRoutes.get("/trending-tags", async (c) => {
   `);
 
   return c.json(success(rows.rows as Array<{ tag: string; post_count: number }>), 200);
+});
+
+/** GET /api/feed/trending-posts — public posts ranked by recent engagement
+ *  (weighted reactions + reposts + comments) over the last 21 days. Powers
+ *  the "Trending" sidebar; clicking a row deep-links to /feed/:id.
+ *
+ *  Anonymous-visible (Public posts only, community excluded), so it is
+ *  served through the shared read-through cache with a short TTL — ranking
+ *  is slow-changing and a per-reaction invalidation would be far heavier
+ *  than a 5-minute refresh window. */
+feedRoutes.get("/trending-posts", async (c) => {
+  const limit = Math.min(20, Math.max(1, Number(c.req.query("limit") ?? "5") || 5));
+  const db = getDb();
+
+  // Reaction weights live in the shared SSoT — build the CASE from there so
+  // the ranking can't drift from the picker. Values are code constants
+  // (no user input), so raw interpolation is safe.
+  const reactionWeightCase = FEED_REACTIONS.map(
+    (r) => `WHEN '${r.type}' THEN ${r.weight}`,
+  ).join(" ");
+
+  const trending = await getOrSetCached<Array<Record<string, unknown>>>({
+    key: `feed:trending-posts:${limit}`,
+    ttlSeconds: 300,
+    loader: async () => {
+      const rows = await db.execute(sql`
+        WITH reaction_stats AS (
+          SELECT feed_post_id,
+                 COUNT(*)::int AS reaction_count,
+                 COALESCE(SUM(CASE reaction_type ${sql.raw(reactionWeightCase)} ELSE 1 END), 0) AS reaction_score
+          FROM feed_post_likes
+          GROUP BY feed_post_id
+        ),
+        comment_stats AS (
+          SELECT feed_post_id, COUNT(*)::int AS comment_count
+          FROM feed_post_comments
+          GROUP BY feed_post_id
+        ),
+        repost_stats AS (
+          SELECT repost_of_id, COUNT(*)::int AS repost_count
+          FROM feed_posts
+          WHERE repost_of_id IS NOT NULL
+          GROUP BY repost_of_id
+        )
+        SELECT
+          p.id,
+          p.user_id        AS "userId",
+          u.name           AS "userName",
+          up.avatar_url    AS "userAvatar",
+          left(p.content, 140) AS "excerpt",
+          p.kind,
+          p.created_at     AS "createdAt",
+          COALESCE(rs.reaction_count, 0) AS "reactionCount",
+          COALESCE(cs.comment_count, 0)  AS "commentCount",
+          COALESCE(ps.repost_count, 0)   AS "repostCount",
+          (COALESCE(rs.reaction_score, 0)
+            + 2 * COALESCE(ps.repost_count, 0)
+            + 1.5 * COALESCE(cs.comment_count, 0)) AS "score"
+        FROM feed_posts p
+        JOIN users u ON u.id = p.user_id
+        LEFT JOIN user_profiles up ON up.user_id = p.user_id
+        LEFT JOIN reaction_stats rs ON rs.feed_post_id = p.id
+        LEFT JOIN comment_stats  cs ON cs.feed_post_id = p.id
+        LEFT JOIN repost_stats   ps ON ps.repost_of_id = p.id
+        WHERE p.privacy = 'Public'
+          AND p.repost_of_id IS NULL
+          AND p.created_at > now() - interval '21 days'
+          AND NOT (p.tags::text LIKE '%"company:%')
+        ORDER BY "score" DESC, p.created_at DESC
+        LIMIT ${limit}
+      `);
+      // Keep only posts with any engagement — a brand-new feed shouldn't
+      // surface a "Trending" box full of zero-engagement posts.
+      return (rows.rows as Array<Record<string, unknown>>).filter(
+        (r) => Number(r.score) > 0,
+      );
+    },
+  });
+
+  return c.json(success(trending), 200);
 });
 
 /** POST /api/feed/posts/:postId/report */

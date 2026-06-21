@@ -363,11 +363,7 @@ export function ToolsBrowser({
           <ToolsTable items={wovenItems} />
         ) : viewMode === "scroll" ? (
           <HorizontalScroller itemCount={wovenItems.length}>
-            {wovenItems.map((item) => (
-              <div key={item.key} className="w-72 shrink-0 snap-start">
-                {renderWovenCard(item)}
-              </div>
-            ))}
+            {wovenItems.map((item) => renderWovenCard(item))}
           </HorizontalScroller>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">

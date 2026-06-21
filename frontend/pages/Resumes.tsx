@@ -26,7 +26,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { Fragment, useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
@@ -1323,12 +1323,9 @@ export default function Resumes() {
               ) : viewMode === "scroll" ? (
                 <HorizontalScroller itemCount={paginatedOwnedResumes.length}>
                   {paginatedOwnedResumes.map((resume) => (
-                    <div
-                      key={resume.id}
-                      className="w-72 shrink-0 snap-start"
-                    >
+                    <Fragment key={resume.id}>
                       {renderResumeCard(resume)}
-                    </div>
+                    </Fragment>
                   ))}
                 </HorizontalScroller>
               ) : (

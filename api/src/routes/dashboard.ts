@@ -451,7 +451,6 @@ dashboardRoutes.get("/admin", async (c) => {
   return c.json(success(base), 200);
 });
 
-dashboardRoutes.post("/profile-view", (c) => c.json(success({ success: true }), 200));
 dashboardRoutes.post("/activity", (c) => c.json(success({ success: true }), 200));
 dashboardRoutes.post("/engagement", (c) => c.json(success({ success: true }), 200));
 dashboardRoutes.post("/refresh", (c) => c.json(success({ success: true }), 200));

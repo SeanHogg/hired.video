@@ -28,7 +28,7 @@ import {
   Plus,
   FileText,
 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { Fragment, useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -922,12 +922,9 @@ export default function People() {
                       ) : viewMode === "scroll" ? (
                         <HorizontalScroller itemCount={tracked.length}>
                           {tracked.map((person: UserWithOwnership) => (
-                            <div
-                              key={person.id}
-                              className="w-72 shrink-0 snap-start"
-                            >
+                            <Fragment key={person.id}>
                               {renderConnectionCard(person)}
-                            </div>
+                            </Fragment>
                           ))}
                         </HorizontalScroller>
                       ) : (

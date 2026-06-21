@@ -1,5 +1,5 @@
 import { ArrowLeft, Building2, Loader2, User as UserIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -59,7 +59,6 @@ import { useStartConversation } from "@/hooks/use-start-conversation";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 import { createRolePermissions, formatRoleForDisplay, getRoleDisplayLabel, roleUtils } from "@/lib/role-utils";
-import { dashboardService } from "@/lib/services/dashboard-service";
 import { resumeEditorPath } from "@/lib/studio/resume-editor-link";
 import {
   recruiterService,
@@ -221,14 +220,11 @@ function PeopleDetailContent() {
 
   useUgcSeo("person", personSeoRecord);
 
-  // Track profile view — only authenticated visitors viewing someone else's
-  // profile. Self-views would pollute the analytics.
-  useEffect(() => {
-    if (!profile?.id || !isAuthenticated || isOwner) return;
-    dashboardService
-      .recordProfileView({ profileUserId: profile.id, viewType: "profile" })
-      .catch((err) => console.warn("Profile view tracking failed:", err));
-  }, [profile?.id, isAuthenticated, isOwner]);
+  // Profile-view tracking is owned entirely by `useArtifactViewTracking`
+  // above (kind="profile"), which records into the unified artifact_views
+  // table with geo / referrer / engagement and self-skips the owner. The
+  // old per-mount recordProfileView() call hit a no-op stub and has been
+  // removed.
 
   // ---------------------------------------------------------------------
   // Visitor handlers — connection state machine
@@ -752,7 +748,10 @@ function PeopleDetailContent() {
 
               {/* Self-gating: renders a "Book a 1:1 session" card only when the
                   viewed user has bookings enabled + active offerings (#1902). */}
-              <BookingsSection handle={profile.externalPublicHandle} />
+              <BookingsSection
+                handle={profile.externalPublicHandle}
+                bookingsActive={profile.bookingsActive}
+              />
             </div>
           </div>
         </div>,

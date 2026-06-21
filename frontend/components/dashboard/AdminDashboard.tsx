@@ -18,6 +18,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MetricGrid } from "./shared/MetricCard";
+import { GaugeCard } from "./gauge/GaugeCard";
+import { buildPlatformGauge } from "@/lib/dashboard/gauge";
 
 import type { BaseDashboard } from "@/lib/services/dashboard-service";
 
@@ -93,8 +95,29 @@ export function AdminDashboard({
     );
   }
 
+  const { platformStats, revenueStats, systemHealth } = dashboardData;
+  const paidConversion =
+    revenueStats && revenueStats.paidAccounts + revenueStats.freeAccounts > 0
+      ? (revenueStats.paidAccounts / (revenueStats.paidAccounts + revenueStats.freeAccounts)) * 100
+      : undefined;
+
   return (
     <div className="space-y-6">
+      {/* Platform-health speedometer — the owner's at-a-glance score. */}
+      <GaugeCard
+        className="lg:max-w-md"
+        model={buildPlatformGauge(
+          {
+            totalUsers: platformStats?.totalUsers,
+            activeUsers: platformStats?.activeUsers,
+            churnRate: revenueStats?.churnRate,
+            conversionRate: paidConversion,
+            uptimePercentage: systemHealth?.uptimePercentage,
+          },
+          t,
+        )}
+      />
+
       {/* Metrics Grid */}
       <MetricGrid
         metrics={dashboardData.metrics || []}
