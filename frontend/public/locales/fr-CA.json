@@ -7305,6 +7305,7 @@
   "studio.editor.missingProjectTitle": "Projet introuvable",
   "studio.editor.missingProjectDesc": "Ce projet n'existe pas ou vous n'y avez pas accès. Vous pouvez en démarrer un nouveau ici.",
   "studio.editor.panelTools": "Outils",
+  "studio.document.sectionInUse": "Utilisé",
   "studio.editor.panelLevels": "Niveaux",
   "studio.editor.sectionPieces": "Pièces",
   "studio.editor.sectionSpritesAssets": "Sprites et ressources",

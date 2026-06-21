@@ -170,6 +170,7 @@ import {
   applyDocumentTemplate,
   resumeTemplateOption,
 } from "@/lib/studio/editor-v2/document-templates";
+import type { ResumeTemplateDescriptor } from "@/types/resume-template";
 import { resumeService } from "@/lib/services/resume-service";
 import { jobService } from "@/lib/services/job-service";
 import {
@@ -3006,6 +3007,11 @@ export default function StudioEditorV2() {
               meta: {
                 ...((documentEntityContent.meta ?? {}) as Record<string, unknown>),
                 documentLayout: documentState,
+                // Keep the resume's default-view template (`content.meta.template`,
+                // what /resumes/:id reads) aligned with the design the user applied
+                // on the canvas, so the preview switcher's "set as default" + every
+                // save agree on one template across both surfaces.
+                ...(documentState.templateId ? { template: documentState.templateId } : {}),
               },
             } as unknown as ResumeData;
             if (documentState.entityId) {
@@ -3117,6 +3123,35 @@ export default function StudioEditorV2() {
       setSaving(false);
     }
   }
+
+  // ── Resume template switching from the preview overlay (#1912 follow-up) ──
+  // The preview reuses the SAME `ResumeTemplateSwitcher` the /resumes/:id viewer
+  // uses. Applying re-skins the live `DocumentState` via the canonical
+  // `applyDocumentTemplate` seam (same one the left-panel picker uses), so the
+  // preview, canvas, and PDF stay in lockstep; "set as default" saves so
+  // `content.meta.template` persists (stamped in `handleSave` above).
+  const applyResumeTemplate = (preset: ResumeTemplateDescriptor) => {
+    const option = resumeTemplateOption(preset.id);
+    if (!option) return;
+    setDocumentState((prev) => applyDocumentTemplate(prev, option, () => crypto.randomUUID()));
+    documentCommit();
+  };
+  const setDefaultResumeTemplate = () => {
+    // handleSave stamps `content.meta.template` from the applied template + shows
+    // its own save toast; only confirm the default once it actually persisted.
+    void handleSave().then((saved) => {
+      if (!saved) return;
+      toast({
+        title: t("messages.resumeDetail.templateAssignedTitle"),
+        description: t("messages.resumeDetail.templateDefaultSet", {
+          name:
+            resumeTemplateOption(documentState.templateId)?.name ??
+            documentState.templateId ??
+            "",
+        }),
+      });
+    });
+  };
 
   if (authLoading) {
     return <StudioLoadingShell />;
@@ -4346,6 +4381,18 @@ export default function StudioEditorV2() {
           content={documentEntityContent}
           title={title}
           onClose={() => setDocPreviewOpen(false)}
+          templateSwitch={
+            documentState.entityKind === "resume"
+              ? {
+                  currentTemplateId: documentState.templateId ?? "",
+                  assignedDefaultId:
+                    ((documentEntityContent?.meta ?? {}) as Record<string, unknown>)
+                      .template as string | undefined ?? null,
+                  onSelect: applyResumeTemplate,
+                  onSetDefault: setDefaultResumeTemplate,
+                }
+              : undefined
+          }
         />
       )}
       {/* 3D-world Invite dialog — modal mounted at the editor root so

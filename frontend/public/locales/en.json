@@ -7528,6 +7528,7 @@
   "studio.editor.missingProjectTitle": "Project not found",
   "studio.editor.missingProjectDesc": "This project doesn't exist or you don't have access to it. You can start a new one here.",
   "studio.editor.panelTools": "Tools",
+  "studio.document.sectionInUse": "In use",
   "studio.editor.panelLevels": "Levels",
   "studio.editor.sectionPieces": "Pieces",
   "studio.editor.sectionSpritesAssets": "Sprites & assets",

@@ -212,7 +212,10 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     focusFeatures: [FEATURES.studio, FEATURES.resumeBuilder, FEATURES.learningPaths, FEATURES.gamification, FEATURES.jobBoard],
     focusContentKinds: ["template", "video", "article", "learning_path", "job"],
     jobFilter: { experienceLevel: "entry" },
-    ctaPrimary: { label: "Build my first video resume", href: "/studio?audience=recent-graduates" },
+    // Studio deep-links use `?contentTemplate=` — the param StudioLayout's
+    // bootstrap + the anon editor (#2212) actually read. `?audience=<slug>`
+    // was a silent no-op (the studio has no life-stage audience filter).
+    ctaPrimary: { label: "Build my first video resume", href: "/studio/new?contentTemplate=resume" },
     ctaSecondary: { label: "Entry-level jobs", href: "/jobs?experienceLevel=entry" },
   },
   {
@@ -225,7 +228,7 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     focusContentKinds: ["template", "learning_path", "article", "video", "job"],
     jobFilter: { employmentType: "internship" },
     ctaPrimary: { label: "Find an internship", href: "/jobs?employmentType=internship" },
-    ctaSecondary: { label: "Build a project reel", href: "/studio?audience=students" },
+    ctaSecondary: { label: "Build a project reel", href: "/studio/new?contentTemplate=skills-demo" },
   },
   {
     key: "unemployed",
@@ -293,7 +296,7 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     focusContentKinds: ["template", "video", "article", "job", "learning_path"],
     jobFilter: { employmentType: "contract" },
     ctaPrimary: { label: "Browse the gig marketplace", href: "/services/gigs" },
-    ctaSecondary: { label: "Build a portfolio reel", href: "/studio?audience=gig-economy" },
+    ctaSecondary: { label: "Build a portfolio reel", href: "/studio/new?contentTemplate=design-portfolio" },
   },
   {
     key: "international_job_seekers",
@@ -327,7 +330,7 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     focusFeatures: [FEATURES.confidentialSearch, FEATURES.retainedSearch, FEATURES.compAnalyzer, FEATURES.studio, FEATURES.articles],
     focusContentKinds: ["article", "video", "template", "job", "learning_path"],
     jobFilter: { experienceLevel: "executive" },
-    ctaPrimary: { label: "Build my exec brand", href: "/studio?audience=senior-executives" },
+    ctaPrimary: { label: "Build my exec brand", href: "/studio/new?contentTemplate=personal-brand" },
     ctaSecondary: { label: "Executive roles", href: "/jobs?experienceLevel=executive" },
   },
 ];

@@ -6,7 +6,8 @@
  * Pure controller over `DocumentState` via the host's history-aware
  * `setState`/`commit`.
  */
-import { GripVertical, LayoutTemplate } from "lucide-react";
+import { Check, GripVertical, LayoutTemplate } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   type DocumentState,
@@ -40,9 +41,19 @@ interface DocumentLeftPanelProps {
 }
 
 export default function DocumentLeftPanel({ state, setState, commit }: DocumentLeftPanelProps) {
+  const { t } = useTranslation();
   const pageId = firstPageId(state);
   const presets = blockPresetsForEntity(state.entityKind);
   const canSetPageMode = documentSupportsPageMode(state.entityKind);
+  // Section keys already placed on the page — drives the "in use" indicator so
+  // the palette shows which sections the resume already contains. Free-content
+  // primitives (text/image/divider/spacer) carry no sectionKey and can repeat,
+  // so they're never marked.
+  const usedSectionKeys = new Set(
+    (state.pages[0]?.blocks ?? [])
+      .filter((b) => b.mode === "flow" && b.sectionKey)
+      .map((b) => b.sectionKey as string),
+  );
   const activeTemplate = state.templateId
     ? documentTemplatesForEntity(state.entityKind).find((o) => o.id === state.templateId)
     : undefined;
@@ -82,23 +93,37 @@ export default function DocumentLeftPanel({ state, setState, commit }: DocumentL
           Sections
         </h3>
         <div className="flex flex-col gap-1.5">
-          {presets.map((preset, i) => (
-            <button
-              key={preset.label}
-              type="button"
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData(DOCUMENT_BLOCK_DRAG_MIME, String(i));
-                e.dataTransfer.effectAllowed = "copy";
-              }}
-              onClick={() => commitState(addBlock(state, pageId, preset).state)}
-              className="flex cursor-grab items-center gap-2 rounded-md border border-border bg-card px-2.5 py-2 text-left text-sm transition hover:border-brand-purple hover:bg-accent active:cursor-grabbing"
-              title="Drag onto the page or click to add"
-            >
-              <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <span className="truncate">{preset.label}</span>
-            </button>
-          ))}
+          {presets.map((preset, i) => {
+            const inUse = preset.sectionKey
+              ? usedSectionKeys.has(preset.sectionKey)
+              : false;
+            return (
+              <button
+                key={preset.label}
+                type="button"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(DOCUMENT_BLOCK_DRAG_MIME, String(i));
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                onClick={() => commitState(addBlock(state, pageId, preset).state)}
+                className="flex cursor-grab items-center gap-2 rounded-md border border-border bg-card px-2.5 py-2 text-left text-sm transition hover:border-brand-purple hover:bg-accent active:cursor-grabbing"
+                title="Drag onto the page or click to add"
+              >
+                <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">{preset.label}</span>
+                {inUse && (
+                  <span
+                    className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-purple/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-purple"
+                    title={t("studio.document.sectionInUse")}
+                  >
+                    <Check className="h-3 w-3" />
+                    {t("studio.document.sectionInUse")}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </section>
 
