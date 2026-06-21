@@ -14,7 +14,7 @@
  * Run: node --import tsx --test src/middleware/__tests__/rateLimiter.test.ts
  */
 
-import { describe, it } from "node:test";
+import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import { Hono } from "hono";
 import { createIpRateLimiter, getClientIp } from "../rateLimiter.js";
@@ -96,16 +96,28 @@ describe("createIpRateLimiter", () => {
     assert.equal((await call(appB, { "CF-Connecting-IP": "7.7.7.7" })).status, 200);
   });
 
-  it("resets the bucket after the window elapses (verified via short window)", async () => {
-    const app = makeApp(createIpRateLimiter({
-      windowMs: 20,
-      maxAttempts: 1,
-      message: "x",
-    }));
-    assert.equal((await call(app, { "CF-Connecting-IP": "3.3.3.3" })).status, 200);
-    assert.equal((await call(app, { "CF-Connecting-IP": "3.3.3.3" })).status, 429);
-    await new Promise((r) => setTimeout(r, 30));
-    assert.equal((await call(app, { "CF-Connecting-IP": "3.3.3.3" })).status, 200, "post-window reset");
+  it("resets the bucket after the window elapses (verified via frozen clock)", async () => {
+    // Freeze Date so the window boundary is driven by an explicit tick, not by
+    // how long the awaited requests happen to take. With a real short window
+    // (the previous windowMs:20 + setTimeout(30) approach) a loaded CI runner
+    // could let real time cross the boundary BETWEEN the two pre-reset calls —
+    // resetting the bucket early and intermittently reding the build. The
+    // limiter reads Date.now(), so freezing Date makes the reset deterministic.
+    mock.timers.enable({ apis: ["Date"] });
+    try {
+      const app = makeApp(createIpRateLimiter({
+        windowMs: 1_000,
+        maxAttempts: 1,
+        message: "x",
+      }));
+      assert.equal((await call(app, { "CF-Connecting-IP": "3.3.3.3" })).status, 200);
+      assert.equal((await call(app, { "CF-Connecting-IP": "3.3.3.3" })).status, 429);
+      // Advance past the window to force a bucket reset.
+      mock.timers.tick(1_001);
+      assert.equal((await call(app, { "CF-Connecting-IP": "3.3.3.3" })).status, 200, "post-window reset");
+    } finally {
+      mock.timers.reset();
+    }
   });
 
   it("honours a custom keyOf so callers can bucket per-user", async () => {
