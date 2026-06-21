@@ -27,15 +27,15 @@
 // thumb visible for crawlers, while the click-to-play interaction is
 // what every comparable marketplace (Canva / Envato / VEED) ships.
 
-import { Play } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import CanvasStatePreview from "@/components/studio/v2/CanvasStatePreview";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
 import type { TemplateDef } from "@/components/studio/templates/catalog";
 import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
 import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
 import type { CanvasState } from "@/lib/studio/editor-v2/canvas-state";
-import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
+import { usePreviewPlayback, type PreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 import type { VideoScript } from "@/types/video-script";
 import type { TemplateMeta } from "@/lib/templates/types";
 
@@ -84,24 +84,23 @@ function CanvasPreviewPlayer({
   const playback = usePreviewPlayback(canvasState);
   const [started, setStarted] = useState(false);
 
-  // When playback ends, drop back to the static still so the surface settles
-  // in a recognisable state and the user can press Play again.
-  // usePreviewPlayback auto-pauses at duration; we observe the flip.
-  useEffect(() => {
-    if (started && !playback.isPlaying && playback.playhead >= playback.duration) {
-      setStarted(false);
-    }
-  }, [started, playback.isPlaying, playback.playhead, playback.duration]);
-
+  // The poster is shown only until the first play — once started we keep the
+  // canvas mounted (paused at the last frame when playback ends) and let the
+  // transport bar drive replay / scrub. This gives the marketplace preview a
+  // standard player (play/pause + progress + mute) instead of a press-play-
+  // then-static surface, and removes the old auto-snap-back-to-poster jump.
   const showPoster = !started && poster != null;
+  const atEnd = playback.playhead >= playback.duration && !playback.isPlaying;
 
   return (
-    <div className="relative h-full w-full bg-black">
+    <div className="group relative h-full w-full bg-black">
       {showPoster ? (
         poster
       ) : (
         <CanvasStatePreview state={canvasState} playback={playback} />
       )}
+
+      {/* Initial press-play overlay — only before the first play. */}
       {!started && (
         <PosterStartOverlay
           onPlay={() => {
@@ -112,8 +111,82 @@ function CanvasPreviewPlayer({
           label={`Play ${name} preview`}
         />
       )}
+
+      {/* Centered play/replay affordance whenever the canvas is mounted but
+          paused — the familiar big-button you click to resume. */}
+      {started && !playback.isPlaying && (
+        <PosterStartOverlay
+          onPlay={() => playback.play()}
+          label={atEnd ? `Replay ${name} preview` : `Play ${name} preview`}
+        />
+      )}
+
+      {/* Transport bar — appears once playback has started. */}
+      {started && (
+        <PlayerTransportBar playback={playback} />
+      )}
     </div>
   );
+}
+
+// ─── Transport bar ───────────────────────────────────────────────────────────
+
+// Standard player chrome for the canvas branch: play/pause, a seekable
+// progress bar, elapsed / total time, and a mute toggle — all driven by the
+// shared `usePreviewPlayback` hook (the SAME hook the editor preview uses),
+// so there's no bespoke playback state here. Fades in on hover so it doesn't
+// obscure the frame.
+function PlayerTransportBar({ playback }: { playback: PreviewPlayback }) {
+  const { isPlaying, playhead, duration, toggle, seek, muted, toggleMute } = playback;
+  const pct = duration > 0 ? Math.min(100, (playhead / duration) * 100) : 0;
+
+  return (
+    <div className="absolute inset-x-0 bottom-0 z-20 flex items-center gap-3 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={isPlaying ? "Pause" : "Play"}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/95 text-slate-900 transition hover:scale-105"
+      >
+        {isPlaying ? (
+          <Pause className="h-4 w-4 fill-current" />
+        ) : (
+          <Play className="ml-0.5 h-4 w-4 fill-current" />
+        )}
+      </button>
+
+      <input
+        type="range"
+        min={0}
+        max={Math.max(0.01, duration)}
+        step={0.05}
+        value={playhead}
+        onChange={(e) => seek(Number(e.target.value))}
+        aria-label="Seek"
+        className="h-1 flex-1 cursor-pointer accent-white"
+      />
+
+      <span className="shrink-0 font-mono text-[11px] tabular-nums text-white/90">
+        {fmtTime(playhead)} / {fmtTime(duration)}
+      </span>
+
+      <button
+        type="button"
+        onClick={toggleMute}
+        aria-label={muted ? "Unmute" : "Mute"}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white/90 transition hover:bg-white/15"
+      >
+        {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+      </button>
+    </div>
+  );
+}
+
+function fmtTime(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${r.toString().padStart(2, "0")}`;
 }
 
 // ─── Built-in branch ─────────────────────────────────────────────────────────

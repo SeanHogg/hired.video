@@ -144,7 +144,7 @@ export default function Sidebar({
           // z-[60] keeps the mobile drawer (and its close X header) above the
           // top Navigation bar (z-50); lg:z-auto drops it back to the docked
           // rail's normal stacking on desktop where there's no overlay.
-          "fixed top-0 left-0 h-full bg-rail border-r border-rail-border z-[60] transform transition-all duration-500 ease-in-out",
+          "rail-drawer fixed top-0 left-0 h-full bg-rail border-r border-rail-border z-[60] transform transition-all duration-500 ease-in-out",
           collapsed ? "w-16 overflow-hidden" : "w-[90%] lg:w-80 overflow-y-auto",
           isOpen ? "translate-x-0" : "-translate-x-full",
           "lg:translate-x-0 lg:fixed lg:z-auto",
@@ -153,7 +153,7 @@ export default function Sidebar({
         <div className="flex flex-col h-full">
           {/* Header — drawer-only (below lg). On lg+ the docked rail sits beneath
               the full-width fixed Navigation bar, which renders the logo. */}
-          <div className="flex items-center justify-between p-4 border-b border-rail-border lg:hidden">
+          <div className="rail-header flex items-center justify-between p-4 border-b border-rail-border lg:hidden">
             <Link to="/" className="flex items-center space-x-2">
               <Video className="h-6 w-6 text-rail-foreground" />
               {!collapsed && (

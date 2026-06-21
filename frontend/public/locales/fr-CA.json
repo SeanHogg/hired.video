@@ -9620,5 +9620,9 @@
   "wishlist.empty.browse": "Parcourir {{type}}",
   "wishlist.browseMore": "Parcourir plus",
   "wishlist.add": "Ajouter à la liste de souhaits",
-  "wishlist.remove": "Retirer de la liste de souhaits"
+  "wishlist.remove": "Retirer de la liste de souhaits",
+  "templateMarketing.whoFor.title": "Pour qui",
+  "templateMarketing.howTo.title": "Comment ça fonctionne",
+  "templateMarketing.why.title": "Pourquoi utiliser ce modèle",
+  "templateMarketing.join.title": "Pourquoi rejoindre hired.video"
 }

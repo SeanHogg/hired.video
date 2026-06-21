@@ -14,7 +14,9 @@ import CreatorPitchAside from "@/components/marketplace/CreatorPitchAside";
 import MarketplaceItemShell from "@/components/marketplace/MarketplaceItemShell";
 import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 import ResumeSourceSelector from "@/components/templates/ResumeSourceSelector";
+import ShareMenu from "@/components/share/ShareMenu";
 import TemplateApplyButton from "@/components/templates/TemplateApplyButton";
+import TemplateMarketingContent from "@/components/templates/TemplateMarketingContent";
 import TemplatePlayer from "@/components/templates/TemplatePlayer";
 import TemplatePreview from "@/components/templates/TemplatePreview";
 import { Badge } from "@/components/ui/badge";
@@ -108,10 +110,24 @@ export default function MarketplaceTemplatePreview() {
     </>
   );
 
+  // Canonical, shareable URL for this template — drives the social ShareMenu
+  // (LinkedIn / X / Facebook / WhatsApp / Email / copy / native). Built from
+  // the live origin so it stays correct across preview / prod hosts.
+  const shareUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/marketplace/templates/${encodeURIComponent(meta.slug)}`
+      : `/marketplace/templates/${encodeURIComponent(meta.slug)}`;
+
   const actions = (
     <>
       <ResumeSourceSelector meta={meta} value={sampleSelection} onChange={setSampleSelection} />
       <TemplateApplyButton meta={meta} size="sm" />
+      <ShareMenu
+        variant="outline"
+        url={shareUrl}
+        title={meta.name}
+        text={meta.blurb}
+      />
       <Button asChild size="sm" variant="ghost">
         <Link to="/search?category=templates">Browse all</Link>
       </Button>
@@ -165,7 +181,7 @@ export default function MarketplaceTemplatePreview() {
   // Isolate the preview render: a malformed resume (bad skillEvidence row,
   // null content, etc.) crashes only the preview pane — not the whole page —
   // and the developer view surfaces the exact error inline (#1885).
-  const wrappedPreview =
+  const playerBlock =
     meta.kind === "resume" ? (
       <ErrorBoundary level="component">
         <TemplatePreview meta={meta} resume={previewResume} />
@@ -177,6 +193,17 @@ export default function MarketplaceTemplatePreview() {
         </div>
       </div>
     );
+
+  // Main column = the preview/player followed by the full marketing surface
+  // (context CTA → how it works → why use → who it's for → why join). The
+  // page used to render only the bare player; the marketing content gives
+  // visitors the description + reasons-to-act the template page was missing.
+  const wrappedPreview = (
+    <>
+      {playerBlock}
+      <TemplateMarketingContent meta={meta} />
+    </>
+  );
 
   return (
     <MarketplaceItemShell

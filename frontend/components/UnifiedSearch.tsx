@@ -139,6 +139,19 @@ const categoryToTypes = (category: string): CardFeedType[] => {
   }
 };
 
+// Search fields are heterogeneous across entity kinds: `keywords`, `tags`,
+// and `category` can arrive as a plain string OR an array of strings
+// (e.g. studio scripts ship `keywords: ["Sean Hogg", "VP Technology"]`,
+// articles ship `tags: [...]`). Normalize any of those shapes to a single
+// lowercase haystack so `.includes()` never explodes on a non-string.
+const fieldMatches = (value: unknown, needle: string): boolean => {
+  if (!value) return false;
+  if (typeof value === "string") return value.toLowerCase().includes(needle);
+  if (Array.isArray(value))
+    return value.some((v) => fieldMatches(v, needle));
+  return false;
+};
+
 export default function UnifiedSearch({
   stickySearch = false,
   promoCard,
@@ -472,19 +485,15 @@ export default function UnifiedSearch({
       const needle = q.toLowerCase();
       const matchesSearch =
         q === "" ||
-        (item.title && item.title.toLowerCase().includes(needle)) ||
-        (item.name && item.name.toLowerCase().includes(needle)) ||
-        (item.profession &&
-          item.profession.toLowerCase().includes(needle)) ||
-        (item.company &&
-          item.company.toLowerCase().includes(needle)) ||
-        (item.summary && item.summary.toLowerCase().includes(needle)) ||
-        ((item as any).description &&
-          (item as any).description.toLowerCase().includes(needle)) ||
-        ((item as any).keywords &&
-          (item as any).keywords.toLowerCase().includes(needle)) ||
-        ((item as any).category &&
-          (item as any).category.toLowerCase().includes(needle));
+        fieldMatches(item.title, needle) ||
+        fieldMatches(item.name, needle) ||
+        fieldMatches(item.profession, needle) ||
+        fieldMatches(item.company, needle) ||
+        fieldMatches(item.summary, needle) ||
+        fieldMatches((item as any).description, needle) ||
+        fieldMatches((item as any).keywords, needle) ||
+        fieldMatches((item as any).tags, needle) ||
+        fieldMatches((item as any).category, needle);
 
       const matchesMedia =
         searchFilters.hasMedia === undefined ||

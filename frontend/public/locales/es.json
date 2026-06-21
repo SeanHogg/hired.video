@@ -9574,5 +9574,9 @@
   "wishlist.empty.browse": "Explorar {{type}}",
   "wishlist.browseMore": "Explorar más",
   "wishlist.add": "Añadir a la lista de deseos",
-  "wishlist.remove": "Quitar de la lista de deseos"
+  "wishlist.remove": "Quitar de la lista de deseos",
+  "templateMarketing.whoFor.title": "Para quién es",
+  "templateMarketing.howTo.title": "Cómo funciona",
+  "templateMarketing.why.title": "Por qué usar esta plantilla",
+  "templateMarketing.join.title": "Por qué unirte a hired.video"
 }

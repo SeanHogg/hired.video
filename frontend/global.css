@@ -67,6 +67,22 @@ body[data-print-mode] [data-print-hide] {
   color: #fff;
 }
 
+/* Mobile slide-out drawer — invert the dark-theme ("S2") menu zone so the menu
+ * surface is the LIGHTER brand purple and the selected row drops to the DARK
+ * brand purple (matching the header). The drawer header keeps its dark purple
+ * via `.rail-header` below. Scoped to dark theme + mobile only: the light-theme
+ * rail already reads as light-menu / purple-selected, and the desktop docked
+ * rail is untouched. */
+@media (max-width: 1023.98px) {
+  .dark .rail-drawer {
+    --rail-background: 271 60% 58%;
+    --rail-active: 271 67% 42%;
+  }
+  .dark .rail-drawer .rail-header {
+    background-color: hsl(271 67% 42%);
+  }
+}
+
 @layer base {
   /**
    * Tailwind CSS theme
