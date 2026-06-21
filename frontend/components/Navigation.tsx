@@ -122,14 +122,17 @@ export default function Navigation({
     <nav className={navCls}>
       <div id="nav-bar-wrapper" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div id="nav-bar" className="flex justify-between items-center h-16">
-          {/* Left side: Hamburger (mobile) / Sidebar Toggle (desktop) + Logo */}
-          <div className="flex items-center space-x-3">
+          {/* Left side: Hamburger (mobile) / Sidebar Toggle (desktop) + Logo.
+              `shrink-0` so the left group keeps its width and the flexible
+              header search shrinks first; tight gap on mobile so the hamburger
+              + logo read as one left-anchored group. */}
+          <div className="flex items-center shrink-0 space-x-1 sm:space-x-3">
             {/* Hamburger must stay `lg:hidden` to match Sidebar's `lg:translate-x-0` dock — anything tighter (e.g. `md:hidden`) leaves a 768–1023px dead zone. Plain (ghost) icon — no border/box, just the hamburger. */}
             <Button
               variant="ghost"
               size="icon"
               onClick={onMenuClick}
-              className="lg:hidden"
+              className="lg:hidden -ml-2"
               aria-label={t("nav.openMenu")}
             >
               <Menu className="h-5 w-5" />
@@ -165,7 +168,7 @@ export default function Navigation({
            * search slot, so we keep the global one to preserve the SEO funnel. Keep this list in sync
            * with the pages that pass `search={<HeaderSearch />}` to PageHeader. */}
           {location.pathname !== "/" && !(isAuthenticated && pathIsInlineHeaderSearch(location.pathname)) && (
-            <div className="flex-none md:flex-1 md:max-w-md mx-1 sm:mx-4 min-w-0">
+            <div className="flex-1 min-w-0 md:max-w-md mx-1 sm:mx-4">
               <HeaderSearch />
             </div>
           )}
@@ -247,8 +250,11 @@ export default function Navigation({
             )}
           </div>
 
-          {/* Right side: SuperAdmin controls + Inbox + Shopping Cart + Desktop CTA Buttons */}
-          <div className="flex items-center space-x-4">
+          {/* Right side: SuperAdmin controls (desktop) + Inbox + Shopping Cart +
+              Desktop CTA Buttons. `shrink-0` so this group never gets clipped
+              (the search shrinks instead); tight gaps on mobile so every always-on
+              control — including the avatar — fits the narrow bar. */}
+          <div className="flex items-center shrink-0 space-x-1 sm:space-x-2 md:space-x-4">
             {/* SuperAdmin controls (idle or active) */}
             <EmulationHeaderControls />
 

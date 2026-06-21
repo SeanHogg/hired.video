@@ -103,13 +103,15 @@ export function useEmulationStyle() {
 
 const PREVIEW_OPTIONS = buildPreviewOptions();
 
-// ── Unified header controls ───────────────────────────────────────────────────
-// Renders inside the header row for all SuperAdmin states.
-// Idle  → SuperAdmin badge + Preview role dropdown + Debug toggle.
-// Active → status badge + role switcher + permissions + copy + exit (all inline).
-export function EmulationHeaderControls() {
+// ── Shared controls hook ──────────────────────────────────────────────────────
+// Centralises every SuperAdmin control's state + handlers so the desktop inline
+// strip (EmulationHeaderControls) and the mobile avatar-menu section
+// (SuperAdminMenuItems) stay in lock-step (DRY). Deliberately does NOT run the
+// expiry-warning side effect — that lives once in EmulationHeaderControls (which
+// is always mounted) so the warning toasts never fire twice.
+export function useSuperAdminControls() {
   const {
-    user, isSuperAdmin,
+    isSuperAdmin,
     impersonationSession, isImpersonating,
     endImpersonation, switchImpersonationRole,
   } = useAuth();
@@ -119,100 +121,16 @@ export function EmulationHeaderControls() {
   const effectiveRole = useEffectiveRole() ?? "";
   const elapsed = useElapsed(impersonationSession?.startedAt ?? null);
 
-  useExpiryWarning(impersonationSession?.expiresAt ?? null, endImpersonation);
-
-  if (!isSuperAdmin) return null;
-
   const isPreviewMode = !isImpersonating && personaPreview !== null;
+  const isActive = isImpersonating || isPreviewMode;
+  const isAmber = isImpersonating;
 
-  // Role-preview menu items — same list in the mobile dropdown and the
-  // desktop "Preview role" dropdown (DRY).
-  const renderPreviewItems = () =>
-    PREVIEW_OPTIONS.map((opt) => (
-      <DropdownMenuItem
-        key={`${opt.role}-${opt.tier ?? "none"}`}
-        onSelect={() => setPersonaPreview(opt.role, opt.tier)}
-      >
-        <Eye className="h-3.5 w-3.5 mr-2" />
-        {opt.label}
-      </DropdownMenuItem>
-    ));
-
-  // ── Idle: no active session ──────────────────────────────────────────────
-  if (!isImpersonating && !isPreviewMode) {
-    return (
-      <>
-        {/* Mobile: a single minimal icon that expands every SuperAdmin tool,
-            so the cart / notifications keep their space. */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="md:hidden relative"
-              title="SuperAdmin tools"
-              aria-label="SuperAdmin tools"
-            >
-              <Shield className="h-5 w-5 text-primary" />
-              {debugMode && (
-                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-500" />
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel className="flex items-center gap-2">
-              <Shield className="h-3.5 w-3.5" />SuperAdmin
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-              Preview as role
-            </DropdownMenuLabel>
-            {renderPreviewItems()}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={toggleDebugMode}>
-              <Bug className="h-3.5 w-3.5 mr-2" />
-              {debugMode ? "Disable" : "Enable"} permission debugger
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Desktop: inline controls */}
-        <div className="hidden md:flex items-center gap-1">
-          <Badge variant="secondary" className="text-xs">SuperAdmin</Badge>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2">
-                <Eye className="h-3 w-3" />Preview role<ChevronDown className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {renderPreviewItems()}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <Button
-            variant={debugMode ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 text-xs gap-1 px-2"
-            onClick={toggleDebugMode}
-            title="Toggle permission debugger (Ctrl+Shift+P)"
-          >
-            <Bug className="h-3 w-3" />Debug
-          </Button>
-        </div>
-      </>
-    );
-  }
-
-  // ── Active: impersonating or role preview ────────────────────────────────
   const effectiveLabel = isImpersonating
     ? getRoleDisplayLabel(effectiveRole)
     : tierPreview
       ? `${getRoleDisplayLabel(effectiveRole)} (${tierPreview === "pro" ? "Pro" : "Free"})`
       : getRoleDisplayLabel(effectiveRole);
   const permCount = checks.size;
-  const isAmber = isImpersonating;
 
   const handleCopyContext = async () => {
     const ctx = {
@@ -241,13 +159,20 @@ export function EmulationHeaderControls() {
     }
   };
 
-  const badgeCls = isAmber
-    ? "bg-amber-500 text-white"
-    : "bg-blue-500 text-white";
-  const btnBorderCls = isAmber ? "border-amber-400" : "border-blue-300";
+  // Role-preview menu items — idle state. Shared between the mobile avatar menu
+  // and the desktop "Preview role" dropdown (DRY).
+  const renderPreviewItems = () =>
+    PREVIEW_OPTIONS.map((opt) => (
+      <DropdownMenuItem
+        key={`${opt.role}-${opt.tier ?? "none"}`}
+        onSelect={() => setPersonaPreview(opt.role, opt.tier)}
+      >
+        <Eye className="h-3.5 w-3.5 mr-2" />
+        {opt.label}
+      </DropdownMenuItem>
+    ));
 
-  // Role-switch menu items — same list in the mobile dropdown and the
-  // desktop "Role" dropdown (DRY). Impersonation switches the live role;
+  // Role-switch menu items — active state. Impersonation switches the live role;
   // preview swaps the persona/tier.
   const renderActiveRoleItems = () =>
     isImpersonating
@@ -268,131 +193,201 @@ export function EmulationHeaderControls() {
           );
         });
 
+  return {
+    isSuperAdmin,
+    impersonationSession, isImpersonating, endImpersonation,
+    isPreviewMode, isActive, isAmber,
+    debugMode, toggleDebugMode,
+    effectiveLabel, permCount, elapsed,
+    handleCopyContext, handleExit,
+    renderPreviewItems, renderActiveRoleItems,
+  };
+}
+
+// ── Mobile: SuperAdmin section embedded in the avatar (UserMenu) dropdown ──────
+// Renders as a set of menu items (leading with its own separator) intended to
+// live INSIDE an existing DropdownMenuContent. Self-gates: renders nothing for
+// non-SuperAdmins, so the host menu can drop it in unconditionally. The active
+// emulation/preview state stays discoverable via the tinted top bar
+// (useEmulationStyle), so folding the trigger into the avatar loses no signal.
+export function SuperAdminMenuItems() {
+  const c = useSuperAdminControls();
+  if (!c.isSuperAdmin) return null;
+
   return (
     <>
-      {/* Mobile: a single minimal, status-tinted icon that expands the full
-          emulation controls — keeps the active top bar uncluttered (the
-          desktop spreads them inline below). */}
+      <DropdownMenuSeparator />
+      {!c.isActive ? (
+        <>
+          <DropdownMenuLabel className="flex items-center gap-2">
+            <Shield className="h-3.5 w-3.5" />SuperAdmin
+          </DropdownMenuLabel>
+          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+            Preview as role
+          </DropdownMenuLabel>
+          {c.renderPreviewItems()}
+          <DropdownMenuItem onSelect={c.toggleDebugMode}>
+            <Bug className="h-3.5 w-3.5 mr-2" />
+            {c.debugMode ? "Disable" : "Enable"} permission debugger
+          </DropdownMenuItem>
+        </>
+      ) : (
+        <>
+          <DropdownMenuLabel className="flex items-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {c.isImpersonating ? "Emulating" : "Role preview"}
+          </DropdownMenuLabel>
+          {c.isImpersonating && (
+            <div className="px-2 pb-1.5 text-xs text-muted-foreground">
+              {c.impersonationSession && (
+                <div className="truncate font-medium text-foreground">
+                  {c.impersonationSession.targetUser.name}
+                </div>
+              )}
+              <div className="tabular-nums">{formatDuration(c.elapsed)}</div>
+            </div>
+          )}
+          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+            {c.isImpersonating ? "Switch role" : "Preview as"}
+          </DropdownMenuLabel>
+          {c.renderActiveRoleItems()}
+          <DropdownMenuItem onSelect={c.toggleDebugMode}>
+            <Bug className="h-3.5 w-3.5 mr-2" />
+            {c.debugMode ? "Disable" : "Enable"} permission debugger
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={c.handleCopyContext}>
+            <Copy className="h-3.5 w-3.5 mr-2" />Copy context
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={c.handleExit}
+            className="text-destructive focus:text-destructive"
+          >
+            <LogOut className="h-3.5 w-3.5 mr-2" />
+            {c.isImpersonating ? "Exit emulation" : "Exit preview"}
+          </DropdownMenuItem>
+        </>
+      )}
+    </>
+  );
+}
+
+// ── Desktop: inline header controls ───────────────────────────────────────────
+// Renders the SuperAdmin strip inline in the top bar on md+ only. On mobile the
+// same controls live in the avatar menu (SuperAdminMenuItems) to keep the
+// narrow top bar uncluttered and let the user's avatar fit. This component is
+// always mounted (just CSS-hidden on mobile), so it owns the single
+// expiry-warning side effect.
+export function EmulationHeaderControls() {
+  const c = useSuperAdminControls();
+
+  useExpiryWarning(c.impersonationSession?.expiresAt ?? null, c.endImpersonation);
+
+  if (!c.isSuperAdmin) return null;
+
+  // ── Idle: no active session ──────────────────────────────────────────────
+  if (!c.isActive) {
+    return (
+      <div className="hidden md:flex items-center gap-1">
+        <Badge variant="secondary" className="text-xs">SuperAdmin</Badge>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2">
+              <Eye className="h-3 w-3" />Preview role<ChevronDown className="h-3 w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {c.renderPreviewItems()}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Button
+          variant={c.debugMode ? "secondary" : "ghost"}
+          size="sm"
+          className="h-7 text-xs gap-1 px-2"
+          onClick={c.toggleDebugMode}
+          title="Toggle permission debugger (Ctrl+Shift+P)"
+        >
+          <Bug className="h-3 w-3" />Debug
+        </Button>
+      </div>
+    );
+  }
+
+  // ── Active: impersonating or role preview ────────────────────────────────
+  const badgeCls = c.isAmber
+    ? "bg-amber-500 text-white"
+    : "bg-blue-500 text-white";
+  const btnBorderCls = c.isAmber ? "border-amber-400" : "border-blue-300";
+
+  return (
+    <div className="hidden md:flex items-center gap-1.5">
+      {/* Status badge */}
+      <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 font-semibold text-xs ${badgeCls}`}>
+        <AlertTriangle className="h-3 w-3" />
+        {c.isImpersonating ? "EMULATING" : "ROLE PREVIEW"}
+      </span>
+
+      {/* Target user name — impersonation only */}
+      {c.isImpersonating && c.impersonationSession && (
+        <span className="text-xs font-medium truncate max-w-[120px]">
+          {c.impersonationSession.targetUser.name}
+        </span>
+      )}
+
+      {/* Role switcher */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             variant="outline"
-            size="icon"
-            className={`md:hidden relative ${btnBorderCls}`}
-            title={isImpersonating ? "Emulation controls" : "Role preview controls"}
-            aria-label={isImpersonating ? "Emulation controls" : "Role preview controls"}
+            size="sm"
+            className={`h-7 text-xs gap-1 ${btnBorderCls}`}
           >
-            <AlertTriangle className={`h-5 w-5 ${isAmber ? "text-amber-500" : "text-blue-500"}`} />
+            Role:&nbsp;{c.effectiveLabel}<ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
-          <DropdownMenuLabel className="flex items-center gap-2">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            {isImpersonating ? "Emulating" : "Role preview"}
-          </DropdownMenuLabel>
-          {isImpersonating && (
-            <div className="px-2 pb-1.5 text-xs text-muted-foreground">
-              {impersonationSession && (
-                <div className="truncate font-medium text-foreground">
-                  {impersonationSession.targetUser.name}
-                </div>
-              )}
-              <div className="tabular-nums">{formatDuration(elapsed)}</div>
-            </div>
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-            {isImpersonating ? "Switch role" : "Preview as"}
-          </DropdownMenuLabel>
-          {renderActiveRoleItems()}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={toggleDebugMode}>
-            <Bug className="h-3.5 w-3.5 mr-2" />
-            {debugMode ? "Disable" : "Enable"} permission debugger
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={handleCopyContext}>
-            <Copy className="h-3.5 w-3.5 mr-2" />Copy context
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onSelect={handleExit}
-            className="text-destructive focus:text-destructive"
-          >
-            <LogOut className="h-3.5 w-3.5 mr-2" />
-            {isImpersonating ? "Exit emulation" : "Exit preview"}
-          </DropdownMenuItem>
+        <DropdownMenuContent align="end">
+          {c.renderActiveRoleItems()}
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Desktop: inline controls */}
-      <div className="hidden md:flex items-center gap-1.5">
-        {/* Status badge */}
-        <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 font-semibold text-xs ${badgeCls}`}>
-          <AlertTriangle className="h-3 w-3" />
-          {isImpersonating ? "EMULATING" : "ROLE PREVIEW"}
+      {/* Permissions / debug toggle */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 text-xs gap-1 px-2"
+        onClick={c.toggleDebugMode}
+        title="Toggle permission debugger (Ctrl+Shift+P)"
+      >
+        <Bug className="h-3 w-3" />
+        Permissions
+        {c.debugMode && <Badge className="ml-1 h-4 text-[10px] px-1">ON</Badge>}
+      </Button>
+
+      {/* Session timer — impersonation only */}
+      {c.isImpersonating && (
+        <span className="text-xs tabular-nums">
+          {formatDuration(c.elapsed)}
         </span>
+      )}
 
-        {/* Target user name — impersonation only */}
-        {isImpersonating && impersonationSession && (
-          <span className="text-xs font-medium truncate max-w-[120px]">
-            {impersonationSession.targetUser.name}
-          </span>
-        )}
+      {/* Copy context */}
+      <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2" onClick={c.handleCopyContext}>
+        <Copy className="h-3 w-3" />
+        Copy Context
+      </Button>
 
-        {/* Role switcher */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className={`h-7 text-xs gap-1 ${btnBorderCls}`}
-            >
-              Role:&nbsp;{effectiveLabel}<ChevronDown className="h-3 w-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {renderActiveRoleItems()}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Permissions / debug toggle */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs gap-1 px-2"
-          onClick={toggleDebugMode}
-          title="Toggle permission debugger (Ctrl+Shift+P)"
-        >
-          <Bug className="h-3 w-3" />
-          Permissions
-          {debugMode && <Badge className="ml-1 h-4 text-[10px] px-1">ON</Badge>}
-        </Button>
-
-        {/* Session timer — impersonation only */}
-        {isImpersonating && (
-          <span className="text-xs tabular-nums">
-            {formatDuration(elapsed)}
-          </span>
-        )}
-
-        {/* Copy context */}
-        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2" onClick={handleCopyContext}>
-          <Copy className="h-3 w-3" />
-          Copy Context
-        </Button>
-
-        {/* Exit */}
-        <Button
-          variant="destructive"
-          size="sm"
-          className="h-7 text-xs gap-1 px-2"
-          onClick={handleExit}
-          title={isImpersonating ? "Exit Emulation" : "Exit Preview"}
-        >
-          <LogOut className="h-3 w-3" />
-          {isImpersonating ? "Exit Emulation" : "Exit Preview"}
-        </Button>
-      </div>
-    </>
+      {/* Exit */}
+      <Button
+        variant="destructive"
+        size="sm"
+        className="h-7 text-xs gap-1 px-2"
+        onClick={c.handleExit}
+        title={c.isImpersonating ? "Exit Emulation" : "Exit Preview"}
+      >
+        <LogOut className="h-3 w-3" />
+        {c.isImpersonating ? "Exit Emulation" : "Exit Preview"}
+      </Button>
+    </div>
   );
 }

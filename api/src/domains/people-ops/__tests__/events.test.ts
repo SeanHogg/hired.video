@@ -2,8 +2,8 @@
  * Tests for the default People-Ops event sink (#1824) — the fan-out from a
  * domain event to BOTH the activity-log audit trail and the inbox
  * notification, including roster-employee→user resolution and the self-notify
- * filter. `runDetached` is overridden to run synchronously so the assertions
- * are deterministic (no floating promise).
+ * filter. `runDetached` is overridden to capture each task's promise so the
+ * assertions can await the REAL work (no floating promise, no timer guess).
  *
  * Run: node --import tsx --test src/domains/people-ops/__tests__/events.test.ts
  */
@@ -65,27 +65,33 @@ function buildSink(opts: {
   const audit = new FakeAudit();
   const notifications = new FakeNotifications();
   const users = new FakeUsers(opts.actors ?? { actor: { id: "actor", name: "Boss" } });
+  // Capture each detached task's promise so the test can await the REAL work
+  // (audit + emitNotification, both genuinely async) instead of guessing with a
+  // setTimeout tick — emitNotification's internal async depth is unbounded, so a
+  // single macrotask tick was an intermittent red under load.
+  const pending: Promise<void>[] = [];
   const sink = createPeopleOpsEventSink({
     audit: audit as unknown as IAuditRepository,
     notify: { repos: { users, notifications } as any },
     employees: new FakeEmployees(opts.employees ?? {}) as any,
     runDetached: (task) => {
-      void task(); // synchronous: the fakes never await real I/O
+      pending.push(task());
     },
   });
-  return { sink, audit, notifications };
+  const settle = () => Promise.all(pending);
+  return { sink, audit, notifications, settle };
 }
 
 describe("createPeopleOpsEventSink — audit + notify fan-out (#1824)", () => {
   it("writes an activity row AND notifies the added employee", async () => {
-    const { sink, audit, notifications } = buildSink({});
+    const { sink, audit, notifications, settle } = buildSink({});
     sink.emit(ctx(), {
       kind: "employee_added",
       employeeId: "emp-1",
       recipientUserId: "user-jane",
       employeeName: "Jane Doe",
     });
-    await tick();
+    await settle();
     assert.equal(audit.activities.length, 1);
     assert.equal(audit.activities[0].action, "people_employee_added");
     assert.equal(audit.activities[0].entityType, "people_employee");
@@ -97,29 +103,29 @@ describe("createPeopleOpsEventSink — audit + notify fan-out (#1824)", () => {
   });
 
   it("audits a placeholder add but notifies nobody (no linked user)", async () => {
-    const { sink, audit, notifications } = buildSink({});
+    const { sink, audit, notifications, settle } = buildSink({});
     sink.emit(ctx(), {
       kind: "employee_added",
       employeeId: "emp-1",
       recipientUserId: null,
       employeeName: "Contractor",
     });
-    await tick();
+    await settle();
     assert.equal(audit.activities.length, 1);
     assert.equal(notifications.inserted.length, 0);
   });
 
   it("removal is audit-only — never notifies", async () => {
-    const { sink, audit, notifications } = buildSink({});
+    const { sink, audit, notifications, settle } = buildSink({});
     sink.emit(ctx(), { kind: "employee_removed", employeeId: "emp-1", employeeName: "Jane" });
-    await tick();
+    await settle();
     assert.equal(audit.activities.length, 1);
     assert.equal(audit.activities[0].action, "people_employee_removed");
     assert.equal(notifications.inserted.length, 0);
   });
 
   it("resolves 1:1 employee ids → user ids and notifies the participant", async () => {
-    const { sink, audit, notifications } = buildSink({
+    const { sink, audit, notifications, settle } = buildSink({
       employees: { "emp-sup": "actor", "emp-part": "user-part" },
     });
     sink.emit(ctx(), {
@@ -129,7 +135,7 @@ describe("createPeopleOpsEventSink — audit + notify fan-out (#1824)", () => {
       participantEmployeeId: "emp-part",
       scheduledDate: "2026-06-10T00:00:00.000Z",
     });
-    await tick();
+    await settle();
     assert.equal(audit.activities[0].action, "people_one_on_one_scheduled");
     // Supervisor resolves to the actor → self-filtered; only the participant is told.
     assert.equal(notifications.inserted.length, 1);
@@ -138,7 +144,7 @@ describe("createPeopleOpsEventSink — audit + notify fan-out (#1824)", () => {
   });
 
   it("notifies every linked action-item assignee, deduped", async () => {
-    const { sink, notifications } = buildSink({
+    const { sink, notifications, settle } = buildSink({
       employees: { "emp-a": "user-a", "emp-b": null, "emp-c": "user-a" },
     });
     sink.emit(ctx(), {
@@ -147,14 +153,9 @@ describe("createPeopleOpsEventSink — audit + notify fan-out (#1824)", () => {
       assigneeEmployeeIds: ["emp-a", "emp-b", "emp-c"],
       count: 3,
     });
-    await tick();
+    await settle();
     // emp-b has no user; emp-a/emp-c resolve to the same user → one notification.
     assert.equal(notifications.inserted.length, 1);
     assert.equal(notifications.inserted[0].userId, "user-a");
   });
 });
-
-/** Let the synchronously-started detached task settle its awaits. */
-function tick() {
-  return new Promise((r) => setTimeout(r, 0));
-}

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth";
 import { useSignOut } from "@/hooks/use-sign-out";
+import { SuperAdminMenuItems } from "@/components/EmulationBar";
 
 /**
  * UserMenu — the avatar dropdown in the top bar that consolidates every
@@ -76,6 +77,13 @@ export function UserMenu() {
             {t("userMenu.pointsRewards")}
           </Link>
         </DropdownMenuItem>
+        {/* SuperAdmin tools — mobile only. On md+ these live inline in the top
+            bar (EmulationHeaderControls); folding them into the avatar here lets
+            the mobile top bar shed the standalone shield so the avatar fits.
+            Self-gates to SuperAdmins (renders nothing otherwise). */}
+        <div className="md:hidden">
+          <SuperAdminMenuItems />
+        </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => signOut()}
