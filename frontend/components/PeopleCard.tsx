@@ -365,7 +365,7 @@ export default function PeopleCard({
   }
 
   return (
-    <BaseCard className="overflow-hidden">
+    <BaseCard className="overflow-hidden flex flex-col h-full">
       <CardHeader className="pb-3 p-4 sm:p-6">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
@@ -460,7 +460,7 @@ export default function PeopleCard({
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="flex-1">
         <div className="space-y-3">
           {/* Current Position */}
           {person.currentPosition && (

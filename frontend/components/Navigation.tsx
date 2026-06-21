@@ -50,6 +50,7 @@ const INLINE_HEADER_SEARCH_ROUTES: ReadonlySet<string> = new Set([
   "/tools",
   "/people",
   "/companies",
+  "/resumes",
   "/search",
   "/studio",
 ]);

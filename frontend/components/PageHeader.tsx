@@ -2,6 +2,7 @@ import { useEffect, useRef, type ComponentType, type ReactNode } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { tabItemClass, TabItemContent } from "@/components/ui/tab-item";
+import { ACTION_BAR_STICKY, ACTION_BAR_SURFACE } from "@/lib/ui/action-bar";
 
 /**
  * PageHeader — the shared "tab strip + heading" pattern used by every
@@ -55,6 +56,11 @@ export interface PageHeaderProps {
   meta?: ReactNode;
   /** Override the wrapper className when a page needs less bottom margin. */
   className?: string;
+  /** Render as a sticky, tonally-distinct action toolbar — the tabs + search +
+   *  filters pin just below the top nav as the list scrolls. Defaults to ON
+   *  whenever an inline `search` slot is present (the signal that this header is
+   *  an interactive list toolbar rather than a plain page title). */
+  sticky?: boolean;
 }
 
 export default function PageHeader({
@@ -66,9 +72,14 @@ export default function PageHeader({
   actions,
   meta,
   className,
+  sticky,
 }: PageHeaderProps): JSX.Element {
   const location = useLocation();
   const [searchParams] = useSearchParams();
+
+  // An interactive list header (one with an inline search) becomes the sticky,
+  // tonally-distinct action bar; a plain title header stays inline.
+  const asActionBar = sticky ?? Boolean(search);
 
   const isActive = (tab: PageHeaderTab): boolean => {
     if (activeTabKey !== undefined) return activeTabKey === tab.key;
@@ -117,24 +128,24 @@ export default function PageHeader({
     activeLiRef.current?.scrollIntoView({ inline: "center", block: "nearest" });
   }, [activeTabKey, location.pathname]);
 
-  return (
-    <div className={cn("mb-6", className)}>
+  const inner = (
+    <>
       {tabs && tabs.length > 0 && (
         <nav className="mb-4 border-b" aria-label="Section">
           <ul className="flex gap-1 -mb-px overflow-x-auto">
             {tabs.map((tab) => {
               const active = isActive(tab);
               const tabClass = tabItemClass(active);
-              const inner = <TabItemContent label={tab.label} icon={tab.icon} badge={tab.badge} />;
+              const tabInner = <TabItemContent label={tab.label} icon={tab.icon} badge={tab.badge} />;
               return (
                 <li key={tab.key} ref={active ? activeLiRef : undefined}>
                   {tab.to ? (
                     <Link to={buildTo(tab.to)} className={tabClass} aria-current={active ? "page" : undefined}>
-                      {inner}
+                      {tabInner}
                     </Link>
                   ) : (
                     <span className={tabClass} aria-current={active ? "page" : undefined}>
-                      {inner}
+                      {tabInner}
                     </span>
                   )}
                 </li>
@@ -164,6 +175,19 @@ export default function PageHeader({
           {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
         </div>
       )}
-    </div>
+    </>
   );
+
+  // Interactive list header → sticky toned action bar; plain title → inline.
+  if (asActionBar) {
+    return (
+      <div className={cn(ACTION_BAR_STICKY, "mb-6", className)}>
+        <div className={cn(ACTION_BAR_SURFACE, "px-4 py-3 md:px-5 md:py-4")}>
+          {inner}
+        </div>
+      </div>
+    );
+  }
+
+  return <div className={cn("mb-6", className)}>{inner}</div>;
 }

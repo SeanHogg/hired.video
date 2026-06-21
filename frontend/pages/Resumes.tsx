@@ -21,7 +21,6 @@ import {
   Calendar,
   Globe,
   Lock,
-  Target,
   Power,
   UserCheck,
   Pencil,
@@ -66,6 +65,7 @@ import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
 import EntityHubShell, { type EntityHubTab } from "@/components/EntityHubShell";
+import HeaderSearch from "@/components/HeaderSearch";
 import EntityHubTabStrip from "@/components/EntityHubTabStrip";
 import CandidatesPanel, {
   CandidatesHeaderActions,
@@ -749,43 +749,6 @@ export default function Resumes() {
     }
   };
 
-  const getActiveResume = () => {
-    // First check in the regular resumes array
-    const activeFromResumes = resumes.find(
-      (resume) => resume.isActive && resume.ownership === "owned",
-    );
-
-    if (activeFromResumes) {
-      return activeFromResumes;
-    }
-
-    // Also check in master resume groups
-    for (const group of masterResumeGroups) {
-      if (group.masterResume.isActive) {
-        // Convert the master resume to the expected format
-        return {
-          id: group.masterResume.id || "",
-          title: group.masterResume.title || "",
-          isActive: group.masterResume.isActive || false,
-          ownership: "owned" as const,
-        };
-      }
-
-      // Check variations too
-      const activeVariation = group.variations.find(v => v.isActive);
-      if (activeVariation) {
-        return {
-          id: activeVariation.id || "",
-          title: activeVariation.title || "",
-          isActive: activeVariation.isActive || false,
-          ownership: "owned" as const,
-        };
-      }
-    }
-
-    return undefined;
-  };
-
   const filteredResumes = displayResumes.filter((resume) => {
     const searchTerm = searchFilters.search || "";
     if (
@@ -1396,40 +1359,26 @@ export default function Resumes() {
     </>
   );
 
-  const mineMeta = () => (
-    <div className="flex items-center gap-2 flex-wrap">
-      {getActiveResume() && (
-        <Badge variant="secondary" className="bg-green-100 text-green-800">
-          <Target className="w-3 h-3 mr-1" />
-          {t("labels.resumes.activeBadge", { name: String(getActiveResume()?.title ?? "") })}
-        </Badge>
-      )}
-      {!loading && !getActiveResume() && (
-        <Badge variant="outline" className="text-orange-600 border-orange-200">
-          {t("labels.noActiveResume")}
-        </Badge>
-      )}
-    </div>
-  );
-
   // Per-tab body / actions / meta — joined onto the shared tab metadata
   // (RESUMES_HUB_TABS, the SSoT for key / label / icon / roles / route)
   // below. Keeping the join keyed by `key` means the strip on detail /
   // edit pages and the hub list page can never diverge on labels.
   const resumeTabBodies: Record<string, Omit<EntityHubTab, "key" | "label" | "icon" | "roles"> | undefined> = {
     mine: {
+      search: <HeaderSearch />,
       title: t("headings.yourResumes"),
       description: t("messages.resumes.mineDescription"),
       headerActions: mineActions,
-      meta: mineMeta,
       body: renderMineBody,
     },
     available: {
+      search: <HeaderSearch />,
       title: t("headings.resumes.availableTab"),
       description: t("messages.resumes.availableDescription"),
       body: <AvailableResumesPanel />,
     },
     sourced: {
+      search: <HeaderSearch />,
       title: t("headings.resumes.sourcedTab"),
       description: t("messages.resumes.sourcedDescription"),
       headerActions: (
