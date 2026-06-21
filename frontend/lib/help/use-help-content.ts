@@ -3,7 +3,8 @@
  *
  * `lib/help/content.ts` eager-globs ~60 Markdown files, so anything that
  * STATICALLY imports it drags that payload into its chunk — and the
- * always-mounted HelpDrawer would pull it into the app-wide entry bundle.
+ * always-mounted AI Brain would pull it into the app-wide entry bundle
+ * (it now passes `enabled: isOpen` so the catalog loads only on open).
  * To keep it out of every-page load, NOTHING imports `content.ts`
  * statically; consumers load it through this memoized dynamic import, so
  * Vite emits it as ONE separate chunk fetched only when help is actually
@@ -31,10 +32,17 @@ export function loadHelpContent(): Promise<HelpContentModule> {
 }
 
 /** React hook: returns the help content module once loaded, else null.
- *  Components render their loading/empty state while it's null. */
-export function useHelpContent(): HelpContentModule | null {
+ *  Components render their loading/empty state while it's null.
+ *
+ *  `enabled` defers the (chunked) load until it's true — e.g. an
+ *  always-mounted consumer (the AI Brain) passes `isOpen` so the ~60-file
+ *  help catalog isn't pulled into every page load, only when the user
+ *  actually opens it. Defaults true for page-level consumers that need it
+ *  immediately (/help, /help/:slug, admin curation). */
+export function useHelpContent(enabled = true): HelpContentModule | null {
   const [mod, setMod] = useState<HelpContentModule | null>(cached);
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
     // Memoized — resolves instantly when already cached.
     loadHelpContent().then((m) => {
@@ -43,6 +51,6 @@ export function useHelpContent(): HelpContentModule | null {
     return () => {
       active = false;
     };
-  }, []);
+  }, [enabled]);
   return mod;
 }

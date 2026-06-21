@@ -413,9 +413,10 @@ aiRoutes.delete("/sessions/:id", async (c) => {
  * must not burn the user's quota (that's the whole point of deflecting).
  */
 aiRoutes.post("/help-assist", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
+  // No auth gate: the Brain answers from PUBLIC help docs for everyone,
+  // including signed-out visitors (mounted optional-auth — `c.var.user` is
+  // present only when a JWT was sent, and is used solely for unbilled
+  // attribution). It never reads private data and never escalates to premium.
   const body = await c.req.json().catch(() => ({}));
   const question = typeof body.message === "string" ? body.message.trim()
     : typeof body.question === "string" ? body.question.trim() : "";

@@ -7,9 +7,10 @@
  * and ZERO network work — the content ships inside the app bundle as an
  * immutable, content-hashed asset and is parsed once in memory.
  *
- * Everything that shows help content (HelpDrawer, /help, /help/:slug,
- * card-feed, admin slug picker) reads through THIS module — never the API
- * (DRY; the API serves only mapping + search META, never content).
+ * Everything that shows help content (the AI Brain via useContextHelpItems,
+ * /help, /help/:slug, card-feed, admin slug picker) reads through THIS module
+ * — never the API (DRY; the API serves only mapping + search META, never
+ * content).
  *
  * Localization: `getHelpItem(slug, locale)` returns the requested locale,
  * falling back to EN when that locale's file is absent.

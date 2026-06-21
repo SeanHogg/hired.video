@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Trash2,
   Image as ImageIcon,
+  HelpCircle,
 } from "lucide-react";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Button, Button as UiButton } from "@/components/ui/button";
@@ -46,6 +47,7 @@ import { AIUsageLimitError, RateLimitError } from "@/lib/errors";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { aiService } from "@/lib/services/ai-service";
 import { helpService } from "@/lib/services/help-service";
+import { useContextHelpItems } from "@/lib/help/use-context-help-items";
 import { TIER_COPY } from "@shared/tier-copy";
 import { getPrompt } from "@shared/ai-prompts";
 import {
@@ -353,6 +355,11 @@ export default function AIChatPanel() {
   const { contextLabel, actionLabel } = useAiLabels();
   const activeResumeId = resolveActiveResumeId(location.pathname, pageContext);
 
+  // Context-aware help, folded into the Brain (the single assistant after the
+  // standalone HelpDrawer was retired). Surfaced as starter chips below; loads
+  // its catalog only while the panel is open. (#2232)
+  const contextHelp = useContextHelpItems(detectContextType(location.pathname), isAIChatOpen);
+
   // Get personalized welcome message based on user role
   const getWelcomeMessage = () => {
     if (!isAuthenticated || !user) {
@@ -559,6 +566,24 @@ export default function AIChatPanel() {
       } catch {
         // Any help-path failure silently falls through to the full chat.
       }
+    }
+
+    // Anonymous users get help-center answers for free (above). Full,
+    // personalised AI Q&A needs an account — don't call the premium /chat
+    // path for them; nudge sign-in instead.
+    if (!isAuthenticated) {
+      const signInMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        content: t(
+          "aiChat.anonEscalate",
+          "I can answer questions about using hired.video from our help center for free. For personalised help — resume reviews, job matching, interview prep — sign in to get 10 free AI requests a month.",
+        ),
+        sender: "ai",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, signInMsg]);
+      setIsTyping(false);
+      return;
     }
 
     try {
@@ -796,9 +821,6 @@ export default function AIChatPanel() {
     // Send the conversational prompt with the action context
     handleSendMessage(conversationalPrompt, action);
   };
-
-  // Allow AI access for all authenticated users (10 requests/month free, unlimited for Pro/Enterprise)
-  const hasAIAccess = isAuthenticated;
 
   // Refresh usage when panel opens
   useEffect(() => {
@@ -1257,10 +1279,7 @@ export default function AIChatPanel() {
                     variant="outline"
                     size="sm"
                     className="h-auto p-2 text-left justify-start"
-                    onClick={() =>
-                      hasAIAccess ? handleQuickSuggestion(suggestion.text, suggestion.action) : undefined
-                    }
-                    disabled={!hasAIAccess}
+                    onClick={() => handleQuickSuggestion(suggestion.text, suggestion.action)}
                   >
                     <Icon className="h-3 w-3 mr-2" />
                     <span className="text-xs">{suggestion.text}</span>
@@ -1268,13 +1287,39 @@ export default function AIChatPanel() {
                 );
               })}
             </div>
+
+            {/* Context help, folded into the Brain (#2232). Clicking a topic
+                asks it as a question → the help-first path answers it inline,
+                so it reads as the AI answering — no separate help surface. */}
+            {contextHelp.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs text-muted-foreground mb-2 flex items-center gap-2">
+                  <HelpCircle className="h-3 w-3" />
+                  {t("aiChat.help.forThisPage", "Help with this page:")}
+                </p>
+                <div className="flex flex-col gap-1">
+                  {contextHelp.slice(0, 4).map((item) => (
+                    <button
+                      key={item.slug}
+                      type="button"
+                      onClick={() => handleSendMessage(item.title)}
+                      className="text-left text-xs rounded-md px-2 py-1.5 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {item.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Input */}
+        {/* Input — available to EVERYONE, including signed-out visitors. The
+            help-first path answers from the public help docs for free; only a
+            premium escalation (authed) or a quota-hit shows an upgrade prompt,
+            and anon escalation nudges sign-in (handled in handleSendMessage). */}
         <div className="p-4 border-t">
-          {hasAIAccess ? (
-            <>
+          <>
               {/* Quick-action chip — bypasses the "type 'generate an
                   image…'" indirection by surfacing the same shared
                   `MediaAiPromptPanel` inline. The image is generated
@@ -1285,11 +1330,11 @@ export default function AIChatPanel() {
                   message; the assistant sees it, can comment, and the
                   conversation continues naturally.
 
-                  Studio-only: image generation feeds the Studio canvas,
-                  so the chip surfaces only when the chat opens over the
-                  Studio editor (contextType resolved from the /studio
+                  Studio-only + authed: image generation feeds the Studio
+                  canvas, so the chip surfaces only when the chat opens over
+                  the Studio editor (contextType resolved from the /studio
                   route in page-meta-registry). */}
-              {pageContext?.contextType === "studio" && (
+              {isAuthenticated && pageContext?.contextType === "studio" && (
               <div className="mb-2 flex items-center gap-2">
                 <Popover open={aiImagePromptOpen} onOpenChange={setAiImagePromptOpen}>
                   <PopoverTrigger asChild>
@@ -1344,34 +1389,19 @@ export default function AIChatPanel() {
               <AIInputBox
                 onSubmit={(v) => handleSendMessage(v)}
                 disabled={isTyping}
-                placeholder={t("aiChat.inputPlaceholder", "Ask me anything about HR...")}
+                placeholder={t("aiChat.inputPlaceholder", "Ask me anything about hiring, jobs, or how to use the platform…")}
                 helpText={<AIFooterCaption />}
               />
-            </>
-          ) : (
-            <>
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-sm text-muted-foreground">
-                  {isAuthenticated
-                    ? t("aiChat.upgrade.authenticated", "You have 10 free AI requests per month. Upgrade to Pro for unlimited access.")
-                    : t("aiChat.upgrade.anonymous", "Sign in to get 10 free AI requests per month. Upgrade to Pro for unlimited access.")}
-                </div>
-                <div className="flex gap-2">
-                  {!isAuthenticated && (
-                    <UiButton asChild variant="outline" size="sm">
-                      <Link to="/login">{t("actions.signIn", "Sign In")}</Link>
-                    </UiButton>
-                  )}
-                  <UiButton asChild size="sm">
-                    <Link to="/pricing">{t("aiChat.viewPlans", "View Plans")}</Link>
-                  </UiButton>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2 text-center">
-                <AIFooterCaption />
-              </p>
-            </>
-          )}
+              {!isAuthenticated && (
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  {t("aiChat.anonHint", "Answering from our help center.")}{" "}
+                  <Link to="/login" className="underline underline-offset-2 hover:text-foreground">
+                    {t("actions.signIn", "Sign in")}
+                  </Link>{" "}
+                  {t("aiChat.anonHintRest", "for full AI help — 10 free requests/month.")}
+                </p>
+              )}
+          </>
         </div>
       </div>
     </div>

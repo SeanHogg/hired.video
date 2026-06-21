@@ -542,6 +542,14 @@ export function createApp() {
   // the explicit slug alternation here.
   const HELP_PUBLIC_READ_ROUTE = /^\/api\/help\/(?:contexts|resolve|search)(?:$|\?)/;
 
+  // Help-first deflection in the AI Brain (#2232) — the Brain is now the single
+  // assistant and answers FAQ-shaped questions from the bundled help docs even
+  // for SIGNED-OUT visitors (a cheap, doc-grounded reply; no user data touched,
+  // never escalates to premium without an account). optional-auth so a present
+  // JWT still attaches (history/personalisation) but anonymous is allowed.
+  // POST-only path; the full `/api/ai/chat` stays authenticated.
+  const AI_HELP_ASSIST_ROUTE = /^\/api\/ai\/help-assist(?:$|\?)/;
+
   // ─── Single source of truth: access mode per request ────────────────
   // Replaces the three parallel exemption lists that previously sat in
   // front of authMiddleware / emailVerifiedMiddleware / passwordChange-
@@ -569,6 +577,7 @@ export function createApp() {
     if (COURSES_SCORM_ASSET_ROUTE.test(path)) return "public";
     if (method === "GET" && HELP_PUBLIC_READ_ROUTE.test(path)) return "public";
 
+    if (AI_HELP_ASSIST_ROUTE.test(path)) return "optional-auth";
     if (STUDIO_PUBLIC_ROUTE.test(path)) return "optional-auth";
     if (SCREENING_PORTAL_ROUTE.test(path)) return "optional-auth";
     if (USAGE_TRACK_ROUTE.test(path)) return "optional-auth";
