@@ -46,6 +46,7 @@ import {
   getTrendingPosts,
   applyReactionToPost,
 } from "@/lib/services/feed-service";
+import { DEFAULT_REACTION, reactionDef } from "@shared/feed-reactions";
 import type {
   FeedPost,
   FeedPostsResponse,
@@ -241,7 +242,11 @@ export function TrendingPostsCard() {
                 </p>
                 <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground tabular-nums">
                   <span className="flex items-center gap-1">
-                    <Heart className="h-3 w-3" /> {p.reactionCount}
+                    {/* Total reactions across all professional types — the
+                        default 👍 glyph stands in for the mixed set (no
+                        longer a heart). */}
+                    <span aria-hidden>{reactionDef(DEFAULT_REACTION).emoji}</span>{" "}
+                    {p.reactionCount}
                   </span>
                   <span className="flex items-center gap-1">
                     <MessageCircle className="h-3 w-3" /> {p.commentCount}

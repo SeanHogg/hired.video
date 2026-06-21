@@ -1,9 +1,11 @@
 /**
  * CampaignComposerDialog — the reusable compose/edit-campaign form. Combines
  * the template picker, inline body, audience selector and scheduling into one
- * dialog. Surface-agnostic: the parent owns persistence via `onSubmit`, so the
- * same dialog serves the SuperAdmin manager today and any future user-facing
- * campaign composer.
+ * slide-out side panel (Sheet). Form inputs live in a side panel, not a modal —
+ * modals are reserved for confirmation/onboarding/celebration, and the panel
+ * works better on mobile. Surface-agnostic: the parent owns persistence via
+ * `onSubmit`, so the same panel serves the SuperAdmin manager today and any
+ * future user-facing campaign composer.
  */
 import { useEffect, useState } from "react";
 import { Loader2, Send, Save } from "lucide-react";
@@ -12,13 +14,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Select,
   SelectContent,
@@ -120,17 +122,20 @@ export function CampaignComposerDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{initial ? "Edit campaign" : "New campaign"}</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="w-full p-0 sm:max-w-xl flex flex-col gap-0"
+      >
+        <SheetHeader className="border-b border-border p-6">
+          <SheetTitle>{initial ? "Edit campaign" : "New campaign"}</SheetTitle>
+          <SheetDescription>
             Compose a marketing email, choose who receives it, and schedule the
             send. Sent as the hired.video company.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
-        <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto space-y-4 p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label htmlFor="c-name">Campaign name</Label>
@@ -215,7 +220,7 @@ export function CampaignComposerDialog({
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
+        <SheetFooter className="gap-2 border-t border-border p-6">
           <Button
             variant="outline"
             disabled={!valid || busy !== null}
@@ -239,9 +244,9 @@ export function CampaignComposerDialog({
             )}
             {scheduledAt ? "Schedule" : "Send now"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 

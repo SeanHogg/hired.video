@@ -33,7 +33,7 @@ export function WelcomeHero() {
   };
 
   return (
-    <Card className="relative border-2 border-primary/30 bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-hidden">
+    <Card className="relative border-2 border-primary/30 bg-gradient-to-br from-blue-50 via-card to-purple-50 dark:from-blue-950/30 dark:via-card dark:to-purple-950/30 overflow-hidden">
       <button
         type="button"
         onClick={handleDismiss}
@@ -61,10 +61,10 @@ export function WelcomeHero() {
           {/* Path 1: Create a Video */}
           <Link
             to="/studio"
-            className="group block p-5 rounded-lg bg-card border-2 border-blue-200 hover:border-blue-500 hover:shadow-md transition-all"
+            className="group block p-5 rounded-lg bg-card border-2 border-blue-200 dark:border-blue-900 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition-all"
           >
-            <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-200 transition-colors">
-              <Film className="h-6 w-6 text-blue-600" />
+            <div className="w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center mb-3 group-hover:bg-blue-200 dark:group-hover:bg-blue-900 transition-colors">
+              <Film className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <h3 className="font-semibold text-base mb-1">
               {t("headings.createMarketingVideoStep")}
@@ -72,7 +72,7 @@ export function WelcomeHero() {
             <p className="text-sm text-muted-foreground mb-3">
               {t("messages.createMarketingVideoStepDesc")}
             </p>
-            <div className="flex items-center text-sm font-medium text-blue-600 group-hover:gap-2 transition-all">
+            <div className="flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 group-hover:gap-2 transition-all">
               {t("actions.openStudio")}
               <ArrowRight className="h-4 w-4 ml-1" />
             </div>
@@ -81,10 +81,10 @@ export function WelcomeHero() {
           {/* Path 2: Install Chrome Extension */}
           <Link
             to="/chrome-extension"
-            className="group block p-5 rounded-lg bg-card border-2 border-green-200 hover:border-green-500 hover:shadow-md transition-all"
+            className="group block p-5 rounded-lg bg-card border-2 border-green-200 dark:border-green-900 hover:border-green-500 dark:hover:border-green-500 hover:shadow-md transition-all"
           >
-            <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center mb-3 group-hover:bg-green-200 transition-colors">
-              <Chrome className="h-6 w-6 text-green-600" />
+            <div className="w-12 h-12 rounded-lg bg-green-100 dark:bg-green-950/50 flex items-center justify-center mb-3 group-hover:bg-green-200 dark:group-hover:bg-green-900 transition-colors">
+              <Chrome className="h-6 w-6 text-green-600 dark:text-green-400" />
             </div>
             <h3 className="font-semibold text-base mb-1">
               {t("headings.findJobsFasterStep")}
@@ -92,7 +92,7 @@ export function WelcomeHero() {
             <p className="text-sm text-muted-foreground mb-3">
               {t("messages.findJobsFasterStepDesc")}
             </p>
-            <div className="flex items-center text-sm font-medium text-green-600 group-hover:gap-2 transition-all">
+            <div className="flex items-center text-sm font-medium text-green-600 dark:text-green-400 group-hover:gap-2 transition-all">
               {t("actions.installExtension")}
               <ArrowRight className="h-4 w-4 ml-1" />
             </div>
@@ -101,10 +101,10 @@ export function WelcomeHero() {
           {/* Path 3: Earn as a Creator */}
           <Link
             to="/services"
-            className="group block p-5 rounded-lg bg-card border-2 border-purple-200 hover:border-purple-500 hover:shadow-md transition-all"
+            className="group block p-5 rounded-lg bg-card border-2 border-purple-200 dark:border-purple-900 hover:border-purple-500 dark:hover:border-purple-500 hover:shadow-md transition-all"
           >
-            <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-200 transition-colors">
-              <Sparkles className="h-6 w-6 text-purple-600" />
+            <div className="w-12 h-12 rounded-lg bg-purple-100 dark:bg-purple-950/50 flex items-center justify-center mb-3 group-hover:bg-purple-200 dark:group-hover:bg-purple-900 transition-colors">
+              <Sparkles className="h-6 w-6 text-purple-600 dark:text-purple-400" />
             </div>
             <h3 className="font-semibold text-base mb-1">
               {t("headings.earnAsCreatorStep")}
@@ -112,7 +112,7 @@ export function WelcomeHero() {
             <p className="text-sm text-muted-foreground mb-3">
               {t("messages.earnAsCreatorStepDesc")}
             </p>
-            <div className="flex items-center text-sm font-medium text-purple-600 group-hover:gap-2 transition-all">
+            <div className="flex items-center text-sm font-medium text-purple-600 dark:text-purple-400 group-hover:gap-2 transition-all">
               {t("actions.startEarning")}
               <ArrowRight className="h-4 w-4 ml-1" />
             </div>

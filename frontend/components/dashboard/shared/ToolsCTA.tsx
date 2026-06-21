@@ -29,11 +29,11 @@ export function ToolsCTA({ variant = "banner" }: ToolsCTAProps) {
 
   if (variant === "compact") {
     return (
-      <Card className="border-purple-200 bg-gradient-to-r from-purple-50 via-white to-blue-50">
+      <Card className="border-primary/30 bg-gradient-to-r from-primary/5 via-card to-primary/10">
         <CardHeader className="pb-2 pt-4 px-4">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-md bg-purple-100 flex items-center justify-center shrink-0">
-              <Wrench className="h-4 w-4 text-purple-600" />
+            <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+              <Wrench className="h-4 w-4 text-primary" />
             </div>
             <CardTitle className="text-sm font-semibold">{t("headings.sharpenYourEdge")}</CardTitle>
           </div>
@@ -42,14 +42,14 @@ export function ToolsCTA({ variant = "banner" }: ToolsCTAProps) {
           <div className="flex flex-wrap gap-1.5 mb-3">
             {TOOL_LINKS.map(({ to, icon: Icon, short }) => (
               <Link key={to} to={to}>
-                <Badge variant="secondary" className="cursor-pointer hover:bg-purple-100 text-xs">
+                <Badge variant="secondary" className="cursor-pointer hover:bg-primary/10 text-xs">
                   <Icon className="h-3 w-3 mr-1" /> {short}
                 </Badge>
               </Link>
             ))}
           </div>
           <Link to="/tools">
-            <Button size="sm" className="w-full bg-purple-600 hover:bg-purple-700 text-xs h-8">
+            <Button size="sm" className="w-full text-xs h-8">
               {t("actions.exploreAllTools")}
               <ArrowRight className="h-3 w-3 ml-1" />
             </Button>
@@ -60,17 +60,17 @@ export function ToolsCTA({ variant = "banner" }: ToolsCTAProps) {
   }
 
   return (
-    <Card className="border-purple-200 bg-gradient-to-r from-purple-50 via-white to-blue-50">
+    <Card className="border-primary/30 bg-gradient-to-r from-primary/5 via-card to-primary/10">
       <CardContent className="p-4 sm:p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
-              <Wrench className="h-6 w-6 text-purple-600" />
+            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Wrench className="h-6 w-6 text-primary" />
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <h3 className="font-semibold text-lg">{t("headings.sharpenYourEdgeWithTools")}</h3>
-                <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">{t("labels.newBadge")}</Badge>
+                <Badge className="bg-primary/10 text-primary hover:bg-primary/10">{t("labels.newBadge")}</Badge>
               </div>
               <p className="text-sm text-muted-foreground mb-3">
                 {t("messages.sharpenYourEdgeDesc")}
@@ -78,7 +78,7 @@ export function ToolsCTA({ variant = "banner" }: ToolsCTAProps) {
               <div className="flex flex-wrap gap-2">
                 {TOOL_LINKS.map(({ to, icon: Icon, label }) => (
                   <Link key={to} to={to}>
-                    <Badge variant="secondary" className="cursor-pointer hover:bg-purple-100">
+                    <Badge variant="secondary" className="cursor-pointer hover:bg-primary/10">
                       <Icon className="h-3 w-3 mr-1" /> {label}
                     </Badge>
                   </Link>
@@ -87,7 +87,7 @@ export function ToolsCTA({ variant = "banner" }: ToolsCTAProps) {
             </div>
           </div>
           <Link to="/tools" className="shrink-0">
-            <Button className="bg-purple-600 hover:bg-purple-700 w-full lg:w-auto">
+            <Button className="w-full lg:w-auto">
               {t("actions.exploreAllTools")}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
