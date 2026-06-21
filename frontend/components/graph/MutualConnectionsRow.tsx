@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Users, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth";
 
 interface MutualUser {
   userId: string;
@@ -32,13 +33,20 @@ interface MutualsRowProps {
 }
 
 export default function MutualConnectionsRow({ targetUserId }: MutualsRowProps) {
+  // Mutuals are computed between ME and the target, so the query is
+  // meaningless — and 401s — for a signed-out viewer. Self-gate on auth so a
+  // public profile view never fires the auth-required graph call.
+  const { isAuthenticated } = useAuth();
   const [mutuals, setMutuals] = useState<MutualUser[] | null>(null);
   const [loadingMutuals, setLoadingMutuals] = useState(true);
   const [path, setPath] = useState<PathStep[] | null>(null);
   const [loadingPath, setLoadingPath] = useState(false);
 
   useEffect(() => {
-    if (!targetUserId) return;
+    if (!targetUserId || !isAuthenticated) {
+      setLoadingMutuals(false);
+      return;
+    }
     let cancelled = false;
     apiClient
       .get(`/api/graph/mutuals/${encodeURIComponent(targetUserId)}`)
@@ -52,7 +60,7 @@ export default function MutualConnectionsRow({ targetUserId }: MutualsRowProps) 
       })
       .finally(() => !cancelled && setLoadingMutuals(false));
     return () => { cancelled = true; };
-  }, [targetUserId]);
+  }, [targetUserId, isAuthenticated]);
 
   const showPath = async () => {
     if (path) return;

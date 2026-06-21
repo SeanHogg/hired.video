@@ -11,6 +11,7 @@
  * fetch with keepalive. Fire-and-forget — failures are swallowed.
  */
 import { hasStoredConsentFor } from "@/lib/legal/consent-mode";
+import { resolveApiUrl } from "@/lib/api-client";
 import type {
   TrackUsageInput,
   UsageEventInput,
@@ -100,15 +101,18 @@ export function flushUsage(): void {
     events: queue.splice(0, MAX_QUEUE),
   };
   const json = JSON.stringify(body);
+  // Absolute API origin — the Pages worker on hired.video does NOT own /api/*
+  // (that's the api.hired.video Hono worker), so a relative path 405s in prod.
+  const url = resolveApiUrl("/api/usage/track");
   try {
     if (navigator.sendBeacon) {
-      navigator.sendBeacon("/api/usage/track", new Blob([json], { type: "application/json" }));
+      navigator.sendBeacon(url, new Blob([json], { type: "application/json" }));
       return;
     }
   } catch {
     /* fall through to fetch */
   }
-  void fetch("/api/usage/track", {
+  void fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: json,

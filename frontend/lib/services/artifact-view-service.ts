@@ -14,8 +14,7 @@
  * See README "Consolidated Gap Register" #1019 for the L1/L2/L3 build.
  */
 
-import { apiClient } from "../api-client";
-import { runtimeConfig } from "../runtime-config";
+import { apiClient, resolveApiUrl } from "../api-client";
 import type { ArtifactKind, ArtifactViewBeacon } from "@shared/artifact-views";
 import type { ArtifactMetrics } from "@/components/analytics";
 
@@ -29,9 +28,10 @@ export async function sendArtifactViewBeacon(
   //
   // Must use the absolute API origin — the Pages worker on hired.video does
   // not own /api/* (that's the api.hired.video Hono worker), so a relative
-  // path 405s in prod.
+  // path 405s in prod. resolveApiUrl also de-dupes the `/api` that the
+  // localhost base (http://localhost:8787/api) already carries.
   const body = JSON.stringify(beacon);
-  const url = `${runtimeConfig.apiUrl.replace(/\/$/, "")}/api/analytics/artifacts/beacon`;
+  const url = resolveApiUrl("/api/analytics/artifacts/beacon");
   if (typeof navigator !== "undefined" && navigator.sendBeacon) {
     try {
       const blob = new Blob([body], { type: "application/json" });

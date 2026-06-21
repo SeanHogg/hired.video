@@ -1039,6 +1039,18 @@ export class ApiClient {
     throw new NetworkError("Maximum retry attempts exceeded");
   }
 
+  /**
+   * Resolve an endpoint to its ABSOLUTE URL against the API base. For
+   * hand-rolled `fetch`/`sendBeacon` callers (unload beacons) that can't route
+   * through request()/post() because they need Beacon / `keepalive` semantics.
+   * Mirrors createUrl exactly — same base + `/api` de-duplication — so beacons
+   * can't drift onto the static frontend origin (which doesn't own /api/* and
+   * 405s). Always absolute because the singleton's baseUrl is absolute.
+   */
+  resolveUrl(endpoint: string): string {
+    return this.createUrl(endpoint);
+  }
+
   // Convenience methods
   async get<T>(
     endpoint: string,
@@ -1246,5 +1258,14 @@ export const apiClient = new ApiClient({
     return error;
   },
 });
+
+/**
+ * Module helper: resolve an endpoint to its absolute API URL for hand-rolled
+ * beacon/fetch callers (usage beacon, artifact-view beacon). Single source of
+ * truth so these can't relative-path onto the static frontend origin and 405.
+ */
+export function resolveApiUrl(endpoint: string): string {
+  return apiClient.resolveUrl(endpoint);
+}
 
 export default apiClient;
