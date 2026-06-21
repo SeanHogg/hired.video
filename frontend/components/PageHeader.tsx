@@ -179,8 +179,19 @@ export default function PageHeader({
       )}
 
       {(title || description || search || actions || meta) && (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="min-w-0 flex-1">
+        <div
+          className={cn(
+            "flex gap-3 sm:gap-4 sm:items-center sm:justify-between",
+            // A search toolbar keeps its (icon-collapsed-on-mobile) search
+            // inline with the filters/actions so the lone icon never strands on
+            // its own row; a plain title header keeps the title stacked above
+            // the actions on mobile.
+            search
+              ? "items-start sm:flex-row"
+              : "flex-col sm:flex-row sm:items-center",
+          )}
+        >
+          <div className={cn("min-w-0", search ? "flex-none sm:flex-1" : "flex-1")}>
             {search ? (
               <div className="w-full">{search}</div>
             ) : (
@@ -195,7 +206,19 @@ export default function PageHeader({
             )}
             {meta && <div className="mt-2">{meta}</div>}
           </div>
-          {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
+          {actions && (
+            <div
+              className={cn(
+                "flex items-center gap-2 flex-wrap",
+                // On mobile the actions grow to fill the row beside the search
+                // icon (and wrap internally); on desktop they sit at natural
+                // width pushed right by the search input's `flex-1`.
+                search && "flex-1 sm:flex-none",
+              )}
+            >
+              {actions}
+            </div>
+          )}
         </div>
       )}
     </>

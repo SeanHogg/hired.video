@@ -202,23 +202,21 @@ body[data-print-mode] [data-print-hide] {
     --sidebar-border: 224 22% 22%;
     --sidebar-ring: 262 83% 66%;
 
-    /* ── App rail — DARK = "Charcoal (minimal)": a near-black menu zone with a
-     * faint violet undertone, so the sidebar recedes and the content/cards
-     * lead. The selected row is the only saturated element — brand purple —
-     * which now reads as a true accent instead of competing with a bright
-     * menu. The usage zone drops to the blackest tone. All light text.
-     * Applies to the desktop docked rail AND the mobile drawer. ──────────── */
-    --rail-background: 260 10% 13%;
-    --rail-foreground: 260 12% 86%;
-    --rail-muted: 260 8% 58%;
-    --rail-hover: 260 9% 19%;
-    --rail-active: 262 83% 58%;
+    /* ── App rail — DARK = "S2": inverted — the menu zone is the LIGHTER brand
+     * purple and the selected row drops to the DARK brand purple (matching the
+     * mobile drawer header). Both still over a darker plum usage zone, all light
+     * text. Applies to the desktop docked rail AND the mobile drawer. ──────── */
+    --rail-background: 271 60% 58%;
+    --rail-foreground: 262 70% 94%;
+    --rail-muted: 264 55% 80%;
+    --rail-hover: 271 55% 50%;
+    --rail-active: 271 67% 42%;
     --rail-active-foreground: 0 0% 100%;
-    --rail-border: 260 10% 22%;
-    --rail-usage-background: 260 12% 9%;
-    --rail-usage-foreground: 260 12% 85%;
-    --rail-usage-muted: 260 10% 56%;
-    --rail-usage-border: 260 12% 18%;
+    --rail-border: 271 40% 32%;
+    --rail-usage-background: 264 72% 23%;
+    --rail-usage-foreground: 262 70% 94%;
+    --rail-usage-muted: 264 50% 74%;
+    --rail-usage-border: 271 40% 30%;
 
     /* Footer keeps the plum bands in dark mode too (same tokens). */
     --footer-background: 248 31% 23%;

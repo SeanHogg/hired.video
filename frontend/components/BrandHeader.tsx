@@ -5,21 +5,51 @@ import { SignOutButton } from "@/components/auth/SignOutButton";
 import { useAuth } from "@/lib/auth";
 
 /**
- * BrandLogo — the canonical hired.video word + glyph. Pure presentational,
- * no hooks beyond `Link`. Reused by `<Navigation>` (full chrome) and by
- * `<BrandHeader>` (the minimal branded strip rendered while auth is still
- * resolving or the user is in verification limbo).
+ * BrandLogo — the canonical hired.video word + glyph (Video + Sparkles badge +
+ * gradient wordmark). Pure presentational, no hooks beyond `Link`. This is the
+ * SINGLE source of the brand mark — `<Navigation>` (full chrome), the
+ * `<Sidebar>` mobile drawer header, and `<BrandHeader>` (the minimal branded
+ * strip shown while auth resolves / in verification limbo) all render it so the
+ * logo can never drift between surfaces.
+ *
+ * - `size` — "md" (top bars) or "sm" (denser drawer header).
+ * - `wordmark` — "responsive" hides the wordmark below `sm` (top bars, where
+ *   space is tight); "always" keeps it (the drawer, which is wide); "hidden"
+ *   drops it entirely (the collapsed rail rail-icon state).
  */
-export function BrandLogo({ className }: { className?: string }): JSX.Element {
+export function BrandLogo({
+  className,
+  size = "md",
+  wordmark = "responsive",
+  onClick,
+}: {
+  className?: string;
+  size?: "sm" | "md";
+  wordmark?: "responsive" | "always" | "hidden";
+  onClick?: () => void;
+}): JSX.Element {
+  const iconSize = size === "sm" ? "h-7 w-7" : "h-8 w-8";
+  const textSize = size === "sm" ? "text-lg" : "text-xl";
+  const wordmarkVisibility =
+    wordmark === "always" ? "inline" : "hidden sm:inline";
+
   return (
-    <Link to="/" className={`flex items-center space-x-2 ${className ?? ""}`}>
+    <Link
+      to="/"
+      onClick={onClick}
+      className={`flex items-center space-x-2 ${className ?? ""}`}
+    >
       <div className="relative">
-        <Video className="h-8 w-8 text-primary" />
+        <Video className={`${iconSize} text-primary`} />
         <Sparkles className="h-4 w-4 text-brand-blue absolute -top-1 -right-1" />
       </div>
-      <span className="hidden sm:inline text-xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-        hired.video
-      </span>
+      {wordmark !== "hidden" && (
+        <span
+          className={`${wordmarkVisibility} ${textSize} font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent`}
+        >
+          hired.video
+        </span>
+      )}
     </Link>
   );
 }

@@ -1,7 +1,5 @@
 import {
   Menu,
-  Video,
-  Sparkles,
   ChevronDown,
   FileText,
   Briefcase,
@@ -28,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmulationHeaderControls, useEmulationStyle } from "@/components/EmulationBar";
 import { Button } from "@/components/ui/button";
 import { AuthButtons } from "@/components/AuthButtons";
+import { BrandLogo } from "@/components/BrandHeader";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -149,16 +148,8 @@ export default function Navigation({
               <Menu className="h-4 w-4" />
             </Button>
 
-            {/* Logo */}
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="relative">
-                <Video className="h-8 w-8 text-primary" />
-                <Sparkles className="h-4 w-4 text-brand-blue absolute -top-1 -right-1" />
-              </div>
-              <span className="hidden sm:inline text-xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                hired.video
-              </span>
-            </Link>
+            {/* Logo — shared canonical mark (see BrandLogo). */}
+            <BrandLogo />
           </div>
 
           {/* Header search — hidden on the home page where the hero + sticky search are already prominent,

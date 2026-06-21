@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>hired.video — dark sidebar options (full layout)</title>
+<style>
+  :root { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    /* App chrome (constant) — pulled from the real dark theme tokens */
+    --c-bg: 224 34% 11%; --c-card: 223 30% 15%; --c-muted: 223 22% 19%;
+    --c-border: 223 20% 24%; --c-topbar: 225 40% 8%; --c-fg: 0 0% 92%;
+    /* Footer plum bands (dark) */
+    --f-bg: 248 31% 23%; --f-fg: 250 30% 92%; --f-muted: 249 22% 72%; --f-brand: 250 60% 81%;
+    --f-strong: 249 31% 15%;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: hsl(220 25% 6%); color: #e7e7ea; padding: 24px 24px 60px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 18px; color: #9aa; font-size: 13px; }
+
+  /* ── Variant picker ─────────────────────────────────────────── */
+  .picker { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px;
+    position: sticky; top: 0; background: hsl(220 25% 6%); padding: 10px 0; z-index: 5; }
+  .picker button { cursor: pointer; border: 1px solid #333; border-radius: 999px;
+    padding: 8px 14px; font-size: 12px; font-weight: 600; color: #ddd; background: #15161c;
+    display: flex; align-items: center; gap: 8px; }
+  .picker button.active { border-color: hsl(262 83% 62%); color: #fff; background: hsl(262 40% 22%); }
+  .picker button .sw { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,.25); }
+
+  .stage { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+
+  /* ── Shared rail skin (driven by --menu-bg etc., set on .skinned) ── */
+  .rail { background: hsl(var(--menu-bg)); display: flex; flex-direction: column; }
+  .rail .section { font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+    color: hsl(var(--muted)); margin: 4px 10px 8px; }
+  .rail .menu { flex: 1; padding: 14px 10px; overflow: hidden; }
+  .rail .item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px;
+    margin-bottom: 3px; font-size: 13px; color: hsl(var(--fg) / .85); }
+  .rail .item .dot { width: 14px; height: 14px; border-radius: 4px; background: hsl(var(--fg) / .5); flex: none; }
+  .rail .item.active { background: hsl(var(--active)); color: hsl(var(--active-fg)); font-weight: 600; }
+  .rail .item.active .dot { background: hsl(var(--active-fg)); }
+  .rail .item.hov { background: hsl(var(--hover)); color: hsl(var(--fg)); }
+  .rail .usage { background: hsl(var(--usage-bg)); border-top: 1px solid hsl(var(--usage-border)); padding: 12px 10px; }
+  .rail .usage .ulabel { font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+    color: hsl(var(--usage-muted)); margin: 0 4px 8px; }
+  .rail .chip { display: flex; align-items: center; justify-content: space-between; padding: 9px 11px;
+    border-radius: 8px; margin-bottom: 8px; font-size: 12px; color: #fff;
+    background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.20); }
+  .rail .chip .muted { color: rgba(255,255,255,.7); font-size: 10px; }
+
+  .logo { width: 22px; height: 22px; border-radius: 6px;
+    background: linear-gradient(135deg, hsl(262 83% 60%), hsl(212 90% 60%)); flex: none; }
+  .word { font-weight: 800; font-size: 15px;
+    background: linear-gradient(90deg, hsl(262 83% 70%), hsl(212 90% 64%));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  /* ── DESKTOP frame ─────────────────────────────────────────── */
+  .desktop { width: 760px; max-width: 100%; border-radius: 14px; overflow: hidden;
+    border: 1px solid hsl(var(--c-border)); box-shadow: 0 14px 40px rgba(0,0,0,.5); }
+  .desktop .topbar { height: 54px; background: hsl(var(--c-topbar)); display: flex; align-items: center;
+    gap: 10px; padding: 0 16px; border-bottom: 1px solid hsl(var(--c-border)); }
+  .desktop .topbar .grow { flex: 1; }
+  .desktop .topbar .pill { height: 30px; border-radius: 8px; background: hsl(var(--c-muted)); }
+  .desktop .topbar .searchbar { flex: 1; max-width: 360px; height: 32px; border-radius: 8px;
+    background: hsl(var(--c-card)); border: 1px solid hsl(var(--c-border)); }
+  .desktop .body { display: flex; height: 460px; }
+  .desktop .rail { width: 210px; flex: none; border-right: 1px solid hsl(var(--usage-border)); }
+  .desktop .main { flex: 1; background: hsl(var(--c-bg)); display: flex; flex-direction: column; overflow: hidden; }
+  .desktop .content { flex: 1; padding: 16px; display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; align-content: start; }
+  .desktop .content .card { height: 84px; border-radius: 10px; background: hsl(var(--c-card));
+    border: 1px solid hsl(var(--c-border)); }
+  .desktop .content .card.tall { grid-row: span 2; height: auto; }
+  /* Footer (plum), inside the content column = right of the rail */
+  .desktop .footer { background: hsl(var(--f-bg)); color: hsl(var(--f-fg)); padding: 16px 18px 10px; }
+  .desktop .footer .cols { display: flex; gap: 40px; margin-bottom: 12px; }
+  .desktop .footer .col h4 { margin: 0 0 8px; font-size: 11px; color: hsl(var(--f-brand)); }
+  .desktop .footer .col a { display: block; font-size: 11px; color: hsl(var(--f-muted)); margin-bottom: 5px; text-decoration: none; }
+  .desktop .footer .strong { background: hsl(var(--f-strong)); color: hsl(var(--f-muted));
+    margin: 6px -18px -10px; padding: 10px 18px; font-size: 10px; }
+
+  /* ── MOBILE frame (drawer open over content) ───────────────── */
+  .phone { width: 300px; height: 600px; border-radius: 30px; border: 9px solid #1b1c22;
+    overflow: hidden; position: relative; background: hsl(var(--c-bg)); box-shadow: 0 14px 40px rgba(0,0,0,.5); flex: none; }
+  .phone .ptop { height: 46px; background: hsl(var(--c-topbar)); display: flex; align-items: center; gap: 8px; padding: 0 12px; }
+  .phone .ptop .grow { flex: 1; }
+  .phone .pcontent { padding: 12px; display: grid; gap: 10px; }
+  .phone .pcontent .card { height: 70px; border-radius: 10px; background: hsl(var(--c-card)); border: 1px solid hsl(var(--c-border)); }
+  .phone .scrim { position: absolute; inset: 0; background: rgba(0,0,0,.55); }
+  .phone .drawer { position: absolute; top: 0; bottom: 0; left: 0; width: 84%; display: flex; flex-direction: column; }
+  .phone .drawer .dhead { display: flex; align-items: center; gap: 8px; padding: 12px 12px;
+    background: hsl(var(--c-topbar)); border-bottom: 1px solid hsl(var(--c-border)); }
+  .phone .drawer .dhead .grow { flex: 1; }
+  .phone .drawer .x { color: #ccc; font-size: 16px; }
+  .phone .bottomnav { position: absolute; left: 0; right: 0; bottom: 0; height: 54px; z-index: 3;
+    background: hsl(var(--c-topbar)); border-top: 1px solid hsl(var(--c-border)); display: flex; }
+  .phone .bottomnav div { flex: 1; display: flex; align-items: center; justify-content: center; }
+  .phone .bottomnav div span { width: 16px; height: 16px; border-radius: 5px; background: hsl(var(--c-muted)); }
+  .phone .bottomnav div.on span { background: hsl(var(--active)); }
+
+  .label { font-size: 12px; font-weight: 700; margin: 0 0 8px; color: #cfd2dc; }
+  .col-wrap { display: flex; flex-direction: column; }
+</style>
+</head>
+<body>
+  <h1>hired.video — dark sidebar, full layout</h1>
+  <p class="sub">Click a variant — the desktop frame (header · rail · content · plum footer) and the mobile drawer both reskin live.</p>
+
+  <div class="picker" id="picker"></div>
+
+  <div class="stage">
+    <div class="col-wrap">
+      <div class="label">Desktop — header · sidebar · content · footer</div>
+      <div class="desktop skinned" id="desk">
+        <div class="topbar">
+          <span class="logo"></span><span class="word">hired.video</span>
+          <div class="grow"></div>
+          <div class="searchbar"></div>
+          <div class="grow"></div>
+          <div class="pill" style="width:54px"></div>
+          <div class="pill" style="width:32px"></div>
+        </div>
+        <div class="body">
+          <div class="rail">
+            <div class="menu">
+              <div class="section">Navigate</div>
+              <div class="item"><span class="dot"></span>Dashboard</div>
+              <div class="item active"><span class="dot"></span>Studio</div>
+              <div class="item"><span class="dot"></span>Tools / Learning</div>
+              <div class="item hov"><span class="dot"></span>Resumes</div>
+              <div class="item"><span class="dot"></span>Jobs</div>
+              <div class="item"><span class="dot"></span>People</div>
+              <div class="section" style="margin-top:12px">Administration</div>
+              <div class="item"><span class="dot"></span>Admin Panel</div>
+            </div>
+            <div class="usage">
+              <div class="ulabel">Usage</div>
+              <div class="chip"><span>Unlimited tokens</span><span class="muted">93.8K</span></div>
+              <div class="chip"><span>Points admin</span><span class="muted">Open →</span></div>
+            </div>
+          </div>
+          <div class="main">
+            <div class="content">
+              <div class="card"></div><div class="card"></div><div class="card"></div>
+              <div class="card tall"></div><div class="card tall"></div><div class="card tall"></div>
+            </div>
+            <div class="footer">
+              <div class="cols">
+                <div class="col"><h4>Product</h4><a>Studio</a><a>Resumes</a><a>Jobs</a></div>
+                <div class="col"><h4>Company</h4><a>About</a><a>Pricing</a><a>Careers</a></div>
+                <div class="col"><h4>Resources</h4><a>Guides</a><a>Tools</a><a>FAQs</a></div>
+              </div>
+              <div class="strong">© hired.video — all rights reserved</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-wrap">
+      <div class="label">Mobile — slide-out drawer</div>
+      <div class="phone skinned" id="phone">
+        <div class="ptop"><span style="color:#bbb;font-size:18px">≡</span><span class="logo"></span><span class="word">hired.video</span><div class="grow"></div><div style="width:24px;height:24px;border-radius:50%;background:hsl(var(--c-muted))"></div></div>
+        <div class="pcontent">
+          <div class="card"></div><div class="card"></div><div class="card"></div>
+        </div>
+        <div class="scrim"></div>
+        <div class="rail drawer">
+          <div class="dhead"><span class="logo"></span><span class="word">hired.video</span><div class="grow"></div><span class="x">✕</span></div>
+          <div class="menu">
+            <div class="section">Navigate</div>
+            <div class="item"><span class="dot"></span>Dashboard</div>
+            <div class="item active"><span class="dot"></span>Studio</div>
+            <div class="item"><span class="dot"></span>Tools / Learning</div>
+            <div class="item hov"><span class="dot"></span>Resumes</div>
+            <div class="item"><span class="dot"></span>Jobs</div>
+          </div>
+          <div class="usage">
+            <div class="ulabel">Usage</div>
+            <div class="chip"><span>Unlimited tokens</span><span class="muted">93.8K</span></div>
+            <div class="chip"><span>Points admin</span><span class="muted">Open →</span></div>
+          </div>
+        </div>
+        <div class="bottomnav"><div class="on"><span></span></div><div><span></span></div><div><span></span></div><div><span></span></div></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const VARIANTS = [
+  { name: "Current — Bright Purple", vars: {
+    "menu-bg":"271 60% 58%","fg":"262 70% 94%","muted":"264 55% 80%","hover":"271 55% 50%",
+    "active":"271 67% 42%","active-fg":"0 0% 100%",
+    "usage-bg":"264 72% 23%","usage-muted":"264 50% 74%","usage-border":"271 40% 30%" } },
+  { name: "Deep Indigo ★", vars: {
+    "menu-bg":"255 33% 22%","fg":"255 25% 90%","muted":"255 15% 65%","hover":"255 30% 28%",
+    "active":"262 83% 60%","active-fg":"0 0% 100%",
+    "usage-bg":"258 46% 13%","usage-muted":"255 20% 65%","usage-border":"258 40% 22%" } },
+  { name: "Royal Plum", vars: {
+    "menu-bg":"272 44% 30%","fg":"272 35% 92%","muted":"272 25% 72%","hover":"272 42% 36%",
+    "active":"272 70% 64%","active-fg":"0 0% 100%",
+    "usage-bg":"272 52% 18%","usage-muted":"272 28% 72%","usage-border":"272 40% 28%" } },
+  { name: "Midnight Navy", vars: {
+    "menu-bg":"226 36% 18%","fg":"226 30% 90%","muted":"226 18% 65%","hover":"226 32% 24%",
+    "active":"262 83% 62%","active-fg":"0 0% 100%",
+    "usage-bg":"230 44% 11%","usage-muted":"226 20% 64%","usage-border":"230 36% 20%" } },
+  { name: "Emerald Slate", vars: {
+    "menu-bg":"182 26% 18%","fg":"180 20% 90%","muted":"182 14% 62%","hover":"182 24% 24%",
+    "active":"262 83% 62%","active-fg":"0 0% 100%",
+    "usage-bg":"188 40% 11%","usage-muted":"182 16% 62%","usage-border":"188 34% 20%" } },
+  { name: "Slate (neutral)", vars: {
+    "menu-bg":"222 16% 19%","fg":"222 20% 90%","muted":"222 12% 62%","hover":"222 14% 25%",
+    "active":"262 83% 60%","active-fg":"0 0% 100%",
+    "usage-bg":"222 22% 11%","usage-muted":"222 14% 62%","usage-border":"222 18% 20%" } },
+];
+
+const picker = document.getElementById("picker");
+const skinned = document.querySelectorAll(".skinned");
+function apply(v, btn) {
+  for (const el of skinned)
+    for (const [k,val] of Object.entries(v.vars)) el.style.setProperty(`--${k}`, val);
+  picker.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+}
+VARIANTS.forEach((v, i) => {
+  const b = document.createElement("button");
+  b.innerHTML = `<span class="sw" style="background:hsl(${v.vars["menu-bg"]})"></span>${v.name}`;
+  b.onclick = () => apply(v, b);
+  picker.appendChild(b);
+  if (i === 1) setTimeout(() => apply(v, b), 0); // default to Deep Indigo
+});
+</script>
+</body>
+</html>
