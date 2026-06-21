@@ -133,10 +133,19 @@ export default function PageHeader({
     activeLiRef.current?.scrollIntoView({ inline: "center", block: "nearest" });
   }, [activeTabKey, location.pathname]);
 
+  // When the action bar holds ONLY the tab strip (no title/search/actions row
+  // below), the band's own bottom hairline is the separator — so the nav drops
+  // its own `mb-4 border-b` to avoid a redundant double line floating in the
+  // band. With a row below (People, Jobs, …) the nav border still divides tabs
+  // from search/actions.
+  const hasRowBelow = Boolean(title || description || search || actions || meta);
+  const navClass =
+    asActionBar && !hasRowBelow ? "" : "mb-4 border-b";
+
   const inner = (
     <>
       {tabs && tabs.length > 0 && (
-        <nav className="mb-4 border-b" aria-label="Section">
+        <nav className={cn(navClass)} aria-label="Section">
           <ul className="flex gap-1 -mb-px overflow-x-auto">
             {tabs.map((tab) => {
               const active = isActive(tab);

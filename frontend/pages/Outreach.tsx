@@ -737,6 +737,7 @@ export default function Outreach() {
             <PageHeader
               tabs={outreachTabs}
               activeTabKey={activeTab}
+              sticky
             />
 
             {/* Loading State */}

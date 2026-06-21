@@ -168,7 +168,7 @@ export default function Navigation({
            * search slot, so we keep the global one to preserve the SEO funnel. Keep this list in sync
            * with the pages that pass `search={<HeaderSearch />}` to PageHeader. */}
           {location.pathname !== "/" && !(isAuthenticated && pathIsInlineHeaderSearch(location.pathname)) && (
-            <div className="flex-1 min-w-0 md:max-w-md mx-1 sm:mx-4">
+            <div className="flex-none md:flex-1 min-w-0 md:max-w-md ml-auto md:ml-4 mr-1 md:mr-4">
               <HeaderSearch />
             </div>
           )}
@@ -269,10 +269,15 @@ export default function Navigation({
 
             {/* Language switcher — same component used in BrandHeader +
                 Footer so a visitor can switch language from any chrome
-                surface. Always visible: on mobile this top bar is the only
-                always-on place to switch language (the sidebar lives behind
-                the hamburger). `buttonVariant="outline"` matches the cart. */}
-            <LocaleSwitcher variant="compact" buttonVariant="outline" className="inline-flex h-11" />
+                surface. `buttonVariant="outline"` matches the cart. On mobile
+                it's folded into the avatar menu (LocaleMenuItems) for signed-in
+                users to free bar space, but stays inline for signed-out visitors
+                — they have no avatar menu, so the bar is their only switch. */}
+            <LocaleSwitcher
+              variant="compact"
+              buttonVariant="outline"
+              className={cn("inline-flex h-11", isAuthenticated && "hidden md:inline-flex")}
+            />
 
             {/* Light/dark toggle — always-on chrome so the theme is reachable
                 from any surface, same rationale as the locale switcher. */}

@@ -100,15 +100,11 @@ function AuthenticatedCommunicationHub({ variant = "ghost" }: { variant?: Button
     [hub, navigate],
   );
 
-  const triggerButton = (
-    <Button
-      variant={variant}
-      size="icon"
-      className="relative"
-      aria-label={
-        unreadCount > 0 ? `Inbox (${unreadCount} unread)` : "Inbox"
-      }
-    >
+  // Bell glyph + unread badge — shared by the desktop popover trigger and the
+  // mobile sheet trigger so both carry the identical icon/badge (DRY).
+  const inboxAriaLabel = unreadCount > 0 ? `Inbox (${unreadCount} unread)` : "Inbox";
+  const bellContent = (
+    <>
       <Send className="h-5 w-5" />
       {unreadCount > 0 && (
         <Badge
@@ -118,6 +114,17 @@ function AuthenticatedCommunicationHub({ variant = "ghost" }: { variant?: Button
           {unreadCount > 99 ? "99+" : unreadCount}
         </Badge>
       )}
+    </>
+  );
+
+  const triggerButton = (
+    <Button
+      variant={variant}
+      size="icon"
+      className="relative"
+      aria-label={inboxAriaLabel}
+    >
+      {bellContent}
     </Button>
   );
 
@@ -139,22 +146,18 @@ function AuthenticatedCommunicationHub({ variant = "ghost" }: { variant?: Button
 
       {/* Mobile sheet */}
       <div className="md:hidden">
-        <button
-          type="button"
+        {/* Same bordered-box chrome as the cart/locale/theme controls — the
+            mobile trigger reuses the Button (outline) instead of a bare button
+            so it isn't the odd borderless icon in the row. */}
+        <Button
+          variant={variant}
+          size="icon"
+          className="relative"
           onClick={() => setSheetOpen(true)}
-          aria-label={unreadCount > 0 ? `Inbox (${unreadCount} unread)` : "Inbox"}
-          className="relative inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label={inboxAriaLabel}
         >
-          <Send className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <Badge
-              variant="destructive"
-              className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 text-[10px] flex items-center justify-center"
-            >
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </Badge>
-          )}
-        </button>
+          {bellContent}
+        </Button>
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetContent
             side="left"

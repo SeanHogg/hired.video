@@ -13,6 +13,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useSignOut } from "@/hooks/use-sign-out";
 import { SuperAdminMenuItems } from "@/components/EmulationBar";
+import { LocaleMenuItems } from "@/components/i18n/LocaleSwitcher";
 
 /**
  * UserMenu — the avatar dropdown in the top bar that consolidates every
@@ -81,8 +82,13 @@ export function UserMenu() {
             bar (EmulationHeaderControls); folding them into the avatar here lets
             the mobile top bar shed the standalone shield so the avatar fits.
             Self-gates to SuperAdmins (renders nothing otherwise). */}
+        {/* Language picker + SuperAdmin tools — mobile only. On md+ both live
+            inline in the top bar; folding them into the avatar here lets the
+            mobile bar shed those controls so the avatar fits. SuperAdminMenuItems
+            self-gates to SuperAdmins; LocaleMenuItems shows for everyone. */}
         <div className="md:hidden">
           <SuperAdminMenuItems />
+          <LocaleMenuItems />
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem

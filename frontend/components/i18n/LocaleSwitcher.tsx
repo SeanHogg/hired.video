@@ -44,28 +44,14 @@ import {
 } from "@shared/i18n";
 import { cn } from "@/lib/utils";
 
-export type LocaleSwitcherVariant = "compact" | "labeled";
-
-export interface LocaleSwitcherProps {
-  /** "compact" = globe icon + short tag (header use). "labeled" = globe
-   *  icon + active language native name (footer use). */
-  variant?: LocaleSwitcherVariant;
-  className?: string;
-  /** Override the dropdown alignment when the trigger sits at the edge
-   *  of its container (default: "end" works for top-right mounts). */
-  align?: "start" | "center" | "end";
-  /** Trigger button style — defaults to the borderless "ghost". The top
-   *  nav passes "outline" so it matches the cart's bordered-box chrome. */
-  buttonVariant?: ButtonProps["variant"];
-}
-
-export function LocaleSwitcher({
-  variant = "compact",
-  className,
-  align = "end",
-  buttonVariant = "ghost",
-}: LocaleSwitcherProps): JSX.Element {
-  const { t, i18n } = useTranslation();
+/**
+ * Shared locale state + selection handler. Consumed by the standalone
+ * <LocaleSwitcher /> dropdown (header/footer) and the embeddable
+ * <LocaleMenuItems /> (folded into the avatar menu on mobile) so both stay in
+ * lock-step (DRY) — same available list, active locale, and persistence path.
+ */
+export function useLocaleSwitcher() {
+  const { i18n } = useTranslation();
   const { user } = useAuth();
 
   const isSuperAdmin = user?.role === USER_ROLES.SUPER_ADMIN;
@@ -88,6 +74,66 @@ export function LocaleSwitcher({
       }
     }
   };
+
+  return { available, active, handleSelect };
+}
+
+/**
+ * LocaleMenuItems — the language list as plain menu items (leading with its own
+ * separator) for embedding INSIDE an existing DropdownMenuContent (e.g. the
+ * avatar menu on mobile, where the standalone switcher is dropped to save bar
+ * space). Mirrors the standalone switcher's list exactly via the shared hook.
+ */
+export function LocaleMenuItems(): JSX.Element {
+  const { t } = useTranslation();
+  const { available, active, handleSelect } = useLocaleSwitcher();
+
+  return (
+    <>
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel>{t("chrome.localeSwitcher.title")}</DropdownMenuLabel>
+      {available.map((loc) => {
+        const isActive = loc === active;
+        return (
+          <DropdownMenuItem
+            key={loc}
+            onSelect={() => void handleSelect(loc)}
+            className="flex items-center justify-between gap-3"
+          >
+            <span>{NATIVE_LABELS[loc]}</span>
+            {isActive ? (
+              <Check className="h-4 w-4 text-primary" aria-hidden />
+            ) : null}
+          </DropdownMenuItem>
+        );
+      })}
+    </>
+  );
+}
+
+export type LocaleSwitcherVariant = "compact" | "labeled";
+
+export interface LocaleSwitcherProps {
+  /** "compact" = globe icon + short tag (header use). "labeled" = globe
+   *  icon + active language native name (footer use). */
+  variant?: LocaleSwitcherVariant;
+  className?: string;
+  /** Override the dropdown alignment when the trigger sits at the edge
+   *  of its container (default: "end" works for top-right mounts). */
+  align?: "start" | "center" | "end";
+  /** Trigger button style — defaults to the borderless "ghost". The top
+   *  nav passes "outline" so it matches the cart's bordered-box chrome. */
+  buttonVariant?: ButtonProps["variant"];
+}
+
+export function LocaleSwitcher({
+  variant = "compact",
+  className,
+  align = "end",
+  buttonVariant = "ghost",
+}: LocaleSwitcherProps): JSX.Element {
+  const { t } = useTranslation();
+  const { available, active, handleSelect } = useLocaleSwitcher();
 
   const triggerLabel =
     variant === "labeled" ? NATIVE_LABELS[active] : SHORT_TAGS[active];
