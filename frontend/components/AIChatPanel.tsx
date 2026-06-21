@@ -45,6 +45,7 @@ import { Link, useLocation } from "react-router-dom";
 import { AIUsageLimitError, RateLimitError } from "@/lib/errors";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { aiService } from "@/lib/services/ai-service";
+import { helpService } from "@/lib/services/help-service";
 import { TIER_COPY } from "@shared/tier-copy";
 import { getPrompt } from "@shared/ai-prompts";
 import {
@@ -505,9 +506,28 @@ export default function AIChatPanel() {
     // (zero cost, zero round-trip) and hand the snippets to the triage call.
     if (!action) {
       try {
-        const { searchHelpLocal } = await import("@/lib/help/content");
+        const { searchHelpLocal, helpItemsForSlugs } = await import("@/lib/help/content");
+        // Retrieve candidate docs two ways and merge (unique by slug):
+        // instant local keyword + cheap Vectorize semantic for paraphrased
+        // questions the keyword index misses. Both are far cheaper than a
+        // premium turn; the triage call is the real gate. (#2232 Phase 2)
         const candidates = searchHelpLocal(content.trim(), i18n.language, 4);
+        try {
+          const sem = await helpService.search(content.trim());
+          if (sem.data?.semantic && sem.data.slugs.length > 0) {
+            const seen = new Set(candidates.map((c) => c.slug));
+            for (const item of helpItemsForSlugs(sem.data.slugs, i18n.language)) {
+              if (!seen.has(item.slug)) {
+                candidates.push(item);
+                seen.add(item.slug);
+              }
+            }
+          }
+        } catch {
+          // Semantic unavailable → keyword candidates only.
+        }
         if (candidates.length > 0) {
+          candidates.length = Math.min(candidates.length, 6);
           const help = await aiService.helpAssist({
             question: content.trim(),
             candidates: candidates.map((cd) => ({

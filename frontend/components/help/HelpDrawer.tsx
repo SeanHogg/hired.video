@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { detectContextType } from "@/lib/config/page-meta-registry";
 import { helpService } from "@/lib/services/help-service";
+import { DEFAULT_HELP_MAPPING } from "@shared/help";
 import type { HelpItem } from "@/lib/help/content";
 import { useHelpContent } from "@/lib/help/use-help-content";
 import { helpKindIcon } from "@/lib/help/kind-icon";
@@ -51,9 +52,14 @@ export function HelpDrawer(): JSX.Element | null {
     staleTime: 10 * 60 * 1000,
     retry: false,
   });
+  // Help works with ZERO DB: a context "has help" if the curated DB mapping
+  // lists it OR the bundled DEFAULT_HELP_MAPPING does. The DB is a pure
+  // override — when help_mappings is empty/unavailable (fresh env, migration
+  // not yet applied, DB hiccup) we fall back to the bundled defaults so the
+  // drawer still renders. (#2231)
   const activeContexts = contextsRes?.data?.contexts ?? [];
-  const hasContextHelp = activeContexts.includes(contextKey);
-  const hasGeneralHelp = activeContexts.includes("general");
+  const hasContextHelp = activeContexts.includes(contextKey) || !!DEFAULT_HELP_MAPPING[contextKey];
+  const hasGeneralHelp = activeContexts.includes("general") || !!DEFAULT_HELP_MAPPING.general;
   const hasAnyHelp = hasContextHelp || hasGeneralHelp;
   const resolveKey = hasContextHelp ? contextKey : "general";
 
@@ -65,10 +71,13 @@ export function HelpDrawer(): JSX.Element | null {
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
-  const curated = useMemo<HelpItem[]>(
-    () => (help ? help.helpItemsForSlugs(resolveRes?.data?.slugs ?? [], lang) : []),
-    [help, resolveRes, lang],
-  );
+  const curated = useMemo<HelpItem[]>(() => {
+    if (!help) return [];
+    // DB curation overrides the bundled default; fall back when it's empty.
+    const apiSlugs = resolveRes?.data?.slugs ?? [];
+    const slugs = apiSlugs.length > 0 ? apiSlugs : DEFAULT_HELP_MAPPING[resolveKey] ?? [];
+    return help.helpItemsForSlugs(slugs, lang);
+  }, [help, resolveRes, resolveKey, lang]);
 
   const trimmed = query.trim();
   const searching = trimmed.length >= 2;

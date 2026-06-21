@@ -4563,8 +4563,8 @@ function EditorHeader({
     getVideoScript,
   });
   return (
-    <header className="flex items-center justify-between gap-4 border-b border-border bg-card px-4 py-2">
-      <div className="flex flex-1 items-center gap-2">
+    <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border bg-card px-3 py-2 sm:px-4">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <Button
           variant="ghost"
           size="sm"
@@ -4577,11 +4577,11 @@ function EditorHeader({
         {/* Title field is editable — the transparent border made that
             non-obvious, so a Pencil hint fades in on hover to advertise
             the affordance without changing the input behaviour. */}
-        <div className="group relative flex items-center">
+        <div className="group relative flex min-w-0 items-center">
           <Input
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
-            className="h-8 max-w-xs border-transparent bg-transparent pr-7 text-sm font-medium shadow-none focus-visible:border-border"
+            className="h-8 min-w-0 max-w-[40vw] border-transparent bg-transparent pr-7 text-sm font-medium shadow-none focus-visible:border-border sm:max-w-xs"
           />
           <Pencil
             className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-0"
@@ -4615,7 +4615,7 @@ function EditorHeader({
           would be a misleading control. The empty flex-1 spacer keeps
           the title block + right actions visually balanced. */}
       {usesTimelineChrome ? (
-        <div className="flex flex-1 items-center justify-center gap-2">
+        <div className="order-last flex w-full flex-1 items-center justify-center gap-2 sm:order-none sm:w-auto">
           <Button
             variant="ghost"
             size="sm"
@@ -4653,9 +4653,9 @@ function EditorHeader({
           </span>
         </div>
       ) : (
-        <div className="flex-1" />
+        <div className="hidden flex-1 sm:block" />
       )}
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         {/* "+ New Video" + Wizard live on the Studio landing (`/studio`,
             reachable via the ← Back arrow). Putting them on the per-
             project header conflated "make ANOTHER project" with "do

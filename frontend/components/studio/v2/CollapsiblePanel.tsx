@@ -47,13 +47,27 @@ export default function CollapsiblePanel({
   children,
 }: CollapsiblePanelProps) {
   const [open, setOpen] = useState<boolean>(() => {
-    if (typeof window === "undefined" || !storageKey) return defaultOpen;
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      if (raw === "open") return true;
-      if (raw === "closed") return false;
-    } catch {
-      // Quota/private-mode — fall through to default.
+    if (typeof window === "undefined") return defaultOpen;
+    if (storageKey) {
+      try {
+        const raw = window.localStorage.getItem(storageKey);
+        if (raw === "open") return true;
+        if (raw === "closed") return false;
+      } catch {
+        // Quota/private-mode — fall through to viewport/default.
+      }
+    }
+    // No stored preference yet: on a narrow (mobile) viewport the
+    // horizontal side rails start collapsed so they don't crowd the
+    // canvas off-screen. The bottom dock keeps its `defaultOpen` —
+    // vertical space isn't the constraint there. Once the user toggles
+    // a panel the choice persists (via storageKey) and wins next time.
+    if (
+      side !== "bottom" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 767px)").matches
+    ) {
+      return false;
     }
     return defaultOpen;
   });
