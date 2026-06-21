@@ -307,11 +307,11 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   // Job extraction (Chrome extension Track click → /api/jobs/extract).
   // One-shot, user-initiated, high-value: a bad extract makes the saved
   // job unusable downstream (match scoring, tailor, autofill all read
-  // this row). Match `studio_script`'s premium shape — Claude Haiku for
+  // this row). Match `studio_script`'s premium shape — Claude Opus 4.8 for
   // best JSON-from-markdown quality, free Qwen primary fallback, and
   // withFallbackChain auto-pads the rest of the free pool.
   job_parser: {
-    model: "anthropic/claude-haiku-4-5",
+    model: "anthropic/claude-opus-4-8",
     temperature: 0.0,
     fallbacks: [
       { model: "qwen/qwen3-next-80b-a3b-instruct:free", temperature: 0.0 },
