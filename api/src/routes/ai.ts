@@ -514,7 +514,7 @@ function buildImproveUserMessage(
  *  collapse the headline to one line, and clamp to the field's max length. */
 function sanitizeImproved(raw: string, field: "headline" | "about"): string {
   let out = (raw ?? "").trim();
-  out = out.replace(/^(headline|about|bio)\s*[:\-]\s*/i, "").trim();
+  out = out.replace(/^(headline|about|bio)\s*[:-]\s*/i, "").trim();
   if ((out.startsWith('"') && out.endsWith('"')) || (out.startsWith("'") && out.endsWith("'"))) {
     out = out.slice(1, -1).trim();
   }
