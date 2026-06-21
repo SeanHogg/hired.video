@@ -70,13 +70,21 @@ export function usePeopleTabs({ connectionsCount }: UsePeopleTabsOptions = {}): 
     });
   }
 
-  tabs.push({
-    key: "hiring",
-    label: "Hiring & Onboarding",
-    icon: ClipboardList,
-    to: "/people/hiring",
-    matchPrefixes: ["/people/hiring"],
-  });
+  // Hiring & Onboarding (offer letters + onboarding checklists) is an
+  // employer/recruiter surface — gate it on role like talent-pool/submissions.
+  // Leaving it unconditional surfaced it to plain job seekers, who'd click
+  // through to /people/hiring and trip the server-side `requirePro` 402 (the
+  // page is Pro-gated), generating noise error reports for a tab they should
+  // never have seen.
+  if (showHiringSide) {
+    tabs.push({
+      key: "hiring",
+      label: "Hiring & Onboarding",
+      icon: ClipboardList,
+      to: "/people/hiring",
+      matchPrefixes: ["/people/hiring"],
+    });
+  }
 
   if (hasCompanyAccess) {
     tabs.push({

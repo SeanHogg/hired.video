@@ -193,14 +193,21 @@ function extractLooseErrorEnvelope(
 function isExpectedSilentError(error: AppError): boolean {
   if (error instanceof UnverifiedAccountError) return true;
   if (error instanceof AuthenticationError && !localStorage.getItem("auth_token")) return true;
+  const serverCode = (error.context as { serverCode?: string } | undefined)?.serverCode;
   // `MAILBOX_REAUTH_REQUIRED` is user-state, not a server fault — Google /
   // Microsoft rejected the stored refresh token (revoked, password change,
   // Testing-app 7-day expiry). The route already flipped the account row
   // to `status: "error"` and the Inbox / Settings surfaces render their
   // own "Reconnect" CTA off that, so suppressing the red global toast
   // avoids a "Support Ticket" prompt for what's a one-click reconnect.
-  const serverCode = (error.context as { serverCode?: string } | undefined)?.serverCode;
   if (serverCode === "MAILBOX_REAUTH_REQUIRED") return true;
+  // `PRO_REQUIRED` (402) is an entitlement signal, not a fault — every
+  // Pro-gated surface (Hiring & Onboarding, ProfileAudit, …) catches it and
+  // renders its own inline upgrade prompt. Dispatching the global red toast
+  // on top of that double-surfaces the gate and, worse, hands the user a
+  // "Report this error" button that emails the maintainer a non-bug. Treat
+  // it like the AI usage-limit gate: the consuming page owns the upgrade UX.
+  if (serverCode === "PRO_REQUIRED") return true;
   return false;
 }
 

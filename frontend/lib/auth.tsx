@@ -302,9 +302,15 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     rememberMe = false,
     cfTurnstileToken?: string,
   ): Promise<true | TwoFactorChallengeUI | EmailVerificationChallengeUI> => {
-    setIsLoading(true);
-    try {
-      console.log("AuthContext.login: Starting login process");
+    // NOTE: do NOT toggle the global `isLoading` here. That flag means "auth
+    // bootstrap not yet settled" and is owned solely by the mount effect.
+    // Flipping it for an in-flight login flips `useShouldRenderAppChrome` /
+    // `useApiReady`, which remounts AppShell's subtree (and any route guard
+    // rendering <PageLoader/>) mid-request — destroying LoginForm's local 2FA
+    // state so the step-up code screen never appears. The caller (LoginForm)
+    // owns its own per-action loading state.
+    console.log("AuthContext.login: Starting login process");
+    {
 
       // Errors propagate so the caller can show the actual server reason
       // (TURNSTILE_FAIL, RATE_LIMIT, ACCOUNT_LOCKED, invalid credentials)
@@ -372,8 +378,6 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
 
       console.log("AuthContext.login: Login successful, returning true");
       return true;
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -388,8 +392,10 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     cfTurnstileToken?: string,
     language?: string,
   ): Promise<void> => {
-    setIsLoading(true);
-    try {
+    // See login(): never flip the global bootstrap `isLoading` for a transient
+    // action — SignupForm owns its own submit-loading state. Flipping the
+    // bootstrap flag remounts the chrome/route subtree mid-request.
+    {
       // Filter out SuperAdmin from registration - it's internal only.
       // Employee is invite-only (#1349); if someone tries to signup as
       // one, coerce to job_seeker — they'll get a normal user account
@@ -430,8 +436,6 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         cfTurnstileToken,
         language,
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -538,8 +542,10 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   };
 
   const verifyTwoFactor = async (code: string, trustDevice = false): Promise<boolean> => {
+    // See login(): never flip the global bootstrap `isLoading` for a transient
+    // action — it remounts the chrome/route subtree (and this very 2FA form)
+    // mid-verify. LoginForm owns `isVerifying` for the button state.
     try {
-      setIsLoading(true);
       await authService.verifyTwoFactor(code, trustDevice);
       const profile = authService.getStoredUser();
       if (profile) setUser(userProfileToUser(profile));
@@ -557,8 +563,6 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     } catch (error) {
       console.error("AuthContext.verifyTwoFactor: failed", error);
       return false;
-    } finally {
-      setIsLoading(false);
     }
   };
 

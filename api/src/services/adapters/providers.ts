@@ -3,8 +3,8 @@
  * sampling profile + cross-vendor fallback chain.
  *
  * Single source of truth for product-level LLM decisions:
- *   - `studio_script` runs on Claude Haiku (best narrative + JSON), with
- *     a free OpenRouter fallback so Claude outage doesn't degrade Pro
+ *   - `studio_script` runs on Claude Opus 4.8 (best narrative + JSON), with
+ *     a free OpenRouter fallback so a Claude outage doesn't degrade Pro
  *     users below free.
  *   - `match` runs on Cerebras for sub-200ms TTFT, with an OpenRouter
  *     fallback when Cerebras is down.
@@ -96,7 +96,7 @@ export type LLMUseCase =
   // 3D world game-builder agent (gap #1638). Multi-turn tool-using
   // agent that calls the world-3d mutation tools to build the game
   // from natural-language prompts. Needs a model with strong tool-use
-  // + reasoning; defaults to anthropic/claude-sonnet-4-6 which the
+  // + reasoning; defaults to anthropic/claude-opus-4-8 which the
   // gateway resolves to the latest tool-calling-capable variant.
   | "studio_game_agent"
   | "default";
@@ -141,18 +141,21 @@ const FREE_TIER_FALLBACK_POOL = [
 
 /** Paid-tier terminal fallback pool for user-interactive use cases.
  *  Cerebras Llama 3.1-8B (sub-200ms TTFT, cheap) is the fast path;
- *  Anthropic Claude Haiku 4.5 (already `studio_script`'s primary) is the
+ *  Anthropic Claude Opus 4.8 (already `studio_script`'s primary) is the
  *  second vendor so the paid layer has the same cross-vendor diversity
  *  we already give the free layer. Closes gap #525 Part B; widened
  *  2026-05-21 (gap #888) after a tailor 503 (`correlationId
  *  llm-4c95a353`) showed Cerebras itself can return 429 in <1s — a
  *  single-vendor paid terminal is one outage away from useless. Ordered
- *  cheapest-fastest first so the common-case cost stays low; Haiku only
+ *  cheapest-fastest first so the common-case cost stays low; Claude only
  *  kicks in when Cerebras itself rejects. Real $ on both; applied only
- *  to the use cases in INTERACTIVE_USE_CASES below. */
+ *  to the use cases in INTERACTIVE_USE_CASES below. The Anthropic entry
+ *  tracks the gateway's current GA id (was `claude-haiku-4-5`/-`3-haiku`;
+ *  retired out of the gateway catalog → bumped to `claude-opus-4-8` on
+ *  2026-06-21 per the model-catalog drift audit, gap #1938). */
 const PAID_TERMINAL_POOL = [
   "cerebras/llama3.1-8b",
-  "anthropic/claude-haiku-4-5",
+  "anthropic/claude-opus-4-8",
 ] as const;
 
 /** A `:free`-tier model string (OpenRouter free pool). Single predicate so
@@ -250,7 +253,7 @@ function withFallbackChain(useCase: LLMUseCase, profile: UseCaseProfile): UseCas
 
 const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   studio_script: {
-    model: "anthropic/claude-haiku-4-5",
+    model: "anthropic/claude-opus-4-8",
     temperature: 0.7,
     fallbacks: [
       { model: "qwen/qwen3-next-80b-a3b-instruct:free", temperature: 0.7 },
@@ -275,7 +278,7 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   interview_questions: { model: "google/gemma-4-31b-it:free", temperature: 0.6 },
   interview_analyze: { model: "openai/gpt-oss-120b:free", temperature: 0.3 },
   interview_answer_score: { model: "openai/gpt-oss-120b:free", temperature: 0.2 },
-  video_pitch_script: { model: "anthropic/claude-haiku-4-5", temperature: 0.7 },
+  video_pitch_script: { model: "anthropic/claude-opus-4-8", temperature: 0.7 },
   autofill: { model: "google/gemma-4-26b-a4b-it:free", temperature: 0.2 },
   skill_extract: { model: "qwen/qwen3-coder:free", temperature: 0.0 },
   linkedin_post: { model: "google/gemma-4-31b-it:free", temperature: 0.8 },
