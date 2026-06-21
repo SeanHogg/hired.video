@@ -389,7 +389,16 @@ export default function DeclarativeResumeRenderer({
 
   const showIconInHeading = descriptor.documentMode === "hero";
 
-  const rootClass = descriptor.documentMode === "print" ? `${theme.pageBg} ${theme.baseText} ${fontFamily}` : fontFamily;
+  // A resume is a fixed paper artifact: its preview must mirror the exported
+  // PDF (always light), so non-embedded documents always establish their own
+  // surface (pageBg + baseText) AND a forced-light token scope. Without this,
+  // hero-mode templates rendered only `fontFamily` and let their fixed-palette
+  // headings fall onto the app's dark canvas → invisible black-on-dark text.
+  // Embedded thumbnails intentionally blend into app-themed cards, so they opt
+  // out and stay theme-adaptive.
+  const rootClass = embedded
+    ? fontFamily
+    : `force-light-scope ${theme.pageBg} ${theme.baseText} ${fontFamily}`;
 
   return (
     <div className={`w-full ${rootClass}`}>

@@ -706,10 +706,14 @@ export default function DeclarativeJobRenderer({
     .map((key) => descriptor.sections.find((b) => b.key === key))
     .filter((b): b is JobSectionBlock => Boolean(b));
 
-  const rootClass =
-    descriptor.documentMode === "print"
-      ? `${theme.pageBg} ${theme.baseText} ${fontFamily}`
-      : fontFamily;
+  // A rendered job document is a fixed paper artifact (mirrors the exported
+  // PDF, always light). Non-embedded documents establish their own surface
+  // (pageBg + baseText) AND a forced-light token scope so hero-mode templates
+  // never drop their fixed-palette headings onto the app's dark canvas.
+  // Embedded thumbnails stay theme-adaptive to blend into app cards.
+  const rootClass = embedded
+    ? fontFamily
+    : `force-light-scope ${theme.pageBg} ${theme.baseText} ${fontFamily}`;
 
   const renderArgs: Omit<RenderSectionArgs, "block"> = {
     job,

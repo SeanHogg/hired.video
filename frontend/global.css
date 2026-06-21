@@ -300,3 +300,36 @@ body[data-print-mode] [data-print-hide] {
   }
 }
 
+/* Forced-light scope for rendered documents (resume templates, etc.).
+ * A resume is a fixed paper artifact — its on-screen preview must match the
+ * exported PDF, which is always light. The themes target a light surface
+ * (dark text on white paper), so under the app's dark theme the fixed-palette
+ * headings would otherwise land on a dark canvas and disappear. Re-declaring
+ * the core design tokens here pins every semantic utility (bg-card,
+ * text-muted-foreground, border, …) used inside the document to its light
+ * value, regardless of the ancestor `.dark`. Custom-property inheritance
+ * resolves to the nearest definition, so this wins over `.dark` on <html>.
+ * Kept unlayered so it also beats the @layer base `.dark` declarations. */
+.force-light-scope {
+  color-scheme: light;
+  --background: 258 45% 97%;
+  --foreground: 250 40% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 250 40% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 250 40% 12%;
+  --primary: 262 83% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 258 24% 92%;
+  --secondary-foreground: 250 30% 20%;
+  --muted: 258 26% 93%;
+  --muted-foreground: 250 12% 42%;
+  --accent: 262 60% 94%;
+  --accent-foreground: 262 70% 24%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 258 26% 89%;
+  --input: 258 24% 87%;
+  --ring: 262 83% 58%;
+}
+
