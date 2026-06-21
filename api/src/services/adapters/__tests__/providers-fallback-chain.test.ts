@@ -24,7 +24,7 @@ describe("interactive free-attempt cap (#1939)", () => {
     const freeCount = chain.filter(isFree).length;
     assert.ok(freeCount <= 2, `expected ≤2 free attempts, got ${freeCount}: ${chain.join(", ")}`);
     // Paid terminal must still be present after the cap.
-    assert.ok(chain.includes("anthropic/claude-haiku-4-5"), `paid terminal missing: ${chain.join(", ")}`);
+    assert.ok(chain.includes("anthropic/claude-opus-4-8"), `paid terminal missing: ${chain.join(", ")}`);
     assert.ok(chain.includes("cerebras/llama3.1-8b"), `cerebras terminal missing: ${chain.join(", ")}`);
   });
 
@@ -41,7 +41,7 @@ describe("interactive free-attempt cap (#1939)", () => {
     const freeCount = chain.filter(isFree).length;
     assert.ok(freeCount >= 3, `non-interactive should keep full free pool, got ${freeCount}`);
     // No paid terminal padding on non-interactive flows.
-    assert.ok(!chain.includes("anthropic/claude-haiku-4-5"));
+    assert.ok(!chain.includes("anthropic/claude-opus-4-8"));
     assert.ok(!chain.includes("cerebras/llama3.1-8b"));
   });
 });

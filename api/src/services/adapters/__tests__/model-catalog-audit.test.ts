@@ -22,20 +22,22 @@ import type { LLMUseCase } from "../providers.js";
 describe("collectConfiguredModels", () => {
   it("includes the paid-terminal models the chains depend on", () => {
     const map = collectConfiguredModels();
-    // The current paid terminal (post-#1937). If these go missing the safety
-    // net is dead — this is exactly what the audit exists to surface.
-    assert.ok(map.has("anthropic/claude-haiku-4-5"), "haiku terminal must be configured");
+    // The current paid terminal (post-#1937; Anthropic id bumped to opus-4-8
+    // on 2026-06-21 when claude-haiku-4-5 retired out of the gateway catalog,
+    // gap #1938). If these go missing the safety net is dead — this is exactly
+    // what the audit exists to surface.
+    assert.ok(map.has("anthropic/claude-opus-4-8"), "anthropic terminal must be configured");
     assert.ok(map.has("cerebras/llama3.1-8b"), "cerebras terminal must be configured");
   });
 
   it("maps each model to the use cases that reference it (sorted, deduped)", () => {
     const map = collectConfiguredModels();
-    const haikuUseCases = map.get("anthropic/claude-haiku-4-5");
-    assert.ok(haikuUseCases && haikuUseCases.length > 0);
+    const anthropicUseCases = map.get("anthropic/claude-opus-4-8");
+    assert.ok(anthropicUseCases && anthropicUseCases.length > 0);
     // sorted
-    assert.deepEqual(haikuUseCases, [...haikuUseCases].sort());
+    assert.deepEqual(anthropicUseCases, [...anthropicUseCases].sort());
     // deduped (Set-backed)
-    assert.equal(new Set(haikuUseCases).size, haikuUseCases.length);
+    assert.equal(new Set(anthropicUseCases).size, anthropicUseCases.length);
   });
 
   it("does not reference any retired Anthropic model id (regression for #1937)", () => {

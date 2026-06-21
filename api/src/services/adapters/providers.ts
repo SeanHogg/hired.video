@@ -318,20 +318,23 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
     ],
   },
   resume_merge: { model: "qwen/qwen3-coder:free", temperature: 0.2 },
-  // Vision OCR for resume images (phone photos / scans). gpt-4o-mini is a
-  // reliable, cheap vision model and the primary so OCR quality is good on
-  // the one-shot, user-initiated upload; a free vision model is the explicit
-  // fallback so a gpt outage doesn't 503 the upload. temp 0 — transcription,
-  // not generation. The text-only free pool auto-appended by withFallbackChain
-  // is only reached if BOTH vision models fail, in which case it produces no
-  // usable text and the /parse route returns a clear 422.
+  // Vision OCR for resume images (phone photos / scans). VISION use case —
+  // the message carries an image_url block, so the model MUST be
+  // vision-capable. Claude Opus 4.8 is a reliable vision model and the
+  // primary so OCR quality is good on the one-shot, user-initiated upload.
+  // temp 0 — transcription, not generation. (Was openai/gpt-4o-mini primary +
+  // a meta-llama/llama-3.2-11b-vision-instruct:free fallback; both retired out
+  // of the gateway catalog on 2026-06-21, gap #1938.) No free vision fallback
+  // is pinned now — there was no current free vision id verifiable against the
+  // live gateway catalog (no key in this env), and re-pinning a guessed id is
+  // exactly the drift this audit exists to prevent. The text-only free pool
+  // auto-appended by withFallbackChain can't OCR, so if the vision primary is
+  // down the /parse route returns a clear 422 (it already guards empty OCR).
+  // Restoring a verified free vision fallback is tracked in #2233.
   resume_ocr: {
-    model: "openai/gpt-4o-mini",
+    model: "anthropic/claude-opus-4-8",
     temperature: 0.0,
     maxTokens: 4000,
-    fallbacks: [
-      { model: "meta-llama/llama-3.2-11b-vision-instruct:free", temperature: 0.0, maxTokens: 4000 },
-    ],
   },
   resume_summary: { model: "google/gemma-4-31b-it:free", temperature: 0.5 },
   resume_consolidate_highlights: { model: "qwen/qwen3-coder:free", temperature: 0.4, maxTokens: 1200 },
@@ -367,10 +370,10 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   // Scorecard bias linter (#1385). Short input + strict JSON output; the
   // gemma 4 instruct family hits the sweet spot of cheap + structured.
   article_moderation: { model: "openai/gpt-oss-120b:free", temperature: 0.2 },
-  course_generation: { model: "anthropic/claude-haiku-4-5", temperature: 0.5 },
+  course_generation: { model: "anthropic/claude-opus-4-8", temperature: 0.5 },
   // Re-rank a small keyword-recall candidate set against a learner's goal
-  // (#1926). Tiny structured output (ordered ids) — cheap haiku, low temp.
-  course_recommend: { model: "anthropic/claude-haiku-4-5", temperature: 0.2, maxTokens: 300 },
+  // (#1926). Tiny structured output (ordered ids) — Claude, low temp.
+  course_recommend: { model: "anthropic/claude-opus-4-8", temperature: 0.2, maxTokens: 300 },
   scorecard_bias_check: {
     model: "google/gemma-4-26b-a4b-it:free",
     temperature: 0.1,
