@@ -2,7 +2,7 @@ import { LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonProps } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type SignOutVariant = "row" | "icon" | "inline";
@@ -14,6 +14,11 @@ interface SignOutButtonProps {
    *  - "inline": ghost button, icon + label that collapses to icon-only
    *    below `sm` — the minimal brand header strip. */
   variant?: SignOutVariant;
+  /** Button chrome style for the "icon"/"inline" variants — defaults to the
+   *  borderless "ghost". The top nav passes "outline" so it matches the
+   *  cart's bordered-box chrome. (Distinct from `variant`, which is the
+   *  layout.) */
+  buttonVariant?: ButtonProps["variant"];
   /** Sidebar collapsed rail (row variant only): center the icon, label via tooltip. */
   collapsed?: boolean;
   /** Navigate here (replace) after sign-out — e.g. "/login" from the
@@ -32,6 +37,7 @@ interface SignOutButtonProps {
  */
 export function SignOutButton({
   variant = "row",
+  buttonVariant = "ghost",
   collapsed,
   redirectTo,
   onAfter,
@@ -50,7 +56,7 @@ export function SignOutButton({
   if (variant === "icon") {
     return (
       <Button
-        variant="ghost"
+        variant={buttonVariant}
         size="icon"
         onClick={handleSignOut}
         className={className}

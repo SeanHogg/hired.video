@@ -125,7 +125,7 @@ export default function Navigation({
           <div className="flex items-center space-x-3">
             {/* Hamburger must stay `lg:hidden` to match Sidebar's `lg:translate-x-0` dock — anything tighter (e.g. `md:hidden`) leaves a 768–1023px dead zone. */}
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
               onClick={onMenuClick}
               className="lg:hidden"
@@ -136,7 +136,7 @@ export default function Navigation({
 
             {/* Desktop Sidebar Collapse Toggle */}
             <Button
-              variant="ghost"
+              variant="outline"
               onClick={onSidebarToggle}
               className="hidden lg:flex h-10 w-10 px-2 py-2 justify-center -ml-4"
               title={sidebarCollapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
@@ -251,27 +251,30 @@ export default function Navigation({
             {/* SuperAdmin controls (idle or active) */}
             <EmulationHeaderControls />
 
-            {/* Unified communication hub - bell with merged inbox */}
-            <CommunicationHub />
+            {/* Unified communication hub - bell with merged inbox.
+                `variant="outline"` so the bell shares the cart's bordered-box
+                chrome (every top-bar control reads as the same boxed icon). */}
+            <CommunicationHub variant="outline" />
 
-            {/* Shopping Cart - Visible on both mobile and desktop */}
+            {/* Shopping Cart - Visible on both mobile and desktop. This is the
+                reference border style the rest of the top-bar chrome matches. */}
             <ShoppingCart />
 
             {/* Language switcher — same component used in BrandHeader +
                 Footer so a visitor can switch language from any chrome
                 surface. Always visible: on mobile this top bar is the only
                 always-on place to switch language (the sidebar lives behind
-                the hamburger). */}
-            <LocaleSwitcher variant="compact" className="inline-flex" />
+                the hamburger). `buttonVariant="outline"` matches the cart. */}
+            <LocaleSwitcher variant="compact" buttonVariant="outline" className="inline-flex h-11" />
 
             {/* Light/dark toggle — always-on chrome so the theme is reachable
                 from any surface, same rationale as the locale switcher. */}
-            <ThemeToggle className="inline-flex" />
+            <ThemeToggle variant="outline" className="inline-flex" />
 
             {/* Sign out — mobile/tablet only (lg:hidden). Below lg the sidebar
                 is a drawer, so without this the only logout is buried behind
                 the hamburger; on lg+ the docked sidebar already shows it. */}
-            {isAuthenticated && <SignOutButton variant="icon" className="lg:hidden" />}
+            {isAuthenticated && <SignOutButton variant="icon" buttonVariant="outline" className="lg:hidden" />}
 
             {/* Desktop CTA Buttons - Hidden on mobile */}
             {!isAuthenticated && <AuthButtons className="hidden md:flex" />}

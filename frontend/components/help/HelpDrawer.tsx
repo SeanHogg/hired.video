@@ -108,7 +108,10 @@ export function HelpDrawer(): JSX.Element | null {
         type="button"
         aria-label="Open help"
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 left-5 z-40 h-12 w-12 rounded-full shadow-lg p-0 print:hidden"
+        // Lifted above the mobile bottom nav so it never covers the Home tab
+        // (mirrors FloatingAIButton's `bottom-24 … md:bottom-6` pattern); drops
+        // back to the corner on md+ where the bottom nav is hidden.
+        className="fixed bottom-24 left-5 z-40 h-12 w-12 rounded-full shadow-lg p-0 print:hidden md:bottom-5"
       >
         <HelpCircle className="h-6 w-6" />
       </Button>

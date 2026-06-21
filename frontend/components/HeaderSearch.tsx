@@ -417,9 +417,9 @@ export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) 
        *  overlay. Keeps the phone header uncluttered (icon only) while the
        *  full input + context picker live in the expanded sheet. */}
       <Button
-        variant="ghost"
+        variant="outline"
         size="icon"
-        className="md:hidden h-9 w-9 shrink-0"
+        className="md:hidden shrink-0"
         onClick={() => setMobileOpen(true)}
         aria-label={t("search.ariaSearch")}
       >

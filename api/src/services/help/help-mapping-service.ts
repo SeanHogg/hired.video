@@ -39,22 +39,41 @@ const CONTEXTS_KEY = "help:contexts";
 export class HelpMappingService {
   constructor(private readonly db: Db) {}
 
+  /** The public help reads power a DECORATIVE, self-gating drawer. The
+   *  mapping store is OPTIONAL curation meta — help CONTENT lives in bundled
+   *  client files, so a missing/empty/unavailable `help_mappings` table must
+   *  degrade to "no curated help here", never a 500 that breaks the page and
+   *  spams client-error reports. Caught OUTSIDE getOrSetCached so the empty
+   *  fallback is never cached (recovers on the next request once the DB is
+   *  reachable). A persistent failure is operational — apply migration 0210;
+   *  see the gap register. */
+  private async safeRead<T>(label: string, fallback: T, fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (err) {
+      console.error(`[HelpMappingService] ${label} degraded (returning fallback):`, err);
+      return fallback;
+    }
+  }
+
   /** The curated, ordered slug list for a page context. Read-through
    *  cached; invalidated on any write that touches the context. Content
    *  is resolved from these slugs on the client (bundled files). */
   async resolveForContext(contextKey: HelpContextKey): Promise<string[]> {
-    return getOrSetCached<string[]>({
-      key: ctxCacheKey(contextKey),
-      ttlSeconds: RESOLVE_TTL_SECONDS,
-      loader: async () => {
-        const rows = await this.db
-          .select({ slug: helpMappings.slug })
-          .from(helpMappings)
-          .where(and(eq(helpMappings.contextKey, contextKey), eq(helpMappings.isActive, true)))
-          .orderBy(asc(helpMappings.position));
-        return rows.map((r) => r.slug);
-      },
-    });
+    return this.safeRead(`resolve:${contextKey}`, [], () =>
+      getOrSetCached<string[]>({
+        key: ctxCacheKey(contextKey),
+        ttlSeconds: RESOLVE_TTL_SECONDS,
+        loader: async () => {
+          const rows = await this.db
+            .select({ slug: helpMappings.slug })
+            .from(helpMappings)
+            .where(and(eq(helpMappings.contextKey, contextKey), eq(helpMappings.isActive, true)))
+            .orderBy(asc(helpMappings.position));
+          return rows.map((r) => r.slug);
+        },
+      }),
+    );
   }
 
   /** Semantic search over help content via Vectorize (vectors keyed by
@@ -68,30 +87,34 @@ export class HelpMappingService {
     // Keyspace is unbounded (free text) → TTL backstop; `avail` in the key so
     // provisioning Vectorize doesn't keep serving cached "unavailable" misses.
     const avail = isSemanticHelpAvailable() ? "1" : "0";
-    return getOrSetCached<{ slugs: string[]; semantic: boolean }>({
-      key: `help:sem:${avail}:${limit}:${q.toLowerCase()}`,
-      ttlSeconds: 300,
-      loader: async () => {
-        const slugs = await semanticSearchHelpIds(q, limit);
-        return slugs === null ? { slugs: [], semantic: false } : { slugs, semantic: true };
-      },
-    });
+    return this.safeRead(`search`, { slugs: [], semantic: false }, () =>
+      getOrSetCached<{ slugs: string[]; semantic: boolean }>({
+        key: `help:sem:${avail}:${limit}:${q.toLowerCase()}`,
+        ttlSeconds: 300,
+        loader: async () => {
+          const slugs = await semanticSearchHelpIds(q, limit);
+          return slugs === null ? { slugs: [], semantic: false } : { slugs, semantic: true };
+        },
+      }),
+    );
   }
 
   /** Cheap membership set — which context keys have any active help, so the
    *  drawer skips the per-context resolve on pages with no mapping. */
   async listActiveContextKeys(): Promise<string[]> {
-    return getOrSetCached<string[]>({
-      key: CONTEXTS_KEY,
-      ttlSeconds: CONTEXTS_TTL_SECONDS,
-      loader: async () => {
-        const rows = await this.db
-          .selectDistinct({ contextKey: helpMappings.contextKey })
-          .from(helpMappings)
-          .where(eq(helpMappings.isActive, true));
-        return rows.map((r) => r.contextKey);
-      },
-    });
+    return this.safeRead(`contexts`, [], () =>
+      getOrSetCached<string[]>({
+        key: CONTEXTS_KEY,
+        ttlSeconds: CONTEXTS_TTL_SECONDS,
+        loader: async () => {
+          const rows = await this.db
+            .selectDistinct({ contextKey: helpMappings.contextKey })
+            .from(helpMappings)
+            .where(eq(helpMappings.isActive, true));
+          return rows.map((r) => r.contextKey);
+        },
+      }),
+    );
   }
 
   /** All mappings for the SuperAdmin curation list (any active state). */

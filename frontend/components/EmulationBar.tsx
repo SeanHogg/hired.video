@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { AlertTriangle, Eye, Copy, LogOut, ChevronDown, Bug, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -125,21 +125,35 @@ export function EmulationHeaderControls() {
 
   const isPreviewMode = !isImpersonating && personaPreview !== null;
 
+  // Role-preview menu items — same list in the mobile dropdown and the
+  // desktop "Preview role" dropdown (DRY).
+  const renderPreviewItems = () =>
+    PREVIEW_OPTIONS.map((opt) => (
+      <DropdownMenuItem
+        key={`${opt.role}-${opt.tier ?? "none"}`}
+        onSelect={() => setPersonaPreview(opt.role, opt.tier)}
+      >
+        <Eye className="h-3.5 w-3.5 mr-2" />
+        {opt.label}
+      </DropdownMenuItem>
+    ));
+
   // ── Idle: no active session ──────────────────────────────────────────────
   if (!isImpersonating && !isPreviewMode) {
     return (
       <>
-        {/* Mobile: collapsed into a single dropdown so cart/notifications stay accessible */}
+        {/* Mobile: a single minimal icon that expands every SuperAdmin tool,
+            so the cart / notifications keep their space. */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
-              className="md:hidden h-8 w-8 relative"
+              className="md:hidden relative"
               title="SuperAdmin tools"
               aria-label="SuperAdmin tools"
             >
-              <Shield className="h-4 w-4 text-primary" />
+              <Shield className="h-5 w-5 text-primary" />
               {debugMode && (
                 <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-500" />
               )}
@@ -153,15 +167,7 @@ export function EmulationHeaderControls() {
             <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
               Preview as role
             </DropdownMenuLabel>
-            {PREVIEW_OPTIONS.map((opt) => (
-              <DropdownMenuItem
-                key={`${opt.role}-${opt.tier ?? "none"}`}
-                onSelect={() => setPersonaPreview(opt.role, opt.tier)}
-              >
-                <Eye className="h-3.5 w-3.5 mr-2" />
-                {opt.label}
-              </DropdownMenuItem>
-            ))}
+            {renderPreviewItems()}
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={toggleDebugMode}>
               <Bug className="h-3.5 w-3.5 mr-2" />
@@ -181,14 +187,7 @@ export function EmulationHeaderControls() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {PREVIEW_OPTIONS.map((opt) => (
-                <DropdownMenuItem
-                  key={`${opt.role}-${opt.tier ?? "none"}`}
-                  onSelect={() => setPersonaPreview(opt.role, opt.tier)}
-                >
-                  {opt.label}
-                </DropdownMenuItem>
-              ))}
+              {renderPreviewItems()}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -247,101 +246,153 @@ export function EmulationHeaderControls() {
     : "bg-blue-500 text-white";
   const btnBorderCls = isAmber ? "border-amber-400" : "border-blue-300";
 
+  // Role-switch menu items — same list in the mobile dropdown and the
+  // desktop "Role" dropdown (DRY). Impersonation switches the live role;
+  // preview swaps the persona/tier.
+  const renderActiveRoleItems = () =>
+    isImpersonating
+      ? ROLES.map((r) => (
+          <DropdownMenuItem key={r} onSelect={() => switchImpersonationRole(r)}>
+            {getRoleDisplayLabel(r)} {r === effectiveRole && "✓"}
+          </DropdownMenuItem>
+        ))
+      : PREVIEW_OPTIONS.map((opt) => {
+          const active = opt.role === effectiveRole && opt.tier === tierPreview;
+          return (
+            <DropdownMenuItem
+              key={`${opt.role}-${opt.tier ?? "none"}`}
+              onSelect={() => setPersonaPreview(opt.role, opt.tier)}
+            >
+              {opt.label} {active && "✓"}
+            </DropdownMenuItem>
+          );
+        });
+
   return (
-    <div className="flex items-center gap-1.5">
-      {/* Status badge — desktop only; mobile relies on tinted nav background */}
-      <span className={`hidden sm:inline-flex items-center gap-1 rounded px-2 py-0.5 font-semibold text-xs ${badgeCls}`}>
-        <AlertTriangle className="h-3 w-3" />
-        {isImpersonating ? "EMULATING" : "ROLE PREVIEW"}
-      </span>
-
-      {/* Target user name — impersonation only, hidden on narrow screens */}
-      {isImpersonating && impersonationSession && (
-        <span className="hidden sm:inline text-xs font-medium truncate max-w-[120px]">
-          {impersonationSession.targetUser.name}
-        </span>
-      )}
-
-      {/* Role switcher */}
+    <>
+      {/* Mobile: a single minimal, status-tinted icon that expands the full
+          emulation controls — keeps the active top bar uncluttered (the
+          desktop spreads them inline below). */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             variant="outline"
-            size="sm"
-            className={`h-7 text-xs gap-1 ${btnBorderCls}`}
+            size="icon"
+            className={`md:hidden relative ${btnBorderCls}`}
+            title={isImpersonating ? "Emulation controls" : "Role preview controls"}
+            aria-label={isImpersonating ? "Emulation controls" : "Role preview controls"}
           >
-            <span className="hidden sm:inline">Role:&nbsp;</span>{effectiveLabel}<ChevronDown className="h-3 w-3" />
+            <AlertTriangle className={`h-5 w-5 ${isAmber ? "text-amber-500" : "text-blue-500"}`} />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {isImpersonating
-            ? ROLES.map((r) => (
-                <DropdownMenuItem
-                  key={r}
-                  onSelect={() => switchImpersonationRole(r)}
-                >
-                  {getRoleDisplayLabel(r)} {r === effectiveRole && "✓"}
-                </DropdownMenuItem>
-              ))
-            : PREVIEW_OPTIONS.map((opt) => {
-                const active = opt.role === effectiveRole && opt.tier === tierPreview;
-                return (
-                  <DropdownMenuItem
-                    key={`${opt.role}-${opt.tier ?? "none"}`}
-                    onSelect={() => setPersonaPreview(opt.role, opt.tier)}
-                  >
-                    {opt.label} {active && "✓"}
-                  </DropdownMenuItem>
-                );
-              })}
+        <DropdownMenuContent align="end" className="w-64">
+          <DropdownMenuLabel className="flex items-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {isImpersonating ? "Emulating" : "Role preview"}
+          </DropdownMenuLabel>
+          {isImpersonating && (
+            <div className="px-2 pb-1.5 text-xs text-muted-foreground">
+              {impersonationSession && (
+                <div className="truncate font-medium text-foreground">
+                  {impersonationSession.targetUser.name}
+                </div>
+              )}
+              <div className="tabular-nums">{formatDuration(elapsed)}</div>
+            </div>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+            {isImpersonating ? "Switch role" : "Preview as"}
+          </DropdownMenuLabel>
+          {renderActiveRoleItems()}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={toggleDebugMode}>
+            <Bug className="h-3.5 w-3.5 mr-2" />
+            {debugMode ? "Disable" : "Enable"} permission debugger
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={handleCopyContext}>
+            <Copy className="h-3.5 w-3.5 mr-2" />Copy context
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={handleExit}
+            className="text-destructive focus:text-destructive"
+          >
+            <LogOut className="h-3.5 w-3.5 mr-2" />
+            {isImpersonating ? "Exit emulation" : "Exit preview"}
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Permissions / debug toggle */}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-7 text-xs gap-1 px-2"
-        onClick={toggleDebugMode}
-        title="Toggle permission debugger (Ctrl+Shift+P)"
-      >
-        <Bug className="h-3 w-3" />
-        <span className="hidden sm:inline">Permissions</span>
-        {debugMode && <Badge className="ml-1 h-4 text-[10px] px-1">ON</Badge>}
-      </Button>
-
-      {/* Session timer — impersonation only */}
-      {isImpersonating && (
-        <span className="hidden sm:inline text-xs tabular-nums">
-          {formatDuration(elapsed)}
+      {/* Desktop: inline controls */}
+      <div className="hidden md:flex items-center gap-1.5">
+        {/* Status badge */}
+        <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 font-semibold text-xs ${badgeCls}`}>
+          <AlertTriangle className="h-3 w-3" />
+          {isImpersonating ? "EMULATING" : "ROLE PREVIEW"}
         </span>
-      )}
 
-      {/* Copy context */}
-      <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2" onClick={handleCopyContext}>
-        <Copy className="h-3 w-3" />
-        <span className="hidden sm:inline">Copy Context</span>
-      </Button>
+        {/* Target user name — impersonation only */}
+        {isImpersonating && impersonationSession && (
+          <span className="text-xs font-medium truncate max-w-[120px]">
+            {impersonationSession.targetUser.name}
+          </span>
+        )}
 
-      {/* Exit */}
-      <Button
-        variant="destructive"
-        size="sm"
-        className="h-7 text-xs gap-1 px-2"
-        onClick={handleExit}
-        title={isImpersonating ? "Exit Emulation" : "Exit Preview"}
-      >
-        <LogOut className="h-3 w-3" />
-        <span className="hidden sm:inline">{isImpersonating ? "Exit Emulation" : "Exit Preview"}</span>
-      </Button>
-    </div>
+        {/* Role switcher */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={`h-7 text-xs gap-1 ${btnBorderCls}`}
+            >
+              Role:&nbsp;{effectiveLabel}<ChevronDown className="h-3 w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {renderActiveRoleItems()}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Permissions / debug toggle */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs gap-1 px-2"
+          onClick={toggleDebugMode}
+          title="Toggle permission debugger (Ctrl+Shift+P)"
+        >
+          <Bug className="h-3 w-3" />
+          Permissions
+          {debugMode && <Badge className="ml-1 h-4 text-[10px] px-1">ON</Badge>}
+        </Button>
+
+        {/* Session timer — impersonation only */}
+        {isImpersonating && (
+          <span className="text-xs tabular-nums">
+            {formatDuration(elapsed)}
+          </span>
+        )}
+
+        {/* Copy context */}
+        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2" onClick={handleCopyContext}>
+          <Copy className="h-3 w-3" />
+          Copy Context
+        </Button>
+
+        {/* Exit */}
+        <Button
+          variant="destructive"
+          size="sm"
+          className="h-7 text-xs gap-1 px-2"
+          onClick={handleExit}
+          title={isImpersonating ? "Exit Emulation" : "Exit Preview"}
+        >
+          <LogOut className="h-3 w-3" />
+          {isImpersonating ? "Exit Emulation" : "Exit Preview"}
+        </Button>
+      </div>
+    </>
   );
 }
-
-// ── Legacy exports (kept so old import sites don't break) ────────────────────
-/** @deprecated Use EmulationHeaderControls */
-export function EmulationInlineControls() { return null; }
-/** @deprecated Use EmulationHeaderControls */
-export function EmulationActiveBanner()   { return null; }
-/** @deprecated Use EmulationHeaderControls */
-export function EmulationBar()            { return null; }

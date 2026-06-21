@@ -184,6 +184,40 @@ class AIService {
   }
 
   /**
+   * Help-first deflection — try to answer from the bundled help docs via a
+   * cheap, grounded model call BEFORE spending a premium chat turn. The
+   * caller supplies candidate docs (content is client-bundled). Returns
+   * `{ escalate: true }` when the docs don't cover the question (or on any
+   * error) so the caller falls through to `sendChatMessage`. Never throws —
+   * a help-path failure must silently escalate, not break the chat.
+   */
+  async helpAssist(input: {
+    question: string;
+    candidates: Array<{ slug: string; title: string; summary: string; body: string }>;
+    history?: ChatMessage[];
+  }): Promise<{ escalate: boolean; answer?: string }> {
+    if (!input.question.trim() || input.candidates.length === 0) {
+      return { escalate: true };
+    }
+    try {
+      const response = await apiClient.post<{ escalate: boolean; answer?: string }>(
+        "/api/ai/help-assist",
+        {
+          message: input.question,
+          candidates: input.candidates,
+          history: input.history?.filter((m) => m.role !== "system"),
+        },
+      );
+      const data = response.data;
+      if (!data || data.escalate || !data.answer) return { escalate: true };
+      return { escalate: false, answer: data.answer };
+    } catch (error) {
+      logger.warn("helpAssist failed, escalating to full chat", { error });
+      return { escalate: true };
+    }
+  }
+
+  /**
    * Get a mock response for development/fallback
    */
   private getMockResponse(userInput: string): ChatResponse {

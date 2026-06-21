@@ -24,7 +24,7 @@
 
 import { Globe, Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonProps } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,12 +54,16 @@ export interface LocaleSwitcherProps {
   /** Override the dropdown alignment when the trigger sits at the edge
    *  of its container (default: "end" works for top-right mounts). */
   align?: "start" | "center" | "end";
+  /** Trigger button style — defaults to the borderless "ghost". The top
+   *  nav passes "outline" so it matches the cart's bordered-box chrome. */
+  buttonVariant?: ButtonProps["variant"];
 }
 
 export function LocaleSwitcher({
   variant = "compact",
   className,
   align = "end",
+  buttonVariant = "ghost",
 }: LocaleSwitcherProps): JSX.Element {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
@@ -92,7 +96,7 @@ export function LocaleSwitcher({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="ghost"
+          variant={buttonVariant}
           size="sm"
           className={cn(
             "gap-2 text-muted-foreground hover:text-foreground",

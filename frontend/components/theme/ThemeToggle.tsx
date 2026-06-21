@@ -7,11 +7,19 @@
  */
 import { Moon, Sun } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonProps } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useThemePreference } from "@/lib/theme/use-theme-preference";
 
-export function ThemeToggle({ className }: { className?: string }) {
+export function ThemeToggle({
+  className,
+  /** Button style — defaults to the borderless "ghost". The top nav passes
+   *  "outline" so it matches the cart's bordered-box chrome. */
+  variant = "ghost",
+}: {
+  className?: string;
+  variant?: ButtonProps["variant"];
+}) {
   const { resolvedTheme, select } = useThemePreference();
   const { t } = useTranslation();
   const isDark = resolvedTheme === "dark";
@@ -22,7 +30,7 @@ export function ThemeToggle({ className }: { className?: string }) {
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant={variant}
       size="icon"
       aria-label={label}
       title={label}

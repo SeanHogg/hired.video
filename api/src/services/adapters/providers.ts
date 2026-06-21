@@ -43,6 +43,11 @@ export type LLMUseCase =
   | "studio_script"
   | "studio_edit_script"
   | "chat"
+  // Help-first deflection in the AI Brain — a cheap, grounded answer
+  // written ONLY from the bundled help docs the client supplies, or the
+  // escalate sentinel when the docs don't cover the question. Free-pool +
+  // low temp (factual, not creative). See POST /api/ai/help-assist.
+  | "help_assist"
   | "resume_roast"
   | "resume_optimize"
   | "match"
@@ -253,6 +258,9 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   },
   studio_edit_script: { model: "google/gemma-4-31b-it:free", temperature: 0.4 },
   chat: { model: "meta-llama/llama-3.3-70b-instruct:free", temperature: 0.7 },
+  // Help deflection: grounded extraction from supplied docs. Low temp so it
+  // sticks to the source and reliably emits the escalate sentinel on a miss.
+  help_assist: { model: "meta-llama/llama-3.3-70b-instruct:free", temperature: 0.2 },
   resume_roast: { model: "nousresearch/hermes-3-llama-3.1-405b:free", temperature: 0.85 },
   resume_optimize: { model: "qwen/qwen3-coder:free", temperature: 0.3 },
   match: {

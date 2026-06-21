@@ -344,7 +344,7 @@ function AIFooterCaption() {
 
 export default function AIChatPanel() {
   const location = useLocation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   const { isAIChatOpen, closeAIChat, pageContext, setPageContext, pendingMessage, clearPendingMessage, getFormSnapshot } = useAI();
   const isMobile = useIsMobile();
@@ -494,6 +494,52 @@ export default function AIChatPanel() {
     setMessages((prev) => [...prev, userMessage]);
     setIsTyping(true);
     setRateLimitError(null);
+
+    // Help-first deflection (#2232): for a plain question (not a structured
+    // quick-action that maps to a tool), try answering from the bundled help
+    // docs via a cheap grounded call BEFORE spending a premium chat turn. A
+    // doc-sourced answer renders in the SAME CHRO bubble — seamless, the user
+    // can't tell — and doesn't burn their AI quota. Anything the docs don't
+    // cover (or any failure) escalates to the full tool-enabled path below.
+    // Help content is client-bundled, so we retrieve candidates locally
+    // (zero cost, zero round-trip) and hand the snippets to the triage call.
+    if (!action) {
+      try {
+        const { searchHelpLocal } = await import("@/lib/help/content");
+        const candidates = searchHelpLocal(content.trim(), i18n.language, 4);
+        if (candidates.length > 0) {
+          const help = await aiService.helpAssist({
+            question: content.trim(),
+            candidates: candidates.map((cd) => ({
+              slug: cd.slug,
+              title: cd.title,
+              summary: cd.summary,
+              body: cd.body,
+            })),
+            history: conversationHistory,
+          });
+          if (!help.escalate && help.answer) {
+            const answer = help.answer;
+            const aiMessage: Message = {
+              id: (Date.now() + 1).toString(),
+              content: answer,
+              sender: "ai",
+              timestamp: new Date(),
+            };
+            setMessages((prev) => [...prev, aiMessage]);
+            setConversationHistory((prev) => [
+              ...prev,
+              { role: "user", content: content.trim() },
+              { role: "assistant", content: answer },
+            ]);
+            setIsTyping(false);
+            return;
+          }
+        }
+      } catch {
+        // Any help-path failure silently falls through to the full chat.
+      }
+    }
 
     try {
       let responseMessage = "";

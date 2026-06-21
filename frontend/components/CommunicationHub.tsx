@@ -13,7 +13,7 @@
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Send } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonProps } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Popover,
@@ -48,16 +48,20 @@ const NOTIFICATION_TYPE_DEEP_LINK: Record<string, string> = {
   moderation_action_taken: "/admin/moderation",
 };
 
-export default function CommunicationHub() {
+export default function CommunicationHub({
+  /** Bell button style — defaults to the borderless "ghost". The top nav
+   *  passes "outline" so it matches the cart's bordered-box chrome. */
+  variant = "ghost",
+}: { variant?: ButtonProps["variant"] } = {}) {
   const { isAuthenticated } = useAuth();
   // Self-gate: anonymous visitors never mount the inner component, so the
   // shared hub's data path is never touched without a token. The provider
   // itself short-circuits via `useApiReady` regardless.
   if (!isAuthenticated) return null;
-  return <AuthenticatedCommunicationHub />;
+  return <AuthenticatedCommunicationHub variant={variant} />;
 }
 
-function AuthenticatedCommunicationHub() {
+function AuthenticatedCommunicationHub({ variant = "ghost" }: { variant?: ButtonProps["variant"] }) {
   const hub = useSharedCommHub();
   const navigate = useNavigate();
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -98,9 +102,9 @@ function AuthenticatedCommunicationHub() {
 
   const triggerButton = (
     <Button
-      variant="ghost"
+      variant={variant}
       size="icon"
-      className="relative h-9 w-9"
+      className="relative"
       aria-label={
         unreadCount > 0 ? `Inbox (${unreadCount} unread)` : "Inbox"
       }
