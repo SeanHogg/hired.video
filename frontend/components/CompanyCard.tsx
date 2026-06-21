@@ -279,7 +279,7 @@ export default function CompanyCard({
   }
 
   return (
-    <BaseCard>
+    <BaseCard className="flex flex-col h-full">
       <CardHeaderWithAvatar
         title={company.name}
         subtitle={company.tagline}
@@ -292,7 +292,7 @@ export default function CompanyCard({
         linkTo={`/companies/${company.id}`}
       />
 
-      <CardContent>
+      <CardContent className="flex-1">
 
         {/* Onboarding Progress */}
         {onboardingStatus.show && canEdit && (

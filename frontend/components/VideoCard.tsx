@@ -107,8 +107,8 @@ export default function VideoCard({
         ];
 
   return (
-    <BaseCard className="group overflow-hidden" onClick={handleView}>
-      <CardContent className="p-0">
+    <BaseCard className="group overflow-hidden flex flex-col h-full" onClick={handleView}>
+      <CardContent className="p-0 flex-1">
         {/* Video Thumbnail Section.
             When the consumer hands us a full PublicVideo, the shared
             PublicVideoPreview surface plays a muted/looping "live

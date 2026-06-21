@@ -38,7 +38,6 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/lib/auth";
 import {
   recruitService,
   type PitchDeckRow,
@@ -51,7 +50,6 @@ const STATUS_ICON: Record<PitchDeckRow["status"], React.ComponentType<any>> = {
 };
 
 export default function PitchDecksList() {
-  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const peopleTabs = usePeopleTabs();
@@ -138,57 +136,53 @@ export default function PitchDecksList() {
 
   return (
     <AppShell bgClassName="bg-background">
-        <div>
-          <div className="p-6">
-            <PageHeader tabs={peopleTabs} activeTabKey="pitch-decks" />
-
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-                  <LayoutPanelLeft className="w-7 h-7 text-primary" />
-                  Pitch Decks
-                </h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Curated shortlists of redacted candidates. Share one link — your hiring
-                  client reviews a branded slide deck.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {scope && scope.companies.length > 1 && (
-                  <Select
-                    value={selectedCompanyId ?? ""}
-                    onValueChange={(v) => setSelectedCompanyId(v)}
-                  >
-                    <SelectTrigger className="w-[220px]">
-                      <Building2 className="w-4 h-4 mr-1" />
-                      <SelectValue placeholder="Company" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {scope.companies.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                <Button onClick={() => setCreateOpen(true)}>
-                  <Plus className="w-4 h-4 mr-1" />
-                  New Deck
-                </Button>
-              </div>
-            </div>
-
-            <div className="relative mb-6">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                type="search"
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                placeholder="Search decks by name or description"
-                className="pl-9"
-              />
-            </div>
+        <div className="p-4 md:p-6">
+            {/* One action panel: the People tab strip, the deck search, the
+                company scope switcher and the New Deck button all live in the
+                single sticky band. The redundant "Pitch Decks" title is gone —
+                the active tab already names the surface. */}
+            <PageHeader
+              tabs={peopleTabs}
+              activeTabKey="pitch-decks"
+              search={
+                <div className="relative w-full">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    placeholder="Search decks by name or description"
+                    className="pl-9"
+                  />
+                </div>
+              }
+              actions={
+                <>
+                  {scope && scope.companies.length > 1 && (
+                    <Select
+                      value={selectedCompanyId ?? ""}
+                      onValueChange={(v) => setSelectedCompanyId(v)}
+                    >
+                      <SelectTrigger className="w-[220px]">
+                        <Building2 className="w-4 h-4 mr-1" />
+                        <SelectValue placeholder="Company" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {scope.companies.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <Button onClick={() => setCreateOpen(true)}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    New Deck
+                  </Button>
+                </>
+              }
+            />
 
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -246,7 +240,6 @@ export default function PitchDecksList() {
                 })}
               </div>
             )}
-          </div>
         </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

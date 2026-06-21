@@ -7712,6 +7712,7 @@
   "contentCard.cta.guide": "Open guide",
   "contentCard.cta.faq": "See answer",
   "contentCard.linkCopied": "{{label}} link has been copied to your clipboard.",
+  "toolCard.linkCopied": "{{label}} link has been copied to your clipboard.",
   "contentCard.minRead": "{{count}} min read",
   "articleCategory.Career Strategy": "Career Strategy",
   "articleCategory.Coaching": "Coaching",

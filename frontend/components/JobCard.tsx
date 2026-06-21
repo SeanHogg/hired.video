@@ -315,7 +315,7 @@ export default function JobCard({
   }
 
   return (
-    <BaseCard>
+    <BaseCard className="flex flex-col h-full">
       <CardHeaderWithAvatar
         title={job.title}
         subtitle={`${job.company}`}
@@ -323,7 +323,7 @@ export default function JobCard({
         linkTo={`/jobs/${job.id}`}
       />
 
-      <CardContent>
+      <CardContent className="flex-1">
         <div className="space-y-3">
           {/* Job Details */}
           <div className="flex items-center justify-between text-sm text-muted-foreground">

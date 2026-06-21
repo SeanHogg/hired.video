@@ -266,7 +266,7 @@ export default function ResumeCard({
     : fallbackActions.filter((a): a is DynamicCardAction => a !== null);
 
   return (
-    <BaseCard>
+    <BaseCard className="flex flex-col h-full">
       <CardHeaderWithAvatar
         title={name}
         subtitle={title}
@@ -279,7 +279,7 @@ export default function ResumeCard({
         linkTo={`/resumes/${id}`}
       />
 
-      <CardContent>
+      <CardContent className="flex-1">
         <div className="space-y-4">
           {/* Parent reference — only rendered when this card is a variant.
               Clickable so the user can jump straight to the primary resume. */}

@@ -35,7 +35,6 @@ import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { HubItem, HubItemKind, UseCommHubReturn } from "@/hooks/use-comm-hub";
 import {
@@ -578,7 +577,15 @@ export function InboxPanel({
 
       {toolbar}
 
-      <ScrollArea className="flex-1 min-h-0">
+      {/* Native overflow scroller — NOT a Radix ScrollArea. The header
+          popover surface caps height with `max-h-…` only (no definite
+          height), and Radix's viewport uses `h-full` (height:100%), which
+          cannot resolve against a flex item sized by `max-height` → the
+          viewport collapses to content height and never scrolls. Native
+          `overflow-y-auto` under `flex-1 min-h-0` scrolls correctly whether
+          the parent height is definite (page-tab / mobile sheet) or merely
+          capped (popover). */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {isLoading && items.length === 0 ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -610,7 +617,7 @@ export function InboxPanel({
             ))}
           </div>
         )}
-      </ScrollArea>
+      </div>
 
       <InboxPaginationFooter
         loadedCount={items.length}

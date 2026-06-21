@@ -7489,6 +7489,7 @@
   "contentCard.cta.guide": "Ouvrir le guide",
   "contentCard.cta.faq": "Voir la réponse",
   "contentCard.linkCopied": "Le lien {{label}} a été copié dans votre presse-papiers.",
+  "toolCard.linkCopied": "Le lien {{label}} a été copié dans votre presse-papiers.",
   "contentCard.minRead": "{{count}} min de lecture",
   "articleCategory.Career Strategy": "Stratégie de carrière",
   "articleCategory.Coaching": "Coaching",

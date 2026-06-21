@@ -622,12 +622,16 @@ export default function UnifiedSearch({
               onClearFilters={handleClearFilters}
             />
 
-            {/* Category chips row + the shared Scroll/Grid/Table toggle.
-             * SearchBar's own legacy grid/list toggle is intentionally not
-             * wired here — UnifiedSearch owns the canonical browse-mode
-             * control so /search matches the Studio landing pattern. */}
+            {/* Category chips + the shared Scroll/Grid/Table toggle, all on
+             * ONE row. The 16 categories used to wrap onto two/three lines on
+             * desktop (`sm:flex-wrap`) which read as a wall of buttons — now
+             * they live on a single horizontally-scrollable track (one line at
+             * every breakpoint) with the view toggle pinned at the end, so the
+             * filter bar stays a single compact band. SearchBar's own legacy
+             * grid/list toggle is intentionally not wired here — UnifiedSearch
+             * owns the canonical browse-mode control. */}
             <div className="flex items-center gap-2">
-              <div className="flex gap-2 flex-1 justify-start overflow-x-auto pb-2 sm:pb-0 sm:flex-wrap">
+              <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-1">
                 {CATEGORIES.map((category) => (
                   <Button
                     key={category.id}
@@ -636,7 +640,7 @@ export default function UnifiedSearch({
                     }
                     size="sm"
                     onClick={() => handleCategoryChange(category.id)}
-                    className="gap-2 flex-shrink-0 min-h-[44px]"
+                    className="h-9 flex-shrink-0 gap-2"
                   >
                     <category.icon className="w-4 h-4" />
                     {t(category.labelKey)}

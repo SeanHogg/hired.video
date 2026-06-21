@@ -147,7 +147,7 @@ export default function MediaCard({ media, resumeId, onView }: MediaCardProps) {
   ];
 
   return (
-    <BaseCard className="group cursor-pointer overflow-hidden" hover={true} onClick={handleNavigateToResume}>
+    <BaseCard className="group cursor-pointer overflow-hidden flex flex-col h-full" hover={true} onClick={handleNavigateToResume}>
       {/* Enhanced Media Preview - Primary Visual Element */}
       <div className="relative">
         {thumbnail ? (
@@ -215,7 +215,7 @@ export default function MediaCard({ media, resumeId, onView }: MediaCardProps) {
       </div>
 
       {/* Compact Content Section */}
-      <CardContent className="p-4 space-y-3">
+      <CardContent className="flex-1 p-4 space-y-3">
         {/* Title and Description */}
         <div className="space-y-2">
           <h3 className="font-semibold text-base line-clamp-2 leading-tight group-hover:text-primary transition-colors">

@@ -7443,6 +7443,7 @@
   "contentCard.cta.guide": "Abrir guía",
   "contentCard.cta.faq": "Ver respuesta",
   "contentCard.linkCopied": "El enlace de {{label}} se ha copiado al portapapeles.",
+  "toolCard.linkCopied": "El enlace de {{label}} se ha copiado al portapapeles.",
   "contentCard.minRead": "{{count}} min de lectura",
   "articleCategory.Career Strategy": "Estrategia de carrera",
   "articleCategory.Coaching": "Coaching",

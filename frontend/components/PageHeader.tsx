@@ -27,6 +27,11 @@ export interface PageHeaderTab {
    *  non-navigating breadcrumb segment (e.g. the leaf "Current Page"
    *  marker on a detail surface). */
   to?: string;
+  /** Click handler — use instead of `to` when the tab switches local state
+   *  or needs custom URL surgery a plain `<Link>` can't express (e.g. Tasks
+   *  surface tabs that must clear `tab`/`view` params on switch). Renders a
+   *  `<button>` rather than a `<Link>`. Ignored when `to` is set. */
+  onClick?: () => void;
   /** Optional badge (count / status pill). */
   badge?: ReactNode;
   /** Mark active when pathname starts with any of these prefixes. */
@@ -143,6 +148,15 @@ export default function PageHeader({
                     <Link to={buildTo(tab.to)} className={tabClass} aria-current={active ? "page" : undefined}>
                       {tabInner}
                     </Link>
+                  ) : tab.onClick ? (
+                    <button
+                      type="button"
+                      onClick={tab.onClick}
+                      className={tabClass}
+                      aria-current={active ? "page" : undefined}
+                    >
+                      {tabInner}
+                    </button>
                   ) : (
                     <span className={tabClass} aria-current={active ? "page" : undefined}>
                       {tabInner}

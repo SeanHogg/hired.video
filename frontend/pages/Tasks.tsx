@@ -171,36 +171,34 @@ export default function Tasks() {
     setSearchParams(sp, { replace: false });
   };
 
-  // Top strip — rendered above every surface, both authed and unauthed,
-  // so the public Discover landing still exposes the route into the
-  // app. Defined here (not inside conditional branches) because both
-  // the unauth marketing block AND the authed branches consume it.
-  const SurfaceTabsStrip = (
-    <div className="border-b">
-      <div className="px-4 md:px-6 flex gap-1 -mb-px">
-        {availableSurfaces.map((key) => {
-          const active = currentSurface === key;
-          const label =
-            key === "tasks" ? t("labels.tasks") :
-            key === "my-events" ? t("labels.myEventsCoffee") :
-            key === "timesheet" ? t("labels.timesheet") :
-            t("labels.discover");
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => switchSurface(key)}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                active
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
+  // Surface tabs — Tasks / My events & coffee / Timesheet / Discover. Routed
+  // through the shared PageHeader tab system (icons + active styling) so the
+  // strip matches every other top-level surface (People, Tools, …). Each tab
+  // switches the `?surface=` param via `onClick` (a plain Link can't clear the
+  // `tab`/`view` params on switch), so the tabs carry `onClick`, not `to`.
+  const surfaceTabs: PageHeaderTab[] = availableSurfaces.map((key) => ({
+    key,
+    label:
+      key === "tasks" ? t("labels.tasks") :
+      key === "my-events" ? t("labels.myEventsCoffee") :
+      key === "timesheet" ? t("labels.timesheet") :
+      t("labels.discover"),
+    icon:
+      key === "tasks" ? CheckSquare :
+      key === "my-events" ? Calendar :
+      key === "timesheet" ? Clock :
+      Search,
+    onClick: () => switchSurface(key),
+  }));
+
+  // Standalone tab strip for the surfaces that don't render their own action
+  // bar (Discover / My events / Timesheet / the unauth landing). The Tasks
+  // surface instead folds these same tabs INTO its action panel (the
+  // PageHeader below), so the menu, search, filters, view options and
+  // "Add task" button all read as one band.
+  const surfaceNav = (
+    <div className="px-4 md:px-6 pt-4 md:pt-6">
+      <PageHeader tabs={surfaceTabs} activeTabKey={currentSurface} className="mb-0" />
     </div>
   );
 
@@ -407,7 +405,7 @@ export default function Tasks() {
   if (currentSurface === "discover") {
     return (
       <AppShell bgClassName="bg-background">
-        {SurfaceTabsStrip}
+        {surfaceNav}
         <div className="p-4 md:p-6">
           <div className="space-y-12">
             <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">{t("messages.loadingMap")}</div>}>
@@ -425,7 +423,7 @@ export default function Tasks() {
   if (!isAuthenticated || !user) {
     return (
       <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-        {SurfaceTabsStrip}
+        {surfaceNav}
         <div>
           <div className="px-4 py-16">
               {/* Hero */}
@@ -710,7 +708,7 @@ export default function Tasks() {
   if (currentSurface === "my-events") {
     return (
       <AppShell bgClassName="bg-background">
-        {SurfaceTabsStrip}
+        {surfaceNav}
         <div className="p-4 md:p-6">
           <div className="space-y-6">
             <MyEventsAndCoffee viewerUserId={user.id} />
@@ -726,7 +724,7 @@ export default function Tasks() {
   if (currentSurface === "timesheet" && isWorkforceMember) {
     return (
       <AppShell bgClassName="bg-background">
-        {SurfaceTabsStrip}
+        {surfaceNav}
         <div className="p-4 md:p-6">
           <div className="space-y-6">
             <TimesheetTab />
@@ -738,10 +736,13 @@ export default function Tasks() {
 
   return (
     <AppShell bgClassName="bg-background">
-      {SurfaceTabsStrip}
       <div className="p-4 md:p-6">
           <div className="space-y-6">
+            {/* One action panel: surface tabs + search + type/status filters
+                + view-axis toggle + Add task, all in the single sticky band. */}
             <PageHeader
+              tabs={surfaceTabs}
+              activeTabKey={currentSurface}
               search={<HeaderSearch />}
               actions={
                 <>
