@@ -423,17 +423,27 @@ export default function StudioLanding() {
   useEffect(() => {
     let cancelled = false;
     setUserTemplatesLoading(true);
+    // Wrap each call in Promise.resolve().then(...) so a SYNCHRONOUS throw in a
+    // service (not just a rejected promise) still funnels into `.catch` — a
+    // sync throw here used to skip the `.then` and leave `loading` stuck true,
+    // which froze the carousel on its skeleton forever. `.finally` guarantees
+    // the flag always clears regardless of how the fetch settled.
     Promise.all([
-      studioTemplatesService.listMine().catch(() => [] as StudioTemplate[]),
-      studioTemplatesService.listMyLicensedTemplates().catch(
-        () => [] as LicensedStudioTemplate[],
-      ),
-    ]).then(([mine, licensed]) => {
-      if (cancelled) return;
-      setUserCreatedTemplates(mine);
-      setUserLicensedTemplates(licensed);
-      setUserTemplatesLoading(false);
-    });
+      Promise.resolve()
+        .then(() => studioTemplatesService.listMine())
+        .catch(() => [] as StudioTemplate[]),
+      Promise.resolve()
+        .then(() => studioTemplatesService.listMyLicensedTemplates())
+        .catch(() => [] as LicensedStudioTemplate[]),
+    ])
+      .then(([mine, licensed]) => {
+        if (cancelled) return;
+        setUserCreatedTemplates(mine);
+        setUserLicensedTemplates(licensed);
+      })
+      .finally(() => {
+        if (!cancelled) setUserTemplatesLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -628,7 +638,7 @@ export default function StudioLanding() {
           band — it pins under the top nav as the user scrolls past the two
           sections below. The section bars (templates / my content) carry the
           same SURFACE tone but don't stick, so they never fight for the top. */}
-      <header className={cn(ACTION_BAR_STICKY, ACTION_BAR_SURFACE, "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between")}>
+      <header className={cn(ACTION_BAR_STICKY, ACTION_BAR_SURFACE, "mb-0 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between")}>
         {/* Site-wide search relocated inline (was docked in the top bar;
             users routinely missed it there). Page title + description are
             dropped — the chooser body labels itself with the "Templates"
@@ -1246,11 +1256,14 @@ function UnifiedTemplateCarousel({
   onPreviewOwned: (template: StudioTemplate) => void;
 }) {
   const { t } = useTranslation();
-  // Owned-only filters depend on the licensed-templates fetch; the
-  // built-in catalog is static so it never reads from `loading`. Only
-  // gate the skeleton on `loading` when the active filter actually needs
-  // the owned set.
-  const dependsOnOwned = useForFilter === "all" || useForFilter === "created" || useForFilter === "purchased";
+  // Owned-ONLY filters depend on the licensed-templates fetch; the built-in
+  // catalog is static so it must never wait on `loading`. The "all" view
+  // includes built-ins (the page's primary CTA), so it renders them
+  // immediately and lets owned rows prepend when the fetch resolves — a slow
+  // or hanging owned-templates request must NOT hide built-in matches (e.g.
+  // searching "actor" → "Actor showreel"). Only created/purchased — which show
+  // owned rows exclusively — gate on the skeleton.
+  const dependsOnOwned = useForFilter === "created" || useForFilter === "purchased";
   if (loading && dependsOnOwned) {
     return (
       <div className="flex gap-4 overflow-hidden pb-2">
