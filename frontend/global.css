@@ -67,20 +67,12 @@ body[data-print-mode] [data-print-hide] {
   color: #fff;
 }
 
-/* Mobile slide-out drawer — invert the dark-theme ("S2") menu zone so the menu
- * surface is the LIGHTER brand purple and the selected row drops to the DARK
- * brand purple (matching the header). The drawer header keeps its dark purple
- * via `.rail-header` below. Scoped to dark theme + mobile only: the light-theme
- * rail already reads as light-menu / purple-selected, and the desktop docked
- * rail is untouched. */
-@media (max-width: 1023.98px) {
-  .dark .rail-drawer {
-    --rail-background: 271 60% 58%;
-    --rail-active: 271 67% 42%;
-  }
-  .dark .rail-drawer .rail-header {
-    background-color: hsl(271 67% 42%);
-  }
+/* The dark-theme rail header (mobile slide-out drawer only — it's `lg:hidden`,
+ * so the desktop docked rail has no header here, the top nav bar does) keeps
+ * the DARK brand purple even though the inverted menu zone below it is now the
+ * lighter shade. */
+.dark .rail-header {
+  background-color: hsl(271 67% 42%);
 }
 
 @layer base {
@@ -218,13 +210,15 @@ body[data-print-mode] [data-print-hide] {
     --sidebar-border: 224 22% 22%;
     --sidebar-ring: 262 83% 66%;
 
-    /* ── App rail — DARK = "S2": brand-purple menu zone over a darker plum
-     * usage zone (both light text). ────────────────────────────────────── */
-    --rail-background: 271 67% 42%;
+    /* ── App rail — DARK = "S2": inverted — the menu zone is the LIGHTER brand
+     * purple and the selected row drops to the DARK brand purple (matching the
+     * mobile drawer header). Both still over a darker plum usage zone, all light
+     * text. Applies to the desktop docked rail AND the mobile drawer. ──────── */
+    --rail-background: 271 60% 58%;
     --rail-foreground: 262 70% 94%;
     --rail-muted: 264 55% 80%;
     --rail-hover: 271 55% 50%;
-    --rail-active: 271 60% 58%;
+    --rail-active: 271 67% 42%;
     --rail-active-foreground: 0 0% 100%;
     --rail-border: 271 40% 32%;
     --rail-usage-background: 264 72% 23%;

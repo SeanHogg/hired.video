@@ -144,7 +144,7 @@ export default function Sidebar({
           // z-[60] keeps the mobile drawer (and its close X header) above the
           // top Navigation bar (z-50); lg:z-auto drops it back to the docked
           // rail's normal stacking on desktop where there's no overlay.
-          "rail-drawer fixed top-0 left-0 h-full bg-rail border-r border-rail-border z-[60] transform transition-all duration-500 ease-in-out",
+          "fixed top-0 left-0 h-full bg-rail border-r border-rail-border z-[60] transform transition-all duration-500 ease-in-out",
           collapsed ? "w-16 overflow-hidden" : "w-[90%] lg:w-80 overflow-y-auto",
           isOpen ? "translate-x-0" : "-translate-x-full",
           "lg:translate-x-0 lg:fixed lg:z-auto",
