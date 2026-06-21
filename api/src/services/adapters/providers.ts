@@ -293,14 +293,16 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   article_writer: { model: "meta-llama/llama-3.3-70b-instruct:free", temperature: 0.7 },
   studio_game_agent: {
     // Tool-use intensive — needs a model that reliably emits structured
-    // function calls. Sonnet is the default; the gateway will substitute
-    // on cooldown / outage and the route surfaces resolvedModel.
-    model: "anthropic/claude-sonnet-4-6",
+    // function calls. Opus 4.8 is the default (was claude-sonnet-4-6 +
+    // an openai/gpt-4o-mini fallback; both retired out of the gateway
+    // catalog on 2026-06-21, gap #1938). No explicit fallback now: this
+    // use case is interactive, so withFallbackChain auto-pads the free
+    // pool + the cross-vendor PAID_TERMINAL_POOL (cerebras → opus,
+    // deduped) — the same safety net every other interactive flow gets,
+    // and the route still surfaces resolvedModel on substitution.
+    model: "anthropic/claude-opus-4-8",
     temperature: 0.4,
     maxTokens: 4096,
-    fallbacks: [
-      { model: "openai/gpt-4o-mini", temperature: 0.4 },
-    ],
   },
   // Job extraction (Chrome extension Track click → /api/jobs/extract).
   // One-shot, user-initiated, high-value: a bad extract makes the saved
