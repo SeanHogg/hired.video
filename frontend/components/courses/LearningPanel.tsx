@@ -1,3 +1,4 @@
+import { TABLE_SURFACE, TABLE_HEAD } from "@/lib/ui/table-surface";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   GraduationCap,
@@ -507,9 +508,9 @@ function LearningTable({ items }: { items: LearningItem[] }) {
   const { pageItems, paginationProps } = usePaginatedList(items, 12);
   return (
     <div>
-      <div className="overflow-x-auto rounded-lg border border-border">
+      <div className={TABLE_SURFACE}>
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+          <thead className={TABLE_HEAD}>
             <tr>
               <th className="px-3 py-2 font-medium">Course</th>
               <th className="px-3 py-2 font-medium">Progress</th>

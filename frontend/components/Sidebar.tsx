@@ -279,22 +279,16 @@ export default function Sidebar({
           )}
 
           {/* ── USAGE ZONE — distinct band pinned at the bottom. The pills
-              style themselves for a light surface, so the wrapper re-skins
-              them (translucent-white chips + light text) so they stay legible
-              on the coloured band in both themes. ───────────────────────── */}
+              style themselves for a light surface; `.rail-usage-chips` (in
+              global.css) re-skins their chip + text to translucent-white so
+              they stay legible on the coloured band in both themes. ───────── */}
           <div className="border-t border-rail-usage-border bg-rail-usage text-rail-usage-foreground p-4 space-y-2">
             {!collapsed && (
               <div className="text-[10px] font-bold uppercase tracking-wider text-rail-usage-muted mb-1 px-1">
                 {t("headings.usage")}
               </div>
             )}
-            <div
-              className={cn(
-                "space-y-2",
-                "[&_a]:!border-white/20 [&_a]:!bg-white/10 [&_a:hover]:!bg-white/20 [&_a]:!text-white",
-                "[&_.text-muted-foreground]:!text-white/70 [&_.text-primary]:!text-white",
-              )}
-            >
+            <div className="rail-usage-chips space-y-2">
               <AITokenPill collapsed={collapsed} onNavigate={onClose} />
               <PointsPill collapsed={collapsed} onNavigate={onClose} />
             </div>

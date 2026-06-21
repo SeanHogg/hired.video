@@ -148,9 +148,11 @@ const STOPWORDS = new Set([
 /** Split a query into meaningful lowercased terms (alphanumeric, ≥2 chars,
  *  non-stopword). */
 function tokenizeQuery(query: string): string[] {
-  return (query.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter(
-    (t) => t.length >= 2 && !STOPWORDS.has(t),
-  );
+  // Annotate the fallback as string[] — a bare `?? []` infers `never[]`, and
+  // filtering the `RegExpMatchArray | never[]` union collapses the callback
+  // param to `never` (TS2339 on `t.length`).
+  const tokens: string[] = query.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+  return tokens.filter((t) => t.length >= 2 && !STOPWORDS.has(t));
 }
 
 /** Client-side keyword search over the bundled corpus — instant, no DB.

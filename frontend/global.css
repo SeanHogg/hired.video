@@ -47,6 +47,26 @@ body[data-print-mode] [data-print-hide] {
   min-height: auto !important;
 }
 
+/* Rail usage band — the AI-token + points pills style themselves for a light
+ * surface; on the coloured usage band we re-skin their chip + text to
+ * translucent-white so they stay legible in both themes (matching the design's
+ * uniform translucent chips). Scoped + unlayered, so it wins over the pills'
+ * Tailwind utility classes by layer order — no !important needed. */
+.rail-usage-chips a {
+  border-color: rgb(255 255 255 / 0.2);
+  background-color: rgb(255 255 255 / 0.1);
+  color: #fff;
+}
+.rail-usage-chips a:hover {
+  background-color: rgb(255 255 255 / 0.2);
+}
+.rail-usage-chips .text-muted-foreground {
+  color: rgb(255 255 255 / 0.72);
+}
+.rail-usage-chips .text-primary {
+  color: #fff;
+}
+
 @layer base {
   /**
    * Tailwind CSS theme

@@ -1,3 +1,4 @@
+import { TABLE_SURFACE, TABLE_HEAD } from "@/lib/ui/table-surface";
 import { ArrowRight } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -384,9 +385,9 @@ export function ToolsBrowser({
 function ToolsTable({ items }: { items: WovenItem[] }) {
   const { t } = useTranslation();
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <div className={TABLE_SURFACE}>
       <table className="w-full text-left text-sm">
-        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+        <thead className={TABLE_HEAD}>
           <tr>
             <th className="px-3 py-2 font-medium">{t("labels.name", "Name")}</th>
             <th className="px-3 py-2 font-medium">

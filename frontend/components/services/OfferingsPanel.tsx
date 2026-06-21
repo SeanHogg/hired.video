@@ -7,6 +7,7 @@
 // `openCreate` is exposed via ref so the parent (CreatorWorkspace) can
 // trigger the Add-Service dialog from buttons rendered in the tabs row.
 
+import { TABLE_SURFACE, TABLE_HEAD } from "@/lib/ui/table-surface";
 import {
   Fragment,
   forwardRef,
@@ -520,9 +521,9 @@ function ServicesTable({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <div className={TABLE_SURFACE}>
       <table className="w-full text-left text-sm">
-        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+        <thead className={TABLE_HEAD}>
           <tr>
             <th className="px-3 py-2 font-medium">Name</th>
             <th className="px-3 py-2 font-medium">Price</th>
