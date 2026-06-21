@@ -100,9 +100,14 @@ export default function MobileBottomNav() {
                     "flex flex-col items-center justify-center gap-1 py-2 px-2 text-xs",
                     "min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                     item.accent
-                      ? "mx-1 my-1 rounded-lg bg-gradient-to-r from-brand-purple to-brand-blue text-white shadow-sm hover:opacity-90 font-semibold"
+                      ? cn(
+                          "mx-1 my-1 rounded-lg bg-gradient-to-r from-brand-purple to-brand-blue text-white shadow-sm hover:opacity-90 font-semibold",
+                          // Even the prominent CTA reflects the current route, so it
+                          // doesn't read as permanently "selected" (#2048).
+                          active && "ring-2 ring-white/70"
+                        )
                       : active
-                        ? "text-primary"
+                        ? "rounded-lg bg-primary/10 text-primary font-medium"
                         : "text-muted-foreground hover:text-foreground"
                   )}
                   aria-current={active ? "page" : undefined}

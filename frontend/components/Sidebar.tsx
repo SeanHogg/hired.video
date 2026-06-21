@@ -1,5 +1,6 @@
 import {
   Video,
+  Sparkles,
   Briefcase,
   TrendingUp,
   HelpCircle,
@@ -152,12 +153,19 @@ export default function Sidebar({
       >
         <div className="flex flex-col h-full">
           {/* Header — drawer-only (below lg). On lg+ the docked rail sits beneath
-              the full-width fixed Navigation bar, which renders the logo. */}
-          <div className="rail-header flex items-center justify-between p-4 border-b border-rail-border lg:hidden">
+              the full-width fixed Navigation bar, which renders the logo. This
+              band mirrors that top nav bar exactly — same `bg-sidebar` surface
+              and the same gradient brand logo (Video + Sparkles + gradient
+              wordmark) — so the drawer reads as a continuation of the header,
+              not a differently-toned panel. */}
+          <div className="flex items-center justify-between p-4 border-b border-sidebar-border bg-sidebar lg:hidden">
             <Link to="/" className="flex items-center space-x-2">
-              <Video className="h-6 w-6 text-rail-foreground" />
+              <div className="relative">
+                <Video className="h-7 w-7 text-primary" />
+                <Sparkles className="h-4 w-4 text-brand-blue absolute -top-1 -right-1" />
+              </div>
               {!collapsed && (
-                <span className="font-bold text-lg text-rail-foreground">
+                <span className="text-lg font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
                   hired.video
                 </span>
               )}
@@ -167,7 +175,7 @@ export default function Sidebar({
               size="icon"
               onClick={onClose}
               aria-label={t("nav.closeMenu")}
-              className="text-rail-foreground hover:bg-rail-hover hover:text-rail-foreground"
+              className="text-foreground hover:bg-muted"
             >
               <X className="h-5 w-5" />
             </Button>

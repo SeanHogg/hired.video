@@ -67,14 +67,6 @@ body[data-print-mode] [data-print-hide] {
   color: #fff;
 }
 
-/* The dark-theme rail header (mobile slide-out drawer only — it's `lg:hidden`,
- * so the desktop docked rail has no header here, the top nav bar does) keeps
- * the DARK brand purple even though the inverted menu zone below it is now the
- * lighter shade. */
-.dark .rail-header {
-  background-color: hsl(271 67% 42%);
-}
-
 @layer base {
   /**
    * Tailwind CSS theme
