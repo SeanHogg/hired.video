@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import { ZodError } from "zod";
 import {
   MessageSquare,
-  Heart,
   Share2,
   Globe,
   Lock,
@@ -11,9 +10,6 @@ import {
   AlertCircle,
   Sparkles,
   ArrowRight,
-  Image,
-  Video,
-  FileText,
   Search,
   ChevronRight,
   Building2,
@@ -28,7 +24,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Card,
   CardContent,
@@ -36,7 +31,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 
 import { useAuth } from "@/lib/auth";
 import {
@@ -59,6 +53,7 @@ import type {
 import FeedPostCard from "@/components/feed/FeedPostCard";
 import CreatePostModal from "@/components/feed/CreatePostModal";
 import FeedProfileCard from "@/components/feed/FeedProfileCard";
+import { FeedComposerHeader } from "@/components/feed/FeedComposer";
 import ToolsCTA from "@/components/dashboard/shared/ToolsCTA";
 import { CheckCircle } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -122,77 +117,6 @@ function FeedMarketingPage() {
             </div>
       </div>
     </AppShell>
-  );
-}
-
-// ─── Inline post composer bar ─────────────────────────────────────────────────
-export function PostComposerBar({
-  user,
-  onOpen,
-}: {
-  user: { name?: string | null; email?: string | null; [key: string]: unknown };
-  onOpen: (mode: PostMode) => void;
-}) {
-  const initials = ((user.name as string) || (user.email as string) || "?")
-    .split(" ")
-    .map((n: string) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
-  const avatar = (user.avatar as string) ?? "";
-
-  return (
-    <Card>
-      <CardContent className="pt-4 pb-3">
-        {/* Top row: avatar + text input trigger */}
-        <div className="flex items-center gap-3 mb-4">
-          <Avatar className="w-10 h-10 shrink-0">
-            <AvatarImage src={avatar} alt={(user.name as string) ?? ""} />
-            <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-          <button
-            type="button"
-            onClick={() => onOpen("text")}
-            className="flex-1 text-left text-sm text-muted-foreground border rounded-full px-4 py-2.5 hover:bg-muted/50 hover:border-primary/40 transition-colors"
-          >
-            What do you want to talk about?
-          </button>
-        </div>
-
-        <Separator className="mb-3" />
-
-        {/* Bottom row: media type buttons */}
-        <div className="flex items-center justify-around">
-          <button
-            type="button"
-            onClick={() => onOpen("video")}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted/60 hover:text-blue-600 transition-colors"
-          >
-            <Video className="h-5 w-5 text-blue-500" />
-            Video
-          </button>
-          <button
-            type="button"
-            onClick={() => onOpen("photo")}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted/60 hover:text-green-600 transition-colors"
-          >
-            <Image className="h-5 w-5 text-green-500" />
-            Photo
-          </button>
-          <button
-            type="button"
-            onClick={() => onOpen("article")}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted/60 hover:text-orange-600 transition-colors"
-          >
-            <FileText className="h-5 w-5 text-orange-500" />
-            Write article
-          </button>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -378,41 +302,6 @@ export function FeedRightPanel({
   );
 }
 
-// ─── Feed filter tabs ─────────────────────────────────────────────────────────
-export function FeedFilterTabs({
-  active,
-  onChange,
-}: {
-  active: "all" | "connections" | "following";
-  onChange: (v: "all" | "connections" | "following") => void;
-}) {
-  const tabs: { value: "all" | "connections" | "following"; label: string; icon: React.ReactNode }[] = [
-    { value: "all", label: "All", icon: <Globe className="h-4 w-4" /> },
-    { value: "connections", label: "Connections", icon: <Users className="h-4 w-4" /> },
-    { value: "following", label: "Following", icon: <Heart className="h-4 w-4" /> },
-  ];
-
-  return (
-    <div className="flex border-b bg-card rounded-t-xl overflow-hidden">
-      {tabs.map((tab) => (
-        <button
-          key={tab.value}
-          type="button"
-          onClick={() => onChange(tab.value)}
-          className={`flex items-center gap-2 flex-1 justify-center py-3 text-sm font-medium border-b-2 transition-colors ${
-            active === tab.value
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
-          }`}
-        >
-          {tab.icon}
-          {tab.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // ─── Main Feed page ────────────────────────────────────────────────────────────
 export default function Feed() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -559,16 +448,15 @@ export default function Feed() {
 
               {/* CENTER — Post bar + Feed */}
               <div className="min-w-0 space-y-4">
-                {/* Post composer */}
-                <PostComposerBar user={user as any} onOpen={openCreate} />
-
-                {/* Filter tabs */}
-                <div className="bg-card rounded-xl overflow-hidden border">
-                  <FeedFilterTabs
-                    active={filters.filter ?? "all"}
-                    onChange={(v) => setFilters((prev) => ({ ...prev, filter: v }))}
-                  />
-                </div>
+                {/* Composer + filter tabs. Non-sticky here — the search strip
+                    above already owns the sticky top slot on this surface. */}
+                <FeedComposerHeader
+                  user={user as any}
+                  onOpen={openCreate}
+                  filter={filters.filter ?? "all"}
+                  onFilterChange={(v) => setFilters((prev) => ({ ...prev, filter: v }))}
+                  sticky={false}
+                />
 
                 {/* Active hashtag filter banner (gap #1829) */}
                 {filters.tag && (

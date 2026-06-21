@@ -9,6 +9,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import ShareMenu, { ShareSubMenu } from "@/components/share/ShareMenu";
+import type { SharePayload } from "@shared/social-share";
 
 interface CardAction {
   label: string;
@@ -25,6 +27,9 @@ interface CardAction {
   onClick: (event: React.MouseEvent) => void;
   disabled?: boolean;
   loading?: boolean;
+  /** When set, this action renders as the full social ShareMenu instead of a
+   *  plain button/menu-item (LinkedIn / X / … / copy link / native). */
+  share?: SharePayload;
 }
 
 interface CardActionsProps {
@@ -67,24 +72,34 @@ export function CardActions({
         className,
       )}
     >
-      {/* Primary action button */}
-      <Button
-        variant={primary.variant || "outline"}
-        size={primary.size || "sm"}
-        disabled={primary.disabled || primary.loading}
-        onClick={(e) => {
-          e.stopPropagation();
-          primary.onClick(e);
-        }}
-        className={cn(primary.icon && "gap-2")}
-      >
-        {primary.loading ? (
-          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-        ) : (
-          primary.icon && <primary.icon className="w-4 h-4" />
-        )}
-        {primary.label}
-      </Button>
+      {/* Primary action — a share action becomes the full social ShareMenu;
+          everything else stays a plain button. */}
+      {primary.share ? (
+        <ShareMenu
+          variant={primary.variant === "default" ? "outline" : "ghost"}
+          size={primary.size === "icon" || primary.size === "lg" ? "default" : (primary.size ?? "sm")}
+          align="start"
+          {...primary.share}
+        />
+      ) : (
+        <Button
+          variant={primary.variant || "outline"}
+          size={primary.size || "sm"}
+          disabled={primary.disabled || primary.loading}
+          onClick={(e) => {
+            e.stopPropagation();
+            primary.onClick(e);
+          }}
+          className={cn(primary.icon && "gap-2")}
+        >
+          {primary.loading ? (
+            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          ) : (
+            primary.icon && <primary.icon className="w-4 h-4" />
+          )}
+          {primary.label}
+        </Button>
+      )}
 
       {/* Overflow actions → ellipsis dropdown */}
       {hasOverflow && (
@@ -96,19 +111,25 @@ export function CardActions({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {overflow.map((action, index) => (
-              <DropdownMenuItem
-                key={index}
-                disabled={action.disabled || action.loading}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  action.onClick(e as unknown as React.MouseEvent);
-                }}
-              >
-                {action.icon && <action.icon className="w-4 h-4 mr-2" />}
-                {action.label}
-              </DropdownMenuItem>
-            ))}
+            {overflow.map((action, index) =>
+              action.share ? (
+                // Share action expands into a "Share ▸" submenu of social
+                // targets (LinkedIn / X / … / copy link / native).
+                <ShareSubMenu key={index} {...action.share} />
+              ) : (
+                <DropdownMenuItem
+                  key={index}
+                  disabled={action.disabled || action.loading}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    action.onClick(e as unknown as React.MouseEvent);
+                  }}
+                >
+                  {action.icon && <action.icon className="w-4 h-4 mr-2" />}
+                  {action.label}
+                </DropdownMenuItem>
+              ),
+            )}
             {extraMenuItems && overflow.length > 0 && <DropdownMenuSeparator />}
             {extraMenuItems}
           </DropdownMenuContent>

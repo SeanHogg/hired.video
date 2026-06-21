@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ShoppingBag, Clock, MessageSquare, Sparkles, Share2 } from "lucide-react";
+import { ShoppingBag, Clock, MessageSquare, Sparkles } from "lucide-react";
 import { CardContent } from "@/components/ui/card";
 import BaseCard from "@/components/ui/BaseCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { buildShareAction } from "@/lib/card-share-action";
+import ShareMenu from "@/components/share/ShareMenu";
 import { serviceCategoryLabel } from "@/lib/taxonomy/category-labels";
 
 export interface ServiceMarketplaceItem {
@@ -33,10 +33,7 @@ export default function ServiceMarketplaceCard({ item }: { item: ServiceMarketpl
   const { t } = useTranslation();
   const providerHref = `/people/${item.providerSlug || item.provider.id}?tab=services`;
   const ctaHref = item.isPlatformService ? "/services?wizard=open" : providerHref;
-  const shareAction = buildShareAction({
-    entityUrl: providerHref,
-    copySuccessDescription: "Service link has been copied to your clipboard.",
-  });
+  const shareUrl = `${window.location.origin}${providerHref}`;
   return (
     <BaseCard className={`h-full flex flex-col ${
       item.isPlatformService
@@ -57,16 +54,15 @@ export default function ServiceMarketplaceCard({ item }: { item: ServiceMarketpl
         {item.isPlatformService && (
           <Badge className="absolute top-2 right-2 bg-purple-600 text-white border-0">hired.video</Badge>
         )}
-        <Button
-          type="button"
-          variant="secondary"
-          size="icon"
-          className="absolute bottom-2 right-2 h-7 w-7 bg-background/90 hover:bg-background"
-          aria-label="Share service"
-          onClick={(e) => shareAction.onClick(e)}
-        >
-          <Share2 className="h-3.5 w-3.5" />
-        </Button>
+        <div className="absolute bottom-2 right-2">
+          <ShareMenu
+            variant="icon"
+            align="end"
+            className="h-7 w-7 bg-background/90 hover:bg-background"
+            url={shareUrl}
+            title={item.title}
+          />
+        </div>
       </div>
       <CardContent className="p-4 space-y-2 flex-1 flex flex-col">
         <h3 className="font-semibold leading-tight line-clamp-2">

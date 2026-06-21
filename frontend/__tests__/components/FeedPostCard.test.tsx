@@ -94,10 +94,13 @@ describe("FeedPostCard", () => {
     await waitFor(() => expect(feedService.getPostComments).toHaveBeenCalledWith("p1"));
   });
 
-  it("opens the reshare composer from the Repost button", () => {
+  it("renders the reusable Share control (Repost now lives inside the Share menu)", () => {
     renderCard();
-    fireEvent.click(screen.getByRole("button", { name: "Repost" }));
-    expect(screen.getByPlaceholderText(/Add a comment to your repost/i)).toBeTruthy();
+    // The old standalone "Repost" button is now a Share dropdown; the repost
+    // affordance is a menu item inside it (driven via Radix, not asserted in
+    // jsdom). The rename is the behavioural contract under test here.
+    expect(screen.getByRole("button", { name: /Share/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Repost" })).toBeNull();
   });
 
   it("renders the embedded original + attribution for a repost", () => {

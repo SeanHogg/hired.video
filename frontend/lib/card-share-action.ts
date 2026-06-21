@@ -20,6 +20,10 @@ interface ShareActionOptions {
    *  The helper prepends `window.location.origin` at click time so links
    *  always point at the current host (preview vs prod). */
   entityUrl: string;
+  /** Short title for the share intents (tweet text, email subject). */
+  shareTitle?: string;
+  /** Longer body for email / WhatsApp prefix. */
+  shareText?: string;
   /** Optional host-supplied callback. When provided, the legacy share modal
    *  fires instead of the clipboard copy — kept for `card-factory` flows
    *  that route every action through their `interactions` bag. */
@@ -32,26 +36,37 @@ interface ShareActionOptions {
   label?: string;
 }
 
+/**
+ * The "Share" card action. Carries a `share` payload so the rich renderer
+ * (CardActions) surfaces the full social ShareMenu — LinkedIn / X / Facebook
+ * / WhatsApp / Email / copy link / native — across every card. `onClick`
+ * remains a copy-link fallback for renderers that don't special-case share.
+ */
 export function buildShareAction({
   entityUrl,
+  shareTitle,
+  shareText,
   onActions,
   copySuccessTitle = "Link copied!",
   copySuccessDescription = "Link has been copied to your clipboard.",
   label = "Share",
 }: ShareActionOptions): DynamicCardAction {
+  const absoluteUrl = `${window.location.origin}${entityUrl.startsWith("/") ? "" : "/"}${entityUrl}`;
   return {
     id: "share",
     label,
     variant: "default",
     icon: Share,
+    // Rich social targets — consumed by CardActions. Omitted when a host
+    // callback owns the share UX (`onActions`), so that legacy path is unchanged.
+    share: onActions ? undefined : { url: absoluteUrl, title: shareTitle, text: shareText },
     onClick: () => {
       if (onActions) {
         onActions();
         return;
       }
-      const url = `${window.location.origin}${entityUrl.startsWith("/") ? "" : "/"}${entityUrl}`;
       navigator.clipboard
-        .writeText(url)
+        .writeText(absoluteUrl)
         .then(() => {
           toast({
             title: copySuccessTitle,
@@ -59,7 +74,7 @@ export function buildShareAction({
           });
         })
         .catch(async () => {
-          await promptDialog({ title: i18n.t("dialogs.share.copyLinkTitle"), label: i18n.t("dialogs.share.copyLinkLabel"), defaultValue: url });
+          await promptDialog({ title: i18n.t("dialogs.share.copyLinkTitle"), label: i18n.t("dialogs.share.copyLinkLabel"), defaultValue: absoluteUrl });
         });
     },
   };

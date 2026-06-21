@@ -146,8 +146,11 @@ export function JobActionsMenu({
           </DropdownMenuItem>
         )}
 
-        {/* Share group — visible to all. Self-gates. */}
+        {/* Share group — visible to all. Self-gates. A real job URL turns
+            this into the full social share set; otherwise it falls back to
+            the legacy onShare/onCopyLink callbacks. */}
         <EntityShareGroup
+          shareUrl={jobId ? `${window.location.origin}/jobs/${jobId}` : undefined}
           onShare={onShare}
           onCopyLink={onCopyLink}
           onShowQR={onShowQR}

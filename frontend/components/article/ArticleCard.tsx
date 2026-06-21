@@ -13,6 +13,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import ShareMenu from "@/components/share/ShareMenu";
 import type { PublicArticleCard } from "@/lib/services/article-service";
 import { buildImageUrl } from "@/lib/utils";
 import {
@@ -38,9 +39,23 @@ export function ArticleCard({ article }: ArticleCardProps) {
     article.audience && (ARTICLE_AUDIENCES as readonly string[]).includes(article.audience)
       ? ARTICLE_AUDIENCE_LABELS[article.audience as ArticleAudience]
       : null;
+  const articleUrl = `${window.location.origin}/articles/${article.author.slug}/${article.slug}`;
   return (
-    <Link to={`/articles/${article.author.slug}/${article.slug}`}>
-      <Card className="h-full hover:border-primary/50 transition-colors">
+    <div className="relative h-full">
+      {/* Share — the reusable cross-card ShareMenu, absolutely positioned so
+          it sits over the card link. The wrapper stops the click from
+          triggering the card's navigation. */}
+      <div
+        className="absolute top-2 right-2 z-10"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      >
+        <ShareMenu variant="icon" align="end" url={articleUrl} title={article.title} text={article.summary ?? undefined} />
+      </div>
+      <Link to={`/articles/${article.author.slug}/${article.slug}`}>
+        <Card className="h-full hover:border-primary/50 transition-colors">
         {article.coverImageUrl && (
           <div
             className="h-32 w-full rounded-t-lg bg-cover bg-center"
@@ -78,6 +93,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
           </p>
         </CardContent>
       </Card>
-    </Link>
+      </Link>
+    </div>
   );
 }

@@ -64,11 +64,8 @@ import type {
 import FeedPostCard from "@/components/feed/FeedPostCard";
 import CreatePostModal from "@/components/feed/CreatePostModal";
 import FeedProfileCard from "@/components/feed/FeedProfileCard";
-import {
-  PostComposerBar,
-  FeedFilterTabs,
-  FeedRightPanel,
-} from "@/pages/Feed";
+import { FeedRightPanel } from "@/pages/Feed";
+import { FeedComposerHeader } from "@/components/feed/FeedComposer";
 
 type PostMode = "text" | "video" | "photo" | "article";
 
@@ -672,16 +669,16 @@ export default function Home() {
                 {/* Feed notification items */}
                 <WelcomeHero />
 
-                <PostComposerBar user={user as never} onOpen={openCreate} />
-
-                <div className="bg-card rounded-xl overflow-hidden border">
-                  <FeedFilterTabs
-                    active={filters.filter ?? "all"}
-                    onChange={(v) =>
-                      setFilters((prev) => ({ ...prev, filter: v }))
-                    }
-                  />
-                </div>
+                {/* Composer + filter tabs — sticky on scroll; flattens to a
+                    compact bar that taps back open to the full options. */}
+                <FeedComposerHeader
+                  user={user as never}
+                  onOpen={openCreate}
+                  filter={filters.filter ?? "all"}
+                  onFilterChange={(v) =>
+                    setFilters((prev) => ({ ...prev, filter: v }))
+                  }
+                />
 
                 {feedError && (
                   <Alert variant="destructive">

@@ -23,6 +23,7 @@ import {
   Info,
   Briefcase,
   Check,
+  CheckCheck,
   X,
   Loader2,
   Mail,
@@ -472,6 +473,10 @@ export interface InboxPanelProps {
   heightClassName?: string;
   /** Hide the header (title + mark-all-read) when the host already has one. */
   hideHeader?: boolean;
+  /** Set when the hosting surface paints its own close affordance in the
+   *  top-right corner (the mobile Sheet's built-in ✕). Reserves header
+   *  inset so "Mark all read" doesn't sit underneath / collide with it. */
+  hasExternalCloseButton?: boolean;
   /** Page-tab only — open the detail sheet on item click instead of the
    *  default mark-read behaviour. The detail sheet is rendered by the
    *  parent so this component stays composable. */
@@ -499,6 +504,7 @@ export function InboxPanel({
   // ancestor for `h-full` to resolve against.
   heightClassName = "max-h-[70vh] md:max-h-[32rem]",
   hideHeader = false,
+  hasExternalCloseButton = false,
   onItemSelect,
   selectionMode = false,
   selectedIds,
@@ -506,6 +512,7 @@ export function InboxPanel({
   highlightedId,
   toolbar,
 }: InboxPanelProps) {
+  const { t } = useTranslation();
   const {
     items,
     unreadCount,
@@ -538,9 +545,16 @@ export function InboxPanel({
         redirect={typeof window !== "undefined" ? window.location.pathname + window.location.search : "/settings?tab=email"}
       />
       {!hideHeader && (
-        <div className="flex items-center justify-between px-3 py-3 border-b shrink-0">
+        <div
+          className={cn(
+            "flex items-center justify-between gap-2 px-3 py-3 border-b shrink-0",
+            // Clear the host's absolute top-right close ✕ (mobile Sheet) so
+            // the "Mark all read" control never sits underneath it.
+            hasExternalCloseButton && "pr-12",
+          )}
+        >
           <div className="flex items-center gap-2">
-            <h2 className="font-semibold text-sm">Inbox</h2>
+            <h2 className="font-semibold text-sm">{t("inbox.title")}</h2>
             {unreadCount > 0 && (
               <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
                 {unreadCount}
@@ -549,12 +563,13 @@ export function InboxPanel({
           </div>
           {items.length > 0 && (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={markAllRead}
-              className="text-xs h-7"
+              className="text-xs h-7 px-2.5 shrink-0"
             >
-              Mark all read
+              <CheckCheck className="h-3.5 w-3.5 mr-1" />
+              {t("inbox.markAllRead")}
             </Button>
           )}
         </div>
@@ -626,13 +641,14 @@ function InboxPaginationFooter({
   isLoading: boolean;
   onLoadMore: () => void;
 }) {
+  const { t } = useTranslation();
   if (loadedCount === 0) return null;
   return (
     <div className="flex items-center justify-between gap-2 px-3 py-2 border-t bg-muted/20 shrink-0">
       <span className="text-[11px] text-muted-foreground">
         {hasMore
-          ? `${loadedCount} loaded`
-          : `${loadedCount} ${loadedCount === 1 ? "item" : "items"}`}
+          ? t("inbox.footer.loaded", { count: loadedCount })
+          : t("inbox.footer.itemCount", { count: loadedCount })}
       </span>
       <Button
         type="button"
@@ -645,12 +661,12 @@ function InboxPaginationFooter({
         {isLoading ? (
           <>
             <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-            Loading…
+            {t("inbox.footer.loading")}
           </>
         ) : hasMore ? (
-          "Older emails →"
+          t("inbox.footer.olderItems")
         ) : (
-          "No more"
+          t("inbox.footer.noMore")
         )}
       </Button>
     </div>

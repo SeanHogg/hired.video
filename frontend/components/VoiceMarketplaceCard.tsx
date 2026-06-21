@@ -14,13 +14,13 @@
 "use client";
 
 import { Link } from "react-router-dom";
-import { Mic, Play, Pause, ShoppingCart, Check, Globe2, Share2 } from "lucide-react";
+import { Mic, Play, Pause, ShoppingCart, Check, Globe2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
 import BaseCard from "@/components/ui/BaseCard";
 import { useCart } from "@/lib/cart-context";
-import { buildShareAction } from "@/lib/card-share-action";
+import ShareMenu from "@/components/share/ShareMenu";
 import { useAudioPreview } from "@/lib/hooks/useAudioPreview";
 import WishlistButton from "@/components/wishlist/WishlistButton";
 import { toast } from "sonner";
@@ -78,10 +78,7 @@ export default function VoiceMarketplaceCard({ item }: Props) {
     toast.success(`${item.name} added to cart`);
   };
 
-  const shareAction = buildShareAction({
-    entityUrl: `/marketplace/voices/${item.voiceCloneId}`,
-    copySuccessDescription: "Voice listing link has been copied to your clipboard.",
-  });
+  const shareUrl = `${window.location.origin}/marketplace/voices/${item.voiceCloneId}`;
 
   return (
     <BaseCard className="overflow-hidden">
@@ -111,16 +108,13 @@ export default function VoiceMarketplaceCard({ item }: Props) {
               entityId={item.voiceCloneId}
               className="h-7 w-7"
             />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
+            <ShareMenu
+              variant="icon"
+              align="end"
               className="h-7 w-7"
-              aria-label="Share voice"
-              onClick={(e) => shareAction.onClick(e)}
-            >
-              <Share2 className="h-4 w-4" />
-            </Button>
+              url={shareUrl}
+              title={item.name}
+            />
             <span className="font-semibold text-sm tabular-nums">
               {formatPrice(item.priceCents, item.currency)}
             </span>

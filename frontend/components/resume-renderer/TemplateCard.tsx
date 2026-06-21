@@ -4,9 +4,9 @@
 //
 // Self-gates everything via TemplateApplyButton (cart vs. claim vs. use)
 // and TemplateInfoButton (route vs. sheet); the card itself doesn't branch
-// on kind. Share affordance routes through the platform-wide
-// `buildShareAction` helper so the copy-link + toast UX is identical to
-// every other entity card.
+// on kind. Share affordance is the reusable <ShareMenu> (LinkedIn / X /
+// Facebook / WhatsApp / Email / copy link / native), identical to every
+// other entity card.
 //
 // Two orientations share one implementation (DRY):
 //   "column" (default) — preview on top, details below; the marketplace grid.
@@ -17,7 +17,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, Share2 } from "lucide-react";
+import { Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import BaseCard from "@/components/ui/BaseCard";
 import TemplateApplyButton from "@/components/templates/TemplateApplyButton";
@@ -27,7 +27,7 @@ import FirstPartyBadge from "@/components/templates/FirstPartyBadge";
 import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 import { priceLabel } from "@/lib/templates/use-apply-template";
 import { getStaticTemplateBySlug } from "@/lib/templates/registry";
-import { buildShareAction } from "@/lib/card-share-action";
+import ShareMenu from "@/components/share/ShareMenu";
 import type { TemplateMeta } from "@/lib/templates/types";
 import type { ResumeTemplateDescriptor } from "@/types/resume-template";
 
@@ -57,10 +57,7 @@ export default function TemplateCard({
   const isFree = resolved.priceCents <= 0;
   const isRow = orientation === "row";
 
-  const shareAction = buildShareAction({
-    entityUrl: `/marketplace/templates/${resolved.slug}`,
-    copySuccessDescription: "Template link has been copied to your clipboard.",
-  });
+  const shareUrl = `${window.location.origin}/marketplace/templates/${resolved.slug}`;
 
   const openPreview = () => navigate(`/marketplace/templates/${resolved.slug}`);
 
@@ -130,18 +127,8 @@ export default function TemplateCard({
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <TemplateInfoButton meta={resolved} className="h-7 w-7" />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            aria-label="Share template"
-            onClick={(e) => {
-              e.stopPropagation();
-              shareAction.onClick(e);
-            }}
-          >
-            <Share2 className="w-4 h-4" />
-          </Button>
+          {/* Reusable cross-card share — LinkedIn / X / … / copy link / native. */}
+          <ShareMenu variant="icon" align="end" url={shareUrl} title={resolved.name} text={resolved.blurb} />
           {/* Report Abuse — only creator-authored templates carry a
               backend uuid + owner to moderate (resume + studio-builtin
               templates are platform content). Self-gates: hidden for the

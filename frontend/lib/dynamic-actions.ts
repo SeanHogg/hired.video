@@ -11,9 +11,18 @@
  * never rendered Share — they're deleted with the share-affordance pass.
  */
 
+import type { SharePayload } from "@shared/social-share";
+
 export interface DynamicCardAction {
   id: string;
   label: string;
+  /**
+   * When set, renderers that support it (CardActions) surface this action as
+   * the full social ShareMenu (LinkedIn / X / … / copy link / native) instead
+   * of a plain button. `onClick` stays the copy-link fallback for renderers
+   * that don't special-case share (ActionsModal, QuickActions).
+   */
+  share?: SharePayload;
   variant?:
     | "default"
     | "destructive"

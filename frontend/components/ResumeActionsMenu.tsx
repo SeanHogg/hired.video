@@ -301,8 +301,12 @@ export function ResumeActionsMenu({
           </DropdownMenuItem>
         )}
 
-        {/* Share group — visible to all. Self-gates. */}
+        {/* Share group — visible to all. Self-gates. When we know the
+            resume id we hand the group a real URL so it renders the full
+            social share set (LinkedIn / X / … / copy link); otherwise it
+            falls back to the legacy onShare/onCopyLink callbacks. */}
         <EntityShareGroup
+          shareUrl={resumeId ? `${window.location.origin}/resumes/${resumeId}` : undefined}
           onShare={onShare}
           onCopyLink={onCopyLink}
           onShowQR={onShowQR}

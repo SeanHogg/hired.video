@@ -4,7 +4,7 @@
 // Preview / Add-to-Cart / Unlocked states wired into the existing cart +
 // template-unlocks surfaces.
 
-import { Check, Eye, ShoppingCart, Share2 } from "lucide-react";
+import { Check, Eye, ShoppingCart } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/lib/cart-context";
 import { SAMPLE_JOB } from "@/lib/sample-job";
 import { isTemplateUnlocked } from "@/lib/template-unlocks";
-import { buildShareAction } from "@/lib/card-share-action";
+import ShareMenu from "@/components/share/ShareMenu";
 import type { JobTemplateDescriptor } from "@/types/job-template";
 
 interface JobTemplateCardProps {
@@ -42,10 +42,7 @@ export default function JobTemplateCard({ descriptor }: JobTemplateCardProps) {
 
   const openPreview = () => navigate(`/jobs/sample?template=${descriptor.id}`);
 
-  const shareAction = buildShareAction({
-    entityUrl: `/jobs/sample?template=${descriptor.id}`,
-    copySuccessDescription: "Job template link has been copied to your clipboard.",
-  });
+  const shareUrl = `${window.location.origin}/jobs/sample?template=${descriptor.id}`;
 
   const handlePrimary = () => {
     addItem({
@@ -94,16 +91,13 @@ export default function JobTemplateCard({ descriptor }: JobTemplateCardProps) {
             )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
+            <ShareMenu
+              variant="icon"
+              align="end"
               className="h-7 w-7"
-              aria-label={t("actions.share", { defaultValue: "Share" })}
-              onClick={(e) => shareAction.onClick(e)}
-            >
-              <Share2 className="w-4 h-4" />
-            </Button>
+              url={shareUrl}
+              title={descriptor.name}
+            />
             <Badge variant={isFree ? "secondary" : "default"}>
               {priceLabel(descriptor.priceCents)}
             </Badge>

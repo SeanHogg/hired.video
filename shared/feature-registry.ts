@@ -202,8 +202,8 @@ export interface MobileCta {
 export const MOBILE_PRIMARY_CTA: Partial<Record<UserRole, MobileCta>> = {
   [USER_ROLES.EMPLOYER]: { labelKey: "labels.postJob", label: "Post Job", href: "/post-a-job", icon: "PlusSquare" },
   [USER_ROLES.RECRUITER]: { labelKey: "labels.postJob", label: "Post Job", href: "/post-a-job", icon: "PlusSquare" },
-  [USER_ROLES.ADMIN]: { labelKey: "labels.adminPanel", label: "Admin", href: "/admin/dashboard", icon: "Shield" },
-  [USER_ROLES.SUPER_ADMIN]: { labelKey: "labels.adminPanel", label: "Admin", href: "/admin/dashboard", icon: "Shield" },
+  [USER_ROLES.ADMIN]: { labelKey: "labels.admin", label: "Admin", href: "/admin/dashboard", icon: "Shield" },
+  [USER_ROLES.SUPER_ADMIN]: { labelKey: "labels.admin", label: "Admin", href: "/admin/dashboard", icon: "Shield" },
 };
 
 /** Dynamic kinds whose entries are built at runtime from a frontend catalog

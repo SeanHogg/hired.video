@@ -123,9 +123,9 @@ export default function Navigation({
         <div id="nav-bar" className="flex justify-between items-center h-16">
           {/* Left side: Hamburger (mobile) / Sidebar Toggle (desktop) + Logo */}
           <div className="flex items-center space-x-3">
-            {/* Hamburger must stay `lg:hidden` to match Sidebar's `lg:translate-x-0` dock — anything tighter (e.g. `md:hidden`) leaves a 768–1023px dead zone. */}
+            {/* Hamburger must stay `lg:hidden` to match Sidebar's `lg:translate-x-0` dock — anything tighter (e.g. `md:hidden`) leaves a 768–1023px dead zone. Plain (ghost) icon — no border/box, just the hamburger. */}
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
               onClick={onMenuClick}
               className="lg:hidden"
@@ -134,9 +134,9 @@ export default function Navigation({
               <Menu className="h-5 w-5" />
             </Button>
 
-            {/* Desktop Sidebar Collapse Toggle */}
+            {/* Desktop Sidebar Collapse Toggle — plain (ghost) icon, no border/box. */}
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={onSidebarToggle}
               className="hidden lg:flex h-10 w-10 px-2 py-2 justify-center -ml-4"
               title={sidebarCollapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}

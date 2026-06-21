@@ -26,6 +26,11 @@ interface Props<V extends string> {
   /** Drop chips whose count is zero so the row only shows reachable
    *  destinations. Default true. */
   hideZeroCounts?: boolean;
+  /** Render as a bare chip group (no own scroll container / horizontal
+   *  padding) so several bars can share ONE parent scroll row — used by the
+   *  flattened Tools filter row. Default false keeps the self-contained
+   *  scrolling row every other consumer relies on. */
+  inline?: boolean;
   className?: string;
 }
 
@@ -36,13 +41,15 @@ export function CategoryFilterBar<V extends string>({
   allLabel = "All",
   allCount,
   hideZeroCounts = true,
+  inline = false,
   className,
 }: Props<V>) {
   const total = allCount ?? options.reduce((sum, o) => sum + o.count, 0);
   return (
     <div
       className={cn(
-        "flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1",
+        "flex items-center gap-2",
+        inline ? "shrink-0" : "overflow-x-auto pb-1 -mx-1 px-1",
         className,
       )}
     >

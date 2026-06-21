@@ -48,6 +48,7 @@ import type { FeedPost, FeedPostComment, FeedRepostPreview } from "@/types/feed"
 import { FeedReviewEmbed } from "./FeedReviewEmbed";
 import PostStatsSheet from "./PostStatsSheet";
 import ReactionPicker, { ReactionSummaryChips } from "./ReactionPicker";
+import ShareMenu from "@/components/share/ShareMenu";
 import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 
 // Sub-components
@@ -479,16 +480,16 @@ const FeedPostActions = ({
             {commentCount}
           </Button>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowReshare((v) => !v)}
-            disabled={!user}
-            className="text-muted-foreground hover:text-green-500"
-          >
-            <Repeat2 className="h-4 w-4 mr-2" />
-            {post.repostCount > 0 ? post.repostCount : "Repost"}
-          </Button>
+          {/* Share — repost to feed + LinkedIn / X / Facebook / WhatsApp /
+              Email / copy link / native share. The reusable cross-card
+              ShareMenu; "Repost" opens the quote-repost composer below. */}
+          <ShareMenu
+            url={`${window.location.origin}/feed/${post.id}`}
+            title={post.content?.slice(0, 140) || post.userName}
+            text={post.content}
+            onRepost={user ? () => setShowReshare(true) : undefined}
+            count={post.repostCount}
+          />
           {/* Canonical moderation report — self-gates (hidden for the
               author, bounces anon to /login) and routes into the admin
               moderation queue with a reason picker. */}

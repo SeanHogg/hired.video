@@ -158,7 +158,7 @@ function AuthenticatedCommunicationHub({ variant = "ghost" }: { variant?: Button
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetContent
             side="left"
-            className="p-0 w-[92vw] max-w-md flex flex-col"
+            className="p-0 w-screen max-w-none flex flex-col"
             aria-describedby="comm-hub-description"
           >
             <SheetHeader className="sr-only">
@@ -167,8 +167,14 @@ function AuthenticatedCommunicationHub({ variant = "ghost" }: { variant?: Button
                 Messages, notifications, and connection requests in one place.
               </SheetDescription>
             </SheetHeader>
+            {/* Fill the full-height sheet so the list + pinned footer reach
+                the bottom edge — without an explicit height the panel falls
+                back to its `max-h-[70vh]` overlay cap and leaves dead
+                whitespace below the footer on mobile. */}
             <InboxPanel
               hub={hub}
+              heightClassName="h-full min-h-0"
+              hasExternalCloseButton
               onClose={() => setSheetOpen(false)}
               onItemSelect={handleItemSelect}
             />

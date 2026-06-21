@@ -37,13 +37,13 @@ export function ToolCard({ tool: rawTool, className }: Props) {
     <Link to={tool.href} className="block h-full">
       <Card
         className={cn(
-          "h-full hover:shadow-lg transition-shadow cursor-pointer group",
+          "h-full flex flex-col hover:shadow-lg transition-shadow cursor-pointer group",
           className,
         )}
       >
         <CardHeader>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
               <div
                 className={cn(
                   "w-12 h-12 rounded-lg flex items-center justify-center shrink-0",
@@ -77,8 +77,8 @@ export function ToolCard({ tool: rawTool, className }: Props) {
             )}
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
+        <CardContent className="flex flex-1 flex-col">
+          <div className="flex flex-1 flex-col space-y-3">
             {tool.stats && (
               <div className="grid grid-cols-2 gap-4 text-sm">
                 {tool.stats.map((stat) => (
@@ -111,16 +111,21 @@ export function ToolCard({ tool: rawTool, className }: Props) {
               </div>
             )}
 
-            {tool.ctaLabel && (
-              <Button className="w-full mt-4" variant="outline">
-                {tool.ctaLabel}
-              </Button>
-            )}
+            {/* Pin the action area to the card bottom (mt-auto) so the CTA
+                always aligns across cards regardless of how much stats/feature
+                content sits above it. */}
+            <div className="mt-auto space-y-3 pt-4">
+              {tool.ctaLabel && (
+                <Button className="w-full" variant="outline">
+                  {tool.ctaLabel}
+                </Button>
+              )}
 
-            {/* Self-gating: ToolPromoVideo returns null when the catalog
-                entry has no promoVideoUrl, so this is safe for every tool. */}
-            <div className="flex justify-end">
-              <ToolPromoVideo tool={tool} />
+              {/* Self-gating: ToolPromoVideo returns null when the catalog
+                  entry has no promoVideoUrl, so this is safe for every tool. */}
+              <div className="flex justify-end">
+                <ToolPromoVideo tool={tool} />
+              </div>
             </div>
           </div>
         </CardContent>

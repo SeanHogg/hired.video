@@ -249,54 +249,59 @@ export function ToolsBrowser({
 
   return (
     <>
-      {/* Audience filter — chip row (#472). Counts are not shown
-          because the audience axis is mutually exclusive with the
-          viewer's effective role; the For-me default already
-          resolves to the right bucket. */}
-      <CategoryFilterBar
-        className="mb-2"
-        value={audienceFilter}
-        onChange={setAudienceFilter}
-        allLabel={t("labels.tools.audienceShowAll")}
-        allCount={0}
-        hideZeroCounts={false}
-        options={AUDIENCE_OPTIONS.filter((o) => o.value !== "all").map((o) => ({
-          value: o.value,
-          label: t(o.labelKey),
-          count: 0,
-        }))}
-      />
-
-      {/* Tier filter — chip row (#472). Counts elided for the same
-          reason: tier is a small enum and counts would be noisy. */}
-      <CategoryFilterBar
-        className="mb-3"
-        value={tierFilter}
-        onChange={setTierFilter}
-        allLabel={t("labels.tools.anyTier")}
-        allCount={0}
-        hideZeroCounts={false}
-        options={TIER_OPTIONS.map((o) => ({
-          value: o.value,
-          label: t(o.labelKey),
-          count: 0,
-        }))}
-      />
-
-      {/* Per-chip count reflects the audience+tier+search filters
-          applied above so the chips never claim a count the grid
-          won't honour. Categories with zero matches drop out. */}
-      <CategoryFilterBar
-        className="mb-4"
-        value={categoryFilter}
-        onChange={setCategoryFilter}
-        allCount={toolsByCategory.length}
-        options={CATEGORY_ORDER.map((cat) => ({
-          value: cat,
-          label: cat,
-          count: categoryCounts.get(cat) ?? 0,
-        }))}
-      />
+      {/* Flattened filter row (#472) — audience · tier · category chip
+          groups live on ONE horizontally-scrolling row, divided by thin
+          rules, with the Scroll/Grid/Table view switcher pinned at the
+          end. Counts are elided on the audience + tier groups (those axes
+          are small enums where counts would be noise); the category group
+          keeps live counts and drops zero-match chips. */}
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto pb-1">
+          <CategoryFilterBar
+            inline
+            value={audienceFilter}
+            onChange={setAudienceFilter}
+            allLabel={t("labels.tools.audienceShowAll")}
+            allCount={0}
+            hideZeroCounts={false}
+            options={AUDIENCE_OPTIONS.filter((o) => o.value !== "all").map(
+              (o) => ({ value: o.value, label: t(o.labelKey), count: 0 }),
+            )}
+          />
+          <span className="h-6 w-px shrink-0 bg-border" aria-hidden />
+          <CategoryFilterBar
+            inline
+            value={tierFilter}
+            onChange={setTierFilter}
+            allLabel={t("labels.tools.anyTier")}
+            allCount={0}
+            hideZeroCounts={false}
+            options={TIER_OPTIONS.map((o) => ({
+              value: o.value,
+              label: t(o.labelKey),
+              count: 0,
+            }))}
+          />
+          <span className="h-6 w-px shrink-0 bg-border" aria-hidden />
+          <CategoryFilterBar
+            inline
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+            allCount={toolsByCategory.length}
+            options={CATEGORY_ORDER.map((cat) => ({
+              value: cat,
+              label: cat,
+              count: categoryCounts.get(cat) ?? 0,
+            }))}
+          />
+        </div>
+        <ViewModeToggle
+          className="shrink-0"
+          value={viewMode}
+          onChange={setViewMode}
+          modes={BROWSE_VIEW_MODES}
+        />
+      </div>
 
       {isFiltering && (
         <div className="mb-4">
@@ -343,18 +348,11 @@ export function ToolsBrowser({
         </div>
       )}
 
-      {/* Unified Tools list — Scroll / Grid / Table. The layout
-          switcher sits in the list header (consistent with the
-          Studio landing + Resumes browse pages) and is scoped to
-          this AI-tools catalog. */}
+      {/* Unified Tools list — Scroll / Grid / Table. The layout switcher
+          now lives at the end of the flattened filter row above (one row,
+          consistent with the Studio landing + Resumes browse pages) and is
+          scoped to this AI-tools catalog. */}
       <div className="mb-8 sm:mb-12">
-        <div className="mb-3 flex items-center justify-end">
-          <ViewModeToggle
-            value={viewMode}
-            onChange={setViewMode}
-            modes={BROWSE_VIEW_MODES}
-          />
-        </div>
         {filteredTools.length === 0 ? (
           <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
             <p>{t("messages.tools.noMatch")}</p>
