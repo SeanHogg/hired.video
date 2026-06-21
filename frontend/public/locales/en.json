@@ -9682,5 +9682,11 @@
   "share.network.x": "X",
   "share.network.facebook": "Facebook",
   "share.network.whatsapp": "WhatsApp",
-  "share.network.email": "Email"
+  "share.network.email": "Email",
+  "marketing.featured.badge": "Featured tool",
+  "marketing.featured.previewLabel": "Live preview",
+  "marketing.career360.seeker.tagline": "Your whole job search on one wheel",
+  "marketing.career360.seeker.body": "Pick a target role and Career 360 maps every gap — resume, skills, certs, outreach, salary — then builds a week-by-week plan and tracks every score as you close them.",
+  "marketing.career360.hiring.tagline": "Every candidate's readiness at a glance",
+  "marketing.career360.hiring.body": "Career 360 scores each candidate across resume, skills, experience and outreach — so you can spot who's interview-ready before you ever open a profile."
 }

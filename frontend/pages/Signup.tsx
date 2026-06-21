@@ -1,4 +1,3 @@
-import { Check } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -13,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { RegisterGate } from "@/components/security/RegisterGate";
 import SignupForm from "@/components/auth/SignupForm";
+import { AuthMarketingPanel } from "@/components/auth/AuthMarketingPanel";
 import { type UserRole, USER_ROLES } from "@/lib/auth";
 import { readRedirectParam } from "@/lib/auth-redirect";
 
@@ -56,35 +56,6 @@ export default function Signup() {
     return () => { document.getElementById(id)?.remove(); };
   }, [signupFaq]);
 
-  const marketingKey = role === USER_ROLES.RECRUITER ? "recruiter" : role === USER_ROLES.EMPLOYER ? "employer" : "jobSeeker";
-
-  const statTiles: { stat: string; desc: string }[] = useMemo(() => {
-    if (role === USER_ROLES.RECRUITER) {
-      return [
-        { stat: t("marketing.signUp.stat.freeStat"), desc: t("marketing.noCreditCard") },
-        { stat: t("marketing.signUp.stat.matching"), desc: t("marketing.signUp.stat.matchingDesc") },
-        { stat: t("labels.videoResumes"), desc: t("marketing.signUp.stat.videoResDesc") },
-        { stat: t("marketing.signUp.stat.users"), desc: t("marketing.signUp.stat.usersDescTalent") },
-      ];
-    }
-    if (role === USER_ROLES.EMPLOYER) {
-      return [
-        { stat: t("marketing.signUp.stat.freeStat"), desc: t("marketing.noCreditCard") },
-        { stat: t("marketing.signUp.stat.companyPage"), desc: t("marketing.signUp.stat.companyPageDesc") },
-        { stat: t("marketing.signUp.stat.aiJobPosts"), desc: t("marketing.signUp.stat.aiJobPostsDesc") },
-        { stat: t("marketing.signUp.stat.users"), desc: t("marketing.signUp.stat.usersDescPros") },
-      ];
-    }
-    return [
-      { stat: t("marketing.signUp.stat.freeStat"), desc: t("marketing.noCreditCard") },
-      { stat: t("marketing.signUp.stat.videoTime"), desc: t("marketing.signUp.stat.videoTimeDesc") },
-      { stat: t("marketing.signUp.stat.tools"), desc: t("marketing.signUp.stat.toolsDesc") },
-      { stat: t("marketing.signUp.stat.users"), desc: t("marketing.signUp.stat.usersDescPros") },
-    ];
-  }, [role, t]);
-
-  const features = (t(`marketing.signUp.features.${marketingKey}`, { returnObjects: true }) as string[]) ?? [];
-
   return (
     <AppShell>
       <div className="flex items-center justify-center p-4">
@@ -110,34 +81,7 @@ export default function Signup() {
             </div>
 
             {/* Marketing panel — hidden on mobile, updates with selected role */}
-            <div className="hidden md:flex flex-col justify-center bg-primary/5 rounded-2xl p-8 space-y-8">
-              <div>
-                <h2 className="text-2xl font-bold tracking-tight">
-                  {t(`marketing.signUp.title.${marketingKey}`)}
-                </h2>
-                <p className="mt-3 text-muted-foreground">
-                  {t(`marketing.signUp.body.${marketingKey}`)}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                {statTiles.map((item) => (
-                  <div key={item.stat} className="bg-background rounded-xl p-4 shadow-sm">
-                    <p className="text-lg font-semibold">{item.stat}</p>
-                    <p className="text-sm text-muted-foreground">{item.desc}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-3">
-                {features.map((feature) => (
-                  <div key={feature} className="flex items-center gap-2">
-                    <Check className="h-5 w-5 text-primary flex-shrink-0" />
-                    <span className="text-sm">{feature}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <AuthMarketingPanel variant={role} />
 
           </div>
       </div>

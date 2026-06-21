@@ -9554,5 +9554,11 @@
   "share.network.x": "X",
   "share.network.facebook": "Facebook",
   "share.network.whatsapp": "WhatsApp",
-  "share.network.email": "Correo electrónico"
+  "share.network.email": "Correo electrónico",
+  "marketing.featured.badge": "Herramienta destacada",
+  "marketing.featured.previewLabel": "Vista previa en vivo",
+  "marketing.career360.seeker.tagline": "Toda tu búsqueda de empleo en una sola rueda",
+  "marketing.career360.seeker.body": "Elige un puesto objetivo y Career 360 mapea cada brecha —currículum, habilidades, certificaciones, contacto, salario— y crea un plan semana a semana, registrando cada puntuación a medida que las cierras.",
+  "marketing.career360.hiring.tagline": "La preparación de cada candidato de un vistazo",
+  "marketing.career360.hiring.body": "Career 360 puntúa a cada candidato en currículum, habilidades, experiencia y contacto, para que detectes quién está listo para la entrevista antes de abrir un perfil."
 }

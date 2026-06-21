@@ -9600,5 +9600,11 @@
   "share.network.x": "X",
   "share.network.facebook": "Facebook",
   "share.network.whatsapp": "WhatsApp",
-  "share.network.email": "Courriel"
+  "share.network.email": "Courriel",
+  "marketing.featured.badge": "Outil en vedette",
+  "marketing.featured.previewLabel": "Aperçu en direct",
+  "marketing.career360.seeker.tagline": "Toute votre recherche d'emploi sur une seule roue",
+  "marketing.career360.seeker.body": "Choisissez un poste cible et Carrière 360 cartographie chaque écart — CV, compétences, certifications, prospection, salaire — puis bâtit un plan semaine par semaine et suit chaque score à mesure que vous les comblez.",
+  "marketing.career360.hiring.tagline": "La préparation de chaque candidat en un coup d'œil",
+  "marketing.career360.hiring.body": "Carrière 360 évalue chaque candidat sur le CV, les compétences, l'expérience et la prospection, pour repérer qui est prêt pour l'entrevue avant même d'ouvrir un profil."
 }

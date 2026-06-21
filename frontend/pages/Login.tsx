@@ -1,4 +1,3 @@
-import { Check } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -12,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { LoginGate } from "@/components/security/RegisterGate";
 import LoginForm from "@/components/auth/LoginForm";
+import { AuthMarketingPanel } from "@/components/auth/AuthMarketingPanel";
 import { readRedirectParam } from "@/lib/auth-redirect";
 
 export default function Login() {
@@ -77,37 +77,8 @@ export default function Login() {
             </LoginGate>
             </div>
 
-            {/* Marketing panel — desktop only */}
-            <div className="hidden md:flex flex-col justify-center bg-primary/5 rounded-2xl p-8 space-y-6">
-              <h2 className="text-2xl font-bold tracking-tight">{t("marketing.signIn.title")}</h2>
-              <p className="text-muted-foreground">{t("marketing.signIn.body")}</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-background rounded-lg p-3 text-center">
-                  <div className="text-xl font-bold text-primary">{t("marketing.signIn.stat.free")}</div>
-                  <div className="text-xs text-muted-foreground">{t("marketing.noCreditCard")}</div>
-                </div>
-                <div className="bg-background rounded-lg p-3 text-center">
-                  <div className="text-xl font-bold text-primary">{t("marketing.signIn.stat.videoTime")}</div>
-                  <div className="text-xs text-muted-foreground">{t("marketing.signIn.stat.videoTimeDesc")}</div>
-                </div>
-                <div className="bg-background rounded-lg p-3 text-center">
-                  <div className="text-xl font-bold text-primary">{t("marketing.signIn.stat.tools")}</div>
-                  <div className="text-xs text-muted-foreground">{t("marketing.signIn.stat.toolsDesc")}</div>
-                </div>
-                <div className="bg-background rounded-lg p-3 text-center">
-                  <div className="text-xl font-bold text-primary">{t("marketing.signIn.stat.users")}</div>
-                  <div className="text-xs text-muted-foreground">{t("marketing.signIn.stat.usersDesc")}</div>
-                </div>
-              </div>
-              <ul className="space-y-2">
-                {(["signInOptions", "magicLink", "dashboard", "scoringHistory"] as const).map((key) => (
-                  <li key={key} className="flex items-center gap-2 text-sm">
-                    <Check className="h-4 w-4 text-primary shrink-0" />
-                    <span>{t(`marketing.signIn.feature.${key}`)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {/* Marketing panel — desktop only, shared with Signup */}
+            <AuthMarketingPanel variant="signIn" />
           </div>
       </div>
     </AppShell>
