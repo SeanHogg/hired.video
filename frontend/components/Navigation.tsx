@@ -23,7 +23,7 @@ import ShoppingCart from "@/components/ShoppingCart";
 import CommunicationHub from "@/components/CommunicationHub";
 import { LocaleSwitcher } from "@/components/i18n/LocaleSwitcher";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { SignOutButton } from "@/components/auth/SignOutButton";
+import { UserMenu } from "@/components/UserMenu";
 import { Badge } from "@/components/ui/badge";
 import { EmulationHeaderControls, useEmulationStyle } from "@/components/EmulationBar";
 import { Button } from "@/components/ui/button";
@@ -271,10 +271,11 @@ export default function Navigation({
                 from any surface, same rationale as the locale switcher. */}
             <ThemeToggle variant="outline" className="inline-flex" />
 
-            {/* Sign out — mobile/tablet only (lg:hidden). Below lg the sidebar
-                is a drawer, so without this the only logout is buried behind
-                the hamburger; on lg+ the docked sidebar already shows it. */}
-            {isAuthenticated && <SignOutButton variant="icon" buttonVariant="outline" className="lg:hidden" />}
+            {/* Avatar menu — the single home for account actions (profile,
+                settings, wishlist, points, sign out) on BOTH mobile + desktop.
+                Self-gates: renders nothing when signed out. Replaces the user
+                block that used to live in the sidebar rail. */}
+            <UserMenu />
 
             {/* Desktop CTA Buttons - Hidden on mobile */}
             {!isAuthenticated && <AuthButtons className="hidden md:flex" />}

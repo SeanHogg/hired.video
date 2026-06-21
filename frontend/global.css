@@ -57,23 +57,25 @@ body[data-print-mode] [data-print-hide] {
    * white cards/popovers visibly float instead of dissolving into a pure-white
    * page (the "too much white" complaint). Brand purple is unchanged. */
   :root {
-    --background: 220 30% 97.5%;
-    --foreground: 222 47% 11%;
+    /* Canvas + neutrals carry a faint brand (lavender) tint instead of flat
+     * grey — warms the whole app toward the purple identity. Cards stay white. */
+    --background: 258 45% 97%;
+    --foreground: 250 40% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 250 40% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 250 40% 12%;
 
     --primary: 262 83% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 16% 92%;
-    --secondary-foreground: 222 30% 18%;
+    --secondary: 258 24% 92%;
+    --secondary-foreground: 250 30% 20%;
 
-    --muted: 220 18% 93%;
-    --muted-foreground: 220 9% 43%;
+    --muted: 258 26% 93%;
+    --muted-foreground: 250 12% 42%;
 
     --accent: 262 60% 94%;
     --accent-foreground: 262 70% 24%;
@@ -81,25 +83,45 @@ body[data-print-mode] [data-print-hide] {
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 16% 88%;
-    --input: 220 16% 86%;
+    --border: 258 26% 89%;
+    --input: 258 24% 87%;
     --ring: 262 83% 58%;
 
     --radius: 0.75rem;
 
-    /* Chrome (Sidebar + top Navigation) renders on `bg-sidebar` so the
-     * exterior frame sits a clear shade below the bright content canvas
-     * (--background). Kept a light recessed grey — not dark — so neutral
-     * nav-item text (muted-foreground) stays legible on the rail, while
-     * hover uses --sidebar-accent for a visible darker highlight. */
-    --sidebar-background: 220 18% 91%;
-    --sidebar-foreground: 222 30% 25%;
+    /* Legacy chrome tokens (still used by the top Navigation bar). Retinted
+     * lavender to match the canvas. The app Sidebar no longer uses these — it
+     * has its own two-zone `--rail-*` set below. */
+    --sidebar-background: 258 30% 95%;
+    --sidebar-foreground: 250 30% 25%;
     --sidebar-primary: 262 83% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 16% 87%;
-    --sidebar-accent-foreground: 222 30% 18%;
-    --sidebar-border: 220 14% 83%;
+    --sidebar-accent: 258 28% 90%;
+    --sidebar-accent-foreground: 250 30% 18%;
+    --sidebar-border: 258 26% 88%;
     --sidebar-ring: 262 83% 58%;
+
+    /* ── App rail (two zones) — LIGHT = "S3": soft lavender menu zone (dark
+     * text) over a deep-brand usage zone (light text). ─────────────────── */
+    --rail-background: 258 60% 95%;
+    --rail-foreground: 257 30% 33%;
+    --rail-muted: 258 25% 58%;
+    --rail-hover: 258 52% 90%;
+    --rail-active: 262 83% 58%;
+    --rail-active-foreground: 0 0% 100%;
+    --rail-border: 258 40% 90%;
+    --rail-usage-background: 262 60% 28%;
+    --rail-usage-foreground: 262 70% 94%;
+    --rail-usage-muted: 262 55% 80%;
+    --rail-usage-border: 262 40% 38%;
+
+    /* ── Footer (two tonal bands, plum "B2") — same in light + dark. ────── */
+    --footer-background: 248 31% 25%;
+    --footer-foreground: 250 30% 92%;
+    --footer-muted: 249 22% 72%;
+    --footer-brand: 250 60% 81%;
+    --footer-strong-background: 249 31% 17%;
+    --footer-strong-foreground: 249 22% 72%;
 
     /* Brand specific colors */
     --brand-purple: 262 83% 58%;
@@ -153,6 +175,28 @@ body[data-print-mode] [data-print-hide] {
     --sidebar-accent-foreground: 220 16% 92%;
     --sidebar-border: 224 22% 22%;
     --sidebar-ring: 262 83% 66%;
+
+    /* ── App rail — DARK = "S2": brand-purple menu zone over a darker plum
+     * usage zone (both light text). ────────────────────────────────────── */
+    --rail-background: 271 67% 42%;
+    --rail-foreground: 262 70% 94%;
+    --rail-muted: 264 55% 80%;
+    --rail-hover: 271 55% 50%;
+    --rail-active: 271 60% 58%;
+    --rail-active-foreground: 0 0% 100%;
+    --rail-border: 271 40% 32%;
+    --rail-usage-background: 264 72% 23%;
+    --rail-usage-foreground: 262 70% 94%;
+    --rail-usage-muted: 264 50% 74%;
+    --rail-usage-border: 271 40% 30%;
+
+    /* Footer keeps the plum bands in dark mode too (same tokens). */
+    --footer-background: 248 31% 23%;
+    --footer-foreground: 250 30% 92%;
+    --footer-muted: 249 22% 72%;
+    --footer-brand: 250 60% 81%;
+    --footer-strong-background: 249 31% 15%;
+    --footer-strong-foreground: 249 22% 72%;
 
     /* Brand specific colors for dark mode */
     --brand-purple: 262 83% 58%;

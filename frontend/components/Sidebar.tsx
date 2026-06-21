@@ -2,8 +2,6 @@ import {
   Video,
   Briefcase,
   TrendingUp,
-  Settings,
-  Crown,
   HelpCircle,
   FileText,
   Building2,
@@ -16,19 +14,15 @@ import {
   ShieldCheck,
   ShoppingBag,
   Store,
-  Heart,
   Palette,
   Handshake,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { AuthButtons } from "@/components/AuthButtons";
-import { SignOutButton } from "@/components/auth/SignOutButton";
 import { useAuth } from "@/lib/auth";
 import { useRoleAccess } from "@/hooks/use-role-access";
-import { useSubscription } from "@/lib/hooks/useSubscription";
 import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "@/components/account/AccountSwitcher";
 import { AITokenPill } from "@/components/AITokenPill";
@@ -60,6 +54,19 @@ interface SidebarProps {
   collapsed?: boolean;
 }
 
+// Shared nav-item classes — a rail item is either the active brand chip or a
+// muted row that lifts on hover. One place so every list (main / admin /
+// public) styles identically (DRY) rather than repeating the ternary.
+function navItemClasses(active: boolean, collapsed: boolean): string {
+  return cn(
+    "flex items-center text-sm font-medium rounded-md transition-colors",
+    collapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
+    active
+      ? "bg-rail-active text-rail-active-foreground"
+      : "text-rail-foreground/85 hover:text-rail-foreground hover:bg-rail-hover",
+  );
+}
+
 export default function Sidebar({
   isOpen,
   onClose,
@@ -67,16 +74,11 @@ export default function Sidebar({
 }: SidebarProps) {
   const { isAuthenticated, user } = useAuth();
   const { hasAnyAccess: hasAdminAccess } = useAdminPermissions();
-  const { isPro } = useSubscription();
   const location = useLocation();
   const { t } = useTranslation();
 
-  // Main navigation is now resolved from the SuperAdmin-curated, per-role
-  // manifest (Feature Registry ⊕ role_feature_access overrides), so each role
-  // only sees its relevant items and the owner can tune any role's menu live
-  // from /admin/role-access — no code change. useRoleAccess keys on the
-  // effective role, so it respects SuperAdmin impersonation + Preview-as-role.
-  // Replaces the old hardcoded `hideForRoles` deny-list (#1995 → #2037).
+  // Main navigation is resolved from the SuperAdmin-curated, per-role manifest
+  // (Feature Registry ⊕ role_feature_access overrides) — see useRoleAccess.
   const { navItems } = useRoleAccess();
   const visibleNavigation = navItems().map((s) => ({
     name: t(s.labelKey, { defaultValue: s.label }),
@@ -96,16 +98,12 @@ export default function Sidebar({
     if (item.exactMatch) {
       return location.pathname === item.href;
     }
-    // For non-exact matches, check if current path starts with the menu item path
-    // But make sure we don't match "/" for everything
     if (item.href === "/") {
       return location.pathname === "/";
     }
 
-    // Special handling for tools — match /tools, /Tools, /learning (the
-    // SEO alias for the Learning Content Library tab), /chrome-extension,
-    // and the course-detail / learner surfaces (/courses/* + /learn/*) so
-    // the nav stays anchored while a learner is inside a course.
+    // Tools owns /tools, /Tools, /learning (SEO alias), /chrome-extension, and
+    // the course-detail / learner surfaces so the nav stays anchored inside a course.
     if (item.href === "/tools") {
       return (
         location.pathname.startsWith("/tools") ||
@@ -117,9 +115,7 @@ export default function Sidebar({
       );
     }
 
-    // Marketplace also owns the /marketplace/* surface — preview pages,
-    // listings, and the upcoming reviews/cross-sell features all highlight
-    // the same nav item.
+    // Marketplace also owns the /marketplace/* surface.
     if (item.href === "/search") {
       return (
         location.pathname.startsWith("/search") ||
@@ -148,41 +144,36 @@ export default function Sidebar({
           // z-[60] keeps the mobile drawer (and its close X header) above the
           // top Navigation bar (z-50); lg:z-auto drops it back to the docked
           // rail's normal stacking on desktop where there's no overlay.
-          "fixed top-0 left-0 h-full bg-sidebar border-r border-sidebar-border z-[60] transform transition-all duration-500 ease-in-out",
+          "fixed top-0 left-0 h-full bg-rail border-r border-rail-border z-[60] transform transition-all duration-500 ease-in-out",
           collapsed ? "w-16 overflow-hidden" : "w-[90%] lg:w-80 overflow-y-auto",
-          // Mobile: hidden by default, show when isOpen
           isOpen ? "translate-x-0" : "-translate-x-full",
-          // Desktop: always visible, ignore isOpen state
           "lg:translate-x-0 lg:fixed lg:z-auto",
         )}
       >
         <div className="flex flex-col h-full">
-          {/* Header — drawer-only (below lg). On lg+ the sidebar is docked
-              beneath the full-width fixed Navigation bar (z-50), which already
-              renders the logo + a collapse toggle; this header would be hidden
-              behind it yet still consume vertical space, producing a dead gap
-              above the nav list. So it's suppressed on lg (content is offset
-              with `lg:pt-20` below to clear the 64px fixed nav instead). */}
-          <div className="flex items-center justify-between p-4 border-b border-sidebar-border lg:hidden">
+          {/* Header — drawer-only (below lg). On lg+ the docked rail sits beneath
+              the full-width fixed Navigation bar, which renders the logo. */}
+          <div className="flex items-center justify-between p-4 border-b border-rail-border lg:hidden">
             <Link to="/" className="flex items-center space-x-2">
-              <Video className="h-6 w-6 text-primary" />
+              <Video className="h-6 w-6 text-rail-foreground" />
               {!collapsed && (
-                <span className="font-bold text-lg bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
+                <span className="font-bold text-lg text-rail-foreground">
                   hired.video
                 </span>
               )}
             </Link>
-            {/* Dismiss the slide-out drawer entirely. */}
             <Button
               variant="ghost"
               size="icon"
               onClick={onClose}
               aria-label={t("nav.closeMenu")}
+              className="text-rail-foreground hover:bg-rail-hover hover:text-rail-foreground"
             >
               <X className="h-5 w-5" />
             </Button>
           </div>
 
+          {/* ── MENU ZONE — scrollable nav, flex-fills the rail. ─────────── */}
           <div
             className={cn(
               "flex-1 p-4 space-y-6 lg:pt-20",
@@ -192,7 +183,7 @@ export default function Sidebar({
             {/* Main Navigation */}
             <div>
               {!collapsed && (
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                <h3 className="text-xs font-bold text-rail-muted uppercase tracking-wider mb-3">
                   {t("headings.navigate")}
                 </h3>
               )}
@@ -201,19 +192,11 @@ export default function Sidebar({
                   <Link
                     key={item.name}
                     to={item.href}
-                    className={cn(
-                      "flex items-center text-sm font-medium rounded-md transition-colors",
-                      collapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
-                      isMenuItemActive(item)
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
-                    )}
+                    className={navItemClasses(isMenuItemActive(item), collapsed)}
                     onClick={onClose}
                     title={collapsed ? item.name : undefined}
                   >
-                    <item.icon
-                      className={cn("h-4 w-4", !collapsed && "mr-3")}
-                    />
+                    <item.icon className={cn("h-4 w-4", !collapsed && "mr-3")} />
                     {!collapsed && item.name}
                   </Link>
                 ))}
@@ -224,19 +207,16 @@ export default function Sidebar({
             {isAuthenticated && hasAdminAccess && (
               <div>
                 {!collapsed && (
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                  <h3 className="text-xs font-bold text-rail-muted uppercase tracking-wider mb-3">
                     {t("headings.administration")}
                   </h3>
                 )}
                 <nav className="space-y-1">
                   <Link
                     to="/admin/dashboard"
-                    className={cn(
-                      "flex items-center text-sm font-medium rounded-md transition-colors",
-                      collapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
-                      location.pathname.startsWith("/admin")
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
+                    className={navItemClasses(
+                      location.pathname.startsWith("/admin"),
+                      collapsed,
                     )}
                     onClick={onClose}
                     title={collapsed ? t("labels.adminPanel") : undefined}
@@ -252,7 +232,7 @@ export default function Sidebar({
             {!isAuthenticated && (
               <div>
                 {!collapsed && (
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                  <h3 className="text-xs font-bold text-rail-muted uppercase tracking-wider mb-3">
                     {t("headings.discover")}
                   </h3>
                 )}
@@ -261,19 +241,11 @@ export default function Sidebar({
                     <Link
                       key={item.name}
                       to={item.href}
-                      className={cn(
-                        "flex items-center text-sm font-medium rounded-md transition-colors",
-                        collapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
-                        isMenuItemActive(item)
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
-                      )}
+                      className={navItemClasses(isMenuItemActive(item), collapsed)}
                       onClick={onClose}
                       title={collapsed ? item.name : undefined}
                     >
-                      <item.icon
-                        className={cn("h-4 w-4", !collapsed && "mr-3")}
-                      />
+                      <item.icon className={cn("h-4 w-4", !collapsed && "mr-3")} />
                       {!collapsed && item.name}
                     </Link>
                   ))}
@@ -282,161 +254,50 @@ export default function Sidebar({
             )}
           </div>
 
-          {/* Footer */}
-          <div className="border-t border-sidebar-border p-4 space-y-2">
-            {/* AI Token Budget Pill — self-gates on auth: shows a free-tier
-                teaser linking to /pricing for signed-out visitors so the
-                marketing surface is always reachable from the sidebar. */}
-            <div className={cn(collapsed ? "mb-1" : "mb-3")}>
-              <AITokenPill collapsed={collapsed} onNavigate={onClose} />
+          {/* Account actions sit between the menu and the usage band — on the
+              menu-zone background, not the coloured usage band. */}
+          {isAuthenticated && user ? (
+            <div
+              className={cn(
+                "px-4 pb-3 space-y-2",
+                collapsed && "px-2",
+              )}
+            >
+              <UpgradeAccountButton
+                fullWidth
+                collapsed={collapsed}
+                onNavigate={onClose}
+              />
+              {!collapsed && <AccountSwitcher className="w-full" />}
             </div>
+          ) : (
+            !collapsed && (
+              <div className="px-4 pb-3">
+                <AuthButtons orientation="vertical" onNavigate={onClose} />
+              </div>
+            )
+          )}
 
-            {/* Points + streak pill — self-gates on auth + role: shows a
-                "X badges to earn" teaser linking to /rewards for signed-out
-                visitors; renders null for ineligible authed roles. */}
-            <div className={cn(collapsed ? "mb-1" : "mb-3")}>
+          {/* ── USAGE ZONE — distinct band pinned at the bottom. The pills
+              style themselves for a light surface, so the wrapper re-skins
+              them (translucent-white chips + light text) so they stay legible
+              on the coloured band in both themes. ───────────────────────── */}
+          <div className="border-t border-rail-usage-border bg-rail-usage text-rail-usage-foreground p-4 space-y-2">
+            {!collapsed && (
+              <div className="text-[10px] font-bold uppercase tracking-wider text-rail-usage-muted mb-1 px-1">
+                {t("headings.usage")}
+              </div>
+            )}
+            <div
+              className={cn(
+                "space-y-2",
+                "[&_a]:!border-white/20 [&_a]:!bg-white/10 [&_a:hover]:!bg-white/20 [&_a]:!text-white",
+                "[&_.text-muted-foreground]:!text-white/70 [&_.text-primary]:!text-white",
+              )}
+            >
+              <AITokenPill collapsed={collapsed} onNavigate={onClose} />
               <PointsPill collapsed={collapsed} onNavigate={onClose} />
             </div>
-
-            {isAuthenticated && user ? (
-              <>
-                {/* Upgrade Account CTA — free-tier users only */}
-                <UpgradeAccountButton
-                  fullWidth
-                  collapsed={collapsed}
-                  className={cn(collapsed ? "mb-1" : "mb-3")}
-                  onNavigate={onClose}
-                />
-
-                {/* Account Switcher */}
-                {!collapsed && (
-                  <div className="mb-3">
-                    <AccountSwitcher className="w-full" />
-                  </div>
-                )}
-
-                {/* User Profile Section */}
-                <Link
-                  to="/profile"
-                  className={cn(
-                    "flex items-center text-sm hover:bg-accent rounded-md transition-colors p-2",
-                    collapsed ? "justify-center" : "gap-3",
-                  )}
-                  onClick={onClose}
-                  title={collapsed ? t("labels.profileOf", { name: user.name }) : undefined}
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.avatar} />
-                    <AvatarFallback className="text-xs">
-                      {user.name
-                        ?.split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  {!collapsed && (
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {user.name}
-                      </p>
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-xs text-muted-foreground truncate capitalize">
-                          {user.role?.replace("_", " ")}
-                        </p>
-                        {isPro ? (
-                          <Crown className="h-3 w-3 text-amber-500 flex-shrink-0" />
-                        ) : (
-                          <span className="text-[10px] text-muted-foreground/60 flex-shrink-0">
-                            {t("labels.freeTier")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </Link>
-
-                {/* Wishlist — saved courses */}
-                <Link
-                  to="/wishlist"
-                  className={cn(
-                    "flex items-center text-sm rounded-md transition-colors",
-                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
-                    isMenuItemActive({ href: "/wishlist", exactMatch: false })
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
-                  )}
-                  onClick={onClose}
-                  title={collapsed ? t("labels.wishlist", { defaultValue: "Wishlist" }) : undefined}
-                >
-                  <Heart className="h-4 w-4" />
-                  {!collapsed && t("labels.wishlist", { defaultValue: "Wishlist" })}
-                </Link>
-
-                {/* Settings */}
-                <Link
-                  to="/settings"
-                  className={cn(
-                    "flex items-center text-sm rounded-md transition-colors",
-                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
-                    isMenuItemActive({ href: "/settings", exactMatch: false })
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
-                  )}
-                  onClick={onClose}
-                  title={collapsed ? t("labels.accountSettings") : undefined}
-                >
-                  <Settings className="h-4 w-4" />
-                  {!collapsed && t("labels.accountSettings")}
-                </Link>
-
-                {/* Sign Out */}
-                <SignOutButton collapsed={collapsed} onAfter={onClose} />
-              </>
-            ) : (
-              <>
-                {/* Authentication Buttons for Unauthenticated Users */}
-                {!collapsed && (
-                  <AuthButtons
-                    orientation="vertical"
-                    onNavigate={onClose}
-                    className="mb-4"
-                  />
-                )}
-
-                {/* Settings and Help for Unauthenticated Users */}
-                <Link
-                  to="/settings"
-                  className={cn(
-                    "flex items-center text-sm rounded-md transition-colors",
-                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
-                    isMenuItemActive({ href: "/settings", exactMatch: false })
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
-                  )}
-                  onClick={onClose}
-                  title={collapsed ? t("labels.accountSettings") : undefined}
-                >
-                  <Settings className="h-4 w-4" />
-                  {!collapsed && t("labels.accountSettings")}
-                </Link>
-                <Link
-                  to="/help"
-                  className={cn(
-                    "flex items-center text-sm rounded-md transition-colors",
-                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
-                    isMenuItemActive({ href: "/help", exactMatch: false })
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
-                  )}
-                  onClick={onClose}
-                  title={collapsed ? t("labels.helpSupport") : undefined}
-                >
-                  <HelpCircle className="h-4 w-4" />
-                  {!collapsed && t("labels.helpSupport")}
-                </Link>
-              </>
-            )}
           </div>
         </div>
       </div>

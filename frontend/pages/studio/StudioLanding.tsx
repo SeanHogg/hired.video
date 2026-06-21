@@ -1092,6 +1092,15 @@ function StudioContentGrid({
   );
 }
 
+// Shared list/table surface — a table is a distinct card panel (white surface
+// + soft border + shadow) so its rows read as a list, not loose text floating
+// on the canvas. Header gets a solid tinted band. Used by both the content and
+// template tables below (DRY) — one definition, identical treatment.
+const TABLE_SURFACE =
+  "overflow-x-auto rounded-xl border border-border bg-card shadow-sm";
+const TABLE_HEAD =
+  "border-b border-border bg-muted text-xs text-muted-foreground";
+
 /** Dense table view of "My content" — one row per project with type chip,
  *  visibility, last-updated, and Edit / Details / Delete actions. */
 function StudioContentTable({
@@ -1109,9 +1118,9 @@ function StudioContentTable({
   const { pageItems, paginationProps } = usePaginatedList(projects, 12);
   return (
     <div>
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <div className={TABLE_SURFACE}>
       <table className="w-full text-left text-sm">
-        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+        <thead className={TABLE_HEAD}>
           <tr>
             <th className="px-3 py-2 font-medium">{t("labels.name")}</th>
             <th className="px-3 py-2 font-medium">{t("labels.type")}</th>
@@ -1355,9 +1364,9 @@ function TemplateTable({
   const { pageItems, paginationProps } = usePaginatedList(rows, 12);
   return (
     <div>
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <div className={TABLE_SURFACE}>
       <table className="w-full text-left text-sm">
-        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+        <thead className={TABLE_HEAD}>
           <tr>
             <th className="px-3 py-2 font-medium">{t("labels.name")}</th>
             <th className="px-3 py-2 font-medium">{t("labels.type")}</th>

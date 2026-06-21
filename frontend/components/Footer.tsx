@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import Copyright from "./Copyright";
 import LegalLinks from "./LegalLinks";
 import { LocaleSwitcher } from "@/components/i18n/LocaleSwitcher";
+import { cn } from "@/lib/utils";
 import { runtimeConfig } from "@/lib/runtime-config";
 import { useAuth } from "@/lib/auth";
 import { AudienceLinks } from "@/components/landing/AudienceLinks";
@@ -27,74 +28,84 @@ export default function Footer() {
   const { user } = useAuth();
   const expanded = !user;
   return (
-    <footer className="bg-sidebar border-t border-sidebar-border">
+    // Two tonal bands (plum "B2"): the links band sits on --footer, the
+    // copyright strip on the darker --footer-strong. Scoped descendant rules
+    // theme every heading/paragraph/link inside — including the shared
+    // <AudienceLinks>/<LocationsSitemap> columns — so nothing has to thread a
+    // colour variant down. The whole footer renders inside the content column
+    // (AppShell), so it never spans under the sidebar.
+    <footer
+      className={cn(
+        "bg-footer text-footer-foreground",
+        "[&_h3]:text-footer-foreground [&_p]:text-footer-muted",
+        "[&_a]:text-footer-muted [&_a:hover]:text-footer-foreground",
+      )}
+    >
+      {/* Band 1 — links */}
       <div id="footer-wrapper" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className={`grid grid-cols-1 gap-8 ${expanded ? "md:grid-cols-7" : "md:grid-cols-5"}`}>
           {/* Logo + tagline */}
           <div className="md:col-span-2 md:pl-4">
             <Link to="/" className="flex items-center space-x-2 mb-4">
               <div className="relative">
-                <Video className="h-8 w-8 text-primary" />
+                <Video className="h-8 w-8 text-footer-brand" />
                 <Sparkles className="h-4 w-4 text-brand-blue absolute -top-1 -right-1" />
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
+              <span className="text-xl font-bold text-footer-brand">
                 Hired.video
               </span>
             </Link>
-            <p className="text-muted-foreground mb-4 max-w-md">
+            <p className="mb-4 max-w-md">
               {t("footer.tagline")}
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm">
               {t("footer.subtagline")}
             </p>
           </div>
 
           {/* Product */}
           <div>
-            <h3 className="font-semibold text-foreground mb-4">{t("labels.product")}</h3>
+            <h3 className="font-semibold mb-4">{t("labels.product")}</h3>
             <ul className="space-y-2">
-              <li><Link to="/features" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.features")}</Link></li>
-              <li><Link to="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.pricing")}</Link></li>
-              <li><Link to="/vs-competitors" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.vsCompetitors")}</Link></li>
-              <li><Link to="/resumes" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.videoResumes")}</Link></li>
-              <li><Link to="/jobs" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.jobBoard")}</Link></li>
-              <li><Link to="/companies" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.forCompanies")}</Link></li>
-              <li><Link to="/affiliate-program" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.affiliateProgram")}</Link></li>
-              <li><Link to="/articles" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.articles", "Articles")}</Link></li>
-              <li><Link to="/blog" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.blog")}</Link></li>
+              <li><Link to="/features" className="transition-colors">{t("labels.features")}</Link></li>
+              <li><Link to="/pricing" className="transition-colors">{t("labels.pricing")}</Link></li>
+              <li><Link to="/vs-competitors" className="transition-colors">{t("labels.vsCompetitors")}</Link></li>
+              <li><Link to="/resumes" className="transition-colors">{t("labels.videoResumes")}</Link></li>
+              <li><Link to="/jobs" className="transition-colors">{t("labels.jobBoard")}</Link></li>
+              <li><Link to="/companies" className="transition-colors">{t("labels.forCompanies")}</Link></li>
+              <li><Link to="/affiliate-program" className="transition-colors">{t("labels.affiliateProgram")}</Link></li>
+              <li><Link to="/articles" className="transition-colors">{t("labels.articles", "Articles")}</Link></li>
+              <li><Link to="/blog" className="transition-colors">{t("labels.blog")}</Link></li>
             </ul>
           </div>
 
           {/* Support */}
           <div>
-            <h3 className="font-semibold text-foreground mb-4">{t("labels.support")}</h3>
+            <h3 className="font-semibold mb-4">{t("labels.support")}</h3>
             <ul className="space-y-2">
-              <li><Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.helpCenter")}</Link></li>
-              <li><Link to="/contact" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.contactUs")}</Link></li>
-              <li><Link to="/about" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.aboutUs")}</Link></li>
-              <li><Link to="/careers" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.careers")}</Link></li>
+              <li><Link to="/help" className="transition-colors">{t("labels.helpCenter")}</Link></li>
+              <li><Link to="/contact" className="transition-colors">{t("labels.contactUs")}</Link></li>
+              <li><Link to="/about" className="transition-colors">{t("labels.aboutUs")}</Link></li>
+              <li><Link to="/careers" className="transition-colors">{t("labels.careers")}</Link></li>
             </ul>
           </div>
 
           {/* Audience links — compact (3 roles + see all) for authed users,
-              expanded (full grid) for anonymous visitors. Component
-              self-gates layout by `variant` so the consumer doesn't pass
-              per-audience props. */}
+              expanded (full grid) for anonymous visitors. Self-gates layout by
+              `variant`; inherits the footer's scoped link/heading colours. */}
           <AudienceLinks variant={expanded ? "expanded" : "compact"} />
 
-          {/* Locations column — expanded mode only. Anonymous visitors
-              (incl. Googlebot) see a curated top-countries list + a link
-              to /sitemap/locations for the full tree. Per the
-              Indeed/ZipRecruiter SEO playbook (#1628). Renders inline as a
-              single column matching Product/Support. */}
+          {/* Locations column — expanded (anon) mode only. */}
           {expanded ? <LocationsSitemap variant="footer-grid" /> : null}
         </div>
+      </div>
 
-        {/* Bottom Section */}
-        <div className="border-t border-border mt-8 pt-8 flex flex-col md:flex-row md:px-4 justify-between items-center gap-4">
-          <div className="mb-4 md:mb-0">
+      {/* Band 2 — copyright strip (darker tone) */}
+      <div className="bg-footer-strong text-footer-strong-foreground">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="text-center md:text-left">
             <Copyright />
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs mt-1">
               {t("footer.build", { build: runtimeConfig.build })}
             </p>
           </div>

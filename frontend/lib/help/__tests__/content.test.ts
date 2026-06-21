@@ -61,6 +61,21 @@ describe("searchHelpLocal", () => {
     expect(hits.length).toBeGreaterThan(0);
   });
 
+  it("answers a natural-language question by term overlap (the Brain's retrieval)", () => {
+    // Regression: a phrased question must not require the exact phrase as a
+    // substring — it should match on terms (create, resume) so the AI Brain
+    // gets candidate docs instead of escalating to the sign-in deflection.
+    const hits = searchHelpLocal("how do i create a resume?", "en");
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.map((h) => h.slug)).toContain("create-first-video-resume");
+    // The most on-point doc should rank first (create + resume both in title).
+    expect(hits[0].slug).toBe("create-first-video-resume");
+  });
+
+  it("returns nothing when the query is only stopwords", () => {
+    expect(searchHelpLocal("how do i", "en")).toEqual([]);
+  });
+
   it("ignores queries under 2 chars", () => {
     expect(searchHelpLocal("a", "en")).toEqual([]);
   });

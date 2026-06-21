@@ -1,7 +1,6 @@
 import { LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/lib/auth";
+import { useSignOut } from "@/hooks/use-sign-out";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -43,15 +42,10 @@ export function SignOutButton({
   onAfter,
   className,
 }: SignOutButtonProps) {
-  const { logout } = useAuth();
   const { t } = useTranslation();
-  const navigate = useNavigate();
+  const signOut = useSignOut();
 
-  const handleSignOut = async () => {
-    await logout();
-    onAfter?.();
-    if (redirectTo) navigate(redirectTo, { replace: true });
-  };
+  const handleSignOut = () => signOut({ onAfter, redirectTo });
 
   if (variant === "icon") {
     return (

@@ -134,23 +134,56 @@ export function helpItemsForSlugs(slugs: string[], locale: unknown = DEFAULT_LOC
   return slugs.map((s) => getHelpItem(s, locale)).filter((i): i is HelpItem => i !== null);
 }
 
+/** Common question words that carry no retrieval signal — dropped so a
+ *  natural-language question ("how do I create a resume?") matches on its
+ *  meaningful terms (create, resume) rather than the whole phrase. */
+const STOPWORDS = new Set([
+  "how", "do", "does", "did", "i", "a", "an", "the", "to", "my", "me", "we",
+  "can", "is", "are", "be", "of", "in", "on", "at", "for", "from", "with",
+  "and", "or", "you", "your", "it", "this", "that", "these", "those",
+  "what", "where", "when", "why", "who", "which", "please", "help", "need",
+  "want", "get", "got", "should", "would", "could", "if", "about", "as",
+]);
+
+/** Split a query into meaningful lowercased terms (alphanumeric, ≥2 chars,
+ *  non-stopword). */
+function tokenizeQuery(query: string): string[] {
+  return (query.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter(
+    (t) => t.length >= 2 && !STOPWORDS.has(t),
+  );
+}
+
 /** Client-side keyword search over the bundled corpus — instant, no DB.
- *  Matches title/summary/body case-insensitively. */
+ *  Tokenizes the query and scores each item by how many query terms appear
+ *  in its title (×3) / summary (×2) / body (×1), so a phrased question
+ *  ("how do I create a resume?") matches on its terms (create, resume)
+ *  instead of requiring the exact phrase as a substring. Used by both the
+ *  Help search box and the AI Brain's help-first retrieval. */
 export function searchHelpLocal(
   query: string,
   locale: unknown = DEFAULT_LOCALE,
   limit = 12,
 ): HelpItem[] {
-  const q = query.trim().toLowerCase();
-  if (q.length < 2) return [];
+  if (query.trim().length < 2) return [];
+  const terms = tokenizeQuery(query);
+  if (terms.length === 0) return [];
   return listHelpItems(locale)
-    .filter(
-      (i) =>
-        i.title.toLowerCase().includes(q) ||
-        i.summary.toLowerCase().includes(q) ||
-        i.body.toLowerCase().includes(q),
-    )
-    .slice(0, limit);
+    .map((item) => {
+      const title = item.title.toLowerCase();
+      const summary = item.summary.toLowerCase();
+      const body = item.body.toLowerCase();
+      let score = 0;
+      for (const t of terms) {
+        if (title.includes(t)) score += 3;
+        else if (summary.includes(t)) score += 2;
+        else if (body.includes(t)) score += 1;
+      }
+      return { item, score };
+    })
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score || a.item.order - b.item.order)
+    .slice(0, limit)
+    .map((s) => s.item);
 }
 
 /** EN text per slug for semantic indexing — the client sends these to the
