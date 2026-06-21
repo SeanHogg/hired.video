@@ -57,7 +57,17 @@ import {
  * widgets all draw. Clips on v2 are sorted by `widget.position.z`
  * before emit so array order = paint order at render time.
  */
-export function canvasStateToTimeline(state: CanvasState): Timeline {
+export function canvasStateToTimeline(stateInput: CanvasState): Timeline {
+  // Defensive normalization: a draft persisted by an OLDER app shape (or a
+  // partial localStorage rehydration) may lack newer array fields. The emitter
+  // does `for (const vo of state.voiceovers)`, which throws "voiceovers is not
+  // iterable" on a pre-voiceovers draft — so guarantee the iterables exist
+  // before any consumer touches them.
+  const state: CanvasState = {
+    ...stateInput,
+    scenes: stateInput.scenes ?? [],
+    voiceovers: stateInput.voiceovers ?? [],
+  };
   const fps = state.fps;
   let cursor = 0;
 

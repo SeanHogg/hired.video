@@ -177,7 +177,7 @@ export default function GlobalErrorHandler() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 w-full max-w-[420px]">
+    <div className="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 z-50 flex flex-col gap-2 sm:w-full sm:max-w-[420px]">
       {toasts.map((toast) => {
         // Extract once per toast so both variants render the same
         // diagnostic without duplicating the lookup. `diag` is null

@@ -91,6 +91,7 @@ import {
   cloneSceneWithNewIds,
   defaultWidget,
   DEFAULT_AUDIO_MIX,
+  emptyCanvasState,
   emptyScene,
   makeLinkedContentWidget,
   makeEngagementAssetWidget,
@@ -5062,7 +5063,14 @@ function hydrateInitialState(
       if (raw) {
         const parsed = JSON.parse(raw) as { state?: CanvasState };
         if (parsed.state && Array.isArray(parsed.state.scenes) && parsed.state.scenes.length > 0) {
-          return parsed.state;
+          // Normalize onto current defaults so a draft saved by an OLDER app
+          // shape (missing `voiceovers` / `captions` / new fields) can't crash
+          // the editor — e.g. `canvasStateToTimeline` does `for (const vo of
+          // state.voiceovers)`, which threw "voiceovers is not iterable" on
+          // pre-voiceovers drafts (exposed once anon visitors started landing
+          // here with stale localStorage). Present keys win; missing keys fall
+          // back to a complete `emptyCanvasState()`.
+          return { ...emptyCanvasState(), ...parsed.state };
         }
       }
     } catch {
