@@ -86,10 +86,23 @@ export function descriptorFromResumeDocument(
 ): ResumeTemplateDescriptor {
   const base = getTemplateById(state.templateId) ?? DEFAULT_DESCRIPTOR;
 
-  const sections = (state.pages[0]?.blocks ?? [])
-    .filter((b) => b.mode === "flow")
+  const flowBlocks = (state.pages[0]?.blocks ?? []).filter((b) => b.mode === "flow");
+
+  const sections = flowBlocks
     .map(blockToDescriptorBlock)
     .filter((b): b is ResumeBlock => b !== null);
+
+  // The hero (name / title / contact / summary) is owned by `descriptor.hero`,
+  // not a body section — but it must still track the canvas. The `basics`
+  // section block IS the header on the editing canvas, so the rendered preview
+  // shows the hero only when that block is present (added + not removed). Without
+  // this, removing the Header block on the canvas left the hero stranded in the
+  // preview/PDF — "the template doesn't match the visible sections". A bare stub
+  // (no mappable section blocks at all) keeps the template's own hero so a
+  // freshly-opened resume still renders its header.
+  const hasBasicsBlock = flowBlocks.some((b) => b.sectionKey === "basics");
+  const hero =
+    sections.length > 0 ? { ...base.hero, enabled: hasBasicsBlock } : base.hero;
 
   return {
     ...base,
@@ -104,10 +117,13 @@ export function descriptorFromResumeDocument(
       density: state.theme.density,
       ...(state.theme.cardStyle ? { cardStyle: state.theme.cardStyle } : {}),
     },
-    // Structural layout (columns/sidebar), hero, and documentMode stay from the
-    // template — the canvas doesn't model them. Sections come from the canvas so
-    // add/remove/reorder is honoured; fall back to the template's section set
-    // when the canvas has no mappable section blocks (e.g. a bare stub).
+    // Hero visibility follows the canvas's `basics` block (above); structural
+    // layout (columns/sidebar) + documentMode stay from the template — the
+    // canvas doesn't model them.
+    hero,
+    // Sections come from the canvas so add/remove/reorder is honoured; fall back
+    // to the template's section set when the canvas has no mappable section
+    // blocks (e.g. a bare stub).
     sections: sections.length > 0 ? sections : base.sections,
   };
 }

@@ -73,9 +73,6 @@ export default function Footer() {
               <li><Link to="/resumes" className="transition-colors">{t("labels.videoResumes")}</Link></li>
               <li><Link to="/jobs" className="transition-colors">{t("labels.jobBoard")}</Link></li>
               <li><Link to="/companies" className="transition-colors">{t("labels.forCompanies")}</Link></li>
-              <li><Link to="/affiliate-program" className="transition-colors">{t("labels.affiliateProgram")}</Link></li>
-              <li><Link to="/articles" className="transition-colors">{t("labels.articles", "Articles")}</Link></li>
-              <li><Link to="/blog" className="transition-colors">{t("labels.blog")}</Link></li>
             </ul>
           </div>
 
@@ -87,6 +84,9 @@ export default function Footer() {
               <li><Link to="/contact" className="transition-colors">{t("labels.contactUs")}</Link></li>
               <li><Link to="/about" className="transition-colors">{t("labels.aboutUs")}</Link></li>
               <li><Link to="/careers" className="transition-colors">{t("labels.careers")}</Link></li>
+              <li><Link to="/affiliate-program" className="transition-colors">{t("labels.affiliateProgram")}</Link></li>
+              <li><Link to="/articles" className="transition-colors">{t("labels.articles", "Articles")}</Link></li>
+              <li><Link to="/blog" className="transition-colors">{t("labels.blog")}</Link></li>
             </ul>
           </div>
 

@@ -3,20 +3,16 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
-  Code2,
   Download,
   Edit,
-  Eye,
   FileJson,
   FileText,
   FileType,
   Lock,
   MessageSquare,
-  Monitor,
   Printer,
   RotateCcw,
   Share2,
-  Store,
   User,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -46,10 +42,10 @@ import SkillNetwork from "@/components/SkillNetwork";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { SplitButton } from "@/components/ui/split-button";
+import ResumeTemplateSwitcher from "@/components/resume/ResumeTemplateSwitcher";
 import { buildTemplateAssignmentContent } from "@/lib/utils/resume-template-assignment";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -62,14 +58,12 @@ import { useUgcSeo } from "@/lib/seo-ugc";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
 import { resumeEditorPath } from "@/lib/studio/resume-editor-link";
 import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
-import { isTemplateUnlocked } from "@/lib/template-unlocks";
 import TextNarrator from "@/components/audio/TextNarrator";
 import { textFromResume } from "@/lib/audio/narrator-text";
 import type { Resume, ResumePrivacy, ResumeSectionMeta } from "@/types/resume";
 import { MetaType } from "@/types/resume";
 import {
   DEFAULT_DESCRIPTOR,
-  TEMPLATE_PRESETS,
   getTemplateById,
   matchesAnyPreset,
   validateDescriptor,
@@ -641,97 +635,28 @@ export default function ResumeDetail() {
                   </Button>
                 )}
 
-                <SplitButton
+                <ResumeTemplateSwitcher
+                  currentTemplateId={descriptor.id}
                   label={descriptor.name}
-                  icon={FileType}
-                  primaryTitle={t("actions.resumeDetail.changeTemplate")}
-                  chevronLabel={t("actions.resumeDetail.templateOptions")}
-                  menuClassName="w-72"
-                >
-                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                    {t("labels.resumeDetail.yourTemplates")}
-                  </DropdownMenuLabel>
-                  {TEMPLATE_PRESETS
-                    // Show only the free default + templates this user has
-                    // unlocked. Previewing other templates lives in the
-                    // marketplace; this dropdown is for applying templates
-                    // the user can actually use.
-                    .filter(
-                      (preset) =>
-                        preset.id === DEFAULT_DESCRIPTOR.id ||
-                        isTemplateUnlocked(preset.id),
-                    )
-                    .map((preset) => {
-                      const isCurrent = descriptor.id === preset.id;
-                      const isAssignedDefault = assignedDefaultId === preset.id;
-                      const isAssignedEmbedded = assignedEmbeddedId === preset.id;
-                      return (
-                        <DropdownMenuItem
-                          key={preset.id}
-                          onClick={() => applyPreset(preset)}
-                          className={isCurrent ? "bg-accent" : ""}
-                        >
-                          <div className="flex flex-col flex-1 min-w-0 gap-0.5">
-                            <span className="font-medium truncate">{preset.name}</span>
-                            <span className="text-xs text-muted-foreground truncate">
-                              {preset.industry}
-                            </span>
-                            {(isAssignedDefault || isAssignedEmbedded) && (
-                              <span className="flex items-center gap-1 mt-0.5">
-                                {isAssignedDefault && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                                    <Eye className="w-3 h-3" />{t("labels.resumeDetail.defaultView")}
-                                  </span>
-                                )}
-                                {isAssignedEmbedded && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                                    <Monitor className="w-3 h-3" />{t("labels.resumeDetail.embedded")}
-                                  </span>
-                                )}
-                              </span>
-                            )}
-                          </div>
-                        </DropdownMenuItem>
-                      );
-                    })}
-                  {isOwner && !isSample && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                        {t("labels.resumeDetail.assignTemplate", { name: descriptor.name })}
-                      </DropdownMenuLabel>
-                      <DropdownMenuItem
-                        onClick={() => saveTemplateAssignment("template")}
-                        disabled={assignedDefaultId === descriptor.id || descriptor.id === "custom"}
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        {t("actions.resumeDetail.setAsDefaultView")}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => saveTemplateAssignment("embeddedTemplate")}
-                        disabled={assignedEmbeddedId === descriptor.id || descriptor.id === "custom"}
-                      >
-                        <Monitor className="w-4 h-4 mr-2" />
-                        {t("actions.resumeDetail.setAsEmbeddedView")}
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  {perms.canEditTemplate && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setEditorOpen((v) => !v)}>
-                        <Code2 className="w-4 h-4 mr-2" />
-                        {editorOpen ? t("actions.resumeDetail.hideTemplateEditor") : t("actions.resumeDetail.editTemplateDesign")}
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  <div className="p-1 pt-2">
-                    <Button size="sm" className="w-full" onClick={() => navigate("/search?category=templates")}>
-                      <Store className="w-4 h-4 mr-1" />
-                      {t("actions.resumeDetail.browseMarketplace")}
-                    </Button>
-                  </div>
-                </SplitButton>
+                  onSelect={applyPreset}
+                  assignedDefaultId={assignedDefaultId}
+                  assignedEmbeddedId={assignedEmbeddedId}
+                  onSetDefault={
+                    isOwner && !isSample
+                      ? () => saveTemplateAssignment("template")
+                      : undefined
+                  }
+                  onSetEmbedded={
+                    isOwner && !isSample
+                      ? () => saveTemplateAssignment("embeddedTemplate")
+                      : undefined
+                  }
+                  onToggleDesignEditor={
+                    perms.canEditTemplate ? () => setEditorOpen((v) => !v) : undefined
+                  }
+                  designEditorOpen={editorOpen}
+                  onBrowseMarketplace={() => navigate("/search?category=templates")}
+                />
 
                 {/* Export — gated to owners, recruiters, employers. Job
                     seekers viewing other people's resumes can't download. */}

@@ -18,12 +18,30 @@ import DocumentPagedView, {
   DocumentViewModeToggle,
   type DocumentViewMode,
 } from "@/components/studio/document/DocumentPagedView";
+import ResumeTemplateSwitcher from "@/components/resume/ResumeTemplateSwitcher";
+import type { ResumeTemplateDescriptor } from "@/types/resume-template";
+
+/** Optional template switching for resume documents — reuses the same switcher
+ *  the resume viewer uses so the user can re-skin + set a default while
+ *  reviewing. Omitted for non-resume documents / read-only contexts. */
+export interface DocumentPreviewTemplateSwitch {
+  /** Currently applied template (`DocumentState.templateId`). */
+  currentTemplateId: string;
+  /** Template persisted as the resume's default view (`content.meta.template`). */
+  assignedDefaultId?: string | null;
+  /** Apply the chosen template to the live document. */
+  onSelect: (preset: ResumeTemplateDescriptor) => void;
+  /** Persist the current template as the resume's default view. */
+  onSetDefault?: () => void;
+}
 
 interface DocumentPreviewOverlayProps {
   state: DocumentState;
   content?: DocumentEntityContent | null;
   title?: string;
   onClose: () => void;
+  /** When supplied (resume only), renders the template switcher in the header. */
+  templateSwitch?: DocumentPreviewTemplateSwitch;
 }
 
 export default function DocumentPreviewOverlay({
@@ -31,6 +49,7 @@ export default function DocumentPreviewOverlay({
   content,
   title,
   onClose,
+  templateSwitch,
 }: DocumentPreviewOverlayProps) {
   // Default to the two-up flip spread — the "review how it paginates" view the
   // continuous editor canvas can't show.
@@ -52,6 +71,15 @@ export default function DocumentPreviewOverlay({
         </span>
         <DocumentViewModeToggle value={viewMode} onChange={setViewMode} />
         <div className="flex items-center gap-2">
+          {templateSwitch && state.entityKind === "resume" && (
+            <ResumeTemplateSwitcher
+              currentTemplateId={templateSwitch.currentTemplateId}
+              onSelect={templateSwitch.onSelect}
+              assignedDefaultId={templateSwitch.assignedDefaultId}
+              onSetDefault={templateSwitch.onSetDefault}
+              variant="secondary"
+            />
+          )}
           <Button
             variant="secondary"
             size="sm"
