@@ -20,6 +20,8 @@ import CoursesManagerPanel from "@/components/creator/CoursesManagerPanel";
 import ArticlesManagerPanel from "@/components/creator/ArticlesManagerPanel";
 import VoiceCloneManager from "@/components/studio/VoiceCloneManager";
 import OfferingsPanel, { type OfferingsPanelHandle } from "@/components/services/OfferingsPanel";
+import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
+import { useViewMode } from "@/lib/hooks/useViewMode";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import type { CreatorProfile } from "@/lib/services/creator-service";
@@ -110,6 +112,15 @@ export default function CreatorWorkspace({
   // the tabs row trigger the same first-time-opt-in + open-dialog flow
   // that lives inside OfferingsPanel.
   const offeringsRef = useRef<OfferingsPanelHandle>(null);
+
+  // Offerings layout mode — owned here so the ViewModeToggle can live in the
+  // shared sub-tab row (same row as the tabs + Add Service) rather than inside
+  // the panel body. Passed down to OfferingsPanel (controlled).
+  const [offeringsView, setOfferingsView] = useViewMode(
+    "services.creator",
+    "grid",
+    BROWSE_VIEW_MODES,
+  );
 
   // Portfolio state
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
@@ -202,6 +213,11 @@ export default function CreatorWorkspace({
               first-time-opt-in + dialog via the imperative ref handle. */}
           {offeringsEnabled && urlTab === "offerings" && (
             <div className="flex items-center gap-2 flex-wrap ml-auto">
+              <ViewModeToggle
+                value={offeringsView}
+                onChange={setOfferingsView}
+                modes={BROWSE_VIEW_MODES}
+              />
               <Link to="/settings?tab=lead-generation">
                 <Button variant="outline" size="sm">
                   <SettingsIcon className="h-4 w-4 mr-2" />
@@ -228,6 +244,8 @@ export default function CreatorWorkspace({
               setServices={setServices}
               profile={profile}
               onProfileChange={onProfileChange ?? (() => {})}
+              viewMode={offeringsView}
+              onViewModeChange={setOfferingsView}
             />
           </TabsContent>
         )}

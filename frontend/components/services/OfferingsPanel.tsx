@@ -31,7 +31,7 @@ import {
 import { toast } from "sonner";
 import AddFirstServiceCTA from "@/components/services/AddFirstServiceCTA";
 import YourProgramsPanel from "@/components/creator/YourProgramsPanel";
-import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
+import ViewModeToggle, { BROWSE_VIEW_MODES, type ViewMode } from "@/components/ViewModeToggle";
 import { useViewMode } from "@/lib/hooks/useViewMode";
 import { HorizontalScroller } from "@/components/HorizontalScroller";
 import { Badge } from "@/components/ui/badge";
@@ -100,6 +100,12 @@ interface Props {
   /** Creator profile (null when not enrolled). Drives YourProgramsPanel. */
   profile: CreatorProfile | null;
   onProfileChange: (next: CreatorProfile | null) => void;
+  /** Controlled layout mode. When the parent hosts the ViewModeToggle in a
+   *  shared header row (CreatorWorkspace's sub-tab row), it owns the state and
+   *  passes it in — and the panel hides its own inline toggle. Falls back to
+   *  the panel's own persisted mode when uncontrolled. */
+  viewMode?: ViewMode;
+  onViewModeChange?: (mode: ViewMode) => void;
 }
 
 export interface OfferingsPanelHandle {
@@ -112,6 +118,8 @@ const OfferingsPanel = forwardRef<OfferingsPanelHandle, Props>(function Offering
   setServices,
   profile,
   onProfileChange,
+  viewMode: viewModeProp,
+  onViewModeChange,
 }, ref) {
   const { t } = useTranslation();
   const [providesServices, setProviderServices] = useState(false);
@@ -119,11 +127,15 @@ const OfferingsPanel = forwardRef<OfferingsPanelHandle, Props>(function Offering
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateServiceInput>(defaultForm);
-  const [viewMode, setViewMode] = useViewMode(
+  // Uncontrolled fallback — used only when no parent drives the view mode.
+  const [internalViewMode, setInternalViewMode] = useViewMode(
     "services.creator",
     "grid",
     BROWSE_VIEW_MODES,
   );
+  const controlled = onViewModeChange !== undefined;
+  const viewMode = viewModeProp ?? internalViewMode;
+  const setViewMode = onViewModeChange ?? setInternalViewMode;
 
   // providesServices is only used by openCreate's first-time opt-in path;
   // load it once so the toggle doesn't fire when the user already has it on.
@@ -329,16 +341,17 @@ const OfferingsPanel = forwardRef<OfferingsPanelHandle, Props>(function Offering
             <AddFirstServiceCTA onClick={openCreate} loading={saving} />
           ) : (
             <div className="space-y-3">
-              {/* Layout switcher — Scroll / Grid / Table, mirroring the Studio
-                  landing + Resumes browse surfaces. Persisted under
-                  `services.creator`. */}
-              <div className="flex items-center justify-end">
-                <ViewModeToggle
-                  value={viewMode}
-                  onChange={setViewMode}
-                  modes={BROWSE_VIEW_MODES}
-                />
-              </div>
+              {/* Layout switcher — Scroll / Grid / Table. Hidden when a parent
+                  (CreatorWorkspace) hosts it in the shared sub-tab row. */}
+              {!controlled && (
+                <div className="flex items-center justify-end">
+                  <ViewModeToggle
+                    value={viewMode}
+                    onChange={setViewMode}
+                    modes={BROWSE_VIEW_MODES}
+                  />
+                </div>
+              )}
               {viewMode === "table" ? (
                 <ServicesTable
                   services={services}
