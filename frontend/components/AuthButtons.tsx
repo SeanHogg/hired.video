@@ -28,10 +28,13 @@ export function AuthButtons({
       )}
     >
       <Link to="/login" onClick={onNavigate} className={linkClass}>
+        {/* Branded outline (purple border + tint) instead of the old pale
+            `bg-accent` chip, which dissolved into the near-white light header.
+            Border + brand tint give it equal presence in light and dark. */}
         <Button
-          variant="ghost"
+          variant="outline"
           className={cn(
-            "bg-accent hover:bg-accent/80 font-medium",
+            "border-primary/30 bg-primary/5 text-primary font-medium",
             buttonWidth,
           )}
         >

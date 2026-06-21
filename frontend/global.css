@@ -109,10 +109,11 @@ body[data-print-mode] [data-print-hide] {
 
     --radius: 0.75rem;
 
-    /* Legacy chrome tokens (still used by the top Navigation bar). Retinted
-     * lavender to match the canvas. The app Sidebar no longer uses these — it
-     * has its own two-zone `--rail-*` set below. */
-    --sidebar-background: 258 30% 95%;
+    /* Top Navigation / BrandHeader chrome (the app Sidebar now uses its own
+     * `--rail-*` set below). A crisp near-white bar — the light counterpart to
+     * the dark header in `.dark` — so it reads clean above the lavender canvas
+     * rather than as a muddy mid-grey band. */
+    --sidebar-background: 258 40% 99%;
     --sidebar-foreground: 250 30% 25%;
     --sidebar-primary: 262 83% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
