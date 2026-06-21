@@ -39,6 +39,20 @@ function ogKindCopy(mediaKind: string | null | undefined) {
   return OG_KIND_COPY[mediaKind ?? "video"] ?? OG_KIND_COPY.video;
 }
 
+// ─── GET /page ───────────────────────────────────────────────────────────────
+// Generic branded social card for any marketing / app route. Driven entirely
+// by query params (title + optional eyebrow + subtitle) so the build-time
+// prerender (frontend/scripts/prerender.mjs) can give EVERY indexable route
+// its own share image — instead of every page falling back to the single
+// static og-image.svg — without this worker needing to know the route table.
+// Stable per (title, eyebrow, subtitle) so the SVG is edge-cached for a day.
+ogRoutes.get("/page", (c) => {
+  const title = truncate((c.req.query("title") || "hired.video").trim(), 90);
+  const eyebrow = truncate((c.req.query("eyebrow") || "").trim(), 30).toUpperCase();
+  const subtitle = truncate((c.req.query("subtitle") || "").trim(), 130);
+  return svgResponse(renderPageCard({ title, eyebrow, subtitle }), true);
+});
+
 // ─── GET /companies/:id ──────────────────────────────────────────────────────
 // Social card for a company profile. Surfaces the cached
 // review_avg_overall + review_count from company_profiles (kept in
@@ -664,6 +678,90 @@ ogRoutes.get("/lesson-diagram", async (c) => {
   }
   return svgResponse(diagram.svg, true);
 });
+
+/** Word-wrap `text` into at most `maxLines` lines of roughly `maxChars`
+ *  characters each, appending an ellipsis when it overflows. Pure string
+ *  math — SVG <text> has no auto-wrap, so the marketing card lays the
+ *  headline out by hand. */
+function wrapText(text: string, maxChars: number, maxLines: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let cur = "";
+  let consumed = 0;
+  for (const w of words) {
+    const cand = cur ? `${cur} ${w}` : w;
+    if (cand.length > maxChars && cur) {
+      lines.push(cur);
+      cur = w;
+      consumed++;
+      if (lines.length === maxLines) break;
+    } else {
+      cur = cand;
+      consumed++;
+    }
+  }
+  if (lines.length < maxLines && cur) lines.push(cur);
+  // If words were dropped because we hit maxLines, mark the truncation.
+  if (consumed < words.length && lines.length) {
+    let last = lines[lines.length - 1].replace(/[.,;:\s]+$/, "");
+    while (last.length > maxChars - 1 && last.includes(" ")) {
+      last = last.slice(0, last.lastIndexOf(" "));
+    }
+    lines[lines.length - 1] = `${last}…`;
+  }
+  return lines;
+}
+
+/** Branded marketing share card (1200×630) — brand gradient + eyebrow tag +
+ *  wrapped headline + optional subtitle + footer. Shared by the `/page`
+ *  endpoint so every prerendered route can point its og:image here. Mirrors
+ *  the hand-designed public/og-image.svg palette (#7c3aed→#3b82f6) so the
+ *  generated per-page cards sit in the same brand family as the home hero. */
+function renderPageCard(opts: { title: string; eyebrow: string; subtitle: string }): string {
+  const titleLines = wrapText(opts.title, 26, 3);
+  const fontSize = titleLines.length >= 3 ? 50 : titleLines.length === 2 ? 58 : 66;
+  const lineHeight = fontSize + 12;
+  // Center the title block vertically, biased up to leave room for the
+  // subtitle + footer. `startY` is the baseline of the first line.
+  const startY = 320 - ((titleLines.length - 1) * lineHeight) / 2;
+  const titleSvg = titleLines
+    .map(
+      (line, i) =>
+        `<text x="100" y="${startY + i * lineHeight}" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="${fontSize}" font-weight="800" fill="white" letter-spacing="-1">${escapeXml(line)}</text>`,
+    )
+    .join("\n  ");
+  const subtitleY = startY + (titleLines.length - 1) * lineHeight + 64;
+  const subtitleSvg = opts.subtitle
+    ? `<text x="100" y="${subtitleY}" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="26" font-weight="400" fill="white" opacity="0.78">${escapeXml(opts.subtitle)}</text>`
+    : "";
+  const eyebrowSvg = opts.eyebrow
+    ? `<text x="100" y="150" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="24" font-weight="700" fill="#a5b4fc" letter-spacing="2">${escapeXml(opts.eyebrow)}</text>`
+    : "";
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="50%" stop-color="#6d28d9"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="1050" cy="120" r="180" fill="white" opacity="0.05"/>
+  <circle cx="150" cy="540" r="120" fill="white" opacity="0.05"/>
+  <!-- Brand glyph (video camera, matches favicon) -->
+  <g transform="translate(100, 70) scale(1.6)" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.9">
+    <rect x="2" y="6" width="14" height="12" rx="2"/>
+    <path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/>
+  </g>
+  ${eyebrowSvg}
+  ${titleSvg}
+  ${subtitleSvg}
+  <rect x="0" y="588" width="1200" height="42" fill="black" opacity="0.18"/>
+  <text x="100" y="616" font-family="system-ui,sans-serif" font-size="22" font-weight="600" fill="white" opacity="0.85">hired.video</text>
+  <text x="1100" y="616" font-family="system-ui,sans-serif" font-size="20" fill="white" opacity="0.6" text-anchor="end">AI video resumes &amp; career tools</text>
+</svg>`;
+}
 
 function genericCard(line1: string, line2: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">

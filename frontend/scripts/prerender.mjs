@@ -129,6 +129,63 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// ---------------------------------------------------------------------------
+// Per-route social card image. Every indexable route gets its OWN branded
+// share card (served by GET /api/og/page) instead of all of them falling
+// back to the single static og-image.svg — so a link shared in iMessage /
+// WhatsApp / Slack previews with the page's actual headline. Derived purely
+// from the title + description the route already carries (no second source
+// of truth). The home route keeps the hand-designed og-image.svg hero.
+// ---------------------------------------------------------------------------
+
+/** Short category label rendered as the card's eyebrow tag. */
+function eyebrowFor(p) {
+  if (p === '/') return 'AI Video Resumes';
+  if (p.startsWith('/tools')) return 'Free AI Tool';
+  if (p.startsWith('/blog')) return 'Career Guide';
+  if (p.startsWith('/sectors')) return 'AI-Resilient Careers';
+  if (p.startsWith('/courses') || p.startsWith('/learning')) return 'Learning Library';
+  if (p.startsWith('/guides')) return 'Guide';
+  if (p === '/privacy-policy' || p === '/terms-of-service') return 'Legal';
+  if (['/for-recruiters', '/post-a-job', '/people/scorecards', '/for-agencies'].includes(p)) return 'For Recruiters & Employers';
+  if (p.startsWith('/resume-templates')) return 'Resume Templates';
+  if (p === '/interview') return 'Interview Practice';
+  if (p === '/pivot-explorer') return 'Career Pivot';
+  if (p === '/affiliate-program') return 'Affiliate Program';
+  if (p === '/chrome-extension') return 'Chrome Extensions';
+  if (['/resumes', '/studio'].includes(p)) return 'AI Studio';
+  return 'hired.video';
+}
+
+/** Drop the trailing brand suffix ("… — hired.video" / "… · hired.video")
+ *  so the card headline reads as the page's own title. */
+function cardTitle(title) {
+  return title.replace(/\s*[—·-]\s*hired\.video\s*$/i, '').trim() || title;
+}
+
+/** Trim a description down to a one-line card subtitle at a word boundary. */
+function cardSubtitle(desc) {
+  if (!desc) return '';
+  let s = desc.trim();
+  if (s.length <= 110) return s;
+  s = s.slice(0, 110);
+  const i = s.lastIndexOf(' ');
+  if (i > 60) s = s.slice(0, i);
+  return s.replace(/[.,;:\s]+$/, '') + '…';
+}
+
+/** Full og:image URL for a route — its own generated card, or the static
+ *  hero for the home page. */
+function ogImageFor(routePath, title, description) {
+  if (routePath === '/') return OG_IMAGE;
+  const params = new URLSearchParams({
+    title: cardTitle(title),
+    eyebrow: eyebrowFor(routePath),
+    subtitle: cardSubtitle(description),
+  });
+  return `${CANONICAL_ORIGIN}/api/og/page?${params.toString()}`;
+}
+
 function ensureDirSync(dir) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -162,6 +219,12 @@ function setOrInsertMeta(html, { title, description, ogTitle, ogDescription, ogI
   // OG image
   if (out.match(/<meta[^>]*property=["']og:image["'][^>]*>/i)) {
     out = out.replace(/<meta([^>]*?)property=["']og:image["']([^>]*?)>/i, `<meta property="og:image" content="${escapeHtml(ogImage)}" />`);
+  }
+
+  // Twitter image (kept in lockstep with og:image so the X / iMessage card
+  // shows the same per-page art).
+  if (out.match(/<meta[^>]*name=["']twitter:image["'][^>]*>/i)) {
+    out = out.replace(/<meta([^>]*?)name=["']twitter:image["']([^>]*?)>/i, `<meta name="twitter:image" content="${escapeHtml(ogImage)}" />`);
   }
 
   // OG URL
@@ -204,7 +267,7 @@ function main() {
       description,
       ogTitle: r.ogTitle || title,
       ogDescription: r.ogDescription || description,
-      ogImage: OG_IMAGE,
+      ogImage: r.ogImage || ogImageFor(r.path, r.ogTitle || title, r.ogDescription || description),
       canonical,
       twitterSite: TWITTER_SITE,
     });
