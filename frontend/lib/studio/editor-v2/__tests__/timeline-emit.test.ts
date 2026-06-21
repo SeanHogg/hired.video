@@ -553,3 +553,37 @@ describe("canvasState ↔ Timeline round-trip", () => {
     expect(restored.scenes[0].widgets.map((w) => w.id)).toEqual(["bottom", "top"]);
   });
 });
+
+describe("canvasStateToTimeline — stale/partial draft tolerance (#2212 crash fix)", () => {
+  // Regression: a draft persisted by an OLDER app shape (before the
+  // `voiceovers[]` field existed) rehydrated from localStorage as a CanvasState
+  // with no `voiceovers` key. The emitter does `for (const vo of
+  // state.voiceovers)`, which threw "voiceovers is not iterable" and crashed the
+  // editor error boundary — surfaced once anonymous visitors began landing on
+  // `/studio/new` with stale localStorage. The emitter must normalize defensively.
+  it("does not throw when voiceovers is missing", () => {
+    const base = emptyCanvasState();
+    const partial = { ...base, scenes: [emptyScene("Scene 1")] } as Partial<CanvasState> &
+      Record<string, unknown>;
+    delete partial.voiceovers;
+    expect(() => canvasStateToTimeline(partial as CanvasState)).not.toThrow();
+  });
+
+  it("does not throw when scenes is missing", () => {
+    const base = emptyCanvasState();
+    const partial = { ...base } as Partial<CanvasState> & Record<string, unknown>;
+    delete partial.scenes;
+    expect(() => canvasStateToTimeline(partial as CanvasState)).not.toThrow();
+  });
+
+  it("treats a missing voiceovers field as an empty voiceover track", () => {
+    const base = emptyCanvasState();
+    const partial = { ...base, scenes: [emptyScene("Scene 1")] } as Partial<CanvasState> &
+      Record<string, unknown>;
+    delete partial.voiceovers;
+    const timeline = canvasStateToTimeline(partial as CanvasState);
+    const a2 = timeline.tracks.find((t) => t.id === "a2");
+    // a2 (voiceover) track exists but carries no clips — same as an explicit [].
+    expect(a2?.clips ?? []).toEqual([]);
+  });
+});
