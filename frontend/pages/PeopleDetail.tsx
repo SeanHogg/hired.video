@@ -53,6 +53,8 @@ import ServiceInquiryDialog from "@/components/profile/dialogs/ServiceInquiryDia
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { AppShell } from "@/components/AppShell";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import { cn } from "@/lib/utils";
+import { ACTION_BAR_STICKY, ACTION_BAR_SURFACE } from "@/lib/ui/action-bar";
 import EntityHubTabStrip from "@/components/EntityHubTabStrip";
 
 import { useStartConversation } from "@/hooks/use-start-conversation";
@@ -510,10 +512,20 @@ function PeopleDetailContent() {
     >
       {shell(
         <div className="p-4 md:p-6">
-          {/* Hub-level tab strip — keeps the People / Connections /
-              Talent Pool / etc. context visible across profile pages. */}
-          <EntityHubTabStrip entity="person" />
-          <PageHeader tabs={profileTabs} activeTabKey={activeProfileTab} />
+          {/* Layered menu — the hub-level strip (People / Connections / …)
+              over the profile-section strip (Profile / Video Promo / …). Wrapped
+              in the shared sticky, tonally-distinct action-bar surface so both
+              rows pin below the top nav as the profile scrolls. */}
+          <div className={cn(ACTION_BAR_STICKY, "mb-6")}>
+            <div className={cn(ACTION_BAR_SURFACE, "px-4 pt-2 md:px-5")}>
+              <EntityHubTabStrip entity="person" className="mb-2" />
+              <PageHeader
+                tabs={profileTabs}
+                activeTabKey={activeProfileTab}
+                className="mb-0"
+              />
+            </div>
+          </div>
 
           <div className="mb-6">
             <ProfileHeader

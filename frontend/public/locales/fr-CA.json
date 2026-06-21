@@ -9606,5 +9606,15 @@
   "marketing.career360.seeker.tagline": "Toute votre recherche d'emploi sur une seule roue",
   "marketing.career360.seeker.body": "Choisissez un poste cible et Carrière 360 cartographie chaque écart — CV, compétences, certifications, prospection, salaire — puis bâtit un plan semaine par semaine et suit chaque score à mesure que vous les comblez.",
   "marketing.career360.hiring.tagline": "La préparation de chaque candidat en un coup d'œil",
-  "marketing.career360.hiring.body": "Carrière 360 évalue chaque candidat sur le CV, les compétences, l'expérience et la prospection, pour repérer qui est prêt pour l'entrevue avant même d'ouvrir un profil."
+  "marketing.career360.hiring.body": "Carrière 360 évalue chaque candidat sur le CV, les compétences, l'expérience et la prospection, pour repérer qui est prêt pour l'entrevue avant même d'ouvrir un profil.",
+  "wishlist.title": "Ma liste de souhaits",
+  "wishlist.subtitle": "Des éléments que vous avez enregistrés pour y revenir.",
+  "wishlist.itemCount": "{{count}} élément",
+  "wishlist.itemCount_other": "{{count}} éléments",
+  "wishlist.empty.title": "Rien d'enregistré pour l'instant",
+  "wishlist.empty.body": "Touchez le cœur sur n'importe quel cours ou voix pour l'enregistrer ici.",
+  "wishlist.empty.browse": "Parcourir {{type}}",
+  "wishlist.browseMore": "Parcourir plus",
+  "wishlist.add": "Ajouter à la liste de souhaits",
+  "wishlist.remove": "Retirer de la liste de souhaits"
 }

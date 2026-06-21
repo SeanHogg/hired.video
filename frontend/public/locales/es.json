@@ -9560,5 +9560,15 @@
   "marketing.career360.seeker.tagline": "Toda tu búsqueda de empleo en una sola rueda",
   "marketing.career360.seeker.body": "Elige un puesto objetivo y Career 360 mapea cada brecha —currículum, habilidades, certificaciones, contacto, salario— y crea un plan semana a semana, registrando cada puntuación a medida que las cierras.",
   "marketing.career360.hiring.tagline": "La preparación de cada candidato de un vistazo",
-  "marketing.career360.hiring.body": "Career 360 puntúa a cada candidato en currículum, habilidades, experiencia y contacto, para que detectes quién está listo para la entrevista antes de abrir un perfil."
+  "marketing.career360.hiring.body": "Career 360 puntúa a cada candidato en currículum, habilidades, experiencia y contacto, para que detectes quién está listo para la entrevista antes de abrir un perfil.",
+  "wishlist.title": "Mi lista de deseos",
+  "wishlist.subtitle": "Cosas que guardaste para volver a verlas.",
+  "wishlist.itemCount": "{{count}} elemento",
+  "wishlist.itemCount_other": "{{count}} elementos",
+  "wishlist.empty.title": "Aún no has guardado nada",
+  "wishlist.empty.body": "Toca el corazón en cualquier curso o voz para guardarlo aquí.",
+  "wishlist.empty.browse": "Explorar {{type}}",
+  "wishlist.browseMore": "Explorar más",
+  "wishlist.add": "Añadir a la lista de deseos",
+  "wishlist.remove": "Quitar de la lista de deseos"
 }

@@ -603,7 +603,11 @@ export default function UnifiedSearch({
       {/* Search + filters control */}
       <section
         className={cn(
-          "py-4 sm:py-6 px-4 sm:px-6 lg:px-8 border-b border-border bg-background/95 backdrop-blur-md",
+          // `bg-secondary` gives the search/filter bar a tone distinct from the
+          // page canvas (it was `bg-background`, which blended in) — matching the
+          // shared action-bar treatment on the entity pages. Already sticky when
+          // the host opts in via `stickySearch` (e.g. the dashboard).
+          "py-4 sm:py-6 px-4 sm:px-6 lg:px-8 border-b border-border bg-secondary/95 backdrop-blur-md",
           stickySearch && "sticky top-16 z-40",
         )}
       >

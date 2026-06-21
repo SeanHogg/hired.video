@@ -113,10 +113,17 @@ export default function DocumentStage({
       <DocumentViewModeToggle value={viewMode} onChange={setViewMode} />
 
       {viewMode === "paged" ? (
+        // Drive the spread off the editor `zoom` (the bottom-right slider) —
+        // the SAME scale the One Page sheet uses — instead of the view's
+        // fit-to-width fallback. The stage mounts inside a shrink-to-content
+        // centering flex (`min-w-min`), so fit-to-width would read a collapsed
+        // `clientWidth` and render the pages tiny, AND the slider would be inert
+        // here. Passing `zoom` makes the slider control the spread too.
         <DocumentPagedView
           state={state}
           content={entityContent}
           mode="paged"
+          zoom={zoom}
           className="w-full"
         />
       ) : (

@@ -8,6 +8,7 @@
 // Backed by the canonical per-user wishlist list (see useWishlist).
 
 import { Heart } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useWishlist } from "@/lib/hooks/useWishlist";
@@ -31,6 +32,7 @@ export default function WishlistButton({
   variant = "ghost",
   className,
 }: WishlistButtonProps) {
+  const { t } = useTranslation();
   const { isAuthenticated, isWishlisted, toggle, isToggling } =
     useWishlist(entityType);
 
@@ -38,6 +40,9 @@ export default function WishlistButton({
   if (!isAuthenticated) return null;
 
   const saved = isWishlisted(entityId);
+  const actionLabel = saved
+    ? t("wishlist.remove")
+    : t("wishlist.add");
 
   return (
     <Button
@@ -46,8 +51,8 @@ export default function WishlistButton({
       size={showLabel ? "sm" : size}
       disabled={isToggling}
       aria-pressed={saved}
-      aria-label={saved ? "Remove from wishlist" : "Add to wishlist"}
-      title={saved ? "Remove from wishlist" : "Add to wishlist"}
+      aria-label={actionLabel}
+      title={actionLabel}
       className={cn(showLabel && "gap-2", className)}
       onClick={(e) => {
         e.preventDefault();
@@ -61,7 +66,7 @@ export default function WishlistButton({
           saved ? "fill-rose-500 text-rose-500" : "text-muted-foreground",
         )}
       />
-      {showLabel && <span>{saved ? "Saved" : "Save"}</span>}
+      {showLabel && <span>{saved ? t("labels.saved") : t("actions.save")}</span>}
     </Button>
   );
 }

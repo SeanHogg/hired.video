@@ -9688,5 +9688,15 @@
   "marketing.career360.seeker.tagline": "Your whole job search on one wheel",
   "marketing.career360.seeker.body": "Pick a target role and Career 360 maps every gap — resume, skills, certs, outreach, salary — then builds a week-by-week plan and tracks every score as you close them.",
   "marketing.career360.hiring.tagline": "Every candidate's readiness at a glance",
-  "marketing.career360.hiring.body": "Career 360 scores each candidate across resume, skills, experience and outreach — so you can spot who's interview-ready before you ever open a profile."
+  "marketing.career360.hiring.body": "Career 360 scores each candidate across resume, skills, experience and outreach — so you can spot who's interview-ready before you ever open a profile.",
+  "wishlist.title": "My Wishlist",
+  "wishlist.subtitle": "Things you've saved to come back to.",
+  "wishlist.itemCount": "{{count}} item",
+  "wishlist.itemCount_other": "{{count}} items",
+  "wishlist.empty.title": "Nothing saved yet",
+  "wishlist.empty.body": "Tap the heart on any course or voice to save it here.",
+  "wishlist.empty.browse": "Browse {{type}}",
+  "wishlist.browseMore": "Browse more",
+  "wishlist.add": "Add to wishlist",
+  "wishlist.remove": "Remove from wishlist"
 }
