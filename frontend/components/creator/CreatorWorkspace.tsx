@@ -21,6 +21,8 @@ import ArticlesManagerPanel from "@/components/creator/ArticlesManagerPanel";
 import VoiceCloneManager from "@/components/studio/VoiceCloneManager";
 import OfferingsPanel, { type OfferingsPanelHandle } from "@/components/services/OfferingsPanel";
 import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
+import { cn } from "@/lib/utils";
+import { ACTION_BAR_STICKY_STACKED, ACTION_BAR_SURFACE } from "@/lib/ui/action-bar";
 import { useViewMode } from "@/lib/hooks/useViewMode";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
@@ -108,6 +110,13 @@ export default function CreatorWorkspace({
     ? { value: urlTab, onValueChange: (v: string) => navigate(`${basePath}/${v}`) }
     : { defaultValue: resolvedDefaultTab };
 
+  // On the My Services hub (basePath set), the sticky `ServicesNav` sits just
+  // above this workspace, so the sub-tab row becomes a SECOND stacked action
+  // band that pins right below it — the whole nav region (top tabs + these
+  // sub-tabs + actions) reads as one sticky toolbar. On /settings (no basePath,
+  // no hub nav above) the row stays inline.
+  const stackedActionBar = Boolean(basePath);
+
   // Imperative handle to OfferingsPanel — lets the Add Service button in
   // the tabs row trigger the same first-time-opt-in + open-dialog flow
   // that lives inside OfferingsPanel.
@@ -194,7 +203,12 @@ export default function CreatorWorkspace({
       />
 
       <Tabs {...tabsProps} className="space-y-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div
+          className={cn(
+            "flex items-center justify-between gap-3 flex-wrap",
+            stackedActionBar && cn(ACTION_BAR_STICKY_STACKED, ACTION_BAR_SURFACE),
+          )}
+        >
           <TabsList>
             {offeringsEnabled && <TabsTrigger value="offerings">Offerings</TabsTrigger>}
             <TabsTrigger value="profile">Profile</TabsTrigger>

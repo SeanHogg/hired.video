@@ -202,21 +202,23 @@ body[data-print-mode] [data-print-hide] {
     --sidebar-border: 224 22% 22%;
     --sidebar-ring: 262 83% 66%;
 
-    /* ── App rail — DARK = "S2": inverted — the menu zone is the LIGHTER brand
-     * purple and the selected row drops to the DARK brand purple (matching the
-     * mobile drawer header). Both still over a darker plum usage zone, all light
-     * text. Applies to the desktop docked rail AND the mobile drawer. ──────── */
-    --rail-background: 271 60% 58%;
-    --rail-foreground: 262 70% 94%;
-    --rail-muted: 264 55% 80%;
-    --rail-hover: 271 55% 50%;
-    --rail-active: 271 67% 42%;
+    /* ── App rail — DARK = "Slate menu + footer-plum usage": a neutral cool-grey
+     * menu zone (the bright brand purple was too saturated), with the selected
+     * row as the one brand-purple accent. The usage band drops to a shade of the
+     * footer plum so the bottom edge of the screen — usage band on the left,
+     * footer on the right — reads as one family. All light text. Applies to the
+     * desktop docked rail AND the mobile drawer. ─────────────────────────────── */
+    --rail-background: 222 16% 19%;
+    --rail-foreground: 222 20% 90%;
+    --rail-muted: 222 12% 62%;
+    --rail-hover: 222 14% 25%;
+    --rail-active: 262 83% 58%;
     --rail-active-foreground: 0 0% 100%;
-    --rail-border: 271 40% 32%;
-    --rail-usage-background: 264 72% 23%;
-    --rail-usage-foreground: 262 70% 94%;
-    --rail-usage-muted: 264 50% 74%;
-    --rail-usage-border: 271 40% 30%;
+    --rail-border: 222 16% 28%;
+    --rail-usage-background: 248 30% 18%;
+    --rail-usage-foreground: 250 30% 92%;
+    --rail-usage-muted: 249 22% 72%;
+    --rail-usage-border: 248 28% 28%;
 
     /* Footer keeps the plum bands in dark mode too (same tokens). */
     --footer-background: 248 31% 23%;

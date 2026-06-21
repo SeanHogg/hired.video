@@ -27,3 +27,11 @@ export const ACTION_BAR_SURFACE =
 /** Add alongside SURFACE to pin the band to the top of the scroll. The negative
  *  top-margin pulls it flush under the nav (cancels the page's top padding). */
 export const ACTION_BAR_STICKY = "sticky top-16 z-30 -mt-4 md:-mt-6";
+
+/** Stack a SECOND action bar directly beneath a primary `ACTION_BAR_STICKY`
+ *  band — e.g. the Content Creator sub-tab row pinning under the My Services
+ *  nav. Pins at `top-32` (nav `h-16` + one ~`h-16` action bar) and sits one
+ *  layer below the primary band (`z-20` < its `z-30`) so the two never fight
+ *  for the top. No negative top-margin: a stacked bar lives mid-content, not
+ *  flush under the nav. Pairs with `ACTION_BAR_SURFACE` like the primary. */
+export const ACTION_BAR_STICKY_STACKED = "sticky top-32 z-20";
