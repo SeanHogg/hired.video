@@ -15,7 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/outreach/shared/EmptyState";
-import { SearchInput } from "@/components/outreach/shared/SearchInput";
+import { OutreachTabToolbar } from "@/components/outreach/shared/OutreachTabToolbar";
 import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
 import { ViewModeList, SCROLL_GRID_LIST_MODES } from "@/components/ViewModeList";
 import {
@@ -58,25 +58,23 @@ export function TemplatesTab({
 }: TemplatesTabProps) {
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Email Templates</h2>
-        <div className="flex items-center gap-2">
-          <ViewModeToggle value={viewMode} onChange={onViewModeChange} modes={SCROLL_GRID_LIST_MODES} />
-          <Button onClick={onCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Template
-          </Button>
-        </div>
-      </div>
-
-      <SearchInput
-        placeholder="Search templates..."
-        value={search}
-        onChange={(v) => {
-          onSearchChange(v);
-          pagination.setCurrentPage(1);
+      <OutreachTabToolbar
+        title="Email Templates"
+        search={{
+          placeholder: "Search templates...",
+          value: search,
+          onChange: (v) => {
+            onSearchChange(v);
+            pagination.setCurrentPage(1);
+          },
         }}
-      />
+      >
+        <ViewModeToggle value={viewMode} onChange={onViewModeChange} modes={SCROLL_GRID_LIST_MODES} />
+        <Button onClick={onCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          New Template
+        </Button>
+      </OutreachTabToolbar>
 
       <ViewModeList viewMode={viewMode}>
         {paginatedTemplates.map((template) => (

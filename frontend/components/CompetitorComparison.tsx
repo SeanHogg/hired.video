@@ -794,7 +794,7 @@ export default function CompetitorComparison({
             </p>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border">
+          <div className="overflow-x-auto rounded-xl border bg-background">
             <table className="w-full text-sm">
               <thead className="bg-muted/40">
                 <tr>

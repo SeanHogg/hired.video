@@ -28,7 +28,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/outreach/shared/EmptyState";
-import { SearchInput } from "@/components/outreach/shared/SearchInput";
+import { OutreachTabToolbar } from "@/components/outreach/shared/OutreachTabToolbar";
 import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
 import { ViewModeList, SCROLL_GRID_LIST_MODES } from "@/components/ViewModeList";
 import {
@@ -79,16 +79,23 @@ export function CampaignsTab({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Campaigns</h2>
-        <div className="flex items-center gap-2">
-          <ViewModeToggle value={viewMode} onChange={onViewModeChange} modes={SCROLL_GRID_LIST_MODES} />
-          <Button onClick={onCreateVideoCampaign}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Video Campaign
-          </Button>
-        </div>
-      </div>
+      <OutreachTabToolbar
+        title="Campaigns"
+        search={{
+          placeholder: "Search campaigns...",
+          value: search,
+          onChange: (v) => {
+            onSearchChange(v);
+            pagination.setCurrentPage(1);
+          },
+        }}
+      >
+        <ViewModeToggle value={viewMode} onChange={onViewModeChange} modes={SCROLL_GRID_LIST_MODES} />
+        <Button onClick={onCreateVideoCampaign}>
+          <Plus className="h-4 w-4 mr-2" />
+          New Video Campaign
+        </Button>
+      </OutreachTabToolbar>
 
       {/* Campaign Manager hierarchy card */}
       <Card>
@@ -160,15 +167,6 @@ export function CampaignsTab({
           </div>
         </CardContent>
       </Card>
-
-      <SearchInput
-        placeholder="Search campaigns..."
-        value={search}
-        onChange={(v) => {
-          onSearchChange(v);
-          pagination.setCurrentPage(1);
-        }}
-      />
 
       {filteredCampaigns.video.length > 0 && (
         <>

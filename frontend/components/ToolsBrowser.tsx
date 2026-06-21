@@ -109,6 +109,7 @@ export function ToolsBrowser({
   weaveCourses = false,
   courseLimit = 12,
   framedFilters = false,
+  filtersStickyTop,
 }: {
   roleGated?: boolean;
   weaveCourses?: boolean;
@@ -118,6 +119,11 @@ export function ToolsBrowser({
    *  under the sticky search header above. The signed-out marketing page
    *  leaves it off (different container padding, no action bar above). */
   framedFilters?: boolean;
+  /** When `framedFilters` is on, the filter row also PINS as a second sticky
+   *  band at this viewport offset (px) — the page measures its sticky header's
+   *  height (nav + tabs + search) and passes `64 + headerHeight` so the row
+   *  sits flush below it. Omit to leave the row non-sticky. */
+  filtersStickyTop?: number;
 } = {}) {
   const { t } = useTranslation();
   const effectiveRole = useEffectiveRole();
@@ -266,12 +272,22 @@ export function ToolsBrowser({
           keeps live counts and drops zero-match chips.
           `framedFilters` lifts the whole row into the page action panel —
           action-bar tone, full-bleed, pulled flush (`-mt-4`) under the
-          sticky search header so the two read as one toolbar. */}
+          sticky search header so the two read as one toolbar. When
+          `filtersStickyTop` is supplied it ALSO pins (sticky, `z-20` under the
+          header's `z-30`) at that measured offset so the filters stay
+          reachable as the catalog scrolls. */}
       <div
         className={cn(
           "flex items-center gap-3",
-          framedFilters ? cn(ACTION_BAR_SURFACE, "-mt-4") : "mb-4",
+          framedFilters
+            ? cn(ACTION_BAR_SURFACE, "-mt-4", filtersStickyTop !== undefined && "sticky z-20")
+            : "mb-4",
         )}
+        style={
+          framedFilters && filtersStickyTop !== undefined
+            ? { top: filtersStickyTop }
+            : undefined
+        }
       >
         <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto pb-1">
           <CategoryFilterBar

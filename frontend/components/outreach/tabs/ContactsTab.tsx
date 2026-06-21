@@ -13,7 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/outreach/shared/EmptyState";
-import { SearchInput } from "@/components/outreach/shared/SearchInput";
+import { OutreachTabToolbar } from "@/components/outreach/shared/OutreachTabToolbar";
 import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
 import { ViewModeList, SCROLL_GRID_LIST_MODES } from "@/components/ViewModeList";
 import type { ExternalContactDTO } from "@/types/communication";
@@ -52,25 +52,23 @@ export function ContactsTab({
 }: ContactsTabProps) {
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">External Contacts</h2>
-        <div className="flex items-center gap-2">
-          <ViewModeToggle value={viewMode} onChange={onViewModeChange} modes={SCROLL_GRID_LIST_MODES} />
-          <Button onClick={onCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Contact
-          </Button>
-        </div>
-      </div>
-
-      <SearchInput
-        placeholder="Search contacts..."
-        value={search}
-        onChange={(v) => {
-          onSearchChange(v);
-          pagination.setCurrentPage(1);
+      <OutreachTabToolbar
+        title="External Contacts"
+        search={{
+          placeholder: "Search contacts...",
+          value: search,
+          onChange: (v) => {
+            onSearchChange(v);
+            pagination.setCurrentPage(1);
+          },
         }}
-      />
+      >
+        <ViewModeToggle value={viewMode} onChange={onViewModeChange} modes={SCROLL_GRID_LIST_MODES} />
+        <Button onClick={onCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Contact
+        </Button>
+      </OutreachTabToolbar>
 
       <ViewModeList viewMode={viewMode}>
         {paginatedContacts.map((contact) => (

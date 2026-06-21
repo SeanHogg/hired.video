@@ -11,7 +11,7 @@ import {
   GraduationCap,
   Users,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
@@ -91,6 +91,24 @@ export default function Tools() {
     }
     if (changed) setSearchParams(next, { replace: true });
   }, [tabParam, searchParams, setSearchParams]);
+
+  // The /tools header is a TWO-row sticky action bar (tabs + global tool
+  // search). The ToolsBrowser filter-chip row pins as a second sticky band
+  // directly beneath it — but the header's height is taller than one row and
+  // varies (search can wrap), so a fixed `top-32` would overlap. We measure
+  // the rendered header and pin the filter row at `nav (h-16 = 64px) + header
+  // height`. ResizeObserver keeps it correct if the header reflows.
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [filtersStickyTop, setFiltersStickyTop] = useState(64);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const measure = () => setFiltersStickyTop(64 + el.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [tabParam]);
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
@@ -411,6 +429,7 @@ export default function Tools() {
       <div className="p-4 md:p-6">
           <div>
             <PageHeader
+              ref={headerRef}
               tabs={[
                 { key: "tools", label: t("labels.tools.tabTools"), icon: Wrench, to: "/tools" },
                 { key: "learning", label: t("labels.tools.tabLearning"), icon: GraduationCap, to: "/tools?tab=learning" },
@@ -440,7 +459,7 @@ export default function Tools() {
             ) : tabParam === "classrooms" ? (
               <ClassroomsPanel view={classroomsView} />
             ) : (
-              <ToolsBrowser framedFilters />
+              <ToolsBrowser framedFilters filtersStickyTop={filtersStickyTop} />
             )}
           </div>
         </div>

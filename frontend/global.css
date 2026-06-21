@@ -123,7 +123,9 @@ body[data-print-mode] [data-print-hide] {
     --sidebar-ring: 262 83% 58%;
 
     /* ── App rail (two zones) — LIGHT = "S3": soft lavender menu zone (dark
-     * text) over a deep-brand usage zone (light text). ─────────────────── */
+     * text) over the usage band. The usage band is the SAME footer-plum shade
+     * in light and dark (matching the footer), so the bottom corner of the rail
+     * never changes between themes. ─────────────────────────────────────────── */
     --rail-background: 258 60% 95%;
     --rail-foreground: 257 30% 33%;
     --rail-muted: 258 25% 58%;
@@ -131,10 +133,10 @@ body[data-print-mode] [data-print-hide] {
     --rail-active: 262 83% 58%;
     --rail-active-foreground: 0 0% 100%;
     --rail-border: 258 40% 90%;
-    --rail-usage-background: 262 60% 28%;
-    --rail-usage-foreground: 262 70% 94%;
-    --rail-usage-muted: 262 55% 80%;
-    --rail-usage-border: 262 40% 38%;
+    --rail-usage-background: 248 30% 18%;
+    --rail-usage-foreground: 250 30% 92%;
+    --rail-usage-muted: 249 22% 72%;
+    --rail-usage-border: 248 28% 28%;
 
     /* ── Footer (two tonal bands, plum "B2") — same in light + dark. ────── */
     --footer-background: 248 31% 25%;

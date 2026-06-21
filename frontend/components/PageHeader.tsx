@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ComponentType, type ReactNode } from "react";
+import { forwardRef, useEffect, useRef, type ComponentType, type ReactNode } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { tabItemClass, TabItemContent } from "@/components/ui/tab-item";
@@ -68,7 +68,7 @@ export interface PageHeaderProps {
   sticky?: boolean;
 }
 
-export default function PageHeader({
+const PageHeader = forwardRef<HTMLDivElement, PageHeaderProps>(function PageHeader({
   tabs,
   activeTabKey,
   title,
@@ -78,7 +78,7 @@ export default function PageHeader({
   meta,
   className,
   sticky,
-}: PageHeaderProps): JSX.Element {
+}, ref) {
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
@@ -228,11 +228,13 @@ export default function PageHeader({
   // header → inline.
   if (asActionBar) {
     return (
-      <div className={cn(ACTION_BAR_STICKY, ACTION_BAR_SURFACE, className)}>
+      <div ref={ref} className={cn(ACTION_BAR_STICKY, ACTION_BAR_SURFACE, className)}>
         {inner}
       </div>
     );
   }
 
-  return <div className={cn("mb-6", className)}>{inner}</div>;
-}
+  return <div ref={ref} className={cn("mb-6", className)}>{inner}</div>;
+});
+
+export default PageHeader;

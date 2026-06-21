@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/outreach/shared/EmptyState";
+import { OutreachTabToolbar } from "@/components/outreach/shared/OutreachTabToolbar";
 import { type StudioProject, StudioProjectStatus } from "@/lib/services/studio-service";
 import SocialShareRow from "@/components/SocialShareRow";
 import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
@@ -75,10 +76,10 @@ export function ContentTab({ publishedProjects }: ContentTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* Action row — view switcher + Create Video. The redundant "My
-          Published Content" title is gone; the active "My Content" tab in the
-          action panel above already names the surface. */}
-      <div className="flex items-center justify-end gap-3">
+      {/* Sticky action toolbar — view switcher + Create Video. No title: the
+          active "My Content" tab in the action panel above already names the
+          surface. */}
+      <OutreachTabToolbar>
         <ViewModeToggle value={view} onChange={setView} modes={BROWSE_VIEW_MODES} />
         <Link to="/studio">
           <Button>
@@ -86,7 +87,7 @@ export function ContentTab({ publishedProjects }: ContentTabProps) {
             Create Video
           </Button>
         </Link>
-      </div>
+      </OutreachTabToolbar>
 
       {publishedProjects.length === 0 ? (
         <EmptyState

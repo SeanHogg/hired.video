@@ -549,16 +549,19 @@ export default function ResumeDetail() {
         <div className={!isAuthenticated ? "relative" : ""}>
           {!isAuthenticated && <AuthOverlay contentType="resume" title={resume?.content?.basics?.name || resume?.title || t("labels.resume")} />}
 
-          {/* Hub-level tab strip — keeps the My Resumes / Available /
-              Sourced context visible as the user navigates into a single
-              resume. Falls back to "no highlight" on direct loads. */}
-          {isAuthenticated && (
-            <div className="px-4 sm:px-6 pt-4">
-              <EntityHubTabStrip entity="resume" />
-            </div>
-          )}
+          {/* Sticky action panel — the hub-level tab strip (My Resumes /
+              Available / Sourced) and the resume action toolbar are pinned
+              together as ONE band just below the top nav (h-16), so the
+              "where am I" context + every action stay reachable while the
+              resume scrolls. Tone tokens mirror the shared action bar
+              (`bg-actionbar` + backdrop-blur) for visual parity. */}
+          <div className="sticky top-16 z-30 border-b bg-actionbar/95 backdrop-blur-md">
+            {isAuthenticated && (
+              <div className="px-4 sm:px-6 pt-3">
+                <EntityHubTabStrip entity="resume" className="mb-0" />
+              </div>
+            )}
 
-          <div className="bg-muted/30 border-b">
             <div className="px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center gap-2 flex-wrap">
                 {/* Resume status flags + scores live in a gated side
