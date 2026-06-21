@@ -138,7 +138,6 @@ function CanvasPreviewPlayer({
 // obscure the frame.
 function PlayerTransportBar({ playback }: { playback: PreviewPlayback }) {
   const { isPlaying, playhead, duration, toggle, seek, muted, toggleMute } = playback;
-  const pct = duration > 0 ? Math.min(100, (playhead / duration) * 100) : 0;
 
   return (
     <div className="absolute inset-x-0 bottom-0 z-20 flex items-center gap-3 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
