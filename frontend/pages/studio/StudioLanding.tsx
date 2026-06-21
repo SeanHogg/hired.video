@@ -106,6 +106,7 @@ import WizardLauncher from "@/components/studio/shared/WizardLauncher";
 import NewVideoSplitButton from "@/components/studio/shared/NewVideoSplitButton";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
+import { ACTION_BAR_SURFACE } from "@/lib/ui/action-bar";
 import { selectionToQuery, useWorkspace } from "@/lib/hooks/useWorkspace";
 import { useCreateStudioDraft } from "@/lib/studio/use-create-studio-draft";
 
@@ -648,7 +649,8 @@ export default function StudioLanding() {
       </header>
 
       <section className="mb-12">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className={ACTION_BAR_SURFACE}>
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-medium">{t("headings.studioLanding.templates")}</h2>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -673,6 +675,7 @@ export default function StudioLanding() {
           onUseForFilterChange={setUseForFilter}
           includeOwnedPills
         />
+        </div>
 
         <UnifiedTemplateCarousel
           rows={filteredRows}
@@ -695,7 +698,8 @@ export default function StudioLanding() {
             and is shared with the editor's sidebar control. Title is
             "My projects" (was "My videos" pre-#894) because the studio
             now hosts every media kind, not just video. */}
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className={ACTION_BAR_SURFACE}>
+        <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-lg font-medium">{t("headings.studioLanding.myContent")}</h2>
           <div className="flex items-center gap-3">
             <ViewModeToggle
@@ -726,6 +730,7 @@ export default function StudioLanding() {
             onClick={() => setVisibilityFilter("private")}
           />
         </FilterPillRow>
+        </div>
         {loading ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (

@@ -158,7 +158,7 @@ Already a known gap in hired.video (keyword match shipped; LLM-ranked variant tr
 
 ## 6. Gap Register linkage
 
-Tracked as a single parent entry plus children in the [Consolidated Gap Register](../../README.md#consolidated-gap-register): parent **#2068** (this analysis), children **GAP-1…GAP-8** as enumerated. GAP-9 already exists in the register (LLM-ranked recommendations). See README for canonical status.
+Tracked as a single parent entry plus children in the [Consolidated Gap Register](../../ROADMAP.md#consolidated-gap-register): parent **#2068** (this analysis), children **GAP-1…GAP-8** as enumerated. GAP-9 already exists in the register (LLM-ranked recommendations). See README for canonical status.
 
 ## 7. References
 - Source prototype: `energizelms/` (React+Vite, Zustand, `src/store/*`, `src/pages/*`).

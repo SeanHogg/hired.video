@@ -13,6 +13,8 @@
 import { Link, useLocation } from "react-router-dom";
 import { Inbox, TrendingUp, Video, Handshake } from "lucide-react";
 import { tabItemClass, TabItemContent } from "@/components/ui/tab-item";
+import { cn } from "@/lib/utils";
+import { ACTION_BAR_STICKY, ACTION_BAR_SURFACE } from "@/lib/ui/action-bar";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { USER_ROLES } from "@shared/user-roles";
 
@@ -70,7 +72,7 @@ export default function ServicesNav() {
   );
 
   return (
-    <nav className="mb-6 border-b">
+    <nav className={cn(ACTION_BAR_STICKY, ACTION_BAR_SURFACE, "border-b")} aria-label="Services">
       <ul className="flex gap-1 -mb-px overflow-x-auto">
         {visibleTabs.map(({ to, label, icon: Icon, matchPrefixes }) => {
           const active = isActive({ to, label, icon: Icon, matchPrefixes });

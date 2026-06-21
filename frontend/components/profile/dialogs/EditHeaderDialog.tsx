@@ -12,9 +12,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
 import { useProfileSectionSaver } from "@/lib/hooks/useProfileSectionSaver";
 import MediaPicker from "@/components/shared/MediaPicker";
+import AIImproveButton from "@/components/profile/AIImproveButton";
 
 interface EditHeaderDialogProps {
   open: boolean;
@@ -132,13 +134,29 @@ export default function EditHeaderDialog({ open, onOpenChange, onSaved }: EditHe
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editHeadline">{t("fields.headline.label")}</Label>
-            <Input
+            <div className="flex items-center justify-between">
+              <Label htmlFor="editHeadline">{t("fields.headline.label")}</Label>
+              <AIImproveButton
+                field="headline"
+                text={form.headline}
+                context={{
+                  name: `${form.firstName} ${form.lastName}`.trim() || undefined,
+                  role: form.currentRole || undefined,
+                  company: form.currentCompany || undefined,
+                }}
+                onImproved={(headline) => setForm((f) => ({ ...f, headline }))}
+                disabled={saving}
+              />
+            </div>
+            {/* Textarea (not Input) so a long headline wraps and stays fully
+                visible — the single-line input was truncating the value. */}
+            <Textarea
               id="editHeadline"
               placeholder={t("fields.headline.placeholder")}
               value={form.headline}
               onChange={(e) => setForm((f) => ({ ...f, headline: e.target.value }))}
-              className="min-h-[44px]"
+              rows={2}
+              className="min-h-[44px] resize-none"
             />
             <p className="text-xs text-muted-foreground">{t("fields.headline.help")}</p>
           </div>

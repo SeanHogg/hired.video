@@ -218,6 +218,29 @@ class AIService {
   }
 
   /**
+   * One-shot AI rewrite for a short profile field (the headline tagline or
+   * the About bio). Powers the ✨ "improve with AI" affordance on
+   * /people/:id. Returns the improved plain-text value; throws on failure
+   * so the caller can toast (the buttons own their loading state).
+   */
+  async improveText(input: {
+    field: "headline" | "about";
+    text: string;
+    context?: { name?: string; role?: string; company?: string };
+  }): Promise<string> {
+    const response = await apiClient.post<{ text: string }>("/api/ai/improve-text", {
+      field: input.field,
+      text: input.text,
+      context: input.context,
+    });
+    const improved = response.data?.text?.trim();
+    if (!improved) {
+      throw new Error("No suggestion was produced");
+    }
+    return improved;
+  }
+
+  /**
    * Get a mock response for development/fallback
    */
   private getMockResponse(userInput: string): ChatResponse {

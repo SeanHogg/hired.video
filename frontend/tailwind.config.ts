@@ -77,6 +77,7 @@ export default {
           "usage-muted": "hsl(var(--rail-usage-muted))",
           "usage-border": "hsl(var(--rail-usage-border))",
         },
+        actionbar: "hsl(var(--action-bar))",
         footer: {
           DEFAULT: "hsl(var(--footer-background))",
           foreground: "hsl(var(--footer-foreground))",

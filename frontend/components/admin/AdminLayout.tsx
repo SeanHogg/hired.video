@@ -76,8 +76,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <AppShell bgClassName="bg-background">
-      {/* Horizontal admin tab bar */}
-      <div className="border-b border-border bg-muted/40">
+      {/* Horizontal admin tab bar — sticky action band (already full-width). */}
+      <div className="sticky top-16 z-30 border-b border-border bg-actionbar/95 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex gap-1 overflow-x-auto" aria-label="Admin navigation">
             {visibleTabs.map(({ resource, label, href, icon: Icon }) => {

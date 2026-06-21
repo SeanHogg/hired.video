@@ -44,9 +44,6 @@ export interface LifeStageAudienceMeta {
   /** Ordered ResourceMap bucket priority — buckets render in this order;
    *  empty buckets self-hide. */
   focusContentKinds: ContentLocationKind[];
-  /** Optional default job-search filter when the user clicks through to
-   *  /jobs from this audience page. */
-  jobFilter?: { employmentType?: string; experienceLevel?: string; isRemote?: boolean };
   ctaPrimary: AudienceCTA;
   ctaSecondary: AudienceCTA;
 }
@@ -211,7 +208,6 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     primaryRole: "job_seeker",
     focusFeatures: [FEATURES.studio, FEATURES.resumeBuilder, FEATURES.learningPaths, FEATURES.gamification, FEATURES.jobBoard],
     focusContentKinds: ["template", "video", "article", "learning_path", "job"],
-    jobFilter: { experienceLevel: "entry" },
     // Studio deep-links use `?contentTemplate=` — the param StudioLayout's
     // bootstrap + the anon editor (#2212) actually read. `?audience=<slug>`
     // was a silent no-op (the studio has no life-stage audience filter).
@@ -226,7 +222,6 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     primaryRole: "job_seeker",
     focusFeatures: [FEATURES.studio, FEATURES.profile, FEATURES.coffeeChats, FEATURES.learningPaths, FEATURES.jobBoard],
     focusContentKinds: ["template", "learning_path", "article", "video", "job"],
-    jobFilter: { employmentType: "internship" },
     ctaPrimary: { label: "Find an internship", href: "/jobs?employmentType=internship" },
     ctaSecondary: { label: "Build a project reel", href: "/studio/new?contentTemplate=skills-demo" },
   },
@@ -249,7 +244,11 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     primaryRole: "job_seeker",
     focusFeatures: [FEATURES.outreach, FEATURES.gamification, FEATURES.studio, FEATURES.resumeBuilder, FEATURES.jobBoard],
     focusContentKinds: ["article", "template", "job", "video", "learning_path"],
-    ctaPrimary: { label: "Open the layoff playbook", href: "/articles?topic=layoff-recovery" },
+    // `/articles` filters on `?audience=<ArticleAudience>` (job_seeker/recruiter/
+    // pivot/resume_guide/civic) + `?sector=` — there is no `?topic=` param, so
+    // the old `?topic=layoff-recovery` was a no-op. Point at the populated
+    // job-seeker career-guidance filter (the closest real surface).
+    ctaPrimary: { label: "Read recovery guides", href: "/articles?audience=job_seeker" },
     ctaSecondary: { label: "Start applying", href: "/jobs" },
   },
   {
@@ -271,7 +270,6 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     primaryRole: "job_seeker",
     focusFeatures: [FEATURES.resumeBuilder, FEATURES.studio, FEATURES.coffeeChats, FEATURES.learningPaths, FEATURES.jobBoard],
     focusContentKinds: ["article", "template", "learning_path", "job", "video"],
-    jobFilter: { isRemote: true },
     ctaPrimary: { label: "Build a returner-friendly resume", href: "/resumes" },
     ctaSecondary: { label: "Flexible roles", href: "/jobs?isRemote=true" },
   },
@@ -294,7 +292,6 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     primaryRole: "job_seeker",
     focusFeatures: [FEATURES.gigMarketplace, FEATURES.studio, FEATURES.profile, FEATURES.outreach, FEATURES.jobBoard],
     focusContentKinds: ["template", "video", "article", "job", "learning_path"],
-    jobFilter: { employmentType: "contract" },
     ctaPrimary: { label: "Browse the gig marketplace", href: "/services/gigs" },
     ctaSecondary: { label: "Build a portfolio reel", href: "/studio/new?contentTemplate=design-portfolio" },
   },
@@ -317,7 +314,6 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     primaryRole: "job_seeker",
     focusFeatures: [FEATURES.learningPaths, FEATURES.studio, FEATURES.gamification, FEATURES.coffeeChats, FEATURES.jobBoard],
     focusContentKinds: ["learning_path", "template", "article", "job", "video"],
-    jobFilter: { experienceLevel: "entry" },
     ctaPrimary: { label: "Pick a bootcamp track", href: "/learning" },
     ctaSecondary: { label: "Entry-level roles", href: "/jobs?experienceLevel=entry" },
   },
@@ -329,7 +325,6 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     primaryRole: "job_seeker",
     focusFeatures: [FEATURES.confidentialSearch, FEATURES.retainedSearch, FEATURES.compAnalyzer, FEATURES.studio, FEATURES.articles],
     focusContentKinds: ["article", "video", "template", "job", "learning_path"],
-    jobFilter: { experienceLevel: "executive" },
     ctaPrimary: { label: "Build my exec brand", href: "/studio/new?contentTemplate=personal-brand" },
     ctaSecondary: { label: "Executive roles", href: "/jobs?experienceLevel=executive" },
   },

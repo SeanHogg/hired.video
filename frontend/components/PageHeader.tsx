@@ -178,13 +178,12 @@ export default function PageHeader({
     </>
   );
 
-  // Interactive list header → sticky toned action bar; plain title → inline.
+  // Interactive list header → flat, full-width, sticky action bar; plain title
+  // header → inline.
   if (asActionBar) {
     return (
-      <div className={cn(ACTION_BAR_STICKY, "mb-6", className)}>
-        <div className={cn(ACTION_BAR_SURFACE, "px-4 py-3 md:px-5 md:py-4")}>
-          {inner}
-        </div>
+      <div className={cn(ACTION_BAR_STICKY, ACTION_BAR_SURFACE, className)}>
+        {inner}
       </div>
     );
   }

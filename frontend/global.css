@@ -144,6 +144,11 @@ body[data-print-mode] [data-print-hide] {
     --footer-strong-background: 249 31% 17%;
     --footer-strong-foreground: 249 22% 72%;
 
+    /* Action bar (sticky search/filter/tab toolbars). A bright, faintly-tinted
+     * band that lifts off the canvas — light mode wants this LIGHTER than the
+     * neutral `secondary`. Dark value lives in `.dark`. */
+    --action-bar: 258 45% 98%;
+
     /* Brand specific colors */
     --brand-purple: 262 83% 58%;
     --brand-purple-light: 262 83% 95%;
@@ -218,6 +223,9 @@ body[data-print-mode] [data-print-hide] {
     --footer-brand: 250 60% 81%;
     --footer-strong-background: 249 31% 15%;
     --footer-strong-foreground: 249 22% 72%;
+
+    /* Action bar — dark kept at the contrast that already read well. */
+    --action-bar: 223 24% 21%;
 
     /* Brand specific colors for dark mode */
     --brand-purple: 262 83% 58%;

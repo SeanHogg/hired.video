@@ -26,12 +26,14 @@ export default function SectionEditPencil({
   label,
 }: Props) {
   if (!isOwner || !onEditSection) return null;
+  // Subtle grey ghost pencil — the app-wide standard for section-edit
+  // affordances (matches SectionEditButton on the profile sections).
   return (
     <Button
       type="button"
-      variant="secondary"
+      variant="ghost"
       size="icon"
-      className="h-8 w-8"
+      className="h-8 w-8 text-muted-foreground hover:text-foreground"
       onClick={(e) => {
         e.stopPropagation();
         onEditSection(sectionKey);

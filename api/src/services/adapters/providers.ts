@@ -81,6 +81,11 @@ export type LLMUseCase =
   | "resume_ocr"
   | "studio_misc"
   | "profile_audit"
+  // One-shot "improve this text with AI" for short profile fields — the
+  // headline/tagline and the About bio on /people/:id. User-initiated,
+  // user-blocking (they click ✨ and wait), prose rewrite. Interactive
+  // so it never bottoms out at the congested free pool.
+  | "profile_text_improve"
   | "career_360"
   | "salary_estimate"
   | "salary_negotiation"
@@ -194,6 +199,7 @@ export const INTERACTIVE_USE_CASES: ReadonlySet<LLMUseCase> = new Set<LLMUseCase
   "match_insights",
   "match_tailor",
   "profile_audit",
+  "profile_text_improve",
   "resume_optimize",
   "resume_roast",
   "studio_game_agent",
@@ -340,6 +346,10 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   resume_consolidate_highlights: { model: "qwen/qwen3-coder:free", temperature: 0.4, maxTokens: 1200 },
   studio_misc: { model: "google/gemma-4-26b-a4b-it:free", temperature: 0.5 },
   profile_audit: { model: "qwen/qwen3-coder:free", temperature: 0.4 },
+  // Short prose rewrite (headline ~1 line / About ≤2000 chars). A touch
+  // of temperature for punchier phrasing; interactive so withFallbackChain
+  // pads the paid terminal pool behind the free primary.
+  profile_text_improve: { model: "google/gemma-4-31b-it:free", temperature: 0.6, maxTokens: 900 },
   career_360: {
     model: "qwen/qwen3-coder:free",
     temperature: 0.4,
@@ -443,6 +453,8 @@ export const FEATURE_KEY_USE_CASE: Record<string, LLMUseCase> = {
   interview_questions: "interview_questions",
   linkedin_post_gen: "linkedin_post",
   linkedin_post_share: "linkedin_post",
+  profile_headline_improve: "profile_text_improve",
+  profile_about_improve: "profile_text_improve",
   match_analyze: "match",
   match_bycontent: "match",
   match_byid: "match",

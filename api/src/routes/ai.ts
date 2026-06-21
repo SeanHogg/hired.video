@@ -456,6 +456,124 @@ aiRoutes.post("/help-assist", async (c) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// POST /api/ai/improve-text — one-shot AI rewrite for short profile fields
+// ---------------------------------------------------------------------------
+/**
+ * Powers the ✨ "improve with AI" affordance next to the profile headline
+ * (Edit Profile dialog) and the About bio (Edit About dialog + section
+ * header). User-initiated, user-blocking, single round-trip — no session,
+ * no tools.
+ *
+ *   Request:  { field: "headline" | "about", text?: string,
+ *               context?: { name?, role?, company? } }
+ *   Response: { text: string }   // the improved field value, plain text
+ *
+ * `text` may be empty (generate from `context` when the field is blank).
+ * Token budget is enforced (mirrors /chat) so the rewrite counts against
+ * the same monthly AI allowance.
+ */
+const IMPROVE_FIELD_GUIDANCE: Record<"headline" | "about", { max: number; system: string }> = {
+  headline: {
+    max: 160,
+    system:
+      "You rewrite a professional profile headline (a one-line tagline shown under a person's name). " +
+      "Make it concise, specific and compelling — highlight role, value and focus. " +
+      "Keep it to a single line, no more than ~140 characters. " +
+      "Do NOT use quotation marks, hashtags, emojis, or a trailing period. " +
+      "Return ONLY the rewritten headline text with no preamble, labels, or explanation.",
+  },
+  about: {
+    max: 2000,
+    system:
+      "You polish a professional 'About' bio for a career profile. " +
+      "Improve clarity, flow and impact while preserving every fact, name and number in the original. " +
+      "Keep the first-person voice when the source uses it. Use short, scannable paragraphs. " +
+      "Stay under 2000 characters. " +
+      "Return ONLY the rewritten bio text with no preamble, labels, headings, or explanation.",
+  },
+};
+
+function buildImproveUserMessage(
+  field: "headline" | "about",
+  text: string,
+  ctx: { name?: string; role?: string; company?: string },
+): string {
+  const facts: string[] = [];
+  if (ctx.name) facts.push(`Name: ${ctx.name}`);
+  if (ctx.role) facts.push(`Current role: ${ctx.role}`);
+  if (ctx.company) facts.push(`Company: ${ctx.company}`);
+  const factBlock = facts.length ? `Context:\n${facts.join("\n")}\n\n` : "";
+  if (text) {
+    return `${factBlock}Rewrite the following ${field === "about" ? "About bio" : "headline"}:\n\n${text}`;
+  }
+  return `${factBlock}Write a strong ${field === "about" ? "About bio" : "headline"} from the context above.`;
+}
+
+/** Strip wrapping quotes / stray label prefixes the model sometimes adds,
+ *  collapse the headline to one line, and clamp to the field's max length. */
+function sanitizeImproved(raw: string, field: "headline" | "about"): string {
+  let out = (raw ?? "").trim();
+  out = out.replace(/^(headline|about|bio)\s*[:\-]\s*/i, "").trim();
+  if ((out.startsWith('"') && out.endsWith('"')) || (out.startsWith("'") && out.endsWith("'"))) {
+    out = out.slice(1, -1).trim();
+  }
+  if (field === "headline") out = out.replace(/\s*\n+\s*/g, " ").trim();
+  const max = IMPROVE_FIELD_GUIDANCE[field].max;
+  if (out.length > max) out = out.slice(0, max).trim();
+  return out;
+}
+
+aiRoutes.post("/improve-text", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const limitError = await checkTokenBudget(c as any);
+  if (limitError) return limitError;
+
+  const body = await c.req.json().catch(() => ({}));
+  const field: "headline" | "about" | null =
+    body.field === "about" ? "about" : body.field === "headline" ? "headline" : null;
+  if (!field) {
+    return c.json(error("INVALID_FIELD", "field must be 'headline' or 'about'"), 400);
+  }
+  const text = typeof body.text === "string" ? body.text.trim().slice(0, 4000) : "";
+  const rawCtx = body.context && typeof body.context === "object" ? body.context : {};
+  const ctx = {
+    name: typeof rawCtx.name === "string" ? rawCtx.name.slice(0, 120) : undefined,
+    role: typeof rawCtx.role === "string" ? rawCtx.role.slice(0, 120) : undefined,
+    company: typeof rawCtx.company === "string" ? rawCtx.company.slice(0, 120) : undefined,
+  };
+
+  if (!text && !ctx.name && !ctx.role && !ctx.company) {
+    return c.json(error("EMPTY_INPUT", "Provide some text or profile context to improve"), 400);
+  }
+
+  if (!hasAnyLLMProviderKey(c.env as any)) {
+    return c.json(error("AI_UNAVAILABLE", "AI is not configured"), 503);
+  }
+
+  try {
+    const llm = createLLMClient(c.env as any, c.var.user);
+    const { content } = await llm.callText(
+      field === "about" ? "profile_about_improve" : "profile_headline_improve",
+      {
+        useCase: "profile_text_improve",
+        systemPrompt: IMPROVE_FIELD_GUIDANCE[field].system,
+        userMessage: buildImproveUserMessage(field, text, ctx),
+        responseFormat: "text",
+      },
+    );
+    const improved = sanitizeImproved(content, field);
+    if (!improved) {
+      return c.json(error("AI_EMPTY", "No suggestion was produced"), 502);
+    }
+    return c.json(success({ text: improved }));
+  } catch (err) {
+    return aiFailure(c, err, "[ai/improve-text] LLM error");
+  }
+});
+
 aiRoutes.all("*", (c) =>
   c.json({ error: { code: "NOT_FOUND", message: "AI route not found" } }, 404),
 );

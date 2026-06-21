@@ -8,7 +8,7 @@
 - **Connections settings** (`/settings/connections`) — OAuth-connect the user's own TikTok / YouTube / Instagram / X / Facebook / LinkedIn accounts.
 - **External API + webhooks** — `/api/social/*` publish + status callbacks; platform webhooks for delivery/analytics.
 
-This document is referenced by the **Social Media Publishing & Distribution** Consolidated Gap Register entries (#2036–#2050, see [README](../../README.md#consolidated-gap-register)).
+This document is referenced by the **Social Media Publishing & Distribution** Consolidated Gap Register entries (#2036–#2050, see [README](../../ROADMAP.md#consolidated-gap-register)).
 
 ---
 
@@ -254,4 +254,4 @@ Plus: extend `PublishDestinationId` + `PUBLISH_DESTINATIONS` ([shared/media-kind
 - **Phase 4 — Scheduling + batch + Distribution Hub (Mid):** `social_publish_jobs` + cron drainer (idempotent/retry-bounded), multi-destination compose, calendar/queue UI, native feed cross-post.
 - **Phase 5 — Analytics ingestion + remaining platforms (Mid):** `external_post_metrics` via webhooks + cron sync, dashboard fold-in; X, Facebook Page, LinkedIn real-post adapters; manual-upload fallback polish.
 
-Per-phase residual gaps + the deferred **cross-platform social inbox / comment management** (explicit non-goal) are tracked in the [Consolidated Gap Register](../../README.md#consolidated-gap-register).
+Per-phase residual gaps + the deferred **cross-platform social inbox / comment management** (explicit non-goal) are tracked in the [Consolidated Gap Register](../../ROADMAP.md#consolidated-gap-register).

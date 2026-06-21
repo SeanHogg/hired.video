@@ -33,12 +33,18 @@ export default function ContentCreatorSection({
   defaultTab,
   basePath,
 }: Props = {}) {
+  // On the My Services hub (basePath="/services/creator") the ServicesNav tab
+  // already reads "Content Creator", so the heading is redundant — hide it
+  // there. On /settings (no hub nav) it's the section's only label, so keep it.
+  const showHeading = basePath !== "/services/creator";
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold flex items-center gap-2">
-        <Video className="h-5 w-5 text-pink-500" />
-        Content Creator
-      </h2>
+      {showHeading && (
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <Video className="h-5 w-5 text-pink-500" />
+          Content Creator
+        </h2>
+      )}
       <CreatorWorkspace
         onProfileChange={onProfileChange}
         profile={profile}

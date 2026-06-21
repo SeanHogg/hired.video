@@ -98,7 +98,13 @@ export default function ProjectPlayer({
   // a single PNG at render-time — until then the bottom layer is the
   // honest preview.
   if (mediaKind === "image") {
-    const pixels = firstLayerPixels(project.imageState as ImageState | null | undefined);
+    // Prefer the project's rendered output (the studio's flattened
+    // thumbnail) and fall back to the bottom layer's raw pixels. Projects
+    // imported/generated without per-layer state still carry a render, so
+    // showing it beats a misleading "isn't ready yet" placeholder.
+    const pixels =
+      (project.thumbnailUrl ?? null) ||
+      firstLayerPixels(project.imageState as ImageState | null | undefined);
     if (pixels) {
       return (
         <img
@@ -119,9 +125,11 @@ export default function ProjectPlayer({
   // kind-tagged placeholder keeps the surface coherent before the
   // user has painted anything.
   if (mediaKind === "animation") {
-    const pixels = firstFramePixels(
-      project.animationState as AnimationState | null | undefined,
-    );
+    // Same render-first fallback as the image kind — the studio render
+    // (thumbnail) wins over the first painted frame.
+    const pixels =
+      (project.thumbnailUrl ?? null) ||
+      firstFramePixels(project.animationState as AnimationState | null | undefined);
     if (pixels) {
       return (
         <img

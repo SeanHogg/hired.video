@@ -154,4 +154,4 @@ This is the only part hired.video builds. It is intentionally thin.
 - **Phase 4 — Compensation & benefits + documents/e-sign (Mid):** comp bands, benefits enrollment, total-rewards statement, document library + signature flow.
 - **Phase 5 — HR analytics + payroll read (Later):** headcount/attrition/leave-liability rollups (ATS-fed), read-only pay history.
 
-Open items + the per-phase hired.video embed gaps are tracked in the [Consolidated Gap Register](../../README.md#consolidated-gap-register).
+Open items + the per-phase hired.video embed gaps are tracked in the [Consolidated Gap Register](../../ROADMAP.md#consolidated-gap-register).

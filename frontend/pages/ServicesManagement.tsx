@@ -454,7 +454,7 @@ export default function ServicesManagement() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <main className="p-4 md:p-8 w-full">
+      <main className="p-4 md:p-6 w-full">
 
           <ServicesNav />
 

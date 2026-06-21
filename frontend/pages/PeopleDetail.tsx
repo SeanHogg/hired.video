@@ -127,6 +127,9 @@ function PeopleDetailContent() {
   // the domain services and then call refetch() to re-sync the aggregate.
   // ---------------------------------------------------------------------
   const [activeOwnerDialog, setActiveOwnerDialog] = useState<OwnerDialog>(null);
+  // When the About dialog is opened via the section's ✨ icon, auto-run the
+  // AI rewrite. Reset whenever the dialog closes.
+  const [aboutAutoImprove, setAboutAutoImprove] = useState(false);
   const [showShare, setShowShare] = useState(false);
 
   const [showConnectionDialog, setShowConnectionDialog] = useState(false);
@@ -516,15 +519,13 @@ function PeopleDetailContent() {
               over the profile-section strip (Profile / Video Promo / …). Wrapped
               in the shared sticky, tonally-distinct action-bar surface so both
               rows pin below the top nav as the profile scrolls. */}
-          <div className={cn(ACTION_BAR_STICKY, "mb-6")}>
-            <div className={cn(ACTION_BAR_SURFACE, "px-4 pt-2 md:px-5")}>
-              <EntityHubTabStrip entity="person" className="mb-2" />
-              <PageHeader
-                tabs={profileTabs}
-                activeTabKey={activeProfileTab}
-                className="mb-0"
-              />
-            </div>
+          <div className={cn(ACTION_BAR_STICKY, ACTION_BAR_SURFACE)}>
+            <EntityHubTabStrip entity="person" className="mb-2" />
+            <PageHeader
+              tabs={profileTabs}
+              activeTabKey={activeProfileTab}
+              className="mb-0"
+            />
           </div>
 
           <div className="mb-6">
@@ -633,7 +634,14 @@ function PeopleDetailContent() {
                   <AboutSection
                     bio={profile.bio ?? undefined}
                     isOwner={isOwner}
-                    onEdit={() => setActiveOwnerDialog("about")}
+                    onEdit={() => {
+                      setAboutAutoImprove(false);
+                      setActiveOwnerDialog("about");
+                    }}
+                    onImproveWithAI={() => {
+                      setAboutAutoImprove(true);
+                      setActiveOwnerDialog("about");
+                    }}
                   />
 
                   <VideoResumeSection videos={videos} isOwner={isOwner} />
@@ -779,7 +787,13 @@ function PeopleDetailContent() {
           />
           <EditAboutDialog
             open={activeOwnerDialog === "about"}
-            onOpenChange={(open) => !open && setActiveOwnerDialog(null)}
+            autoImprove={aboutAutoImprove}
+            onOpenChange={(open) => {
+              if (!open) {
+                setActiveOwnerDialog(null);
+                setAboutAutoImprove(false);
+              }
+            }}
             onSaved={refetch}
           />
           <EditContactDialog

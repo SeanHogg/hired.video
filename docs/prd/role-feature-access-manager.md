@@ -246,7 +246,7 @@ These are first-cut and are exactly what `/admin/role-access` lets the owner tun
 
 ## 9. Tracking
 
-Phases + residuals tracked in the [Consolidated Gap Register](../../README.md#consolidated-gap-register) as #2036 (umbrella) → #2037–#2042 (this feature) + cleanups #2061/#2062, plus #2063–#2066 (the §10 usage/engagement extension; renumbered from #2043–#2046 after a collision with the Social-Publishing PRD) + residual #2067. Supersedes the menu-only scope of #1995.
+Phases + residuals tracked in the [Consolidated Gap Register](../../ROADMAP.md#consolidated-gap-register) as #2036 (umbrella) → #2037–#2042 (this feature) + cleanups #2061/#2062, plus #2063–#2066 (the §10 usage/engagement extension; renumbered from #2043–#2046 after a collision with the Social-Publishing PRD) + residual #2067. Supersedes the menu-only scope of #1995.
 
 ---
 
