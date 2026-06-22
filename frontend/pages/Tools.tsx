@@ -114,7 +114,7 @@ export default function Tools() {
   if (!isAuthenticated || !user) {
     return (
       <AppShell>
-        <div className="px-4 py-16">
+        <div className="px-4 md:px-6 py-16">
               {/* Hero Section */}
               <div className="text-center mb-16">
                 <div className="inline-flex items-center space-x-3 mb-6">
@@ -173,7 +173,16 @@ export default function Tools() {
                 <p className="text-center text-muted-foreground mb-8 sm:mb-12 max-w-3xl mx-auto">
                   {t("messages.tools.careerToolsCoursesDesc")}
                 </p>
-                <ToolsBrowser roleGated={false} weaveCourses courseLimit={12} />
+                {/* Same framed, sticky filter row as the authenticated tab.
+                    No search header sits above it on the marketing page, so it
+                    pins directly under the top nav (h-16 = 64px). */}
+                <ToolsBrowser
+                  roleGated={false}
+                  weaveCourses
+                  courseLimit={12}
+                  framedFilters
+                  filtersStickyTop={64}
+                />
               </div>
 
               {/* Stats Section */}
