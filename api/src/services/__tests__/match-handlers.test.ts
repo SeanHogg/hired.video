@@ -155,18 +155,27 @@ function buildDeps(opts: {
   llm?: LLMClient | null;
   resumes?: any[];
   jobs?: any[];
-} = {}): MatchDeps & { _state: any; _calls: any[] } {
+} = {}): MatchDeps & { _state: any; _calls: any[]; _settle: () => Promise<unknown[]> } {
   const fake = buildFakeDb({
     resume_information: opts.resumes ?? [],
     job_items: opts.jobs ?? [],
     resume_match_scores: [],
   });
+  // Capture the handler's detached cache-write (saveMatchScore) so tests can
+  // await the REAL onConflict insert instead of guessing its async depth with
+  // a setImmediate tick — that guess raced the write under CI load (the
+  // #pass-N/#fail-1 flake). Mirrors the people-ops sink's runDetached capture.
+  const detached: Promise<unknown>[] = [];
   return {
     db: fake.db,
     now: () => new Date("2026-04-21T00:00:00Z"),
     llm: opts.llm === undefined ? null : opts.llm,
+    runDetached: (task) => {
+      detached.push(Promise.resolve().then(task));
+    },
     _state: fake.state,
     _calls: fake.calls,
+    _settle: () => Promise.all(detached),
   } as any;
 }
 
@@ -350,6 +359,7 @@ describe("handleAnalyze — LLM happy path", () => {
       jobs: [seedJob()],
     });
     await handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
+    await deps._settle();
     const wrote = deps._calls.filter((c: any) => c.kind === "insert" && c.table === "resume_match_scores");
     assert.equal(wrote.length, 1);
     assert.equal(wrote[0].values[0].score, 71);
@@ -470,6 +480,7 @@ describe("handleAnalyze — jobHtml path", () => {
     const { client } = makeFakeLLM(() => ({ score: 40, summaryRecommendations: "- x" }));
     const deps = buildDeps({ llm: client, resumes: [seedResume()] });
     await handleAnalyze(deps, USER_ID, { jobHtml: "<p>Backend</p>" });
+    await deps._settle();
     const wrote = deps._calls.filter((c: any) => c.kind === "insert" && c.table === "resume_match_scores");
     assert.equal(wrote.length, 0);
   });
@@ -522,14 +533,15 @@ describe("handleAnalyze — concurrent writes for the same (user, job, resume)",
       jobs: [seedJob()],
     });
 
-    // Fire two concurrent calls. saveMatchScore is fire-and-forget
-    // inside the handler, so we await the void-returning internals
-    // before asserting: use setImmediate to flush the microtask queue.
+    // Fire two concurrent calls. saveMatchScore is detached inside the
+    // handler (runs after the scored response), so we await the captured
+    // task promises — the REAL onConflict insert — before asserting,
+    // instead of guessing its async depth with a setImmediate tick.
     const [resA, resB] = await Promise.all([
       handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID }),
       handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID }),
     ]);
-    await new Promise((r) => setImmediate(r));
+    await deps._settle();
 
     // Both handlers return 200.
     assert.equal(resA.status, 200);
@@ -638,6 +650,7 @@ describe("handleByid — persisted ids", () => {
     assert.equal(body.data.score, 81);
     assert.equal(body.data.jobId, JOB_ID);
     assert.equal(body.data.resumeId, RESUME_ID);
+    await deps._settle();
     const cache = deps._calls.filter((c: any) => c.kind === "insert" && c.table === "resume_match_scores");
     assert.equal(cache.length, 1);
   });

@@ -21,7 +21,7 @@
  */
 
 import { and, eq, sql } from "drizzle-orm";
-import { z } from "zod";
+import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import { schema } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
@@ -47,6 +47,20 @@ export interface MatchDeps {
    *  prod client charges `tokenLedger` automatically on every call, so
    *  handlers don't need a separate usage recorder. */
   llm: LLMClient | null;
+  /** Seam for the cache-write side effect (`saveMatchScore`), which the
+   *  handler runs detached so it never blocks the scored response. Prod
+   *  leaves this undefined → the default fire-and-forget (`void task()`).
+   *  Tests inject a capturing variant so they can await the REAL insert
+   *  instead of guessing the async depth with a setTimeout/setImmediate
+   *  tick (which raced the onConflict write under CI load). Mirrors the
+   *  people-ops event sink's `runDetached`. */
+  runDetached?: (task: () => Promise<unknown>) => void;
+}
+
+/** Run a side effect detached from the response path. Defaults to true
+ *  fire-and-forget; `deps.runDetached` lets tests capture the promise. */
+function detach(deps: MatchDeps, task: () => Promise<unknown>): void {
+  (deps.runDetached ?? ((t) => void t()))(task);
 }
 
 // ---------------------------------------------------------------------------
@@ -666,13 +680,13 @@ export async function handleAnalyze(
         },
         AnalyzeResponseSchema,
       );
-      void saveMatchScore(deps, {
+      detach(deps, () => saveMatchScore(deps, {
         userId: auth.userId,
         jobId: job.jobId,
         resumeId,
         score: result.score,
         recommendations: result.summaryRecommendations,
-      });
+      }));
       return ok({
         score: result.score,
         summaryRecommendations: result.summaryRecommendations,
@@ -1176,13 +1190,13 @@ export async function handleByid(
         },
         AnalyzeResponseSchema,
       );
-      void saveMatchScore(deps, {
+      detach(deps, () => saveMatchScore(deps, {
         userId: auth.userId,
         jobId: job.jobId,
         resumeId: resume.id as string,
         score: result.score,
         recommendations: result.summaryRecommendations,
-      });
+      }));
       return ok({ ...result, jobId, resumeId });
     } catch {
       // fall through to keyword overlap
