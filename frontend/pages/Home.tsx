@@ -27,8 +27,8 @@ import { AppShell } from "@/components/AppShell";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { ToolCard } from "@/components/ToolCard";
 import { getToolsForHome } from "@/data/tools-catalog";
-import TemplateCard from "@/components/resume-renderer/TemplateCard";
-import { useTemplates } from "@/lib/templates/registry";
+import TemplateGallery from "@/components/resume-renderer/TemplateGallery";
+import JobTemplateGallery from "@/components/job-renderer/JobTemplateGallery";
 
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -415,22 +415,12 @@ function HomeMarketingPage() {
               </div>
             </div>
 
-            {/* Templates — pulled from the unified registry so creator-
-                published templates surface alongside the in-house
-                presets. Each card links to /marketplace/templates/<slug>,
-                the per-template SEO page where the Use / Preview CTA
-                lives. Sync content (resume + studio-builtin) paints
-                instantly; creator templates merge in once their
-                listPublic() fetch resolves. */}
-            <MarketingTemplateStrip />
-            <div className="mb-16 -mt-8 text-center">
-              <Link
-                to="/search?category=templates"
-                className="inline-flex items-center text-sm font-medium text-primary hover:underline"
-              >
-                {t("marketing.home.templatesBrowseAll")}
-                <ArrowRight className="ml-1 h-4 w-4" />
-              </Link>
+            {/* Resume + Job Posting templates — render the SAME gallery
+                sections the public homepage (/) uses, so the dashboard and
+                the marketing home share one card surface (DRY). */}
+            <div className="mb-16">
+              <TemplateGallery />
+              <JobTemplateGallery />
             </div>
 
             {/* Testimonials */}
@@ -789,48 +779,3 @@ export default function Home() {
   );
 }
 
-// Marketing-home templates strip. Reads the unified registry so creator-
-// published templates surface alongside in-house presets — the homepage
-// advertises the full marketplace, not just the static catalog.
-// The merged list is sliced so the section stays a single content block
-// (visitors get a sample; the "Browse all templates" link below leads
-// to the full /search?category=templates surface).
-function MarketingTemplateStrip() {
-  const { templates, loading } = useTemplates({});
-  const { t } = useTranslation();
-  const visible = templates.slice(0, 12);
-  return (
-    <div className="mb-16">
-      <h2 className="text-3xl font-bold text-center mb-4">
-        {t("marketing.home.templatesTitle")}
-      </h2>
-      <p className="text-center text-muted-foreground mb-12">
-        {t("marketing.home.templatesSubtitle")}
-      </p>
-      {/* Row cards (details left, preview right) — a wider 2-up grid so the
-          design *type* reads first and the preview sits alongside it. Reuses
-          the shared marketplace TemplateCard so the homepage strip, search,
-          and marketplace all share one card (DRY) — including the bold
-          name hover-link, Preview action button, and "Get started" CTA that
-          opens the studio/editor via the shared apply() handler. */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {visible.map((meta) => (
-          <TemplateCard
-            key={`${meta.kind}:${meta.slug}`}
-            meta={meta}
-            orientation="row"
-            primaryCtaLabel={t("actions.getStarted")}
-          />
-        ))}
-        {loading && visible.length === 0
-          ? Array.from({ length: 4 }).map((_, i) => (
-              <div
-                key={`skel-${i}`}
-                className="h-56 animate-pulse rounded-xl bg-muted/40"
-              />
-            ))
-          : null}
-      </div>
-    </div>
-  );
-}
