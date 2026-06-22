@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   USER_LIST_FIELDS,
+  JOB_LIST_FIELDS,
   CARD_FIELDS_BY_KIND,
   parseFields,
   projectRows,
@@ -100,5 +101,54 @@ describe("user list-field projection", () => {
     assert.equal("summary" in projected, false);
     assert.equal("creatorPrograms" in projected, false);
     assert.equal("yearsOfExperience" in projected, false);
+  });
+});
+
+/**
+ * Same footgun, jobs flavour: the job cards rendered the literal string
+ * "undefined" for every employer because JOB_LIST_FIELDS / CARD_FIELDS_BY_KIND
+ * named `companyName` (a DB-ish spelling) while the `rowToJob` DTO every list
+ * endpoint ships emits `company`. projectRows kept only keys present in BOTH
+ * the row and the requested list, so the employer name was silently dropped
+ * and the frontend `${job.company}` template literal printed "undefined".
+ */
+
+// Representative jobs list DTO — keys + value types match
+// api/src/services/job/JobService.ts `rowToJob`.
+const jobDto = {
+  id: "f1a0fcf4-52ad-4806-8e65-7f0e166f75e6",
+  title: "Reliability Manager",
+  slug: "f1a0fcf4-52ad-4806-8e65-7f0e166f75e6",
+  company: "Detroit Salt Company",
+  location: "Detroit, MI, US",
+  description: "Long job body that should NOT ship on the card view.",
+  employmentType: "full_time",
+  experienceLevel: "entry",
+  isRemote: false,
+  salaryMin: 80000,
+  salaryMax: 120000,
+  postedDate: "2026-06-21T00:00:00.000Z",
+};
+
+describe("job list-field projection", () => {
+  it("allow-list names the DTO key `company`, not the DB-ish `companyName`", () => {
+    const allow = new Set<string>(JOB_LIST_FIELDS);
+    assert.ok(allow.has("company"), "JOB_LIST_FIELDS must allow-list the DTO key `company`");
+    assert.ok(!allow.has("companyName"), "JOB_LIST_FIELDS leaks the non-DTO key `companyName`");
+    assert.ok(
+      !CARD_FIELDS_BY_KIND.jobs.includes("companyName"),
+      "CARD_FIELDS_BY_KIND.jobs leaks the non-DTO key `companyName`",
+    );
+  });
+
+  it("the employer name survives the projection round-trip", () => {
+    const fields = parseFields(serializeListFields("jobs", CARD_FIELDS_BY_KIND.jobs), JOB_LIST_FIELDS);
+    const [projected] = projectRows([jobDto], fields) as Array<Partial<typeof jobDto>>;
+    // The field whose loss made the card render "undefined".
+    assert.equal(projected.company, "Detroit Salt Company");
+    assert.equal(projected.title, "Reliability Manager");
+    assert.equal(projected.location, "Detroit, MI, US");
+    // ...and the heavy job body is still trimmed off the card view.
+    assert.equal("description" in projected, false);
   });
 });

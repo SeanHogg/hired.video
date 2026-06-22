@@ -283,28 +283,30 @@ export default function JobDetail() {
             <AuthOverlay contentType="job" title={job?.data.title} />
           )}
           <div className="p-4 md:p-6">
-            {/* Hub-level tab strip — keeps the Jobs / Saved / Applications
-                / Alerts / My Postings / Candidates context visible. */}
-            {isAuthenticated && <EntityHubTabStrip entity="job" />}
-            <PageHeader tabs={jobTabs} activeTabKey={activeJobTab} />
-
-            {section === "candidates" ? (
-              <JobPipelineKanban
-                jobId={job.id}
-                jobOwner={{ userId: job.userId, viewerCanManage: job.viewerCanManage }}
-                onCountChange={setPipelineCount}
-              />
-            ) : section === "reports" ? (
-              <JobPipelineReports
-                jobId={job.id}
-                jobOwner={{ userId: job.userId, viewerCanManage: job.viewerCanManage }}
-              />
-            ) : (
-              <>
-            {/* Owner / viewer toolbar — sits above the declarative renderer.
-                The header + all content sections are now produced by
-                DeclarativeJobRenderer, themed via a JobTemplateDescriptor. */}
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            {/* Sticky action band — the hub-level tab strip (Jobs / Saved /
+                Applications / …), the leaf section tabs (Overview / Candidates
+                / Reports), and the job action toolbar pin together as ONE band
+                just below the top nav (h-16) so the "where am I" context +
+                every action stay reachable while the posting scrolls. Mirrors
+                the shared action-bar tone + the ResumeDetail pattern. The
+                negative x/top-margins break out of the page's `p-4 md:p-6`
+                padding so the band reaches the content edges and sits flush
+                under the nav; the inner rows restore their own padding. */}
+            <div className="sticky top-16 z-30 -mx-4 md:-mx-6 -mt-4 md:-mt-6 mb-4 border-b border-border bg-actionbar/95 backdrop-blur-md">
+              {isAuthenticated && (
+                <div className="px-4 md:px-6 pt-3">
+                  <EntityHubTabStrip entity="job" className="mb-0" />
+                </div>
+              )}
+              <div className="px-4 md:px-6 pt-3">
+                <PageHeader tabs={jobTabs} activeTabKey={activeJobTab} className="mb-0" />
+              </div>
+              {/* Owner / viewer action toolbar — only on the Overview leaf; the
+                  Candidates / Reports panels carry their own controls. The job
+                  content sections are produced by DeclarativeJobRenderer below,
+                  themed via a JobTemplateDescriptor. */}
+              {section === "overview" && (
+            <div className="px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
                 <JobScoreBadges job={job} />
@@ -441,7 +443,22 @@ export default function JobDetail() {
                 </DropdownMenu>
               </div>
             </div>
+              )}
+            </div>
 
+            {section === "candidates" ? (
+              <JobPipelineKanban
+                jobId={job.id}
+                jobOwner={{ userId: job.userId, viewerCanManage: job.viewerCanManage }}
+                onCountChange={setPipelineCount}
+              />
+            ) : section === "reports" ? (
+              <JobPipelineReports
+                jobId={job.id}
+                jobOwner={{ userId: job.userId, viewerCanManage: job.viewerCanManage }}
+              />
+            ) : (
+              <>
             {isOwner && (
               <div className="mb-4">
                 <SourcingFeePanel jobId={job.id} />

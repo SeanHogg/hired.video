@@ -93,11 +93,16 @@ export function pickSelectShape<T extends Record<string, unknown>>(
 // list consumers actually need it. Detail endpoints keep returning the
 // full row.
 
+// NOTE: these match the keys of the `rowToJob` DTO (the shape every jobs
+// list endpoint ships), NOT raw `job_items` columns. The projector matches
+// top-level keys, so the employer name MUST be listed as `company` (the DTO
+// key) — naming it `companyName` silently drops it at projection time and the
+// job cards render the literal string "undefined" for every employer.
 export const JOB_LIST_FIELDS = [
   "id",
   "title",
   "slug",
-  "companyName",
+  "company",
   "companyId",
   "location",
   "employmentType",
@@ -260,7 +265,7 @@ type ListFieldsKind = keyof typeof LIST_FIELDS_BY_KIND;
  *  the LIST_FIELDS_BY_KIND allow-list, so editing this is safe — the
  *  worst case is dropping a field from the wire payload. */
 export const CARD_FIELDS_BY_KIND: Record<ListFieldsKind, readonly string[]> = {
-  jobs: ["id", "title", "slug", "companyName", "location", "isRemote", "employmentType", "salaryMin", "salaryMax", "postedAt"],
+  jobs: ["id", "title", "slug", "company", "location", "isRemote", "employmentType", "salaryMin", "salaryMax", "postedAt"],
   users: ["id", "type", "fullName", "firstName", "lastName", "slug", "avatar", "headline", "role", "location", "currentRole", "currentCompany", "openToWork", "emailConfirmed", "isCreator", "createdAt", "updatedAt"],
   companies: ["id", "name", "slug", "logoUrl", "industry", "openJobsCount"],
   resumes: ["id", "title", "slug", "privacy", "isMaster", "viewCount", "updatedAt"],

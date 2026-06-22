@@ -318,7 +318,7 @@ export default function JobCard({
     <BaseCard className="flex flex-col h-full">
       <CardHeaderWithAvatar
         title={job.title}
-        subtitle={`${job.company}`}
+        subtitle={job.company}
         badges={badges}
         linkTo={`/jobs/${job.id}`}
       />
