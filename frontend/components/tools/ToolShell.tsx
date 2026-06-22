@@ -90,7 +90,7 @@ export function ToolShell({
 
   return (
     <AppShell bgClassName="bg-background">
-      <div className={cn("p-6", showOverlay && "relative")}>
+      <div className={cn("p-4 md:p-6", showOverlay && "relative")}>
         {showOverlay && (
           <AuthOverlay
             contentType="tool"

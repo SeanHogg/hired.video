@@ -73,10 +73,13 @@ export function ToolPageHeader({
   // filter mirrors `/tools` so a recruiter doesn't see seeker-only tabs.
   const tabs: PageHeaderTab[] = useMemo(() => {
     const audience = audienceForRole(effectiveRole) ?? "all";
+    // Each tab carries its tool's catalog icon so the strip reads as an
+    // icon menu (matching the icon'd top-level Tools / Learning tabs) rather
+    // than a wall of text.
     const toolTabs: PageHeaderTab[] = TOOLS_CATALOG
       .filter((t) => t.href.startsWith("/tools/"))
       .filter((t) => isToolInAudience(t, audience))
-      .map((t) => ({ key: t.id, label: t.title, to: t.href }));
+      .map((t) => ({ key: t.id, label: t.title, to: t.href, icon: t.icon }));
     return [
       { key: "all", label: "All Tools", icon: Wrench, to: "/tools" },
       ...toolTabs,
@@ -85,9 +88,13 @@ export function ToolPageHeader({
 
   return (
     <>
+      {/* Cross-tool nav strip — pinned as a sticky action bar (same pattern
+          as the list pages' tab strips) so the user can hop between tools
+          without scrolling back to the top. Tabs-only header → PageHeader
+          renders it as the flat full-bleed band; the title block below
+          scrolls normally. */}
+      <PageHeader tabs={tabs} activeTabKey={toolId} sticky />
       <PageHeader
-        tabs={tabs}
-        activeTabKey={toolId}
         className={cn("mb-6", className)}
         title={
           <span className="flex items-center gap-3 min-w-0">
