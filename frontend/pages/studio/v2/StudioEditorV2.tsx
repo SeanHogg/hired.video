@@ -43,6 +43,9 @@ import {
   Eye,
   History,
   ClipboardCheck,
+  Loader2,
+  Check,
+  CloudOff,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { shouldShowBranding } from "@/lib/studio/branding-policy";
@@ -232,6 +235,10 @@ import { useStudioShortcuts } from "@/lib/studio/editor-v2/use-studio-shortcuts"
 import { useScreenshotCapture } from "@/lib/studio/editor-v2/use-screenshot-capture";
 import { useKindHydration } from "@/lib/studio/editor-v2/use-kind-hydration";
 import { runtimeStatePayload } from "@/lib/studio/editor-v2/runtime-state-payload";
+import {
+  useServerAutosave,
+  type AutosaveStatus,
+} from "@/lib/studio/editor-v2/use-server-autosave";
 import { exportProjectByKind, extensionForBlob } from "@/lib/studio/editor-v2/export-facade";
 
 import ScenesRail from "@/components/studio/v2/ScenesRail";
@@ -270,6 +277,10 @@ const LinkedInPublisher = lazy(
 
 const LOCAL_STORAGE_PREFIX = "studio.v2.draft.";
 const AUTOSAVE_DEBOUNCE_MS = 800;
+// Server autosave runs on a longer cadence than the local (localStorage) one so
+// a burst of edits coalesces into one network write while the local snapshot
+// still captures every keystroke for instant reload recovery.
+const SERVER_AUTOSAVE_DEBOUNCE_MS = 2500;
 
 /** Pull the server's machine-readable error code off an ApiClient error.
  *  NetworkError stashes the original code under `context.serverCode`; typed
@@ -1672,6 +1683,82 @@ export default function StudioEditorV2() {
     return () => window.clearTimeout(handle);
   }, [projectId, title, state, imageState, documentState, currentMediaKind, isAnonVisitor]);
 
+  // Per-kind runtime readiness — image / animation / game canvases mount null
+  // until their state hydrates; Timeline kinds are seeded synchronously. Used
+  // both by the server-autosave gate below and the project-ready render gate.
+  const runtimeHydrated =
+    currentMediaKind === "image"
+      ? imageStateHydrated
+      : currentMediaKind === "animation"
+        ? animationStateHydrated
+        : currentMediaKind === "game"
+          ? gameState !== null
+          : true;
+
+  // Server autosave — signed-in users' edits persist to the server on a debounced
+  // cadence so a session expiry / logout never loses work. Anon visitors are
+  // excluded (their draft lives in localStorage + claims on auth via the gate),
+  // as is a project that failed to load (`missingProject`) so a transient read
+  // error can't silently fork a duplicate row. Undo/redo makes continuous save
+  // safe — an accidental edit is reversible. Mirrors the local-autosave content
+  // deps; the snapshot serializer is only invoked inside the debounced callback.
+  const serverAutosaveReady =
+    runtimeHydrated &&
+    !missingProject &&
+    (projectId === "new" || persistedProject !== null) &&
+    (currentMediaKind !== "document" || documentStateHydrated);
+  const computeAutosaveSnapshot = useCallback((): string => {
+    const slice = runtimeStatePayload(currentMediaKind, {
+      canvasState: state,
+      imageState,
+      animationState,
+      gameState,
+      cadState,
+      cad3dState: cad3DState,
+      documentState,
+    });
+    // Document CONTENT lives in its entity row (resume/job/article), not in the
+    // runtime slice — fold it in so editing those fields counts as a change.
+    return JSON.stringify({
+      title,
+      slice,
+      entityContent:
+        currentMediaKind === "document" ? documentEntityContent : undefined,
+    });
+  }, [
+    currentMediaKind,
+    title,
+    state,
+    imageState,
+    animationState,
+    gameState,
+    cadState,
+    cad3DState,
+    documentState,
+    documentEntityContent,
+  ]);
+  const { status: autosaveStatus } = useServerAutosave({
+    enabled: !!user && !authLoading,
+    ready: serverAutosaveReady,
+    debounceMs: SERVER_AUTOSAVE_DEBOUNCE_MS,
+    computeSnapshot: computeAutosaveSnapshot,
+    isSaving: saving,
+    save: () => handleSave({ silent: true }),
+    deps: [
+      projectId,
+      title,
+      state,
+      imageState,
+      animationState,
+      gameState,
+      cadState,
+      cad3DState,
+      documentState,
+      documentEntityContent,
+      currentMediaKind,
+    ],
+  });
+
   const fitZoom = useCallback(() => {
     const el = stageContainerRef.current;
     if (!el) return;
@@ -2924,11 +3011,19 @@ export default function StudioEditorV2() {
   // Returns the persisted StudioProject so callers (notably
   // `ensureRendered`) can chain a follow-up upload without re-reading
   // through the async-state setters. Resolves to null on failure.
-  async function handleSave(): Promise<StudioProject | null> {
+  async function handleSave(
+    opts?: { silent?: boolean },
+  ): Promise<StudioProject | null> {
+    // `silent` = a background autosave (see useServerAutosave). It suppresses the
+    // success/validation/error toasts (the header's autosave indicator reports
+    // status instead) and never opens the anon gate — autosave is enabled only
+    // for signed-in users, so a gate here would be a no-op anyway.
+    const silent = opts?.silent === true;
     // Anon adoption gate (#2212): signed-out visitors can build freely, but
     // Save requires an account. The in-place panel opens and this same handler
     // re-runs (and the draft persists) once they authenticate.
     if (
+      !silent &&
       !gateAction(
         "save",
         t("studio.anon.gateSave", {
@@ -2989,11 +3084,13 @@ export default function StudioEditorV2() {
           documentEntityContent as Record<string, unknown> | null,
         );
         if (contentIssues.length > 0) {
-          toast({
-            title: t("studio.editorV2.fixFieldsBeforeSaving"),
-            description: contentIssues.slice(0, 4).join(" · "),
-            variant: "destructive",
-          });
+          if (!silent) {
+            toast({
+              title: t("studio.editorV2.fixFieldsBeforeSaving"),
+              description: contentIssues.slice(0, 4).join(" · "),
+              variant: "destructive",
+            });
+          }
           setSaving(false);
           return null;
         }
@@ -3068,11 +3165,19 @@ export default function StudioEditorV2() {
             }
           }
         } catch (err) {
-          toast({
-            title: t("errors.saveFailed"),
-            description: err instanceof Error ? err.message : t("errors.unknownError"),
-            variant: "destructive",
-          });
+          if (!silent) {
+            toast({
+              title: t("errors.saveFailed"),
+              description: err instanceof Error ? err.message : t("errors.unknownError"),
+              variant: "destructive",
+            });
+          }
+          // Autosave: surface the failure to the caller so the indicator can show
+          // "Save failed" — don't fall through and persist a partial row.
+          if (silent) {
+            setSaving(false);
+            return null;
+          }
         }
       }
       const runtimeSlice = runtimeStatePayload(currentMediaKind, {
@@ -3110,14 +3215,16 @@ export default function StudioEditorV2() {
         }
         setMissingProject(false);
       }
-      toast({ title: t("messages.savedTitle") });
+      if (!silent) toast({ title: t("messages.savedTitle") });
       return res.data ?? null;
     } catch (err) {
-      toast({
-        title: t("errors.saveFailed"),
-        description: err instanceof Error ? err.message : t("errors.unknownError"),
-        variant: "destructive",
-      });
+      if (!silent) {
+        toast({
+          title: t("errors.saveFailed"),
+          description: err instanceof Error ? err.message : t("errors.unknownError"),
+          variant: "destructive",
+        });
+      }
       return null;
     } finally {
       setSaving(false);
@@ -3183,18 +3290,11 @@ export default function StudioEditorV2() {
   //     loads OR the load failed (`missingProject` — surfaces the empty
   //     editor with a "doesn't exist" banner instead of looping
   //     forever).
-  // `runtimeHydrated` waits the additional tick that per-kind
-  // runtimes need to seed (image / animation / game canvases mount
-  // null until their state hydrates). Timeline kinds always return
-  // true because `state` is seeded synchronously by useState.
-  const runtimeHydrated =
-    currentMediaKind === "image"
-      ? imageStateHydrated
-      : currentMediaKind === "animation"
-        ? animationStateHydrated
-        : currentMediaKind === "game"
-          ? gameState !== null
-          : true;
+  // `runtimeHydrated` (computed once above, near the server-autosave wiring that
+  // also gates on it) waits the additional tick that per-kind runtimes need to
+  // seed (image / animation / game canvases mount null until their state
+  // hydrates). Timeline kinds always return true because `state` is seeded
+  // synchronously by useState.
   const projectReady =
     (projectId === "new" || persistedProject !== null || missingProject) &&
     runtimeHydrated;
@@ -3239,6 +3339,7 @@ export default function StudioEditorV2() {
           onBack={() => navigate("/studio")}
           onSave={handleSave}
           saving={saving}
+          autosaveStatus={autosaveStatus}
           playback={playback}
           onApplyLayoutBindings={(bindings) => {
             if (bindings.leftTab === "widgets" || bindings.leftTab === "actions") {
@@ -4492,6 +4593,7 @@ function EditorHeader({
   onBack,
   onSave,
   saving,
+  autosaveStatus,
   playback,
   onApplyLayoutBindings,
   persistedProjectId,
@@ -4528,6 +4630,9 @@ function EditorHeader({
   onBack: () => void;
   onSave: () => void;
   saving: boolean;
+  /** Background server-autosave status (#2242) — drives the "Saving… / Saved /
+   *  Save failed" indicator next to the Save menu. */
+  autosaveStatus: AutosaveStatus;
   playback: ReturnType<typeof usePreviewPlayback>;
   /** Workspace-layout dropdown handler (#349). The header mounts the
    *  PreviewLayoutGroup (Preview + layout split-button) but defers the
@@ -4829,6 +4934,9 @@ function EditorHeader({
             {t("studio.editorV2.embed")}
           </Button>
         )}
+        {/* Background autosave status — reassures the user their work is
+            persisting without them clicking Save (#2242). */}
+        <AutosaveIndicator status={autosaveStatus} saving={saving} />
         {/* Single split-button for the whole project: Save (primary —
             persists draft) + chevron-dropdown with Export MP4, Copy
             link, and Publish (YouTube / LinkedIn / Profile). Replaces
@@ -4872,6 +4980,60 @@ function EditorHeader({
         />
       </div>
     </header>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// AutosaveIndicator — quiet status chip next to the Save menu that confirms
+// background server autosave is working. Shows nothing until the first save
+// cycle so a brand-new untouched draft stays uncluttered.
+// ───────────────────────────────────────────────────────────────────────────
+function AutosaveIndicator({
+  status,
+  saving,
+}: {
+  status: AutosaveStatus;
+  saving: boolean;
+}) {
+  const { t } = useTranslation();
+  // A manual save in flight reads as "Saving…" too, so the indicator never
+  // contradicts the Save button's own spinner.
+  const effective: AutosaveStatus = saving ? "saving" : status;
+  if (effective === "idle") return null;
+  const map: Record<
+    Exclude<AutosaveStatus, "idle">,
+    { icon: typeof Loader2; label: string; className: string }
+  > = {
+    saving: {
+      icon: Loader2,
+      label: t("studio.autosave.saving"),
+      className: "text-muted-foreground",
+    },
+    saved: {
+      icon: Check,
+      label: t("studio.autosave.saved"),
+      className: "text-emerald-600 dark:text-emerald-400",
+    },
+    error: {
+      icon: CloudOff,
+      label: t("studio.autosave.error"),
+      className: "text-amber-600 dark:text-amber-400",
+    },
+  };
+  const { icon: Icon, label, className } = map[effective];
+  return (
+    <span
+      className={cn("flex items-center gap-1 text-xs", className)}
+      role="status"
+      aria-live="polite"
+      title={label}
+    >
+      <Icon
+        className={cn("h-3.5 w-3.5", effective === "saving" && "animate-spin")}
+        aria-hidden="true"
+      />
+      <span className="hidden sm:inline">{label}</span>
+    </span>
   );
 }
 
