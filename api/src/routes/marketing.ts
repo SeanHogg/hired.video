@@ -4,6 +4,9 @@ import { z } from "zod";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { buildRepos } from "../repositories/index.js";
+import { emitNotification } from "../services/notifications/notificationService.js";
+import { sendContactConfirmationEmail } from "../services/adapters/email.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 
 export const marketingRoutes = new Hono<AppEnv>();
@@ -142,12 +145,13 @@ marketingRoutes.post("/contact", async (c) => {
     } as any)
     .returning();
 
-  // Notify every super_admin so the inquiry surfaces in the existing
-  // unified inbox (/outreach Inbox tab + CommunicationHub bell — both
-  // hydrate from /api/inbox which reads `notifications`). Best-effort: a
-  // notification failure must not swallow the inquiry itself. The body
-  // is packed into `message` so the inbox row preview shows the full
-  // submission inline without needing a second surface.
+  // Notify every super_admin through the unified dispatcher
+  // (`emitNotification`) so the inquiry not only lands in the bell/inbox
+  // (/outreach Inbox tab + CommunicationHub — both read `notifications`)
+  // but ALSO fans out a preference-gated Web Push + email heads-up. The
+  // previous raw `notifications` insert here persisted a bell row only —
+  // it never pushed or emailed, so off-screen admins missed inquiries.
+  // Best-effort: a dispatch failure must not swallow the inquiry itself.
   try {
     const admins = await db
       .select({ id: schema.users.id })
@@ -176,23 +180,47 @@ marketingRoutes.post("/contact", async (c) => {
         ? composed.slice(0, 1900) + "…"
         : composed;
 
-      await db.insert(schema.notifications).values(
-        admins.map((a) => ({
-          userId: a.id,
+      await emitNotification(
+        { repos: buildRepos(db) },
+        {
+          recipientIds: admins.map((a) => a.id),
           type: "contact_inquiry",
+          // The submitter is typically anonymous (not a platform user), so
+          // the notification is system-originated.
+          actor: null,
           title: `New ${INQUIRY_LABEL[data.inquiryType]} — ${data.subject}`,
           message,
-          data: {
+          // Deep-link to the inbox where the inline lead-status actions live.
+          url: "/outreach",
+          extraData: {
             leadId: lead?.id ?? null,
             email: data.email,
             inquiryType: data.inquiryType,
             page: data.page ?? null,
           },
-        })) as any,
+          // Opt into the email channel — this is a real-time staff heads-up,
+          // not routine inbox noise. Still pref-gated per recipient.
+          email: true,
+        },
       );
     }
   } catch {
     // Swallow — the lead row is the authoritative record.
+  }
+
+  // Acknowledge the submitter with a confirmation receipt so they have a
+  // durable record of what they sent (the on-screen toast vanishes on
+  // reload). Best-effort: the lead + admin notification already landed.
+  try {
+    await sendContactConfirmationEmail({
+      to: data.email,
+      recipientName: data.name,
+      inquiryLabel: INQUIRY_LABEL[data.inquiryType],
+      subject: data.subject,
+      message: data.message,
+    });
+  } catch {
+    // Swallow — a confirmation-email failure must not fail the request.
   }
 
   return c.json(success({ id: lead?.id ?? null }), 201);

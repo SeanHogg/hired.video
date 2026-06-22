@@ -1161,6 +1161,97 @@ export async function sendNotificationEmail(input: {
   await provider.send({ to: input.to, subject, html });
 }
 
+// ============================================================================
+// Contact-inquiry confirmation — the receipt sent to a visitor who submits
+// the shared <ContactPanel> form (Pricing "Request a demo", "Talk to us",
+// support, etc.). The on-screen toast is not a durable acknowledgement, so
+// this closes the loop and gives them a copy of what they sent.
+// ============================================================================
+
+const CONTACT_CONFIRMATION_BODY = `
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 16px;">
+                <tr>
+                  <td align="center">
+                    <span style="color: #111827; font-size: 24px; font-weight: bold;">We've got your message</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-top: 8px;">
+                    <span style="color: #6b7280; font-size: 14px;">Thanks for reaching out to hired.video.</span>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td style="color: #111827; padding-bottom: 8px;">Hi {{RecipientName}},</td>
+                </tr>
+                <tr>
+                  <td style="color: #374151; line-height: 1.6; padding-bottom: 16px;">
+                    We've received your {{InquiryLabel}} and our team will get back to you at
+                    <strong>{{ReplyEmail}}</strong>, usually within one business day. Here's a copy
+                    of what you sent us:
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 24px;">
+                <tr>
+                  <td style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px 20px;">
+                    <div style="color: #1e40af; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 6px;">Subject</div>
+                    <div style="color: #111827; font-size: 15px; font-weight: 600; padding-bottom: 14px;">{{Subject}}</div>
+                    <div style="color: #1e40af; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 6px;">Your message</div>
+                    <div style="color: #374151; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">{{Message}}</div>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td style="color: #9ca3af; font-size: 13px;">
+                    If you didn't submit this request, you can safely ignore this email.
+                  </td>
+                </tr>
+              </table>`;
+
+export interface ContactConfirmationEmailInput {
+  to: string;
+  /** Submitter's name — falls back to a neutral greeting when blank. */
+  recipientName: string;
+  /** Human label for the inquiry kind ("demo request", "support request", …),
+   *  used in the body sentence. */
+  inquiryLabel: string;
+  subject: string;
+  message: string;
+}
+
+/** Pure builder: render the contact-confirmation email without sending.
+ *  Exported for unit tests. `white-space:pre-wrap` preserves the message's
+ *  line breaks; render() HTML-escapes every var. */
+export function buildContactConfirmationEmail(
+  input: ContactConfirmationEmailInput,
+): { subject: string; html: string } {
+  const html = render(CONTACT_CONFIRMATION_BODY, {
+    RecipientName: input.recipientName.trim() || "there",
+    InquiryLabel: input.inquiryLabel.toLowerCase(),
+    Subject: input.subject,
+    Message: input.message,
+    ReplyEmail: getEnv("EMAIL_FROM") || "info@hired.video",
+  });
+  return { subject: "We've received your message – hired.video", html };
+}
+
+/** Send the contact-inquiry confirmation receipt. No-ops when no provider
+ *  is configured (matches every other sender here). */
+export async function sendContactConfirmationEmail(
+  input: ContactConfirmationEmailInput,
+): Promise<void> {
+  const provider = getEmailProvider();
+  if (!provider) return;
+  const { subject, html } = buildContactConfirmationEmail(input);
+  await provider.send({ to: input.to, subject, html });
+}
+
 export async function sendConnectionRequestEmail(
   to: string,
   recipientName: string,
