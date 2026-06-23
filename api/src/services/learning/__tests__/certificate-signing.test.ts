@@ -70,6 +70,13 @@ async function ed25519Sig(priv: CryptoKey, msg: string): Promise<string> {
   return b64url(new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, priv, enc(msg))));
 }
 
+// Deterministically corrupt a base64url signature. Must flip a FULLY significant
+// byte: a 64-byte Ed25519 sig is 86 base64url chars whose final char carries only
+// 2 significant bits (4 "don't care" padding bits), so mutating the tail can decode
+// to the SAME bytes — the (correct) verifier then accepts it. That was a ~1/256 CI
+// flake. byte 0 is always fully significant, so flipping sig[0] is a real tamper.
+const tamperSig = (sig: string) => (sig[0] === "A" ? "B" : "A") + sig.slice(1);
+
 function seedCert(signedPayload: string) {
   return buildFakeDb({
     course_certificates: [
@@ -93,7 +100,7 @@ describe("CertificateService.verify — HMAC (2-part) back-compat", () => {
   it("rejects a tampered HMAC signature", async () => {
     const b64 = payloadB64();
     const sig = await hmacSig(SECRET, b64);
-    const bad = sig.slice(0, -2) + (sig.endsWith("A") ? "BB" : "AA");
+    const bad = tamperSig(sig);
     const { db } = seedCert(`${b64}.${bad}`);
     const out = await new CertificateService(db as never, SECRET).verify(CERT_NO);
     assert.equal(out.valid, false);
@@ -127,7 +134,7 @@ describe("CertificateService.verify — Ed25519 (3-part)", () => {
     const { kp, pubB64 } = await genEd25519();
     const b64 = payloadB64();
     const sig = await ed25519Sig(kp.privateKey, b64);
-    const bad = sig.slice(0, -2) + (sig.endsWith("A") ? "BB" : "AA");
+    const bad = tamperSig(sig);
     const { db } = seedCert(`${b64}.${bad}.ed25519`);
     const svc = new CertificateService(db as never, SECRET, { ed25519: { publicKeyRawB64: pubB64 } });
     const out = await svc.verify(CERT_NO);
