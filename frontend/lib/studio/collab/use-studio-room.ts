@@ -203,7 +203,7 @@ export function useStudioRoom({
 
 // ─── Message handling ──────────────────────────────────────────────────
 
-interface MessageCtx {
+export interface MessageCtx {
   setSelfId: React.Dispatch<React.SetStateAction<string | null>>;
   setIsHost: React.Dispatch<React.SetStateAction<boolean>>;
   setPeers: React.Dispatch<React.SetStateAction<CollabPeer[]>>;
@@ -211,7 +211,9 @@ interface MessageCtx {
   applyRemote: (doc: unknown) => void;
 }
 
-function handleMessage(raw: string, ctx: MessageCtx): void {
+/** Pure protocol reducer over an inbound DO frame — exported for tests.
+ *  Mutates the supplied setters/refs; safe to drive without a live socket. */
+export function handleMessage(raw: string, ctx: MessageCtx): void {
   let env: Record<string, unknown>;
   try {
     env = JSON.parse(raw);
@@ -262,7 +264,7 @@ function handleMessage(raw: string, ctx: MessageCtx): void {
       if (version <= ctx.lastVersionRef.current) return;
       ctx.lastVersionRef.current = version;
       if (env.doc !== undefined) ctx.applyRemote(env.doc);
-      return;
+      break;
     }
     // "cursor" frames are handled by a future live-cursor layer; ignored here.
   }
