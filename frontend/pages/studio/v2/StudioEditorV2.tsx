@@ -239,6 +239,8 @@ import {
   useServerAutosave,
   type AutosaveStatus,
 } from "@/lib/studio/editor-v2/use-server-autosave";
+import { useStudioRoom } from "@/lib/studio/collab/use-studio-room";
+import CollabPresenceBar from "@/components/studio/v2/CollabPresenceBar";
 import { exportProjectByKind, extensionForBlob } from "@/lib/studio/editor-v2/export-facade";
 
 import ScenesRail from "@/components/studio/v2/ScenesRail";
@@ -281,6 +283,26 @@ const AUTOSAVE_DEBOUNCE_MS = 800;
 // a burst of edits coalesces into one network write while the local snapshot
 // still captures every keystroke for instant reload recovery.
 const SERVER_AUTOSAVE_DEBOUNCE_MS = 2500;
+// Real-time collaboration broadcast (#2243) — far tighter than autosave so
+// co-editors see each other's changes near-instantly, while still coalescing
+// a fast burst (e.g. dragging) into one frame.
+const COLLAB_BROADCAST_DEBOUNCE_MS = 350;
+
+/** Wire shape for a collaborative document snapshot (#2243). Carries the raw
+ *  per-kind editor state (NOT the persisted timelineSpec form — that's lossy
+ *  to round-trip). Only the active kind's slice plus the always-present
+ *  `title`/`canvasState` are populated. */
+interface CollabDocShape {
+  title?: string;
+  canvasState?: CanvasState;
+  imageState?: ImageState;
+  animationState?: AnimationState;
+  gameState?: import("@shared/game-state").GameState;
+  cadState?: CadState;
+  cad3dState?: Cad3DState;
+  documentState?: DocumentState;
+  entityContent?: DocumentEntityContent;
+}
 
 /** Pull the server's machine-readable error code off an ApiClient error.
  *  NetworkError stashes the original code under `context.serverCode`; typed
@@ -1707,6 +1729,144 @@ export default function StudioEditorV2() {
     !missingProject &&
     (projectId === "new" || persistedProject !== null) &&
     (currentMediaKind !== "document" || documentStateHydrated);
+
+  // ───── Real-time collaboration (#2243) ─────
+  // Live multi-editor sync via the StudioRoom Durable Object: presence + edit
+  // relay + host election. `buildCollabDoc` snapshots the local raw runtime
+  // state to send; `applyCollabDoc` writes an inbound peer snapshot into the
+  // live state. Echo is suppressed by `collabBaselineRef` (set both after a
+  // broadcast AND after applying a remote doc) so the post-apply re-render
+  // doesn't bounce the same content back — same change-detection idea as the
+  // autosave baseline. Opt-in (VITE_STUDIO_REALTIME); the disabled stub keeps
+  // `isHost` true so solo autosave is unchanged. Only the HOST persists to the
+  // DB (single writer) — that's what stops concurrent collaborators clobbering
+  // each other, which a blind last-write-wins save-draft otherwise allows.
+  const collabBaselineRef = useRef<string | null>(null);
+  const collabArmedRef = useRef(false);
+  const collabIdentity = useMemo(
+    () =>
+      user
+        ? { userId: user.id, displayName: user.name || user.email || "Editor" }
+        : null,
+    [user],
+  );
+  const buildCollabDoc = useCallback(
+    (): CollabDocShape => ({
+      title,
+      canvasState: state,
+      ...(currentMediaKind === "image" ? { imageState } : {}),
+      ...(currentMediaKind === "animation" ? { animationState } : {}),
+      ...(currentMediaKind === "game" && gameState ? { gameState } : {}),
+      ...(currentMediaKind === "cad" ? { cadState } : {}),
+      ...(currentMediaKind === "cad_3d" ? { cad3dState: cad3DState } : {}),
+      ...(currentMediaKind === "document"
+        ? { documentState, entityContent: documentEntityContent ?? undefined }
+        : {}),
+    }),
+    [
+      title,
+      state,
+      imageState,
+      animationState,
+      gameState,
+      cadState,
+      cad3DState,
+      documentState,
+      documentEntityContent,
+      currentMediaKind,
+    ],
+  );
+  const applyCollabDoc = useCallback(
+    (raw: unknown) => {
+      if (!raw || typeof raw !== "object") return;
+      const doc = raw as CollabDocShape;
+      // Baseline BEFORE the setState calls so the broadcast effect that fires
+      // on the resulting re-render sees no net change and doesn't echo back.
+      collabBaselineRef.current = JSON.stringify(doc);
+      if (typeof doc.title === "string") setTitle(doc.title);
+      switch (currentMediaKind) {
+        case "image": {
+          const v = doc.imageState;
+          if (v) setImageState(() => v);
+          break;
+        }
+        case "animation": {
+          const v = doc.animationState;
+          if (v) setAnimationState(() => v);
+          break;
+        }
+        case "game": {
+          const v = doc.gameState;
+          if (v) setGameState(() => v);
+          break;
+        }
+        case "cad": {
+          const v = doc.cadState;
+          if (v) setCadState(() => v);
+          break;
+        }
+        case "cad_3d": {
+          const v = doc.cad3dState;
+          if (v) setCad3DState(() => v);
+          break;
+        }
+        case "document": {
+          if (doc.documentState) {
+            const ds = doc.documentState;
+            setDocumentState(() => ds);
+          }
+          if (doc.entityContent !== undefined) setDocumentEntityContent(doc.entityContent);
+          break;
+        }
+        default: {
+          const v = doc.canvasState;
+          if (v) setState(() => v);
+          break;
+        }
+      }
+    },
+    [
+      currentMediaKind,
+      setState,
+      setImageState,
+      setAnimationState,
+      setCadState,
+      setCad3DState,
+      setDocumentState,
+    ],
+  );
+  const studioRoom = useStudioRoom({
+    projectId: persistedProjectId,
+    identity: collabIdentity,
+    // Live collab needs a saved project (a shareable id); a brand-new unsaved
+    // draft has nothing for a second editor to open yet.
+    active: !!user && !authLoading && serverAutosaveReady && persistedProjectId !== null,
+    onRemoteDoc: applyCollabDoc,
+  });
+  // Broadcast local edits to peers (debounced, change-detected, echo-safe).
+  useEffect(() => {
+    if (!studioRoom.connected) return;
+    // First armed pass = the just-connected baseline (or the doc the DO just
+    // sync'd in via applyCollabDoc), not a user edit — record + bail.
+    if (!collabArmedRef.current) {
+      collabArmedRef.current = true;
+      collabBaselineRef.current = JSON.stringify(buildCollabDoc());
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      const snap = JSON.stringify(buildCollabDoc());
+      if (snap === collabBaselineRef.current) return; // unchanged / remote-echo
+      collabBaselineRef.current = snap;
+      studioRoom.broadcast(JSON.parse(snap));
+    }, COLLAB_BROADCAST_DEBOUNCE_MS);
+    return () => window.clearTimeout(handle);
+  }, [studioRoom, buildCollabDoc]);
+  // Re-arm the broadcast baseline when the live connection drops so a later
+  // reconnect re-seeds from the then-current state instead of a stale one.
+  useEffect(() => {
+    if (!studioRoom.connected) collabArmedRef.current = false;
+  }, [studioRoom.connected]);
+
   const computeAutosaveSnapshot = useCallback((): string => {
     const slice = runtimeStatePayload(currentMediaKind, {
       canvasState: state,
@@ -1738,7 +1898,10 @@ export default function StudioEditorV2() {
     documentEntityContent,
   ]);
   const { status: autosaveStatus } = useServerAutosave({
-    enabled: !!user && !authLoading,
+    // Only the room HOST persists while collaborating, so concurrent editors
+    // never clobber each other's DB writes (single writer). `isHost` is true
+    // when not connected, so a solo session autosaves exactly as before.
+    enabled: !!user && !authLoading && studioRoom.isHost,
     ready: serverAutosaveReady,
     debounceMs: SERVER_AUTOSAVE_DEBOUNCE_MS,
     computeSnapshot: computeAutosaveSnapshot,
@@ -3340,6 +3503,8 @@ export default function StudioEditorV2() {
           onSave={handleSave}
           saving={saving}
           autosaveStatus={autosaveStatus}
+          collabConnected={studioRoom.connected}
+          collabPeers={studioRoom.peers}
           playback={playback}
           onApplyLayoutBindings={(bindings) => {
             if (bindings.leftTab === "widgets" || bindings.leftTab === "actions") {
@@ -4594,6 +4759,8 @@ function EditorHeader({
   onSave,
   saving,
   autosaveStatus,
+  collabConnected,
+  collabPeers,
   playback,
   onApplyLayoutBindings,
   persistedProjectId,
@@ -4633,6 +4800,11 @@ function EditorHeader({
   /** Background server-autosave status (#2242) — drives the "Saving… / Saved /
    *  Save failed" indicator next to the Save menu. */
   autosaveStatus: AutosaveStatus;
+  /** Real-time collaboration presence (#2243) — drives the live "N others
+   *  editing" avatar bar. `collabConnected` false / empty peers → the bar
+   *  self-hides. */
+  collabConnected: boolean;
+  collabPeers: import("@/lib/studio/collab/use-studio-room").CollabPeer[];
   playback: ReturnType<typeof usePreviewPlayback>;
   /** Workspace-layout dropdown handler (#349). The header mounts the
    *  PreviewLayoutGroup (Preview + layout split-button) but defers the
@@ -4934,6 +5106,8 @@ function EditorHeader({
             {t("studio.editorV2.embed")}
           </Button>
         )}
+        {/* Live collaborators (#2243) — self-hides when nobody else is here. */}
+        <CollabPresenceBar connected={collabConnected} peers={collabPeers} />
         {/* Background autosave status — reassures the user their work is
             persisting without them clicking Save (#2242). */}
         <AutosaveIndicator status={autosaveStatus} saving={saving} />

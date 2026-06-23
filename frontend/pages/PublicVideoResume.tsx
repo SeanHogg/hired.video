@@ -178,8 +178,12 @@ export default function PublicVideoResume() {
             </p>
             <p className="text-sm text-muted-foreground mt-0.5">AI-powered in minutes. Free to start.</p>
           </div>
+          {/* Anon adoption (#2212): drop the viewer straight into the studio
+              to create their own — no account required. A video resume seeds
+              the resume template; other kinds open a fresh draft they pick
+              from. Save/Publish gate for sign-up in place. */}
           <Link
-            to="/signup"
+            to={mediaKind === "video" ? "/studio/new?contentTemplate=resume" : "/studio/new"}
             className="shrink-0 px-5 py-2.5 rounded-lg bg-gradient-to-r from-brand-purple to-brand-blue text-white font-medium text-sm hover:opacity-90 transition-opacity"
           >
             Get Started Free

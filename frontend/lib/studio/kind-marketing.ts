@@ -38,6 +38,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { MediaKind } from "@shared/media-kinds";
+import type { ContentTemplate } from "@/components/studio/templates/catalog";
 
 export interface KindMarketingPitch {
   /** Display title — what the kind IS in user-facing terms. Different
@@ -64,6 +65,15 @@ export interface KindMarketingPitch {
    *  the runtime ships. Single SoT for "is this kind shipping?" — the
    *  router + the landing both gate on this flag. */
   isShippable: boolean;
+  /** Representative built-in content template the marketing "What you can
+   *  make" card seeds when a signed-out visitor picks this kind. Clicking
+   *  the card drops them straight into the anon editor on a fresh draft of
+   *  the right mediaKind via `/studio/new?contentTemplate=<id>` (#2212 anon
+   *  adoption). One curated starter per kind — the flagship template for
+   *  that format, not just "the first catalog match". Roadmap kinds carry a
+   *  best-fit id for type completeness; it's never linked because the grid
+   *  filters on `isShippable`. */
+  starterTemplate: ContentTemplate;
 }
 
 /** Per-kind pitch. `Record<MediaKind, …>` makes adding a new kind a
@@ -82,6 +92,9 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     // the flagship icon invisible against the dark "What you can make" grid.
     accentClass: "bg-slate-500/10 text-slate-500",
     isShippable: true,
+    // Video resume — the flagship video starter, same default the hero CTA
+    // seeds so the hero + this card open the identical fresh draft.
+    starterTemplate: "resume",
   },
   podcast: {
     title: "Podcasts & audio episodes",
@@ -90,6 +103,7 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     icon: Headphones,
     accentClass: "bg-violet-600/10 text-violet-600",
     isShippable: true,
+    starterTemplate: "podcast_episode",
   },
   voice: {
     title: "Voice clips",
@@ -98,6 +112,7 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     icon: Mic2,
     accentClass: "bg-amber-500/10 text-amber-600",
     isShippable: true,
+    starterTemplate: "voice_audition_reel",
   },
   animation: {
     title: "Animated loops",
@@ -106,6 +121,7 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     icon: Sparkles,
     accentClass: "bg-emerald-500/10 text-emerald-600",
     isShippable: true,
+    starterTemplate: "animation-explainer",
   },
   game: {
     title: "Browser games",
@@ -114,6 +130,9 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     icon: Gamepad2,
     accentClass: "bg-fuchsia-600/10 text-fuchsia-600",
     isShippable: true,
+    // 3D world — the headline of the games shelf (the 2D mini-games are the
+    // secondary lane). See [project_3d_world_game_studio].
+    starterTemplate: "game_3d_world",
   },
   comic: {
     title: "Interactive comics",
@@ -122,6 +141,9 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     icon: BookOpen,
     accentClass: "bg-sky-600/10 text-sky-600",
     isShippable: true,
+    // First genre in COMIC_GENRES — the editor lets the user switch genre
+    // inside ComicIntake, so any genre starter is a valid entry point.
+    starterTemplate: "comic_hero",
   },
   image: {
     // Roadmap kind — see #932 / #940. Listed here for TypeScript
@@ -133,6 +155,7 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     icon: ImageIcon,
     accentClass: "bg-rose-600/10 text-rose-600",
     isShippable: false,
+    starterTemplate: "drawing_blank",
   },
   cad: {
     // CAD 2D drafting runtime (#930) — Phase 1 scaffolding ships the
@@ -144,6 +167,7 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     icon: Ruler,
     accentClass: "bg-cyan-600/10 text-cyan-600",
     isShippable: false,
+    starterTemplate: "cad-floor-plan",
   },
   cad_3d: {
     // 3D CAD runtime (#930 follow-on). Primitive solids + boolean ops;
@@ -155,6 +179,7 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     icon: Box,
     accentClass: "bg-teal-600/10 text-teal-600",
     isShippable: false,
+    starterTemplate: "cad3d_part",
   },
   interactive_comic: {
     // Branching comic runtime (#929). Pages = scenes; reader picks
@@ -165,6 +190,7 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     icon: Workflow,
     accentClass: "bg-indigo-600/10 text-indigo-600",
     isShippable: false,
+    starterTemplate: "icomic_branching_pitch",
   },
   document: {
     // Paged WYSIWYG document runtime (#1912) — resume / job / article / blog
@@ -176,6 +202,7 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     icon: FileText,
     accentClass: "bg-blue-700/10 text-blue-700",
     isShippable: false,
+    starterTemplate: "resume_doc",
   },
 };
 
@@ -189,4 +216,16 @@ export function listShippableKindPitches(): Array<
   return (Object.entries(KIND_MARKETING) as Array<[MediaKind, KindMarketingPitch]>)
     .filter(([, p]) => p.isShippable)
     .map(([kind, pitch]) => ({ kind, ...pitch }));
+}
+
+/** Anon-editor deep link for a kind's marketing card. Drops a signed-out
+ *  visitor straight into `/studio/new` on a fresh draft of the right
+ *  mediaKind, seeded from the kind's representative starter template (#2212
+ *  anon adoption). The raw `ContentTemplate` id is passed verbatim as
+ *  `?contentTemplate=` — StudioEditorV2 resolves both the snake id and its
+ *  kebab slug (`slugToBuiltinId(hint) ?? hint`), so no normalisation here.
+ *  Single SoT for "where does picking this kind take you" — every marketing
+ *  surface links through this, never a hand-built `/studio/new?...` string. */
+export function kindStarterHref(kind: MediaKind): string {
+  return `/studio/new?contentTemplate=${KIND_MARKETING[kind].starterTemplate}`;
 }

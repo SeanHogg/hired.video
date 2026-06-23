@@ -1449,7 +1449,10 @@ export default function Jobs() {
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
-                <Link to="/signup?role=recruiter">
+                {/* Anon adoption (#2212): start a job posting in the studio
+                    (fresh draft, no account). Save/Publish — which attaches
+                    the posting to a company — gate for sign-up in place. */}
+                <Link to="/studio/new?contentTemplate=job_doc">
                   <Button size="lg" variant="outline" className="text-lg px-8">
                     <Plus className="mr-2 h-5 w-5" />
                     {t("actions.postAJob")}
@@ -1589,7 +1592,7 @@ export default function Jobs() {
                   {t("messages.jobs.employerCtaDesc")}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Link to="/signup?role=recruiter">
+                  <Link to="/studio/new?contentTemplate=job_doc">
                     <Button
                       size="lg"
                       className="bg-green-600 hover:bg-green-700 text-white"

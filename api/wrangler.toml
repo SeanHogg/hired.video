@@ -73,6 +73,15 @@ class_name = "ChatRoom"
 name = "GAME_ROOM"
 class_name = "GameSignalingRoom"
 
+# Real-time collaborative studio editing (gap #2243). One DO per
+# studio_projects.id — the authoritative hub for presence, live edit
+# relay (debounced document snapshots), host election, and the latest
+# collaborative snapshot. Hibernation keeps idle rooms ~free. See
+# api/src/durable/StudioRoom.ts + api/src/routes/studio-socket.ts.
+[[durable_objects.bindings]]
+name = "STUDIO_ROOM"
+class_name = "StudioRoom"
+
 [[migrations]]
 tag = "v1"
 # SQLite-backed Durable Object — required on the Workers free plan (the
@@ -87,6 +96,13 @@ tag = "v2"
 # (SQLite-backed, hibernation-enabled) as ChatRoom. Separate migration
 # tag so the original `v1` migration stays content-stable.
 new_sqlite_classes = ["GameSignalingRoom"]
+
+[[migrations]]
+tag = "v3"
+# StudioRoom (gap #2243) — SQLite-backed, hibernation-enabled, same family
+# as ChatRoom / GameSignalingRoom. Separate tag keeps prior migrations
+# content-stable.
+new_sqlite_classes = ["StudioRoom"]
 
 [vars]
 # Partner domains are sourced from shared/security/partnerDomains.ts.
@@ -191,10 +207,24 @@ binding = "AI"
 name = "CHAT_ROOM"
 class_name = "ChatRoom"
 
+# Real-time collaborative studio editing (gap #2243). Named-env blocks do
+# NOT inherit the top-level durable_objects/migrations, so STUDIO_ROOM must
+# be declared here too or `wrangler deploy --env production` ships without
+# it (the same reason GAME_ROOM is absent in prod — logged separately).
+[[env.production.durable_objects.bindings]]
+name = "STUDIO_ROOM"
+class_name = "StudioRoom"
+
 [[env.production.migrations]]
 tag = "v1"
 # SQLite-backed DO — see comment on the top-level [[migrations]] block.
 new_sqlite_classes = ["ChatRoom"]
+
+[[env.production.migrations]]
+tag = "v2"
+# StudioRoom (gap #2243) — SQLite-backed, hibernation-enabled. Production's
+# migration chain is independent of the top-level one; this is prod's v2.
+new_sqlite_classes = ["StudioRoom"]
 
 # To expose the worker via your custom domains, set your Cloudflare zone_id below and
 # add routes for both the new and legacy domains.

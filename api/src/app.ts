@@ -157,6 +157,7 @@ import { hiringInsightsRoutes } from "./routes/hiring-insights.js";
 import { graphRoutes } from "./routes/graph.js";
 import { chatSocketRoutes } from "./routes/chat-socket.js";
 import { gameSocketRoutes } from "./routes/game-socket.js";
+import { studioSocketRoutes } from "./routes/studio-socket.js";
 import { autoApplyRoutes } from "./routes/auto-apply.js";
 import { autofillRoutes } from "./routes/autofill.js";
 import { discoveryRoutes } from "./routes/discovery.js";
@@ -448,6 +449,14 @@ export function createApp() {
   const LIVE_SCREEN_PUBLIC_ROUTE =
     /^\/api\/live-screen\/invites\/[^/]+(?:\/respond)?$/;
 
+  // Studio collaboration WebSocket upgrade (gap #2243). A browser
+  // `WebSocket` can't send an Authorization header, so this upgrade can't
+  // pass the Bearer-header authMiddleware. The route
+  // ([studio-socket.ts](./routes/studio-socket.ts)) is its OWN auth gate —
+  // it verifies the `?access_token=` JWT and enforces `canActFor` against
+  // the project owner — so it's safe to bypass the global auth layer here.
+  const STUDIO_COLLAB_SOCKET_ROUTE = /^\/api\/studio\/[^/]+\/collab-socket$/;
+
   // Email-integration OAuth start + callback. These are top-level browser
   // navigations (consent screen redirect) so they can't carry an
   // Authorization header. The route reads the user id from a short-lived
@@ -570,6 +579,7 @@ export function createApp() {
     if (INTERVIEW_PUBLIC_ROUTE.test(path)) return "public";
     if (INTERVIEW_ASSIGNMENT_PUBLIC_ROUTE.test(path)) return "public";
     if (LIVE_SCREEN_PUBLIC_ROUTE.test(path)) return "public";
+    if (STUDIO_COLLAB_SOCKET_ROUTE.test(path)) return "public";
     if (POINTS_PUBLIC_ROUTE.test(path)) return "public";
     if (PREDICTIVE_ASSESSMENTS_PUBLIC_ROUTE.test(path)) return "public";
     if (EMAIL_OAUTH_PUBLIC_ROUTE.test(path)) return "public";
@@ -872,6 +882,12 @@ export function createApp() {
   app.route("/api/graph", graphRoutes);
   app.route("/api/chat/socket", chatSocketRoutes);
   app.route("/api/games", gameSocketRoutes);
+  // Real-time collaborative studio editing (gap #2243) — WS upgrade to the
+  // StudioRoom DO. Dual-mounted at /api/studio (same pattern as the games
+  // socket); self-authenticates via query-param JWT (browser WS can't send
+  // a Bearer header), so it's in the STUDIO_COLLAB_SOCKET_ROUTE public
+  // carve-out above.
+  app.route("/api/studio", studioSocketRoutes);
   app.route("/api/auto-apply", autoApplyRoutes);
   app.route("/api/autofill", autofillRoutes);
   app.route("/api/discovery", discoveryRoutes);

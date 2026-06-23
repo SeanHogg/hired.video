@@ -843,27 +843,18 @@ export default function Resumes() {
                   {t("messages.standOutAiVideo")}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  {isAuthenticated ? (
-                    <Link to="/studio">
-                      <Button
-                        size="lg"
-                        className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
-                      >
-                        {t("actions.createVideoResume")}
-                        <ArrowRight className="ml-2 h-5 w-5" />
-                      </Button>
-                    </Link>
-                  ) : (
-                    <Link to="/signup">
-                      <Button
-                        size="lg"
-                        className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
-                      >
-                        {t("actions.createVideoResume")}
-                        <ArrowRight className="ml-2 h-5 w-5" />
-                      </Button>
-                    </Link>
-                  )}
+                  {/* Anon adoption (#2212): signed-out visitors start a video
+                      resume in the studio (fresh draft, no account). Save /
+                      Publish gate for sign-up in place. */}
+                  <Link to="/studio/new?contentTemplate=resume">
+                    <Button
+                      size="lg"
+                      className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
+                    >
+                      {t("actions.createVideoResume")}
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
                   <WatchFeaturedVideoButton
                     size="lg"
                     variant="outline"
@@ -1149,27 +1140,15 @@ export default function Resumes() {
                 <p className="text-muted-foreground mb-8">
                   {t("messages.videoResumeCallToAction")}
                 </p>
-                {isAuthenticated ? (
-                  <Link to="/studio">
-                    <Button
-                      size="lg"
-                      className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
-                    >
-                      {t("actions.getStartedToday")}
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                  </Link>
-                ) : (
-                  <Link to="/signup">
-                    <Button
-                      size="lg"
-                      className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
-                    >
-                      {t("actions.getStartedToday")}
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                  </Link>
-                )}
+                <Link to="/studio/new?contentTemplate=resume">
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                  >
+                    {t("actions.getStartedToday")}
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
               </div>
         </div>
       </AppShell>

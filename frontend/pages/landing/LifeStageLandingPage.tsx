@@ -16,9 +16,11 @@ import { audienceLabel } from "@/components/landing/localize-audience";
 import { ResourceMap } from "@/components/landing/ResourceMap";
 import { ToolShowcase } from "@/components/landing/ToolShowcase";
 import { RelatedAudiences } from "@/components/landing/RelatedAudiences";
+import { AudienceHiringCTA } from "@/components/landing/AudienceHiringCTA";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { audienceSlug } from "@shared/audiences";
 import type { LifeStageAudienceMeta } from "@shared/audiences-registry";
 
 export interface LifeStageLandingPageProps {
@@ -35,6 +37,18 @@ export function LifeStageLandingPage({ meta }: LifeStageLandingPageProps): JSX.E
     description: meta.thesis,
     ogTitle: `For ${label} · hired.video`,
     ogDescription: meta.thesis,
+    // CollectionPage JSON-LD — complements the FAQPage (MarketingFAQ) +
+    // BreadcrumbList (useDefaultBreadcrumbs) so search + generative engines
+    // get a clear entity for this audience page.
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: `${label} · hired.video`,
+      description: meta.thesis,
+      url: `https://hired.video/for/${audienceSlug(meta.key)}`,
+      isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
+      about: { "@type": "Thing", name: label },
+    },
   });
   useDefaultBreadcrumbs();
 
@@ -84,6 +98,8 @@ export function LifeStageLandingPage({ meta }: LifeStageLandingPageProps): JSX.E
           },
         ]}
       />
+
+      <AudienceHiringCTA />
 
       <RelatedAudiences current={meta.key} />
     </AppShell>

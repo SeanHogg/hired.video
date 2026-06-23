@@ -315,7 +315,9 @@ export default function Features() {
               {t("features.heroSubtitle")}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/signup">
+              {/* Anon adoption (#2212): start creating in the studio with no
+                  account; value-capture actions gate for sign-up in place. */}
+              <Link to="/studio/new?contentTemplate=resume">
                 <Button
                   size="lg"
                   className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
@@ -400,7 +402,7 @@ export default function Features() {
               {t("features.ctaSubtitle")}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/signup">
+              <Link to="/studio/new?contentTemplate=resume">
                 <Button
                   size="lg"
                   className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"

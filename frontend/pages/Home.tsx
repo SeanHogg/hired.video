@@ -182,7 +182,12 @@ function HomeMarketingPage() {
                 {t("marketing.home.heroSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link to="/signup">
+                {/* Anon adoption (#2212): the primary CTA drops visitors
+                    straight into the studio on a fresh video-resume draft —
+                    no account required. Save/Publish/Export prompt for
+                    sign-up in place (and keep their work). Only "Sign In"
+                    routes to auth. */}
+                <Link to="/studio/new?contentTemplate=resume">
                   <Button
                     size="lg"
                     className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
@@ -474,7 +479,7 @@ function HomeMarketingPage() {
                 {t("marketing.home.ctaSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link to="/signup">
+                <Link to="/studio/new?contentTemplate=resume">
                   <Button
                     size="lg"
                     className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"

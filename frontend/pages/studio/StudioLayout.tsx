@@ -62,7 +62,7 @@ import { useSEO } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { studioService, type PublicVideo } from "@/lib/services/studio-service";
 import HeroVideoSpotlight from "@/components/HeroVideoSpotlight";
-import { listShippableKindPitches } from "@/lib/studio/kind-marketing";
+import { listShippableKindPitches, kindStarterHref } from "@/lib/studio/kind-marketing";
 import { AudienceQuickLinks } from "@/components/studio/templates/AudienceQuickLinks";
 import { compile } from "@/lib/compiler/video-compiler";
 import { migrateScriptToElements } from "@/lib/compiler/legacy-to-elements";
@@ -329,11 +329,21 @@ function Landing() {
           <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
             {t("messages.studioLayout.whatYouCanMakeDesc")}
           </p>
+          {/* Each kind card is now an actionable entry point — clicking it
+              drops a signed-out visitor straight into the anon editor on a
+              fresh draft of that mediaKind (#2212). Destination is owned by
+              `kindStarterHref` (single SoT for "picking this kind takes you
+              here"), so the marketing grid never hand-builds a /studio/new
+              URL. `mt-auto` on the CTA pins it to the card bottom regardless
+              of blurb length so the row of "Start creating →" affordances
+              lines up. */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {listShippableKindPitches().map((pitch) => (
-              <div
+              <Link
                 key={pitch.kind}
-                className="p-6 rounded-xl border border-border hover:border-primary/30 transition-colors"
+                to={kindStarterHref(pitch.kind)}
+                aria-label={t("labels.studioLayout.createKindAria", { kind: pitch.title })}
+                className="group flex flex-col p-6 rounded-xl border border-border hover:border-primary/40 hover:shadow-md transition-all"
               >
                 <div className={cn(
                   "w-12 h-12 rounded-lg flex items-center justify-center mb-4",
@@ -343,7 +353,11 @@ function Landing() {
                 </div>
                 <h3 className="font-semibold mb-2">{pitch.title}</h3>
                 <p className="text-sm text-muted-foreground">{pitch.blurb}</p>
-              </div>
+                <span className="mt-auto pt-4 inline-flex items-center gap-1 text-sm font-medium text-primary opacity-80 transition-opacity group-hover:opacity-100">
+                  {t("actions.studioLayout.startCreating")}
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </span>
+              </Link>
             ))}
           </div>
         </div>
