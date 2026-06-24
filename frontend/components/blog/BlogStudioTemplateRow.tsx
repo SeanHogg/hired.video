@@ -4,8 +4,9 @@
 // listed files match the registered TEMPLATES). Per the project's DRY
 // rule, the consumer never needs to gate this component itself.
 //
-// Each card links to `/studio?template=<file>` which the StudioLayout
-// bootstrap effect picks up to pre-load the worked-example structure.
+// Each card links to `/studio?template=<file>` which StudioLanding's mount
+// deep-link effect picks up (dynamic-imports `loadTemplate`, seeds a v2 draft
+// via the `kind:"script"` create seam) to pre-load the worked-example.
 
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";

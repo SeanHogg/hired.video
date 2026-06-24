@@ -106,6 +106,7 @@ import WizardLauncher from "@/components/studio/shared/WizardLauncher";
 import NewVideoSplitButton from "@/components/studio/shared/NewVideoSplitButton";
 import { AppShell } from "@/components/AppShell";
 import StudioMarketingHeader from "@/components/studio/StudioMarketingHeader";
+import StudioMarketingSections from "@/components/studio/StudioMarketingSections";
 import { useAuth } from "@/lib/auth";
 import { useSEO } from "@/lib/seo";
 import { cn } from "@/lib/utils";
@@ -353,6 +354,32 @@ export default function StudioLanding() {
         void create({ kind: "template", templateId: id }).then(navigateToProject);
         return;
       }
+    }
+    // `?template=<visual-theme-file>` — the blog "worked example" deep-link
+    // (BlogStudioTemplateRow). These are V1 visual-theme files (data/templates/
+    // *.json → VideoScript); the create seam converts the script to a v2 draft
+    // via `kind:"script"`. StudioSidebar is imported dynamically so its (v1)
+    // chunk loads ONLY for the rare blog visitor, not on every /studio view.
+    // (Handler used to live in the now-deleted StudioLayout.) Signed-out
+    // visitors fall back to a blank anon draft via the create seam.
+    const visualTemplateFile = searchParams.get("template");
+    if (visualTemplateFile) {
+      void (async () => {
+        try {
+          const { loadTemplate } = await import("./StudioSidebar");
+          const script = await loadTemplate(visualTemplateFile);
+          if (!script) return;
+          const created = await create({ kind: "script", script });
+          navigateToProject(created);
+        } catch (err) {
+          toast({
+            title: t("messages.studioLanding.loadTemplateFailed"),
+            description: err instanceof Error ? err.message : t("errors.unknownErrorAdmin"),
+            variant: "destructive",
+          });
+        }
+      })();
+      return;
     }
     const studioTemplateSlug = searchParams.get("studioTemplate");
     if (studioTemplateSlug) {
@@ -650,7 +677,15 @@ export default function StudioLanding() {
     STUDIO_EDIT_PARAMS.some((p) => searchParams.has(p)) ||
     searchParams.has("subject") ||
     searchParams.has("capture") ||
-    searchParams.has("new");
+    searchParams.has("new") ||
+    // Template deep-links (content template, creator template, blog visual
+    // theme) mint a draft then replace-navigate — show the shell, not a flash
+    // of the workspace, while that's in flight (signed-in only; signed-out
+    // template clicks route to the anon editor from the create seam).
+    (!!user &&
+      (searchParams.has("contentTemplate") ||
+        searchParams.has("studioTemplate") ||
+        searchParams.has("template")));
   if (redirecting) return <StudioLoadingShell />;
 
   return (
@@ -854,6 +889,11 @@ export default function StudioLanding() {
           />
         )}
       </section>
+      {/* Signed-out marketing band (stats · features · how-it-works · kind
+          grid · FAQ structured data · final CTA). Renders BELOW the workspace
+          so crawlers + first-time visitors still get the full studio pitch the
+          unified /studio used to carry; self-gated to `!user`. */}
+      {!user && <StudioMarketingSections />}
       <ProjectDetailsSheet
         noTrigger
         open={detailsProject !== null}

@@ -279,7 +279,35 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
       { model: "qwen/qwen3-coder:free", temperature: 0.2 },
     ],
   },
-  match_tailor: { model: "qwen/qwen3-next-80b-a3b-instruct:free", temperature: 0.4 },
+  // Resume tailoring emits the LARGEST JSON of any use case — the full
+  // tailored `ResumeContent` document PLUS a justified `changes[]` list and a
+  // summary. The previous profile (free-tier primary, NO maxTokens) made this
+  // flow fail systematically, not occasionally:
+  //   1. NO maxTokens → the gateway sent no `max_tokens`. Free/8B models
+  //      default to a small completion cap and TRUNCATE the full-resume echo
+  //      → invalid JSON → parse throw → chain advances. Worse, the paid
+  //      terminal `anthropic/claude-opus-4-8` REQUIRES `max_tokens`; an unset
+  //      value makes that attempt 400, so even the last-resort model couldn't
+  //      rescue the call → the whole chain exhausted with no result.
+  //   2. Free-tier primary → the common case depended on a congested free pool
+  //      that 429s / times out (each free attempt burns the 25s per-attempt
+  //      cap), and small models (cerebras llama3.1-8b) drop work/education
+  //      entries → `validateTailorOutput` fails → 400 after the single retry.
+  // This is a one-shot, user-blocking, high-value flow (same shape as
+  // job_parser / resume_ocr), so it now gets a reliable JSON-capable paid
+  // primary with a generous, explicit maxTokens (a large resume + changes +
+  // summary fits well under 8000). A free model stays as the cost-saving first
+  // fallback. The remaining structural win — switch to a diff-only output
+  // contract so the model never re-emits the untouched document — is tracked
+  // in gap #2109.
+  match_tailor: {
+    model: "anthropic/claude-opus-4-8",
+    temperature: 0.3,
+    maxTokens: 8000,
+    fallbacks: [
+      { model: "qwen/qwen3-next-80b-a3b-instruct:free", temperature: 0.3, maxTokens: 8000 },
+    ],
+  },
   match_insights: { model: "nousresearch/hermes-3-llama-3.1-405b:free", temperature: 0.4 },
   interview_questions: { model: "google/gemma-4-31b-it:free", temperature: 0.6 },
   interview_analyze: { model: "openai/gpt-oss-120b:free", temperature: 0.3 },
