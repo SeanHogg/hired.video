@@ -5192,7 +5192,12 @@ function EditorHeader({
           saving={saving}
           onSave={onSave}
           hasContent={hasContent}
-          mediaKind={persistedProject?.mediaKind ?? "video"}
+          // Use the canonical LIVE kind (the same `currentMediaKind` this
+          // header gates Playtest/Play on), NOT `persistedProject?.mediaKind ??
+          // "video"` — that defaulted an unsaved/document draft to "video", so
+          // a résumé document offered "Export video" + YouTube/LinkedIn. The
+          // save menu derives its export verb + publish rows from this kind.
+          mediaKind={mediaKind}
           projectId={persistedProjectId}
           slug={persistedProject?.slug ?? null}
           hasVideo={!!persistedProject?.videoUrl}

@@ -275,32 +275,40 @@ export default function StudioSaveMenuV2({
             Copy editor link
           </DropdownMenuItem>
 
-          <DropdownMenuSeparator />
+          {/* Publish section self-hides when the kind has no destinations
+              (e.g. `document` → résumé PDF: nothing to publish to YouTube /
+              RSS / a gallery). Per DRY the menu derives this from
+              `publishDestinationsFor(mediaKind)` — no caller-passed flag. */}
+          {destinations.length > 0 && (
+            <>
+              <DropdownMenuSeparator />
 
-          <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            Publish
-          </DropdownMenuLabel>
-          <p className="text-[10px] text-muted-foreground px-2 pb-1.5 leading-tight">
-            {publishHint}
-          </p>
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Publish
+              </DropdownMenuLabel>
+              <p className="text-[10px] text-muted-foreground px-2 pb-1.5 leading-tight">
+                {publishHint}
+              </p>
 
-          {destinations.map((dest) => {
-            // The Profile destination flips its verb based on the
-            // already-published state. Every other destination uses the
-            // registry's static label. ONE label-source per row.
-            const baseLabel = dest.id === "profile"
-              ? (isPublishedToProfile ? "Remove from profile" : "Publish to profile")
-              : `Publish to ${dest.label}`;
-            return (
-              <PublishItem
-                key={dest.id}
-                icon={destinationIcon(dest.id)}
-                label={baseLabel}
-                onClick={publishHandlers?.[dest.id]}
-                hasVideo={hasVideo}
-              />
-            );
-          })}
+              {destinations.map((dest) => {
+                // The Profile destination flips its verb based on the
+                // already-published state. Every other destination uses the
+                // registry's static label. ONE label-source per row.
+                const baseLabel = dest.id === "profile"
+                  ? (isPublishedToProfile ? "Remove from profile" : "Publish to profile")
+                  : `Publish to ${dest.label}`;
+                return (
+                  <PublishItem
+                    key={dest.id}
+                    icon={destinationIcon(dest.id)}
+                    label={baseLabel}
+                    onClick={publishHandlers?.[dest.id]}
+                    hasVideo={hasVideo}
+                  />
+                );
+              })}
+            </>
+          )}
 
           {/* More — project-lifecycle + template actions (clone / delete /
               publish-as-template). Folded into this dropdown so the header
