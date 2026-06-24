@@ -52,6 +52,7 @@ import {
   hasRecognisedPayload,
   readDragPayload,
   type DragKind,
+  type DragPayload,
 } from "@/lib/studio/editor-v2/drag-protocol";
 import {
   parseLinkedContentRef,
@@ -139,6 +140,10 @@ export interface CanvasStageProps {
    *  own (the picker can't be invoked from inside a sync drop handler),
    *  so this is purely "place here when capture finishes". */
   onScreenshotDrop?: (atFraction: { x: number; y: number }) => void;
+  /** A music track was dropped onto the canvas → add it as a music audio
+   *  layer (multi-track audio). The drop point is irrelevant for audio
+   *  (it's composition-wide), so this just receives the drag payload. */
+  onMusicDrop?: (payload: DragPayload) => void;
   /** Project-level font (FontPreset.id). Applied to every text /
    *  heading widget body unless that widget overrides locally. */
   defaultFontId?: string | null;
@@ -161,6 +166,7 @@ export default function CanvasStage({
   onLinkedContentDrop,
   onEngagementAssetDrop,
   onScreenshotDrop,
+  onMusicDrop,
   defaultFontId,
   projectId,
 }: CanvasStageProps) {
@@ -240,11 +246,14 @@ export default function CanvasStage({
         // parent run the async capture/upload then place the image.
         onScreenshotDrop?.(f);
         break;
-      case "font":
       case "music":
-        // Targeted drops (font onto text widget / music onto timeline)
-        // are gap-registered — the canvas isn't the right target for
-        // those today.
+        // Dropping a music track on the canvas adds a composition-wide
+        // music layer (multi-track audio). The drop point is irrelevant.
+        onMusicDrop?.(payload);
+        break;
+      case "font":
+        // Targeted font-onto-text-widget drops are gap-registered — the
+        // canvas isn't the right target for those today.
         break;
     }
   }

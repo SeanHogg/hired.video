@@ -1,33 +1,28 @@
 /**
  * Studio route dispatcher (V2 only).
  *
- *   /studio        →  unauth → StudioLayout's marketing landing
- *                              (kept for the signed-out hero/FAQ/CTA —
- *                              the v1 editor inside it never runs
- *                              because /studio/:id always routes to v2)
- *                       auth   → StudioLanding (chooser)
+ *   /studio        →  StudioLanding (the workspace) for EVERY visitor.
+ *                     Signed-out visitors get the same templates +
+ *                     "My content" layout a signed-in user sees, topped
+ *                     with a marketing hero (StudioLanding self-gates the
+ *                     header + the empty "My content" state on `!user`).
  *   /studio/:id    →  StudioEditorV2
  *
- * The classic v1 editor + the v1/v2 opt-in toggle have been removed
- * from the user-facing flow. V1 source files remain in the repo
- * (unmaintained) and will be deleted once every v1 capability has
- * been ported into v2.
+ * The classic v1 editor + the v1/v2 opt-in toggle have been removed from the
+ * user-facing flow. The old signed-out marketing landing lived inside
+ * `StudioLayout` (the unmaintained v1 surface); it no longer renders here —
+ * StudioLanding owns the signed-out marketing header now.
  */
 import { lazy, Suspense } from "react";
 import { useAuth } from "@/lib/auth";
-import StudioLayout from "./StudioLayout";
 import StudioLoadingShell from "./StudioLoadingShell";
 
 const StudioLanding = lazy(() => import("./StudioLanding"));
 const StudioEditorV2 = lazy(() => import("./v2/StudioEditorV2"));
 
 export default function StudioRoot() {
-  const { user, isLoading } = useAuth();
+  const { isLoading } = useAuth();
   if (isLoading) return <StudioLoadingShell />;
-  // Unauthenticated visitors still see the marketing surface that lives
-  // inside StudioLayout — the layout self-gates and returns its
-  // <Landing /> when `!user`, so the v1 editor never mounts.
-  if (!user) return <StudioLayout />;
   return (
     <Suspense fallback={<StudioLoadingShell />}>
       <StudioLanding />

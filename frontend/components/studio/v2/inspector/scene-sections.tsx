@@ -22,17 +22,33 @@ import FiltersPicker from "@/components/studio/shared/FiltersPicker";
 import FontPicker from "@/components/studio/shared/FontPicker";
 import ColorPalettePicker from "@/components/studio/shared/ColorPalettePicker";
 import RemoveBrandingToggle from "@/components/studio/shared/RemoveBrandingToggle";
-import { resolveMusic } from "@/lib/studio/music-catalog";
 import { findFormatByDimensions } from "@/lib/studio/video-formats";
 import { Input } from "@/components/ui/input";
 import { AutoSizeTextarea, ColorInput, Field } from "./fields";
 import { TRANSITION_PRESETS } from "@/lib/studio/motion-presets";
 import { scenePatchFromBgPreset } from "@/lib/studio/visual-themes";
 import EffectStackEditor from "@/components/studio/effects/EffectStackEditor";
+import { musicLayers } from "@/lib/studio/editor-v2/canvas-state";
+import { writeDragPayload } from "@/lib/studio/editor-v2/drag-protocol";
+import i18n from "@/lib/i18n/i18n";
 import type {
   SceneInspectorSection,
   CanvasInspectorSection,
 } from "./types";
+
+/** Active stock-music track id from the unified audioLayers model — the
+ *  first music layer backed by a stock catalog track. Drives the
+ *  MusicPicker's highlighted row. Custom (composed/uploaded) music
+ *  doesn't match a catalog id, so it stays unhighlighted (same as the
+ *  pre-audioLayers behaviour). */
+function activeStockMusicTrackId(
+  state: import("@/lib/studio/editor-v2/canvas-state").CanvasState,
+): string | null {
+  for (const layer of musicLayers(state)) {
+    if (layer.source.kind === "stock") return layer.source.trackId;
+  }
+  return null;
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // Per-scene sections — mutate state.scenes[active] only.
@@ -226,10 +242,18 @@ export const CANVAS_SECTIONS: CanvasInspectorSection[] = [
   {
     id: "canvas-music",
     title: "Music",
+    // Click selects (onSelectMusic) AND each row is draggable onto the
+    // timeline / canvas to add a music LAYER — both paths resolve the
+    // track by id, so they can't disagree on what's available.
     render: ({ state, onSelectMusic }) => (
       <MusicPicker
-        activeSelectionId={resolveMusic(state.musicSource)?.selectionId ?? null}
+        activeSelectionId={activeStockMusicTrackId(state)}
         onSelect={onSelectMusic}
+        trackDraggable
+        trackDragLabel={i18n.t("studio.music.dragToAdd")}
+        onTrackDragStart={(track, e) =>
+          writeDragPayload(e.dataTransfer, { kind: "music", data: track.id })
+        }
       />
     ),
   },

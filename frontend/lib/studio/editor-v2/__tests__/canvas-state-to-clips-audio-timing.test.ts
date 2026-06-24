@@ -1,9 +1,11 @@
 /**
  * Tests for the music + voiceover timing-control plumbing in
- * `canvasStateToAudioClips` (#1115). Pins:
+ * `canvasStateToAudioClips` (#1115), rebuilt on the unified
+ * `audioLayers[]` model. Pins:
  *   - Music `startOffsetSec` shifts the clip's composition-time start.
  *   - Music `fadeInSec` / `fadeOutSec` ride the first / last segment.
  *   - Voiceover trims shrink the playable length; offset shifts start.
+ *   - Each music layer emits its own clip.
  *
  * The shared audio scheduler reads these fields verbatim, so a
  * regression here would silently break preview + export fades.
@@ -11,21 +13,26 @@
 
 import { describe, expect, it } from "vitest";
 import { canvasStateToAudioClips } from "../canvas-state-to-clips";
-import { emptyCanvasState, type CanvasState } from "../canvas-state";
+import {
+  emptyCanvasState,
+  makeAudioLayer,
+  type AudioLayer,
+  type CanvasState,
+} from "../canvas-state";
 
-function withVoiceover(overrides: { startOffsetSec?: number; trimStartSec?: number; trimEndSec?: number; fadeInSec?: number; fadeOutSec?: number } = {}): CanvasState {
+function withVoiceover(overrides: Partial<AudioLayer> = {}): CanvasState {
   const base = emptyCanvasState();
   return {
     ...base,
-    voiceovers: [
-      {
+    audioLayers: [
+      makeAudioLayer({
         id: "vo-1",
-        url: "https://example.com/vo.mp3",
+        kind: "voiceover",
+        source: { kind: "custom", url: "https://example.com/vo.mp3" },
         label: "Take 1",
         durationSeconds: 12,
-        anchorSceneId: null,
         ...overrides,
-      },
+      }),
     ],
   };
 }
@@ -66,19 +73,20 @@ describe("canvasStateToAudioClips — voiceover timing", () => {
 });
 
 describe("canvasStateToAudioClips — music timing", () => {
-  function withMusic(
-    timing: { startOffsetSec?: number; fadeInSec?: number; fadeOutSec?: number } = {},
-  ): CanvasState {
+  function withMusic(overrides: Partial<AudioLayer> = {}): CanvasState {
     const base = emptyCanvasState();
     return {
       ...base,
-      musicSource: {
-        kind: "custom",
-        url: "https://example.com/track.mp3",
-        label: "Stock",
-        durationSeconds: 60,
-        ...timing,
-      },
+      audioLayers: [
+        makeAudioLayer({
+          id: "m-1",
+          kind: "music",
+          source: { kind: "custom", url: "https://example.com/track.mp3" },
+          label: "Stock",
+          durationSeconds: 60,
+          ...overrides,
+        }),
+      ],
     };
   }
 
@@ -106,5 +114,33 @@ describe("canvasStateToAudioClips — music timing", () => {
     const state = withMusic({ startOffsetSec: 9999 });
     const clips = canvasStateToAudioClips(state).filter((c) => c.id.startsWith("v2-music"));
     expect(clips.length).toBe(0);
+  });
+
+  it("emits a separate clip for each music layer", () => {
+    const base = emptyCanvasState();
+    const state: CanvasState = {
+      ...base,
+      audioLayers: [
+        makeAudioLayer({
+          id: "m-1",
+          kind: "music",
+          source: { kind: "custom", url: "https://example.com/bed-a.mp3" },
+          label: "Bed A",
+          durationSeconds: 60,
+        }),
+        makeAudioLayer({
+          id: "m-2",
+          kind: "music",
+          source: { kind: "custom", url: "https://example.com/bed-b.mp3" },
+          label: "Bed B",
+          durationSeconds: 60,
+        }),
+      ],
+    };
+    const music = canvasStateToAudioClips(state).filter((c) => c.id.startsWith("v2-music"));
+    // Two music layers → two clips, indexed by layer order.
+    expect(music).toHaveLength(2);
+    expect(music.map((c) => c.id).sort()).toEqual(["v2-music-0", "v2-music-1"]);
+    expect(music.map((c) => c.label).sort()).toEqual(["Bed A", "Bed B"]);
   });
 });

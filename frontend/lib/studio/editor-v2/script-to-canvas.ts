@@ -16,7 +16,7 @@
  *   - backgroundImage / overlayMediaUrl → image OR video widget
  *   - sceneElements → free-form widgets already positioned by the v1
  *     editor; box uses % so we just normalise to fractions
- *   - script.video.audio.track → musicSource (stock id)
+ *   - script.video.audio.track → a "music" audio layer (stock id)
  *
  * Single source of truth: every "open a v1 project in v2" path calls
  * this function. No consumer hand-rolls the mapping.
@@ -36,10 +36,11 @@ import type { VideoFilters as CanvasVideoFilters } from "../video-filters";
 import {
   CANVAS_STATE_VERSION,
   emptyCanvasState,
+  makeAudioLayer,
+  type AudioLayer,
   type CanvasState,
   type ContainerStyle,
   type Scene,
-  type VoiceoverClip,
   type Widget,
   type WidgetParams,
   type WidgetPosition,
@@ -72,6 +73,21 @@ export function scriptToCanvasState(script: VideoScript): CanvasState {
     : emptyCanvasState({ width: dim.width, height: dim.height, fps }).scenes;
 
   const musicTrack = script.video.audio?.track;
+  // One music layer first (when the script names a real stock track),
+  // then the per-scene voiceover layers — preserving the old
+  // `musicSource` + `voiceovers[]` ordering as a single `audioLayers`
+  // array.
+  const musicLayer: AudioLayer | null =
+    musicTrack && musicTrack !== "none" && musicTrack !== "custom"
+      ? makeAudioLayer({
+          kind: "music",
+          source: { kind: "stock", trackId: musicTrack },
+          label: script.video.audio?.label ?? musicTrack,
+          // Track-bar duration falls back to the composition length; the
+          // mixer can trim/extend within it.
+          durationSeconds: script.video.duration ?? 0,
+        })
+      : null;
   return {
     schemaVersion: CANVAS_STATE_VERSION,
     width: dim.width,
@@ -79,15 +95,12 @@ export function scriptToCanvasState(script: VideoScript): CanvasState {
     fps,
     scenes,
     themeId: null,
-    musicSource:
-      musicTrack && musicTrack !== "none" && musicTrack !== "custom"
-        ? { kind: "stock", trackId: musicTrack }
-        : null,
     captions: null,
     // Per-scene `sceneAudio` strings + sceneElements audio entries
-    // hoist into voiceovers, anchored to their source scene so the
-    // composition's per-scene audio survives import (gap #604).
-    voiceovers: collectVoiceovers(script),
+    // hoist into voiceover layers, anchored to their source scene so the
+    // composition's per-scene audio survives import (gap #604). A stock
+    // music track (when present) leads the array.
+    audioLayers: [...(musicLayer ? [musicLayer] : []), ...collectVoiceovers(script)],
     codec: null,
     motion: null,
     defaultTransition: null,
@@ -96,27 +109,33 @@ export function scriptToCanvasState(script: VideoScript): CanvasState {
   };
 }
 
-function collectVoiceovers(script: VideoScript): VoiceoverClip[] {
-  const out: VoiceoverClip[] = [];
+function collectVoiceovers(script: VideoScript): AudioLayer[] {
+  const out: AudioLayer[] = [];
   for (const s of script.scenes) {
     if (s.sceneAudio) {
-      out.push({
-        id: `vo_${s.id}_audio`,
-        url: s.sceneAudio,
-        durationSeconds: s.duration,
-        anchorSceneId: s.id,
-        label: s.sceneAudioLabel ?? "Scene audio",
-      });
+      out.push(
+        makeAudioLayer({
+          id: `vo_${s.id}_audio`,
+          kind: "voiceover",
+          source: { kind: "custom", url: s.sceneAudio },
+          durationSeconds: s.duration,
+          anchorSceneId: s.id,
+          label: s.sceneAudioLabel ?? "Scene audio",
+        }),
+      );
     }
     for (const el of s.sceneElements ?? []) {
       if (el.kind === "audio" && el.url) {
-        out.push({
-          id: `vo_${el.id}`,
-          url: el.url,
-          durationSeconds: s.duration,
-          anchorSceneId: s.id,
-          label: el.label ?? "Audio",
-        });
+        out.push(
+          makeAudioLayer({
+            id: `vo_${el.id}`,
+            kind: "voiceover",
+            source: { kind: "custom", url: el.url },
+            durationSeconds: s.duration,
+            anchorSceneId: s.id,
+            label: el.label ?? "Audio",
+          }),
+        );
       }
     }
   }
@@ -585,7 +604,7 @@ function elementToWidget(
         containerStyle,
       };
     case "audio":
-      // Audio elements hoist into top-level voiceovers (see
+      // Audio elements hoist into top-level voiceover audio layers (see
       // `collectVoiceovers`) rather than living as a canvas widget,
       // because v2 doesn't have a non-visual widget kind.
       return null;

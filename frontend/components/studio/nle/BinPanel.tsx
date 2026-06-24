@@ -60,9 +60,18 @@ interface Props {
   /** Called when the user double-clicks (or activates) a source. The
    *  parent typically inserts the clip onto the active track. */
   onPickSource?: (source: NleMediaSourceWithBin) => void;
+  /** Optional extra `dragstart` hook — invoked AFTER the panel sets its
+   *  own `NLE_SOURCE_DRAG_MIME`, letting a consumer attach an additional
+   *  drag payload (e.g. the studio's `{kind:"music"}` protocol so a bin
+   *  audio source can be dragged onto the canvas/timeline as a layer).
+   *  The NLE source MIME stays intact for NLE drop targets. */
+  onSourceDragStart?: (
+    e: React.DragEvent,
+    source: NleMediaSourceWithBin,
+  ) => void;
 }
 
-export default function BinPanel({ initial, onPickSource }: Props) {
+export default function BinPanel({ initial, onPickSource, onSourceDragStart }: Props) {
   const { t } = useTranslation();
   const [sources, setSources] = useState<NleMediaSourceWithBin[]>(initial ?? []);
   const [loaded, setLoaded] = useState(initial != null);
@@ -358,6 +367,7 @@ export default function BinPanel({ initial, onPickSource }: Props) {
             onDragStart={(e) => {
               e.dataTransfer.setData(NLE_SOURCE_DRAG_MIME, src.id);
               e.dataTransfer.effectAllowed = "copy";
+              onSourceDragStart?.(e, src);
             }}
             onDoubleClick={() => onPickSource?.(src)}
             className="group flex items-center gap-2 rounded border bg-background p-1.5 hover:bg-accent cursor-grab"

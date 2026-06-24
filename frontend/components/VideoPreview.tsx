@@ -4,7 +4,7 @@
 // live player all schedule audio through the SAME `scheduleClipsToDestination`
 // seam (per the DRY rule). TTS voiceover (`speakWithEngine`) stays in
 // this component because the V1 voiceover model is a TTS spec, not a
-// pre-rendered audio clip — V2's pre-rendered VoiceoverClip[] rides on
+// pre-rendered audio clip — V2's voiceover-kind audio layers ride on
 // the music-clip lane via canvas-state-to-clips.ts.
 
 import { useEffect, useRef, useCallback } from "react";

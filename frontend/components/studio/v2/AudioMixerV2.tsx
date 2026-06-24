@@ -1,29 +1,23 @@
 /**
  * AudioMixerV2 — V2-native audio mixer. Operates directly on
- * `CanvasState.audioMix` + `CanvasState.voiceovers[].gain/muted`, with
- * no v1 `VideoScript` projection (#645). Two lanes — Music (sourced
- * from `state.musicSource`) and Voiceover (each clip in `voiceovers[]`
- * gets its own row) — plus a master fader.
+ * `CanvasState.audioMix` (master + per-lane gain/mute) and the unified
+ * `CanvasState.audioLayers[]` model (#645), with no v1 `VideoScript`
+ * projection. Two mixer lanes — Music (every music + sfx layer rides the
+ * music lane) and Voiceover (each voiceover layer its own row) — plus a
+ * master fader. Every layer also gets a per-layer gain/mute sub-row.
  *
  * Self-gating per the DRY rule:
- *   - Returns null when the state has no music AND no voiceovers (no
- *     audio to mix — silence the trigger surface).
- *   - Mute / unmute toggles read their own state from `audioMix` (or
- *     per-clip `muted`), never from a consumer-derived boolean.
+ *   - Returns null when the state has no audio layers at all (nothing to
+ *     mix — silence the trigger surface).
+ *   - Mute / unmute toggles read their own state from `audioMix` (lane)
+ *     or per-layer `muted`, never from a consumer-derived boolean.
  *
- * Render path: the preview player + future v2-native render facade
- * both compose final gain as `master * lane * clip` so the mix the
- * user hears in preview is the mix the export emits.
+ * Render path: the preview player + v2-native render facade both compose
+ * final gain as `master * lane * layer` so the mix the user hears in
+ * preview is the mix the export emits.
  */
-import { useMemo } from "react";
-import {
-  Loader2,
-  Mic,
-  Music,
-  Sliders,
-  Volume2,
-  VolumeX,
-} from "lucide-react";
+import { Mic, Music, Sliders, Volume2, VolumeX } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -35,21 +29,25 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { resolveMusic } from "@/lib/studio/music-catalog";
 import {
   DEFAULT_AUDIO_MIX,
   DEFAULT_DUCK_AMOUNT,
+  musicLayers,
+  voiceoverLayers,
   type CanvasAudioMix,
   type CanvasState,
-  type VoiceoverClip,
 } from "@/lib/studio/editor-v2/canvas-state";
 
 interface Props {
   state: CanvasState;
   onPatchMix: (patch: Partial<CanvasAudioMix>) => void;
+  /** Patch ANY audio layer's per-layer gain / muted by id (music,
+   *  voiceover, or sfx — the id is enough to locate it in
+   *  `audioLayers`). Named `onPatchVoiceover` for call-site
+   *  back-compat; it patches any layer. */
   onPatchVoiceover: (
-    clipId: string,
-    patch: Partial<Pick<VoiceoverClip, "gain" | "muted">>,
+    layerId: string,
+    patch: { gain?: number; muted?: boolean },
   ) => void;
 }
 
@@ -58,14 +56,16 @@ export default function AudioMixerV2({
   onPatchMix,
   onPatchVoiceover,
 }: Props) {
-  const music = useMemo(() => resolveMusic(state.musicSource), [state.musicSource]);
-  const hasMusic = music !== null;
-  const hasVoiceover = state.voiceovers.length > 0;
-  const hasAnyAudio = hasMusic || hasVoiceover;
+  const { t } = useTranslation();
+  const music = musicLayers(state);
+  const voiceovers = voiceoverLayers(state);
+  const sfx = state.audioLayers.filter((l) => l.kind === "sfx");
+  const hasMusic = music.length > 0;
+  const hasVoiceover = voiceovers.length > 0;
   const mix = state.audioMix ?? DEFAULT_AUDIO_MIX;
 
-  // Self-gate: nothing to mix, no point rendering the trigger.
-  if (!hasAnyAudio) return null;
+  // Self-gate: no audio layers at all, no point rendering the trigger.
+  if (state.audioLayers.length === 0) return null;
 
   return (
     <Dialog>
@@ -76,15 +76,14 @@ export default function AudioMixerV2({
           className="h-7 justify-start px-2 text-xs"
         >
           <Sliders className="mr-1.5 h-3.5 w-3.5" />
-          Audio mixer
+          {t("studio.audioMixer.trigger")}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Audio mixer</DialogTitle>
+          <DialogTitle>{t("studio.audioMixer.title")}</DialogTitle>
           <DialogDescription>
-            Master, music, and voiceover gains. Preview + export both
-            compose final gain as <code>master × lane × clip</code>.
+            {t("studio.audioMixer.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -92,33 +91,53 @@ export default function AudioMixerV2({
           {/* Master */}
           <LaneRow
             icon={Volume2}
-            label="Master"
+            label={t("studio.audioMixer.lane.master")}
             gain={mix.masterGain}
             muted={false}
             onGain={(masterGain) => onPatchMix({ masterGain })}
           />
 
-          {/* Music lane */}
-          {hasMusic && (
-            <LaneRow
-              icon={Music}
-              label={`Music — ${music?.label ?? "selected"}`}
-              gain={mix.musicGain}
-              muted={mix.musicMuted}
-              onGain={(musicGain) => onPatchMix({ musicGain })}
-              onToggleMute={() => onPatchMix({ musicMuted: !mix.musicMuted })}
-            />
+          {/* Music lane — the lane fader, then a per-layer sub-row for
+              each music AND sfx layer (sfx rides the music lane). */}
+          {(hasMusic || sfx.length > 0) && (
+            <>
+              {hasMusic && (
+                <LaneRow
+                  icon={Music}
+                  label={t("studio.audioMixer.lane.music")}
+                  gain={mix.musicGain}
+                  muted={mix.musicMuted}
+                  onGain={(musicGain) => onPatchMix({ musicGain })}
+                  onToggleMute={() =>
+                    onPatchMix({ musicMuted: !mix.musicMuted })
+                  }
+                />
+              )}
+              <div className="ml-4 flex flex-col gap-3 border-l border-border pl-3">
+                {[...music, ...sfx].map((layer) => (
+                  <LaneRow
+                    key={layer.id}
+                    icon={Music}
+                    label={layer.label}
+                    gain={layer.gain}
+                    muted={layer.muted}
+                    compact
+                    onGain={(gain) => onPatchVoiceover(layer.id, { gain })}
+                    onToggleMute={() =>
+                      onPatchVoiceover(layer.id, { muted: !layer.muted })
+                    }
+                  />
+                ))}
+              </div>
+            </>
           )}
 
           {/* Ducking — only meaningful when both music + voiceover are
               present. Self-gate per DRY: returns null otherwise so the
-              user doesn't see a control that can't actually do
-              anything. The slider value is the ducked multiplier; the
-              shared `audio-ducking.ts` helper composes it with the
-              music lane gain so preview + export match (1:1 split:
-              preview pipes through `canvasStateToAudioClips`, export
-              through `canvasStateToTimeline` — both call the same
-              `computeDuckingSegments`). */}
+              user doesn't see a control that can't do anything. The
+              slider value is the ducked multiplier; the shared
+              `audio-ducking.ts` helper composes it with the music lane
+              gain so preview + export match. */}
           {hasMusic && hasVoiceover && (
             <DuckingRow
               enabled={Boolean(mix.duckMusicUnderVoiceover)}
@@ -130,12 +149,12 @@ export default function AudioMixerV2({
             />
           )}
 
-          {/* Voiceover lane — master plus a row per clip */}
+          {/* Voiceover lane — the lane fader plus a row per layer */}
           {hasVoiceover && (
             <>
               <LaneRow
                 icon={Mic}
-                label="Voiceover (lane)"
+                label={t("studio.audioMixer.lane.voiceover")}
                 gain={mix.voiceoverGain}
                 muted={mix.voiceoverMuted}
                 onGain={(voiceoverGain) => onPatchMix({ voiceoverGain })}
@@ -144,17 +163,20 @@ export default function AudioMixerV2({
                 }
               />
               <div className="ml-4 flex flex-col gap-3 border-l border-border pl-3">
-                {state.voiceovers.map((clip) => (
+                {voiceovers.map((layer) => (
                   <LaneRow
-                    key={clip.id}
+                    key={layer.id}
                     icon={Mic}
-                    label={clip.label || "Voiceover"}
-                    gain={clip.gain ?? 1}
-                    muted={Boolean(clip.muted)}
+                    label={
+                      layer.label ||
+                      t("studio.audioMixer.voiceoverFallback")
+                    }
+                    gain={layer.gain}
+                    muted={layer.muted}
                     compact
-                    onGain={(gain) => onPatchVoiceover(clip.id, { gain })}
+                    onGain={(gain) => onPatchVoiceover(layer.id, { gain })}
                     onToggleMute={() =>
-                      onPatchVoiceover(clip.id, { muted: !clip.muted })
+                      onPatchVoiceover(layer.id, { muted: !layer.muted })
                     }
                   />
                 ))}
@@ -178,18 +200,19 @@ function DuckingRow({
   onToggle: (next: boolean) => void;
   onAmount: (next: number) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-1.5 rounded-md border border-border bg-muted/30 px-3 py-2">
       <div className="flex items-center justify-between gap-2">
         <Label className="flex items-center gap-1.5 text-xs">
           <Music className="h-3 w-3" />
-          Duck music under voiceover
+          {t("studio.audioMixer.duck.label")}
         </Label>
         <input
           type="checkbox"
           checked={enabled}
           onChange={(e) => onToggle(e.target.checked)}
-          aria-label="Auto-duck music under voiceover"
+          aria-label={t("studio.audioMixer.duck.toggleAria")}
         />
       </div>
       {enabled && (
@@ -204,7 +227,7 @@ function DuckingRow({
             value={[amount]}
             onValueChange={([v]) => onAmount(v)}
             className="flex-1"
-            aria-label="Ducked music volume"
+            aria-label={t("studio.audioMixer.duck.amountAria")}
           />
         </div>
       )}
@@ -229,6 +252,7 @@ function LaneRow({
   onToggleMute?: () => void;
   compact?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
@@ -237,7 +261,7 @@ function LaneRow({
           {label}
         </Label>
         <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
-          {muted ? "muted" : `${Math.round(gain * 100)}%`}
+          {muted ? t("studio.audioMixer.mute") : `${Math.round(gain * 100)}%`}
         </span>
       </div>
       <div className="flex items-center gap-2">
@@ -248,7 +272,11 @@ function LaneRow({
             size="sm"
             className="h-6 w-6 p-0"
             onClick={onToggleMute}
-            aria-label={muted ? "Unmute" : "Mute"}
+            aria-label={
+              muted
+                ? t("studio.audioMixer.unmute")
+                : t("studio.audioMixer.mute")
+            }
           >
             {muted ? (
               <VolumeX className="h-3 w-3 text-muted-foreground" />

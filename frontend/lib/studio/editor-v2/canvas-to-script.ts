@@ -19,9 +19,9 @@
  *   - `containerStyle.padding`, `chart`/`webcam` widget kinds, and
  *     non-Ken-Burns animations pass through directly because v1's
  *     SceneElement union already supports them.
- *   - Voiceover clips ride along as scene-level overlays on whichever
- *     scene they anchor to (best-effort — multi-clip voice is gap-
- *     registered for full audio mixing).
+ *   - Voiceover audio layers ride along as scene-level overlays on
+ *     whichever scene they anchor to (best-effort — multi-clip voice is
+ *     gap-registered for full audio mixing).
  *
  * Per the DRY rule: every v2→render path goes through this function.
  * No consumer hand-rolls the conversion.
@@ -41,11 +41,13 @@ import type {
   ImageAnimation,
   AudioElement,
 } from "@/types/video-script";
-import type {
-  CanvasState,
-  ContainerStyle,
-  Scene,
-  Widget,
+import {
+  musicLayers,
+  voiceoverLayers,
+  type CanvasState,
+  type ContainerStyle,
+  type Scene,
+  type Widget,
 } from "./canvas-state";
 
 export interface CanvasToScriptOptions {
@@ -62,11 +64,16 @@ export function canvasStateToScript(
   const aspect = aspectFor(state.width, state.height);
   const resolution = resolutionFor(state.height);
 
+  // Voiceover layers anchor scene-level audio; the first music layer (if
+  // any) drives v1's single `audio.track` field.
+  const voiceovers = voiceoverLayers(state);
+  const firstMusic = musicLayers(state)[0] ?? null;
+
   let cursor = 0;
   const scenes: SceneScript[] = state.scenes.map((scene, idx) => {
     const start = cursor;
     cursor += scene.durationSeconds;
-    return sceneToSceneScript(scene, state, idx, start);
+    return sceneToSceneScript(scene, voiceovers, state, idx, start);
   });
 
   const total = options.totalDurationOverride ?? cursor;
@@ -89,16 +96,16 @@ export function canvasStateToScript(
           ? canvasFiltersToScript(state.scenes[0].filters)
           : undefined,
       },
-      audio: state.musicSource
+      audio: firstMusic
         ? {
             track:
-              state.musicSource.kind === "stock"
-                ? state.musicSource.trackId
+              firstMusic.source.kind === "stock"
+                ? firstMusic.source.trackId
                 : "custom",
             label:
-              state.musicSource.kind === "stock"
-                ? state.musicSource.trackId
-                : state.musicSource.label,
+              firstMusic.source.kind === "stock"
+                ? firstMusic.source.trackId
+                : firstMusic.label,
             volume: 0.6,
           }
         : undefined,
@@ -109,13 +116,15 @@ export function canvasStateToScript(
 
 function sceneToSceneScript(
   scene: Scene,
+  voiceovers: ReadonlyArray<CanvasState["audioLayers"][number]>,
   state: CanvasState,
   idx: number,
   start: number,
 ): SceneScript {
-  // Anchor voiceovers to the scene — populate sceneAudio so v1's
+  // Anchor voiceover layers to the scene — populate sceneAudio so v1's
   // compiler stitches the URL onto the timeline.
-  const vo = state.voiceovers.find((v) => v.anchorSceneId === scene.id);
+  const vo = voiceovers.find((v) => v.anchorSceneId === scene.id);
+  const voUrl = vo?.source.kind === "custom" ? vo.source.url : undefined;
   // CTA widgets are first-class in v2 but v1 represents the CTA on the
   // scene envelope (`ctaText` + the storyboard's `ctaUrl`). Emit the
   // first CTA widget back at scene scope so the v1 render path can
@@ -150,7 +159,7 @@ function sceneToSceneScript(
     sceneElements: scene.widgets
       .map(widgetToElement)
       .filter((e): e is SceneElement => e !== null),
-    sceneAudio: vo?.url,
+    sceneAudio: voUrl,
     sceneAudioLabel: vo?.label,
     ...(animation ? { animation } : {}),
     ...(scene.effects && scene.effects.length > 0 ? { effects: scene.effects } : {}),

@@ -34,6 +34,7 @@
  */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/auth";
 import type { StudioSubject } from "@shared/studio-subject";
 import type { ComicSpec } from "@shared/comic-spec";
 import { useToast } from "@/hooks/use-toast";
@@ -91,9 +92,25 @@ interface Opts {
   skipNavigate?: boolean;
 }
 
+/** Where a signed-out visitor lands when they "start a new project". An
+ *  anonymous visitor has no server row to write to, so we route them into the
+ *  anon editor (`/studio/new`) where the canvas autosaves to localStorage and
+ *  Save / Publish / Export prompt for sign-up in place (StudioEditorV2 +
+ *  useAuthGate). `template` carries the chosen kind via `?contentTemplate=` so
+ *  the draft opens seeded with the right template; every other input shape has
+ *  server-generated content that can't survive a URL hop, so it falls back to
+ *  a blank anon draft. */
+function anonStartHref(input: CreateStudioDraftInput): string {
+  if (input.kind === "template") {
+    return `/studio/new?contentTemplate=${encodeURIComponent(input.templateId)}`;
+  }
+  return "/studio/new?new=1";
+}
+
 export function useCreateStudioDraft(opts: Opts = {}) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const { isV2 } = useEditorPreference();
   const [defaultTemplate, setDefaultTemplate] =
     usePersistentState<ContentTemplate>("studio_default_template", "basic");
@@ -101,6 +118,18 @@ export function useCreateStudioDraft(opts: Opts = {}) {
 
   async function create(input: CreateStudioDraftInput): Promise<StudioProject | null> {
     if (creating) return null;
+    // Signed-out visitors don't have a server row to write to — route every
+    // "start a new project" path into the anon editor instead. Doing it here
+    // (the single create seam) means every consumer — the /studio template
+    // carousel, NewVideoSplitButton, WizardLauncher — works signed-out with no
+    // per-caller branch. We navigate and return null; callers already treat a
+    // null result as "nothing more to do" (their `onCreated`/optimistic
+    // prepend simply doesn't fire).
+    if (!user) {
+      if (input.kind === "template") setDefaultTemplate(input.templateId);
+      navigate(anonStartHref(input));
+      return null;
+    }
     setCreating(true);
     // Derive the kind that's being created so a failure toast can say
     // "Couldn't create drawing" instead of the generic "Couldn't create

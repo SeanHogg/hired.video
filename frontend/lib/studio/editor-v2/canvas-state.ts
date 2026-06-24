@@ -23,8 +23,12 @@ import {
   stampLinkedContentColors,
   stampEngagementAssetColors,
 } from "./linked-content";
+import { findMusicTrack } from "../music-catalog";
 
-export const CANVAS_STATE_VERSION = 1;
+// v2: unified `audioLayers[]` replaces the single `musicSource` +
+// `voiceovers[]` split (multi-track audio rebuild). Legacy drafts are
+// migrated forward by `normalizeCanvasState` / `buildAudioLayers`.
+export const CANVAS_STATE_VERSION = 2;
 
 export type WidgetKind =
   | "text"
@@ -594,49 +598,67 @@ export interface CanvasCaptions {
   enabled: boolean;
 }
 
-/** Voiceover audio attached to the composition. Stored alongside the
- *  scenes so the v2 editor can show it in the timeline + emit it on
- *  save. The url is whatever the recorder produced (blob: in-memory
- *  for unsaved drafts, R2 cdn URL after first save). */
-export interface VoiceoverClip {
+/** Kinds of audio layer. `music` is a background bed (one OR MORE per
+ *  composition since the multi-track rebuild), `voiceover` is narration
+ *  (recorded or TTS-synthesised), `sfx` is a one-shot sound effect. The
+ *  kind drives the mixer lane (see `audioLaneForKind`) + the timeline
+ *  row accent — NOT a separate data shape per kind. */
+export type AudioLayerKind = "music" | "voiceover" | "sfx";
+
+/** Playable source for an audio layer. `stock` references a procedural
+ *  catalog track by id (resolved lazily — see music-catalog.ts);
+ *  `custom` carries a concrete blob:/cdn URL (recorder output, upload,
+ *  Original Music Composer render). A `custom` layer with an empty url +
+ *  a `text` script is a pending-synthesis voiceover placeholder. */
+export type AudioLayerSource =
+  | { kind: "stock"; trackId: string }
+  | { kind: "custom"; url: string };
+
+/** A single audio layer on the composition timeline. The unified shape
+ *  the multi-track audio rebuild is built on — music, voiceover, and
+ *  sfx are all `AudioLayer`s of a tagged `kind`, so the timeline can
+ *  render N stacked rows, the user can drag music in to add another
+ *  layer, and every layer supports the same trim / fade / split / gain
+ *  operations. Replaces the old single `musicSource` + `voiceovers[]`
+ *  split (legacy drafts migrate via `buildAudioLayers`).
+ *
+ *  All timing fields are in seconds and non-optional here (the
+ *  constructors + migration always fill them) so consumers don't
+ *  re-derive defaults at every read site. */
+export interface AudioLayer {
   id: string;
-  url: string;
-  durationSeconds: number;
-  /** Optional anchor — when set, the voiceover starts at that scene's
-   *  beginning. `null` means start at composition 0. */
-  anchorSceneId: string | null;
-  /** Display label surfaced in the timeline strip. */
+  kind: AudioLayerKind;
+  source: AudioLayerSource;
+  /** Display label surfaced on the timeline bar + in the mixer. */
   label: string;
-  /** The narration script that produced (or will produce) this clip's
-   *  audio. Set by AI-generated drafts (e.g. the page→video pipeline) so
-   *  the editor can show the words and re-synthesise on demand. Optional —
-   *  recorded/uploaded clips have no source script. A clip with `text` but
-   *  an empty `url` is a "pending synthesis" placeholder. */
+  /** Source-file length in seconds. For stock procedural music this is
+   *  the catalog duration; the bar can still trim/extend within it. */
+  durationSeconds: number;
+  /** When set, the layer starts at that scene's beginning; `null` means
+   *  composition 0. Voiceover/sfx commonly anchor to a scene; music is
+   *  conventionally `null` (absolute timeline position). */
+  anchorSceneId: string | null;
+  /** Manual start-offset in seconds, added to the anchor's start (or
+   *  composition 0 when no anchor). Drag-to-move on the bar writes this. */
+  startOffsetSec: number;
+  /** Trim — start playback this many seconds INTO the source file. */
+  trimStartSec: number;
+  /** Trim — stop this many seconds BEFORE the end of the source file. */
+  trimEndSec: number;
+  /** Fade-in duration in seconds (gain ramps 0 → effective). */
+  fadeInSec: number;
+  /** Fade-out duration in seconds (gain ramps effective → 0). */
+  fadeOutSec: number;
+  /** Per-layer gain in 0..1 (1 = unity). Composes with the lane + master
+   *  gains in `audioMix`. */
+  gain: number;
+  /** Per-layer mute. */
+  muted: boolean;
+  /** Narration script that produced (or will produce) a voiceover layer's
+   *  audio. Optional — recorded/uploaded/music layers have none. A layer
+   *  with `text` but an empty source url is a pending-synthesis
+   *  placeholder. */
   text?: string;
-  /** Per-clip gain in the 0..1 range (1 = unity). Optional — preview
-   *  and render fall back to 1 when absent. Mutated by `<AudioMixerV2>`. */
-  gain?: number;
-  /** Per-clip mute. Optional — preview / render treat absence as false. */
-  muted?: boolean;
-  /** Manual start-offset in seconds, added to the anchor scene's start
-   *  (or composition 0 when no anchor). Lets the user nudge a
-   *  voiceover earlier / later than the scene boundary without
-   *  re-anchoring. Default 0 — pre-#567 rows keep current behavior. */
-  startOffsetSec?: number;
-  /** Fade-in duration in seconds (0..clip-duration). The scheduler
-   *  ramps gain from 0 → effective over this window. Default 0. */
-  fadeInSec?: number;
-  /** Fade-out duration in seconds. Scheduler ramps gain from effective
-   *  → 0 over the final `fadeOutSec` of the clip. Default 0. */
-  fadeOutSec?: number;
-  /** Manual trim — start playback this many seconds INTO the source
-   *  file. Default 0 (play from the beginning). Used by drag-to-trim
-   *  on the timeline bar's left edge. */
-  trimStartSec?: number;
-  /** Manual trim — end playback this many seconds BEFORE the end of
-   *  the source file. Default 0 (play to the end). Used by drag-to-
-   *  trim on the timeline bar's right edge. */
-  trimEndSec?: number;
 }
 
 /** Canvas-level audio mix state — master gain + per-lane gain / mute.
@@ -680,6 +702,196 @@ export const DEFAULT_AUDIO_MIX: CanvasAudioMix = {
  *  so consumers that need the fallback don't redefine the constant. */
 export const DEFAULT_DUCK_AMOUNT = 0.3;
 
+// ─── Audio-layer model helpers ─────────────────────────────────────────────
+// Single source of truth for constructing, classifying, and migrating
+// audio layers. Every surface that adds music / voiceover / sfx, reads a
+// layer's mixer lane, or loads a legacy draft routes through these so the
+// shape can't drift.
+
+/** Which mixer lane a layer's gain/mute is governed by. Music + sfx ride
+ *  the music lane; voiceover its own. Ducking targets `music`-kind layers
+ *  only (see the audio math) — sfx plays through the music lane gain but
+ *  is not ducked under voiceover. */
+export function audioLaneForKind(kind: AudioLayerKind): "music" | "voiceover" {
+  return kind === "voiceover" ? "voiceover" : "music";
+}
+
+/** Build an audio layer, filling every timing field with its default so
+ *  consumers never read `undefined`. Pass only what differs. */
+export function makeAudioLayer(
+  input: {
+    kind: AudioLayerKind;
+    source: AudioLayerSource;
+    label: string;
+    durationSeconds: number;
+  } & Partial<Omit<AudioLayer, "kind" | "source" | "label" | "durationSeconds">>,
+): AudioLayer {
+  return {
+    id: input.id ?? makeId("audio"),
+    kind: input.kind,
+    source: input.source,
+    label: input.label,
+    durationSeconds: input.durationSeconds,
+    anchorSceneId: input.anchorSceneId ?? null,
+    startOffsetSec: input.startOffsetSec ?? 0,
+    trimStartSec: input.trimStartSec ?? 0,
+    trimEndSec: input.trimEndSec ?? 0,
+    fadeInSec: input.fadeInSec ?? 0,
+    fadeOutSec: input.fadeOutSec ?? 0,
+    gain: input.gain ?? 1,
+    muted: input.muted ?? false,
+    ...(input.text ? { text: input.text } : {}),
+  };
+}
+
+/** Music layers in composition order (drag-add appends, so array order =
+ *  stacking order top→bottom in the timeline). */
+export function musicLayers(state: CanvasState): AudioLayer[] {
+  return state.audioLayers.filter((l) => l.kind === "music");
+}
+
+/** Voiceover layers — narration recorded or TTS-synthesised. */
+export function voiceoverLayers(state: CanvasState): AudioLayer[] {
+  return state.audioLayers.filter((l) => l.kind === "voiceover");
+}
+
+/** True when the composition carries any audio at all. */
+export function hasAnyAudio(state: CanvasState): boolean {
+  return state.audioLayers.length > 0;
+}
+
+/** Effective playable length of a layer after both-end trims, floored to
+ *  50ms so a fully-trimmed clip can't crash interval math. */
+export function layerPlayableSeconds(layer: AudioLayer): number {
+  return Math.max(
+    0.05,
+    layer.durationSeconds - layer.trimStartSec - layer.trimEndSec,
+  );
+}
+
+// ─── Legacy audio shape (pre-v2 drafts / Timeline round-trip) ──────────────
+// The old single-music + voiceovers[] shape. Kept ONLY so `buildAudioLayers`
+// can migrate a persisted draft forward; nothing authors these anymore.
+interface LegacyMusicSource {
+  kind: "stock" | "custom";
+  trackId?: string;
+  url?: string;
+  label?: string;
+  durationSeconds?: number;
+  startOffsetSec?: number;
+  fadeInSec?: number;
+  fadeOutSec?: number;
+}
+interface LegacyVoiceover {
+  id?: string;
+  url?: string;
+  durationSeconds?: number;
+  anchorSceneId?: string | null;
+  label?: string;
+  text?: string;
+  gain?: number;
+  muted?: boolean;
+  startOffsetSec?: number;
+  fadeInSec?: number;
+  fadeOutSec?: number;
+  trimStartSec?: number;
+  trimEndSec?: number;
+}
+
+/** Map a legacy `musicSource` union to a music `AudioLayer`. Stock keeps
+ *  its catalog duration; custom carries its url + saved duration. */
+export function audioLayerFromLegacyMusic(
+  src: LegacyMusicSource | null | undefined,
+): AudioLayer | null {
+  if (!src) return null;
+  if (src.kind === "stock") {
+    if (!src.trackId || src.trackId === "none") return null;
+    const track = findMusicTrack(src.trackId);
+    return makeAudioLayer({
+      kind: "music",
+      source: { kind: "stock", trackId: src.trackId },
+      label: track?.label ?? "Music",
+      durationSeconds: track?.durationSeconds ?? 0,
+      startOffsetSec: src.startOffsetSec ?? 0,
+      fadeInSec: src.fadeInSec ?? 0,
+      fadeOutSec: src.fadeOutSec ?? 0,
+    });
+  }
+  if (!src.url) return null;
+  return makeAudioLayer({
+    kind: "music",
+    source: { kind: "custom", url: src.url },
+    label: src.label ?? "Music",
+    durationSeconds: src.durationSeconds ?? 0,
+    startOffsetSec: src.startOffsetSec ?? 0,
+    fadeInSec: src.fadeInSec ?? 0,
+    fadeOutSec: src.fadeOutSec ?? 0,
+  });
+}
+
+/** Map a legacy voiceover clip to a voiceover `AudioLayer`. */
+function audioLayerFromLegacyVoiceover(vo: LegacyVoiceover): AudioLayer {
+  return makeAudioLayer({
+    id: vo.id,
+    kind: "voiceover",
+    source: { kind: "custom", url: vo.url ?? "" },
+    label: vo.label ?? "Voiceover",
+    durationSeconds: vo.durationSeconds ?? 0,
+    anchorSceneId: vo.anchorSceneId ?? null,
+    startOffsetSec: vo.startOffsetSec ?? 0,
+    trimStartSec: vo.trimStartSec ?? 0,
+    trimEndSec: vo.trimEndSec ?? 0,
+    fadeInSec: vo.fadeInSec ?? 0,
+    fadeOutSec: vo.fadeOutSec ?? 0,
+    gain: vo.gain ?? 1,
+    muted: vo.muted ?? false,
+    text: vo.text,
+  });
+}
+
+/** Resolve the `audioLayers[]` for a draft that may be in either the
+ *  current shape OR a pre-v2 shape (`musicSource` + `voiceovers[]`).
+ *  When `audioLayers` is already present it wins; otherwise the legacy
+ *  fields are converted. Single migration seam — used by
+ *  `normalizeCanvasState` + the Timeline round-trip recover. */
+export function buildAudioLayers(raw: {
+  audioLayers?: unknown;
+  musicSource?: LegacyMusicSource | null;
+  voiceovers?: LegacyVoiceover[];
+}): AudioLayer[] {
+  if (Array.isArray(raw.audioLayers)) {
+    // Backfill any missing timing fields so an older `audioLayers` draft
+    // (or a hand-built fixture) reads cleanly.
+    return (raw.audioLayers as Partial<AudioLayer>[])
+      .filter((l) => l && l.kind && l.source)
+      .map((l) =>
+        makeAudioLayer({
+          kind: l.kind as AudioLayerKind,
+          source: l.source as AudioLayerSource,
+          label: l.label ?? "Audio",
+          durationSeconds: l.durationSeconds ?? 0,
+          id: l.id,
+          anchorSceneId: l.anchorSceneId ?? null,
+          startOffsetSec: l.startOffsetSec,
+          trimStartSec: l.trimStartSec,
+          trimEndSec: l.trimEndSec,
+          fadeInSec: l.fadeInSec,
+          fadeOutSec: l.fadeOutSec,
+          gain: l.gain,
+          muted: l.muted,
+          text: l.text,
+        }),
+      );
+  }
+  const out: AudioLayer[] = [];
+  const music = audioLayerFromLegacyMusic(raw.musicSource);
+  if (music) out.push(music);
+  for (const vo of raw.voiceovers ?? []) {
+    out.push(audioLayerFromLegacyVoiceover(vo));
+  }
+  return out;
+}
+
 export interface CanvasState {
   schemaVersion: number;
   /** Output frame width (matches Timeline.width on emit). */
@@ -692,19 +904,17 @@ export interface CanvasState {
    *  Persisted so the Design panel re-highlights the active theme on
    *  re-open. `null` means no theme has been applied. */
   themeId: string | null;
-  /** Background music selection — single union that covers both stock
-   *  catalog picks AND user-supplied custom music (Original Music
-   *  Composer, R2 uploads, etc). Resolved to a playable URL via
-   *  `resolveMusic()` in `lib/studio/music-catalog.ts` — single source
-   *  of truth for "what music plays?" across preview, picker, and
-   *  render. */
-  musicSource: import("../music-catalog").MusicSource | null;
+  /** Audio layers — the unified multi-track audio model. Music beds,
+   *  voiceovers, and sfx are all `AudioLayer`s tagged by `kind`. There
+   *  can be MANY music layers (drag a track in → append another). The
+   *  timeline renders one row per layer; the scheduler + render emit
+   *  iterate the whole array. Replaces the old single `musicSource` +
+   *  `voiceovers[]` fields (legacy drafts migrate via `buildAudioLayers`
+   *  in `normalizeCanvasState`). */
+  audioLayers: AudioLayer[];
   /** Caption cues + style. `null` means captions haven't been authored
    *  yet — the CaptionEditor dialog still mounts to start them. */
   captions: CanvasCaptions | null;
-  /** Voiceover clips. Appended by the Voiceover dialog; played on A2
-   *  during preview + render. */
-  voiceovers: VoiceoverClip[];
   /** Audio mix — master gain + per-lane gain / mute. `null` means
    *  defaults (DEFAULT_AUDIO_MIX). Optional so legacy rows without
    *  the field parse without migration. */
@@ -743,9 +953,8 @@ export function emptyCanvasState(opts: {
     fps: opts.fps ?? 30,
     scenes: [emptyScene("Scene 1")],
     themeId: null,
-    musicSource: null,
+    audioLayers: [],
     captions: null,
-    voiceovers: [],
     codec: null,
     motion: null,
     defaultTransition: null,
@@ -1243,58 +1452,146 @@ export function applyThemeToState(
   };
 }
 
-// ─── Audio-timeline mutators (#1115) ──────────────────────────────────────
+// ─── Audio-layer mutators ──────────────────────────────────────────────────
 //
-// Single seam for the audio-timeline drag UI's per-clip edits. The
-// AudioBar component fires `onChange` per drag tick with the next
-// timing snapshot; the host translates that into one of these calls.
-// Mutators are STRUCTURAL-SHARE pure functions matching the rest of
-// the canvas-state mutators — undo/redo participates via the same
-// `useCanvasHistory` wrapper.
+// Single seam for the multi-track audio timeline's edits. The AudioBar
+// component fires `onChange` per drag tick with the next timing snapshot;
+// the host translates that into `updateAudioLayer`. Add / remove / split
+// power the drag-music-in, delete, and split-at-playhead ops. All are
+// STRUCTURAL-SHARE pure functions matching the rest of the canvas-state
+// mutators — undo/redo participates via the same `useCanvasHistory` wrapper.
 
-/** Patch a voiceover clip's timing fields in place. Per-clip fields
- *  on `VoiceoverClip` (`startOffsetSec` / `fadeInSec` / `fadeOutSec` /
- *  `trimStartSec` / `trimEndSec` / `gain` / `muted`) are all optional;
- *  passing `undefined` keeps the existing value, passing `0` writes
- *  it. Unknown ids are no-ops. */
-export function updateVoiceoverClip(
-  state: CanvasState,
-  voiceoverId: string,
-  patch: Partial<Pick<VoiceoverClip,
+/** The subset of an `AudioLayer`'s fields a timeline drag / mixer edit
+ *  can patch. `kind` / `source` / `durationSeconds` are immutable post-
+ *  creation, so they're excluded. */
+export type AudioLayerPatch = Partial<
+  Pick<
+    AudioLayer,
     | "startOffsetSec"
-    | "fadeInSec"
-    | "fadeOutSec"
     | "trimStartSec"
     | "trimEndSec"
+    | "fadeInSec"
+    | "fadeOutSec"
     | "gain"
     | "muted"
     | "anchorSceneId"
-  >>,
+    | "label"
+  >
+>;
+
+/** Patch an audio layer's editable fields. `undefined` keeps the current
+ *  value; `0` writes it. Unknown ids are no-ops. */
+export function updateAudioLayer(
+  state: CanvasState,
+  layerId: string,
+  patch: AudioLayerPatch,
 ): CanvasState {
   return {
     ...state,
-    voiceovers: state.voiceovers.map((vo) =>
-      vo.id === voiceoverId ? { ...vo, ...patch } : vo,
+    audioLayers: state.audioLayers.map((l) =>
+      l.id === layerId ? { ...l, ...patch } : l,
     ),
   };
 }
 
-/** Patch the music source's timing controls. No-op when no music
- *  source is set (the audio-timeline bar self-hides in that case).
- *  Both stock + custom sources accept the same `MusicTimingControls`
- *  fields. */
-export function updateMusicTiming(
-  state: CanvasState,
-  patch: {
-    startOffsetSec?: number;
-    fadeInSec?: number;
-    fadeOutSec?: number;
-  },
-): CanvasState {
-  if (!state.musicSource) return state;
+/** Append an audio layer (drag-in, picker, recorder, composer). */
+export function addAudioLayer(state: CanvasState, layer: AudioLayer): CanvasState {
+  return { ...state, audioLayers: [...state.audioLayers, layer] };
+}
+
+/** Remove an audio layer by id. */
+export function removeAudioLayer(state: CanvasState, layerId: string): CanvasState {
   return {
     ...state,
-    musicSource: { ...state.musicSource, ...patch },
+    audioLayers: state.audioLayers.filter((l) => l.id !== layerId),
   };
+}
+
+/** Composition-time start (seconds) of a layer = its anchor scene's
+ *  start (or 0) plus its manual offset. Shared so the timeline, the
+ *  scheduler, and the splitter agree on where a layer begins. */
+export function layerCompositionStart(
+  state: CanvasState,
+  layer: AudioLayer,
+): number {
+  let anchorStart = 0;
+  if (layer.anchorSceneId) {
+    let cursor = 0;
+    for (const scene of state.scenes) {
+      if (scene.id === layer.anchorSceneId) {
+        anchorStart = cursor;
+        break;
+      }
+      cursor += scene.durationSeconds;
+    }
+  }
+  return anchorStart + layer.startOffsetSec;
+}
+
+/** Split a layer into two at the given composition-time second. The head
+ *  keeps the start + fade-in and ends at the cut (via added trim-end);
+ *  the tail is a new layer that starts at the cut (offset + trim-start
+ *  advanced) and keeps the fade-out. No-op when the cut falls outside the
+ *  layer's playable span. Returns the (possibly unchanged) state plus the
+ *  new tail layer's id so the host can re-select it. */
+export function splitAudioLayer(
+  state: CanvasState,
+  layerId: string,
+  atCompositionSec: number,
+): { state: CanvasState; newLayerId: string | null } {
+  const layer = state.audioLayers.find((l) => l.id === layerId);
+  if (!layer) return { state, newLayerId: null };
+  const start = layerCompositionStart(state, layer);
+  const playable = layerPlayableSeconds(layer);
+  const local = atCompositionSec - start;
+  // Need at least 50ms on each side of the cut.
+  if (local <= 0.05 || local >= playable - 0.05) return { state, newLayerId: null };
+
+  const head: AudioLayer = {
+    ...layer,
+    // End the head at the cut by trimming its tail.
+    trimEndSec: layer.durationSeconds - layer.trimStartSec - local,
+    // Head can't carry a fade-out (its tail is now the cut, not the
+    // original end); the tail owns the fade-out.
+    fadeOutSec: 0,
+  };
+  const tailId = makeId("audio");
+  const tail: AudioLayer = {
+    ...layer,
+    id: tailId,
+    // Tail starts where the head ended.
+    startOffsetSec: layer.startOffsetSec + local,
+    trimStartSec: layer.trimStartSec + local,
+    // Tail owns the fade-out; the fade-in belonged to the head.
+    fadeInSec: 0,
+  };
+  const audioLayers = state.audioLayers.flatMap((l) =>
+    l.id === layerId ? [head, tail] : [l],
+  );
+  return { state: { ...state, audioLayers }, newLayerId: tailId };
+}
+
+/** Normalize a parsed/persisted draft onto the current shape. Fills any
+ *  missing top-level fields from `emptyCanvasState()` (present keys win)
+ *  AND migrates a pre-v2 audio shape (`musicSource` + `voiceovers[]`)
+ *  forward into `audioLayers[]`. Single seam for the localStorage load
+ *  path + any other place a raw draft enters the editor. */
+export function normalizeCanvasState(raw: unknown): CanvasState {
+  const base = emptyCanvasState();
+  if (!raw || typeof raw !== "object") return base;
+  const r = raw as Record<string, unknown>;
+  const merged = { ...base, ...(r as Partial<CanvasState>) } as CanvasState & {
+    musicSource?: unknown;
+    voiceovers?: unknown;
+  };
+  merged.audioLayers = buildAudioLayers({
+    audioLayers: (r as { audioLayers?: unknown }).audioLayers,
+    musicSource: (r as { musicSource?: LegacyMusicSource | null }).musicSource,
+    voiceovers: (r as { voiceovers?: LegacyVoiceover[] }).voiceovers,
+  });
+  // Drop the dead legacy keys so they don't linger on the in-memory state.
+  delete merged.musicSource;
+  delete merged.voiceovers;
+  return merged;
 }
 

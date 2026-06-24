@@ -18,6 +18,7 @@
 
 "use client";
 
+import { useState } from "react";
 import {
   Camera,
   Image as ImageIcon,
@@ -26,13 +27,19 @@ import {
   UserSquare,
   Video as VideoIcon,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { LeftPanelSection } from "./LeftPanelScroller";
 import LeftPanelTile from "./LeftPanelTile";
 import MediaPicker from "@/components/shared/MediaPicker";
 import BinPanel from "../nle/BinPanel";
 import { useToast } from "@/hooks/use-toast";
-import type { VoiceoverClip } from "@/lib/studio/editor-v2/canvas-state";
+import {
+  type AudioLayer,
+  type AudioLayerKind,
+  makeAudioLayer,
+} from "@/lib/studio/editor-v2/canvas-state";
 import { writeDragPayload } from "@/lib/studio/editor-v2/drag-protocol";
+import { cn } from "@/lib/utils";
 
 export interface MediaSectionProps {
   open: boolean;
@@ -49,8 +56,10 @@ export interface MediaSectionProps {
    *  branch because they place different widget kinds. */
   onAddImageWidget: (url: string) => void;
   onAddVideoWidget: (url: string, durationSeconds: number) => void;
-  /** Audio source from the embedded bin → voiceover on the active scene. */
-  onAddVoiceover: (clip: VoiceoverClip) => void;
+  /** Append an audio layer (music / voiceover / sfx) built from a bin
+   *  source. The layer already carries its `kind`, so this is the single
+   *  generic add seam for all three audio kinds. */
+  onAddAudioLayer: (layer: AudioLayer) => void;
   activeSceneId: string;
   /** When provided, surfaces the AI-Headshot tile. The Actions-tab host
    *  opens the existing HeadshotGenerator sheet here; the Widgets-tab
@@ -68,11 +77,32 @@ export default function MediaSection({
   onCaptureScreenshot,
   onAddImageWidget,
   onAddVideoWidget,
-  onAddVoiceover,
+  onAddAudioLayer,
   activeSceneId,
   onOpenAiHeadshot,
 }: MediaSectionProps) {
   const { toast } = useToast();
+  const { t } = useTranslation();
+  // Which audio kind a picked / dragged bin audio source becomes. Drag
+  // always adds music (the "drag music in" gesture); click-add uses this.
+  const [audioKind, setAudioKind] = useState<AudioLayerKind>("voiceover");
+
+  // Build an audio layer of `kind` from a bin audio source.
+  const audioLayerFromSource = (
+    kind: AudioLayerKind,
+    url: string,
+    durationSeconds: number,
+    label: string,
+  ): AudioLayer =>
+    makeAudioLayer({
+      kind,
+      source: { kind: "custom", url },
+      durationSeconds,
+      // Voiceover/sfx anchor to the active scene; music plays from
+      // composition 0 (no anchor).
+      anchorSceneId: kind === "music" ? null : activeSceneId,
+      label,
+    });
 
   return (
     <LeftPanelSection title="Media" open={open} onToggle={onToggle}>
@@ -134,11 +164,37 @@ export default function MediaSection({
         )}
       </div>
 
+      {/* Audio-kind selector — governs what a picked / dragged bin AUDIO
+          source becomes (a music bed, a voiceover, or a one-shot sound
+          effect). Dragging an audio source onto the canvas/timeline
+          always adds it as a MUSIC track regardless (the "drag music in"
+          gesture); this toggle drives the double-click add. */}
+      <div className="mt-3 flex items-center gap-1 text-[10px]">
+        <span className="text-muted-foreground">{t("studio.media.addAudioAs")}</span>
+        <div className="flex overflow-hidden rounded border border-border">
+          {(["music", "voiceover", "sfx"] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setAudioKind(k)}
+              className={cn(
+                "px-1.5 py-0.5 transition",
+                audioKind === k
+                  ? "bg-brand-purple text-white"
+                  : "bg-background text-muted-foreground hover:bg-muted",
+              )}
+            >
+              {t(`studio.media.audioKind.${k}`)}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Embedded bin — the former Media tab folded inline. `-mx-3`
           cancels the section's px-3 so the bin spans edge-to-edge; the
           fixed h-80 bounds it inside the scroller while the bin's own
           inner list scrolls independently. */}
-      <div className="-mx-3 mt-3 h-80 border-t">
+      <div className="-mx-3 mt-2 h-80 border-t">
         <BinPanel
           onPickSource={(src) => {
             if (src.kind === "image") {
@@ -146,23 +202,28 @@ export default function MediaSection({
             } else if (src.kind === "video") {
               onAddVideoWidget(src.url, src.durationFrames / src.fps);
             } else if (src.kind === "audio") {
-              onAddVoiceover({
-                id:
-                  typeof crypto !== "undefined" && "randomUUID" in crypto
-                    ? crypto.randomUUID()
-                    : `vo_${Date.now()}`,
-                url: src.url,
-                durationSeconds: src.durationFrames / src.fps,
-                anchorSceneId: activeSceneId,
-                label: src.filename,
-                gain: 1,
-                muted: false,
-              });
+              const durationSeconds = src.durationFrames / src.fps;
+              onAddAudioLayer(
+                audioLayerFromSource(audioKind, src.url, durationSeconds, src.filename),
+              );
               toast({
-                title: "Added as voiceover",
+                title: t(`studio.media.addedAs.${audioKind}`),
                 description: src.filename,
               });
             }
+          }}
+          onSourceDragStart={(e, src) => {
+            // Dragging a bin audio source onto the canvas/timeline adds a
+            // MUSIC layer — encode the custom source for `handleMusicDrop`.
+            if (src.kind !== "audio") return;
+            writeDragPayload(e.dataTransfer, {
+              kind: "music",
+              data: JSON.stringify({
+                url: src.url,
+                label: src.filename,
+                durationSeconds: src.durationFrames / src.fps,
+              }),
+            });
           }}
         />
       </div>

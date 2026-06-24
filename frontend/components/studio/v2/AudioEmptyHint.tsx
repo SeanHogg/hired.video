@@ -18,7 +18,7 @@ import {
   MEDIA_KIND_UI,
   type MediaKind,
 } from "@shared/media-kinds";
-import type { CanvasState } from "@/lib/studio/editor-v2/canvas-state";
+import { voiceoverLayers, type CanvasState } from "@/lib/studio/editor-v2/canvas-state";
 import { cn } from "@/lib/utils";
 
 interface AudioEmptyHintProps {
@@ -42,7 +42,7 @@ export default function AudioEmptyHint({
   // recorded their own voice yet.
   const isAudioOnly = mediaKindHasAudio(mediaKind) && !mediaKindHasVideo(mediaKind);
   if (!isAudioOnly) return null;
-  if (state.voiceovers.length > 0) return null;
+  if (voiceoverLayers(state).length > 0) return null;
 
   const kindLabel = MEDIA_KIND_UI[mediaKind].badgeLabel;
   return (

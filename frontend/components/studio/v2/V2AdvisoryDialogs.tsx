@@ -40,7 +40,7 @@ import {
   canvasStateToTimeline,
   timelineToCanvasState,
 } from "@/lib/studio/editor-v2/timeline-emit";
-import type { CanvasState } from "@/lib/studio/editor-v2/canvas-state";
+import { voiceoverLayers, type CanvasState } from "@/lib/studio/editor-v2/canvas-state";
 import type { VideoScript } from "@/types/video-script";
 import {
   analyzeDelivery,
@@ -324,7 +324,7 @@ function DeliveryCoachTrigger({
   const [result, setResult] = useState<DeliveryCoachingResult | null>(null);
 
   // Find every webcam-widget URL in the canvas so the user can pick one
-  // to analyse. Voiceover clips with audio URLs are also fair game.
+  // to analyse. Voiceover layers with audio URLs are also fair game.
   const candidates = useMemo(() => {
     const out: Array<{ id: string; label: string; url: string; kind: "webcam" | "voiceover" }> = [];
     for (const scene of state.scenes) {
@@ -339,9 +339,12 @@ function DeliveryCoachTrigger({
         }
       }
     }
-    for (const vo of state.voiceovers) {
-      if (vo.url) {
-        out.push({ id: vo.id, label: vo.label, url: vo.url, kind: "voiceover" });
+    for (const vo of voiceoverLayers(state)) {
+      // Only `custom`-source layers carry a concrete playable URL;
+      // stock procedural music isn't a delivery-coaching candidate.
+      const url = vo.source.kind === "custom" ? vo.source.url : "";
+      if (url) {
+        out.push({ id: vo.id, label: vo.label, url, kind: "voiceover" });
       }
     }
     return out;

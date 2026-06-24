@@ -16,6 +16,7 @@ import {
   type PageVideoScene,
 } from "@shared/page-video-spec";
 import { pageVideoSpecToCanvas } from "../page-spec-to-canvas";
+import { voiceoverLayers } from "../canvas-state";
 
 function scene(over: Partial<PageVideoScene> & { kind: PageVideoScene["kind"] }): PageVideoScene {
   return {
@@ -51,22 +52,25 @@ describe("pageVideoSpecToCanvas()", () => {
     expect(canvas.colorPalette).toHaveLength(4);
   });
 
-  it("seeds a pending-synthesis voiceover clip per narrated scene, anchored to it", () => {
+  it("seeds a pending-synthesis voiceover layer per narrated scene, anchored to it", () => {
     const canvas = pageVideoSpecToCanvas(
       spec([
         scene({ kind: "hook", narration: "Stop scrolling — this changes hiring." }),
-        scene({ kind: "point", narration: "" }), // silent → no clip
+        scene({ kind: "point", narration: "" }), // silent → no layer
         scene({ kind: "cta", narration: "Start free today." }),
       ]),
     );
-    expect(canvas.voiceovers).toHaveLength(2);
-    // Each clip carries its script, has no url yet, and anchors to its scene.
-    expect(canvas.voiceovers[0]).toMatchObject({
+    const vos = voiceoverLayers(canvas);
+    expect(vos).toHaveLength(2);
+    // Each layer carries its script, has no source url yet (pending
+    // synthesis), and anchors to its scene.
+    expect(vos[0]).toMatchObject({
+      kind: "voiceover",
       text: "Stop scrolling — this changes hiring.",
-      url: "",
+      source: { kind: "custom", url: "" },
       anchorSceneId: canvas.scenes[0].id,
     });
-    expect(canvas.voiceovers[1]).toMatchObject({
+    expect(vos[1]).toMatchObject({
       text: "Start free today.",
       anchorSceneId: canvas.scenes[2].id,
     });

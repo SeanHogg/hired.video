@@ -8,6 +8,7 @@
  * so every consumer gets the same audition behaviour without rolling
  * their own playback state.
  */
+import type { DragEvent } from "react";
 import { Play, Pause } from "lucide-react";
 import { MUSIC_TRACKS, type MusicTrack } from "@/lib/studio/music-catalog";
 import { hasProceduralMusic, getProceduralMusicUrl } from "@/lib/studio/music-procedural";
@@ -22,12 +23,25 @@ export interface MusicPickerProps {
   activeSelectionId?: string | null;
   onSelect: (track: MusicTrack) => void;
   className?: string;
+  /** When set, each track row is draggable so the user can drop it onto
+   *  the timeline / canvas to add a music layer (v2 audioLayers model).
+   *  Omitted (v1 sidebar) = rows are click-only, unchanged. */
+  trackDraggable?: boolean;
+  /** dragstart handler for a track row. Only fires when `trackDraggable`
+   *  is set; the consumer writes the drag payload. */
+  onTrackDragStart?: (track: MusicTrack, e: DragEvent<HTMLLIElement>) => void;
+  /** Accessible affordance ("drag to add a track") surfaced as the row's
+   *  title/aria-label when draggable. */
+  trackDragLabel?: string;
 }
 
 export default function MusicPicker({
   activeSelectionId,
   onSelect,
   className,
+  trackDraggable,
+  onTrackDragStart,
+  trackDragLabel,
 }: MusicPickerProps) {
   const { toggle, isActive: isPreviewing } = useAudioPreview();
 
@@ -55,9 +69,18 @@ export default function MusicPicker({
         return (
           <li
             key={track.id}
+            draggable={trackDraggable || undefined}
+            onDragStart={
+              trackDraggable && onTrackDragStart
+                ? (e) => onTrackDragStart(track, e)
+                : undefined
+            }
+            title={trackDraggable ? trackDragLabel : undefined}
+            aria-label={trackDraggable ? trackDragLabel : undefined}
             className={cn(
               "flex items-center gap-2 rounded-md border bg-card px-2 py-1.5 transition",
               isSelected ? "border-brand-purple" : "border-border",
+              trackDraggable && "cursor-grab active:cursor-grabbing",
             )}
           >
             <button

@@ -26,6 +26,9 @@ import {
   defaultWidget,
   emptyCanvasState,
   emptyScene,
+  makeAudioLayer,
+  musicLayers,
+  voiceoverLayers,
   type CanvasState,
   type Widget,
 } from "@/lib/studio/editor-v2/canvas-state";
@@ -56,8 +59,16 @@ describe("voiceover narration round-trip (#2006)", () => {
     const state: CanvasState = {
       ...base,
       scenes: [scene],
-      voiceovers: [
-        { id: "vo-1", url: "", text: "Stop scrolling.", durationSeconds: 4, anchorSceneId: scene.id, label: "Narration" },
+      audioLayers: [
+        makeAudioLayer({
+          id: "vo-1",
+          kind: "voiceover",
+          source: { kind: "custom", url: "" },
+          text: "Stop scrolling.",
+          durationSeconds: 4,
+          anchorSceneId: scene.id,
+          label: "Narration",
+        }),
       ],
     };
     const a2 = canvasStateToTimeline(state).tracks.find((t) => t.id === "a2");
@@ -70,32 +81,130 @@ describe("voiceover narration round-trip (#2006)", () => {
     const state: CanvasState = {
       ...base,
       scenes: [scene],
-      voiceovers: [
-        { id: "vo-1", url: "", text: "Stop scrolling — this changes hiring.", durationSeconds: 4, anchorSceneId: scene.id, label: "Narration — Hook" },
+      audioLayers: [
+        makeAudioLayer({
+          id: "vo-1",
+          kind: "voiceover",
+          source: { kind: "custom", url: "" },
+          text: "Stop scrolling — this changes hiring.",
+          durationSeconds: 4,
+          anchorSceneId: scene.id,
+          label: "Narration — Hook",
+        }),
       ],
     };
     const round = timelineToCanvasState(canvasStateToTimeline(state));
-    expect(round.voiceovers).toHaveLength(1);
-    expect(round.voiceovers[0]).toMatchObject({
-      url: "",
+    const vos = voiceoverLayers(round);
+    expect(vos).toHaveLength(1);
+    expect(vos[0]).toMatchObject({
+      source: { kind: "custom", url: "" },
       text: "Stop scrolling — this changes hiring.",
       anchorSceneId: round.scenes[0].id,
     });
   });
 
-  it("keeps the source script on a synthesised (with-url) clip too", () => {
+  it("keeps the source script on a synthesised (with-url) layer too", () => {
     const base = emptyCanvasState();
     const scene = { ...emptyScene("Hook"), durationSeconds: 4, widgets: [] };
     const state: CanvasState = {
       ...base,
       scenes: [scene],
-      voiceovers: [
-        { id: "vo-1", url: "https://cdn/n.wav", text: "Voiced line.", durationSeconds: 4, anchorSceneId: scene.id, label: "Narration" },
+      audioLayers: [
+        makeAudioLayer({
+          id: "vo-1",
+          kind: "voiceover",
+          source: { kind: "custom", url: "https://cdn/n.wav" },
+          text: "Voiced line.",
+          durationSeconds: 4,
+          anchorSceneId: scene.id,
+          label: "Narration",
+        }),
       ],
     };
     const round = timelineToCanvasState(canvasStateToTimeline(state));
-    const vo = round.voiceovers.find((v) => v.url === "https://cdn/n.wav");
+    const vo = voiceoverLayers(round).find(
+      (v) => v.source.kind === "custom" && v.source.url === "https://cdn/n.wav",
+    );
     expect(vo?.text).toBe("Voiced line.");
+  });
+});
+
+describe("canvasStateToTimeline — audio layers", () => {
+  it("emits a separate a1 clip per music layer with the right source ids", () => {
+    const base = emptyCanvasState();
+    const scene = { ...emptyScene("Scene 1"), durationSeconds: 10, widgets: [] };
+    const state: CanvasState = {
+      ...base,
+      scenes: [scene],
+      audioLayers: [
+        makeAudioLayer({
+          id: "m-stock",
+          kind: "music",
+          source: { kind: "stock", trackId: "corporate-inspire" },
+          label: "Bed A",
+          durationSeconds: 28,
+        }),
+        makeAudioLayer({
+          id: "m-custom",
+          kind: "music",
+          source: { kind: "custom", url: "https://cdn/bed.mp3" },
+          label: "Bed B",
+          durationSeconds: 60,
+        }),
+      ],
+    };
+    const a1 = canvasStateToTimeline(state).tracks.find((t) => t.id === "a1")!;
+    expect(a1.clips).toHaveLength(2);
+    const byId = new Map(a1.clips.map((c) => [c.id, c]));
+    // Stock → `music:<trackId>`; custom → the raw url.
+    expect(byId.get("audio_m-stock")?.sourceId).toBe("music:corporate-inspire");
+    expect(byId.get("audio_m-custom")?.sourceId).toBe("https://cdn/bed.mp3");
+  });
+
+  it("round-trips multiple music layers + a voiceover losslessly via the snapshot", () => {
+    const base = emptyCanvasState();
+    const scene = { ...emptyScene("Scene 1"), durationSeconds: 10, widgets: [] };
+    const state: CanvasState = {
+      ...base,
+      scenes: [scene],
+      audioLayers: [
+        makeAudioLayer({
+          id: "m-1",
+          kind: "music",
+          source: { kind: "stock", trackId: "corporate-inspire" },
+          label: "Bed A",
+          durationSeconds: 28,
+          fadeInSec: 1,
+        }),
+        makeAudioLayer({
+          id: "m-2",
+          kind: "music",
+          source: { kind: "custom", url: "https://cdn/bed.mp3" },
+          label: "Bed B",
+          durationSeconds: 60,
+        }),
+        makeAudioLayer({
+          id: "vo-1",
+          kind: "voiceover",
+          source: { kind: "custom", url: "https://cdn/vo.wav" },
+          label: "Narration",
+          durationSeconds: 4,
+          anchorSceneId: scene.id,
+          text: "Hello there.",
+        }),
+      ],
+    };
+    const round = timelineToCanvasState(canvasStateToTimeline(state));
+    expect(musicLayers(round)).toHaveLength(2);
+    expect(voiceoverLayers(round)).toHaveLength(1);
+    // The full layer set (ids, trims, fades, multiple beds, vo script)
+    // survives the snapshot round-trip.
+    expect(round.audioLayers.map((l) => l.id).sort()).toEqual(["m-1", "m-2", "vo-1"]);
+    const bedA = round.audioLayers.find((l) => l.id === "m-1")!;
+    expect(bedA.fadeInSec).toBe(1);
+    expect(bedA.source).toEqual({ kind: "stock", trackId: "corporate-inspire" });
+    const vo = voiceoverLayers(round)[0];
+    expect(vo.text).toBe("Hello there.");
   });
 });
 
@@ -556,17 +665,36 @@ describe("canvasState ↔ Timeline round-trip", () => {
 
 describe("canvasStateToTimeline — stale/partial draft tolerance (#2212 crash fix)", () => {
   // Regression: a draft persisted by an OLDER app shape (before the
-  // `voiceovers[]` field existed) rehydrated from localStorage as a CanvasState
-  // with no `voiceovers` key. The emitter does `for (const vo of
-  // state.voiceovers)`, which threw "voiceovers is not iterable" and crashed the
-  // editor error boundary — surfaced once anonymous visitors began landing on
-  // `/studio/new` with stale localStorage. The emitter must normalize defensively.
-  it("does not throw when voiceovers is missing", () => {
+  // `audioLayers[]` field existed) rehydrated from localStorage as a CanvasState
+  // with no audio array. The emitter iterates the audio layers, which threw
+  // "is not iterable" on such a draft and crashed the editor error boundary —
+  // surfaced once anonymous visitors began landing on `/studio/new` with stale
+  // localStorage. `canvasStateToTimeline` runs the draft through
+  // `buildAudioLayers` so it normalizes BOTH the missing-`audioLayers` shape
+  // AND a pre-v2 `voiceovers[]` / `musicSource` draft defensively.
+  it("does not throw when audioLayers is missing", () => {
     const base = emptyCanvasState();
     const partial = { ...base, scenes: [emptyScene("Scene 1")] } as Partial<CanvasState> &
       Record<string, unknown>;
-    delete partial.voiceovers;
+    delete partial.audioLayers;
     expect(() => canvasStateToTimeline(partial as CanvasState)).not.toThrow();
+  });
+
+  it("does not throw on a pre-v2 draft carrying legacy `voiceovers[]`", () => {
+    const base = emptyCanvasState();
+    const scene = emptyScene("Scene 1");
+    const legacy = {
+      ...base,
+      scenes: [scene],
+      voiceovers: [
+        { id: "vo-1", url: "https://cdn/n.wav", durationSeconds: 4, anchorSceneId: scene.id, label: "VO" },
+      ],
+    } as unknown as CanvasState;
+    delete (legacy as unknown as Record<string, unknown>).audioLayers;
+    expect(() => canvasStateToTimeline(legacy)).not.toThrow();
+    // The legacy voiceover is migrated forward → one a2 clip.
+    const a2 = canvasStateToTimeline(legacy).tracks.find((t) => t.id === "a2");
+    expect(a2?.clips ?? []).toHaveLength(1);
   });
 
   it("does not throw when scenes is missing", () => {
@@ -576,14 +704,16 @@ describe("canvasStateToTimeline — stale/partial draft tolerance (#2212 crash f
     expect(() => canvasStateToTimeline(partial as CanvasState)).not.toThrow();
   });
 
-  it("treats a missing voiceovers field as an empty voiceover track", () => {
+  it("treats a missing audioLayers field as empty audio tracks", () => {
     const base = emptyCanvasState();
     const partial = { ...base, scenes: [emptyScene("Scene 1")] } as Partial<CanvasState> &
       Record<string, unknown>;
-    delete partial.voiceovers;
+    delete partial.audioLayers;
     const timeline = canvasStateToTimeline(partial as CanvasState);
+    const a1 = timeline.tracks.find((t) => t.id === "a1");
     const a2 = timeline.tracks.find((t) => t.id === "a2");
-    // a2 (voiceover) track exists but carries no clips — same as an explicit [].
+    // Both audio tracks exist but carry no clips — same as explicit [].
+    expect(a1?.clips ?? []).toEqual([]);
     expect(a2?.clips ?? []).toEqual([]);
   });
 });

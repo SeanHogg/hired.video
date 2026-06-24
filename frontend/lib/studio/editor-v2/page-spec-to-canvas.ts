@@ -23,9 +23,10 @@ import {
   defaultWidget,
   emptyCanvasState,
   emptyScene,
+  makeAudioLayer,
+  type AudioLayer,
   type CanvasState,
   type Scene,
-  type VoiceoverClip,
   type Widget,
   type WidgetPosition,
 } from "./canvas-state";
@@ -238,22 +239,24 @@ export function pageVideoSpecToCanvas(spec: PageVideoSpec): CanvasState {
   // id `emptyScene` minted — the voiceover clips anchor to those ids.
   const scenes = spec.scenes.map((scene) => buildScene(scene, spec.palette));
 
-  // Seed one "pending synthesis" voiceover per narrated scene: the script
-  // rides on `text`, anchored to its scene, with an empty `url`. The commit
-  // path (or the editor's Voiceover panel) synthesises the audio and fills
-  // the url + real duration. Silent scenes (no narration) get no clip.
-  const voiceovers: VoiceoverClip[] = spec.scenes.flatMap((scene, i) => {
+  // Seed one "pending synthesis" voiceover layer per narrated scene: the
+  // script rides on `text`, anchored to its scene, with an empty source
+  // url. The commit path (or the editor's Voiceover panel) synthesises the
+  // audio and fills the url + real duration. Silent scenes (no narration)
+  // get no layer.
+  const audioLayers: AudioLayer[] = spec.scenes.flatMap((scene, i) => {
     const narration = scene.narration?.trim();
     if (!narration) return [];
     return [
-      {
+      makeAudioLayer({
         id: `vo-${scenes[i].id}`,
-        url: "",
+        kind: "voiceover",
+        source: { kind: "custom", url: "" },
         text: narration,
         durationSeconds: scene.durationSeconds,
         anchorSceneId: scenes[i].id,
         label: `Narration — ${scene.label}`,
-      },
+      }),
     ];
   });
 
@@ -268,6 +271,6 @@ export function pageVideoSpecToCanvas(spec: PageVideoSpec): CanvasState {
       spec.palette.text,
     ],
     scenes,
-    voiceovers,
+    audioLayers,
   };
 }

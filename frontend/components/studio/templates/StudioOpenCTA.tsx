@@ -3,19 +3,25 @@
 //
 // Per the standing DRY rule, every marketing page that links into the
 // studio renders this component instead of hand-rolling a `<Button asChild>
-// <Link to=…>` pair. When the editor's deep-link contract changes (it has
-// already shifted from `/studio/new` → `/studio?template=…`) only this
+// <Link to=…>` pair. When the editor's deep-link contract changes only this
 // file updates; every page picks it up automatically.
+//
+// A `templateId` drops the visitor STRAIGHT into the editor on a fresh draft
+// seeded with that template (`/studio/new?contentTemplate=<id>`) — works
+// signed-out (localStorage draft + sign-up gate on Save) and signed-in (the
+// editor autosaves a real project). This replaces the old `/studio?template=`
+// link, which collided with the legacy *visual-theme* `?template=` param and
+// never actually seeded the content template.
 
 import { Link } from "react-router-dom";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export interface StudioOpenCTAProps {
-  /** When set, the URL becomes `/studio?template=<id>` so the editor
-   *  pre-selects that template via the existing `searchParams.get("template")`
-   *  contract in `StudioLayout` + `StudioEditorV2`. When omitted, the URL is
-   *  `/studio` (the unfiltered chooser). */
+  /** When set, the URL becomes `/studio/new?contentTemplate=<id>` so the
+   *  editor opens a fresh draft seeded with that template (resolved via
+   *  `slugToBuiltinId(...) ?? id` in `StudioEditorV2`). When omitted, the URL
+   *  is `/studio` (the workspace / unfiltered chooser). */
   templateId?: string;
   /** Visible label. Defaults to "Open in studio" when a template is given,
    *  "Open the studio" otherwise — matches the prior hand-rolled copy. */
@@ -33,7 +39,9 @@ export function StudioOpenCTA({
   withArrow = false,
   size = "lg",
 }: StudioOpenCTAProps): JSX.Element {
-  const to = templateId ? `/studio?template=${templateId}` : "/studio";
+  const to = templateId
+    ? `/studio/new?contentTemplate=${encodeURIComponent(templateId)}`
+    : "/studio";
   const text = label ?? (templateId ? "Open in studio" : "Open the studio");
   return (
     <Button asChild size={size}>

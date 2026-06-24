@@ -74,92 +74,60 @@ export function findMusicTrack(id: string): MusicTrack | null {
   return MUSIC_TRACKS.find((t) => t.id === id) ?? null;
 }
 
-/**
- * Music selection — single union that covers both stock-catalog picks
- * (id-based) and custom music (composed, recorded, or user-uploaded
- * URLs). Every music-aware surface (right-panel Music section, ActionsPanel
- * composer, usePreviewPlayback, canvasStateToTimeline) reads + writes
- * through this shape so there's ONE seam to update.
- */
-/** Per-source timing controls — `startOffsetSec` shifts the music's
- *  composition start, `fadeInSec` / `fadeOutSec` ramp gain at the
- *  edges (parity with VoiceoverClip per #1115). Optional; absent
- *  fields default to 0. Both stock + custom sources carry them so
- *  the audio-timeline UI can render fade handles identically. */
-export interface MusicTimingControls {
-  /** Manual start-offset in seconds from composition 0. Default 0. */
-  startOffsetSec?: number;
-  /** Fade-in duration in seconds. Default 0. */
-  fadeInSec?: number;
-  /** Fade-out duration in seconds. Default 0. */
-  fadeOutSec?: number;
+// ─── Audio-layer source resolution ─────────────────────────────────────────
+// The multi-track audio model stores each layer's source as a structural
+// `{ kind: "stock"; trackId } | { kind: "custom"; url }` union (see
+// `AudioLayer` in canvas-state.ts). These helpers are the SINGLE seam
+// between that union and any playable / addressable representation, so
+// preview, render emit, and the mixer can't derive URLs differently.
+// Typed structurally (no canvas-state import) to avoid a module cycle.
+
+export type AudioLayerSourceLike =
+  | { kind: "stock"; trackId: string }
+  | { kind: "custom"; url: string };
+
+/** Shared stock → playable-URL resolver. Static catalog URL wins when
+ *  present (legacy / future real files); otherwise procedural render. */
+async function resolvePlayableStock(trackId: string): Promise<string | null> {
+  const track = findMusicTrack(trackId);
+  if (!track || track.id === "none") return null;
+  if (track.src) return track.src;
+  const { getProceduralMusicUrl, hasProceduralMusic } = await import(
+    "./music-procedural"
+  );
+  if (!hasProceduralMusic(track.id)) return null;
+  return getProceduralMusicUrl(track.id);
 }
 
-export type MusicSource =
-  | ({ kind: "stock"; trackId: string } & MusicTimingControls)
-  | ({ kind: "custom"; url: string; label: string; durationSeconds: number } & MusicTimingControls);
-
-export interface ResolvedMusic {
-  /** Playable URL — public asset path for stock, blob:/cdn for custom. */
-  src: string;
-  /** Display label for timeline / picker highlight. */
-  label: string;
-  /** Stable id for picker active-state matching (the stock track id for
-   *  stock, or `custom:<url>` for custom). */
-  selectionId: string;
+/** Stable selection id for a layer source — `<trackId>` for stock,
+ *  `custom:<url>` for custom. Used as the render-side `sourceId` suffix
+ *  (`music:<selectionId>`) and the picker's active-state key. */
+export function audioLayerSelectionId(source: AudioLayerSourceLike): string {
+  return source.kind === "stock" ? source.trackId : `custom:${source.url}`;
 }
 
-/**
- * Resolve a MusicSource to its label + selection id. Stock entries
- * don't carry a static URL anymore (the catalog was previously pointing
- * at `/audio/*.mp3` files that were never bundled, which made every
- * picker preview + composition playback silent); callers that need a
- * playable URL go through `resolvePlayableSrc()` which lazily
- * generates a WAV blob via the procedural pipeline.
- *
- * Returns null when the source can't be resolved at all (unknown stock
- * id, missing custom URL). Per DRY: every consumer that needs to
- * play/render/display music goes through this helper — no caller
- * hand-rolls the resolution.
- */
-export function resolveMusic(source: MusicSource | null): ResolvedMusic | null {
-  if (!source) return null;
-  if (source.kind === "stock") {
-    const track = findMusicTrack(source.trackId);
-    if (!track || track.id === "none") return null;
-    return { src: track.src, label: track.label, selectionId: track.id };
-  }
-  if (!source.url) return null;
-  return {
-    src: source.url,
-    label: source.label,
-    selectionId: `custom:${source.url}`,
-  };
-}
-
-/**
- * Resolve a MusicSource to a playable URL — generating the procedural
- * WAV on first request for stock tracks and reusing the cached blob
- * URL thereafter. Returns null when the source can't be resolved.
- * Async because procedural rendering goes through OfflineAudioContext;
- * callers should await + then create their Audio element or HTMLAudio
- * src.
- */
-export async function resolvePlayableSrc(
-  source: MusicSource | null,
+/** Resolve a layer source to its playable URL — generating procedural
+ *  stock WAVs on first use, returning the custom url verbatim. Null when
+ *  unresolvable (unknown stock id / empty custom url). */
+export async function resolvePlayableLayerSrc(
+  source: AudioLayerSourceLike,
 ): Promise<string | null> {
-  if (!source) return null;
+  if (source.kind === "stock") return resolvePlayableStock(source.trackId);
+  return source.url || null;
+}
+
+/** Resolve a stock layer source to the scheduler's `track` value — the
+ *  static catalog src when present, else the track id (the live preview
+ *  scheduler maps stock ids to procedural buffers itself). Custom returns
+ *  its url. Null when the stock id is unknown / "none". Mirrors the old
+ *  single-source `resolvedMusic()` seam, now per layer. */
+export function resolveLayerTrack(
+  source: AudioLayerSourceLike,
+): string | null {
   if (source.kind === "stock") {
     const track = findMusicTrack(source.trackId);
     if (!track || track.id === "none") return null;
-    // Static URL (legacy / future real files) wins when present; fall
-    // back to procedural rendering otherwise.
-    if (track.src) return track.src;
-    const { getProceduralMusicUrl, hasProceduralMusic } = await import(
-      "./music-procedural"
-    );
-    if (!hasProceduralMusic(track.id)) return null;
-    return getProceduralMusicUrl(track.id);
+    return track.src || track.id;
   }
   return source.url || null;
 }

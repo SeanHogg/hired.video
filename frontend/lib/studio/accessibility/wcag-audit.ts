@@ -31,6 +31,7 @@ import type {
   Scene,
   Widget,
 } from "../editor-v2/canvas-state";
+import { voiceoverLayers } from "../editor-v2/canvas-state";
 import { evaluateContrast } from "./contrast";
 
 export type WcagSeverity = "error" | "warning" | "info";
@@ -78,7 +79,7 @@ export function auditCanvasState(state: CanvasState): WcagReport {
   const hasAnyVideo = state.scenes.some((s) =>
     s.widgets.some((w) => w.kind === "video" || w.kind === "webcam"),
   );
-  const hasAnyVoiceover = state.voiceovers.length > 0;
+  const hasAnyVoiceover = voiceoverLayers(state).length > 0;
   const hasCaptions =
     state.captions !== null && state.captions.cues.length > 0;
   if ((hasAnyVideo || hasAnyVoiceover) && !hasCaptions) {

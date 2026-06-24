@@ -34,8 +34,6 @@ import {
   Play,
   Pause,
   SkipBack,
-  Music,
-  Mic,
   Pencil,
   UserPlus,
   Download,
@@ -47,7 +45,7 @@ import {
   Check,
   CloudOff,
 } from "lucide-react";
-import { resolveMusic } from "@/lib/studio/music-catalog";
+import { findMusicTrack } from "@/lib/studio/music-catalog";
 import { shouldShowBranding } from "@/lib/studio/branding-policy";
 import { useRemoveBrandingFlag } from "@/lib/studio/use-remove-branding-flag";
 import { useSubscription } from "@/lib/hooks/useSubscription";
@@ -82,26 +80,30 @@ import {
 } from "@/lib/studio/anon-conversion";
 
 import {
+  type AudioLayer,
   type CanvasAudioMix,
   type CanvasState,
   type Scene,
-  type VoiceoverClip,
   type Widget,
   type WidgetKind,
   type WidgetParams,
   type WidgetPosition,
+  addAudioLayer,
   applyThemeToState,
   cloneSceneWithNewIds,
   defaultWidget,
   DEFAULT_AUDIO_MIX,
   emptyCanvasState,
   emptyScene,
+  makeAudioLayer,
   makeLinkedContentWidget,
   makeEngagementAssetWidget,
   makeRecordingScene,
+  normalizeCanvasState,
+  removeAudioLayer,
+  splitAudioLayer,
   totalDurationSeconds,
-  updateMusicTiming,
-  updateVoiceoverClip,
+  updateAudioLayer,
 } from "@/lib/studio/editor-v2/canvas-state";
 import {
   resolveLinkedContentColors,
@@ -2223,28 +2225,85 @@ export default function StudioEditorV2() {
     [],
   );
 
-  // Audio-timeline drag UI (#1115). One selection union for the
-  // currently-active audio bar (music OR a specific voiceover); per-
-  // source change handlers route through the shared mutator helpers in
-  // canvas-state.ts. Commit fires on drag-end so a multi-tick drag
-  // becomes one undo step.
-  const [selectedAudio, setSelectedAudio] = useState<
-    import("@/components/studio/v2/AdvancedTimeline").AudioSelection | null
-  >(null);
-  const handleVoiceoverChange = useCallback(
+  // Audio timeline — the multi-track model. One selected layer id at a
+  // time; the per-bar change handler routes through `updateAudioLayer`,
+  // split/remove through their mutators. Commit fires on drag-end so a
+  // multi-tick drag becomes one undo step.
+  const [selectedAudioLayerId, setSelectedAudioLayerId] = useState<string | null>(null);
+  const handleAudioLayerChange = useCallback(
     (
-      voiceoverId: string,
+      layerId: string,
       patch: import("@/components/studio/v2/AdvancedTimeline").AudioPatch,
     ) => {
-      setState((prev) => updateVoiceoverClip(prev, voiceoverId, patch));
+      setState((prev) => updateAudioLayer(prev, layerId, patch));
     },
     [setState],
   );
-  const handleMusicChange = useCallback(
-    (patch: import("@/components/studio/v2/AdvancedTimeline").AudioPatch) => {
-      setState((prev) => updateMusicTiming(prev, patch));
+  const handleSplitAudioLayer = useCallback(
+    (layerId: string, atCompositionSec: number) => {
+      setState((prev) => {
+        const { state: next, newLayerId } = splitAudioLayer(prev, layerId, atCompositionSec);
+        if (newLayerId) setSelectedAudioLayerId(newLayerId);
+        return next;
+      });
+      commitHistory();
     },
-    [setState],
+    [setState, commitHistory],
+  );
+  const handleRemoveAudioLayer = useCallback(
+    (layerId: string) => {
+      setState((prev) => removeAudioLayer(prev, layerId));
+      setSelectedAudioLayerId((cur) => (cur === layerId ? null : cur));
+      commitHistory();
+    },
+    [setState, commitHistory],
+  );
+  // A music track dragged onto the timeline / canvas → append a music
+  // layer. Payload data is EITHER a stock catalog track id OR a
+  // JSON-encoded custom source `{url,label,durationSeconds}` (uploaded /
+  // composed music dragged from the bin), so both stock and custom music
+  // get drag-to-add parity.
+  const handleMusicDrop = useCallback(
+    (payload: import("@/lib/studio/editor-v2/drag-protocol").DragPayload) => {
+      if (payload.kind !== "music") return;
+      let layer: AudioLayer | null = null;
+      if (payload.data.startsWith("{")) {
+        try {
+          const custom = JSON.parse(payload.data) as {
+            url?: string;
+            label?: string;
+            durationSeconds?: number;
+          };
+          if (custom.url) {
+            layer = makeAudioLayer({
+              kind: "music",
+              source: { kind: "custom", url: custom.url },
+              label: custom.label || "Music",
+              durationSeconds: custom.durationSeconds ?? 0,
+            });
+          }
+        } catch {
+          // Malformed payload — ignore the drop.
+        }
+      } else {
+        const track = findMusicTrack(payload.data);
+        if (track && track.id !== "none") {
+          layer = makeAudioLayer({
+            kind: "music",
+            source: { kind: "stock", trackId: track.id },
+            label: track.label,
+            durationSeconds: track.durationSeconds,
+          });
+        }
+      }
+      if (!layer) return;
+      const added = layer;
+      setState((prev) => addAudioLayer(prev, added));
+      setSelectedAudioLayerId(added.id);
+      commitHistory();
+      toast({ title: t("studio.editor.musicToast", { label: added.label }) });
+    },
+    [setState, commitHistory, toast, t],
   );
   const handleAudioCommit = useCallback(() => {
     // The history wrapper's `commit` records the current state as one
@@ -2361,22 +2420,25 @@ export default function StudioEditorV2() {
     setState((prev) => ({ ...prev, captions }));
   }, []);
 
-  const addVoiceoverClip = useCallback((clip: VoiceoverClip) => {
-    setState((prev) => ({ ...prev, voiceovers: [...prev.voiceovers, clip] }));
+  const addVoiceoverLayer = useCallback((layer: AudioLayer) => {
+    setState((prev) => addAudioLayer(prev, layer));
   }, []);
 
   const setMusicFromBlob = useCallback(
     (blob: Blob, durationSeconds: number, label: string) => {
-      // Original-music composer hands us a freshly-rendered WAV. We
-      // register it as a custom MusicSource so resolveMusic() can hand
-      // back a playable URL — same channel the stock picker uses (DRY).
-      // R2 upload on save is gap-registered (#563); blob URL is fine
-      // for the in-editor preview.
+      // Original-music composer hands us a freshly-rendered WAV. We add
+      // it as a custom music layer so the resolver can hand back a
+      // playable URL — same channel the stock picker uses (DRY). R2
+      // upload on save is gap-registered (#563); blob URL is fine for
+      // the in-editor preview.
       const url = URL.createObjectURL(blob);
-      setState((prev) => ({
-        ...prev,
-        musicSource: { kind: "custom", url, label, durationSeconds },
-      }));
+      const layer = makeAudioLayer({
+        kind: "music",
+        source: { kind: "custom", url },
+        label,
+        durationSeconds,
+      });
+      setState((prev) => addAudioLayer(prev, layer));
     },
     [],
   );
@@ -2558,14 +2620,9 @@ export default function StudioEditorV2() {
     },
     [],
   );
-  const patchVoiceoverClip = useCallback(
-    (clipId: string, patch: Partial<Pick<VoiceoverClip, "gain" | "muted">>) => {
-      setState((prev) => ({
-        ...prev,
-        voiceovers: prev.voiceovers.map((v) =>
-          v.id === clipId ? { ...v, ...patch } : v,
-        ),
-      }));
+  const patchAudioLayerMix = useCallback(
+    (layerId: string, patch: { gain?: number; muted?: boolean }) => {
+      setState((prev) => updateAudioLayer(prev, layerId, patch));
     },
     [],
   );
@@ -3791,7 +3848,7 @@ export default function StudioEditorV2() {
                       onAddVideoWidget={(url, durationSeconds) =>
                         addMediaWidget("video", url, durationSeconds)
                       }
-                      onAddVoiceover={addVoiceoverClip}
+                      onAddVoiceover={addVoiceoverLayer}
                       activeSceneId={activeSceneId}
                       mediaKind={currentMediaKind}
                     />
@@ -3821,7 +3878,7 @@ export default function StudioEditorV2() {
                         addMediaWidget("video", url, durationSeconds)
                       }
                       onAddImageWidget={(url) => addMediaWidget("image", url)}
-                      onAddVoiceover={addVoiceoverClip}
+                      onAddVoiceover={addVoiceoverLayer}
                       onSetCaptions={setCaptionsState}
                       onSetMusicFromBlob={setMusicFromBlob}
                       onUpdateWidgetText={updateWidgetText}
@@ -3833,7 +3890,7 @@ export default function StudioEditorV2() {
                         setActiveSceneId(next.scenes[0]?.id ?? activeSceneId);
                       }}
                       onPatchAudioMix={patchAudioMix}
-                      onPatchVoiceover={patchVoiceoverClip}
+                      onPatchVoiceover={patchAudioLayerMix}
                       onInsertEngagementAsset={insertEngagementAsset}
                     />
                   )}
@@ -4146,6 +4203,7 @@ export default function StudioEditorV2() {
                         ? undefined
                         : (atFraction) => placeScreenshot(atFraction)
                     }
+                    onMusicDrop={playback.isPlaying ? undefined : handleMusicDrop}
                     defaultFontId={state.fontFamily}
                     projectId={persistedProjectId}
                   />
@@ -4279,11 +4337,15 @@ export default function StudioEditorV2() {
                   updateScene(sceneId, { durationSeconds })
                 }
                 onWidgetWindowChange={updateWidgetWindow}
-                selectedAudio={selectedAudio}
-                onSelectAudio={setSelectedAudio}
-                onVoiceoverChange={handleVoiceoverChange}
-                onMusicChange={handleMusicChange}
+                selectedAudioLayerId={selectedAudioLayerId}
+                onSelectAudioLayer={setSelectedAudioLayerId}
+                onAudioLayerChange={handleAudioLayerChange}
                 onAudioCommit={handleAudioCommit}
+                onSplitAudioLayer={handleSplitAudioLayer}
+                onRemoveAudioLayer={handleRemoveAudioLayer}
+                onMusicDrop={handleMusicDrop}
+                playheadSec={playback.playhead}
+                onSeek={playback.seek}
               />
             </CollapsiblePanel>
             )}
@@ -4340,15 +4402,25 @@ export default function StudioEditorV2() {
                 updateScene(activeScene.id, scenePatchFromBgPreset(preset))
               }
               onSelectMusic={(track) => {
+                // "None" clears every music layer; picking a track APPENDS
+                // a new music layer (multi-track audio — drag/pick adds, it
+                // doesn't replace).
                 if (track.id === "none") {
-                  setState((prev) => ({ ...prev, musicSource: null }));
+                  setState((prev) => ({
+                    ...prev,
+                    audioLayers: prev.audioLayers.filter((l) => l.kind !== "music"),
+                  }));
                   toast({ title: t("studio.editor.musicRemoved") });
                   return;
                 }
-                setState((prev) => ({
-                  ...prev,
-                  musicSource: { kind: "stock", trackId: track.id },
-                }));
+                const layer = makeAudioLayer({
+                  kind: "music",
+                  source: { kind: "stock", trackId: track.id },
+                  label: track.label,
+                  durationSeconds: track.durationSeconds,
+                });
+                setState((prev) => addAudioLayer(prev, layer));
+                setSelectedAudioLayerId(layer.id);
                 toast({ title: t("studio.editor.musicToast", { label: track.label }) });
               }}
               onSelectFormat={(format) => {
@@ -5297,15 +5369,20 @@ function TimelineDock({
   onSelectWidget,
   onSceneDurationChange,
   onWidgetWindowChange,
-  selectedAudio,
-  onSelectAudio,
-  onVoiceoverChange,
-  onMusicChange,
+  selectedAudioLayerId,
+  onSelectAudioLayer,
+  onAudioLayerChange,
   onAudioCommit,
+  onSplitAudioLayer,
+  onRemoveAudioLayer,
+  onMusicDrop,
+  playheadSec,
+  onSeek,
 }: {
   state: CanvasState;
   activeSceneId: string | null;
   selection: Selection;
+  /** Expanded (full multi-track) vs collapsed (minimal) timeline. */
   advancedOpen: boolean;
   onToggleAdvanced: () => void;
   onSelectScene: (sceneId: string) => void;
@@ -5316,117 +5393,64 @@ function TimelineDock({
     visibleFrom: number | null,
     visibleTo: number | null,
   ) => void;
-  selectedAudio: import("@/components/studio/v2/AdvancedTimeline").AudioSelection | null;
-  onSelectAudio: (sel: import("@/components/studio/v2/AdvancedTimeline").AudioSelection) => void;
-  onVoiceoverChange: (id: string, patch: import("@/components/studio/v2/AdvancedTimeline").AudioPatch) => void;
-  onMusicChange: (patch: import("@/components/studio/v2/AdvancedTimeline").AudioPatch) => void;
+  selectedAudioLayerId: string | null;
+  onSelectAudioLayer: (layerId: string) => void;
+  onAudioLayerChange: (id: string, patch: import("@/components/studio/v2/AdvancedTimeline").AudioPatch) => void;
   onAudioCommit: () => void;
+  onSplitAudioLayer: (layerId: string, atCompositionSec: number) => void;
+  onRemoveAudioLayer: (layerId: string) => void;
+  onMusicDrop: (payload: import("@/lib/studio/editor-v2/drag-protocol").DragPayload) => void;
+  playheadSec: number;
+  onSeek: (sec: number) => void;
 }) {
   const { t } = useTranslation();
   const total = totalDurationSeconds(state);
   const selectedWidgetId =
     selection.kind === "widget" ? selection.widgetId : null;
-  // Outer border + bg come from the wrapping CollapsiblePanel; this
-  // root is a plain block. The collapse toggle half-protrudes above
-  // the top-left edge of the panel, so the header row needs no padding
-  // adjustment — the toggle never overlaps content.
+  // There is ONE always-mounted timeline now (no basic/advanced split).
+  // The header toggle expands it from the minimal scene strip + audio
+  // summary into the full multi-track view; the timeline itself renders
+  // both states off the `expanded` prop.
   return (
     <div>
-      {advancedOpen && (
-        <AdvancedTimeline
-          state={state}
-          activeSceneId={activeSceneId}
-          selectedWidgetId={selectedWidgetId}
-          onSelectScene={onSelectScene}
-          onSelectWidget={onSelectWidget}
-          onSceneDurationChange={onSceneDurationChange}
-          onWidgetWindowChange={onWidgetWindowChange}
-          selectedAudio={selectedAudio}
-          onSelectAudio={onSelectAudio}
-          onVoiceoverChange={onVoiceoverChange}
-          onMusicChange={onMusicChange}
-          onAudioCommit={onAudioCommit}
-        />
-      )}
-      <div className="px-4 py-3">
-        <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
-          <span>{t("labels.studioLayout.timeline")}</span>
-          <div className="flex items-center gap-3">
-            <span>{t("studio.editorV2.totalSeconds", { seconds: total.toFixed(1) })}</span>
-            <button
-              type="button"
-              onClick={onToggleAdvanced}
-              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label={advancedOpen ? t("studio.editorV2.hideAdvancedTimeline") : t("studio.editorV2.showAdvancedTimeline")}
-            >
-              {t("search.advanced")}
-              {advancedOpen ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronUp className="h-3 w-3" />
-              )}
-            </button>
-          </div>
+      <div className="flex items-center justify-between px-4 pt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+        <span>{t("labels.studioLayout.timeline")}</span>
+        <div className="flex items-center gap-3">
+          <span>{t("studio.editorV2.totalSeconds", { seconds: total.toFixed(1) })}</span>
+          <button
+            type="button"
+            onClick={onToggleAdvanced}
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label={advancedOpen ? t("studio.timeline.collapse") : t("studio.timeline.expand")}
+          >
+            {advancedOpen ? t("studio.timeline.collapse") : t("studio.timeline.expand")}
+            {advancedOpen ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronUp className="h-3 w-3" />
+            )}
+          </button>
         </div>
-        <div className="flex h-10 items-stretch gap-1">
-          {state.scenes.map((scene) => {
-            const pct = total > 0 ? (scene.durationSeconds / total) * 100 : 0;
-            const active = scene.id === activeSceneId;
-            return (
-              <button
-                key={scene.id}
-                type="button"
-                onClick={() => onSelectScene(scene.id)}
-                style={{ flexBasis: `${pct}%` }}
-                className={cn(
-                  "flex min-w-[3rem] items-center justify-center rounded border text-[10px] font-medium transition",
-                  active
-                    ? "border-brand-purple bg-brand-purple/10 text-brand-purple"
-                    : "border-border bg-background hover:bg-muted",
-                )}
-              >
-                <span className="truncate px-1">{scene.label}</span>
-              </button>
-            );
-          })}
-        </div>
-        <AudioTimelineRow state={state} />
       </div>
-    </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────────────────────
-// AudioTimelineRow — single read-only row under the scene strip showing
-// the active music track + voiceover clips so the user can see at a
-// glance that their pick landed on the composition. Editing audio
-// timing happens in the Advanced timeline (gap-registered for full
-// per-clip editing). Self-gates: returns null when there's no audio.
-// ───────────────────────────────────────────────────────────────────────────
-
-function AudioTimelineRow({ state }: { state: CanvasState }) {
-  const { t } = useTranslation();
-  const music = resolveMusic(state.musicSource);
-  if (!music && state.voiceovers.length === 0) return null;
-  return (
-    <div className="mt-1.5 flex flex-col gap-1">
-      {music && (
-        <div className="flex h-7 items-center gap-2 rounded border border-emerald-500/40 bg-emerald-500/10 px-2 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
-          <Music className="h-3 w-3" />
-          <span className="truncate">{t("studio.editorV2.musicLabel", { label: music.label })}</span>
-        </div>
-      )}
-      {state.voiceovers.map((vo) => (
-        <div
-          key={vo.id}
-          className="flex h-7 items-center gap-2 rounded border border-sky-500/40 bg-sky-500/10 px-2 text-[10px] font-medium text-sky-700 dark:text-sky-300"
-        >
-          <Mic className="h-3 w-3" />
-          <span className="truncate">
-            {t("studio.editorV2.voiceoverLabel", { label: vo.label, seconds: vo.durationSeconds.toFixed(1) })}
-          </span>
-        </div>
-      ))}
+      <AdvancedTimeline
+        state={state}
+        expanded={advancedOpen}
+        activeSceneId={activeSceneId}
+        selectedWidgetId={selectedWidgetId}
+        selectedAudioLayerId={selectedAudioLayerId}
+        onSelectScene={onSelectScene}
+        onSelectWidget={onSelectWidget}
+        onSceneDurationChange={onSceneDurationChange}
+        onWidgetWindowChange={onWidgetWindowChange}
+        onSelectAudioLayer={onSelectAudioLayer}
+        onAudioLayerChange={onAudioLayerChange}
+        onAudioCommit={onAudioCommit}
+        onSplitAudioLayer={onSplitAudioLayer}
+        onRemoveAudioLayer={onRemoveAudioLayer}
+        onMusicDrop={onMusicDrop}
+        playheadSec={playheadSec}
+        onSeek={onSeek}
+      />
     </div>
   );
 }
@@ -5446,14 +5470,12 @@ function hydrateInitialState(
       if (raw) {
         const parsed = JSON.parse(raw) as { state?: CanvasState };
         if (parsed.state && Array.isArray(parsed.state.scenes) && parsed.state.scenes.length > 0) {
-          // Normalize onto current defaults so a draft saved by an OLDER app
-          // shape (missing `voiceovers` / `captions` / new fields) can't crash
-          // the editor — e.g. `canvasStateToTimeline` does `for (const vo of
-          // state.voiceovers)`, which threw "voiceovers is not iterable" on
-          // pre-voiceovers drafts (exposed once anon visitors started landing
-          // here with stale localStorage). Present keys win; missing keys fall
-          // back to a complete `emptyCanvasState()`.
-          return { ...emptyCanvasState(), ...parsed.state };
+          // `normalizeCanvasState` fills any missing top-level fields from
+          // `emptyCanvasState()` (present keys win) AND migrates a pre-v2
+          // audio shape (`musicSource` + `voiceovers[]`) forward into
+          // `audioLayers[]`, so a draft saved by an OLDER app shape can't
+          // crash the editor (e.g. emit iterating a missing array).
+          return normalizeCanvasState(parsed.state);
         }
       }
     } catch {

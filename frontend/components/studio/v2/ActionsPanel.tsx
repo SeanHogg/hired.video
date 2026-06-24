@@ -41,15 +41,16 @@ import LeftPanelTile from "./LeftPanelTile";
 import MediaSection from "./MediaSection";
 import { useCollapsibleSections } from "@/lib/hooks/useCollapsibleSections";
 import { mediaKindHasAudio, mediaKindHasVideo } from "@shared/media-kinds";
-import type {
-  CanvasAudioMix,
-  CanvasCaptions,
-  CanvasCaptionCue,
-  CanvasState,
-  Scene,
-  VoiceoverClip,
-  Widget,
-  WidgetKind,
+import {
+  makeAudioLayer,
+  type AudioLayer,
+  type CanvasAudioMix,
+  type CanvasCaptions,
+  type CanvasCaptionCue,
+  type CanvasState,
+  type Scene,
+  type Widget,
+  type WidgetKind,
 } from "@/lib/studio/editor-v2/canvas-state";
 
 // Lazy-load every dialog so the editor's initial bundle doesn't pull
@@ -125,7 +126,7 @@ export interface ActionsPanelProps {
   videoId?: string | null;
   onAddVideoWidget: (url: string, durationSeconds: number) => void;
   onAddImageWidget: (url: string) => void;
-  onAddVoiceover: (clip: VoiceoverClip) => void;
+  onAddVoiceover: (layer: AudioLayer) => void;
   /** Drops a blank widget (image / video / webcam) onto the active
    *  scene — threaded into the shared `MediaSection` so the Actions-tab
    *  mount has feature parity with the Widgets-tab mount. */
@@ -143,8 +144,8 @@ export interface ActionsPanelProps {
    *  Required when the Engagement section's audio-mixer trigger is
    *  visible — the mixer can't compose without a way to mutate state. */
   onPatchAudioMix?: (patch: Partial<CanvasAudioMix>) => void;
-  /** Patch one voiceover clip's per-clip gain / muted. */
-  onPatchVoiceover?: (clipId: string, patch: Partial<Pick<VoiceoverClip, "gain" | "muted">>) => void;
+  /** Patch one audio layer's per-layer gain / muted (any kind). */
+  onPatchVoiceover?: (layerId: string, patch: { gain?: number; muted?: boolean }) => void;
   /** When set, the panel auto-opens this action on mount. Drives the
    *  `?capture=screen|webcam|screen+webcam` deep-link from chrome
    *  extensions and "Record promo" CTAs (#651) — caller maps the URL
@@ -272,7 +273,7 @@ export default function ActionsPanel(props: ActionsPanelProps) {
         onCaptureScreenshot={props.onCaptureScreenshot}
         onAddImageWidget={props.onAddImageWidget}
         onAddVideoWidget={props.onAddVideoWidget}
-        onAddVoiceover={props.onAddVoiceover}
+        onAddAudioLayer={props.onAddVoiceover}
         activeSceneId={props.activeScene.id}
         onOpenAiHeadshot={() => setOpenAction("ai-headshot")}
       />
@@ -472,13 +473,15 @@ function ActionSheet({
                 }))}
                 projectId={persistedProjectId ?? undefined}
                 onPublishToScene={(sceneId, audioUrl, durationMs, label) => {
-                  onAddVoiceover({
-                    id: `vo_${Math.random().toString(36).slice(2, 10)}`,
-                    url: audioUrl,
-                    durationSeconds: durationMs / 1000,
-                    anchorSceneId: sceneId,
-                    label,
-                  });
+                  onAddVoiceover(
+                    makeAudioLayer({
+                      kind: "voiceover",
+                      source: { kind: "custom", url: audioUrl },
+                      label,
+                      durationSeconds: durationMs / 1000,
+                      anchorSceneId: sceneId,
+                    }),
+                  );
                   toast({ title: `Voiceover added: ${label}` });
                 }}
               />

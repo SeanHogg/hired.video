@@ -2,8 +2,8 @@
  * Studio Dubbing Panel (#1558) — translate the project's caption cues
  * to a target language, then re-synthesize them through the chosen TTS
  * engine (cloned-voice preferred). The output blob is appended to the
- * canvas as a new VoiceoverClip so the dub plays back alongside the
- * original timeline.
+ * canvas as a new voiceover `AudioLayer` so the dub plays back alongside
+ * the original timeline.
  *
  * Closes the Synthesia "140+ language dubbing with consistent voice"
  * gap. Translation is server-side via the platform LLM; voice synth is
@@ -23,9 +23,10 @@ import {
   type TtsEngineId,
 } from "@/lib/services/tts-engines";
 import type {
+  AudioLayer,
   CanvasState,
-  VoiceoverClip,
 } from "@/lib/studio/editor-v2/canvas-state";
+import { makeAudioLayer } from "@/lib/studio/editor-v2/canvas-state";
 import { Button } from "@/components/ui/button";
 
 export interface StudioDubbingPanelProps {
@@ -33,7 +34,7 @@ export interface StudioDubbingPanelProps {
   /** Adds the dubbed track to the canvas. The panel synthesizes one
    *  long audio blob covering all translated cues, sequenced against
    *  their original timing. */
-  onAddVoiceover: (clip: VoiceoverClip) => void;
+  onAddVoiceover: (layer: AudioLayer) => void;
 }
 
 type Phase = "idle" | "translating" | "synthesizing" | "done" | "error";
@@ -134,13 +135,16 @@ export default function StudioDubbingPanel({
       const url = URL.createObjectURL(wav);
       const durationSeconds = totalSamples / sampleRate;
 
-      onAddVoiceover({
-        id: `dub_${Math.random().toString(36).slice(2, 10)}`,
-        url,
-        durationSeconds,
-        anchorSceneId: state.scenes[0]?.id ?? null,
-        label: `Dubbed — ${translated.targetLabel}`,
-      });
+      onAddVoiceover(
+        makeAudioLayer({
+          id: `dub_${Math.random().toString(36).slice(2, 10)}`,
+          kind: "voiceover",
+          source: { kind: "custom", url },
+          label: `Dubbed — ${translated.targetLabel}`,
+          durationSeconds,
+          anchorSceneId: state.scenes[0]?.id ?? null,
+        }),
+      );
 
       setProgress(100);
       setPhase("done");

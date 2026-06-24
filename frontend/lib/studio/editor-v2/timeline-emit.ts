@@ -19,11 +19,18 @@
  */
 
 import {
+  audioLaneForKind,
+  type AudioLayer,
+  buildAudioLayers,
   CANVAS_STATE_VERSION,
   type CanvasState,
   type ChromaKeyParams,
   emptyCanvasState,
+  layerCompositionStart,
+  layerPlayableSeconds,
+  makeAudioLayer,
   type Scene,
+  voiceoverLayers,
   type Widget,
 } from "./canvas-state";
 import {
@@ -32,9 +39,9 @@ import {
 } from "./audio-ducking";
 import { isLinkedContentKind } from "./linked-content";
 import {
-  resolveMusic,
-  resolvePlayableSrc,
-  type MusicSource,
+  audioLayerSelectionId,
+  findMusicTrack,
+  resolvePlayableLayerSrc,
 } from "../music-catalog";
 import {
   TIMELINE_SCHEMA_VERSION,
@@ -66,7 +73,11 @@ export function canvasStateToTimeline(stateInput: CanvasState): Timeline {
   const state: CanvasState = {
     ...stateInput,
     scenes: stateInput.scenes ?? [],
-    voiceovers: stateInput.voiceovers ?? [],
+    // A draft persisted by an OLDER app shape may carry `musicSource` +
+    // `voiceovers[]` instead of `audioLayers[]`. `buildAudioLayers`
+    // migrates either shape forward so the emit loop always iterates
+    // the unified list. (Already-normalized states pass through.)
+    audioLayers: buildAudioLayers(stateInput as Parameters<typeof buildAudioLayers>[0]),
   };
   const fps = state.fps;
   let cursor = 0;
@@ -89,27 +100,24 @@ export function canvasStateToTimeline(stateInput: CanvasState): Timeline {
   // full frame instead of just the bg. Adding a clip is `{startFrame,
   // durationFrames, effects: scene.effects}` with no source draw.
   const v3: Track = defaultTrack({ id: "v3", kind: "video", label: "Scene post" });
-  const a1: Track = defaultTrack({ id: "a1", kind: "audio", label: "A1" });
-  const a2: Track = defaultTrack({ id: "a2", kind: "audio", label: "A2" });
+  // a1 carries every music + sfx layer, a2 every voiceover layer. Both
+  // allow overlap now that there can be MANY simultaneous layers (the
+  // multi-track audio rebuild) — the render audio mixer sums all active
+  // clips per lane.
+  const a1: Track = defaultTrack({ id: "a1", kind: "audio", label: "A1", allowsOverlap: true });
+  const a2: Track = defaultTrack({ id: "a2", kind: "audio", label: "A2", allowsOverlap: true });
   // Collect widget clips with their z so we can sort them globally
   // before pushing into v2 (paint order = clip-array order).
   const widgetEntries: Array<{ clip: Clip; z: number }> = [];
 
-  // Pending-synthesis voiceovers (a script in `text`, no audio `url` yet)
-  // can't be emitted as A2 clips — an empty sourceId would break the
-  // renderer. But the script must survive a save so the editor can voice
-  // it later, so we stash these on the first scene's background effect
-  // (same place audioMix rides), and `timelineToCanvasState` rehydrates
-  // them back into `voiceovers[]` (gap #2006).
-  const pendingVoiceovers = state.voiceovers
-    .filter((vo) => vo.text && !vo.url)
-    .map((vo) => ({
-      id: vo.id,
-      text: vo.text,
-      anchorSceneId: vo.anchorSceneId,
-      label: vo.label,
-      durationSeconds: vo.durationSeconds,
-    }));
+  // The full `audioLayers[]` snapshot rides on the first scene's
+  // background effect params (same place audioMix rides) so the editor's
+  // Timeline round-trip (`timelineToCanvasState`) recovers every layer
+  // LOSSLESSLY — trims, fades, splits, multiple music beds, and
+  // pending-synthesis voiceover scripts (text + empty url) all survive a
+  // save → load cycle. The a1/a2 clips below are the *render* projection
+  // (playable layers only); this snapshot is the *editor* projection.
+  const audioLayersSnapshot = state.audioLayers;
 
   for (const scene of state.scenes) {
     const sceneFrames = Math.max(1, Math.round(scene.durationSeconds * fps));
@@ -148,8 +156,8 @@ export function canvasStateToTimeline(stateInput: CanvasState): Timeline {
             // saves space and gives the read-side one obvious place
             // to look. The mix is canvas-scoped, not scene-scoped.
             ...(cursor === 0 && state.audioMix ? { audioMix: state.audioMix } : {}),
-            ...(cursor === 0 && pendingVoiceovers.length
-              ? { pendingVoiceovers }
+            ...(cursor === 0 && audioLayersSnapshot.length
+              ? { audioLayers: audioLayersSnapshot }
               : {}),
           },
         },
@@ -182,115 +190,86 @@ export function canvasStateToTimeline(stateInput: CanvasState): Timeline {
     cursor += sceneFrames;
   }
 
-  // Music track lays one OR MORE clips across the full composition on
-  // A1, depending on the audioMix ducking config. Source is
-  // `music:<selectionId>` for both stock + custom — the render facade
-  // resolves the URL via the MediaSource map populated separately
-  // (gap-registered). resolveMusic() is the SINGLE seam between music
-  // source state and any playable representation; consumers don't
-  // re-derive playable URLs.
+  // Audio layers → render clips. Music + sfx layers lay on A1, voiceover
+  // layers on A2; both tracks allow overlap so MANY layers can sound at
+  // once (the multi-track audio rebuild). Per-layer gain composes with
+  // the mix's lane + master gains so the render facade (which honours
+  // per-clip `gain`) plays the mixed output verbatim. The full layer
+  // set is ALSO stashed on the first background effect (above) so the
+  // editor round-trip is lossless; these clips are the render projection.
   //
-  // Audio mix (#645) — master gain + per-lane gain / mute. Fold the
-  // user-configured music slice into the clip's `gain` so the render
-  // facade (which already honours per-clip gain) plays the mixed
-  // output verbatim. The full mix shape is also stashed on the first
-  // background clip's params so a save → load round-trip preserves
-  // master / voiceover-lane settings the music clip alone can't express.
-  //
-  // Ducking: when `mix.duckMusicUnderVoiceover` is true, the shared
-  // `computeDuckingSegments` helper splits the full-composition span
-  // into open / ducked segments based on the voiceovers' time
-  // windows. We emit one Clip per segment so the render facade hears
-  // the right gain at every moment — same data the preview path uses
-  // via `canvas-state-to-clips.ts`, single SSoT for the segment math.
+  // Ducking: each MUSIC layer is split by the shared
+  // `computeDuckingSegments` helper into open / ducked segments based on
+  // the voiceover layers' windows — same SSoT math the preview path uses
+  // in `canvas-state-to-clips.ts`. sfx layers are not ducked.
   const mix = state.audioMix;
-  const musicLaneGain = mix
-    ? (mix.musicMuted ? 0 : mix.masterGain * mix.musicGain)
-    : 0.6;
-  const resolvedMusic = resolveMusic(state.musicSource);
-  if (resolvedMusic && cursor > 0 && musicLaneGain > 0) {
-    const totalSec = cursor / fps;
-    const voiceoverIntervals: DuckingInterval[] = state.voiceovers
-      .filter((vo) => !(mix?.voiceoverMuted) && !vo.muted)
-      .map((vo) => {
-        const anchorIdx = vo.anchorSceneId
-          ? state.scenes.findIndex((s) => s.id === vo.anchorSceneId)
-          : 0;
-        const startFrame = anchorIdx >= 0 ? sceneStartFrame(state, anchorIdx, fps) : 0;
-        return {
-          startSec: startFrame / fps,
-          endSec: startFrame / fps + vo.durationSeconds,
-        };
-      });
-    const segments = computeDuckingSegments(totalSec, voiceoverIntervals, {
-      enabled: Boolean(mix?.duckMusicUnderVoiceover),
-      duckAmount: mix?.duckAmount,
+  const master = mix?.masterGain ?? 1;
+  const musicLaneGain = mix ? (mix.musicMuted ? 0 : mix.musicGain) : 0.6;
+  const voiceoverLaneGain = mix ? (mix.voiceoverMuted ? 0 : mix.voiceoverGain) : 1;
+  const totalSec = cursor / fps;
+
+  // Voiceover windows (composition time) drive music ducking. Built once.
+  const voiceoverIntervals: DuckingInterval[] = voiceoverLayers(state)
+    .filter((l) => !l.muted && voiceoverLaneGain > 0 && l.source.kind === "custom" && l.source.url)
+    .map((l) => {
+      const start = layerCompositionStart(state, l);
+      return { startSec: start, endSec: start + layerPlayableSeconds(l) };
     });
-    segments.forEach((seg, i) => {
-      const startFrame = Math.round(seg.startSec * fps);
-      const endFrame = Math.round(seg.endSec * fps);
-      const durationFrames = Math.max(1, endFrame - startFrame);
-      a1.clips.push({
-        id:
-          segments.length === 1
-            ? `music_${resolvedMusic.selectionId}`
-            : `music_${resolvedMusic.selectionId}_${i}`,
-        sourceId: `music:${resolvedMusic.selectionId}`,
-        startFrame,
-        durationFrames,
-        // Each segment seeks into the same source at its own start
-        // offset so the music isn't restarted at each segment edge —
-        // it continues uninterrupted under the duck.
-        sourceInFrame: startFrame,
-        gain: musicLaneGain * seg.gainMultiplier,
+
+  for (const layer of state.audioLayers) {
+    // Pending-synthesis voiceover (script, no url) has no render clip —
+    // the snapshot preserves it for the editor to voice later.
+    if (layer.source.kind === "custom" && !layer.source.url) continue;
+    const lane = audioLaneForKind(layer.kind);
+    const laneGain = lane === "music" ? musicLaneGain : voiceoverLaneGain;
+    const effective = layer.muted ? 0 : master * laneGain * layer.gain;
+    if (effective <= 0) continue;
+    const start = Math.max(0, layerCompositionStart(state, layer));
+    if (start >= totalSec) continue;
+    const playable = Math.min(layerPlayableSeconds(layer), totalSec - start);
+    if (playable <= 0) continue;
+    const sourceId =
+      layer.source.kind === "custom"
+        ? layer.source.url
+        : `music:${audioLayerSelectionId(layer.source)}`;
+    const trimStartFrame = Math.round(layer.trimStartSec * fps);
+
+    if (layer.kind === "music") {
+      const segments = computeDuckingSegments(
+        playable,
+        voiceoverIntervals.map((iv) => ({
+          startSec: iv.startSec - start,
+          endSec: iv.endSec - start,
+        })),
+        { enabled: Boolean(mix?.duckMusicUnderVoiceover), duckAmount: mix?.duckAmount },
+      );
+      segments.forEach((seg, i) => {
+        const startFrame = Math.round((start + seg.startSec) * fps);
+        const durationFrames = Math.max(1, Math.round((seg.endSec - seg.startSec) * fps));
+        a1.clips.push({
+          id: segments.length === 1 ? `audio_${layer.id}` : `audio_${layer.id}_${i}`,
+          sourceId,
+          startFrame,
+          durationFrames,
+          // Seek into the source at the layer's trim + this segment's
+          // elapsed offset so the music continues uninterrupted under
+          // the duck and honours the trim handle.
+          sourceInFrame: trimStartFrame + Math.round(seg.startSec * fps),
+          gain: effective * seg.gainMultiplier,
+        });
       });
-    });
-  }
-  // Voiceover clips lay sequentially on A2 with their per-clip gain
-  // composed with master × voiceover-lane. Anchor scene id (when set)
-  // picks the clip's start frame; otherwise it starts at 0.
-  for (const vo of state.voiceovers) {
-    // Skip un-synthesised placeholders (a pending-narration clip carries a
-    // `text` script but no `url` yet) — emitting an audio clip with an empty
-    // sourceId would break the renderer. The script is NOT lost: it was
-    // stashed on the first background effect above (#2006) and rehydrates
-    // into `voiceovers[]`.
-    if (!vo.url) continue;
-    const anchorIdx = vo.anchorSceneId
-      ? state.scenes.findIndex((s) => s.id === vo.anchorSceneId)
-      : 0;
-    const startFrame = anchorIdx >= 0 ? sceneStartFrame(state, anchorIdx, fps) : 0;
-    const clipFrames = Math.max(1, Math.round(vo.durationSeconds * fps));
-    const clipGain = mix
-      ? (mix.voiceoverMuted || vo.muted
-          ? 0
-          : mix.masterGain * mix.voiceoverGain * (vo.gain ?? 1))
-      : vo.muted
-        ? 0
-        : (vo.gain ?? 1);
-    a2.clips.push({
-      id: vo.id,
-      sourceId: vo.url,
-      startFrame,
-      durationFrames: clipFrames,
-      sourceInFrame: 0,
-      gain: clipGain,
-      // Stash the un-composed per-clip values so timelineToCanvasState
-      // can hydrate `voiceovers[].gain` / `.muted` back unchanged.
-      effects: [
-        {
-          kind: "canvas-v2:voiceover-meta",
-          params: {
-            anchorSceneId: vo.anchorSceneId,
-            label: vo.label,
-            gain: vo.gain ?? 1,
-            muted: Boolean(vo.muted),
-            // Keep the source script with synthesised clips too, so the
-            // editor can show the words + re-synthesise (#2006).
-            ...(vo.text ? { text: vo.text } : {}),
-          },
-        },
-      ],
+      continue;
+    }
+
+    // Voiceover + sfx — a single clip, no ducking.
+    const track = lane === "music" ? a1 : a2;
+    track.clips.push({
+      id: `audio_${layer.id}`,
+      sourceId,
+      startFrame: Math.round(start * fps),
+      durationFrames: Math.max(1, Math.round(playable * fps)),
+      sourceInFrame: trimStartFrame,
+      gain: effective,
     });
   }
 
@@ -340,39 +319,31 @@ export async function resolveTimelineAudioSources(
   const sources: Record<string, MediaSource> = {};
   const fps = state.fps;
   const uploadedAt = new Date(0).toISOString();
+  const layers = buildAudioLayers(state as Parameters<typeof buildAudioLayers>[0]);
 
-  const resolvedMusic = resolveMusic(state.musicSource);
-  if (resolvedMusic) {
-    const url = await resolvePlayableSrc(state.musicSource);
-    if (url) {
-      const sourceId = `music:${resolvedMusic.selectionId}`;
-      sources[sourceId] = {
-        id: sourceId,
-        kind: "audio",
-        url,
-        proxyUrl: null,
-        durationFrames: 0,
-        fps,
-        width: null,
-        height: null,
-        filename: resolvedMusic.label,
-        uploadedAt,
-      };
-    }
-  }
-
-  for (const vo of state.voiceovers) {
-    if (!vo.url || sources[vo.url]) continue;
-    sources[vo.url] = {
-      id: vo.url,
+  for (const layer of layers) {
+    const sourceId =
+      layer.source.kind === "custom"
+        ? layer.source.url
+        : `music:${audioLayerSelectionId(layer.source)}`;
+    if (!sourceId || sources[sourceId]) continue;
+    const url = await resolvePlayableLayerSrc(layer.source);
+    if (!url) continue;
+    sources[sourceId] = {
+      id: sourceId,
       kind: "audio",
-      url: vo.url,
+      url,
       proxyUrl: null,
-      durationFrames: Math.max(1, Math.round(vo.durationSeconds * fps)),
+      // Stock music has no fixed frame length (it fits the comp); custom
+      // layers carry their source duration.
+      durationFrames:
+        layer.source.kind === "custom"
+          ? Math.max(1, Math.round(layer.durationSeconds * fps))
+          : 0,
       fps,
       width: null,
       height: null,
-      filename: vo.label || "voiceover",
+      filename: layer.label || layer.kind,
       uploadedAt,
     };
   }
@@ -798,62 +769,20 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
   if (scenes.length === 0) {
     return emptyCanvasState({ width: timeline.width, height: timeline.height, fps });
   }
-  // Recover the chosen music from the audio track's clip sourceId. Stock
-  // selections re-resolve cleanly (the id matches a MUSIC_TRACKS entry);
-  // custom selections lose their URL on round-trip here because the
-  // Timeline doesn't carry it — full custom-music round-trip is
-  // gap-registered.
-  const a1 = timeline.tracks.find((t) => t.id === "a1");
-  const musicClip = a1?.clips.find((c) => c.sourceId.startsWith("music:"));
-  const musicSelectionId = musicClip
-    ? musicClip.sourceId.slice("music:".length)
-    : null;
-  const musicSource: MusicSource | null =
-    musicSelectionId && !musicSelectionId.startsWith("custom:")
-      ? { kind: "stock", trackId: musicSelectionId }
-      : null;
-
-  // Audio mix + voiceovers (#645). The mix was stashed on the first
-  // scene's background effect params on emit; voiceover clips ride on
-  // a2 with their per-clip gain/muted preserved by a sidecar
-  // `canvas-v2:voiceover-meta` effect.
+  // Audio + mix recover. The full `audioLayers[]` snapshot AND the mix
+  // were stashed on the first scene's background effect params on emit,
+  // so the editor round-trip is lossless — trims, fades, splits, multiple
+  // music beds, and pending-synthesis voiceover scripts all survive. Fall
+  // back to reconstructing layers from the a1 (music/sfx) + a2 (voiceover)
+  // render clips for timelines authored before the snapshot existed.
   const firstBgParams = (v1Clips[0]?.effects?.find((e) => e.kind === "canvas-v2:background")?.params ?? {}) as Record<string, unknown>;
   const audioMix =
     firstBgParams.audioMix && typeof firstBgParams.audioMix === "object"
       ? (firstBgParams.audioMix as CanvasState["audioMix"])
       : null;
-  const a2 = timeline.tracks.find((t) => t.id === "a2");
-  const voiceovers: VoiceoverClipShape[] = (a2?.clips ?? []).map((c) => {
-    const meta = (c.effects?.find((e) => e.kind === "canvas-v2:voiceover-meta")?.params ?? {}) as Record<string, unknown>;
-    return {
-      id: c.id,
-      url: c.sourceId,
-      durationSeconds: c.durationFrames / fps,
-      anchorSceneId:
-        typeof meta.anchorSceneId === "string" ? meta.anchorSceneId : null,
-      label: stringOr(meta.label, "Voiceover"),
-      gain: typeof meta.gain === "number" ? meta.gain : (c.gain ?? 1),
-      muted: meta.muted === true,
-      ...(typeof meta.text === "string" && meta.text ? { text: meta.text } : {}),
-    };
-  });
-
-  // Rehydrate pending-synthesis voiceovers stashed on the first bg effect
-  // (#2006) — scripts that hadn't been voiced when the draft was saved.
-  const pendingRaw = Array.isArray(firstBgParams.pendingVoiceovers)
-    ? (firstBgParams.pendingVoiceovers as Array<Record<string, unknown>>)
-    : [];
-  for (const p of pendingRaw) {
-    if (typeof p.text !== "string" || !p.text) continue;
-    voiceovers.push({
-      id: stringOr(p.id, `vo-pending-${voiceovers.length}`),
-      url: "",
-      text: p.text,
-      durationSeconds: typeof p.durationSeconds === "number" ? p.durationSeconds : 0,
-      anchorSceneId: typeof p.anchorSceneId === "string" ? p.anchorSceneId : null,
-      label: stringOr(p.label, "Narration"),
-    });
-  }
+  const audioLayers: AudioLayer[] = Array.isArray(firstBgParams.audioLayers)
+    ? buildAudioLayers({ audioLayers: firstBgParams.audioLayers })
+    : recoverAudioLayersFromClips(timeline, fps);
 
   return {
     schemaVersion: CANVAS_STATE_VERSION,
@@ -862,9 +791,8 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
     fps,
     scenes,
     themeId: null,
-    musicSource,
+    audioLayers,
     captions: null,
-    voiceovers,
     audioMix,
     // Project-level styling fields default to null on hydrate — Timeline
     // JSON doesn't carry them across the round-trip yet (gap #561 +
@@ -877,7 +805,78 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
   };
 }
 
-type VoiceoverClipShape = import("./canvas-state").VoiceoverClip;
+/** Reconstruct audio layers from a timeline's a1/a2 render clips — the
+ *  fallback when no `audioLayers` snapshot is present (timelines authored
+ *  before the multi-track rebuild). a1 carries music (sourceId
+ *  `music:<id>`) + sfx (raw url); a2 carries voiceover (raw url, with an
+ *  optional `canvas-v2:voiceover-meta` sidecar from legacy emits). Stock
+ *  music re-resolves by id; custom-music URLs aren't carried by render
+ *  clips (gap-registered). */
+function recoverAudioLayersFromClips(timeline: Timeline, fps: number): AudioLayer[] {
+  const out: AudioLayer[] = [];
+  const a1 = timeline.tracks.find((t) => t.id === "a1");
+  const seenMusic = new Set<string>();
+  const seenSfx = new Set<string>();
+  for (const c of a1?.clips ?? []) {
+    if (c.sourceId.startsWith("music:")) {
+      const sel = c.sourceId.slice("music:".length);
+      if (seenMusic.has(sel)) continue;
+      seenMusic.add(sel);
+      if (sel.startsWith("custom:")) {
+        // Custom music — the selection id carries the playable url
+        // (`custom:<url>`), so a pre-snapshot legacy timeline still
+        // recovers the layer's source instead of dropping it.
+        const url = sel.slice("custom:".length);
+        if (!url) continue;
+        out.push(
+          makeAudioLayer({
+            kind: "music",
+            source: { kind: "custom", url },
+            label: "Music",
+            durationSeconds: c.durationFrames / fps,
+          }),
+        );
+      } else {
+        out.push(
+          makeAudioLayer({
+            kind: "music",
+            source: { kind: "stock", trackId: sel },
+            label: findMusicTrack(sel)?.label ?? "Music",
+            durationSeconds: findMusicTrack(sel)?.durationSeconds ?? 0,
+          }),
+        );
+      }
+    } else if (c.sourceId && !seenSfx.has(c.sourceId)) {
+      seenSfx.add(c.sourceId);
+      out.push(
+        makeAudioLayer({
+          kind: "sfx",
+          source: { kind: "custom", url: c.sourceId },
+          label: "SFX",
+          durationSeconds: c.durationFrames / fps,
+        }),
+      );
+    }
+  }
+  const a2 = timeline.tracks.find((t) => t.id === "a2");
+  for (const c of a2?.clips ?? []) {
+    if (!c.sourceId) continue;
+    const meta = (c.effects?.find((e) => e.kind === "canvas-v2:voiceover-meta")?.params ?? {}) as Record<string, unknown>;
+    out.push(
+      makeAudioLayer({
+        kind: "voiceover",
+        source: { kind: "custom", url: c.sourceId },
+        label: typeof meta.label === "string" ? meta.label : "Voiceover",
+        durationSeconds: c.durationFrames / fps,
+        anchorSceneId: typeof meta.anchorSceneId === "string" ? meta.anchorSceneId : null,
+        gain: typeof meta.gain === "number" ? meta.gain : c.gain ?? 1,
+        muted: meta.muted === true,
+        ...(typeof meta.text === "string" && meta.text ? { text: meta.text } : {}),
+      }),
+    );
+  }
+  return out;
+}
 
 function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | null {
   const effect = clip.effects?.[0];

@@ -2,8 +2,9 @@
  * Page→video narration synthesis.
  *
  * The page→video scaffolder writes a spoken `narration` line per scene and
- * `pageVideoSpecToCanvas()` seeds a "pending synthesis" VoiceoverClip per
- * narrated scene (text set, url empty). This module turns those scripts
+ * `pageVideoSpecToCanvas()` seeds a "pending synthesis" voiceover audio
+ * layer per narrated scene (text set, source url empty). This module turns
+ * those scripts
  * into actual audio CLIENT-SIDE — TTS engines (Kokoro/Piper/VibeVoice) run
  * in-browser via WebGPU, the same path the manual Voiceover panel uses
  * (DRY: `renderToPcm` → `pcmToWav` → `uploadSceneAudio`).
@@ -28,7 +29,18 @@ import {
   type TtsEngineId,
 } from "@/lib/services/tts-engines";
 import { studioService } from "@/lib/services/studio-service";
-import type { CanvasState } from "@/lib/studio/editor-v2/canvas-state";
+import type { AudioLayer, CanvasState } from "@/lib/studio/editor-v2/canvas-state";
+
+/** A pending-synthesis narration layer: a voiceover audio layer that
+ *  carries a script (`text`) but whose source url is still empty. */
+function isPendingNarration(layer: AudioLayer): boolean {
+  return (
+    layer.kind === "voiceover" &&
+    !!layer.text &&
+    layer.source.kind === "custom" &&
+    layer.source.url === ""
+  );
+}
 
 /** Engines that can render PCM (exportable), in preferred order. Kokoro is
  *  the best quality-for-size default; Piper is the lighter fallback. */
@@ -57,15 +69,15 @@ export interface SynthesizeNarrationResult {
 }
 
 /**
- * Synthesise every pending-narration voiceover clip in a CanvasState and
- * return an updated copy: clip urls + durations filled, anchored scenes
- * stretched to fit their audio. The input is not mutated.
+ * Synthesise every pending-narration voiceover layer in a CanvasState and
+ * return an updated copy: layer source urls + durations filled, anchored
+ * scenes stretched to fit their audio. The input is not mutated.
  */
 export async function synthesizePendingNarration(
   canvas: CanvasState,
   opts: { onProgress?: (done: number, total: number) => void; speed?: number } = {},
 ): Promise<SynthesizeNarrationResult> {
-  const pendingClips = canvas.voiceovers.filter((v) => v.text && !v.url);
+  const pendingClips = canvas.audioLayers.filter(isPendingNarration);
   if (pendingClips.length === 0) {
     return { canvas, synthesised: 0, pending: 0 };
   }
@@ -92,21 +104,21 @@ export async function synthesizePendingNarration(
   }
 
   // Mutable working copies — clone so callers' input stays untouched.
-  const voiceovers = canvas.voiceovers.map((v) => ({ ...v }));
+  const audioLayers = canvas.audioLayers.map((l) => ({ ...l }));
   const scenes = canvas.scenes.map((s) => ({ ...s }));
   const sceneById = new Map(scenes.map((s) => [s.id, s] as const));
 
   let done = 0;
   let synthesised = 0;
-  for (const clip of voiceovers) {
-    if (!clip.text || clip.url) continue;
+  for (const clip of audioLayers) {
+    if (!isPendingNarration(clip) || !clip.text) continue;
     try {
       const { pcm, sampleRate } = await renderToPcm(engine, clip.text, voiceId, opts.speed ?? 1);
       const wav = pcmToWav(pcm, sampleRate);
       const file = new File([wav], `narration-${clip.id}.wav`, { type: "audio/wav" });
       const { data } = await studioService.uploadSceneAudio(file);
       const durationSeconds = pcm.length / sampleRate;
-      clip.url = data.url;
+      clip.source = { kind: "custom", url: data.url };
       clip.durationSeconds = durationSeconds;
       // Stretch the anchored scene so the visual covers the whole line.
       if (clip.anchorSceneId) {
@@ -128,7 +140,7 @@ export async function synthesizePendingNarration(
   }
 
   return {
-    canvas: { ...canvas, voiceovers, scenes },
+    canvas: { ...canvas, audioLayers, scenes },
     synthesised,
     pending: pendingClips.length,
   };

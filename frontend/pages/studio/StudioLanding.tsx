@@ -31,7 +31,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import {
@@ -105,6 +105,9 @@ import WorkspaceSwitcher from "@/components/studio/WorkspaceSwitcher";
 import WizardLauncher from "@/components/studio/shared/WizardLauncher";
 import NewVideoSplitButton from "@/components/studio/shared/NewVideoSplitButton";
 import { AppShell } from "@/components/AppShell";
+import StudioMarketingHeader from "@/components/studio/StudioMarketingHeader";
+import { useAuth } from "@/lib/auth";
+import { useSEO } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { ACTION_BAR_SURFACE, ACTION_BAR_STICKY } from "@/lib/ui/action-bar";
 import { selectionToQuery, useWorkspace } from "@/lib/hooks/useWorkspace";
@@ -153,6 +156,13 @@ type TemplateRow =
 
 
 export default function StudioLanding() {
+  // /studio is one surface for everyone now: signed-in users get the
+  // workspace; signed-out visitors get the SAME workspace topped with a
+  // marketing hero, an empty "My content" (nothing saved until they have an
+  // account), and template clicks that drop into the anon editor (the
+  // create seam in `useCreateStudioDraft` routes anon users there).
+  const { user } = useAuth();
+  useSEO("/studio");
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -393,6 +403,13 @@ export default function StudioLanding() {
   }, []);
 
   useEffect(() => {
+    // Signed-out visitors have nothing saved — skip the (401-bound) fetch and
+    // render an empty "My content" with a sign-up prompt instead.
+    if (!user) {
+      setProjects([]);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     (async () => {
@@ -415,12 +432,20 @@ export default function StudioLanding() {
     return () => {
       cancelled = true;
     };
-  }, [toast, workspaceQuery]);
+  }, [toast, workspaceQuery, user]);
 
   // Load the user's own + licensed templates once on mount. Both endpoints
   // soft-fail to an empty list — a network blip or 401 shouldn't break the
   // built-in carousel, which is the primary CTA on this page.
   useEffect(() => {
+    // Signed-out visitors own no templates — skip the (401-bound) fetches; the
+    // built-in catalog still renders (it's static, not gated on this flag).
+    if (!user) {
+      setUserCreatedTemplates([]);
+      setUserLicensedTemplates([]);
+      setUserTemplatesLoading(false);
+      return;
+    }
     let cancelled = false;
     setUserTemplatesLoading(true);
     // Wrap each call in Promise.resolve().then(...) so a SYNCHRONOUS throw in a
@@ -447,7 +472,7 @@ export default function StudioLanding() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user]);
 
   const sortedProjects = useMemo(() => {
     if (!projects) return [];
@@ -634,6 +659,11 @@ export default function StudioLanding() {
         cancels it exactly — the bands span the content column edge-to-edge
         with no side gap. */}
     <div className="p-4 md:p-6">
+      {/* Signed-out marketing hero (the "red region"). It sits ABOVE the same
+          workspace a signed-in user sees — the only difference for an
+          anonymous visitor is this band + an empty "My content". Self-gated
+          to `!user` so signed-in users go straight to the workspace. */}
+      {!user && <StudioMarketingHeader />}
       {/* The search header IS the page's action panel and the single sticky
           band — it pins under the top nav as the user scrolls past the two
           sections below. The section bars (templates / my content) carry the
@@ -654,8 +684,12 @@ export default function StudioLanding() {
           {/* Wizard launcher — opens the 3-step "create your first video"
               modal. Mounted here (was previously duplicated on the v2
               editor header; the editor lost it 2026-05-14 because that
-              header acts on the CURRENT project, not creates another). */}
-          <WizardLauncher variant="button" />
+              header acts on the CURRENT project, not creates another).
+              Signed-in only: it's an AI-generation flow that needs an
+              account (token budget), so it would dead-end an anon visitor.
+              The hero "Start Creating" + template cards + NewVideoSplitButton
+              are the signed-out entry points (all drop into the anon editor). */}
+          {user && <WizardLauncher variant="button" />}
           {/* Split-button "+ New <last-used-template> [▼]" — single
               source of truth for "start a new video" with last-used
               template memory. Replaces the inline Create-blank-video
@@ -770,7 +804,25 @@ export default function StudioLanding() {
           <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-muted/20 py-12 text-center">
             <Video className="h-10 w-10 text-muted-foreground" />
             <div>
-              {totalProjectCount === 0 ? (
+              {!user ? (
+                // Signed-out: nothing is saved until they have an account.
+                // Anything they start from a template above opens in the anon
+                // editor, where Save/Publish/Export prompt for sign-up in place.
+                <>
+                  <p className="text-sm font-medium">{t("messages.studioLanding.anonMyContentTitle")}</p>
+                  <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
+                    {t("messages.studioLanding.anonMyContentHint")}
+                  </p>
+                  <div className="mt-4 flex justify-center gap-2">
+                    <Button asChild size="sm">
+                      <Link to="/signup">{t("actions.createAccount")}</Link>
+                    </Button>
+                    <Button asChild size="sm" variant="outline">
+                      <Link to="/login">{t("actions.signIn")}</Link>
+                    </Button>
+                  </div>
+                </>
+              ) : totalProjectCount === 0 ? (
                 <>
                   <p className="text-sm font-medium">{t("messages.studioLanding.noProjectsYet")}</p>
                   <p className="mt-1 text-xs text-muted-foreground">

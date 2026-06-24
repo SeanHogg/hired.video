@@ -34,7 +34,7 @@ import {
   UserCircle,
 } from "lucide-react";
 import type { ComponentType } from "react";
-import type { WidgetKind, VoiceoverClip } from "@/lib/studio/editor-v2/canvas-state";
+import type { WidgetKind, AudioLayer } from "@/lib/studio/editor-v2/canvas-state";
 import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
 import LeftPanelTile from "./LeftPanelTile";
 import LinkedContentPaletteSection from "./LinkedContentPaletteSection";
@@ -127,7 +127,7 @@ export interface WidgetPaletteProps {
    *  mount (Upload / Stock / AI, plus the embedded source bin). */
   onAddImageWidget: (url: string) => void;
   onAddVideoWidget: (url: string, durationSeconds: number) => void;
-  onAddVoiceover: (clip: VoiceoverClip) => void;
+  onAddVoiceover: (layer: AudioLayer) => void;
   /** Scene a new voiceover anchors to (bin → audio source path). */
   activeSceneId: string;
   /** Active project's mediaKind. Controls which palette groups are
@@ -212,7 +212,7 @@ export default function WidgetPalette({
         onCaptureScreenshot={onCaptureScreenshot}
         onAddImageWidget={onAddImageWidget}
         onAddVideoWidget={onAddVideoWidget}
-        onAddVoiceover={onAddVoiceover}
+        onAddAudioLayer={onAddVoiceover}
         activeSceneId={activeSceneId}
       />
       {POST_MEDIA_GROUPS.map(renderCatalogGroup)}
