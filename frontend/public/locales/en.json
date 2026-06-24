@@ -9716,6 +9716,7 @@
   "studio.anon.gateSave": "Create a free account to save your work — your draft stays exactly as it is.",
   "studio.anon.gateExport": "Create a free account to export — your draft is saved to your account first.",
   "studio.anon.gatePublish": "Create a free account to publish — we'll keep everything you've made.",
+  "studio.anon.gateResumeImport": "Create a free account to import your résumé — we'll parse it and fill your canvas, and your draft stays exactly as it is.",
   "messages.placement.uploaded": "Uploaded",
   "messages.placement.uploadFailed": "Upload failed",
   "messages.placement.markedSigned": "Marked signed",

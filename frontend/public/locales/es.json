@@ -9588,6 +9588,7 @@
   "studio.anon.gateSave": "Crea una cuenta gratuita para guardar tu trabajo: tu borrador se conserva tal como está.",
   "studio.anon.gateExport": "Crea una cuenta gratuita para exportar: primero tu borrador se guarda en tu cuenta.",
   "studio.anon.gatePublish": "Crea una cuenta gratuita para publicar: conservaremos todo lo que has creado.",
+  "studio.anon.gateResumeImport": "Crea una cuenta gratuita para importar tu currículum: lo analizaremos y rellenaremos tu lienzo, y tu borrador se mantendrá tal cual.",
   "messages.placement.uploaded": "Cargado",
   "messages.placement.uploadFailed": "Error al cargar",
   "messages.placement.markedSigned": "Marcado como firmado",

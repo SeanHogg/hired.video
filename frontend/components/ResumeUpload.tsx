@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { resumeService, type Resume } from "@/lib/services/resume-service";
+import { useAnonGate } from "@/lib/studio/anon-gate-context";
 import { confirmDialog } from "@/lib/dialogs";
 import type {
   ResumePrivacy,
@@ -88,6 +89,11 @@ export default function ResumeUpload({
   targetResumeId,
 }: ResumeUploadProps) {
   const { t } = useTranslation();
+  // Self-gate the server-touching import behind auth. Default is a NO-OP that
+  // proceeds (authenticated surfaces + anywhere without the Studio gate
+  // provider); inside the anon Studio editor it opens the in-place sign-up
+  // panel instead of firing a 401 at /api/resumes/parse (#2214).
+  const { requireAuth } = useAnonGate();
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(initialFile);
   const [name, setName] = useState("");
@@ -307,6 +313,23 @@ export default function ResumeUpload({
     // In overwrite mode the title is irrelevant (we keep the existing one), so
     // only the create flow requires a name.
     if (!file || (!targetResumeId && !name.trim())) return;
+
+    // Parsing the file runs a server-side LLM pass and writes a résumé row —
+    // both need an account. For a signed-out Studio visitor this opens the
+    // in-place sign-up panel and re-runs the import once they authenticate
+    // (their attached file + canvas are preserved); on authenticated surfaces
+    // (or anywhere outside the gate provider) it's a no-op that returns true.
+    if (
+      !requireAuth({
+        reason: "resume-import",
+        displayReason: t("studio.anon.gateResumeImport"),
+        onAuthed: () => {
+          void handleUpload();
+        },
+      })
+    ) {
+      return;
+    }
 
     // Overwrite-in-place REPLACES the open résumé's content and the editor's
     // Undo does NOT cover entity content — so confirm first, and reassure the

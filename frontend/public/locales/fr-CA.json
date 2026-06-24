@@ -9634,6 +9634,7 @@
   "studio.anon.gateSave": "Créez un compte gratuit pour enregistrer votre travail — votre brouillon reste exactement tel quel.",
   "studio.anon.gateExport": "Créez un compte gratuit pour exporter — votre brouillon est d'abord enregistré dans votre compte.",
   "studio.anon.gatePublish": "Créez un compte gratuit pour publier — nous conserverons tout ce que vous avez créé.",
+  "studio.anon.gateResumeImport": "Créez un compte gratuit pour importer votre CV — nous l'analyserons et remplirons votre canevas, et votre brouillon restera tel quel.",
   "messages.placement.uploaded": "Téléversé",
   "messages.placement.uploadFailed": "Échec du téléversement",
   "messages.placement.markedSigned": "Marqué comme signé",
