@@ -17,7 +17,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ImageIcon, Loader2, Sparkles, Store, ShoppingBag, ExternalLink, X } from "lucide-react";
+import { ImageIcon, Loader2, Sparkles, Store, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -167,6 +167,19 @@ export default function PublishAsTemplateDialog({
       });
       return;
     }
+    // Selling on the marketplace (public) is a Creator Program perk; saving a
+    // PRIVATE or UNLISTED variation is open to everyone. The backend enforces
+    // the same rule — this guard just gives a friendly message instead of a
+    // 403 if a non-creator somehow targets public.
+    if (visibility === "public" && !isVideoCreator) {
+      toast({
+        title: "Become a creator to sell",
+        description:
+          "Saving a private template is free for everyone. Selling on the marketplace needs the Creator Program.",
+        variant: "destructive",
+      });
+      return;
+    }
     const dollars = Number(priceDollars);
     if (Number.isNaN(dollars) || dollars < PRICE_MIN_DOLLARS || dollars > PRICE_MAX_DOLLARS) {
       toast({
@@ -253,16 +266,7 @@ export default function PublishAsTemplateDialog({
           </div>
         )}
 
-        {creatorState.status === "ready" && !isVideoCreator && (
-          <BecomeCreatorPitch
-            onEnroll={() => {
-              onOpenChange(false);
-              navigate("/services?wizard=open");
-            }}
-          />
-        )}
-
-        {creatorState.status === "ready" && isVideoCreator && (
+        {creatorState.status === "ready" && (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {/* Kind annotation — read-only. Self-hides for `video` so the
                 existing video-only publish flow stays unchanged. The
@@ -373,10 +377,32 @@ export default function PublishAsTemplateDialog({
                 >
                   <option value="private">Private draft</option>
                   <option value="unlisted">Unlisted (link only)</option>
-                  <option value="public">Public — list in marketplace</option>
+                  {/* Selling on the marketplace is a Creator Program perk —
+                      non-creators can still save private/unlisted variations. */}
+                  {isVideoCreator && (
+                    <option value="public">Public — list in marketplace</option>
+                  )}
                 </select>
               </div>
             </div>
+
+            {!isVideoCreator && (
+              <div className="rounded-md border border-brand-purple/20 bg-brand-purple/5 px-3 py-2 text-xs text-foreground">
+                Saving a private template is free. Want to sell it on the
+                marketplace and keep {CREATOR_SHARE_PCT}% of every sale?{" "}
+                <button
+                  type="button"
+                  className="font-semibold text-primary underline"
+                  onClick={() => {
+                    onOpenChange(false);
+                    navigate("/services?wizard=open");
+                  }}
+                >
+                  Become a creator
+                </button>
+                .
+              </div>
+            )}
 
             {visibility === "public" && (
               <label className="flex items-start gap-2 text-xs text-muted-foreground p-3 rounded-md border bg-muted/30">
@@ -423,39 +449,3 @@ export default function PublishAsTemplateDialog({
   );
 }
 
-function BecomeCreatorPitch({ onEnroll }: { onEnroll: () => void }) {
-  return (
-    <div className="flex flex-col gap-4 py-2">
-      <div className="rounded-lg border bg-gradient-to-br from-brand-purple/10 to-brand-blue/10 p-5">
-        <div className="flex items-start gap-3">
-          <div className="rounded-full bg-primary/15 p-2 shrink-0">
-            <ShoppingBag className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex flex-col gap-2 text-sm">
-            <p className="font-semibold">
-              Become a creator to publish templates.
-            </p>
-            <p className="text-muted-foreground">
-              Selling templates is a Creator Program perk. Set your own price,
-              keep <span className="font-medium text-foreground">95%</span> of
-              every sale, and reach buyers browsing the marketplace at{" "}
-              <span className="font-medium">/search?category=templates</span>.
-            </p>
-            <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5">
-              <li>One short enrollment wizard — takes about a minute.</li>
-              <li>Accept the program terms once; toggle programs anytime.</li>
-              <li>Templates remain editable and unpublishable from this dialog.</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <DialogFooter>
-        <Button onClick={onEnroll}>
-          Become a creator
-          <ExternalLink className="w-3.5 h-3.5 ml-1.5" />
-        </Button>
-      </DialogFooter>
-    </div>
-  );
-}

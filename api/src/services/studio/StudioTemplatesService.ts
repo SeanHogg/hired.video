@@ -196,21 +196,47 @@ export class StudioTemplatesService {
     if (!project) {
       throw new StudioTemplatesError("NOT_FOUND", "Source studio project not found.");
     }
-    // Prefer the inline `videoScript` from V2 callers — they compute it
-    // at click time via `canvasStateToScript(state)` so the project row
-    // doesn't need to mirror a v1 storyboard column (gap #637). Falls
-    // back to `project.storyboard` for legacy V1 projects whose script
-    // already lives on the row.
-    const scriptSource = input.videoScript ?? project.storyboard;
+    // Snapshot the source project's mediaKind so the template is the
+    // same kind as what the creator authored. Per the standing DRY rule
+    // there is no separate "what kind is this template?" form field;
+    // the publish dialog reads project.mediaKind read-only. Defaults to
+    // 'video' if the column is null (legacy pre-#894 rows).
+    const sourceMediaKind = (project as any).mediaKind ?? "video";
+    const isDocument = sourceMediaKind === "document";
+
+    // The template payload column (`video_script`) is the generic
+    // "reusable snapshot" blob for EVERY kind, not just video. For the
+    // `document` kind the design lives in `document_state` (a
+    // DocumentState: page geometry + theme + block/overlay layout), so we
+    // snapshot THAT, content-stripped, instead of a v1 storyboard. This is
+    // what lets a resume/job/article design be saved as a private
+    // variation or published to the marketplace through the one shared
+    // marketplace (no parallel document-template table). V2 callers may
+    // still pass the live state inline as `videoScript` so the row need
+    // not be re-read; otherwise we read the persisted column.
+    const scriptSource = isDocument
+      ? input.videoScript ?? (project as any).documentState
+      : input.videoScript ?? project.storyboard;
     if (!scriptSource) {
       throw new StudioTemplatesError(
         "VALIDATION_ERROR",
-        "Source project has no script yet — save the project before publishing as a template.",
+        isDocument
+          ? "Source document has no saved layout yet — save the project before publishing it as a template."
+          : "Source project has no script yet — save the project before publishing as a template.",
       );
     }
 
-    const sanitisedScript = sanitiseScriptForTemplate(scriptSource);
-    const meta = extractScriptMeta(sanitisedScript);
+    // Strip the per-document content binding (a template is STRUCTURE, not
+    // content — see the structure-vs-content note in document-state.ts) for
+    // documents; video keeps its existing user-field stripper.
+    const sanitisedScript = isDocument
+      ? sanitiseDocumentForTemplate(scriptSource)
+      : sanitiseScriptForTemplate(scriptSource);
+    // Catalog metadata is video-shaped; documents have no duration/motion,
+    // so the extractor returns nulls — fine, the card just omits them.
+    const meta = isDocument
+      ? { durationSec: null, motion: null, language: null }
+      : extractScriptMeta(sanitisedScript);
 
     const willPublishNow = visibility === "public";
     const slug = willPublishNow ? await this.generateUniqueSlug(input.name) : null;
@@ -222,13 +248,6 @@ export class StudioTemplatesService {
     // gets granted to the company-via-membership rather than only the
     // creator user (the canActFor check honours both).
     const ownerCompanyId = (project as any).companyId ?? null;
-
-    // Snapshot the source project's mediaKind so the template is the
-    // same kind as what the creator authored. Per the standing DRY rule
-    // there is no separate "what kind is this template?" form field;
-    // the publish dialog reads project.mediaKind read-only. Defaults to
-    // 'video' if the column is null (legacy pre-#894 rows).
-    const sourceMediaKind = (project as any).mediaKind ?? "video";
 
     const inserted = await repos.studioTemplates.insert({
       creatorId: input.creatorUserId,
@@ -509,6 +528,36 @@ export function sanitiseScriptForTemplate(script: unknown): Record<string, unkno
           }
           if (el && typeof el === "object" && "role" in el && el.role === "headline" && typeof el.text === "string") {
             el.text = "{{headline}}";
+          }
+        }
+      }
+    }
+  }
+  return cloned;
+}
+
+/** Strip the per-document CONTENT binding from a `DocumentState` so the
+ *  same JSON is reusable as a template (a template is structure, not
+ *  content — see the structure-vs-content note in document-state.ts). Keeps
+ *  page geometry, theme, columns, flow-block layout and free overlays;
+ *  clears the bound `entityId` and any overlay `mediaBinding` (which points
+ *  at a specific resume's section items by id and must not leak into a
+ *  shared template). Resilient to non-document JSON (returns a shallow
+ *  clone) so a mis-routed payload never throws. */
+export function sanitiseDocumentForTemplate(state: unknown): Record<string, unknown> {
+  if (!state || typeof state !== "object") return {};
+  const cloned = JSON.parse(JSON.stringify(state)) as Record<string, unknown>;
+  // Unbind from the source entity — the template carries no content.
+  (cloned as any).entityId = null;
+  // Drop item-bound overlay handles so a template never references the
+  // original document's section-item ids.
+  const pages = (cloned as any).pages;
+  if (Array.isArray(pages)) {
+    for (const page of pages) {
+      if (page && Array.isArray(page.overlays)) {
+        for (const overlay of page.overlays) {
+          if (overlay && typeof overlay === "object" && "mediaBinding" in overlay) {
+            delete (overlay as any).mediaBinding;
           }
         }
       }

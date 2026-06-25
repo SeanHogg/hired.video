@@ -1,16 +1,21 @@
 /**
  * DocumentTemplatePicker — the in-editor design-template gallery for the
- * document canvas. Surfaces the resume / job design presets (the same
- * descriptors the marketing [TemplateGallery] / [JobTemplateGallery] show) and
- * applies the chosen one's theme + section layout to the live `DocumentState`.
+ * document canvas. Surfaces, for the active entity kind:
+ *   • the built-in resume / job design presets (the same descriptors the
+ *     marketing [TemplateGallery] / [JobTemplateGallery] show), AND
+ *   • the user's OWN saved variations / published document templates, AND
+ *   • document templates the user purchased or claimed from the marketplace.
+ * Applying one stamps its theme + section layout + page geometry onto the live
+ * `DocumentState`. All three groups normalize to one `DocumentTemplateOption`
+ * so there's one card + one apply path (DRY).
  *
  * Self-gating per the DRY rule: it renders nothing when the active entity kind
- * has no design templates (article / blog today — see
- * `documentTemplatesForEntity`), so the DocumentStage toolbar never hard-codes
+ * has no templates in ANY group, so the DocumentStage toolbar never hard-codes
  * an `entityKind === "resume" || "job"` check.
  */
-import { useState } from "react";
-import { LayoutTemplate, Check } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import { LayoutTemplate, Check, Sparkles, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,10 +28,8 @@ import {
 import { cn } from "@/lib/utils";
 import { THEMES } from "@/lib/resume-template-themes";
 import type { DocumentEntityKind } from "@/lib/studio/editor-v2/document-state";
-import {
-  documentTemplatesForEntity,
-  type DocumentTemplateOption,
-} from "@/lib/studio/editor-v2/document-templates";
+import type { DocumentTemplateOption } from "@/lib/studio/editor-v2/document-templates";
+import { useDocumentTemplates } from "@/lib/studio/editor-v2/use-document-templates";
 
 interface DocumentTemplatePickerProps {
   entityKind: DocumentEntityKind;
@@ -42,40 +45,75 @@ export default function DocumentTemplatePicker({
   currentTemplateId,
   onApply,
 }: DocumentTemplatePickerProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const options = documentTemplatesForEntity(entityKind);
+  const { presets, owned, purchased } = useDocumentTemplates(entityKind);
 
-  // No design library for this entity (article / blog) — render nothing.
-  if (options.length === 0) return null;
+  // No template in any group for this entity — render nothing.
+  if (presets.length === 0 && owned.length === 0 && purchased.length === 0) {
+    return null;
+  }
+
+  const apply = (option: DocumentTemplateOption) => {
+    onApply(option);
+    setOpen(false);
+  };
+
+  const renderGroup = (
+    label: string,
+    icon: ReactNode,
+    options: DocumentTemplateOption[],
+  ) => {
+    if (options.length === 0) return null;
+    return (
+      <div className="space-y-2">
+        <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          {icon}
+          {label}
+        </h4>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {options.map((option) => (
+            <TemplateOptionCard
+              key={`${option.source ?? "builtin"}:${option.id}`}
+              option={option}
+              active={option.id === currentTemplateId}
+              onUse={() => apply(option)}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
           <LayoutTemplate className="mr-1 h-4 w-4" />
-          Templates
+          {t("studio.document.templates")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Choose a design template</DialogTitle>
-          <DialogDescription>
-            Applies a layout + theme to your document. Your content stays — only
-            the design changes.
-          </DialogDescription>
+          <DialogTitle>{t("studio.document.chooseTemplate")}</DialogTitle>
+          <DialogDescription>{t("studio.document.chooseTemplateHint")}</DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {options.map((option) => (
-            <TemplateOptionCard
-              key={option.id}
-              option={option}
-              active={option.id === currentTemplateId}
-              onUse={() => {
-                onApply(option);
-                setOpen(false);
-              }}
-            />
-          ))}
+        <div className="space-y-6">
+          {renderGroup(
+            t("studio.document.yourTemplates"),
+            <Sparkles className="h-3.5 w-3.5" />,
+            owned,
+          )}
+          {renderGroup(
+            t("studio.document.purchasedTemplates"),
+            <ShoppingBag className="h-3.5 w-3.5" />,
+            purchased,
+          )}
+          {renderGroup(
+            t("studio.document.designLibrary"),
+            <LayoutTemplate className="h-3.5 w-3.5" />,
+            presets,
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -91,6 +129,7 @@ function TemplateOptionCard({
   active: boolean;
   onUse: () => void;
 }) {
+  const { t } = useTranslation();
   const theme = THEMES[option.theme.themeKey];
   return (
     <div
@@ -112,7 +151,7 @@ function TemplateOptionCard({
         </div>
         {active && (
           <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-brand-purple">
-            <Check className="h-3 w-3" /> Applied
+            <Check className="h-3 w-3" /> {t("studio.document.applied")}
           </span>
         )}
       </div>
@@ -128,10 +167,10 @@ function TemplateOptionCard({
         )}
         <div className="mt-auto flex items-center justify-between pt-1">
           <span className="text-[11px] text-muted-foreground">
-            {option.sections.length} sections
+            {t("studio.document.sectionCount", { count: option.sections.length })}
           </span>
           <Button size="sm" variant={active ? "secondary" : "default"} onClick={onUse}>
-            {active ? "Reapply" : "Use template"}
+            {active ? t("studio.document.reapply") : t("studio.document.useTemplate")}
           </Button>
         </div>
       </div>

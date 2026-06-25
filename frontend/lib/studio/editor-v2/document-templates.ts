@@ -20,10 +20,14 @@
  */
 
 import {
+  DEFAULT_DOCUMENT_THEME,
+  DOCUMENT_ENTITY_KINDS,
   type DocumentBlock,
   type DocumentEntityKind,
   type DocumentState,
   type DocumentTheme,
+  type PageOrientation,
+  type PageSize,
 } from "./document-state";
 import {
   TEMPLATE_PRESETS,
@@ -52,6 +56,18 @@ export interface DocumentTemplateOption {
   theme: DocumentTheme;
   /** Ordered flow-block specs — the document body structure. */
   sections: DocumentBlockSpec[];
+  /** Page geometry the option carries. Built-in descriptor presets leave
+   *  these undefined (apply preserves the document's current page setup);
+   *  user-saved / marketplace document templates set them so a "Legal
+   *  landscape" or "A4" design round-trips its page mode on apply. */
+  pageSize?: PageSize;
+  orientation?: PageOrientation;
+  columns?: number;
+  /** Provenance — set for templates that came from the marketplace
+   *  (a user's own saved variation or a purchased listing) rather than the
+   *  built-in descriptor library. Lets the picker group + badge them and the
+   *  card show ownership. Absent for built-in presets. */
+  source?: "builtin" | "owned" | "purchased";
 }
 
 /** Shared theme shape between both descriptor families → `DocumentTheme`.
@@ -175,6 +191,90 @@ export function applyDocumentTemplate(
     ...state,
     theme: { ...option.theme },
     templateId: option.id,
+    // Adopt the option's page geometry when it carries one (user-saved /
+    // marketplace document templates do; built-in presets leave it
+    // undefined and the document keeps its current page setup).
+    ...(option.pageSize ? { pageSize: option.pageSize } : {}),
+    ...(option.orientation ? { orientation: option.orientation } : {}),
+    ...(typeof option.columns === "number" ? { columns: option.columns } : {}),
     pages: state.pages.map((p, i) => (i === 0 ? { ...p, blocks } : p)),
+  };
+}
+
+// ── Marketplace document templates (saved variations + purchased) ────────────
+//
+// A document studio-template's payload (`studio_templates.video_script` for a
+// `media_kind === "document"` row) is a content-stripped `DocumentState`. These
+// helpers bridge that stored payload to the same entity-agnostic
+// `DocumentTemplateOption` the built-in presets use, so the picker + applicator
+// stay DRY: one card renderer, one apply path, whether the template is a
+// shipped preset, the user's own saved variation, or a purchased listing.
+
+/** Read the entity kind a stored document-template payload targets, so the
+ *  picker can show only the templates that fit the document being edited.
+ *  Returns null for a malformed / non-document payload. */
+export function documentTemplateEntityKind(
+  payload: unknown,
+): DocumentEntityKind | null {
+  const kind = (payload as { entityKind?: unknown } | null)?.entityKind;
+  return typeof kind === "string" && (DOCUMENT_ENTITY_KINDS as readonly string[]).includes(kind)
+    ? (kind as DocumentEntityKind)
+    : null;
+}
+
+/** Convert a stored content-stripped `DocumentState` payload (a marketplace
+ *  document template) into a `DocumentTemplateOption`. Pulls page-0 flow
+ *  blocks → section specs, theme, and page geometry. Returns null when the
+ *  payload has no usable layout. */
+export function documentStateToTemplateOption(
+  payload: unknown,
+  meta: { id: string; name: string; description?: string | null; source: "owned" | "purchased" },
+): DocumentTemplateOption | null {
+  const state = payload as Partial<DocumentState> | null;
+  const firstPage = Array.isArray(state?.pages) ? state!.pages[0] : undefined;
+  const rawBlocks = Array.isArray(firstPage?.blocks) ? firstPage!.blocks : [];
+  if (rawBlocks.length === 0) return null;
+  const sections: DocumentBlockSpec[] = rawBlocks.map((b) => {
+    const { id: _id, mode: _mode, ...spec } = b as DocumentBlock;
+    void _id;
+    void _mode;
+    return spec;
+  });
+  const theme: DocumentTheme = {
+    ...DEFAULT_DOCUMENT_THEME,
+    ...(state?.theme ?? {}),
+  } as DocumentTheme;
+  return {
+    id: meta.id,
+    name: meta.name,
+    ...(meta.description ? { description: meta.description } : {}),
+    theme,
+    sections,
+    ...(state?.pageSize ? { pageSize: state.pageSize } : {}),
+    ...(state?.orientation ? { orientation: state.orientation } : {}),
+    ...(typeof state?.columns === "number" ? { columns: state.columns } : {}),
+    source: meta.source,
+  };
+}
+
+/**
+ * Strip the per-document CONTENT binding from a live `DocumentState` so it can
+ * be saved as a reusable template (private variation) or published to the
+ * marketplace. Frontend mirror of the API's `sanitiseDocumentForTemplate` — the
+ * editor passes the result as the publish payload so the row is captured at
+ * click time (no extra save round-trip). Clears `entityId` and item-bound
+ * overlay `mediaBinding`s; keeps page geometry, theme, columns, and layout.
+ */
+export function stripDocumentContent(state: DocumentState): DocumentState {
+  return {
+    ...state,
+    entityId: null,
+    pages: state.pages.map((p) => ({
+      ...p,
+      overlays: p.overlays.map(({ mediaBinding: _mb, ...rest }) => {
+        void _mb;
+        return rest;
+      }),
+    })),
   };
 }

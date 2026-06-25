@@ -262,9 +262,11 @@ export type DocumentEntityContent = Record<string, unknown>;
 // at the call site.
 
 export interface DocumentEntityCapabilities {
-  /** Whether the user can change page size + orientation. Only the resume is
-   *  a designed artefact with portrait/landscape freedom; jobs / articles /
-   *  blogs are always Letter portrait (a reading document, not a layout). */
+  /** Whether the user can change page size + orientation. Every content type
+   *  is a designed, savable-as-template artefact with full page/orientation
+   *  freedom (a creator can publish a Legal-landscape resume template or an
+   *  A4 article template), so this is on for all document entities — the
+   *  template pattern is uniform across kinds. */
   configurablePageMode: boolean;
 }
 
@@ -273,9 +275,9 @@ export const DOCUMENT_ENTITY_CAPABILITIES: Record<
   DocumentEntityCapabilities
 > = {
   resume: { configurablePageMode: true },
-  article: { configurablePageMode: false },
-  job: { configurablePageMode: false },
-  blog: { configurablePageMode: false },
+  article: { configurablePageMode: true },
+  job: { configurablePageMode: true },
+  blog: { configurablePageMode: true },
 };
 
 /** Whether the canvas-mode (page size + orientation) control should render for

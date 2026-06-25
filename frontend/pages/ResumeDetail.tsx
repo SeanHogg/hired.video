@@ -11,7 +11,6 @@ import {
   Lock,
   MessageSquare,
   Printer,
-  RotateCcw,
   Share2,
   User,
 } from "lucide-react";
@@ -65,7 +64,6 @@ import { MetaType } from "@/types/resume";
 import {
   DEFAULT_DESCRIPTOR,
   getTemplateById,
-  matchesAnyPreset,
   validateDescriptor,
   type ResumeTemplateDescriptor,
 } from "@/types/resume-template";
@@ -200,10 +198,7 @@ export default function ResumeDetail() {
   // set only on an explicit user pick, so the saved layout renders verbatim on
   // first load and only re-skins when the user switches templates (#1883).
   const [layoutTemplateOverrideId, setLayoutTemplateOverrideId] = useState<string | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
   const [requestingFeedback, setRequestingFeedback] = useState(false);
-  const [editorText, setEditorText] = useState<string>(() => JSON.stringify(DEFAULT_DESCRIPTOR, null, 2));
-  const [editorError, setEditorError] = useState<string | null>(null);
 
   useArtifactViewTracking({
     artifactKind: "resume",
@@ -312,7 +307,6 @@ export default function ResumeDetail() {
       if (loaded) {
         const initial = pickInitialDescriptor(loaded);
         setDescriptor(initial);
-        setEditorText(JSON.stringify(initial, null, 2));
       }
       setLoading(false);
 
@@ -344,8 +338,6 @@ export default function ResumeDetail() {
     // is shared between the declarative preset and the document-template option
     // (both derive from TEMPLATE_PRESETS).
     setLayoutTemplateOverrideId(preset.id);
-    setEditorText(JSON.stringify(preset, null, 2));
-    setEditorError(null);
 
     // #1945 — for a canvas-authored resume the dropdown used to re-skin only
     // the view-local preview; the saved `documentLayout` kept its old
@@ -374,29 +366,6 @@ export default function ResumeDetail() {
         variant: "destructive",
       });
     }
-  };
-
-  const applyEditor = () => {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(editorText);
-    } catch (e) {
-      setEditorError(t("errors.resumeDetail.jsonParseError", { message: (e as Error).message }));
-      return;
-    }
-    const result = validateDescriptor(parsed);
-    if (result.ok === false) {
-      setEditorError(result.error);
-      return;
-    }
-    // Badge the design as "Custom" the moment it diverges from any stock
-    // preset — preserves id/name when it happens to match a preset exactly.
-    const next = matchesAnyPreset(result.value)
-      ? result.value
-      : { ...result.value, id: "custom", name: t("labels.resumeDetail.customTemplateName") };
-    setDescriptor(next);
-    setEditorText(JSON.stringify(next, null, 2));
-    setEditorError(null);
   };
 
   // Print mode — bare resume, no chrome, auto-prints for PDF export. The
@@ -654,10 +623,11 @@ export default function ResumeDetail() {
                       ? () => saveTemplateAssignment("embeddedTemplate")
                       : undefined
                   }
-                  onToggleDesignEditor={
-                    perms.canEditTemplate ? () => setEditorOpen((v) => !v) : undefined
+                  onEditInStudio={
+                    perms.canEditTemplate
+                      ? async () => navigate(await resumeEditorPath(resume.id))
+                      : undefined
                   }
-                  designEditorOpen={editorOpen}
                   onBrowseMarketplace={() => navigate("/search?category=templates")}
                 />
 
@@ -832,30 +802,6 @@ export default function ResumeDetail() {
                 </div>
               </div>
 
-              {editorOpen && (
-                <aside className="hidden lg:block w-[420px] shrink-0 border-l bg-card sticky top-16 self-start max-h-[calc(100vh-4rem)] overflow-auto">
-                  <div className="p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold">{t("headings.resumeDetail.templateDesign")}</h3>
-                      <Button size="sm" variant="ghost" onClick={() => applyPreset(DEFAULT_DESCRIPTOR)}>
-                        <RotateCcw className="w-4 h-4 mr-1" />{t("actions.reset")}
-                      </Button>
-                    </div>
-                    <textarea
-                      className="w-full h-[60vh] font-mono text-xs p-3 border rounded bg-background"
-                      value={editorText}
-                      onChange={(e) => setEditorText(e.target.value)}
-                    />
-                    {editorError && (
-                      <div className="text-sm text-destructive whitespace-pre-wrap">{editorError}</div>
-                    )}
-                    <Button size="sm" className="w-full" onClick={applyEditor}>{t("headings.apply")}</Button>
-                    <p className="text-xs text-muted-foreground">
-                      {t("messages.resumeDetail.customDesignNote")}
-                    </p>
-                  </div>
-                </aside>
-              )}
             </div>
           )}
 

@@ -174,6 +174,7 @@ import {
 import {
   applyDocumentTemplate,
   resumeTemplateOption,
+  stripDocumentContent,
 } from "@/lib/studio/editor-v2/document-templates";
 import type { ResumeTemplateDescriptor } from "@/types/resume-template";
 import { resumeService } from "@/lib/services/resume-service";
@@ -3572,7 +3573,16 @@ export default function StudioEditorV2() {
           persistedProjectId={persistedProjectId}
           persistedProject={persistedProject}
           onProjectChange={setPersistedProject}
-          getVideoScript={() => canvasStateToScript(state)}
+          getVideoScript={() =>
+            // The publish payload is the kind's reusable snapshot. For the
+            // document canvas that's the content-stripped DocumentState (saved
+            // as a private variation or published to the marketplace through
+            // the same flow video uses); every other kind serialises its
+            // CanvasState to a VideoScript.
+            currentMediaKind === "document"
+              ? stripDocumentContent(documentState)
+              : canvasStateToScript(state)
+          }
           hasContent={
             // Per-kind content predicate — Timeline kinds need at
             // least one widget on a scene; game kinds need a

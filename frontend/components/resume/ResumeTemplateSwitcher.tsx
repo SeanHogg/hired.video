@@ -18,7 +18,7 @@
  * just the switch + set-default core without branching at the call site.
  */
 import { useTranslation } from "react-i18next";
-import { Code2, Eye, FileType, Monitor, Store } from "lucide-react";
+import { Eye, FileType, Monitor, Paintbrush, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenuItem,
@@ -48,10 +48,10 @@ export interface ResumeTemplateSwitcherProps {
   assignedEmbeddedId?: string | null;
   /** Set the CURRENT template as the embedded view. Omit to hide. */
   onSetEmbedded?: () => void;
-  /** Toggle the advanced JSON template-design editor. Omit to hide. */
-  onToggleDesignEditor?: () => void;
-  /** Whether that editor is currently open (flips the menu label). */
-  designEditorOpen?: boolean;
+  /** Open the resume's design in the Studio (full-canvas template editing:
+   *  layout, theme, font, colour, page size/orientation — and save variations
+   *  / publish to the marketplace there). Omit to hide (non-owner). */
+  onEditInStudio?: () => void;
   /** Open the template marketplace. Omit to hide. */
   onBrowseMarketplace?: () => void;
   /** Variant for the SplitButton (defaults to outline). */
@@ -67,8 +67,7 @@ export default function ResumeTemplateSwitcher({
   onSetDefault,
   assignedEmbeddedId,
   onSetEmbedded,
-  onToggleDesignEditor,
-  designEditorOpen,
+  onEditInStudio,
   onBrowseMarketplace,
   variant,
   className,
@@ -159,14 +158,12 @@ export default function ResumeTemplateSwitcher({
         </>
       )}
 
-      {onToggleDesignEditor && (
+      {onEditInStudio && (
         <>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={onToggleDesignEditor}>
-            <Code2 className="w-4 h-4 mr-2" />
-            {designEditorOpen
-              ? t("actions.resumeDetail.hideTemplateEditor")
-              : t("actions.resumeDetail.editTemplateDesign")}
+          <DropdownMenuItem onClick={onEditInStudio}>
+            <Paintbrush className="w-4 h-4 mr-2" />
+            {t("actions.resumeDetail.editTemplateInStudio")}
           </DropdownMenuItem>
         </>
       )}
