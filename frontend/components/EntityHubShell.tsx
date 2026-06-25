@@ -56,6 +56,11 @@ export interface EntityHubTab {
    *  description block with this node. Used on hub tabs (e.g. Companies
    *  browse) that relocated the global HeaderSearch inline. */
   search?: ReactNode;
+  /** Pin the header as the sticky, tonally-distinct action bar even without a
+   *  `search` slot. A tab with `search` is sticky automatically; set this on
+   *  title/description-only tabs (e.g. Companies connections / mine / team)
+   *  so their tabs + actions follow the same pinned action-panel pattern. */
+  sticky?: boolean;
   /** Optional badge value for the tab strip (count / status). */
   badge?: ReactNode;
   /** Right-side header buttons specific to this tab. */
@@ -146,6 +151,7 @@ export default function EntityHubShell({
             title={activeTab?.search ? undefined : activeTab?.title}
             description={activeTab?.search ? undefined : activeTab?.description}
             search={activeTab?.search}
+            sticky={activeTab?.sticky}
             actions={resolveNode(activeTab?.headerActions)}
             meta={resolveNode(activeTab?.meta)}
           />

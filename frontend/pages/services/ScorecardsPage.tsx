@@ -31,9 +31,9 @@ export default function ScorecardsPage() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <main className="px-4 sm:px-6 lg:px-8 pb-12">
-        <div className="pt-6 space-y-6">
-          <PageHeader tabs={peopleTabs} activeTabKey="scorecards" />
+      <main className="px-4 md:px-6 pt-4 md:pt-6 pb-12">
+        <div className="space-y-6">
+          <PageHeader tabs={peopleTabs} activeTabKey="scorecards" sticky />
 
           <div>
             <h1 className="text-2xl font-bold">Scorecards & Interview Kits</h1>

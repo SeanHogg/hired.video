@@ -358,8 +358,8 @@ export default function HiringOnboarding() {
   return (
     <AppShell bgClassName="bg-background">
         <div>
-          <div className="p-6">
-            <PageHeader tabs={peopleTabs} activeTabKey="hiring" />
+          <div className="p-4 md:p-6">
+            <PageHeader tabs={peopleTabs} activeTabKey="hiring" sticky />
 
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
               <div>

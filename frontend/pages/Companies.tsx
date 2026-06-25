@@ -520,17 +520,20 @@ export default function Companies() {
         title: t("labels.following"),
         description: t("messages.companies.followingDescription"),
         badge: trackedCompanyCount > 0 ? trackedCompanyCount : undefined,
+        sticky: true,
         body: renderConnectionsBody,
       },
       mine: {
         title: t("headings.companies.mine"),
         description: t("messages.companies.mineDescription"),
         headerActions: mineActions,
+        sticky: true,
         body: renderMineBody,
       },
       team: {
         title: t("headings.companies.teamLeaderboard"),
         description: t("messages.companies.teamLeaderboardDescription"),
+        sticky: true,
         body: () => <TeamLeaderboardPanel />,
       },
     };

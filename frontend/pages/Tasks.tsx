@@ -198,7 +198,7 @@ export default function Tasks() {
   // "Add task" button all read as one band.
   const surfaceNav = (
     <div className="px-4 md:px-6 pt-4 md:pt-6">
-      <PageHeader tabs={surfaceTabs} activeTabKey={currentSurface} className="mb-0" />
+      <PageHeader tabs={surfaceTabs} activeTabKey={currentSurface} sticky className="mb-0" />
     </div>
   );
 
