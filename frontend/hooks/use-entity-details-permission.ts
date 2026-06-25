@@ -18,6 +18,12 @@
  * "owner" of a job posting is the whole company team (backend-stamped
  * `viewerCanManage`), so we delegate to `canEdit`.
  *
+ * Owner-STRICT kinds: `profile` and `post` drop even the super-admin
+ * escape hatch — the drawer surfaces who-viewed / engagement signal
+ * that belongs solely to that person, so the button never renders for
+ * a non-owner (product decision 2026-06-24 for profile). Every other
+ * kind keeps the super-admin support hatch below.
+ *
  * Super-admin only (NOT plain admin): the stats endpoint that backs
  * this drawer (`GET /api/analytics/artifacts/:kind/:id`) is gated to
  * owner-or-super-admin server-side, so granting the button to a plain
@@ -94,7 +100,15 @@ export function useEntityDetailsPermission(
     case "resume": return { canViewStats: resume.isOwner || canViewAsAdmin };
     case "job": return { canViewStats: job.canEdit || canViewAsAdmin };
     case "company": return { canViewStats: company.isOwner || canViewAsAdmin };
-    case "profile": return { canViewStats: profile.isOwner || canViewAsAdmin };
+    case "profile":
+      // Profiles are OWNER-STRICT for the [🌐 Details] drawer — the
+      // drawer surfaces who-viewed / engagement signal that is the
+      // profile owner's private surface, so NOT even a super-admin gets
+      // the button on someone else's profile (product decision
+      // 2026-06-24). The backing stats endpoint still allows super-admin
+      // for support tooling; the UI button is the strict surface (same
+      // shape as the "post" case below).
+      return { canViewStats: profile.isOwner };
     case "article": return { canViewStats: article.isOwner || canViewAsAdmin };
     case "studio_template": return { canViewStats: template.isOwner || canViewAsAdmin };
     case "service": return { canViewStats: service.isOwner || canViewAsAdmin };
