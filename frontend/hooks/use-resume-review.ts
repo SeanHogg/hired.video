@@ -126,7 +126,7 @@ export function useResumeReview({ reviewId, token }: UseResumeReviewArgs): UseRe
     deleteAnnotation: (annotationId) =>
       run(() => resumeFeedbackService.deleteAnnotation(annotationId)).then(() => undefined),
     submitReview: (message) =>
-      run(() => resumeFeedbackService.submitReview(id, { message })).then(() => undefined),
+      run(() => resumeFeedbackService.submitReview(id, { message }, token)).then(() => undefined),
     completeReview: () =>
       run(() => resumeFeedbackService.completeReview(id)).then(() => undefined),
     cancelReview: () =>

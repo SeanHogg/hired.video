@@ -16,7 +16,7 @@
 import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
-const { resumeReviews, resumeReviewAnnotations, resumeVersions, resumeInformation } = schema;
+const { resumeReviews, resumeReviewAnnotations, resumeVersions, resumeInformation, users } = schema;
 
 export type DbLike = any;
 
@@ -45,6 +45,13 @@ export interface AnnotationCounts {
   total: number;
 }
 
+/** Minimal user identity slice — author attribution + invite email send. */
+export interface UserContact {
+  id: string;
+  name: string | null;
+  email: string | null;
+}
+
 export interface IResumeFeedbackRepository {
   // ── reviews ──
   findReviewById(id: string): Promise<ResumeReviewRow | null>;
@@ -70,6 +77,9 @@ export interface IResumeFeedbackRepository {
   // ── resume content (read for reviewers, write on accept) ──
   findResumeContentSlice(resumeId: string): Promise<ResumeContentSlice | null>;
   updateResumeContent(resumeId: string, content: unknown): Promise<void>;
+
+  // ── identity (author attribution + invite email) ──
+  findUserContacts(ids: string[]): Promise<UserContact[]>;
 
   // ── proposed-draft revisions (resume_versions proposal slice) ──
   nextVersionNumber(resumeId: string): Promise<number>;
@@ -227,6 +237,16 @@ export class ResumeFeedbackRepository implements IResumeFeedbackRepository {
       .update(resumeInformation)
       .set({ content: content as any, updatedAt: this.now() })
       .where(eq(resumeInformation.id, resumeId));
+  }
+
+  // ── identity ──
+  async findUserContacts(ids: string[]): Promise<UserContact[]> {
+    const unique = [...new Set(ids.filter(Boolean))];
+    if (unique.length === 0) return [];
+    return this.db
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .where(inArray(users.id, unique));
   }
 
   // ── proposed-draft revisions ──

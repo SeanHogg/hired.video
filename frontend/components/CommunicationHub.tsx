@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/sheet";
 import { useAuth } from "@/lib/auth";
 import { useSharedCommHub } from "@/providers/CommHubProvider";
-import { InboxPanel } from "@/components/communication/InboxPanel";
+import { CommHubTabs } from "@/components/communication/CommHubTabs";
 import type { HubItem } from "@/hooks/use-comm-hub";
 
 /**
@@ -135,7 +135,7 @@ function AuthenticatedCommunicationHub({ variant = "ghost" }: { variant?: Button
         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
           <PopoverTrigger asChild>{triggerButton}</PopoverTrigger>
           <PopoverContent className="w-96 p-0" align="end">
-            <InboxPanel
+            <CommHubTabs
               hub={hub}
               onClose={() => setPopoverOpen(false)}
               onItemSelect={handleItemSelect}
@@ -174,7 +174,7 @@ function AuthenticatedCommunicationHub({ variant = "ghost" }: { variant?: Button
                 the bottom edge — without an explicit height the panel falls
                 back to its `max-h-[70vh]` overlay cap and leaves dead
                 whitespace below the footer on mobile. */}
-            <InboxPanel
+            <CommHubTabs
               hub={hub}
               heightClassName="h-full min-h-0"
               hasExternalCloseButton

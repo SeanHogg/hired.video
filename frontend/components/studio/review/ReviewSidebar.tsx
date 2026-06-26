@@ -12,14 +12,15 @@
 import { useMemo, useState } from "react";
 import {
   Check,
-  Copy,
   MessageSquare,
   StickyNote,
   Trash2,
   Highlighter,
   Send,
+  UserPlus,
   X,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type {
   ResumeReviewDetailDTO,
   ResumeReviewAnnotationDTO,
@@ -30,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import InviteReviewersDialog from "@/components/studio/review/InviteReviewersDialog";
 
 interface ReviewSidebarProps {
   detail: ResumeReviewDetailDTO;
@@ -42,6 +44,9 @@ interface ReviewSidebarProps {
   onStartSticky: () => void;
   /** Owner only — copyable reviewer share link. */
   shareUrl?: string;
+  /** Owner: called after the review is marked complete (so the page can
+   *  navigate the owner back to their resume). */
+  onAfterComplete?: () => void;
 }
 
 const STATUS_FILTERS: { key: "all" | AnnotationStatus; label: string }[] = [
@@ -78,11 +83,14 @@ export default function ReviewSidebar({
   onFlash,
   onStartSticky,
   shareUrl,
+  onAfterComplete,
 }: ReviewSidebarProps) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [filter, setFilter] = useState<"all" | AnnotationStatus>("all");
   const [comment, setComment] = useState("");
   const [editing, setEditing] = useState<{ id: string; body: string } | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const { isOwner, busy } = review;
   const canAnnotate = isActiveReview(detail);
@@ -111,15 +119,7 @@ export default function ReviewSidebar({
     });
   };
 
-  const copyShare = async () => {
-    if (!shareUrl) return;
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      toast({ title: "Link copied", description: "Send it to whoever should review your resume." });
-    } catch {
-      toast({ title: "Couldn't copy", description: shareUrl, variant: "destructive" });
-    }
-  };
+  const reviewerLabel = detail.review.reviewerName || detail.review.reviewerEmail;
 
   return (
     <div className="flex h-full flex-col">
@@ -137,10 +137,31 @@ export default function ReviewSidebar({
           <Badge variant="outline" className="capitalize">{detail.review.status}</Badge>
         </div>
 
-        {isOwner && shareUrl && canAnnotate && (
-          <Button variant="outline" size="sm" className="mt-3 w-full" onClick={copyShare}>
-            <Copy className="mr-1 h-3 w-3" /> Copy reviewer link
+        {/* Who's reviewing (owner-facing attribution). */}
+        {isOwner && reviewerLabel && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t("review.reviewerLine", { name: reviewerLabel })}
+          </p>
+        )}
+
+        {isOwner && canAnnotate && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3 w-full"
+            onClick={() => setInviteOpen(true)}
+          >
+            <UserPlus className="mr-1 h-3 w-3" /> {t("reviewInvite.openButton")}
           </Button>
+        )}
+
+        {isOwner && (
+          <InviteReviewersDialog
+            resumeId={detail.resume.id}
+            open={inviteOpen}
+            onOpenChange={setInviteOpen}
+            shareUrl={shareUrl}
+          />
         )}
 
         {detail.review.message && (
@@ -189,10 +210,13 @@ export default function ReviewSidebar({
               }}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-xs font-medium capitalize text-muted-foreground">
-                  <Icon className="h-3.5 w-3.5" /> {a.kind.replace("_", " ")}
+                <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">
+                    {mine ? t("review.you") : a.authorName || t("review.reviewer")}
+                  </span>
                 </span>
-                <Badge variant={STATUS_VARIANT[a.status]} className="text-[10px] capitalize">
+                <Badge variant={STATUS_VARIANT[a.status]} className="shrink-0 text-[10px] capitalize">
                   {a.status}
                 </Badge>
               </div>
@@ -341,17 +365,32 @@ export default function ReviewSidebar({
                 variant="default"
                 className="flex-1"
                 disabled={busy}
-                onClick={() => review.submitReview()}
+                onClick={async () => {
+                  await review.submitReview();
+                  toast({
+                    title: t("review.feedbackSent"),
+                    description: t("review.feedbackSentHint"),
+                  });
+                }}
               >
-                <Send className="mr-1 h-3 w-3" /> Submit feedback
+                <Send className="mr-1 h-3 w-3" /> {t("review.submitFeedback")}
               </Button>
             ) : (
               <>
-                <Button size="sm" variant="outline" className="flex-1" disabled={busy} onClick={() => review.completeReview()}>
-                  Complete
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  disabled={busy}
+                  onClick={async () => {
+                    await review.completeReview();
+                    onAfterComplete?.();
+                  }}
+                >
+                  {t("review.complete")}
                 </Button>
                 <Button size="sm" variant="ghost" disabled={busy} onClick={() => review.cancelReview()}>
-                  Cancel
+                  {t("review.cancel")}
                 </Button>
               </>
             )}

@@ -48,6 +48,10 @@ export const resumeReviews = pgTable(
     // immediately for a direct user invite.
     reviewerId: uuid("reviewer_id").references(() => users.id, { onDelete: "set null" }),
     reviewerEmail: varchar("reviewer_email", { length: 320 }),
+    // Display name for the reviewer — captured at invite time (from the chosen
+    // contact) or by an external guest when they open the link, so the owner can
+    // attribute feedback to a person even when there's no platform account.
+    reviewerName: varchar("reviewer_name", { length: 160 }),
     // Unguessable token gating link access (self-share + coach). Generated
     // once at create time.
     shareToken: varchar("share_token", { length: 64 }).notNull(),

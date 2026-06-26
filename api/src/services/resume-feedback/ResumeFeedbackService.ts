@@ -19,7 +19,9 @@
  */
 import {
   REVIEW_SOURCES,
+  DEFAULT_REVIEW_EXPIRY_HOURS,
   type CreateReviewInput,
+  type InviteReviewersInput,
   type CreateAnnotationInput,
   type UpdateAnnotationInput,
   type SubmitReviewInput,
@@ -97,24 +99,84 @@ export class ResumeFeedbackService {
       throw new ResumeFeedbackServiceError("VALIDATION_ERROR", "Cannot review your own resume");
     }
 
-    const expiresAt = input.expiresInDays
-      ? new Date(this.deps.now().getTime() + input.expiresInDays * 86_400_000)
-      : null;
-
     const row = await this.deps.repo.insertReview({
       resumeId: input.resumeId,
       ownerId,
       reviewerId: input.reviewerUserId ?? null,
       reviewerEmail: input.reviewerEmail ?? null,
+      reviewerName: input.reviewerName ?? null,
       shareToken: this.generateToken(),
       source: input.source,
       coachingInquiryId: input.coachingInquiryId ?? null,
       title: input.title ?? null,
       status: "pending",
       message: input.message ?? null,
-      expiresAt,
+      expiresAt: this.computeExpiry({
+        source: input.source,
+        expiresInHours: input.expiresInHours,
+        expiresInDays: input.expiresInDays,
+      }),
     });
     return this.toReviewDTO(row, { includeToken: true });
+  }
+
+  /**
+   * Batch invite: share ONE resume with many reviewers at once. Each invitee
+   * (a platform user by id, or an external person by email) gets their OWN
+   * review — its own share link + feedback thread — so feedback stays
+   * attributable per person and one reviewer's revoke/expiry never touches
+   * another's. Returns the created reviews (token included) so the caller can
+   * fan out invite emails + notifications.
+   */
+  async inviteReviewers(ownerId: string, input: InviteReviewersInput): Promise<ResumeReviewDTO[]> {
+    const resume = await this.deps.repo.findResumeContentSlice(input.resumeId);
+    if (!resume) throw new ResumeFeedbackServiceError("NOT_FOUND", "Resume not found");
+    if (resume.userId !== ownerId) {
+      throw new ResumeFeedbackServiceError("FORBIDDEN", "Not your resume");
+    }
+    const expiresAt = this.computeExpiry({
+      source: "self_share",
+      expiresInHours: input.expiresInHours,
+    });
+    const created: ResumeReviewDTO[] = [];
+    for (const invitee of input.invitees) {
+      if (invitee.userId && invitee.userId === ownerId) continue; // can't review your own resume
+      const row = await this.deps.repo.insertReview({
+        resumeId: input.resumeId,
+        ownerId,
+        reviewerId: invitee.userId ?? null,
+        reviewerEmail: invitee.email ?? null,
+        reviewerName: invitee.name ?? null,
+        shareToken: this.generateToken(),
+        source: "self_share",
+        coachingInquiryId: null,
+        title: input.title ?? null,
+        status: "pending",
+        message: input.message ?? null,
+        expiresAt,
+      });
+      created.push(this.toReviewDTO(row, { includeToken: true }));
+    }
+    return created;
+  }
+
+  /** Resolve a review's expiry. Explicit hours win over explicit days; a
+   *  self-share link with no override gets the default comment window so every
+   *  share link eventually expires. Coaching engagements have no default. */
+  private computeExpiry(opts: {
+    source: string;
+    expiresInHours?: number;
+    expiresInDays?: number;
+  }): Date | null {
+    const explicitMs =
+      opts.expiresInHours != null
+        ? opts.expiresInHours * 3_600_000
+        : opts.expiresInDays != null
+          ? opts.expiresInDays * 86_400_000
+          : null;
+    const ttlMs =
+      explicitMs ?? (opts.source === "self_share" ? DEFAULT_REVIEW_EXPIRY_HOURS * 3_600_000 : null);
+    return ttlMs != null ? new Date(this.deps.now().getTime() + ttlMs) : null;
   }
 
   async listOwnerReviews(ownerId: string): Promise<ResumeReviewDTO[]> {
@@ -147,10 +209,11 @@ export class ResumeFeedbackService {
 
   async submitReview(
     reviewId: string,
-    actor: string,
+    actor: string | null,
     input: SubmitReviewInput,
+    token?: string,
   ): Promise<ResumeReviewDTO> {
-    const { review, role } = await this.resolveAccess({ reviewId }, actor);
+    const { review, role } = await this.resolveAccess({ reviewId }, actor, token);
     if (role !== "reviewer") {
       throw new ResumeFeedbackServiceError("FORBIDDEN", "Only the reviewer can submit feedback");
     }
@@ -187,20 +250,21 @@ export class ResumeFeedbackService {
     actor: string | null,
     token?: string,
   ): Promise<ResumeReviewAnnotationDTO[]> {
-    await this.resolveAccess({ reviewId }, actor, token);
+    const { review } = await this.resolveAccess({ reviewId }, actor, token);
     return getOrSetCached({
       key: annotationCacheKey(reviewId),
       ttlSeconds: ANNOTATION_CACHE_TTL,
       loader: async () => {
         const rows = await this.deps.repo.listAnnotations(reviewId);
-        return rows.map((r) => this.toAnnotationDTO(r));
+        const names = await this.authorNamesByAnnotation(review, rows);
+        return rows.map((r) => this.toAnnotationDTO(r, names.get(r.id) ?? null));
       },
     });
   }
 
   async createAnnotation(
     reviewId: string,
-    actor: string,
+    actor: string | null,
     input: CreateAnnotationInput,
     token?: string,
   ): Promise<ResumeReviewAnnotationDTO> {
@@ -214,8 +278,9 @@ export class ResumeFeedbackService {
     }
     const pageId = input.anchor.type === "canvas" ? input.anchor.pageId : null;
     const row = await this.deps.repo.insertAnnotation({
+      // Null for an external guest acting via a share token (no account).
+      authorId: actor ?? null,
       reviewId,
-      authorId: actor,
       kind: input.kind,
       body: input.body,
       color: input.color ?? null,
@@ -226,7 +291,7 @@ export class ResumeFeedbackService {
       parentAnnotationId: input.parentAnnotationId ?? null,
     });
     invalidateCachedKey(annotationCacheKey(reviewId));
-    return this.toAnnotationDTO(row);
+    return this.toAnnotationDTO(row, await this.nameForAuthor(row.authorId, review));
   }
 
   async updateAnnotation(
@@ -258,7 +323,7 @@ export class ResumeFeedbackService {
     });
     invalidateCachedKey(annotationCacheKey(review.id));
     void role;
-    return this.toAnnotationDTO(updated!);
+    return this.toAnnotationDTO(updated!, await this.nameForAuthor(updated!.authorId, review));
   }
 
   /** Owner accepts a suggestion: applies its `suggestedEdit` (if any) to the
@@ -297,7 +362,7 @@ export class ResumeFeedbackService {
     // who authored the accepted suggestion (#1952). Null for token-only
     // external reviewers with no platform account.
     return {
-      annotation: this.toAnnotationDTO(updated!),
+      annotation: this.toAnnotationDTO(updated!, await this.nameForAuthor(updated!.authorId, review)),
       appliedEdit,
       reviewerId: review.reviewerId ?? null,
     };
@@ -403,11 +468,16 @@ export class ResumeFeedbackService {
         : await this.deps.repo.findReviewById(locate.reviewId);
     if (!review) throw new ResumeFeedbackServiceError("NOT_FOUND", "Review not found");
 
-    if (review.expiresAt && review.expiresAt.getTime() < this.deps.now().getTime()) {
+    // The owner ALWAYS retains access to their own review — expiry only gates
+    // the reviewer's share link, never the owner's view of the feedback.
+    if (actor && review.ownerId === actor) return { review, role: "owner" };
+
+    const expired =
+      !!review.expiresAt && review.expiresAt.getTime() < this.deps.now().getTime();
+    if (expired) {
       throw new ResumeFeedbackServiceError("FORBIDDEN", "This review link has expired");
     }
 
-    if (actor && review.ownerId === actor) return { review, role: "owner" };
     if (actor && review.reviewerId && review.reviewerId === actor) {
       return { review, role: "reviewer" };
     }
@@ -476,11 +546,12 @@ export class ResumeFeedbackService {
       this.deps.repo.listProposalsForReview(review.id),
     ]);
     void actor;
+    const names = await this.authorNamesByAnnotation(review, annotations);
     return {
       role: access.role,
       review: this.toReviewDTO(review, { includeToken: access.role === "owner" }),
       resume: { id: resume.id, title: resume.title, content: resume.content },
-      annotations: annotations.map((a) => this.toAnnotationDTO(a)),
+      annotations: annotations.map((a) => this.toAnnotationDTO(a, names.get(a.id) ?? null)),
       proposals: proposals.map((p) => this.toProposalDTO(p)),
     };
   }
@@ -517,6 +588,7 @@ export class ResumeFeedbackService {
       ownerId: row.ownerId,
       reviewerId: row.reviewerId,
       reviewerEmail: row.reviewerEmail,
+      reviewerName: row.reviewerName ?? null,
       source: row.source as ResumeReviewDTO["source"],
       coachingInquiryId: row.coachingInquiryId,
       title: row.title,
@@ -531,11 +603,49 @@ export class ResumeFeedbackService {
     };
   }
 
-  private toAnnotationDTO(row: ResumeReviewAnnotationRow): ResumeReviewAnnotationDTO {
+  /** A reviewer's display label — the captured name, else their email. */
+  private reviewerLabel(review: ResumeReviewRow): string | null {
+    return review.reviewerName ?? review.reviewerEmail ?? null;
+  }
+
+  /** Map each annotation id → its author's display name. Batched (no N+1):
+   *  one lookup for all distinct platform authors; a null-author row (an
+   *  external guest with no account) falls back to the review's reviewer
+   *  name/email so the owner still sees who left it. */
+  private async authorNamesByAnnotation(
+    review: ResumeReviewRow,
+    rows: ResumeReviewAnnotationRow[],
+  ): Promise<Map<string, string | null>> {
+    const ids = [...new Set(rows.map((r) => r.authorId).filter((x): x is string => !!x))];
+    const contacts = ids.length ? await this.deps.repo.findUserContacts(ids) : [];
+    const nameById = new Map(contacts.map((c) => [c.id, c.name ?? c.email ?? null]));
+    const fallback = this.reviewerLabel(review);
+    const out = new Map<string, string | null>();
+    for (const r of rows) {
+      out.set(r.id, r.authorId ? (nameById.get(r.authorId) ?? null) : fallback);
+    }
+    return out;
+  }
+
+  /** Single-author resolve for mutation responses. */
+  private async nameForAuthor(
+    authorId: string | null,
+    review: ResumeReviewRow,
+  ): Promise<string | null> {
+    if (!authorId) return this.reviewerLabel(review);
+    const [c] = await this.deps.repo.findUserContacts([authorId]);
+    return c?.name ?? c?.email ?? null;
+  }
+
+  private toAnnotationDTO(
+    row: ResumeReviewAnnotationRow,
+    authorName: string | null,
+  ): ResumeReviewAnnotationDTO {
     return {
       id: row.id,
       reviewId: row.reviewId,
       authorId: row.authorId,
+      authorName,
       kind: row.kind as ResumeReviewAnnotationDTO["kind"],
       body: row.body,
       color: row.color,

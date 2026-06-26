@@ -526,6 +526,15 @@ export function createApp() {
   // All other resume-feedback routes stay authenticated via the default branch.
   const RESUME_FEEDBACK_LINK_ROUTE = /^\/api\/resume-feedback\/link\/[^/]+(?:$|\?)/;
 
+  // Any resume-feedback request carrying a `?token=` is a reviewer acting via
+  // their unguessable share link — the token IS the access grant, so an
+  // UNauthenticated peer can read the review and leave feedback without an
+  // account (the explicit "email lets a guest give feedback, no sign-up"
+  // requirement). Escalated to optional-auth in the auth layer below (a JWT
+  // still attaches if present so an authed visitor claims the link). The
+  // service re-validates the token against the review on every call.
+  const RESUME_FEEDBACK_ROUTE = /^\/api\/resume-feedback(?:\/|$)/;
+
   // Reviews are public-read: the polymorphic reviews router documents its
   // list (`/:subjectType/:subjectId`), aggregate, and threaded comments
   // GETs as public, and those handlers never read c.var.user. Without a
@@ -611,7 +620,18 @@ export function createApp() {
 
   // ── Auth layer ──────────────────────────────────────────────────────
   app.use("/api/*", async (c, next) => {
-    const mode = resolveAccessMode(c.req.path, c.req.method);
+    let mode = resolveAccessMode(c.req.path, c.req.method);
+    // Reviewer share-token writes: the unguessable token is the access grant,
+    // so an unauthenticated peer can leave feedback. Escalate any token-bearing
+    // resume-feedback request to optional-auth (attach a JWT if present, never
+    // require one). `/link/:token` is already optional-auth above.
+    if (
+      mode === "authenticated" &&
+      RESUME_FEEDBACK_ROUTE.test(c.req.path) &&
+      c.req.query("token")
+    ) {
+      mode = "optional-auth";
+    }
     if (mode === "public") return next();
     if (mode === "optional-auth") return optionalAuthMiddleware(c as any, next);
     return authMiddleware(c as any, next);

@@ -10,11 +10,13 @@
  * (a peer/mentor who may not even have an account).
  */
 import { useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
 import AnnotationLayer, { flashQuoteInContainer } from "@/components/studio/review/AnnotationLayer";
 import ReviewSidebar from "@/components/studio/review/ReviewSidebar";
@@ -79,6 +81,8 @@ export default function ResumeReviewPage(): JSX.Element {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
+  const { t } = useTranslation();
 
   const review = useResumeReview({ reviewId, token });
   const { detail, loading, notFound } = review;
@@ -140,8 +144,55 @@ export default function ResumeReviewPage(): JSX.Element {
     );
   }
 
+  const isOwner = detail.role === "owner";
+  const resumeId = detail.review.resumeId;
+  const reviewActive =
+    detail.review.status !== "completed" && detail.review.status !== "cancelled";
+
+  const goBack = () => {
+    if (isOwner) navigate(`/resumes/${resumeId}`);
+    else if (user) navigate(-1);
+    else navigate("/");
+  };
+  const exitLabel = isOwner
+    ? t("review.backToResume")
+    : user
+      ? t("review.back")
+      : t("review.backHome");
+  const handleAfterComplete = () => {
+    toast({ title: t("review.completedToast"), description: t("review.completedToastHint") });
+    navigate(`/resumes/${resumeId}`);
+  };
+
   return (
     <AppShell bgClassName="bg-muted/30">
+      {/* Persistent exit bar — the owner always has a way back to their resume,
+          even after the review is completed and the action footer is gone. */}
+      <div className="sticky top-16 z-20 flex items-center justify-between gap-2 border-b bg-card/95 px-4 py-2 backdrop-blur">
+        <Button variant="ghost" size="sm" onClick={goBack}>
+          <ArrowLeft className="mr-1.5 h-4 w-4" /> {exitLabel}
+        </Button>
+        <span className="truncate text-sm font-medium text-muted-foreground">
+          {detail.review.title || t("review.title")}
+        </span>
+      </div>
+
+      {!reviewActive && (
+        <div className="flex flex-wrap items-center justify-center gap-3 border-b bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">
+          <CheckCircle2 className="h-4 w-4" />
+          <span>
+            {detail.review.status === "cancelled"
+              ? t("review.cancelledBanner")
+              : t("review.completedBanner")}
+          </span>
+          {isOwner && (
+            <Button variant="outline" size="sm" className="h-7" onClick={goBack}>
+              {t("review.backToResume")}
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-col lg:flex-row">
         {/* Resume canvas + annotation overlay */}
         <div className="flex-1 overflow-auto p-4 lg:p-8">
@@ -174,6 +225,7 @@ export default function ResumeReviewPage(): JSX.Element {
               onFlash={onFlash}
               onStartSticky={() => setPlacing(true)}
               shareUrl={shareUrl}
+              onAfterComplete={handleAfterComplete}
             />
           </div>
         </aside>

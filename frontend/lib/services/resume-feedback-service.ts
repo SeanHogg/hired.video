@@ -14,6 +14,7 @@ import type {
   ProposedDraftDTO,
   ResumeReviewDetailDTO,
   CreateReviewInput,
+  InviteReviewersInput,
   CreateAnnotationInput,
   UpdateAnnotationInput,
   SubmitReviewInput,
@@ -66,12 +67,21 @@ export class ResumeFeedbackService {
     return res.data;
   }
 
+  /** Batch-invite reviewers (platform contacts + external emails). Each invitee
+   *  gets their own review + share link; the backend fans out the emails,
+   *  in-app notifications, and lead capture. */
+  async inviteReviewers(input: InviteReviewersInput): Promise<ResumeReviewDTO[]> {
+    const res = await apiClient.post<ResumeReviewDTO[]>(`${BASE}/reviews/invite`, input);
+    return res.data;
+  }
+
   async submitReview(
     reviewId: string,
     input: SubmitReviewInput = {},
+    token?: string,
   ): Promise<ResumeReviewDTO> {
     const res = await apiClient.post<ResumeReviewDTO>(
-      `${BASE}/reviews/${reviewId}/submit`,
+      withToken(`${BASE}/reviews/${reviewId}/submit`, token),
       input,
     );
     return res.data;

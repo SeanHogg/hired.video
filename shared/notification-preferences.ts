@@ -104,7 +104,8 @@ export function notificationPreferenceKey(
 export function categoryForNotificationType(type: string): NotificationCategory | null {
   const t = type.toLowerCase().replace(/[-\s]/g, "_");
   if (t.includes("connection")) return "connectionRequests";
-  if (t.includes("message") || t === "service_inquiry" || t === "review") return "messages";
+  if (t.includes("message") || t === "service_inquiry" || t.includes("review") || t.includes("feedback"))
+    return "messages";
   if (t.includes("application") || t === "applied" || t === "interview" || t === "offer") {
     return "applicationUpdates";
   }

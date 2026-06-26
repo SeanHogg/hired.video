@@ -83,6 +83,13 @@ export const FEEDBACK_COLORS = [
 export const PROPOSAL_STATUSES = ["proposed", "accepted", "rejected"] as const;
 export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
 
+/** Default comment window for a review-invite link, in hours. The owner can
+ *  override per invite. Expressed in hours (not days) because peer/mentor
+ *  feedback is usually wanted fast — the default is ~1.75 days. */
+export const DEFAULT_REVIEW_EXPIRY_HOURS = 42;
+/** Hard ceiling on an override (one year) so a typo can't mint an immortal link. */
+export const MAX_REVIEW_EXPIRY_HOURS = 24 * 365;
+
 // ── Annotation anchor (discriminated union, persisted as jsonb) ───────────────
 
 /** Sticky note: a free position on a document page, in the same 0..1 fraction
@@ -152,16 +159,50 @@ export const CreateReviewInputSchema = z
     reviewerUserId: z.string().uuid().optional(),
     /** Invite by email (link-claim flow); ignored if `reviewerUserId` set. */
     reviewerEmail: z.string().email().optional(),
+    /** Display name for the reviewer (from the chosen contact / typed in). */
+    reviewerName: z.string().trim().max(160).optional(),
     source: z.enum(REVIEW_SOURCES).default("self_share"),
     /** Set when `source === "coaching"` to bind the paid engagement. */
     coachingInquiryId: z.string().uuid().optional(),
     title: z.string().trim().max(160).optional(),
     message: z.string().trim().max(4000).optional(),
-    /** Link/invite TTL. Omit for no expiry. */
+    /** Link/invite TTL in days. Omit for no expiry. Superseded by
+     *  `expiresInHours` when both are given. */
     expiresInDays: z.number().int().positive().max(365).optional(),
+    /** Link/invite TTL in hours — the invite flow's native unit (default 42). */
+    expiresInHours: z.number().int().positive().max(MAX_REVIEW_EXPIRY_HOURS).optional(),
   })
   .strict();
 export type CreateReviewInput = z.infer<typeof CreateReviewInputSchema>;
+
+/** One invitee in a batch review-invite — a platform user (by id) OR an
+ *  external person (by email). At least one of the two must be present. */
+export const ReviewInviteeSchema = z
+  .object({
+    userId: z.string().uuid().optional(),
+    email: z.string().email().optional(),
+    name: z.string().trim().max(160).optional(),
+  })
+  .strict()
+  .refine((v) => !!v.userId || !!v.email, {
+    message: "Each invitee needs a userId or an email",
+  });
+export type ReviewInvitee = z.infer<typeof ReviewInviteeSchema>;
+
+/** Batch invite: share ONE resume with many reviewers at once. Each invitee
+ *  gets their OWN review (its own share link + feedback thread) so feedback
+ *  stays attributable per person. */
+export const InviteReviewersInputSchema = z
+  .object({
+    resumeId: z.string().uuid(),
+    invitees: z.array(ReviewInviteeSchema).min(1).max(50),
+    title: z.string().trim().max(160).optional(),
+    message: z.string().trim().max(4000).optional(),
+    /** Comment window in hours; defaults to DEFAULT_REVIEW_EXPIRY_HOURS. */
+    expiresInHours: z.number().int().positive().max(MAX_REVIEW_EXPIRY_HOURS).optional(),
+  })
+  .strict();
+export type InviteReviewersInput = z.infer<typeof InviteReviewersInputSchema>;
 
 export const CreateAnnotationInputSchema = z
   .object({
@@ -208,6 +249,7 @@ export interface ResumeReviewDTO {
   ownerId: string;
   reviewerId: string | null;
   reviewerEmail: string | null;
+  reviewerName: string | null;
   source: ReviewSource;
   coachingInquiryId: string | null;
   title: string | null;
@@ -230,6 +272,11 @@ export interface ResumeReviewAnnotationDTO {
   id: string;
   reviewId: string;
   authorId: string | null;
+  /** Resolved display name of whoever wrote this note — the author's platform
+   *  name, or the review's reviewer name/email for an external (account-less)
+   *  reviewer. Lets the owner see who left each comment. Null only when the
+   *  author can't be resolved at all. */
+  authorName: string | null;
   kind: AnnotationKind;
   body: string;
   color: string | null;
