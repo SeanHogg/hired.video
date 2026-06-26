@@ -739,6 +739,13 @@ export const PAGE_SEO: Record<string, SEOData> = {
       isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
     },
   },
+  "/recruit/pipeline": {
+    title: "Candidate Pipeline — hired.video",
+    description:
+      "Work every candidate across all your jobs in one cross-job kanban. Drag candidates through stages, bulk-move, and export — the recruiter pipeline that spans your whole desk.",
+    keywords:
+      "candidate pipeline, recruiting kanban, ATS pipeline, cross-job pipeline, applicant tracking",
+  },
   "/companies": {
     title: "Companies Hiring — hired.video",
     description:

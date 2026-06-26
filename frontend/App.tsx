@@ -137,6 +137,7 @@ const InterviewTemplates = lazy(() => import("./pages/tools/InterviewTemplates")
 const VideoPitchLab = lazy(() => import("./pages/tools/VideoPitchLab"));
 const MyInterviewAssignments = lazy(() => import("./pages/MyInterviewAssignments"));
 const LiveScreenInvite = lazy(() => import("./pages/LiveScreenInvite"));
+const CrossJobPipeline = lazy(() => import("./pages/recruit/CrossJobPipeline"));
 const LiveScreens = lazy(() => import("./pages/recruit/LiveScreens"));
 const AgentRuns = lazy(() => import("./pages/recruit/AgentRuns"));
 const VendorSync = lazy(() => import("./pages/tools/VendorSync"));
@@ -1007,6 +1008,10 @@ const App = () => (
                       <Route
                         path="/interview-assignments/:id"
                         element={<MyInterviewAssignments />}
+                      />
+                      <Route
+                        path="/recruit/pipeline"
+                        element={<CrossJobPipeline />}
                       />
                       <Route
                         path="/recruit/live-screens"

@@ -81,6 +81,88 @@ export async function listEntriesByStage(jobId: string) {
   return { rows, grouped };
 }
 
+/**
+ * Cross-job aggregate read (#405) — every pipeline entry across the jobs the
+ * recruiter can manage, grouped by stage, with each entry stamped with its
+ * job title so the UI can label "for [Job Name]". Powers the cross-job
+ * kanban that Loxo / Bullhorn / Greenhouse expose; the per-job
+ * `listEntriesByStage` stays the single-job surface.
+ *
+ * `jobIds` is the viewer's already-resolved manageable set (see
+ * `resolveManageableJobIds`) — the row-level tenancy filter. Optional
+ * `stage` / `jobId` narrow the result; `jobId` is intersected with the
+ * scope so it can never widen access. The same confidential-applicant
+ * masking (#1679) as the per-job read is applied at this boundary.
+ */
+export async function listCrossJobEntriesByStage(
+  jobIds: string[],
+  filters: { stage?: PipelineStage; jobId?: string } = {},
+) {
+  const emptyGrouped = () =>
+    Object.fromEntries(PIPELINE_STAGES.map((s) => [s, [] as any[]])) as Record<PipelineStage, any[]>;
+  if (jobIds.length === 0) {
+    return { rows: [] as any[], grouped: emptyGrouped(), jobs: [] as { id: string; title: string }[] };
+  }
+
+  const db = getDb();
+
+  // Job-filter dropdown: every in-scope job that has ≥1 pipeline entry,
+  // computed from the FULL scope (not the stage/job filter) so changing the
+  // filter never empties the dropdown.
+  const jobRows = await db
+    .selectDistinct({ id: schema.jobItems.id, title: schema.jobItems.title })
+    .from(schema.jobPipelineEntries)
+    .innerJoin(schema.jobItems, eq(schema.jobPipelineEntries.jobId, schema.jobItems.id))
+    .where(inArray(schema.jobPipelineEntries.jobId, jobIds));
+  const jobs = jobRows
+    .map((r: { id: string; title: string }) => ({ id: r.id, title: r.title }))
+    .sort((a: { title: string }, b: { title: string }) => a.title.localeCompare(b.title));
+
+  // A jobId filter is intersected with the scope — out-of-scope ids resolve
+  // to an empty entry set (never an access widen).
+  const scopedIds = filters.jobId
+    ? jobIds.includes(filters.jobId)
+      ? [filters.jobId]
+      : []
+    : jobIds;
+  if (scopedIds.length === 0) {
+    return { rows: [] as any[], grouped: emptyGrouped(), jobs };
+  }
+
+  const where = filters.stage
+    ? and(
+        inArray(schema.jobPipelineEntries.jobId, scopedIds),
+        eq(schema.jobPipelineEntries.stage, filters.stage),
+      )
+    : inArray(schema.jobPipelineEntries.jobId, scopedIds);
+
+  const raw = await db
+    .select({ entry: schema.jobPipelineEntries, jobTitle: schema.jobItems.title })
+    .from(schema.jobPipelineEntries)
+    .innerJoin(schema.jobItems, eq(schema.jobPipelineEntries.jobId, schema.jobItems.id))
+    .where(where)
+    .orderBy(desc(schema.jobPipelineEntries.stageChangedAt));
+
+  const confidential = await confidentialCandidateIds(
+    raw.map((r: any) => r.entry.candidateUserId).filter(Boolean) as string[],
+  );
+  const rows = raw.map((r: any) => ({
+    ...maskConfidentialCandidate(r.entry, {
+      isConfidential: !!r.entry.candidateUserId && confidential.has(r.entry.candidateUserId),
+      stage: (r.entry.stage as PipelineStage) ?? "applied",
+    }),
+    jobTitle: r.jobTitle,
+  }));
+
+  const grouped = emptyGrouped() as Record<PipelineStage, typeof rows>;
+  for (const row of rows) {
+    const stage = (row.stage as PipelineStage) ?? "applied";
+    if (grouped[stage]) grouped[stage].push(row);
+  }
+
+  return { rows, grouped, jobs };
+}
+
 export async function moveStage(input: {
   jobId: string;
   entryId: string;

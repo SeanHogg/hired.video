@@ -30,6 +30,10 @@ export interface PipelineEntry {
   candidateLinkedinUrl: string | null;
   candidateResumeUrl: string | null;
   candidateAvatarUrl: string | null;
+  /** Parent job's title — only populated on cross-job reads (#405) so a
+   *  card can show "for [Job Name]". Null/undefined on per-job reads where
+   *  the job is already the page context. */
+  jobTitle?: string | null;
   stage: PipelineStage;
   stageChangedAt: string;
   ownerId: string | null;
@@ -51,6 +55,20 @@ export interface PipelineStageGroup {
 export interface PipelineSnapshot {
   stages: PipelineStageGroup[];
   total: number;
+}
+
+/** A job that has at least one candidate in the cross-job pipeline (#405) —
+ *  drives the board's "filter by job" dropdown. */
+export interface CrossJobJobRef {
+  id: string;
+  title: string;
+}
+
+/** Cross-job kanban snapshot: the same stage groups as a per-job snapshot,
+ *  but entries carry `jobTitle` and the payload lists the jobs present so the
+ *  board can offer a job filter. */
+export interface CrossJobPipelineSnapshot extends PipelineSnapshot {
+  jobs: CrossJobJobRef[];
 }
 
 export interface PipelineReport {
@@ -80,6 +98,22 @@ const base = (jobId: string) => `/api/jobs/${jobId}/pipeline`;
 export const jobPipelineService = {
   async list(jobId: string): Promise<PipelineSnapshot> {
     const response = await apiClient.get<PipelineSnapshot>(base(jobId));
+    return response.data;
+  },
+
+  /** Cross-job board (#405) — every candidate across the viewer's manageable
+   *  jobs, grouped by stage. Optional stage / jobId narrow the result. */
+  async listAll(filters?: {
+    stage?: PipelineStage;
+    jobId?: string;
+  }): Promise<CrossJobPipelineSnapshot> {
+    const params = new URLSearchParams();
+    if (filters?.stage) params.set("stage", filters.stage);
+    if (filters?.jobId) params.set("jobId", filters.jobId);
+    const qs = params.toString();
+    const response = await apiClient.get<CrossJobPipelineSnapshot>(
+      `/api/pipeline/all${qs ? `?${qs}` : ""}`,
+    );
     return response.data;
   },
 

@@ -14,10 +14,11 @@
  *      manage it (multi-recruiter team support).
  */
 import type { MiddlewareHandler } from "hono";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import type { Variables, AppEnv } from "../../types/index.js";
 import { error } from "../../types/index.js";
 import { getDb, schema } from "../../db/index.js";
+import { getUserCompanyIds } from "../company/scope.js";
 
 type AppCtx = Parameters<MiddlewareHandler<AppEnv>>[0];
 
@@ -83,6 +84,33 @@ export async function canViewerManageJob(
   }
 
   return { canManage: false, access };
+}
+
+/**
+ * Resolves every job the viewer is authorised to manage — the same rule as
+ * `canViewerManageJob`, but applied set-wise so cross-job surfaces (the
+ * cross-job pipeline kanban, #405) can scope a single query instead of
+ * checking each job individually. A job is manageable when the viewer
+ * posted it (`postedByUserId`) OR it belongs to a company the viewer is an
+ * active member/owner of (`companyId` ∈ their company scope).
+ *
+ * Returns the bare jobId list so callers can `WHERE jobId IN (...)`.
+ */
+export async function resolveManageableJobIds(viewerUserId: string): Promise<string[]> {
+  const db = getDb();
+  const companyIds = await getUserCompanyIds(viewerUserId);
+  const rows = await db
+    .select({ id: schema.jobItems.id })
+    .from(schema.jobItems)
+    .where(
+      companyIds.length > 0
+        ? or(
+            eq(schema.jobItems.postedByUserId, viewerUserId),
+            inArray(schema.jobItems.companyId, companyIds),
+          )
+        : eq(schema.jobItems.postedByUserId, viewerUserId),
+    );
+  return rows.map((r: { id: string }) => r.id);
 }
 
 export async function requireJobOwner(

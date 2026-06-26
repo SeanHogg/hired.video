@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Mail, Phone, FileText, Linkedin, MoreHorizontal, MapPin, Clock, Trash2, Sparkles, ClipboardCheck } from "lucide-react";
+import { Mail, Phone, FileText, Linkedin, MoreHorizontal, MapPin, Clock, Trash2, Sparkles, ClipboardCheck, Briefcase } from "lucide-react";
 import { initials } from "@/lib/utils/initials";
 import { daysSince } from "@/lib/utils/datetime";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -64,6 +64,14 @@ export default function JobPipelineCard({
           <div className="flex items-center gap-2">
             <p className="font-semibold text-sm truncate">{entry.candidateName}</p>
           </div>
+          {/* Cross-job board (#405): label which job this card belongs to. On a
+              per-job board `jobTitle` is absent, so this row simply doesn't render. */}
+          {entry.jobTitle && (
+            <p className="text-xs text-primary truncate inline-flex items-center gap-1">
+              <Briefcase className="w-3 h-3" />
+              {t("labels.forJob", { job: entry.jobTitle })}
+            </p>
+          )}
           {entry.candidateLocation && (
             <p className="text-xs text-muted-foreground truncate">{entry.candidateLocation}</p>
           )}

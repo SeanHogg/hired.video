@@ -5,6 +5,7 @@
 // See README § "Phase 1 first-pass: static vs declarative decomposition".
 
 import type { Density, FontFamilyKey, HeadingStyle, ThemeKey } from "@/lib/resume-template-themes";
+import { resumeListing } from "@shared/marketplace-template-listings";
 
 export type ResumeSectionKey =
   | "work"
@@ -147,10 +148,8 @@ const baseSections: SectionBlock[] = [
 // 1. Default (hired.video) — matches current ResumeDetail pixel-close.
 export const DEFAULT_DESCRIPTOR: ResumeTemplateDescriptor = {
   id: "hired-default",
-  name: "Hired Video (Default)",
-  industry: "All",
+  ...resumeListing("hired-default"),
   priceCents: 0,
-  description: "Signature hired.video layout — gradient hero with embedded video resume, timeline work history, and cross-section career overview.",
   version: "1.2",
   documentMode: "hero",
   theme: {
@@ -208,10 +207,8 @@ function printPreset(
 // 2. Payroll / Finance — Iron Gray, serif, 2-column, divider headings.
 export const PAYROLL_IRON_GRAY: ResumeTemplateDescriptor = printPreset({
   id: "payroll-iron-gray",
-  name: "Payroll & Finance — Iron Gray",
-  industry: "Finance / Payroll",
+  ...resumeListing("payroll-iron-gray"),
   priceCents: 0,
-  description: "Classic two-column print layout with sober serif headings — ATS-friendly for payroll, accounting, and financial analyst roles.",
   theme: {
     themeKey: "iron-gray",
     fontFamily: "serif",
@@ -226,10 +223,8 @@ export const PAYROLL_IRON_GRAY: ResumeTemplateDescriptor = printPreset({
 // 3. Risk / Consulting — Assertive Asphalt, sans, 2-column, caps headings.
 export const RISK_ASPHALT: ResumeTemplateDescriptor = printPreset({
   id: "risk-asphalt",
-  name: "Risk & Consulting — Asphalt",
-  industry: "Risk / Consulting",
+  ...resumeListing("risk-asphalt"),
   priceCents: 0,
-  description: "Dark, assertive two-column layout with ALL-CAPS headings — signals gravitas for risk, audit, compliance, and consulting.",
   theme: {
     themeKey: "assertive-asphalt",
     fontFamily: "sans",
@@ -244,10 +239,8 @@ export const RISK_ASPHALT: ResumeTemplateDescriptor = printPreset({
 // 4. Executive — Trusted Taupe, serif, 1-column, divider headings, spacious.
 export const EXECUTIVE_TAUPE: ResumeTemplateDescriptor = printPreset({
   id: "executive-taupe",
-  name: "Executive — Trusted Taupe",
-  industry: "Executive / C-Suite",
+  ...resumeListing("executive-taupe"),
   priceCents: 0,
-  description: "Spacious single-column serif layout with elegant divider headings — built for CXO, VP, and Director-level narratives.",
   theme: {
     themeKey: "trusted-taupe",
     fontFamily: "serif",
@@ -262,10 +255,8 @@ export const EXECUTIVE_TAUPE: ResumeTemplateDescriptor = printPreset({
 // 5. New Grad / Intern — Balanced Blue, Education first, 1-column, underlined headings.
 export const INTERN_EDUCATION_FIRST: ResumeTemplateDescriptor = printPreset({
   id: "intern-education-first",
-  name: "New Grad — Education First",
-  industry: "Intern / New Grad",
+  ...resumeListing("intern-education-first"),
   priceCents: 0,
-  description: "Education leads, projects and coursework shine — optimized for interns, recent grads, and anyone with limited work history.",
   theme: {
     themeKey: "balanced-blue",
     fontFamily: "sans",
@@ -290,10 +281,8 @@ export const INTERN_EDUCATION_FIRST: ResumeTemplateDescriptor = printPreset({
 // 6. Hospitality — Warm Amber, sans, caps headings, 1-column.
 export const HOSPITALITY_AMBER: ResumeTemplateDescriptor = printPreset({
   id: "hospitality-amber",
-  name: "Hospitality — Warm Amber",
-  industry: "Hospitality / Retail",
+  ...resumeListing("hospitality-amber"),
   priceCents: 0,
-  description: "Warm, approachable amber palette with ALL-CAPS headings — suited to hospitality, retail, customer success, and service roles.",
   theme: {
     themeKey: "warm-amber",
     fontFamily: "sans",
@@ -308,10 +297,8 @@ export const HOSPITALITY_AMBER: ResumeTemplateDescriptor = printPreset({
 // 7. Creative / Minimal — minimal slate, mono font, plain headings.
 export const CREATIVE_MINIMAL: ResumeTemplateDescriptor = printPreset({
   id: "creative-minimal",
-  name: "Creative — Minimal Slate",
-  industry: "Creative / Product",
+  ...resumeListing("creative-minimal"),
   priceCents: 0,
-  description: "Ultra-minimal monospace layout with generous whitespace — product designers, creative directors, and indie makers.",
   theme: {
     themeKey: "minimal-slate",
     fontFamily: "mono",
@@ -326,10 +313,8 @@ export const CREATIVE_MINIMAL: ResumeTemplateDescriptor = printPreset({
 // 8. Software Engineer — Dev Graphite, mono, 2-column with skills/projects sidebar.
 export const SOFTWARE_ENGINEER_GRAPHITE: ResumeTemplateDescriptor = printPreset({
   id: "software-engineer-graphite",
-  name: "Software Engineer — Dev Graphite",
-  industry: "Software / Engineering",
+  ...resumeListing("software-engineer-graphite"),
   priceCents: 0,
-  description: "Two-column developer-focused layout with monospace accents — tech stack and projects sidebar, achievement-led work history.",
   theme: {
     themeKey: "dev-graphite",
     fontFamily: "mono",
@@ -344,10 +329,8 @@ export const SOFTWARE_ENGINEER_GRAPHITE: ResumeTemplateDescriptor = printPreset(
 // 9. Healthcare / Clinical — Balanced Blue, sans, 2-column with credentials sidebar.
 export const HEALTHCARE_CLINICAL_BLUE: ResumeTemplateDescriptor = printPreset({
   id: "healthcare-clinical-blue",
-  name: "Healthcare — Clinical Blue",
-  industry: "Healthcare / Clinical",
+  ...resumeListing("healthcare-clinical-blue"),
   priceCents: 0,
-  description: "Credentials-forward two-column layout for nurses, physicians, and allied health — licenses and certifications above the fold.",
   theme: {
     themeKey: "balanced-blue",
     fontFamily: "sans",
@@ -362,10 +345,8 @@ export const HEALTHCARE_CLINICAL_BLUE: ResumeTemplateDescriptor = printPreset({
 // 10. Sales / BD — Growth Emerald, sans, 1-column, achievement-driven caps headings.
 export const SALES_GROWTH_EMERALD: ResumeTemplateDescriptor = printPreset({
   id: "sales-growth-emerald",
-  name: "Sales — Growth Emerald",
-  industry: "Sales / Business Development",
+  ...resumeListing("sales-growth-emerald"),
   priceCents: 0,
-  description: "Achievement-driven single-column layout with confident green accents — built for AEs, SDRs, sales leaders, and BD professionals.",
   theme: {
     themeKey: "growth-emerald",
     fontFamily: "sans",
@@ -384,11 +365,8 @@ export const SALES_GROWTH_EMERALD: ResumeTemplateDescriptor = printPreset({
 // per row.
 export const ACTOR_HEADSHOT_HERO: ResumeTemplateDescriptor = {
   id: "actor-headshot-hero",
-  name: "Actor — Headshot Hero",
-  industry: "Film / Theatre / Television",
+  ...resumeListing("actor-headshot-hero"),
   priceCents: 0,
-  description:
-    "Industry-standard actor one-pager — large headshot, projects-first credits (film / TV / theatre), training, special skills, reps + contact.",
   version: "1.2",
   documentMode: "hero",
   theme: {
@@ -423,11 +401,8 @@ export const ACTOR_HEADSHOT_HERO: ResumeTemplateDescriptor = {
 // festival selections + awards above work history, training last.
 export const DIRECTOR_FILMOGRAPHY_SERIF: ResumeTemplateDescriptor = printPreset({
   id: "director-filmography-serif",
-  name: "Director — Filmography Serif",
-  industry: "Film / Television",
+  ...resumeListing("director-filmography-serif"),
   priceCents: 0,
-  description:
-    "Print-style directorial CV — filmography-led with festival selections and awards above the fold, classic serif with divider headings.",
   theme: {
     themeKey: "trusted-taupe",
     fontFamily: "serif",

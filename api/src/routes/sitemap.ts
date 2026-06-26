@@ -4,11 +4,15 @@
 
 import { Hono } from "hono";
 import { getDb, schema } from "../db/index.js";
-import { and, eq, desc } from "drizzle-orm";
+import { and, eq, desc, isNotNull } from "drizzle-orm";
 import {
   getPopularRoles,
   getPopularCities,
 } from "../services/job/salary-popularity.js";
+// First-party marketplace template slugs — shared SSoT with the resume
+// preset descriptors + the prerender step, so the same /marketplace/
+// templates/<slug> pages that get prerendered also appear in the sitemap.
+import { RESUME_TEMPLATE_LISTINGS } from "../../../shared/marketplace-template-listings.js";
 
 export const sitemapRoutes = new Hono();
 
@@ -77,7 +81,7 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
   const now = new Date().toISOString();
 
   // Fetch dynamic content (limit to recent 500 of each to keep sitemap manageable)
-  const [jobs, companies, publicUsers] = await Promise.allSettled([
+  const [jobs, companies, publicUsers, creatorTemplates] = await Promise.allSettled([
     db
       .select({ id: schema.jobItems.id, title: schema.jobItems.title, updatedAt: schema.jobItems.updatedAt })
       .from(schema.jobItems)
@@ -109,11 +113,25 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
       ))
       .orderBy(desc(schema.userProfiles.updatedAt))
       .limit(500),
+
+    // Creator-published marketplace templates — public, slugged listings
+    // surfaced at /marketplace/templates/<slug>. First-party (resume preset)
+    // template URLs are added separately from the shared SSoT below.
+    db
+      .select({ slug: schema.studioTemplates.listingSlug, updatedAt: schema.studioTemplates.updatedAt })
+      .from(schema.studioTemplates)
+      .where(and(
+        eq(schema.studioTemplates.visibility, "public"),
+        isNotNull(schema.studioTemplates.listingSlug),
+      ))
+      .orderBy(desc(schema.studioTemplates.updatedAt))
+      .limit(500),
   ]);
 
   const jobRows = jobs.status === "fulfilled" ? jobs.value : [];
   const companyRows = companies.status === "fulfilled" ? companies.value : [];
   const userRows = publicUsers.status === "fulfilled" ? publicUsers.value : [];
+  const creatorTemplateRows = creatorTemplates.status === "fulfilled" ? creatorTemplates.value : [];
 
   // Resume-guide slugs keep their legacy derivation so historical URLs
   // stay stable. Salary URLs now ride off the canonical popular-roles /
@@ -166,6 +184,19 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
 
     // Programmatic SEO: resume guide pages (legacy slug derivation).
     ...jobSlugs.map((s) => url(`/resume-guide/${s}`, now, "weekly", "0.8")),
+
+    // First-party marketplace template pages (resume presets) — static SSoT,
+    // also prerendered with per-template meta + JSON-LD.
+    ...RESUME_TEMPLATE_LISTINGS.map((tpl) =>
+      url(`/marketplace/templates/${tpl.slug}`, now, "monthly", "0.7"),
+    ),
+
+    // Creator-published marketplace template pages (public, slugged).
+    ...creatorTemplateRows
+      .filter((tpl) => !!tpl.slug)
+      .map((tpl) =>
+        url(`/marketplace/templates/${tpl.slug}`, tpl.updatedAt?.toISOString(), "weekly", "0.6"),
+      ),
   ];
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>

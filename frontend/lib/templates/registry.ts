@@ -215,6 +215,46 @@ export function useTemplates(filter: TemplateFilter = {}): {
   return { templates: merged, loading };
 }
 
+// ─── Related templates ──────────────────────────────────────────────────────
+
+/** Overlap score between two templates — drives the "More templates like
+ *  this" grid + the prerendered crawlable internal links. Pure + kind-
+ *  agnostic so resume, studio-builtin, and creator templates all relate to
+ *  each other through one rule (DRY: the page never re-derives this). */
+function relatednessScore(a: TemplateMeta, b: TemplateMeta): number {
+  let score = 0;
+  if (a.industry && b.industry && a.industry === b.industry) score += 3;
+  const aTags = new Set(a.tags.map((t) => t.toLowerCase()));
+  for (const t of b.tags) if (aTags.has(t.toLowerCase())) score += 1;
+  if (a.kind === b.kind) score += 1;
+  return score;
+}
+
+/**
+ * Templates most related to `meta`, ranked by shared industry / tags / kind.
+ * Resolved synchronously over the static catalog (resume + studio-builtin)
+ * so the related grid renders immediately and the same set can be emitted as
+ * crawlable links. Falls back to same-kind, then any, template so the grid is
+ * never empty — every template page stays internally linked, not orphaned.
+ */
+export function getRelatedTemplates(meta: TemplateMeta, limit = 6): TemplateMeta[] {
+  const pool = getStaticTemplates().filter((t) => t.slug !== meta.slug);
+  const scored = pool
+    .map((t) => ({ t, score: relatednessScore(meta, t) }))
+    .sort((a, b) => b.score - a.score);
+
+  const related = scored.filter((s) => s.score > 0).map((s) => s.t);
+  if (related.length >= limit) return related.slice(0, limit);
+
+  // Backfill with the remaining (zero-overlap) templates, same-kind first, so
+  // the section always offers somewhere to click.
+  const remaining = scored
+    .filter((s) => s.score === 0)
+    .map((s) => s.t)
+    .sort((a, b) => Number(b.kind === meta.kind) - Number(a.kind === meta.kind));
+  return [...related, ...remaining].slice(0, limit);
+}
+
 // ─── Helpers exported for the apply layer + studio deep-link ────────────────
 
 export { studioBuiltinSlug, slugToBuiltinId };

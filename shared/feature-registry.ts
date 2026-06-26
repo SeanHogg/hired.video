@@ -109,15 +109,27 @@ export const FEATURE_REGISTRY: readonly FeatureRegistryEntry[] = [
   nav("tools", "labels.tools", "Tools", "Wrench", "/tools", ALL_ROLES, 2),
   nav("resumes", "labels.resumes", "Resumes", "FileText", "/resumes", allExcept(AFFILIATE), 3),
   nav("jobs", "labels.jobs", "Jobs", "Briefcase", "/jobs", ALL_ROLES, 4),
-  nav("companies", "labels.companies", "Companies", "Building2", "/companies", allExcept(AFFILIATE), 5),
-  nav("people", "labels.people", "People", "Users", "/people", ALL_ROLES, 6),
-  nav("tasks", "labels.tasksAndEvents", "Tasks / Events", "CheckSquare", "/tasks", ALL_ROLES, 7),
-  nav("outreach", "labels.outreach", "Outreach", "Send", "/outreach", allExcept(AFFILIATE, CREATOR), 8),
-  nav("marketplace", "labels.marketplace", "Marketplace", "Store", "/search", ALL_ROLES, 9),
+  // Cross-job candidate pipeline (#405) — hiring-side only, so scoped to
+  // recruiter / employer / admin (job_seeker / employee / creator / affiliate
+  // never see it). Sits right after Jobs in the rail.
+  nav(
+    "pipeline",
+    "labels.candidatePipeline",
+    "Pipeline",
+    "KanbanSquare",
+    "/recruit/pipeline",
+    [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN, USER_ROLES.SUPER_ADMIN],
+    5,
+  ),
+  nav("companies", "labels.companies", "Companies", "Building2", "/companies", allExcept(AFFILIATE), 6),
+  nav("people", "labels.people", "People", "Users", "/people", ALL_ROLES, 7),
+  nav("tasks", "labels.tasksAndEvents", "Tasks / Events", "CheckSquare", "/tasks", ALL_ROLES, 8),
+  nav("outreach", "labels.outreach", "Outreach", "Send", "/outreach", allExcept(AFFILIATE, CREATOR), 9),
+  nav("marketplace", "labels.marketplace", "Marketplace", "Store", "/search", ALL_ROLES, 10),
   // Gigs folded into the My Services hub as a tab (/services/gigs); the
   // standalone /gigs nav entry was retired — the hub link covers both. The
   // affiliate gate that gigs carried now lives on the in-hub Gigs tab.
-  nav("services", "labels.servicesGigs", "Services / Gigs", "ShoppingBag", "/services", ALL_ROLES, 10),
+  nav("services", "labels.servicesGigs", "Services / Gigs", "ShoppingBag", "/services", ALL_ROLES, 11),
 ] as const;
 
 /**

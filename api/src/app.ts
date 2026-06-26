@@ -31,6 +31,7 @@ import { resumeFeedbackRoutes } from "./routes/resume-feedback.js";
 import { jobRoutes } from "./routes/jobs.js";
 import { jobPipelineRoutes } from "./routes/jobpipeline.js";
 import { pipelineShareRoutes, pipelinePublicRoutes } from "./routes/pipeline-share.js";
+import { crossJobPipelineRoutes } from "./routes/pipeline-all.js";
 import { bulkScoringRoutes } from "./routes/bulk-scoring.js";
 import { transcriptSearchRoutes } from "./routes/transcript-search.js";
 import {
@@ -738,6 +739,9 @@ export function createApp() {
   app.route("/api/jobs/:jobId/pipeline/share", pipelineShareRoutes);
   app.route("/api/jobs/:jobId/pipeline", jobPipelineRoutes);
   app.route("/api/pipeline/public", pipelinePublicRoutes);
+  // Cross-job kanban (#405). Mounted AFTER /api/pipeline/public so the more
+  // specific public-share router keeps priority for `/api/pipeline/public/*`.
+  app.route("/api/pipeline", crossJobPipelineRoutes);
   app.route("/api/recruiter/bulk-score", bulkScoringRoutes);
   app.route("/api/transcripts/search", transcriptSearchRoutes);
   app.route("/api/jobs/:jobId/sourcing-bids", sourcingBidsByJobRoutes);

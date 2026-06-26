@@ -59,6 +59,10 @@ export const PAGE_META_RULES: PageMetaRule[] = [
   { test: /^\/jobs\/?$/, contextType: "job-list", seoKey: "/jobs" },
   { test: /^\/post-a-job\b/, contextType: "job-create", seoKey: "/post-a-job" },
 
+  // Cross-job candidate pipeline (#405) — a recruiting workspace, not a job
+  // detail; reuses the job-list AI context (candidate/job operations).
+  { test: /^\/recruit\/pipeline\b/, contextType: "job-list", seoKey: "/recruit/pipeline" },
+
   // Studio — every studio surface (editor, preview, wizard, settings…)
   { test: /^\/studio(\/|$)/, contextType: "studio", seoKey: "/studio" },
 

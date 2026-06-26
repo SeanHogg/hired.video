@@ -14,6 +14,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+// First-party marketplace template listings — the SSoT shared with the
+// resume preset descriptors (frontend/types/resume-template.ts) and the
+// XML sitemap (api/src/routes/sitemap.ts). Imported here so each
+// /marketplace/templates/<slug> page is prerendered with its own meta +
+// JSON-LD + crawlable body. Run via `tsx` (see package.json build script)
+// so this `.js` specifier resolves to the shared `.ts` module.
+import {
+  RESUME_TEMPLATE_LISTINGS,
+  relatedResumeListings,
+} from '../../shared/marketplace-template-listings.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -176,11 +186,11 @@ function cardSubtitle(desc) {
 
 /** Full og:image URL for a route — its own generated card, or the static
  *  hero for the home page. */
-function ogImageFor(routePath, title, description) {
+function ogImageFor(routePath, title, description, eyebrow) {
   if (routePath === '/') return OG_IMAGE;
   const params = new URLSearchParams({
     title: cardTitle(title),
-    eyebrow: eyebrowFor(routePath),
+    eyebrow: eyebrow || eyebrowFor(routePath),
     subtitle: cardSubtitle(description),
   });
   return `${CANONICAL_ORIGIN}/api/og/page?${params.toString()}`;
@@ -192,7 +202,15 @@ function ensureDirSync(dir) {
   }
 }
 
-function setOrInsertMeta(html, { title, description, ogTitle, ogDescription, ogImage, canonical }) {
+/** Serialize a JSON-LD object for safe inline embedding in a <script> tag.
+ *  Escaping `<` prevents a stray `</script>` (or `<!--`) inside string values
+ *  from terminating the script element early. */
+function jsonLdScript(obj) {
+  const json = JSON.stringify(obj).replace(/</g, '\\u003c');
+  return `<script type="application/ld+json">${json}</script>`;
+}
+
+function setOrInsertMeta(html, { title, description, ogTitle, ogDescription, ogImage, canonical, jsonLd, rootHtml }) {
   let out = html;
 
   // Title
@@ -247,7 +265,113 @@ function setOrInsertMeta(html, { title, description, ogTitle, ogDescription, ogI
     out = out.replace(/<\/head>/i, `  <link rel="canonical" href="${escapeHtml(canonical)}" />\n</head>`);
   }
 
+  // JSON-LD structured data (Product, BreadcrumbList, …) — injected before
+  // </head> so non-JS crawlers and AI answer engines get rich data without
+  // executing the SPA. The client useSEO/useBreadcrumbs hooks re-inject the
+  // same shapes after hydration; duplicate JSON-LD is harmless to crawlers.
+  if (Array.isArray(jsonLd) && jsonLd.length > 0) {
+    const block = jsonLd.map(jsonLdScript).join('\n    ');
+    out = out.replace(/<\/head>/i, `    ${block}\n</head>`);
+  }
+
+  // Crawlable fallback content injected INSIDE the (otherwise empty) SPA root.
+  // createRoot().render() replaces these children on hydration, so JS visitors
+  // never see them — but non-JS crawlers read the H1, description, and the
+  // internal links (related templates + catalog hubs) that the client renders
+  // only after the bundle runs.
+  if (rootHtml) {
+    out = out.replace(/<div id="root">\s*<\/div>/i, `<div id="root">${rootHtml}</div>`);
+  }
+
   return out;
+}
+
+const CANONICAL_TEMPLATE_PATH = (slug) => `/marketplace/templates/${slug}`;
+
+/** schema.org Product — mirrors generateStructuredData.product in
+ *  frontend/lib/seo.ts so prerendered and client-injected JSON-LD agree. All
+ *  first-party resume templates are free (priceCents 0). */
+function productSchema({ name, description, category, url }) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name,
+    brand: { '@type': 'Organization', name: 'hired.video' },
+    url,
+    description,
+    category,
+    offers: {
+      '@type': 'Offer',
+      price: '0.00',
+      priceCurrency: 'USD',
+      availability: 'https://schema.org/InStock',
+      url,
+    },
+  };
+}
+
+/** schema.org BreadcrumbList — mirrors generateBreadcrumbs in seo.ts. */
+function breadcrumbSchema(items) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((it, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: it.name,
+      item: `${CANONICAL_ORIGIN}${it.url}`,
+    })),
+  };
+}
+
+/** The in-#root crawlable fallback for a template page: breadcrumb links, the
+ *  H1, the description, and the related-template + browse links. Mirrors what
+ *  MarketplaceTemplatePreview renders client-side. */
+function templateRootHtml({ name, industry, description, slug, related }) {
+  const crumbs =
+    `<nav aria-label="Breadcrumb"><a href="/">Home</a> › ` +
+    `<a href="/search?category=templates">Templates</a> › ` +
+    `<span>${escapeHtml(name)}</span></nav>`;
+  const relatedItems = related
+    .map(
+      (r) =>
+        `<li><a href="${CANONICAL_TEMPLATE_PATH(r.slug)}">${escapeHtml(r.name)} — ${escapeHtml(r.industry)}</a></li>`,
+    )
+    .join('');
+  return (
+    `${crumbs}` +
+    `<main>` +
+    `<h1>${escapeHtml(name)}</h1>` +
+    `<p>${escapeHtml(industry)}</p>` +
+    `<p>${escapeHtml(description)}</p>` +
+    `<h2>More templates like this</h2>` +
+    `<ul>${relatedItems}</ul>` +
+    `<p><a href="/search?category=templates">Browse all templates</a></p>` +
+    `</main>`
+  );
+}
+
+/** Build the prerender descriptor for one first-party resume template. */
+function templateRoute(listing) {
+  const { slug, name, industry, description } = listing;
+  const related = relatedResumeListings(slug, 6);
+  const url = `${CANONICAL_ORIGIN}${CANONICAL_TEMPLATE_PATH(slug)}`;
+  const title = `${name} — hired.video Marketplace`;
+  return {
+    path: CANONICAL_TEMPLATE_PATH(slug),
+    title,
+    description,
+    eyebrow: 'Resume Template',
+    jsonLd: [
+      productSchema({ name, description, category: industry, url }),
+      breadcrumbSchema([
+        { name: 'Home', url: '/' },
+        { name: 'Templates', url: '/search?category=templates' },
+        { name, url: CANONICAL_TEMPLATE_PATH(slug) },
+      ]),
+    ],
+    rootHtml: templateRootHtml({ name, industry, description, slug, related }),
+  };
 }
 
 function main() {
@@ -258,7 +382,11 @@ function main() {
 
   const baseHtml = fs.readFileSync(ENTRY_HTML, 'utf8');
 
-  for (const r of ROUTES) {
+  // Static marketing routes + one page per first-party marketplace template.
+  const templateRoutes = RESUME_TEMPLATE_LISTINGS.map(templateRoute);
+  const allRoutes = [...ROUTES, ...templateRoutes];
+
+  for (const r of allRoutes) {
     const canonical = r.path === '/' ? `${CANONICAL_ORIGIN}/` : `${CANONICAL_ORIGIN}${r.path}`;
     const title = r.title || DEFAULTS.title;
     const description = r.description || DEFAULTS.description;
@@ -267,9 +395,11 @@ function main() {
       description,
       ogTitle: r.ogTitle || title,
       ogDescription: r.ogDescription || description,
-      ogImage: r.ogImage || ogImageFor(r.path, r.ogTitle || title, r.ogDescription || description),
+      ogImage: r.ogImage || ogImageFor(r.path, r.ogTitle || title, r.ogDescription || description, r.eyebrow),
       canonical,
       twitterSite: TWITTER_SITE,
+      jsonLd: r.jsonLd,
+      rootHtml: r.rootHtml,
     });
 
     const outDir = r.path === '/' ? DIST_DIR : path.join(DIST_DIR, r.path.replace(/^\//, ''));
@@ -279,7 +409,9 @@ function main() {
     console.log(`[prerender] Wrote ${path.relative(DIST_DIR, outFile)}`);
   }
 
-  console.log(`✅ Pre-rendered ${ROUTES.length} routes`);
+  console.log(
+    `✅ Pre-rendered ${allRoutes.length} routes (${ROUTES.length} static + ${templateRoutes.length} marketplace templates)`,
+  );
 }
 
 main();

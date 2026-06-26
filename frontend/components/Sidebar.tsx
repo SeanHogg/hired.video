@@ -15,6 +15,7 @@ import {
   Store,
   Palette,
   Handshake,
+  KanbanSquare,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -46,6 +47,7 @@ const NAV_ICONS: Record<string, typeof TrendingUp> = {
   Store,
   Handshake,
   ShoppingBag,
+  KanbanSquare,
 };
 
 interface SidebarProps {

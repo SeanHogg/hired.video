@@ -4,15 +4,17 @@
 // <TemplatePreview> + <TemplateApplyButton> so a new kind lands here for
 // free as soon as it's registered.
 
-import { Eye, Loader2, Store } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ChevronRight, Eye, Loader2, Store } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import ErrorBoundary from "@/components/ErrorBoundary";
 import CreatorAttribution from "@/components/studio/CreatorAttribution";
 import CreatorPitchAside from "@/components/marketplace/CreatorPitchAside";
 import MarketplaceItemShell from "@/components/marketplace/MarketplaceItemShell";
 import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
+import RelatedTemplates from "@/components/templates/RelatedTemplates";
 import ResumeSourceSelector from "@/components/templates/ResumeSourceSelector";
 import ShareMenu from "@/components/share/ShareMenu";
 import TemplateApplyButton from "@/components/templates/TemplateApplyButton";
@@ -22,6 +24,7 @@ import TemplatePreview from "@/components/templates/TemplatePreview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SAMPLE_RESUME } from "@/lib/sample-resume";
+import { useBreadcrumbs } from "@/lib/seo";
 import { useUgcSeo } from "@/lib/seo-ugc";
 import { resumeService } from "@/lib/services/resume-service";
 import { useTemplate } from "@/lib/templates/registry";
@@ -45,6 +48,11 @@ function TemplateSEO({ meta }: { meta: TemplateMeta }) {
     industry: meta.industry,
     tags: meta.tags,
     priceCents: meta.priceCents,
+    // OG / Twitter / JSON-LD image — previously dropped, leaving social + AI
+    // preview cards image-less. Creator templates carry a real thumbnail;
+    // others omit it and fall back to the platform default card via the SEO
+    // layer. (previewVideoUrl is a clip, not an image — never used here.)
+    previewImageUrl: meta.thumbnailUrl,
   });
   return null;
 }
@@ -52,6 +60,26 @@ function TemplateSEO({ meta }: { meta: TemplateMeta }) {
 export default function MarketplaceTemplatePreview() {
   const { templateId } = useParams<{ templateId: string }>();
   const { template: meta, loading } = useTemplate(templateId);
+  const { t } = useTranslation();
+
+  // BreadcrumbList JSON-LD (Home → Templates → this template). Built before
+  // the early returns so the hook order stays stable; emits an empty list
+  // while the template resolves, then the real trail once it does.
+  const breadcrumbItems = useMemo(
+    () =>
+      meta
+        ? [
+            { name: t("marketplaceTemplate.breadcrumb.home"), url: "/" },
+            {
+              name: t("marketplaceTemplate.breadcrumb.templates"),
+              url: "/search?category=templates",
+            },
+            { name: meta.name, url: `/marketplace/templates/${meta.slug}` },
+          ]
+        : [],
+    [meta, t],
+  );
+  useBreadcrumbs(breadcrumbItems);
 
   // Resume picker state — only the "resume" kind reads `previewResume` so
   // it's safe to keep this state at the top level. ResumeSourceSelector
@@ -194,14 +222,53 @@ export default function MarketplaceTemplatePreview() {
       </div>
     );
 
-  // Main column = the preview/player followed by the full marketing surface
-  // (context CTA → how it works → why use → who it's for → why join). The
-  // page used to render only the bare player; the marketing content gives
-  // visitors the description + reasons-to-act the template page was missing.
+  // Page header — the single <h1> (the template name used to render only as a
+  // mono Badge in the action bar, leaving the page with no H1) plus a visible
+  // breadcrumb trail whose Home / Templates links flow PageRank back up to the
+  // catalog hubs and give crawlers a path off every template page.
+  const header = (
+    <header className="mx-auto w-full max-w-3xl px-4 pt-6 sm:px-6">
+      <nav aria-label="Breadcrumb" className="mb-3">
+        <ol className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+          <li>
+            <Link to="/" className="hover:underline">
+              {t("marketplaceTemplate.breadcrumb.home")}
+            </Link>
+          </li>
+          <li aria-hidden="true">
+            <ChevronRight className="h-3 w-3" />
+          </li>
+          <li>
+            <Link to="/search?category=templates" className="hover:underline">
+              {t("marketplaceTemplate.breadcrumb.templates")}
+            </Link>
+          </li>
+          <li aria-hidden="true">
+            <ChevronRight className="h-3 w-3" />
+          </li>
+          <li className="font-medium text-foreground" aria-current="page">
+            {meta.name}
+          </li>
+        </ol>
+      </nav>
+      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">{meta.name}</h1>
+      {meta.industry && (
+        <p className="mt-1 text-sm text-muted-foreground">{meta.industry}</p>
+      )}
+    </header>
+  );
+
+  // Main column = header → preview/player → full marketing surface (context
+  // CTA → how it works → why use → who it's for → why join) → related
+  // templates. The page used to render only the bare player; the header gives
+  // it a crawlable H1 + breadcrumbs and the related grid keeps it linked into
+  // the rest of the catalog instead of being a near-orphan.
   const wrappedPreview = (
     <>
+      {header}
       {playerBlock}
       <TemplateMarketingContent meta={meta} />
+      <RelatedTemplates meta={meta} />
     </>
   );
 
