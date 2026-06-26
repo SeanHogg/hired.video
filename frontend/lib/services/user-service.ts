@@ -470,6 +470,22 @@ export class UserService {
   }
 
   /**
+   * Server-side typeahead over the viewer's accepted connections — returns at
+   * most `limit` cards, name/headline matched, ordered by name. Used by pickers
+   * (e.g. review-invite) so a user with thousands of connections never ships the
+   * whole list to the client.
+   */
+  async searchMyConnections(q: string, limit = 20): Promise<PublicUser[]> {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    params.set("limit", String(limit));
+    const response = await apiClient.get<{ items: PublicUser[] }>(
+      `/api/users/me/connections/search?${params.toString()}`,
+    );
+    return response.data?.items ?? [];
+  }
+
+  /**
    * Get user by ID or slug. The backend resolves both via /api/users/:id, so
    * callers don't need to know which form they have.
    *

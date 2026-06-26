@@ -11,7 +11,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Copy, Loader2, Mail, Send, UserPlus, X } from "lucide-react";
+import { Copy, Loader2, Mail, Search, Send, UserPlus, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +46,11 @@ interface InviteReviewersDialogProps {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Page size for the server-side connection typeahead. The server caps + orders
+ *  by name; results beyond this are reached by narrowing the search. */
+const SEARCH_LIMIT = 20;
+const SEARCH_DEBOUNCE_MS = 250;
+
 function contactName(u: PublicUser): string {
   return (
     u.fullName ||
@@ -66,8 +71,14 @@ export default function InviteReviewersDialog({
   const { t } = useTranslation();
   const { toast } = useToast();
 
-  const [contacts, setContacts] = useState<PublicUser[]>([]);
+  const [results, setResults] = useState<PublicUser[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
+  const [contactQuery, setContactQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [noConnections, setNoConnections] = useState(false);
+  // Every contact we've seen across searches, so selected chips + invitee names
+  // resolve even after the result list changes underneath the selection.
+  const [knownById, setKnownById] = useState<Map<string, PublicUser>>(new Map());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [emails, setEmails] = useState<string[]>([]);
   const [emailDraft, setEmailDraft] = useState("");
@@ -75,18 +86,40 @@ export default function InviteReviewersDialog({
   const [expiryHours, setExpiryHours] = useState<number>(DEFAULT_REVIEW_EXPIRY_HOURS);
   const [sending, setSending] = useState(false);
 
-  // Load the owner's connections once the dialog opens.
+  // Start each open with a fresh, empty search.
+  useEffect(() => {
+    if (!open) return;
+    setContactQuery("");
+    setDebouncedQuery("");
+  }, [open]);
+
+  // Debounce the search box so we don't hit the server on every keystroke.
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(contactQuery.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [contactQuery]);
+
+  // Server-side typeahead — bounded, ordered, capped. No full-list download.
   useEffect(() => {
     if (!open) return;
     let active = true;
     setLoadingContacts(true);
     userService
-      .getMyConnectionCards()
-      .then((cards) => {
-        if (active) setContacts(cards.filter((c) => !!c.id));
+      .searchMyConnections(debouncedQuery, SEARCH_LIMIT)
+      .then((rows) => {
+        if (!active) return;
+        const clean = rows.filter((r) => !!r.id);
+        setResults(clean);
+        setKnownById((prev) => {
+          const next = new Map(prev);
+          for (const c of clean) if (c.id) next.set(c.id, c);
+          return next;
+        });
+        // Only the unfiltered baseline tells us "this user has no connections".
+        if (debouncedQuery === "") setNoConnections(clean.length === 0);
       })
       .catch(() => {
-        if (active) setContacts([]);
+        if (active) setResults([]);
       })
       .finally(() => {
         if (active) setLoadingContacts(false);
@@ -94,7 +127,7 @@ export default function InviteReviewersDialog({
     return () => {
       active = false;
     };
-  }, [open]);
+  }, [open, debouncedQuery]);
 
   const toggleContact = (id: string) => {
     setSelected((prev) => {
@@ -123,13 +156,24 @@ export default function InviteReviewersDialog({
   const removeEmail = (value: string) =>
     setEmails((prev) => prev.filter((e) => e !== value));
 
+  // Selected contacts (resolved from the accumulated known map, so a pick
+  // survives the result list changing). Surfaced as removable chips.
+  const selectedContacts = useMemo(
+    () =>
+      [...selected]
+        .map((id) => knownById.get(id))
+        .filter((c): c is PublicUser => !!c),
+    [selected, knownById],
+  );
+
   const invitees = useMemo<ReviewInvitee[]>(() => {
-    const byUser: ReviewInvitee[] = contacts
-      .filter((c) => c.id && selected.has(c.id))
-      .map((c) => ({ userId: c.id, name: contactName(c) }));
+    const byUser: ReviewInvitee[] = [...selected].map((id) => {
+      const c = knownById.get(id);
+      return { userId: id, name: c ? contactName(c) : undefined };
+    });
     const byEmail: ReviewInvitee[] = emails.map((email) => ({ email }));
     return [...byUser, ...byEmail];
-  }, [contacts, selected, emails]);
+  }, [selected, knownById, emails]);
 
   // Count a valid-but-not-yet-added email draft too, so the Send button is
   // live the moment there's something to send (send() folds the draft in).
@@ -146,9 +190,10 @@ export default function InviteReviewersDialog({
         ? [...emails, pending]
         : emails;
     const finalInvitees: ReviewInvitee[] = [
-      ...contacts
-        .filter((c) => c.id && selected.has(c.id))
-        .map((c) => ({ userId: c.id, name: contactName(c) })),
+      ...[...selected].map((id) => {
+        const c = knownById.get(id);
+        return { userId: id, name: c ? contactName(c) : undefined };
+      }),
       ...finalEmails.map((email) => ({ email })),
     ];
     if (finalInvitees.length === 0) {
@@ -208,48 +253,103 @@ export default function InviteReviewersDialog({
             </TabsTrigger>
           </TabsList>
 
-          {/* Platform contacts */}
-          <TabsContent value="contacts" className="mt-3">
-            {loadingContacts ? (
-              <div className="flex items-center justify-center py-10">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : contacts.length === 0 ? (
+          {/* Platform contacts — server-side typeahead (no full-list download) */}
+          <TabsContent value="contacts" className="mt-3 space-y-2">
+            {noConnections ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 {t("reviewInvite.noContacts")}
               </p>
             ) : (
-              <div className="max-h-56 space-y-1 overflow-auto pr-1">
-                {contacts.map((c) => {
-                  const id = c.id;
-                  const name = contactName(c);
-                  const isSel = selected.has(id);
-                  return (
-                    <button
-                      type="button"
-                      key={id}
-                      onClick={() => toggleContact(id)}
-                      className={`flex w-full items-center gap-3 rounded-md border p-2 text-left transition ${
-                        isSel ? "border-brand-purple bg-brand-purple/5" : "hover:bg-muted/50"
-                      }`}
-                    >
-                      <Checkbox checked={isSel} aria-hidden tabIndex={-1} />
-                      <Avatar className="h-7 w-7">
-                        {c.avatar && <AvatarImage src={c.avatar} alt="" />}
-                        <AvatarFallback>{name.charAt(0).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{name}</span>
-                        {c.headline && (
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {c.headline}
+              <>
+                {/* Picked contacts as removable chips (survive new searches). */}
+                {selectedContacts.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedContacts.map((c) => (
+                      <Badge key={c.id} variant="secondary" className="gap-1">
+                        {contactName(c)}
+                        <button
+                          type="button"
+                          aria-label={t("reviewInvite.remove")}
+                          onClick={() => toggleContact(c.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+
+                {/* Search box — drives the debounced server typeahead. */}
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  {loadingContacts && (
+                    <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
+                  <Input
+                    value={contactQuery}
+                    onChange={(e) => setContactQuery(e.target.value)}
+                    placeholder={t("reviewInvite.searchContacts")}
+                    className="pl-8"
+                    aria-label={t("reviewInvite.searchContacts")}
+                  />
+                </div>
+
+                <div className="max-h-52 space-y-1 overflow-auto pr-1">
+                  {loadingContacts && results.length === 0 ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : results.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                      {contactQuery
+                        ? t("reviewInvite.noMatches", { query: contactQuery })
+                        : t("reviewInvite.noContacts")}
+                    </p>
+                  ) : (
+                    results.map((c) => {
+                      const id = c.id;
+                      const name = contactName(c);
+                      const isSel = selected.has(id);
+                      return (
+                        <button
+                          type="button"
+                          key={id}
+                          onClick={() => toggleContact(id)}
+                          className={`flex w-full items-center gap-3 rounded-md border p-2 text-left transition ${
+                            isSel ? "border-brand-purple bg-brand-purple/5" : "hover:bg-muted/50"
+                          }`}
+                        >
+                          <Checkbox checked={isSel} aria-hidden tabIndex={-1} />
+                          <Avatar className="h-7 w-7">
+                            {c.avatar && <AvatarImage src={c.avatar} alt="" />}
+                            <AvatarFallback>{name.charAt(0).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium">{name}</span>
+                            {c.headline && (
+                              <span className="block truncate text-xs text-muted-foreground">
+                                {c.headline}
+                              </span>
+                            )}
                           </span>
-                        )}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Result hint — server caps at SEARCH_LIMIT; narrow to see more. */}
+                {results.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {results.length >= SEARCH_LIMIT
+                      ? t("reviewInvite.refineHint", { count: SEARCH_LIMIT })
+                      : t("reviewInvite.contactCount", { count: results.length })}
+                    {selectedContacts.length > 0
+                      ? ` · ${t("reviewInvite.selectedCount", { count: selectedContacts.length })}`
+                      : ""}
+                  </p>
+                )}
+              </>
             )}
           </TabsContent>
 

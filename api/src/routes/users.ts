@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, or, and, lte, isNull, inArray, notInArray, sql, count } from "drizzle-orm";
+import { eq, or, and, lte, isNull, inArray, notInArray, ilike, sql, count } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -389,7 +389,7 @@ const inMemoryConnections = new Map<string, ReturnType<typeof makeConnection>>()
 async function queryUserCards(
   db: ReturnType<typeof getDb>,
   conds: ReturnType<typeof and>[],
-  opts: { limit?: number; offset?: number } = {},
+  opts: { limit?: number; offset?: number; orderByName?: boolean } = {},
 ) {
   let q = db
     .select({
@@ -426,6 +426,7 @@ async function queryUserCards(
       and(eq(creatorProfiles.userId, users.id), sql`${creatorProfiles.endedAt} IS NULL`),
     )
     .where(and(...conds)) as any;
+  if (opts.orderByName) q = q.orderBy(users.name);
   if (opts.limit != null) q = q.limit(opts.limit);
   if (opts.offset != null) q = q.offset(opts.offset);
   const rows = await q;
@@ -762,6 +763,34 @@ userRoutes.get("/me/connections", async (c) => {
 });
 
 const connCardsKey = (userId: string) => `conns:cards:${userId}`;
+const connIdsKey = (userId: string) => `conns:ids:${userId}`;
+
+/** The viewer's accepted-connection user ids — the stable, expensive part of the
+ *  connections graph. Read-through cached per viewer + invalidated on
+ *  accept/remove (same lifecycle as the card list), so the typeahead search
+ *  doesn't re-walk `user_connections` on every keystroke. Bounded by the
+ *  viewer's connection count. */
+async function loadConnectionIds(
+  db: ReturnType<typeof getDb>,
+  me: string,
+): Promise<string[]> {
+  return getOrSetCached({
+    key: connIdsKey(me),
+    ttlSeconds: 120,
+    loader: async () => {
+      const links = await db
+        .select({ fromUserId: userConnections.fromUserId, toUserId: userConnections.toUserId })
+        .from(userConnections)
+        .where(
+          and(
+            eq(userConnections.status, "Accepted"),
+            or(eq(userConnections.fromUserId, me), eq(userConnections.toUserId, me)),
+          ),
+        );
+      return [...new Set(links.map((l) => (l.fromUserId === me ? l.toUserId : l.fromUserId)))];
+    },
+  });
+}
 
 /** GET /api/users/me/connections/cards — the viewer's accepted connections as
  *  People cards (#802). Powers the Connections tab, which previously read a
@@ -775,24 +804,39 @@ userRoutes.get("/me/connections/cards", async (c) => {
     key: connCardsKey(me),
     ttlSeconds: 120,
     loader: async () => {
-      const links = await db
-        .select({ fromUserId: userConnections.fromUserId, toUserId: userConnections.toUserId })
-        .from(userConnections)
-        .where(
-          and(
-            eq(userConnections.status, "Accepted"),
-            or(eq(userConnections.fromUserId, me), eq(userConnections.toUserId, me)),
-          ),
-        );
-      const otherIds = [
-        ...new Set(links.map((l) => (l.fromUserId === me ? l.toUserId : l.fromUserId))),
-      ];
+      const otherIds = await loadConnectionIds(db, me);
       if (otherIds.length === 0) return [];
       // Your own connections are visible regardless of public-directory
       // visibility; only require the account still be active.
       return queryUserCards(db, [eq(users.isActive, true), inArray(users.id, otherIds)]);
     },
   });
+  return c.json(success({ items }), 200);
+});
+
+/** GET /api/users/me/connections/search?q=&limit= — server-side typeahead over
+ *  the viewer's accepted connections. Returns at most `limit` cards (cap 50),
+ *  name/headline matched, ordered by name. The connection-id SET is cached
+ *  (loadConnectionIds); the per-query filter runs live and bounded (id IN set +
+ *  LIMIT), so we DON'T cache per-`q` (the query keyspace is unbounded and each
+ *  hit is a small, indexed, capped read). Lets the invite/contact pickers stay
+ *  instant for users with thousands of connections instead of shipping the
+ *  whole list to the client. */
+userRoutes.get("/me/connections/search", async (c) => {
+  const me = c.var.user.sub;
+  const db = getDb();
+  const q = (c.req.query("q") ?? "").trim();
+  const limit = Math.min(Math.max(Number(c.req.query("limit")) || 20, 1), 50);
+
+  const otherIds = await loadConnectionIds(db, me);
+  if (otherIds.length === 0) return c.json(success({ items: [] }), 200);
+
+  const conds = [eq(users.isActive, true), inArray(users.id, otherIds)];
+  if (q) {
+    const like = `%${q}%`;
+    conds.push(or(ilike(users.name, like), ilike(userProfiles.headline, like)) as any);
+  }
+  const items = await queryUserCards(db, conds, { limit, orderByName: true });
   return c.json(success({ items }), 200);
 });
 
@@ -836,9 +880,11 @@ userRoutes.put("/connections/:id/accept", async (c) => {
     return c.json(error("NOT_FOUND", "Connection request not found"), 404);
   }
 
-  // Both sides just gained a connection — drop their cached card lists (#802).
+  // Both sides just gained a connection — drop their cached card + id lists (#802).
   invalidateCachedKey(connCardsKey(me));
   invalidateCachedKey(connCardsKey(updated.fromUserId));
+  invalidateCachedKey(connIdsKey(me));
+  invalidateCachedKey(connIdsKey(updated.fromUserId));
 
   // Notify the original sender that their request was accepted.
   (async () => {
@@ -879,10 +925,12 @@ userRoutes.delete("/connections/:id", async (c) => {
       ),
     )
     .returning();
-  // Drop both sides' cached card lists so a removed connection disappears (#802).
+  // Drop both sides' cached card + id lists so a removed connection disappears (#802).
   if (removed) {
     invalidateCachedKey(connCardsKey(removed.fromUserId));
     invalidateCachedKey(connCardsKey(removed.toUserId));
+    invalidateCachedKey(connIdsKey(removed.fromUserId));
+    invalidateCachedKey(connIdsKey(removed.toUserId));
   }
   return c.json(success(null), 200);
 });
