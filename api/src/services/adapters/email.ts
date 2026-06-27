@@ -1110,7 +1110,7 @@ const NOTIFICATION_TITLE_BLOCK = `
               </table>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                 <tr>
-                  <td style="color: #374151; line-height: 1.6; padding-bottom: 24px;">{{Message}}</td>
+                  <td style="color: #374151; line-height: 1.6; padding-bottom: 24px; white-space: pre-wrap;">{{Message}}</td>
                 </tr>
               </table>`;
 
@@ -1125,8 +1125,10 @@ function notificationCtaUrl(url: string | undefined): string | null {
 }
 
 /** Pure builder: render a generic notification email. Exported for tests
- *  and for the dispatcher. `title`/`message` are HTML-escaped; the CTA
- *  href is a validated absolute/relative URL only. */
+ *  and for the dispatcher. `title`/`message` are HTML-escaped; the message
+ *  cell uses `white-space: pre-wrap` so newline-joined multi-field bodies
+ *  (e.g. the contact-inquiry heads-up) keep their line breaks. The CTA href
+ *  is a validated absolute/relative URL only. */
 export function buildNotificationEmail(input: {
   title: string;
   message: string;

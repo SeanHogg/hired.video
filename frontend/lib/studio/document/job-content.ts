@@ -11,7 +11,6 @@
  * / dates / privacy) ride along untouched so a save never drops them.
  */
 import {
-  DisplayPrivacy,
   EmploymentType,
   JobStatus,
   WorkSetting,
@@ -24,12 +23,8 @@ export interface JobDocumentContent {
   requirements: string[];
   responsibilities: string[];
   atsApplyUrl?: string;
+  /** Single annual salary figure — maps to `job_items.salary_min` on save. */
   salary?: number;
-  bonus?: number;
-  equity?: number;
-  // Passthrough publishing config — not surfaced on the canvas yet, preserved
-  // verbatim so a save never wipes them (see gap register for the field-widget
-  // follow-up).
   employmentType: number[];
   workSetting: number;
   /** Canonical lowercase seniority (`shared/seniority.ts` SSoT, #2090/#2218) —
@@ -37,12 +32,13 @@ export interface JobDocumentContent {
    *  `experienceLevel` and the write schema accepts any spelling, so this rides
    *  through as the canonical value at both ends. */
   seniority?: SeniorityLevel | "";
-  hiringTarget?: number;
-  goLiveDate?: string;
   expirationDate?: string;
   status?: number;
-  privacy_ShowJob: number;
   heroImageUrl?: string;
+  // NOTE: `bonus`/`equity`/`hiringTarget`/`goLiveDate`/`privacy_ShowJob` were
+  // removed (#2259) — the job route has no column/DTO for them, so they were
+  // edit-only-then-silently-dropped phantoms. The canvas schema only exposes
+  // fields that actually persist.
 }
 
 /** number → enum-key name reverse maps. The canvas stores enum FIELDS as the
@@ -71,8 +67,6 @@ export function jobItemToContent(job: Record<string, unknown>): JobDocumentConte
     responsibilities: (job.responsibilities as string[]) || [],
     atsApplyUrl: (job.atsApplyUrl as string) || (job.applyUrl as string) || "",
     salary: num(job.salary) ?? num(job.salaryMin),
-    bonus: num(job.bonus),
-    equity: num(job.equity),
     employmentType: (job.employmentType as number[]) || [EmploymentType.FullTime],
     workSetting: num(job.workSetting) ?? WorkSetting.OnSite,
     // Read the canonical experience level the DTO actually emits
@@ -80,11 +74,8 @@ export function jobItemToContent(job: Record<string, unknown>): JobDocumentConte
     seniority: normalizeSeniority(
       (job.experienceLevel as string) ?? (job.seniority as string),
     ) ?? "",
-    hiringTarget: num(job.hiringTarget),
-    goLiveDate: dateStr(job.goLiveDate),
     expirationDate: dateStr(job.expirationDate),
     status: num(job.status) ?? JobStatus.Draft,
-    privacy_ShowJob: num(job.privacy_ShowJob) ?? DisplayPrivacy.ToPublic,
     heroImageUrl: (job.heroImageUrl as string) ?? "",
   };
 }

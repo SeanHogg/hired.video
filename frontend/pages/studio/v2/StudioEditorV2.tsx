@@ -159,6 +159,7 @@ import AnimationStage from "@/components/studio/animation/AnimationStage";
 import FramesRail from "@/components/studio/animation/FramesRail";
 import CadStage from "@/components/studio/cad/CadStage";
 import Cad3DStage from "@/components/studio/cad-3d/Cad3DStage";
+import InteractiveComicStage from "@/components/studio/comic/InteractiveComicStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
 import DocumentStage from "@/components/studio/document/DocumentStage";
 import DocumentLeftPanel from "@/components/studio/document/DocumentLeftPanel";
@@ -202,6 +203,10 @@ import {
 } from "@shared/animation-state";
 import { type CadState, createBlankCadState } from "@shared/cad-state";
 import { type Cad3DState, createBlankCad3DState } from "@shared/cad-3d-state";
+import {
+  type InteractiveComicState,
+  createBlankInteractiveComicState,
+} from "@shared/interactive-comic-state";
 import { seedImageFromTemplate } from "@/lib/studio/image/image-seeds";
 import { seedAnimationFromTemplate } from "@/lib/studio/animation/animation-seeds";
 import FloatingImageLayersPanel from "@/components/studio/drawing/FloatingImageLayersPanel";
@@ -239,6 +244,10 @@ import { useStudioShortcuts } from "@/lib/studio/editor-v2/use-studio-shortcuts"
 import { useScreenshotCapture } from "@/lib/studio/editor-v2/use-screenshot-capture";
 import { useKindHydration } from "@/lib/studio/editor-v2/use-kind-hydration";
 import { runtimeStatePayload } from "@/lib/studio/editor-v2/runtime-state-payload";
+import {
+  captureCanvasThumbnail,
+  dataUrlToBlob,
+} from "@/lib/studio/editor-v2/capture-thumbnail";
 import {
   useServerAutosave,
   type AutosaveStatus,
@@ -304,6 +313,7 @@ interface CollabDocShape {
   gameState?: import("@shared/game-state").GameState;
   cadState?: CadState;
   cad3dState?: Cad3DState;
+  interactiveComicState?: InteractiveComicState;
   documentState?: DocumentState;
   entityContent?: DocumentEntityContent;
 }
@@ -571,6 +581,20 @@ export default function StudioEditorV2() {
     reset: resetCad3DHistory,
   } = cad3DHistory;
   const [cad3DStateHydrated, setCad3DStateHydrated] = useState(false);
+  // Interactive-comic (Comic+) branching choice graph (#1960 / #2126) — same
+  // parallel-history pattern as the other non-Timeline runtimes. The per-page
+  // CanvasState is authored on the Timeline shell; THIS holds the branch graph.
+  // Shape in `shared/interactive-comic-state.ts`.
+  const interactiveComicHistory = useCanvasHistory<InteractiveComicState>(() =>
+    createBlankInteractiveComicState(),
+  );
+  const {
+    state: interactiveComicState,
+    setState: setInteractiveComicState,
+    reset: resetInteractiveComicHistory,
+  } = interactiveComicHistory;
+  const [interactiveComicStateHydrated, setInteractiveComicStateHydrated] =
+    useState(false);
   // Document runtime state (#1912) — paged WYSIWYG resume / job / article /
   // blog. Same parallel-history pattern as the other non-Timeline runtimes;
   // shape in `editor-v2/document-state.ts`.
@@ -1277,6 +1301,24 @@ export default function StudioEditorV2() {
     unhydrate: () => setCad3DStateHydrated(false),
   });
 
+  // Interactive-comic (Comic+) hydration (#1960 / #2126). Persisted column is
+  // `interactiveComicState`; seeded as a blank branch graph for a fresh draft.
+  // Same pattern as the other non-Timeline runtimes.
+  useKindHydration<InteractiveComicState>({
+    active: currentMediaKind === "interactive_comic",
+    hydrated: interactiveComicStateHydrated,
+    serverState: persistedProject?.interactiveComicState as
+      | InteractiveComicState
+      | null
+      | undefined,
+    seed: () => createBlankInteractiveComicState(),
+    hydrate: (next) => {
+      resetInteractiveComicHistory(next);
+      setInteractiveComicStateHydrated(true);
+    },
+    unhydrate: () => setInteractiveComicStateHydrated(false),
+  });
+
   // Document hydration (#1912). Persisted column is `documentState`; seeded
   // as a blank resume document for a fresh draft. Same pattern as the other
   // non-Timeline runtimes.
@@ -1763,6 +1805,7 @@ export default function StudioEditorV2() {
       ...(currentMediaKind === "game" && gameState ? { gameState } : {}),
       ...(currentMediaKind === "cad" ? { cadState } : {}),
       ...(currentMediaKind === "cad_3d" ? { cad3dState: cad3DState } : {}),
+      ...(currentMediaKind === "interactive_comic" ? { interactiveComicState } : {}),
       ...(currentMediaKind === "document"
         ? { documentState, entityContent: documentEntityContent ?? undefined }
         : {}),
@@ -1775,6 +1818,7 @@ export default function StudioEditorV2() {
       gameState,
       cadState,
       cad3DState,
+      interactiveComicState,
       documentState,
       documentEntityContent,
       currentMediaKind,
@@ -1814,6 +1858,11 @@ export default function StudioEditorV2() {
           if (v) setCad3DState(() => v);
           break;
         }
+        case "interactive_comic": {
+          const v = doc.interactiveComicState;
+          if (v) setInteractiveComicState(() => v);
+          break;
+        }
         case "document": {
           if (doc.documentState) {
             const ds = doc.documentState;
@@ -1836,6 +1885,7 @@ export default function StudioEditorV2() {
       setAnimationState,
       setCadState,
       setCad3DState,
+      setInteractiveComicState,
       setDocumentState,
     ],
   );
@@ -1879,6 +1929,7 @@ export default function StudioEditorV2() {
       gameState,
       cadState,
       cad3dState: cad3DState,
+      interactiveComicState,
       documentState,
     });
     // Document CONTENT lives in its entity row (resume/job/article), not in the
@@ -1898,6 +1949,7 @@ export default function StudioEditorV2() {
     gameState,
     cadState,
     cad3DState,
+    interactiveComicState,
     documentState,
     documentEntityContent,
   ]);
@@ -3412,6 +3464,7 @@ export default function StudioEditorV2() {
         gameState,
         cadState,
         cad3dState: cad3DState,
+        interactiveComicState,
         documentState: documentStateForSave,
       });
       const res = await studioService.saveDraft({
@@ -3586,6 +3639,18 @@ export default function StudioEditorV2() {
             currentMediaKind === "document"
               ? stripDocumentContent(documentState)
               : canvasStateToScript(state)
+          }
+          // Snapshot the current canvas frame as a template thumbnail (#854) —
+          // only for CanvasState-authoring kinds (the others have no Timeline
+          // frame to render). Renders frame 0 + uploads, returning the URL.
+          captureCurrentFrame={
+            mediaKindUsesCanvasStateAuthoring(currentMediaKind)
+              ? async () => {
+                  const dataUrl = await captureCanvasThumbnail(state);
+                  if (!dataUrl) return null;
+                  return uploadImage(dataUrlToBlob(dataUrl), "template-thumbnail.jpg");
+                }
+              : undefined
           }
           hasContent={
             // Per-kind content predicate — Timeline kinds need at
@@ -4116,6 +4181,17 @@ export default function StudioEditorV2() {
                           mode="edit"
                           className="absolute inset-0"
                         />
+                      ) : null,
+                      // Comic+ branch-graph authoring (#1960). `onChange` writes
+                      // the whole graph through the history setState (debounced
+                      // auto-commit), so edits are undoable + flow into save.
+                      interactive_comic: interactiveComicStateHydrated ? (
+                        <div className="absolute inset-0 overflow-auto">
+                          <InteractiveComicStage
+                            state={interactiveComicState}
+                            onChange={(next) => setInteractiveComicState(() => next)}
+                          />
+                        </div>
                       ) : null,
                       document: documentStateHydrated ? (
                         <DocumentStage
@@ -4853,6 +4929,7 @@ function EditorHeader({
   persistedProject,
   onProjectChange,
   getVideoScript,
+  captureCurrentFrame,
   hasContent,
   onOpenPreview,
   onOpenDocumentPreview,
@@ -4902,6 +4979,7 @@ function EditorHeader({
   persistedProject: StudioProject | null;
   onProjectChange: (next: StudioProject) => void;
   getVideoScript: () => unknown;
+  captureCurrentFrame?: () => Promise<string | null>;
   hasContent: boolean;
   onOpenPreview: () => void;
   /** Document-kind preview (resume). Opens the fullscreen read-only
@@ -4971,6 +5049,7 @@ function EditorHeader({
   const projectChrome = useProjectChrome({
     project: persistedProject,
     getVideoScript,
+    captureCurrentFrame,
   });
   return (
     <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border bg-card px-3 py-2 sm:px-4">

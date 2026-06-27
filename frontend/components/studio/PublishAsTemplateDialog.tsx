@@ -17,7 +17,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ImageIcon, Loader2, Sparkles, Store, X } from "lucide-react";
+import { Camera, ImageIcon, Loader2, Sparkles, Store, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,6 +63,10 @@ interface Props {
    *  have to duplicate the v1 storyboard on every save (gap #637).
    *  V1 callers omit this and the backend reads `project.storyboard`. */
   getVideoScript?: () => unknown;
+  /** Optional "snapshot the current canvas frame" capture (#854). When
+   *  supplied (V2 only), a "Use current frame" button renders + uploads the
+   *  frame the creator is looking at and preselects it as the thumbnail. */
+  captureCurrentFrame?: () => Promise<string | null>;
   onPublished?: (template: StudioTemplate) => void;
 }
 
@@ -79,10 +83,12 @@ export default function PublishAsTemplateDialog({
   mediaKind = "video",
   defaultThumbnailUrl,
   getVideoScript,
+  captureCurrentFrame,
   onPublished,
 }: Props) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [capturingFrame, setCapturingFrame] = useState(false);
 
   const [creatorState, setCreatorState] = useState<
     | { status: "loading" }
@@ -241,6 +247,31 @@ export default function PublishAsTemplateDialog({
     }
   }
 
+  async function handleCaptureFrame() {
+    if (!captureCurrentFrame) return;
+    setCapturingFrame(true);
+    try {
+      const url = await captureCurrentFrame();
+      if (url) {
+        setThumbnailUrl(url);
+      } else {
+        toast({
+          title: "Nothing to capture",
+          description: "Add something to the canvas first, then snapshot it.",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Couldn't capture the frame",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setCapturingFrame(false);
+    }
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -333,12 +364,32 @@ export default function PublishAsTemplateDialog({
                   </div>
                 )}
                 <div className="flex flex-col gap-1">
-                  <MediaPicker
-                    accept="image"
-                    title="Choose template thumbnail"
-                    triggerLabel={thumbnailUrl ? "Change image" : "Choose image"}
-                    onPick={(asset) => setThumbnailUrl(asset.url)}
-                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <MediaPicker
+                      accept="image"
+                      title="Choose template thumbnail"
+                      triggerLabel={thumbnailUrl ? "Change image" : "Choose image"}
+                      onPick={(asset) => setThumbnailUrl(asset.url)}
+                    />
+                    {/* Self-gating 4th source (#854): only V2 callers pass a
+                        capture fn, so V1 (no canvas) never sees this button. */}
+                    {captureCurrentFrame && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCaptureFrame}
+                        disabled={capturingFrame}
+                      >
+                        {capturingFrame ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <Camera className="w-3.5 h-3.5 mr-1.5" />
+                        )}
+                        Use current frame
+                      </Button>
+                    )}
+                  </div>
                   <p className="text-[11px] text-muted-foreground">
                     Shown in marketplace search and on your "My published templates" list.
                   </p>

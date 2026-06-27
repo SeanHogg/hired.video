@@ -254,11 +254,13 @@ export function createApp() {
     "/api/auth/magic-link",
     "/api/errors/report",
     // Opened straight from a recipient's email client (no JWT): the open-
-    // tracking pixel, one-click unsubscribe, and the token-keyed preference
+    // tracking pixel, the signed click redirect, one-click unsubscribe, and the
+    // token-keyed preference
     // center. The authenticated SuperAdmin manager (/api/admin/campaigns) and
     // the Settings panel (/api/email/preferences/me) are NOT matched by these
     // prefixes and stay authenticated.
     "/api/campaigns/open",
+    "/api/campaigns/click",
     "/api/email/unsubscribe",
     "/api/email/preferences/token",
     // Geo-IP surface for the dynamic Privacy / Terms / Cookie pages

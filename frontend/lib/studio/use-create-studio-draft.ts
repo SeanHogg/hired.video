@@ -180,6 +180,10 @@ export function useCreateStudioDraft(opts: Opts = {}) {
           ...(seed.cadState !== undefined ? { cadState: seed.cadState } : {}),
           ...(seed.cad3dState !== undefined ? { cad3dState: seed.cad3dState } : {}),
           ...(seed.documentState !== undefined ? { documentState: seed.documentState } : {}),
+          // Interactive-comic templates ship a starter branch graph; carry it
+          // through so the seeded graph persists from first save instead of the
+          // editor re-seeding a blank one (#2126).
+          ...(seed.interactiveComicState !== undefined ? { interactiveComicState: seed.interactiveComicState } : {}),
         });
         return finalise(res.data);
       }

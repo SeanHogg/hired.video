@@ -270,6 +270,11 @@ export const StudioProjectSchema = z.object({
   // pattern is total. Removes the foot-gun where a future comic-only
   // field silently round-trips to nothing.
   comicState: z.unknown().nullish(),
+  // Interactive-comic (Comic+) branching choice graph for
+  // mediaKind='interactive_comic' projects (#1960 / #2126). Validated
+  // client-side by <InteractiveComicStage>; server stores verbatim. See
+  // shared/interactive-comic-state.ts.
+  interactiveComicState: z.unknown().nullish(),
   // Document runtime state for mediaKind='document' projects (#1912).
   // Same parallel-column pattern. Validated client-side by <DocumentStage>;
   // server stores verbatim. See document-state.ts.
@@ -852,6 +857,11 @@ export const studioService = {
       /** Document runtime state for mediaKind='document' projects (#1912).
        *  Sent by `<DocumentStage>` on save; same parallel-column pattern. */
       documentState?: unknown;
+      /** Interactive-comic (Comic+) branching choice graph for
+       *  mediaKind='interactive_comic' projects (#1960 / #2126). Sent by
+       *  `<InteractiveComicStage>` on save; same parallel-column pattern.
+       *  See `shared/interactive-comic-state.ts`. */
+      interactiveComicState?: unknown;
       // SEO patch — sent only by the "Details" drawer; omit-vs-empty
       // matters server-side (omitted = preserve, empty string = clear).
       metaDescription?: string;
@@ -878,6 +888,7 @@ export const studioService = {
       ...(args.cadState !== undefined ? { cadState: args.cadState } : {}),
       ...(args.cad3dState !== undefined ? { cad3dState: args.cad3dState } : {}),
       ...(args.documentState !== undefined ? { documentState: args.documentState } : {}),
+      ...(args.interactiveComicState !== undefined ? { interactiveComicState: args.interactiveComicState } : {}),
       ...(args.metaDescription !== undefined ? { metaDescription: args.metaDescription } : {}),
       ...(args.slug !== undefined ? { slug: args.slug } : {}),
       ...(args.keywords !== undefined ? { keywords: args.keywords } : {}),

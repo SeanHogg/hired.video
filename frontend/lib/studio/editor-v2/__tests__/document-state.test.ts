@@ -40,11 +40,15 @@ describe("pageDimensions", () => {
 });
 
 describe("documentSupportsPageMode", () => {
-  it("only resume gets configurable page mode", () => {
+  it("every document kind gets configurable page mode (paged geometry)", () => {
+    // DOCUMENT_ENTITY_CAPABILITIES sets configurablePageMode: true explicitly
+    // for all four kinds — a resume/job/article/blog authored as a paged
+    // document can pick Letter/A4 × orientation. (The earlier "resume only"
+    // assertion drifted from the widened capability map.)
     expect(documentSupportsPageMode("resume")).toBe(true);
-    expect(documentSupportsPageMode("article")).toBe(false);
-    expect(documentSupportsPageMode("job")).toBe(false);
-    expect(documentSupportsPageMode("blog")).toBe(false);
+    expect(documentSupportsPageMode("article")).toBe(true);
+    expect(documentSupportsPageMode("job")).toBe(true);
+    expect(documentSupportsPageMode("blog")).toBe(true);
   });
 
   it("covers every entity kind", () => {

@@ -14,6 +14,7 @@ import { schema } from "../../db/index.js";
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
 import { getEmailProvider } from "../adapters/email.js";
 import { MarketingConsentService } from "../email/MarketingConsentService.js";
+import { rewriteLinksForClickTracking } from "./campaign-links.js";
 import { buildRepos } from "../../repositories/index.js";
 import { USER_ROLES } from "../../../../shared/user-roles.js";
 import {
@@ -502,24 +503,57 @@ export class CampaignService {
     }
   }
 
+  /**
+   * Mark a recipient clicked (signed click-redirect hit). A click implies an
+   * open, so this advances sent/opened → clicked (forward-only; never downgrades
+   * an already-clicked row, and never resurrects a failed one). Best-effort —
+   * the redirect must succeed even if the stat write fails. Also stamps
+   * `openedAt` when the click arrived before any pixel load (image-blocked
+   * clients), so the open metric stays consistent with the click.
+   */
+  async markClicked(recipientId: string): Promise<void> {
+    try {
+      const r = await this.repo.findRecipient(recipientId);
+      if (r && (r.status === "sent" || r.status === "opened")) {
+        const now = new Date();
+        await this.repo.markRecipient(recipientId, {
+          status: "clicked",
+          clickedAt: now,
+          openedAt: r.openedAt ?? now,
+        } as any);
+        this.bust();
+      }
+    } catch {
+      /* swallow — click tracking must never break the redirect */
+    }
+  }
+
   // ── Email chrome ────────────────────────────────────────────────────────────
   /** Wrap rendered body in a minimal layout + the CAN-SPAM-required footer
    *  (one-click unsubscribe + manage-preferences link + physical postal
    *  address) and a 1px open-tracking pixel. The unsubscribe link carries an
-   *  opaque token — never the email. */
+   *  opaque token — never the email. Outbound body links are rewritten through
+   *  the signed click-redirect so the `clicked` recipient stat advances; the
+   *  footer's own unsubscribe/manage links are added AFTER rewriting and stay
+   *  direct. */
   private async wrapBody(
     inner: string,
     email: string,
     userId: string | null,
     recipientId: string,
   ): Promise<string> {
+    const base = frontendBase();
+    const trackedInner = await rewriteLinksForClickTracking(inner, recipientId, base);
     const { unsubscribeUrl, manageUrl } = await this.consent.footerLinks(email, userId);
-    const pixel = `${frontendBase()}/api/campaigns/open/${recipientId}.png`;
+    const pixel = `${base}/api/campaigns/open/${recipientId}.png`;
+    // CAN-SPAM footer contact — a real registered postal address (#1977), not a
+    // placeholder. The env override still wins if the address ever changes
+    // without a redeploy.
     const postalAddress =
-      getEnv("EMAIL_PHYSICAL_ADDRESS") || "hired.video — mailing address on file";
+      getEnv("EMAIL_PHYSICAL_ADDRESS") || "hired.video — 6513 Basswood Dr, Troy, MI 48098";
     return `<!doctype html><html><body style="margin:0;padding:0;background:#f4f4f5;">
   <div style="max-width:600px;margin:0 auto;padding:24px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#18181b;line-height:1.6;">
-    ${inner}
+    ${trackedInner}
     <hr style="border:none;border-top:1px solid #e4e4e7;margin:32px 0 16px;" />
     <p style="font-size:12px;color:#71717a;">
       You're receiving this because you're part of the hired.video community.

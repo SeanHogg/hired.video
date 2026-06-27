@@ -111,11 +111,11 @@ describe("validateDocumentContent — real-shaped content", () => {
   it("validates a flat job record (compensation + apply URL)", () => {
     const content = {
       title: "Staff Engineer",
-      equity: 150,
+      salary: -5,
       atsApplyUrl: "broken url",
     };
     const issues = validateDocumentContent("job", content);
-    expect(issues.some((i) => /Equity/.test(i))).toBe(true);
+    expect(issues.some((i) => /Salary/.test(i))).toBe(true);
     expect(issues.some((i) => /Application URL/.test(i))).toBe(true);
   });
 

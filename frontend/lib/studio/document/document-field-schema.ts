@@ -25,7 +25,6 @@
 import { newId } from "@/lib/studio/editor-v2/document-edit";
 import type { DocumentEntityKind } from "@/lib/studio/editor-v2/document-state";
 import {
-  DISPLAY_PRIVACY_OPTIONS,
   EMPLOYMENT_TYPE_OPTIONS,
   JOB_STATUS_OPTIONS,
   WORK_SETTING_OPTIONS,
@@ -266,10 +265,11 @@ const JOB_SECTION_SCHEMAS: Record<string, DocumentSectionSchema> = {
   requirements: objectSchema("requirements", "Requirements", [
     { key: "requirements", label: "Requirements", type: "list" },
   ]),
+  // Only `salary` is exposed — it maps to `job_items.salary_min` via
+  // `contentToUpdateJob`. `bonus`/`equity` were pruned (#2259): the job route
+  // has no column for them, so editing them on the canvas silently dropped.
   compensation: objectSchema("compensation", "Compensation", [
     { key: "salary", label: "Salary (annual)", type: "number", validate: { min: 0 } },
-    { key: "bonus", label: "Bonus", type: "number", validate: { min: 0 } },
-    { key: "equity", label: "Equity %", type: "number", validate: { min: 0, max: 100 } },
   ]),
   details: objectSchema("details", "Role details", [
     { key: "employmentType", label: "Employment type", type: "multiselect", numeric: true, options: enumFieldOptions(EMPLOYMENT_TYPE_OPTIONS) },
@@ -279,20 +279,16 @@ const JOB_SECTION_SCHEMAS: Record<string, DocumentSectionSchema> = {
     // lowercase levels, so the value round-trips through `contentToUpdateJob`.
     { key: "seniority", label: "Seniority", type: "select", options: SENIORITY_FIELD_OPTIONS },
     { key: "status", label: "Status", type: "select", numeric: true, options: enumFieldOptions(JOB_STATUS_OPTIONS) },
-    { key: "hiringTarget", label: "Openings", type: "number", validate: { min: 1 } },
+    // `hiringTarget` (openings) pruned (#2259) — no job_items column / consumer.
   ]),
-  publishing: objectSchema(
-    "publishing",
-    "Publishing & apply",
-    [
-      { key: "privacy_ShowJob", label: "Visibility", type: "select", numeric: true, options: enumFieldOptions(DISPLAY_PRIVACY_OPTIONS) },
-      { key: "goLiveDate", label: "Go-live date", type: "day" },
-      { key: "expirationDate", label: "Expires", type: "day" },
-      { key: "atsApplyUrl", label: "Application URL", type: "text", validate: { format: "url" } },
-    ],
-    undefined,
-    { start: "goLiveDate", end: "expirationDate" },
-  ),
+  // `privacy_ShowJob` (per-audience visibility — a profile/resume concept jobs
+  // don't model) and `goLiveDate` (scheduled publish — jobs go live via status)
+  // were pruned (#2259): neither has a job route column, so editing them on the
+  // canvas silently dropped. Only the fields that actually persist remain.
+  publishing: objectSchema("publishing", "Publishing & apply", [
+    { key: "expirationDate", label: "Expires", type: "day" },
+    { key: "atsApplyUrl", label: "Application URL", type: "text", validate: { format: "url" } },
+  ]),
 };
 
 // ── Registry ─────────────────────────────────────────────────────────────────

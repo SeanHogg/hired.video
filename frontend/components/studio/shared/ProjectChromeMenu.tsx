@@ -71,6 +71,11 @@ interface UseProjectChromeArgs {
    *  omitted, the backend reads from `project.storyboard` — V1 publish
    *  path is unchanged. */
   getVideoScript?: () => unknown;
+  /** Optional "snapshot the current canvas frame" capture (#854). V2 callers
+   *  pass a function that renders frame 0 + uploads it, returning the hosted
+   *  URL (or null on empty canvas / failure); the publish dialog then offers a
+   *  "Use current frame" thumbnail source. Omitted on V1 (no canvas). */
+  captureCurrentFrame?: () => Promise<string | null>;
 }
 
 export interface ProjectChromeSlots {
@@ -84,6 +89,7 @@ export function useProjectChrome({
   project,
   onDeleted,
   getVideoScript,
+  captureCurrentFrame,
 }: UseProjectChromeArgs): ProjectChromeSlots {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -164,6 +170,7 @@ export function useProjectChrome({
             defaultName={project.title}
             mediaKind={project.mediaKind ?? "video"}
             getVideoScript={getVideoScript}
+            captureCurrentFrame={captureCurrentFrame}
             onPublished={() => {
               // The dialog already closes on success and toasts. The toast
               // is easy to miss, so we also auto-open the creator's catalog

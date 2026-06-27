@@ -224,6 +224,14 @@ export const studioProjects = pgTable("studio_projects", {
   // future `shared/comic-state.ts` alongside its canvas implementation
   // (#929). Migration 0101 / #929.
   comicState: jsonb("comic_state"),
+  // Branching CHOICE GRAPH for mediaKind='interactive_comic' (Comic+)
+  // projects (#1960 / #2126). Distinct from `comicState` (linear comic) and
+  // from the per-page CanvasState (authored on the Timeline shell): this is
+  // the `InteractiveComicState` shape (pages + startPageId + per-page choice
+  // branches) in `shared/interactive-comic-state.ts`. Same parallel-column
+  // pattern as the other non-Timeline runtimes. Null for non-Comic+ projects.
+  // Migration 0486.
+  interactiveComicState: jsonb("interactive_comic_state"),
   // Image state JSON for mediaKind='image' projects. Parallel column
   // for the Photoshop-shaped raster editor (#932); shape lives in
   // `shared/image-state.ts` (layers + dimensions + history). Null for

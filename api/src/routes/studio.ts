@@ -1620,6 +1620,9 @@ function toProjectDto(
     // and unblocks future comic-only fields (panel-graph nodes,
     // reading order overrides) without a follow-up schema sweep.
     comicState: project.comicState ?? null,
+    // Interactive-comic (Comic+) branching choice graph (#1960 / #2126).
+    // Distinct from `comicState`; null for non-interactive-comic projects.
+    interactiveComicState: project.interactiveComicState ?? null,
     prompt: savedPrompt ?? null,
     jobDescription: savedJobDescription ?? null,
     resumeText: project.resumeText ?? null,
@@ -1797,6 +1800,10 @@ studioRoutes.post("/save-draft", async (c) => {
     // Document state JSON for mediaKind='document' projects (#1912). Same
     // parallel-column pattern. See document-state.ts.
     documentState:  z.any().optional(),
+    // Interactive-comic (Comic+) branching choice graph for
+    // mediaKind='interactive_comic' projects (#1960 / #2126). Same
+    // parallel-column pattern. See shared/interactive-comic-state.ts.
+    interactiveComicState: z.any().optional(),
     // Polymorphic subject links — many-to-many, so an array. When the
     // field is omitted we leave existing links untouched; when it's
     // explicitly present we replace-all (matches the array semantics
@@ -1824,7 +1831,7 @@ studioRoutes.post("/save-draft", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
 
-  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, kind, mediaKind, timelineSpec, gameState, imageState, animationState, cadState, cad3dState, documentState, subjects, metaDescription, slug, keywords, socialCardImage } = parsed.data;
+  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, kind, mediaKind, timelineSpec, gameState, imageState, animationState, cadState, cad3dState, documentState, interactiveComicState, subjects, metaDescription, slug, keywords, socialCardImage } = parsed.data;
   // The v2 editor sends `timelineSpec` without a `script`; the kind
   // discriminator is what tells reads which JSONB blob to honour.
   // mediaKind is orthogonal (output axis) — patched separately when the
@@ -1833,7 +1840,7 @@ studioRoutes.post("/save-draft", async (c) => {
   // (#927 / #932); each lives on its own JSONB column per the canvas-
   // runtime extensibility model (PRD §1.2).
   const editorKindPatch =
-    kind !== undefined || mediaKind !== undefined || timelineSpec !== undefined || gameState !== undefined || imageState !== undefined || animationState !== undefined || cadState !== undefined || cad3dState !== undefined || documentState !== undefined
+    kind !== undefined || mediaKind !== undefined || timelineSpec !== undefined || gameState !== undefined || imageState !== undefined || animationState !== undefined || cadState !== undefined || cad3dState !== undefined || documentState !== undefined || interactiveComicState !== undefined
       ? {
           kind: kind ?? (timelineSpec !== undefined ? "nle" : undefined),
           ...(mediaKind !== undefined ? { mediaKind } : {}),
@@ -1844,6 +1851,7 @@ studioRoutes.post("/save-draft", async (c) => {
           ...(cadState !== undefined ? { cadState } : {}),
           ...(cad3dState !== undefined ? { cad3dState } : {}),
           ...(documentState !== undefined ? { documentState } : {}),
+          ...(interactiveComicState !== undefined ? { interactiveComicState } : {}),
         }
       : {};
   const db = getDb();
