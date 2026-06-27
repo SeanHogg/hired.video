@@ -746,7 +746,11 @@ const App = () => (
                       <Route path="/for" element={<ForIndex />} />
                       <Route path="/for/:audience" element={<AudienceLandingPage />} />
                       <Route path="/retained-search" element={<RetainedSearchDirectory />} />
-                      <Route path="/references" element={<References />} />
+                      {/* Reference contacts hold private names/emails/phones —
+                          gate behind auth so signed-out visitors can't reach the
+                          owner-management surface. The recipient share view below
+                          stays public (it's token-gated + NDA-walled). */}
+                      <Route path="/references" element={<RequireVerified><References /></RequireVerified>} />
                       <Route path="/references/shared/:token" element={<ReferencesShared />} />
                       <Route path="/network/warm-intros" element={<WarmIntros />} />
                       <Route path="/in/:country" element={<LocationLandingPage />} />

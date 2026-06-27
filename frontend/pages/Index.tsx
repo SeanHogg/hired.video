@@ -20,6 +20,9 @@ import TemplateGallery from "@/components/resume-renderer/TemplateGallery";
 import JobTemplateGallery from "@/components/job-renderer/JobTemplateGallery";
 import VideoCard from "@/components/VideoCard";
 import HeroVideoSpotlight from "@/components/HeroVideoSpotlight";
+import MarketingSection, {
+  type MarketingCard,
+} from "@/components/marketing/MarketingSection";
 import { AppShell } from "@/components/AppShell";
 import { studioService, type PublicVideo } from "@/lib/services/studio-service";
 import { aiCoachHref } from "@/lib/ai-context";
@@ -136,21 +139,21 @@ export default function Index() {
         {/* Public Video Resumes Section */}
         {publicVideos.length > 0 && (
           <section className="py-8 px-4 sm:px-6 lg:px-8 border-t border-border">
-            <div>
-              <div className="flex items-center gap-2 mb-6">
-                <Play className="w-5 h-5 text-primary" />
-                <h2 className="text-lg sm:text-xl font-semibold text-foreground">
-                  {t("labels.videoResumes")}
-                </h2>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                {publicVideos.map((v) => (
+            <MarketingSection
+              id="public-video-resumes"
+              align="left"
+              icon={Play}
+              title={t("labels.videoResumes")}
+              gridClassName="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+              cards={publicVideos.map<MarketingCard>((v) => ({
+                key: v.id,
+                node: (
                   <VideoCard
-                    key={v.id}
                     id={v.id}
                     title={v.title}
                     description={
-                      v.description ?? t("marketing.index.ownerVideoResume", { name: v.ownerName })
+                      v.description ??
+                      t("marketing.index.ownerVideoResume", { name: v.ownerName })
                     }
                     thumbnail={v.thumbnailUrl ?? ""}
                     duration=""
@@ -162,9 +165,9 @@ export default function Index() {
                     video={v}
                     onView={() => navigate(`/v/${v.id}`)}
                   />
-                ))}
-              </div>
-            </div>
+                ),
+              }))}
+            />
           </section>
         )}
 

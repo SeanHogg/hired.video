@@ -26,6 +26,7 @@ import ContactSidebar from "@/components/profile/sections/ContactSidebar";
 import OpportunityPreferencesSection from "@/components/profile/sections/OpportunityPreferencesSection";
 import ProfileHeader from "@/components/profile/sections/ProfileHeader";
 import ProfileHeaderVideos from "@/components/profile/sections/ProfileHeaderVideos";
+import ReferencesSection from "@/components/profile/sections/ReferencesSection";
 import ProfileProgramPanel, {
   PROGRAM_ICON,
 } from "@/components/profile/sections/programs/ProfileProgramPanel";
@@ -671,6 +672,11 @@ function PeopleDetailContent() {
                     isOwner={isOwner}
                     onEdit={() => setActiveOwnerDialog("skills")}
                     title={t("messages.discoverabilityTags")}
+                  />
+
+                  <ReferencesSection
+                    profileUserId={profile.id ?? ""}
+                    isOwner={isOwner}
                   />
                 </TabsContent>
 

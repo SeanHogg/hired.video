@@ -1,6 +1,9 @@
 import { Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import TemplateCard from "@/components/resume-renderer/TemplateCard";
+import MarketingSection, {
+  type MarketingCard,
+} from "@/components/marketing/MarketingSection";
 import { TEMPLATE_PRESETS } from "@/types/resume-template";
 
 interface TemplateGalleryProps {
@@ -19,25 +22,27 @@ interface TemplateGalleryProps {
 
 export default function TemplateGallery({ templates = TEMPLATE_PRESETS, compact, title, subtitle }: TemplateGalleryProps) {
   const { t } = useTranslation();
+  const cards: MarketingCard[] = templates.map((descriptor) => ({
+    key: descriptor.id,
+    node: <TemplateCard descriptor={descriptor} />,
+  }));
+
   return (
     <section className={compact ? "" : "py-12"}>
-      <div className={compact ? "mb-4" : "mb-8"}>
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-primary" />
-          <h2 className={compact ? "text-xl font-bold" : "text-2xl md:text-3xl font-bold"}>
-            {title ?? t("headings.resumeTemplates")}
-          </h2>
-        </div>
-        <p className="text-sm text-muted-foreground mt-1">
-          {subtitle ?? t("messages.resumeTemplatesIntro", { count: templates.length })}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {templates.map((descriptor) => (
-          <TemplateCard key={descriptor.id} descriptor={descriptor} />
-        ))}
-      </div>
+      {/* Shares <MarketingSection> with the rest of the home page so the
+          template gallery offers the same carousel | cards | list toggle. */}
+      <MarketingSection
+        id="resume-templates"
+        align="left"
+        compact={compact}
+        icon={Sparkles}
+        title={title ?? t("headings.resumeTemplates")}
+        subtitle={
+          subtitle ?? t("messages.resumeTemplatesIntro", { count: templates.length })
+        }
+        cards={cards}
+        gridClassName="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+      />
     </section>
   );
 }

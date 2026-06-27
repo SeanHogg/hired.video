@@ -5,6 +5,9 @@
 import { Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import JobTemplateCard from "@/components/job-renderer/JobTemplateCard";
+import MarketingSection, {
+  type MarketingCard,
+} from "@/components/marketing/MarketingSection";
 import { JOB_TEMPLATE_PRESETS } from "@/types/job-template";
 
 interface JobTemplateGalleryProps {
@@ -19,25 +22,25 @@ export default function JobTemplateGallery({
   compact,
 }: JobTemplateGalleryProps) {
   const { t } = useTranslation();
+  const cards: MarketingCard[] = templates.map((descriptor) => ({
+    key: descriptor.id,
+    node: <JobTemplateCard descriptor={descriptor} />,
+  }));
+
   return (
     <section className={compact ? "" : "py-12"}>
-      <div className={compact ? "mb-4" : "mb-8"}>
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-primary" />
-          <h2 className={compact ? "text-xl font-bold" : "text-2xl md:text-3xl font-bold"}>
-            {t("headings.jobPostingTemplates")}
-          </h2>
-        </div>
-        <p className="text-sm text-muted-foreground mt-1">
-          {t("messages.jobTemplatesIntro", { count: templates.length })}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {templates.map((descriptor) => (
-          <JobTemplateCard key={descriptor.id} descriptor={descriptor} />
-        ))}
-      </div>
+      {/* Shares <MarketingSection> with the rest of the home page so the
+          job-template gallery offers the same carousel | cards | list toggle. */}
+      <MarketingSection
+        id="job-templates"
+        align="left"
+        compact={compact}
+        icon={Sparkles}
+        title={t("headings.jobPostingTemplates")}
+        subtitle={t("messages.jobTemplatesIntro", { count: templates.length })}
+        cards={cards}
+        gridClassName="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+      />
     </section>
   );
 }

@@ -10,7 +10,6 @@ import {
   Sparkles,
   TrendingUp,
   Video as VideoIcon,
-  CheckCircle2,
   Star,
   FileText,
   Eye,
@@ -29,16 +28,14 @@ import { ToolCard } from "@/components/ToolCard";
 import { getToolsForHome } from "@/data/tools-catalog";
 import TemplateGallery from "@/components/resume-renderer/TemplateGallery";
 import JobTemplateGallery from "@/components/job-renderer/JobTemplateGallery";
+import MarketingSection, {
+  type MarketingItem,
+  type MarketingCard,
+} from "@/components/marketing/MarketingSection";
 
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 
 import { useAuth } from "@/lib/auth";
 import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
@@ -160,6 +157,109 @@ function HomeMarketingPage() {
     { question: t("faq.home.startQ"), answer: t("faq.home.startA") },
   ];
 
+  // ── Every content section feeds the shared <MarketingSection> so they all
+  // expose the SAME carousel | cards | list patterns. Each section just maps
+  // its data to the normalized MarketingItem shape (or pre-rendered cards for
+  // sections with a dedicated card component). ──────────────────────────────
+  const featureItems: MarketingItem[] = HOME_FEATURES.map((f) => ({
+    key: f.title,
+    icon: f.icon,
+    iconColor: f.iconColor,
+    borderClass: f.border,
+    title: f.title,
+    description: f.description,
+    bullets: f.bullets,
+  }));
+
+  const howItWorksItems: MarketingItem[] = HOME_HOW_IT_WORKS.map((s) => ({
+    key: s.step,
+    icon: s.icon,
+    title: s.step,
+    description: s.desc,
+  }));
+
+  const studioItems: MarketingItem[] = [
+    {
+      key: "studio-video",
+      icon: Clapperboard,
+      iconColor: "text-brand-purple",
+      borderClass: "border-brand-purple/20 hover:border-brand-purple/40",
+      title: t("marketing.home.studio.video.title"),
+      description: t("marketing.home.studio.video.desc"),
+    },
+    {
+      key: "studio-audio",
+      icon: Headphones,
+      iconColor: "text-violet-600",
+      borderClass: "border-violet-500/20 hover:border-violet-500/40",
+      title: t("marketing.home.studio.audio.title"),
+      description: t("marketing.home.studio.audio.desc"),
+    },
+    {
+      key: "studio-interactive",
+      icon: Gamepad2,
+      iconColor: "text-fuchsia-600",
+      borderClass: "border-fuchsia-500/20 hover:border-fuchsia-500/40",
+      title: t("marketing.home.studio.interactive.title"),
+      description: t("marketing.home.studio.interactive.desc"),
+    },
+  ];
+
+  const platformItems: MarketingItem[] = [
+    {
+      key: "platform-learning",
+      icon: GraduationCap,
+      iconColor: "text-brand-blue",
+      title: t("marketing.home.platform.learning.title"),
+      description: t("marketing.home.platform.learning.desc"),
+    },
+    {
+      key: "platform-people-ops",
+      icon: Users,
+      iconColor: "text-emerald-600",
+      title: t("marketing.home.platform.peopleOps.title"),
+      description: t("marketing.home.platform.peopleOps.desc"),
+    },
+    {
+      key: "platform-recruiting",
+      icon: ClipboardCheck,
+      iconColor: "text-amber-600",
+      title: t("marketing.home.platform.recruiting.title"),
+      description: t("marketing.home.platform.recruiting.desc"),
+    },
+  ];
+
+  const toolCards: MarketingCard[] = getToolsForHome().map((tool) => ({
+    key: tool.id,
+    node: <ToolCard tool={tool} />,
+  }));
+
+  const testimonialCards: MarketingCard[] = HOME_TESTIMONIALS.map((tt) => ({
+    key: tt.name,
+    node: (
+      <Card className="h-full">
+        <CardContent className="p-6">
+          <div className="flex items-center mb-4">
+            {[...Array(5)].map((_, i) => (
+              <Star
+                key={i}
+                className="h-4 w-4 fill-yellow-400 text-yellow-400"
+              />
+            ))}
+          </div>
+          <p className="text-sm mb-4">&ldquo;{tt.quote}&rdquo;</p>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-gradient-to-r from-brand-purple to-brand-blue rounded-full" />
+            <div>
+              <p className="font-medium text-sm">{tt.name}</p>
+              <p className="text-xs text-muted-foreground">{tt.title}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    ),
+  }));
+
   return (
     <AppShell>
       <main>
@@ -228,238 +328,122 @@ function HomeMarketingPage() {
           <UnifiedSearch />
 
           <div className="px-4 pb-16 pt-8">
+            {/* Every content section below renders through <MarketingSection>,
+                so each one offers the SAME carousel | cards | list patterns
+                behind the shared view toggle (persisted per section). */}
+
             {/* Features */}
-            <div className="mb-16">
-              <h2 className="text-3xl font-bold text-center mb-4">
-                {t("marketing.home.featuresTitle")}
-              </h2>
-              <p className="text-center text-muted-foreground mb-12">
-                {t("marketing.home.featuresSubtitle")}
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                {HOME_FEATURES.map(
-                  ({ icon: Icon, title, description, bullets, border, iconColor }) => (
-                    <Card
-                      key={title}
-                      className={`${border} transition-colors`}
-                    >
-                      <CardHeader>
-                        <Icon className={`h-10 w-10 ${iconColor} mb-4`} />
-                        <CardTitle>{title}</CardTitle>
-                        <CardDescription>{description}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2 text-sm">
-                          {bullets.map((b) => (
-                            <div key={b} className="flex items-center gap-2">
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
-                              {b}
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ),
-                )}
-              </div>
-            </div>
+            <MarketingSection
+              id="home-features"
+              className="mb-16"
+              title={t("marketing.home.featuresTitle")}
+              subtitle={t("marketing.home.featuresSubtitle")}
+              items={featureItems}
+              gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
+            />
 
             {/* How It Works */}
-            <div className="mb-16">
-              <h2 className="text-3xl font-bold text-center mb-12">
-                {t("marketing.home.howItWorks")}
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                {HOME_HOW_IT_WORKS.map(({ icon: Icon, step, desc }) => (
-                  <div key={step} className="text-center">
-                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Icon className="h-8 w-8 text-primary" />
-                    </div>
-                    <h3 className="font-semibold mb-2">{step}</h3>
-                    <p className="text-sm text-muted-foreground">{desc}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <MarketingSection
+              id="home-how-it-works"
+              className="mb-16"
+              title={t("marketing.home.howItWorks")}
+              items={howItWorksItems}
+              gridClassName="grid-cols-1 md:grid-cols-4"
+            />
 
             {/* Tool highlights — rendered from the shared tools catalog via
                 the same ToolCard used on the Tools page, so adding a tool in
                 one place surfaces it everywhere. */}
-            <div className="mb-16">
-              <h2 className="text-3xl font-bold text-center mb-4">
-                {t("marketing.home.toolsTitle")}
-              </h2>
-              <p className="text-center text-muted-foreground mb-12">
-                {t("marketing.home.toolsSubtitle")}
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-                {getToolsForHome().map((tool) => (
-                  <ToolCard key={tool.id} tool={tool} />
-                ))}
-              </div>
-              {/* Built-in learning library teaser — keeps the home page
-                  surface lean (no new section) while still planting the
-                  flag against LinkedIn Learning's ~$379/seat/yr SKU.
-                  /learning redirects to /tools?tab=learning. */}
-              <div className="mt-10 text-center">
-                <Link
-                  to="/learning"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-                >
-                  {t("marketing.home.learningLibraryTeaser")}
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
+            <MarketingSection
+              id="home-tools"
+              className="mb-16"
+              title={t("marketing.home.toolsTitle")}
+              subtitle={t("marketing.home.toolsSubtitle")}
+              cards={toolCards}
+              gridClassName="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+              footer={
+                // Built-in learning library teaser — keeps the home page
+                // surface lean (no new section) while still planting the flag
+                // against LinkedIn Learning's ~$379/seat/yr SKU. /learning
+                // redirects to /tools?tab=learning.
+                <div className="mt-10 text-center">
+                  <Link
+                    to="/learning"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                  >
+                    {t("marketing.home.learningLibraryTeaser")}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              }
+            />
 
             {/* Creator Studio — one canvas, every media kind. Surfaces the
                 multi-kind studio story (video/NLE, podcast, comic, game,
                 animation) the tool grid above doesn't carry. Links into
                 the live /studio surface. Only shippable kinds are pitched
                 (image / cad / 3d-model are roadmap — KIND_MARKETING). */}
-            <div className="mb-16">
-              <h2 className="text-3xl font-bold text-center mb-4">
-                {t("marketing.home.studioTitle")}
-              </h2>
-              <p className="text-center text-muted-foreground mb-12 max-w-3xl mx-auto">
-                {t("marketing.home.studioSubtitle")}
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {[
-                  {
-                    icon: Clapperboard,
-                    iconColor: "text-brand-purple",
-                    border: "border-brand-purple/20 hover:border-brand-purple/40",
-                    title: t("marketing.home.studio.video.title"),
-                    desc: t("marketing.home.studio.video.desc"),
-                  },
-                  {
-                    icon: Headphones,
-                    iconColor: "text-violet-600",
-                    border: "border-violet-500/20 hover:border-violet-500/40",
-                    title: t("marketing.home.studio.audio.title"),
-                    desc: t("marketing.home.studio.audio.desc"),
-                  },
-                  {
-                    icon: Gamepad2,
-                    iconColor: "text-fuchsia-600",
-                    border: "border-fuchsia-500/20 hover:border-fuchsia-500/40",
-                    title: t("marketing.home.studio.interactive.title"),
-                    desc: t("marketing.home.studio.interactive.desc"),
-                  },
-                ].map(({ icon: Icon, iconColor, border, title, desc }) => (
-                  <Card key={title} className={`${border} transition-colors`}>
-                    <CardHeader>
-                      <Icon className={`h-10 w-10 ${iconColor} mb-4`} />
-                      <CardTitle className="text-lg">{title}</CardTitle>
-                      <CardDescription>{desc}</CardDescription>
-                    </CardHeader>
-                  </Card>
-                ))}
-              </div>
-              <div className="mt-10 text-center">
-                <Link to="/studio">
-                  <Button variant="outline">
-                    {t("marketing.home.studioCta")}
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-              </div>
-            </div>
+            <MarketingSection
+              id="home-studio"
+              className="mb-16"
+              title={t("marketing.home.studioTitle")}
+              subtitle={t("marketing.home.studioSubtitle")}
+              items={studioItems}
+              gridClassName="grid-cols-1 md:grid-cols-3"
+              footer={
+                <div className="mt-10 text-center">
+                  <Link to="/studio">
+                    <Button variant="outline">
+                      {t("marketing.home.studioCta")}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
+              }
+            />
 
             {/* Whole-platform strip — the home page is candidate-first, so
                 this single block plants the flag that hired.video also
                 carries Learning, People Operations, and structured
                 recruiting. Deep-links to the Features page for the full
                 story rather than expanding the home surface. */}
-            <div className="mb-16">
-              <h2 className="text-3xl font-bold text-center mb-4">
-                {t("marketing.home.platformTitle")}
-              </h2>
-              <p className="text-center text-muted-foreground mb-12 max-w-3xl mx-auto">
-                {t("marketing.home.platformSubtitle")}
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {[
-                  {
-                    icon: GraduationCap,
-                    iconColor: "text-brand-blue",
-                    title: t("marketing.home.platform.learning.title"),
-                    desc: t("marketing.home.platform.learning.desc"),
-                  },
-                  {
-                    icon: Users,
-                    iconColor: "text-emerald-600",
-                    title: t("marketing.home.platform.peopleOps.title"),
-                    desc: t("marketing.home.platform.peopleOps.desc"),
-                  },
-                  {
-                    icon: ClipboardCheck,
-                    iconColor: "text-amber-600",
-                    title: t("marketing.home.platform.recruiting.title"),
-                    desc: t("marketing.home.platform.recruiting.desc"),
-                  },
-                ].map(({ icon: Icon, iconColor, title, desc }) => (
-                  <div key={title} className="flex items-start gap-3">
-                    <Icon className={`h-8 w-8 ${iconColor} shrink-0 mt-0.5`} />
-                    <div>
-                      <p className="font-semibold">{title}</p>
-                      <p className="text-sm text-muted-foreground">{desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-10 text-center">
-                <Link
-                  to="/features"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-                >
-                  {t("marketing.home.platformCta")}
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
+            <MarketingSection
+              id="home-platform"
+              className="mb-16"
+              title={t("marketing.home.platformTitle")}
+              subtitle={t("marketing.home.platformSubtitle")}
+              items={platformItems}
+              gridClassName="grid-cols-1 md:grid-cols-3"
+              footer={
+                <div className="mt-10 text-center">
+                  <Link
+                    to="/features"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                  >
+                    {t("marketing.home.platformCta")}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              }
+            />
 
             {/* Resume + Job Posting templates — render the SAME gallery
                 sections the public homepage (/) uses, so the dashboard and
-                the marketing home share one card surface (DRY). */}
+                the marketing home share one card surface (DRY). Each gallery
+                offers the same carousel | cards | list toggle internally. */}
             <div className="mb-16">
               <TemplateGallery />
               <JobTemplateGallery />
             </div>
 
             {/* Testimonials */}
-            <div className="mb-16">
-              <h2 className="text-3xl font-bold text-center mb-12">
-                {t("marketing.home.testimonialsTitle")}
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {HOME_TESTIMONIALS.map((t) => (
-                  <Card key={t.name}>
-                    <CardContent className="p-6">
-                      <div className="flex items-center mb-4">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className="h-4 w-4 fill-yellow-400 text-yellow-400"
-                          />
-                        ))}
-                      </div>
-                      <p className="text-sm mb-4">&ldquo;{t.quote}&rdquo;</p>
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gradient-to-r from-brand-purple to-brand-blue rounded-full" />
-                        <div>
-                          <p className="font-medium text-sm">{t.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {t.title}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
+            <MarketingSection
+              id="home-testimonials"
+              className="mb-16"
+              title={t("marketing.home.testimonialsTitle")}
+              cards={testimonialCards}
+              gridClassName="grid-cols-1 md:grid-cols-3"
+            />
           </div>
 
           {/* FAQ */}

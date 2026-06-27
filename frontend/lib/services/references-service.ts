@@ -15,6 +15,15 @@ export interface ReferenceContact {
   notes: string | null;
 }
 
+/** Non-PII reference summary surfaced on the public profile section. */
+export interface ReferenceSummary {
+  id: string;
+  name: string;
+  title: string | null;
+  company: string | null;
+  relationship: string | null;
+}
+
 export interface ReferenceShare {
   id: string;
   token: string;
@@ -44,6 +53,15 @@ export const referencesService = {
   updateContact: (id: string, body: Partial<ReferenceContact>) =>
     apiClient.put<ReferenceContact>(`/api/references/contacts/${id}`, body).then((r) => r.data),
   deleteContact: (id: string) => apiClient.delete(`/api/references/contacts/${id}`),
+
+  /** Public, non-PII summaries for a profile's References section. Gated
+   *  server-side on the owner's `references` profile-section visibility. */
+  listPublicContacts: (userId: string) =>
+    apiClient
+      .get<ReferenceSummary[]>(`/api/references/public/${userId}`, undefined, {
+        suppressErrorEvent: true,
+      })
+      .then((r) => r.data ?? []),
 
   listShares: () =>
     apiClient.get<ReferenceShare[]>("/api/references/shares").then((r) => r.data ?? []),

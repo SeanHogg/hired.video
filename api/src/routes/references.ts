@@ -25,8 +25,17 @@ import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { getOrSetCached, invalidateCachedKey } from "../utils/edge-cache.js";
+import {
+  isProfileSectionVisible,
+  type StoredProfileSections,
+} from "../../../shared/profile-sections.js";
 
-const { referenceContacts, referenceShares } = schema;
+const { referenceContacts, referenceShares, users, userProfiles } = schema;
+
+/** Cache key for a user's public (non-PII) reference summary list. Bumped on
+ *  every contact mutation by that owner. */
+const publicCacheKey = (userId: string) => `refs:public:${userId}`;
 
 export const referenceRoutes = new Hono<AppEnv>();
 
@@ -79,6 +88,7 @@ referenceRoutes.post("/contacts", async (c) => {
       notes: d.notes ?? null,
     } as any)
     .returning();
+  invalidateCachedKey(publicCacheKey(userId));
   return c.json(success(row), 201);
 });
 
@@ -94,6 +104,7 @@ referenceRoutes.put("/contacts/:id", async (c) => {
     .where(and(eq(referenceContacts.id, id), eq(referenceContacts.ownerUserId, userId)))
     .returning();
   if (!row) return c.json(error("NOT_FOUND", "contact not found"), 404);
+  invalidateCachedKey(publicCacheKey(userId));
   return c.json(success(row), 200);
 });
 
@@ -104,7 +115,56 @@ referenceRoutes.delete("/contacts/:id", async (c) => {
   await getDb()
     .delete(referenceContacts)
     .where(and(eq(referenceContacts.id, id), eq(referenceContacts.ownerUserId, userId)));
+  invalidateCachedKey(publicCacheKey(userId));
   return c.json(success({ id }), 200);
+});
+
+// ── Public: profile reference summaries (PUBLIC_PREFIXES) ───────────────
+/**
+ * GET /api/references/public/:userId — non-PII reference summaries for the
+ * given user's profile References section. Returns name + role context only
+ * (NEVER email/phone/notes — those stay behind the NDA-gated share flow).
+ *
+ * Gated on the owner's `references` profile-section visibility: if they
+ * haven't opted the section in, this returns an empty list regardless of how
+ * many contacts they hold. Read-through cached (120s) and invalidated on
+ * every contact mutation by the owner.
+ */
+referenceRoutes.get("/public/:userId", async (c) => {
+  const userId = c.req.param("userId");
+  const summaries = await getOrSetCached({
+    key: publicCacheKey(userId),
+    ttlSeconds: 120,
+    loader: async () => {
+      const db = getDb();
+      const [owner] = await db
+        .select({ role: users.role, sections: userProfiles.profileSections })
+        .from(users)
+        .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+        .where(eq(users.id, userId))
+        .limit(1);
+      if (!owner) return [];
+      const visible = isProfileSectionVisible(
+        (owner.sections ?? null) as StoredProfileSections | null,
+        owner.role,
+        "references",
+      );
+      if (!visible) return [];
+      const rows = await db
+        .select({
+          id: referenceContacts.id,
+          name: referenceContacts.name,
+          title: referenceContacts.title,
+          company: referenceContacts.company,
+          relationship: referenceContacts.relationship,
+        })
+        .from(referenceContacts)
+        .where(eq(referenceContacts.ownerUserId, userId))
+        .orderBy(asc(referenceContacts.name));
+      return rows;
+    },
+  });
+  return c.json(success(summaries), 200);
 });
 
 // ── Owner: shares ──────────────────────────────────────────────────────

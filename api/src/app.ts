@@ -279,6 +279,7 @@ export function createApp() {
     "/api/search/public",
     "/api/retained-search/firms",
     "/api/references/shared/",
+    "/api/references/public/",
     "/api/jobs/public",
     "/api/companies/public",
     "/api/resume/public",

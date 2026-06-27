@@ -15,6 +15,7 @@
  */
 import { Plus, Trash2 } from "lucide-react";
 import { FieldGroupEditor } from "@/components/studio/fields/FieldGroupEditor";
+import { SECTION_IMPORTERS } from "@/components/studio/document/section-importers";
 import type { DocumentEntityContent, DocumentEntityKind } from "@/lib/studio/editor-v2/document-state";
 import {
   documentSectionSchema,
@@ -73,6 +74,7 @@ function ArrayEditor({
   onChange: (next: DocumentEntityContent) => void;
 }) {
   const items = itemsFor(content, schema.sectionKey);
+  const Importer = SECTION_IMPORTERS[schema.sectionKey];
 
   const setItem = (idx: number, key: string, value: unknown) => {
     const next = items.map((it, i) => (i === idx ? { ...it, [key]: value } : it));
@@ -80,6 +82,9 @@ function ArrayEditor({
   };
   const addItem = () => {
     onChange(writeItems(content, schema.sectionKey, [...items, schema.newItem()]));
+  };
+  const importItems = (incoming: Item[]) => {
+    onChange(writeItems(content, schema.sectionKey, [...items, ...incoming]));
   };
   const removeItem = (idx: number) => {
     onChange(writeItems(content, schema.sectionKey, items.filter((_, i) => i !== idx)));
@@ -115,17 +120,20 @@ function ArrayEditor({
           />
         </div>
       ))}
-      <button
-        type="button"
-        className="inline-flex items-center gap-1 rounded border border-dashed border-border px-2 py-1 text-xs text-muted-foreground hover:border-brand-purple hover:text-brand-purple"
-        onClick={(e) => {
-          e.stopPropagation();
-          addItem();
-        }}
-      >
-        <Plus className="h-3.5 w-3.5" />
-        Add {schema.itemNoun}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded border border-dashed border-border px-2 py-1 text-xs text-muted-foreground hover:border-brand-purple hover:text-brand-purple"
+          onClick={(e) => {
+            e.stopPropagation();
+            addItem();
+          }}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add {schema.itemNoun}
+        </button>
+        {Importer && <Importer existing={items} onImport={importItems} />}
+      </div>
     </div>
   );
 }

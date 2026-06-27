@@ -8,7 +8,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useBreadcrumbs, usePageChrome } from "@/lib/seo";
-import { useUgcSeo } from "@/lib/seo-ugc";
+import { useUgcSeo, blogPostHeroImageUrl } from "@/lib/seo-ugc";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,15 +32,13 @@ export default function BlogPost() {
 
   // SEO — single adapter call. Builder lives in lib/seo-ugc.ts
   // ("blogPost" kind) and emits title/description/keywords plus the
-  // BlogPosting JSON-LD via generateStructuredData.article.
-  // `heroImageUrl` falls back to the per-post generated SVG at
-  // `/api/og/blog` (see api/src/routes/og.ts) when the post doesn't
-  // supply a real image — so every post gets a per-post share card.
+  // BlogPosting JSON-LD via generateStructuredData.article. The adapter
+  // resolves the hero image through `blogPostHeroImageUrl`, which falls
+  // back to the per-post generated SVG card at `/api/og/blog` (see
+  // api/src/routes/og.ts) when the post ships no real image — so every
+  // post gets a per-post share card AND the on-page hero below.
   const blogSeoRecord = useMemo(() => {
     if (!post) return null;
-    const heroImageUrl =
-      post.heroImageUrl ??
-      `/api/og/blog?title=${encodeURIComponent(post.title)}&category=${encodeURIComponent(post.category)}&date=${encodeURIComponent(post.publishedAt.slice(0, 10))}&author=${encodeURIComponent(post.author)}`;
     return {
       title: post.title,
       slug: post.slug,
@@ -49,11 +47,19 @@ export default function BlogPost() {
       publishedAt: post.publishedAt,
       updatedAt: post.updatedAt,
       category: post.category,
-      heroImageUrl,
+      heroImageUrl: post.heroImageUrl,
+      author: post.author,
       wordCount: post.sections.reduce((n, s) => n + s.body.split(/\s+/).length, 0),
     };
   }, [post]);
   useUgcSeo("blogPost", blogSeoRecord);
+
+  // Same SSoT helper drives the visible in-page graphic (absolute URL,
+  // real art when supplied, branded generated card otherwise).
+  const heroImageUrl = useMemo(
+    () => (post ? blogPostHeroImageUrl(post) : null),
+    [post],
+  );
 
   useBreadcrumbs(
     post
@@ -95,6 +101,18 @@ export default function BlogPost() {
           >
             <ArrowLeft className="h-4 w-4" /> All guides
           </Link>
+
+          {/* Hero graphic — real art when the post supplies `heroImageUrl`,
+              otherwise the per-post branded card generated at /api/og/blog.
+              `heroAlt` is the content-aligned description authored per post. */}
+          {heroImageUrl && (
+            <img
+              src={heroImageUrl}
+              alt={post.heroAlt}
+              className="w-full aspect-[1200/630] object-cover rounded-lg border mb-8"
+              loading="eager"
+            />
+          )}
 
           {/* Meta line */}
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-4">

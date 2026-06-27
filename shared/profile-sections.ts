@@ -36,6 +36,10 @@ export const PROFILE_SECTION_KEYS = [
   "opportunityPreferences",
   "additionalInfo",
   "profileVideos",
+  // Professional references (#1677). Surfaces names + roles only (contact
+  // details stay private behind the NDA-gated share flow). SSoT is the
+  // `reference_contacts` store managed at /references.
+  "references",
   // Networking-side sections. `openToCoffee` gates the discoverable
   // "Grab a coffee" CTA on /people/[id] AND the user's pin visibility
   // on the /map page. Opt-in by default for job_seekers (they're the
@@ -61,6 +65,11 @@ const JOB_SEEKER_DEFAULTS: ProfileSections = {
   opportunityPreferences: true,
   additionalInfo: true,
   profileVideos: true,
+  // Opt-IN even for job seekers: reference contacts are confidential by
+  // design (the feature's whole point is the NDA-gated share flow), so we
+  // never retroactively publish saved reference names. The owner enables
+  // the section from Settings → Profile sections when they want it shown.
+  references: false,
   openToCoffee: true,
 };
 
@@ -79,6 +88,7 @@ const HIRING_SIDE_DEFAULTS: ProfileSections = {
   opportunityPreferences: false,
   additionalInfo: true,
   profileVideos: true,
+  references: false,
   openToCoffee: false,
 };
 
@@ -99,6 +109,7 @@ const WORKFORCE_DEFAULTS: ProfileSections = {
   opportunityPreferences: false,
   additionalInfo: false,
   profileVideos: true,         // creator/social posts surface here
+  references: false,
   openToCoffee: false,
 };
 
@@ -119,6 +130,7 @@ const CREATOR_DEFAULTS: ProfileSections = {
   opportunityPreferences: false,
   additionalInfo: true,
   profileVideos: true,
+  references: false,
   openToCoffee: true,
 };
 
@@ -137,6 +149,7 @@ const AFFILIATE_DEFAULTS: ProfileSections = {
   opportunityPreferences: false,
   additionalInfo: false,
   profileVideos: false,
+  references: false,
   openToCoffee: false,
 };
 
@@ -230,6 +243,10 @@ export const PROFILE_SECTION_I18N: Record<
   profileVideos: {
     label: "settings.profileSections.profileVideos.label",
     description: "settings.profileSections.profileVideos.desc",
+  },
+  references: {
+    label: "settings.profileSections.references.label",
+    description: "settings.profileSections.references.desc",
   },
   openToCoffee: {
     label: "settings.profileSections.openToCoffee.label",

@@ -244,8 +244,32 @@ export interface BlogPostRecord {
   updatedAt?: string | null;
   category?: string | null;
   heroImageUrl?: string | null;
+  author?: string | null;
   /** Optional pre-computed word count from sections. */
   wordCount?: number;
+}
+
+/**
+ * Single source of truth for a blog post's hero image URL — used by both
+ * the SEO adapter (ogImage + JSON-LD image) and the in-page hero in
+ * BlogPost.tsx. Mirrors {@link articleCoverImageUrl}: falls back to the
+ * per-post generated SVG card at `/api/og/blog` when the post ships no
+ * `heroImageUrl`, so every post gets a branded share card + on-page
+ * graphic without the author uploading one. Always resolved through
+ * buildImageUrl so the relative `/api/og/blog?…` fallback becomes an
+ * absolute URL on the API origin — the SPA's static host does not proxy
+ * `/api` to the worker, so an unresolved relative src would 404 (the
+ * missing-image bug).
+ */
+export function blogPostHeroImageUrl(
+  post: Pick<BlogPostRecord, "title" | "category" | "publishedAt" | "heroImageUrl" | "author">,
+): string {
+  if (post.heroImageUrl) return buildImageUrl(post.heroImageUrl)!;
+  const params = new URLSearchParams({ title: post.title });
+  if (post.category) params.set("category", post.category);
+  if (post.publishedAt) params.set("date", post.publishedAt.slice(0, 10));
+  if (post.author) params.set("author", post.author);
+  return buildImageUrl(`/api/og/blog?${params.toString()}`)!;
 }
 
 export interface VideoResumeRecord {
@@ -513,17 +537,18 @@ registerUgcSeo<BlogPostRecord>("blogPost", (post, pathname) => {
     ? post.keywords.split(",").map((s) => s.trim())
     : [];
   const keywords = joinKeywords([post.category, ...tagArray]);
+  const ogImage = blogPostHeroImageUrl(post);
   return {
     title,
     description,
     ...mirrorOg(title, description),
-    ...(post.heroImageUrl ? { ogImage: post.heroImageUrl } : {}),
+    ogImage,
     ...(keywords ? { keywords } : {}),
     structuredData: generateStructuredData.article({
       type: "BlogPosting",
       headline: post.title,
       description: clip(post.description, 200),
-      image: post.heroImageUrl ?? undefined,
+      image: ogImage,
       datePublished: post.publishedAt ?? undefined,
       dateModified: post.updatedAt ?? post.publishedAt ?? undefined,
       authorName: "Sean Hogg",
