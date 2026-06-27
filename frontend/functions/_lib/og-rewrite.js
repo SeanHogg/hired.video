@@ -36,7 +36,15 @@ function setTitle(html, title) {
     : html.replace(/<\/head>/i, `  <title>${escapeHtml(title)}</title>\n</head>`);
 }
 
-export function rewriteMeta(html, { title, description, image, url }) {
+/** Serialize a JSON-LD object for safe inline embedding in a <script> tag.
+ *  Escaping `<` prevents a stray `</script>` (or `<!--`) inside string values
+ *  from terminating the script element early. Mirrors prerender.mjs. */
+function jsonLdScript(obj) {
+  const json = JSON.stringify(obj).replace(/</g, "\\u003c");
+  return `<script type="application/ld+json">${json}</script>`;
+}
+
+export function rewriteMeta(html, { title, description, image, url, jsonLd }) {
   let out = html;
   if (title) {
     out = setTitle(out, title);
@@ -54,6 +62,14 @@ export function rewriteMeta(html, { title, description, image, url }) {
   }
   if (url) {
     out = setMeta(out, "property", "og:url", url);
+  }
+  // Inject per-content structured data (VideoObject / Article) into the HTML
+  // <head> so search + AI crawlers get the thumbnail/image-bearing JSON-LD
+  // WITHOUT executing the SPA bundle. The client useUgcSeo hook re-injects the
+  // same shape after hydration; duplicate JSON-LD is harmless to crawlers.
+  if (Array.isArray(jsonLd) && jsonLd.length > 0) {
+    const block = jsonLd.map(jsonLdScript).join("\n    ");
+    out = out.replace(/<\/head>/i, `    ${block}\n</head>`);
   }
   return out;
 }

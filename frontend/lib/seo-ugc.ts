@@ -281,7 +281,36 @@ export interface VideoResumeRecord {
   socialCardImage?: string | null;
   keywords?: string[] | null;
   youtubeUrl?: string | null;
+  /** Hosted MP4 URL when the project rendered to a file (vs. a YouTube
+   *  embed). Emitted as VideoObject.contentUrl so Google can index the
+   *  actual media, not just the watch page. */
+  videoUrl?: string | null;
   publishedAt?: string | null;
+  /** Project creation timestamp from the public watch payload. Used as the
+   *  VideoObject.uploadDate fallback because public studio projects don't
+   *  carry an explicit publishedAt. */
+  createdAt?: string | null;
+}
+
+/**
+ * Single source of truth for a video's thumbnail URL — used by both the
+ * VideoObject `thumbnailUrl` (REQUIRED by Google for a video to be
+ * indexable — an absent one is the Search Console "missing thumbnail"
+ * error) and the `ogImage` social card. Mirrors {@link articleCoverImageUrl}:
+ * falls back through the owner-authored social card to the always-available
+ * generated card at `/api/og/v/:id` (which itself 302-redirects to a baked
+ * thumbnail when one exists, else returns a branded 1200×630 card), so every
+ * video gets a crawlable thumbnail even before a frame is baked. Resolved
+ * through buildImageUrl so the relative `/api/og/v/:id` path becomes an
+ * absolute URL on the API origin — the SPA's static host does not proxy
+ * `/api` to the worker, so an unresolved relative src would 404.
+ */
+export function videoThumbnailUrl(
+  video: Pick<VideoResumeRecord, "id" | "thumbnailUrl" | "socialCardImage">,
+): string {
+  if (video.thumbnailUrl) return buildImageUrl(video.thumbnailUrl)!;
+  if (video.socialCardImage) return buildImageUrl(video.socialCardImage)!;
+  return buildImageUrl(`/api/og/v/${video.id}`)!;
 }
 
 export interface TemplateListingRecord {
@@ -566,19 +595,27 @@ registerUgcSeo<VideoResumeRecord>("videoResume", (video, pathname) => {
     clip(video.metaDescription) ||
     clip(video.description) ||
     `Watch ${video.title} on hired.video.`;
-  const image = video.socialCardImage ?? video.thumbnailUrl ?? undefined;
+  // Never omit the thumbnail (Search Console "videos can't be indexed —
+  // missing thumbnail") — videoThumbnailUrl always resolves to a crawlable
+  // image. The same URL doubles as the social-card ogImage.
+  const thumbnailUrl = videoThumbnailUrl(video);
+  // uploadDate is likewise required by Google's video structured data; the
+  // public watch payload carries `createdAt` even when no explicit
+  // publishedAt was ever set.
+  const uploadDate = video.publishedAt ?? video.createdAt ?? undefined;
   const keywords = joinKeywords(video.keywords ?? []);
   return {
     title,
     description,
     ...mirrorOg(title, description),
-    ...(image ? { ogImage: image } : {}),
+    ogImage: thumbnailUrl,
     ...(keywords ? { keywords } : {}),
     structuredData: generateStructuredData.videoObject({
       name: video.title,
       description: clip(video.description ?? video.metaDescription, 200),
-      thumbnailUrl: video.thumbnailUrl ?? undefined,
-      uploadDate: video.publishedAt ?? undefined,
+      thumbnailUrl,
+      uploadDate,
+      contentUrl: video.videoUrl ?? undefined,
       embedUrl: video.youtubeUrl ?? undefined,
       url: absUrl(pathname),
     }),

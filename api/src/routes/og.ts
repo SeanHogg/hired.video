@@ -15,6 +15,7 @@ const {
   studioProjects,
   creatorProfiles,
   userProfiles,
+  articles,
 } = schema;
 
 export const ogRoutes = new Hono<AppEnv>();
@@ -208,6 +209,7 @@ async function resolveOgMetaForVideoId(
   thumbnailUrl: string | null;
   ownerName: string | null;
   mediaKind: string;
+  uploadDate: string | null;
 }> {
   if (isUuid(videoId)) {
     const [proj] = await db
@@ -217,6 +219,7 @@ async function resolveOgMetaForVideoId(
         storyboard: studioProjects.storyboard,
         mediaKind: studioProjects.mediaKind,
         ownerName: users.name,
+        createdAt: studioProjects.createdAt,
       })
       .from(studioProjects)
       .innerJoin(users, eq(studioProjects.userId, users.id))
@@ -244,6 +247,7 @@ async function resolveOgMetaForVideoId(
           ?? null,
         ownerName: proj.ownerName,
         mediaKind: (proj.mediaKind as string | null) ?? "video",
+        uploadDate: proj.createdAt ? proj.createdAt.toISOString() : null,
       };
     }
   }
@@ -256,6 +260,7 @@ async function resolveOgMetaForVideoId(
       thumbnailUrl: videos.thumbnailUrl,
       privacyStatus: videos.privacyStatus,
       ownerName: users.name,
+      createdAt: videos.createdAt,
     })
     .from(videos)
     .innerJoin(users, eq(videos.userId, users.id))
@@ -269,6 +274,7 @@ async function resolveOgMetaForVideoId(
       thumbnailUrl: null,
       ownerName: null,
       mediaKind: "video",
+      uploadDate: null,
     };
   }
   return {
@@ -278,6 +284,7 @@ async function resolveOgMetaForVideoId(
     thumbnailUrl: row.thumbnailUrl,
     ownerName: row.ownerName,
     mediaKind: "video",
+    uploadDate: row.createdAt ? row.createdAt.toISOString() : null,
   };
 }
 
@@ -470,17 +477,39 @@ ogRoutes.get("/v/:videoId/meta", async (c) => {
   const meta = await resolveOgMetaForVideoId(db, videoId);
   const kindCopy = ogKindCopy(meta.mediaKind);
   if (!meta.isPublic) {
-    return c.json({ title: `${kindCopy.noun} — hired.video`, description: null, image: null });
+    return c.json({ title: `${kindCopy.noun} — hired.video`, description: null, image: null, jsonLd: [] });
   }
   const ownerSubject = meta.ownerName ?? "this creator";
+  const origin = new URL(c.req.url).origin;
+  const title = meta.title
+    ? `${meta.title} — ${kindCopy.noun} on hired.video`
+    : `${meta.ownerName ?? kindCopy.noun} — ${kindCopy.noun} on hired.video`;
+  const description =
+    meta.description
+    ?? `${kindCopy.verb} ${ownerSubject}'s ${kindCopy.noun.toLowerCase()} on hired.video.`;
+  // Thumbnail is REQUIRED for video indexing — fall back to the generated
+  // OG card (this endpoint's sibling /api/og/v/:id, which 302s to the baked
+  // thumbnail when one exists). Never null so crawlers always get one.
+  const thumbnailUrl = meta.thumbnailUrl ?? `${origin}/api/og/v/${videoId}`;
   return c.json({
-    title: meta.title
-      ? `${meta.title} — ${kindCopy.noun} on hired.video`
-      : `${meta.ownerName ?? kindCopy.noun} — ${kindCopy.noun} on hired.video`,
-    description:
-      meta.description
-      ?? `${kindCopy.verb} ${ownerSubject}'s ${kindCopy.noun.toLowerCase()} on hired.video.`,
-    image: meta.thumbnailUrl ?? null,
+    title,
+    description,
+    image: thumbnailUrl,
+    // VideoObject for crawler-side injection (Cloudflare Pages Function).
+    // Mirrors generateStructuredData.videoObject in frontend/lib/seo.ts —
+    // keep the two in sync.
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoObject",
+        name: meta.title ?? `${kindCopy.noun} on hired.video`,
+        url: `https://hired.video/v/${videoId}`,
+        description: description.slice(0, 200),
+        thumbnailUrl,
+        ...(meta.uploadDate ? { uploadDate: meta.uploadDate } : {}),
+        embedUrl: `https://hired.video/v/${videoId}`,
+      },
+    ],
   });
 });
 
@@ -575,6 +604,111 @@ ogRoutes.get("/r/:id/meta", async (c) => {
     description: row.headline
       ? `${owner} — ${row.headline}. View the full resume on hired.video.`
       : `${owner}'s resume on hired.video — watch their video, see their skills, and get in touch.`,
+  });
+});
+
+// ─── GET /article/:userRef/:slug/meta ──────────────────────────────────────────
+// Crawler-facing metadata for a DB-backed article (/articles/:authorSlug/:slug).
+// Returns title + description + a guaranteed image + the Article JSON-LD so the
+// Cloudflare Pages Function can inject an image-bearing rich result into the
+// HTML for search/AI crawlers without executing the SPA — closing the
+// "articles missing thumbnails" gap. Mirrors the article public query in
+// routes/articles.ts and the Article adapter in frontend/lib/seo-ugc.ts.
+ogRoutes.get("/article/:userRef/:slug/meta", async (c) => {
+  const { userRef, slug } = c.req.param();
+  const db = getDb();
+  const origin = new URL(c.req.url).origin;
+  // Slow-changing per-article metadata, consumed only on the crawler path
+  // (the Pages Function caches the resulting HTML too). Edge-cache it.
+  c.header("Cache-Control", "public, max-age=300, s-maxage=3600");
+
+  // Resolve the first path segment (UUID or customUrlSlug) to a userId.
+  let authorUserId: string | null = isUuid(userRef) ? userRef : null;
+  if (!authorUserId) {
+    const [p] = await db
+      .select({ userId: userProfiles.userId })
+      .from(userProfiles)
+      .where(eq(userProfiles.customUrlSlug, userRef))
+      .limit(1);
+    authorUserId = p?.userId ?? null;
+  }
+  if (!authorUserId) {
+    return c.json({ title: "Article — hired.video", description: null, image: null, jsonLd: [] });
+  }
+
+  const [row] = await db
+    .select({
+      title: articles.title,
+      summary: articles.summary,
+      coverImageUrl: articles.coverImageUrl,
+      category: articles.category,
+      tags: articles.tags,
+      publishedAt: articles.publishedAt,
+      updatedAt: articles.updatedAt,
+      authorName: users.name,
+      authorSlug: userProfiles.customUrlSlug,
+      authorId: users.id,
+    })
+    .from(articles)
+    .innerJoin(users, eq(articles.userId, users.id))
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(and(
+      eq(articles.userId, authorUserId),
+      eq(articles.slug, slug),
+      eq(articles.status, "published"),
+      eq(users.emailVerified, true),
+    ))
+    .limit(1);
+
+  if (!row) {
+    return c.json({ title: "Article — hired.video", description: null, image: null, jsonLd: [] });
+  }
+
+  const title = `${row.title} — hired.video`;
+  const description = (row.summary ?? "").trim().slice(0, 160) || `${row.title} on hired.video.`;
+  // Cover image with the same fallback chain as articleCoverImageUrl: a
+  // stored cover (absolutized onto the API origin), else the generated card.
+  const image = row.coverImageUrl
+    ? (row.coverImageUrl.startsWith("http") ? row.coverImageUrl : `${origin}${row.coverImageUrl.startsWith("/") ? "" : "/"}${row.coverImageUrl}`)
+    : `${origin}/api/og/articles?${new URLSearchParams({
+        title: row.title,
+        ...(row.category ? { category: row.category } : {}),
+        ...(row.publishedAt ? { date: row.publishedAt.toISOString().slice(0, 10) } : {}),
+        ...(row.authorName ? { author: row.authorName } : {}),
+      }).toString()}`;
+  const authorRef = row.authorSlug ?? row.authorId;
+  const pageUrl = `https://hired.video/articles/${authorRef}/${slug}`;
+
+  return c.json({
+    title,
+    description,
+    image,
+    // Article JSON-LD — mirrors generateStructuredData.article in
+    // frontend/lib/seo.ts; keep the two in sync.
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        headline: row.title,
+        mainEntityOfPage: { "@type": "WebPage", "@id": pageUrl },
+        image,
+        url: pageUrl,
+        description,
+        ...(row.publishedAt ? { datePublished: row.publishedAt.toISOString() } : {}),
+        ...(row.updatedAt || row.publishedAt
+          ? { dateModified: (row.updatedAt ?? row.publishedAt)!.toISOString() }
+          : {}),
+        ...(row.authorName
+          ? { author: { "@type": "Person", name: row.authorName, url: `https://hired.video/people/${authorRef}` } }
+          : {}),
+        ...(Array.isArray(row.tags) && row.tags.length > 0 ? { keywords: row.tags.join(", ") } : {}),
+        publisher: {
+          "@type": "Organization",
+          name: "hired.video",
+          logo: { "@type": "ImageObject", url: "https://hired.video/og-image.svg" },
+        },
+      },
+    ],
   });
 });
 

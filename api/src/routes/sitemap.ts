@@ -61,6 +61,44 @@ function url(loc: string, lastmod?: string, changefreq = "weekly", priority = "0
   </url>`;
 }
 
+function xmlEscape(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+/**
+ * Video-sitemap entry (Google video indexing). `thumbnailLoc` MUST be a
+ * crawlable raster/SVG image — we point it at the worker's own
+ * `/api/og/v/:id` card endpoint (302s to a baked thumbnail when one exists),
+ * which is why it uses the request origin (the worker) rather than BASE (the
+ * SPA host, which doesn't proxy /api). Directly addresses the "videos can't
+ * be indexed — missing thumbnail" report by handing Google the thumbnail.
+ */
+function videoUrlEntry(opts: {
+  id: string;
+  title: string;
+  description: string;
+  thumbnailLoc: string;
+  lastmod?: string;
+}): string {
+  const player = `${BASE}/v/${opts.id}`;
+  return `  <url>
+    <loc>${player}</loc>${opts.lastmod ? `\n    <lastmod>${opts.lastmod.slice(0, 10)}</lastmod>` : ""}
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+    <video:video>
+      <video:thumbnail_loc>${xmlEscape(opts.thumbnailLoc)}</video:thumbnail_loc>
+      <video:title>${xmlEscape(opts.title)}</video:title>
+      <video:description>${xmlEscape(opts.description)}</video:description>
+      <video:player_loc>${player}</video:player_loc>
+    </video:video>
+  </url>`;
+}
+
 const STATIC_PAGES = [
   { loc: "/", changefreq: "daily", priority: "1.0" },
   { loc: "/jobs", changefreq: "hourly", priority: "0.9" },
@@ -104,6 +142,7 @@ const STATIC_PAGES = [
   { loc: "/pivot-explorer", changefreq: "weekly", priority: "0.8" },
   { loc: "/resume-templates", changefreq: "weekly", priority: "0.7" },
   { loc: "/articles", changefreq: "daily", priority: "0.7" },
+  { loc: "/blog", changefreq: "weekly", priority: "0.7" },
 ];
 
 sitemapRoutes.get("/sitemap.xml", async (c) => {
@@ -114,9 +153,12 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
   // does (process.env → globalThis.__ENV).
   const db = getDb();
   const now = new Date().toISOString();
+  // The worker serves both this sitemap and /api/og/* — use its own origin
+  // for OG/thumbnail URLs (BASE = the SPA host, which doesn't proxy /api).
+  const reqOrigin = new URL(c.req.url).origin;
 
   // Fetch dynamic content (limit to recent 500 of each to keep sitemap manageable)
-  const [jobs, companies, publicUsers, creatorTemplates] = await Promise.allSettled([
+  const [jobs, companies, publicUsers, creatorTemplates, publicProjects, publishedArticles] = await Promise.allSettled([
     db
       .select({ id: schema.jobItems.id, title: schema.jobItems.title, updatedAt: schema.jobItems.updatedAt })
       .from(schema.jobItems)
@@ -161,12 +203,54 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
       ))
       .orderBy(desc(schema.studioTemplates.updatedAt))
       .limit(500),
+
+    // Public studio projects (every mediaKind) — surfaced at /v/:id with a
+    // <video:video> entry so Google can index the video + its thumbnail.
+    // emailVerified-gated to keep spam out of the index, same as profiles.
+    db
+      .select({
+        id: schema.studioProjects.id,
+        storyboard: schema.studioProjects.storyboard,
+        mediaKind: schema.studioProjects.mediaKind,
+        ownerName: schema.users.name,
+        updatedAt: schema.studioProjects.updatedAt,
+      })
+      .from(schema.studioProjects)
+      .innerJoin(schema.users, eq(schema.users.id, schema.studioProjects.userId))
+      .where(and(
+        eq(schema.studioProjects.isPublic, true),
+        eq(schema.users.emailVerified, true),
+      ))
+      .orderBy(desc(schema.studioProjects.updatedAt))
+      .limit(500),
+
+    // Published DB articles — surfaced at /articles/:authorSlug/:slug.
+    // authorSlug mirrors the card link (customUrlSlug ?? userId).
+    db
+      .select({
+        slug: schema.articles.slug,
+        title: schema.articles.title,
+        userId: schema.articles.userId,
+        authorSlug: schema.userProfiles.customUrlSlug,
+        updatedAt: schema.articles.updatedAt,
+      })
+      .from(schema.articles)
+      .innerJoin(schema.users, eq(schema.users.id, schema.articles.userId))
+      .leftJoin(schema.userProfiles, eq(schema.userProfiles.userId, schema.articles.userId))
+      .where(and(
+        eq(schema.articles.status, "published"),
+        eq(schema.users.emailVerified, true),
+      ))
+      .orderBy(desc(schema.articles.updatedAt))
+      .limit(500),
   ]);
 
   const jobRows = jobs.status === "fulfilled" ? jobs.value : [];
   const companyRows = companies.status === "fulfilled" ? companies.value : [];
   const userRows = publicUsers.status === "fulfilled" ? publicUsers.value : [];
   const creatorTemplateRows = creatorTemplates.status === "fulfilled" ? creatorTemplates.value : [];
+  const projectRows = publicProjects.status === "fulfilled" ? publicProjects.value : [];
+  const articleRows = publishedArticles.status === "fulfilled" ? publishedArticles.value : [];
 
   // Resume-guide slugs keep their legacy derivation so historical URLs
   // stay stable. Salary URLs now ride off the canonical popular-roles /
@@ -233,10 +317,33 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
       .map((tpl) =>
         url(`/marketplace/templates/${tpl.slug}`, tpl.updatedAt?.toISOString(), "weekly", "0.6"),
       ),
+
+    // Public DB articles — image-bearing rich result + crawlable URL.
+    ...articleRows
+      .filter((a) => !!a.slug)
+      .map((a) =>
+        url(`/articles/${a.authorSlug ?? a.userId}/${a.slug}`, a.updatedAt?.toISOString(), "weekly", "0.6"),
+      ),
+
+    // Public studio projects as video-sitemap entries (thumbnail handed to
+    // Google so the video is indexable). Kept last so the <video:*> blocks
+    // group together.
+    ...projectRows.map((p) => {
+      const sb = (p.storyboard ?? null) as { _name?: string; _metaDescription?: string } | null;
+      const title = (sb?._name || p.ownerName || "Video").toString();
+      const description = (sb?._metaDescription || `Watch ${title} on hired.video.`).toString();
+      return videoUrlEntry({
+        id: p.id,
+        title,
+        description,
+        thumbnailLoc: `${reqOrigin}/api/og/v/${p.id}`,
+        lastmod: p.updatedAt?.toISOString(),
+      });
+    }),
   ];
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
 ${urls.join("\n")}
 </urlset>`;
 

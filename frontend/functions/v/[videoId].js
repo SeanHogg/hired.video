@@ -25,6 +25,7 @@ export async function onRequest({ request, env, params, next }) {
     description: "Check out this project on hired.video.",
     image: `${base}/api/og/v/${id}`,
     url: new URL(request.url).toString(),
+    jsonLd: undefined,
   };
   try {
     const r = await fetch(`${base}/api/og/v/${id}/meta`);
@@ -33,6 +34,10 @@ export async function onRequest({ request, env, params, next }) {
       if (m?.title) meta.title = m.title;
       if (m?.description) meta.description = m.description;
       if (m?.image) meta.image = m.image;
+      // VideoObject JSON-LD (with the required thumbnailUrl) so crawlers get
+      // an indexable video without running the SPA — fixes the Search Console
+      // "videos can't be indexed — missing thumbnail" report.
+      if (Array.isArray(m?.jsonLd) && m.jsonLd.length) meta.jsonLd = m.jsonLd;
     }
   } catch { /* fall back to defaults */ }
 

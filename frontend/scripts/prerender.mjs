@@ -300,6 +300,34 @@ function productSchema({ name, description, category, url }) {
   };
 }
 
+/** True for an individual blog POST route (not the /blog index). */
+function isBlogPostPath(p) {
+  return p.startsWith('/blog/') && p !== '/blog';
+}
+
+/** schema.org BlogPosting — mirrors generateStructuredData.article({type:
+ *  'BlogPosting'}) in seo.ts so the prerendered HTML carries an image-bearing
+ *  rich result (the client re-injects the same shape on hydration). Without
+ *  this, prerendered posts shipped an og:image but no Article JSON-LD image —
+ *  the "articles missing thumbnails" gap on the blog surface. */
+function blogPostingSchema({ title, description, url, image }) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: cardTitle(title),
+    description,
+    image,
+    url,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+    author: { '@type': 'Person', name: 'Sean Hogg', url: 'https://hired.video/people/seanhogg' },
+    publisher: {
+      '@type': 'Organization',
+      name: 'hired.video',
+      logo: { '@type': 'ImageObject', url: OG_IMAGE },
+    },
+  };
+}
+
 /** schema.org BreadcrumbList — mirrors generateBreadcrumbs in seo.ts. */
 function breadcrumbSchema(items) {
   return {
@@ -427,15 +455,23 @@ function main() {
     const canonical = r.path === '/' ? `${CANONICAL_ORIGIN}/` : `${CANONICAL_ORIGIN}${r.path}`;
     const title = r.title || DEFAULTS.title;
     const description = r.description || DEFAULTS.description;
+    const ogImage = r.ogImage || ogImageFor(r.path, r.ogTitle || title, r.ogDescription || description, r.eyebrow);
+    // Blog posts get a BlogPosting rich result whose image is the same card
+    // used for og:image, so crawlers see an article thumbnail in the JSON-LD.
+    const jsonLd =
+      r.jsonLd ||
+      (isBlogPostPath(r.path)
+        ? [blogPostingSchema({ title, description, url: canonical, image: ogImage })]
+        : undefined);
     const html = setOrInsertMeta(baseHtml, {
       title,
       description,
       ogTitle: r.ogTitle || title,
       ogDescription: r.ogDescription || description,
-      ogImage: r.ogImage || ogImageFor(r.path, r.ogTitle || title, r.ogDescription || description, r.eyebrow),
+      ogImage,
       canonical,
       twitterSite: TWITTER_SITE,
-      jsonLd: r.jsonLd,
+      jsonLd,
       rootHtml: r.rootHtml,
     });
 
