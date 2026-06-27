@@ -39,7 +39,6 @@ export function notificationPrefsCacheKey(userId: string): string {
 type PrefsRow = {
   notificationPreferences?: Record<string, boolean> | null;
   emailNotificationsEnabled?: boolean | null;
-  marketingEmailsEnabled?: boolean | null;
   weeklyDigestEnabled?: boolean | null;
 } | null
   | undefined;
@@ -52,13 +51,16 @@ type PrefsRow = {
 export function legacyToGranularBase(row: PrefsRow): Partial<NotificationPreferences> {
   if (!row) return {};
   const email = row.emailNotificationsEnabled ?? true;
+  // `emailMarketingUpdates` is no longer hydrated from a coarse column (the
+  // `marketing_emails_enabled` column was retired in 0487, #1976) — it now
+  // comes from the granular JSONB blob (or its default) via
+  // mergeNotificationPreferences.
   return {
     emailJobMatches: email,
     emailApplicationUpdates: email,
     emailMessages: email,
     emailConnectionRequests: email,
     emailWeeklyDigest: row.weeklyDigestEnabled ?? true,
-    emailMarketingUpdates: row.marketingEmailsEnabled ?? false,
   };
 }
 
@@ -66,17 +68,18 @@ export function legacyToGranularBase(row: PrefsRow): Partial<NotificationPrefere
  *  the older readers (account.ts) stay consistent after a granular save. */
 export function granularToLegacy(prefs: NotificationPreferences): {
   emailNotificationsEnabled: boolean;
-  marketingEmailsEnabled: boolean;
   jobAlertEmailsEnabled: boolean;
   weeklyDigestEnabled: boolean;
 } {
+  // `marketingEmailsEnabled` dropped — its backing column was retired in 0487
+  // (#1976); the granular `emailMarketingUpdates` toggle still lives in the
+  // JSONB blob but no longer projects onto a coarse column.
   return {
     emailNotificationsEnabled:
       prefs.emailJobMatches ||
       prefs.emailApplicationUpdates ||
       prefs.emailMessages ||
       prefs.emailConnectionRequests,
-    marketingEmailsEnabled: prefs.emailMarketingUpdates,
     jobAlertEmailsEnabled: prefs.emailJobMatches,
     weeklyDigestEnabled: prefs.emailWeeklyDigest,
   };
@@ -107,7 +110,6 @@ export async function loadNotificationPreferences(
         .select({
           notificationPreferences: accountPreferences.notificationPreferences,
           emailNotificationsEnabled: accountPreferences.emailNotificationsEnabled,
-          marketingEmailsEnabled: accountPreferences.marketingEmailsEnabled,
           weeklyDigestEnabled: accountPreferences.weeklyDigestEnabled,
         })
         .from(accountPreferences)

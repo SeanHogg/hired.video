@@ -408,6 +408,16 @@
     <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/pricing?lang=es" />
     <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/pricing?lang=fr-CA" />
   </url>
+  <url>
+    <loc>https://hired.video/rewards</loc>
+    <lastmod>2026-06-27</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/rewards" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/rewards" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/rewards?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/rewards?lang=fr-CA" />
+  </url>
 
   <url>
     <loc>https://hired.video/about</loc>

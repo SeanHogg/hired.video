@@ -10,11 +10,12 @@ import { apiClient } from "../api-client";
 // SCHEMAS
 // ============================================================================
 
-// Frontend simplified notifications model (UI)
+// Frontend simplified notifications model (UI). The coarse `marketing` toggle
+// was retired with #1976 — granular marketing consent lives in the email-keyed
+// ledger surfaced by <EmailPreferencesPanel>, not this simplified model.
 export const NotificationSettingsSchema = z.object({
   email: z.boolean(),
   push: z.boolean(),
-  marketing: z.boolean(),
   weekly: z.boolean(),
 });
 
@@ -229,7 +230,6 @@ export class SettingsService {
     return {
       email,
       push,
-      marketing: dto.emailMarketingUpdates ?? false,
       weekly: dto.emailWeeklyDigest ?? true,
     };
   }
@@ -248,9 +248,6 @@ export class SettingsService {
       payload.pushApplicationUpdates = settings.push;
       payload.pushJobMatches = settings.push;
       payload.pushConnectionRequests = settings.push;
-    }
-    if (typeof settings.marketing === "boolean") {
-      payload.emailMarketingUpdates = settings.marketing;
     }
     if (typeof settings.weekly === "boolean") {
       payload.emailWeeklyDigest = settings.weekly;

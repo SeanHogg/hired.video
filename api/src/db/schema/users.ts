@@ -275,7 +275,9 @@ export const accountPreferences = pgTable("account_preferences", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
   emailNotificationsEnabled: boolean("email_notifications_enabled").default(true).notNull(),
-  marketingEmailsEnabled: boolean("marketing_emails_enabled").default(false).notNull(),
+  // marketing_emails_enabled (coarse opt-out) retired in 0487 (#1976) — the
+  // authoritative marketing-consent store is the email-keyed
+  // `email_marketing_preferences` ledger honored by the send path.
   jobAlertEmailsEnabled: boolean("job_alert_emails_enabled").default(true).notNull(),
   weeklyDigestEnabled: boolean("weekly_digest_enabled").default(true).notNull(),
   // Granular per-channel × per-category notification toggles (the shape the

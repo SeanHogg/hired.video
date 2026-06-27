@@ -39,6 +39,7 @@ import { StudioOpenCTA } from "@/components/studio/templates/StudioOpenCTA";
 import { AudienceQuickLinks } from "@/components/studio/templates/AudienceQuickLinks";
 import { AudienceHiringCTA } from "@/components/landing/AudienceHiringCTA";
 import type { AudienceDef } from "@/components/studio/templates/audiences";
+import { localizeAudience } from "@/lib/studio/localize-audience";
 import { templatesForAudience } from "@/components/studio/templates/templates-by-audience";
 
 export interface ProfessionLandingPageProps {
@@ -53,15 +54,18 @@ export function ProfessionLandingPage({
   pathname,
 }: ProfessionLandingPageProps): JSX.Element {
   const { t } = useTranslation();
-  const label = audience.label; // plural display label, e.g. "Directors"
+  // Localized hero label + lede (#2249) — overlays per-locale copy on the
+  // English audiences.ts SSoT so the headline, meta description, and JSON-LD
+  // are localized for es / fr-CA, not English-only.
+  const { label, blurb } = localizeAudience(audience, t);
   const labelLower = label.toLowerCase();
 
   useDefaultBreadcrumbs();
   useSEO(pathname, {
     title: `${label}: AI video maker + templates · hired.video`,
-    description: `${audience.blurb} Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.`,
+    description: `${blurb} Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.`,
     ogTitle: `hired.video for ${label}`,
-    ogDescription: audience.blurb,
+    ogDescription: blurb,
     // CollectionPage JSON-LD — pairs with the FAQPage (MarketingFAQ) and
     // BreadcrumbList (useDefaultBreadcrumbs) so search + generative engines
     // get a clear entity for this role page.
@@ -69,7 +73,7 @@ export function ProfessionLandingPage({
       "@context": "https://schema.org",
       "@type": "CollectionPage",
       name: `${label} — video templates & tools · hired.video`,
-      description: audience.blurb,
+      description: blurb,
       url: `https://hired.video/for/${slug}`,
       isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
       about: { "@type": "Thing", name: label },
@@ -111,7 +115,7 @@ export function ProfessionLandingPage({
             {t("audiences.forBadge", { label })}
           </Badge>
           <h1 className="mb-4 text-5xl font-bold">{label}</h1>
-          <p className="mb-8 text-xl text-muted-foreground">{audience.blurb}</p>
+          <p className="mb-8 text-xl text-muted-foreground">{blurb}</p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <StudioOpenCTA withArrow label={t("audienceLanding.hero.openStudio")} />
             <Button asChild variant="outline" size="lg">

@@ -149,14 +149,15 @@ describe("mergeNotificationPreferences", () => {
 
 describe("legacy ↔ granular projections", () => {
   it("legacyToGranularBase maps the coarse email columns onto the email toggles", () => {
+    // marketing_emails_enabled retired in 0487 (#1976) — emailMarketingUpdates
+    // is no longer hydrated from a coarse column; it rides the JSONB blob.
     const base = legacyToGranularBase({
       emailNotificationsEnabled: false,
-      marketingEmailsEnabled: true,
       weeklyDigestEnabled: false,
     });
     assert.equal(base.emailMessages, false);
     assert.equal(base.emailJobMatches, false);
-    assert.equal(base.emailMarketingUpdates, true);
+    assert.equal(base.emailMarketingUpdates, undefined);
     assert.equal(base.emailWeeklyDigest, false);
   });
 
@@ -170,7 +171,8 @@ describe("legacy ↔ granular projections", () => {
       emailWeeklyDigest: false,
     }));
     assert.equal(legacy.emailNotificationsEnabled, false); // all transactional off
-    assert.equal(legacy.marketingEmailsEnabled, true);
+    // marketingEmailsEnabled dropped from the projection (0487, #1976).
+    assert.equal("marketingEmailsEnabled" in legacy, false);
     assert.equal(legacy.weeklyDigestEnabled, false);
     assert.equal(legacy.jobAlertEmailsEnabled, false);
   });

@@ -124,7 +124,6 @@ function SettingsContent() {
   const [notifications, setNotifications] = useState({
     email: true,
     push: true,
-    marketing: false,
     weekly: true,
   });
 
@@ -258,7 +257,6 @@ function SettingsContent() {
       .then((n) => setNotifications({
         email: n.email,
         push: n.push,
-        marketing: n.marketing,
         weekly: n.weekly,
       }))
       .catch((err) => {

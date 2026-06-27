@@ -237,6 +237,20 @@ export default function Navigation({
                 >
                   {t("labels.pricing")}
                 </Link>
+
+                {/* Rewards — incentive discovery for signed-out visitors (#1146):
+                    let them see what they could earn BEFORE signing up. */}
+                <Link
+                  to="/rewards"
+                  className={cn(
+                    "transition-colors font-medium",
+                    location.pathname === "/rewards"
+                      ? "text-primary"
+                      : "text-foreground/70 hover:text-foreground",
+                  )}
+                >
+                  {t("labels.rewards")}
+                </Link>
               </>
             )}
           </div>

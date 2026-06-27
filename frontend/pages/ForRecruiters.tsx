@@ -17,6 +17,7 @@ import {
   TrendingUp,
   Shield,
   Globe,
+  GraduationCap,
 } from "lucide-react";
 
 import MarketingFAQ from "@/components/MarketingFAQ";
@@ -103,6 +104,16 @@ export default function ForRecruiters() {
         t("marketing.recruiters.features.dashboard.bullet1"),
         t("marketing.recruiters.features.dashboard.bullet2"),
         t("marketing.recruiters.features.dashboard.bullet3"),
+      ],
+    },
+    {
+      icon: GraduationCap,
+      title: t("marketing.recruiters.features.learning.title"),
+      description: t("marketing.recruiters.features.learning.desc"),
+      bullets: [
+        t("marketing.recruiters.features.learning.bullet1"),
+        t("marketing.recruiters.features.learning.bullet2"),
+        t("marketing.recruiters.features.learning.bullet3"),
       ],
     },
   ];
