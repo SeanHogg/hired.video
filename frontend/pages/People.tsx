@@ -97,6 +97,7 @@ import {
   type SubmissionDTO,
   type SubmissionFilters,
 } from "@/lib/services/submission-service";
+import CandidatePacketGenerator from "@/components/recruit/CandidatePacketGenerator";
 import { apiClient } from "@/lib/api-client";
 import { useConnectionStatuses } from "@/lib/use-connection-statuses";
 import { listsService } from "@/lib/services/lists-service";
@@ -1141,6 +1142,17 @@ export default function People() {
                       </Card>
                     ) : (
                       <div className="space-y-4">
+                        {/* #243 — bundle selected submissions into a print-ready
+                            packet for the hiring manager (optional anonymize). */}
+                        <div className="flex justify-end">
+                          <CandidatePacketGenerator
+                            submissions={submissions.map((s) => ({
+                              id: s.id,
+                              candidateName: s.candidateName,
+                              jobTitle: s.jobTitle,
+                            }))}
+                          />
+                        </div>
                         {submissions.map((submission) => (
                           <Card key={submission.id}>
                             <CardHeader>

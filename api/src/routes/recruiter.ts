@@ -33,6 +33,7 @@ import {
 	buildPlacementNotificationService,
 	isPlacementEvent,
 } from "../services/notifications/placement-notifications.js";
+import { renderCandidatePacketHtml } from "../services/recruiter/packet-renderer.js";
 
 export const recruiterRoutes = new Hono<AppEnv>();
 
@@ -1017,6 +1018,24 @@ recruiterRoutes.get("/submissions", async (c) => {
 		.where(eq(schema.candidateSubmissions.recruiterId, user.sub))
 		.orderBy(desc(schema.candidateSubmissions.submittedAt));
 	return c.json(responseEnvelope(rows.map(rowToSubmission)));
+});
+
+// GET /submissions/packet — print-ready multi-candidate packet (#243).
+// Returns HTML (browser print-to-PDF). `ids` = comma-separated submission ids,
+// `anonymize=1` hides name/email/photo. Ownership enforced in the renderer.
+// Declared before /submissions/:id so the static segment wins the match.
+recruiterRoutes.get("/submissions/packet", async (c) => {
+	const user = c.get("user");
+	const ids = (c.req.query("ids") ?? "")
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
+	const anonymize = ["1", "true", "yes"].includes((c.req.query("anonymize") ?? "").toLowerCase());
+	const html = await renderCandidatePacketHtml(user.sub, ids, anonymize);
+	return new Response(html, {
+		status: 200,
+		headers: { "Content-Type": "text/html; charset=utf-8" },
+	});
 });
 
 // GET /submissions/:id — single submission

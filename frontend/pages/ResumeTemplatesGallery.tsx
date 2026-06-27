@@ -11,19 +11,22 @@
 
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppShell } from "@/components/AppShell";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { SectorFilter, sectorFilterFromQuery, applySectorFilterToQuery } from "@/components/sector/SectorFilter";
+import TemplateGallery from "@/components/resume-renderer/TemplateGallery";
 import { allSectors, sectorMeta, type Sector } from "@shared/sectors";
 import { sectorTemplateRec, sectorTemplateFile } from "@shared/sector-templates";
 import { VISUAL_THEMES } from "@/lib/studio/visual-themes";
 
 export default function ResumeTemplatesGallery() {
+  const { t } = useTranslation();
   useSEO("/resume-templates");
-  useBreadcrumbs([{ name: "Resume Templates", url: "/resume-templates" }]);
+  useBreadcrumbs([{ name: t("resumeTemplatesGallery.title"), url: "/resume-templates" }]);
 
   const [params, setParams] = useSearchParams();
   const selectedSector = sectorFilterFromQuery(params);
@@ -44,11 +47,29 @@ export default function ResumeTemplatesGallery() {
     <AppShell bgClassName="bg-background">
       <main className="pb-20 px-6">
         <section className="py-12 space-y-3">
-          <h1 className="text-4xl font-bold tracking-tight">Resume Templates</h1>
+          <h1 className="text-4xl font-bold tracking-tight">{t("resumeTemplatesGallery.title")}</h1>
           <p className="text-lg text-muted-foreground max-w-3xl">
-            Five base storyboards, each tuned for a different sector and
-            seniority profile. Filter by sector to surface the recommended
-            template + rationale.
+            {t("resumeTemplatesGallery.intro")}
+          </p>
+        </section>
+
+        {/* Document templates — the real resume template catalog (every
+            TEMPLATE_PRESET), rendered through the shared TemplateGallery /
+            TemplateCard so each card previews + links to its
+            /marketplace/templates/<slug> page (DRY: same cards as /search). */}
+        <TemplateGallery
+          title={t("resumeTemplatesGallery.documentTemplates.title")}
+          subtitle={t("resumeTemplatesGallery.documentTemplates.subtitle")}
+        />
+
+        {/* Video resume themes by sector — a distinct surface (storyboard
+            themes for the studio), kept below the document catalog. */}
+        <section className="pt-8 pb-2 space-y-2">
+          <h2 className="text-2xl font-semibold tracking-tight">
+            {t("resumeTemplatesGallery.videoThemes.title")}
+          </h2>
+          <p className="text-muted-foreground max-w-3xl">
+            {t("resumeTemplatesGallery.videoThemes.subtitle")}
           </p>
         </section>
 
@@ -65,7 +86,10 @@ export default function ResumeTemplatesGallery() {
             <Card className="bg-muted/30 border-primary/40">
               <CardHeader>
                 <CardTitle>
-                  Recommended for {sectorMeta(selectedSector).label}: {sectorTemplateRec(selectedSector).displayName}
+                  {t("resumeTemplatesGallery.recommendedFor", {
+                    sector: sectorMeta(selectedSector).label,
+                    template: sectorTemplateRec(selectedSector).displayName,
+                  })}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -74,7 +98,7 @@ export default function ResumeTemplatesGallery() {
                 </p>
                 {sectorTemplateRec(selectedSector).alternates.length > 0 && (
                   <div>
-                    <p className="text-sm font-medium mb-1">Alternates</p>
+                    <p className="text-sm font-medium mb-1">{t("resumeTemplatesGallery.alternates")}</p>
                     <ul className="space-y-1">
                       {sectorTemplateRec(selectedSector).alternates.map((alt) => (
                         <li key={alt.themeId} className="text-sm text-muted-foreground">
@@ -106,7 +130,7 @@ export default function ResumeTemplatesGallery() {
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-base">{theme.label}</CardTitle>
-                    {isRecommended && <Badge>Recommended</Badge>}
+                    {isRecommended && <Badge>{t("resumeTemplatesGallery.recommendedBadge")}</Badge>}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -130,7 +154,7 @@ export default function ResumeTemplatesGallery() {
                           : theme.file
                       }`}
                     >
-                      Open in studio
+                      {t("resumeTemplatesGallery.openInStudio")}
                     </Link>
                   </Button>
                 </CardContent>
@@ -142,7 +166,7 @@ export default function ResumeTemplatesGallery() {
         {/* Sector matrix — every sector + its primary recommendation, for
             quick discovery without scanning the cards. */}
         <section className="pb-12 space-y-3">
-          <h2 className="text-2xl font-semibold tracking-tight">By sector</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">{t("resumeTemplatesGallery.bySector")}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {allSectors().map((m) => {
               const rec = sectorTemplateRec(m.slug);

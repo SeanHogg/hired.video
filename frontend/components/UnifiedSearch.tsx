@@ -101,13 +101,15 @@ const categoryToTypes = (category: string): CardFeedType[] => {
       // Courses also bypass the card-feed pipeline (separate /api/courses/public)
       return [];
     case "templates":
-      // Templates = UNION of every template-shaped surface: studio
-      // templates AND public resumes (which serve as resume templates;
-      // no isTemplate flag exists on the resume schema today — every
-      // public resume is reusable). Per #1613 fix. Future kinds
-      // (job_templates, learning_path_templates) get added here as they
-      // ship.
-      return ["template", "resume"];
+      // Templates = the actual template catalog only: resume presets +
+      // studio built-ins + creator-published studio templates, ALL of which
+      // the "template" fetcher already surfaces through the unified registry
+      // (card-feed `fetchTemplates`). Public USER resumes are NOT templates —
+      // they previously rode along here (the #1613 conflation) but, carrying
+      // real recent dates, out-ranked and crowded out the actual templates
+      // under the "recent" sort. They live under the "resumes" category.
+      // Future kinds (job_templates, learning_path_templates) get added here.
+      return ["template"];
     case "articles":
       return ["article"];
     case "guides":
