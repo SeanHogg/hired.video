@@ -92,3 +92,41 @@ export function htmlResponse(html, baseHeaders) {
 export function apiBase(env) {
   return env.PUBLIC_API_BASE || env.API_BASE || "https://hired.video";
 }
+
+// Factory for the per-entity crawler-OG Pages Functions (/v, /articles,
+// /people, /resumes, /creators, /voice). They all do the same thing — bots
+// only, fetch a worker meta endpoint, rewrite OG tags + inject any JSON-LD,
+// humans get the untouched SPA — and differ ONLY in the meta URL + default
+// copy. This keeps that one behaviour in one place (DRY) so a new crawlable
+// detail route is a 4-line file.
+//
+//   metaUrl:  (ctx) => string            — worker meta endpoint to fetch
+//   defaults: { title?, description?, image?(ctx) } — fallbacks on fetch fail
+// ctx = { base, params, request }.
+export function makeCrawlerOgHandler({ metaUrl, defaults }) {
+  return async function onRequest({ request, env, params, next }) {
+    if (!isSocialCrawler(request)) return next();
+    const base = apiBase(env);
+    const ctx = { base, params, request };
+    const meta = {
+      title: defaults?.title,
+      description: defaults?.description,
+      image: defaults?.image ? defaults.image(ctx) : undefined,
+      url: new URL(request.url).toString(),
+      jsonLd: undefined,
+    };
+    try {
+      const r = await fetch(metaUrl(ctx));
+      if (r.ok) {
+        const m = await r.json();
+        if (m?.title) meta.title = m.title;
+        if (m?.description) meta.description = m.description;
+        if (m?.image) meta.image = m.image;
+        // VideoObject / Article / ProfilePage JSON-LD for crawler injection.
+        if (Array.isArray(m?.jsonLd) && m.jsonLd.length) meta.jsonLd = m.jsonLd;
+      }
+    } catch { /* fall back to defaults */ }
+    const { html, headers } = await getBaseHtml(next);
+    return htmlResponse(rewriteMeta(html, meta), headers);
+  };
+}

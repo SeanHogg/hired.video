@@ -38,6 +38,7 @@ import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { generateStructuredData, useSEO, type SEOData } from "./seo";
 import { buildImageUrl } from "./utils";
+import { getYouTubeEmbedUrl } from "./media-url";
 
 // ---------------------------------------------------------------------------
 // Registry
@@ -616,7 +617,11 @@ registerUgcSeo<VideoResumeRecord>("videoResume", (video, pathname) => {
       thumbnailUrl,
       uploadDate,
       contentUrl: video.videoUrl ?? undefined,
-      embedUrl: video.youtubeUrl ?? undefined,
+      // Canonical YouTube /embed/ player when hosted on YouTube (a raw
+      // watch?v= URL is not a valid embedUrl); otherwise the watch page,
+      // which is the one player surface valid for every mediaKind incl.
+      // live-rendered canvas projects.
+      embedUrl: video.youtubeUrl ? getYouTubeEmbedUrl(video.youtubeUrl) : absUrl(pathname),
       url: absUrl(pathname),
     }),
   };

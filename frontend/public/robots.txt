@@ -88,3 +88,8 @@ Sitemap: https://hired.video/sitemap.xml
 # launch-market /in/[country]/[state]/[city] page. Regenerate after a
 # content/geo refresh.
 Sitemap: https://hired.video/sitemap-locations.xml
+# Dynamic inventory proxied from the API worker (#2260) — jobs, companies,
+# public profiles, salary leaves, marketplace templates, public studio videos
+# (with <video:video> thumbnails for video indexing), and published articles.
+# Served by frontend/functions/sitemap-content.xml.js.
+Sitemap: https://hired.video/sitemap-content.xml

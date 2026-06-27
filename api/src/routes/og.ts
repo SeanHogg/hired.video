@@ -497,7 +497,12 @@ ogRoutes.get("/v/:videoId/meta", async (c) => {
     image: thumbnailUrl,
     // VideoObject for crawler-side injection (Cloudflare Pages Function).
     // Mirrors generateStructuredData.videoObject in frontend/lib/seo.ts —
-    // keep the two in sync.
+    // keep the two in sync. embedUrl is the watch page: it's the ONE player
+    // surface valid for every mediaKind, including live-rendered canvas
+    // projects (the standalone /embed/video/frame only resolves once a video
+    // is baked to MP4/YouTube, so it would be a dead link for those). The
+    // watch page + the always-present thumbnailUrl satisfy Google's video
+    // requirements for all kinds.
     jsonLd: [
       {
         "@context": "https://schema.org",
@@ -706,6 +711,74 @@ ogRoutes.get("/article/:userRef/:slug/meta", async (c) => {
           "@type": "Organization",
           name: "hired.video",
           logo: { "@type": "ImageObject", url: "https://hired.video/og-image.svg" },
+        },
+      },
+    ],
+  });
+});
+
+// ─── GET /person/:userRef/meta ──────────────────────────────────────────────
+// Crawler-facing metadata for a public profile (/people/:id). Returns
+// title + description + image + ProfilePage JSON-LD so the Cloudflare Pages
+// Function can give Googlebot/AI crawlers a rich result without the SPA.
+// Only PUBLIC + email-verified profiles resolve; everything else returns a
+// neutral fallback (so private profiles aren't leaked or indexed). Mirrors
+// generateStructuredData.profilePage in frontend/lib/seo.ts.
+ogRoutes.get("/person/:userRef/meta", async (c) => {
+  const { userRef } = c.req.param();
+  const db = getDb();
+  const o = new URL(c.req.url).origin;
+  c.header("Cache-Control", "public, max-age=300, s-maxage=3600");
+
+  const [row] = await db
+    .select({
+      name: users.name,
+      headline: userProfiles.headline,
+      avatarUrl: userProfiles.avatarUrl,
+      slug: userProfiles.customUrlSlug,
+      visibility: userProfiles.profileVisibility,
+    })
+    .from(users)
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(and(
+      isUuid(userRef) ? eq(users.id, userRef) : eq(userProfiles.customUrlSlug, userRef),
+      eq(users.emailVerified, true),
+    ))
+    .limit(1);
+
+  if (!row || row.visibility !== "public") {
+    // null title → the crawler Pages Function leaves the SPA meta untouched
+    // (so named /people/* marketing sub-routes aren't clobbered).
+    return c.json({ title: null, description: null, image: null, jsonLd: [] });
+  }
+
+  const name = row.name ?? "Professional";
+  const headline = (row.headline ?? "").trim();
+  const title = headline ? `${name}, ${headline} — hired.video` : `${name} — hired.video`;
+  const description = headline
+    ? `${name} — ${headline}. View the full profile on hired.video.`
+    : `${name}'s professional profile on hired.video.`;
+  const ref = row.slug ?? userRef;
+  const pageUrl = `https://hired.video/people/${ref}`;
+  const image = row.avatarUrl
+    ? (row.avatarUrl.startsWith("http") ? row.avatarUrl : `${o}${row.avatarUrl.startsWith("/") ? "" : "/"}${row.avatarUrl}`)
+    : `${o}/api/og/page?${new URLSearchParams({ title: name, eyebrow: "PROFILE", subtitle: headline }).toString()}`;
+
+  return c.json({
+    title,
+    description,
+    image,
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "ProfilePage",
+        url: pageUrl,
+        mainEntity: {
+          "@type": "Person",
+          name,
+          ...(headline ? { jobTitle: headline } : {}),
+          ...(row.avatarUrl ? { image } : {}),
+          url: pageUrl,
         },
       },
     ],
