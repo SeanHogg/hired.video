@@ -31,18 +31,16 @@ import { EmptyState } from "@/components/outreach/shared/EmptyState";
 import { OutreachTabToolbar } from "@/components/outreach/shared/OutreachTabToolbar";
 import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
 import { ViewModeList, SCROLL_GRID_LIST_MODES } from "@/components/ViewModeList";
-import {
-  EmailCampaignStatus,
-  type EmailCampaignDTO,
-} from "@/types/communication";
+import { CampaignList } from "@/components/campaigns";
+import type { CampaignDTO } from "@shared/campaigns";
 import type { VideoCampaign } from "@/lib/services/studio-service";
 
 export interface CampaignsTabProps {
   videoCampaigns: VideoCampaign[];
-  emailCampaigns: EmailCampaignDTO[];
+  emailCampaigns: CampaignDTO[];
   filteredCampaigns: {
     video: VideoCampaign[];
-    email: EmailCampaignDTO[];
+    email: CampaignDTO[];
   };
   totalCampaigns: number;
   search: string;
@@ -280,68 +278,10 @@ export function CampaignsTab({
           <h3 className="text-lg font-semibold flex items-center gap-2 mt-6">
             <Mail className="h-4 w-4" /> Email Campaigns
           </h3>
-          <ViewModeList viewMode={viewMode}>
-            {filteredCampaigns.email.map((campaign) => (
-              <Card
-                key={campaign.id}
-                className={viewMode === "list" ? "flex flex-row items-center" : ""}
-              >
-                {viewMode === "list" ? (
-                  <div className="flex-1 flex items-center gap-4 p-4 min-w-0">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold truncate">{campaign.name}</p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {campaign.description}
-                      </p>
-                    </div>
-                    <div className="hidden md:flex items-center gap-3 text-sm text-muted-foreground flex-shrink-0">
-                      <span>{campaign.totalRecipients} recipients</span>
-                      <span>{campaign.emailsSent} sent</span>
-                      <span>{campaign.emailsOpened} opened</span>
-                    </div>
-                    <Badge
-                      variant={
-                        campaign.status === EmailCampaignStatus.Sent
-                          ? "default"
-                          : "secondary"
-                      }
-                      className="flex-shrink-0"
-                    >
-                      {EmailCampaignStatus[campaign.status]}
-                    </Badge>
-                  </div>
-                ) : (
-                  <>
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle>{campaign.name}</CardTitle>
-                          <CardDescription>{campaign.description}</CardDescription>
-                        </div>
-                        <Badge
-                          variant={
-                            campaign.status === EmailCampaignStatus.Sent
-                              ? "default"
-                              : "secondary"
-                          }
-                        >
-                          {EmailCampaignStatus[campaign.status]}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <Stat label="Recipients" value={campaign.totalRecipients} />
-                        <Stat label="Sent" value={campaign.emailsSent} />
-                        <Stat label="Opened" value={campaign.emailsOpened} />
-                        <Stat label="Replies" value={campaign.repliesReceived} />
-                      </div>
-                    </CardContent>
-                  </>
-                )}
-              </Card>
-            ))}
-          </ViewModeList>
+          {/* Reuses the same engine-driven <CampaignList> as the SuperAdmin
+              manager (string status + real stats + audience) — read-only here,
+              no per-row actions (#1970). */}
+          <CampaignList campaigns={filteredCampaigns.email} />
         </>
       )}
 

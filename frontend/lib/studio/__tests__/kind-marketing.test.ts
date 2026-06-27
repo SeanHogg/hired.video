@@ -31,29 +31,16 @@ describe("KIND_MARKETING", () => {
     }
   });
 
-  it("every pitch ships a non-empty title + blurb + icon + accentClass", () => {
+  it("every pitch ships a non-empty titleKey + blurbKey + icon + accentClass", () => {
     for (const kind of MEDIA_KINDS) {
       const p = KIND_MARKETING[kind];
-      expect(p.title.trim().length, `${kind} title empty`).toBeGreaterThan(0);
-      expect(p.blurb.trim().length, `${kind} blurb empty`).toBeGreaterThan(20);
+      // Pure module exposes i18n keys, not literals (#2245). Pin the
+      // convention so a regression to a hardcoded string is caught.
+      expect(p.titleKey, `${kind} titleKey wrong`).toBe(`studioKind.${kind}.title`);
+      expect(p.blurbKey, `${kind} blurbKey wrong`).toBe(`studioKind.${kind}.blurb`);
       expect(p.icon, `${kind} icon missing`).toBeTruthy();
       expect(p.accentClass.trim().length, `${kind} accent class empty`).toBeGreaterThan(
         0,
-      );
-    }
-  });
-
-  it("blurb avoids leaving 'TODO' placeholders past review", () => {
-    // Cheap catch for the common pattern of "TODO: write the blurb"
-    // landing in production. The blurb is what users SEE on the
-    // marketing surface — placeholders are an outright bug.
-    for (const kind of MEDIA_KINDS) {
-      const p = KIND_MARKETING[kind];
-      expect(p.blurb.toLowerCase(), `${kind} has TODO placeholder`).not.toContain(
-        "todo",
-      );
-      expect(p.title.toLowerCase(), `${kind} title has TODO placeholder`).not.toContain(
-        "todo",
       );
     }
   });

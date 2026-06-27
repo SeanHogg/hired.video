@@ -4,11 +4,11 @@
  */
 
 import { apiClient } from "@/lib/api-client";
+import type { CampaignDTO } from "@shared/campaigns";
 import {
   ConversationDTO,
   MessageDTO,
   EmailTemplateDTO,
-  EmailCampaignDTO,
   CommunicationTrackingDTO,
   ExternalContactDTO,
   CreateConversationRequest,
@@ -340,11 +340,14 @@ export class CommunicationService {
   // ===== EMAIL CAMPAIGNS =====
 
   /**
-   * Get email campaigns
+   * Get the caller's email campaigns. Returns the canonical `CampaignDTO`
+   * (string status + stats + audience) from the campaign engine — the user-
+   * facing Outreach surface drives the same `<CampaignList>` as SuperAdmin
+   * (#1970).
    */
-  async getEmailCampaigns(): Promise<EmailCampaignDTO[]> {
+  async getEmailCampaigns(): Promise<CampaignDTO[]> {
     try {
-      const response = await apiClient.get<EmailCampaignDTO[]>(
+      const response = await apiClient.get<CampaignDTO[]>(
         `${this.baseUrl}/email-campaigns`,
       );
       return response.data;
@@ -355,13 +358,14 @@ export class CommunicationService {
   }
 
   /**
-   * Create a new email campaign
+   * Create a new email campaign. The route delegates to the canonical
+   * CampaignService engine and returns a `CampaignDTO` (#1971/#1970).
    */
   async createEmailCampaign(
     request: CreateEmailCampaignRequest,
-  ): Promise<EmailCampaignDTO> {
+  ): Promise<CampaignDTO> {
     try {
-      const response = await apiClient.post<EmailCampaignDTO>(
+      const response = await apiClient.post<CampaignDTO>(
         `${this.baseUrl}/email-campaigns`,
         request,
       );

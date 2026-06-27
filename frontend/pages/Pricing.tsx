@@ -845,7 +845,7 @@ export default function Pricing() {
                         <FeatureRow
                           key={pitch.kind}
                           icon={pitch.icon}
-                          label={pitch.title}
+                          label={t(pitch.titleKey)}
                           free
                           pro={t("messages.pricing.value.allTemplatesProExport")}
                         />

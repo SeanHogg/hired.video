@@ -41,15 +41,17 @@ import type { MediaKind } from "@shared/media-kinds";
 import type { ContentTemplate } from "@/components/studio/templates/catalog";
 
 export interface KindMarketingPitch {
-  /** Display title — what the kind IS in user-facing terms. Different
-   *  from `MEDIA_KIND_UI[kind].badgeLabel` because that's a single-word
-   *  chip ("Video", "Comic") whereas the pitch wants a marketable
-   *  phrase ("Video pitches & resumes", "Interactive comics"). */
-  title: string;
-  /** 1-2 sentence pitch — what the user can MAKE with this kind. Plain
-   *  prose, no marketing jargon. Reads as the body copy under the
-   *  title in the "What you can make" grid. */
-  blurb: string;
+  /** i18n flat-key for the display title — what the kind IS in user-facing
+   *  terms. Different from `MEDIA_KIND_UI[kind].badgeLabel` because that's a
+   *  single-word chip ("Video", "Comic") whereas the pitch wants a marketable
+   *  phrase ("Video pitches & resumes", "Interactive comics"). Per the repo
+   *  i18n rule, this pure module exposes a key — the consumer renders it via
+   *  `t(...)`, never the literal. Catalog: `studioKind.<kind>.title`. */
+  titleKey: string;
+  /** i18n flat-key for the 1-2 sentence pitch — what the user can MAKE with
+   *  this kind. Reads as the body copy under the title in the "What you can
+   *  make" grid. Catalog: `studioKind.<kind>.blurb`. */
+  blurbKey: string;
   /** Marketing icon. lucide-react reference; the grid renders it at
    *  ~h-10 w-10 size. */
   icon: LucideIcon;
@@ -82,9 +84,8 @@ export interface KindMarketingPitch {
  *  pitch here. */
 export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
   video: {
-    title: "Video pitches & resumes",
-    blurb:
-      "AI writes the script and renders a polished 720p / 1080p video in 60 seconds. Job seekers, recruiters, and companies all use the same canvas — video resumes, job ads, company promos, sizzle reels.",
+    titleKey: "studioKind.video.title",
+    blurbKey: "studioKind.video.blurb",
     icon: Film,
     // Mid-tone slate so the icon mirrors the video badge's slate identity
     // (`MediaKindBadge` uses bg-slate-900/85) while staying legible on BOTH
@@ -97,36 +98,32 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     starterTemplate: "resume",
   },
   podcast: {
-    title: "Podcasts & audio episodes",
-    blurb:
-      "Trailers, full-length episodes, two-host interviews. MP3 / M4A export with chapter markers, RSS-feed-ready. The same studio surface, just audio-first.",
+    titleKey: "studioKind.podcast.title",
+    blurbKey: "studioKind.podcast.blurb",
     icon: Headphones,
     accentClass: "bg-violet-600/10 text-violet-600",
     isShippable: true,
     starterTemplate: "podcast_episode",
   },
   voice: {
-    title: "Voice clips",
-    blurb:
-      "Audition reels, IVR / voicemail prompts, audiobook chapters. Powered by the same TTS + voice-clone catalog that drives video voiceovers.",
+    titleKey: "studioKind.voice.title",
+    blurbKey: "studioKind.voice.blurb",
     icon: Mic2,
     accentClass: "bg-amber-500/10 text-amber-600",
     isShippable: true,
     starterTemplate: "voice_audition_reel",
   },
   animation: {
-    title: "Animated loops",
-    blurb:
-      "GIFs, animated WebP, looping promo clips for social. The same canvas runtime, exported as a loop.",
+    titleKey: "studioKind.animation.title",
+    blurbKey: "studioKind.animation.blurb",
     icon: Sparkles,
     accentClass: "bg-emerald-500/10 text-emerald-600",
     isShippable: true,
     starterTemplate: "animation-explainer",
   },
   game: {
-    title: "Browser games",
-    blurb:
-      "Endless runners, quiz games, memory matches. Built in the studio, exported as a self-contained HTML5 bundle that runs on any web host.",
+    titleKey: "studioKind.game.title",
+    blurbKey: "studioKind.game.blurb",
     icon: Gamepad2,
     accentClass: "bg-fuchsia-600/10 text-fuchsia-600",
     isShippable: true,
@@ -135,9 +132,8 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     starterTemplate: "game_3d_world",
   },
   comic: {
-    title: "Interactive comics",
-    blurb:
-      "Turn your resume into a 6-page pitch comic — 12 genres from noir detective to shonen manga, each with its own palette + AI scriptwriter that grounds the story in your real career.",
+    titleKey: "studioKind.comic.title",
+    blurbKey: "studioKind.comic.blurb",
     icon: BookOpen,
     accentClass: "bg-sky-600/10 text-sky-600",
     isShippable: true,
@@ -149,9 +145,8 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     // Roadmap kind — see #932 / #940. Listed here for TypeScript
     // exhaustiveness; `isShippable: false` keeps it out of the public
     // "what you can make" grid until the runtime ships.
-    title: "Static images",
-    blurb:
-      "Photoshop-shaped raster authoring — single-frame social posts, OG cards, podcast covers. Coming soon (#932).",
+    titleKey: "studioKind.image.title",
+    blurbKey: "studioKind.image.blurb",
     icon: ImageIcon,
     accentClass: "bg-rose-600/10 text-rose-600",
     isShippable: false,
@@ -161,9 +156,8 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     // CAD 2D drafting runtime (#930) — Phase 1 scaffolding ships the
     // canvas surface + state model; full tooling (DXF / STEP / layers /
     // dimensions UI) lands in Phase 2.
-    title: "Technical drawings",
-    blurb:
-      "2D vector drafting — lines, rectangles, circles, dimensions. Millimetre-accurate. Coming soon (#930).",
+    titleKey: "studioKind.cad.title",
+    blurbKey: "studioKind.cad.blurb",
     icon: Ruler,
     accentClass: "bg-cyan-600/10 text-cyan-600",
     isShippable: false,
@@ -173,9 +167,8 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     // 3D CAD runtime (#930 follow-on). Primitive solids + boolean ops;
     // STL / STEP / PNG export. BREP analytic surfaces land with the
     // replicad kernel integration.
-    title: "3D models",
-    blurb:
-      "Primitive solids, boolean ops, STL + STEP export for 3D printing and downstream CAM. Coming soon (#930).",
+    titleKey: "studioKind.cad_3d.title",
+    blurbKey: "studioKind.cad_3d.blurb",
     icon: Box,
     accentClass: "bg-teal-600/10 text-teal-600",
     isShippable: false,
@@ -184,9 +177,8 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
   interactive_comic: {
     // Branching comic runtime (#929). Pages = scenes; reader picks
     // branches at runtime.
-    title: "Branching comics",
-    blurb:
-      "Choose-your-own-adventure comics — reader picks panels' next page, flags unlock branches. Coming soon (#929).",
+    titleKey: "studioKind.interactive_comic.title",
+    blurbKey: "studioKind.interactive_comic.blurb",
     icon: Workflow,
     accentClass: "bg-indigo-600/10 text-indigo-600",
     isShippable: false,
@@ -196,9 +188,8 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
     // Paged WYSIWYG document runtime (#1912) — resume / job / article / blog
     // authored on a fixed print sheet. Hidden from the public grid until the
     // DocumentStage runtime ships.
-    title: "Resumes & documents",
-    blurb:
-      "Design resumes, job posts, and articles on a print-perfect canvas — drag in sections, add interactive media, export to PDF. Coming soon (#1912).",
+    titleKey: "studioKind.document.title",
+    blurbKey: "studioKind.document.blurb",
     icon: FileText,
     accentClass: "bg-blue-700/10 text-blue-700",
     isShippable: false,

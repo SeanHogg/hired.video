@@ -96,6 +96,19 @@ export class MarketingConsentService {
     });
   }
 
+  /** Record a permanent, non-user-reversible suppression (#1975) — the write
+   *  side of `hardSuppressedSet`. Fed by the provider bounce/complaint webhook
+   *  so repeatedly-bouncing / complaining addresses drop out of every send
+   *  (sender reputation + CAN-SPAM complaint handling). Idempotent at the repo
+   *  layer (ON CONFLICT DO NOTHING on email). */
+  async recordHardSuppression(
+    email: string,
+    reason: string,
+    campaignId?: string | null,
+  ): Promise<void> {
+    await this.repo.addHardSuppression(email, reason, campaignId ?? null);
+  }
+
   /** Single-address gate — used by 1:1 nurture drips (pass null category to
    *  check only the master switch + hard suppression). */
   async isMailable(email: string, category: MarketingCategory | null): Promise<boolean> {

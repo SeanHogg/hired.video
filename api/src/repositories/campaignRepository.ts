@@ -36,6 +36,9 @@ export interface RecipientStatCounts {
 export interface ICampaignRepository {
   // Campaigns
   listCampaigns(): Promise<CampaignRow[]>;
+  /** Campaigns created by one user — the user-facing Outreach surface (#1970).
+   *  Same shape + ordering as `listCampaigns`, scoped to `createdByUserId`. */
+  listCampaignsByUser(userId: string): Promise<CampaignRow[]>;
   findCampaign(id: string): Promise<CampaignRow | null>;
   createCampaign(values: CampaignInsert): Promise<CampaignRow>;
   updateCampaign(id: string, patch: Partial<CampaignInsert>): Promise<CampaignRow | null>;
@@ -73,6 +76,15 @@ export class CampaignRepository implements ICampaignRepository {
     return this.db
       .select()
       .from(emailCampaigns)
+      .orderBy(desc(emailCampaigns.createdAt))
+      .limit(500);
+  }
+
+  async listCampaignsByUser(userId: string): Promise<CampaignRow[]> {
+    return this.db
+      .select()
+      .from(emailCampaigns)
+      .where(eq(emailCampaigns.createdByUserId, userId))
       .orderBy(desc(emailCampaigns.createdAt))
       .limit(500);
   }

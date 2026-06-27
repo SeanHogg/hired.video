@@ -146,7 +146,7 @@ export default function StudioMarketingSections() {
               <Link
                 key={pitch.kind}
                 to={kindStarterHref(pitch.kind)}
-                aria-label={t("labels.studioLayout.createKindAria", { kind: pitch.title })}
+                aria-label={t("labels.studioLayout.createKindAria", { kind: t(pitch.titleKey) })}
                 className="group flex flex-col rounded-xl border border-border p-6 transition-all hover:border-primary/40 hover:shadow-md"
               >
                 <div className={cn(
@@ -155,8 +155,8 @@ export default function StudioMarketingSections() {
                 )}>
                   <pitch.icon className="h-6 w-6" />
                 </div>
-                <h3 className="mb-2 font-semibold">{pitch.title}</h3>
-                <p className="text-sm text-muted-foreground">{pitch.blurb}</p>
+                <h3 className="mb-2 font-semibold">{t(pitch.titleKey)}</h3>
+                <p className="text-sm text-muted-foreground">{t(pitch.blurbKey)}</p>
                 <span className="mt-auto inline-flex items-center gap-1 pt-4 text-sm font-medium text-primary opacity-80 transition-opacity group-hover:opacity-100">
                   {t("actions.studioLayout.startCreating")}
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
@@ -209,7 +209,7 @@ export default function StudioMarketingSections() {
         schemaId="studio"
         subheading={t("messages.studioLayout.faqSubheading")}
         items={[
-          { question: t("messages.studioLayout.faqQ1Question"), answer: t("messages.studioLayout.faqQ1Answer", { formats: listShippableKindPitches().map((p) => p.title.toLowerCase()).join(", ") }) },
+          { question: t("messages.studioLayout.faqQ1Question"), answer: t("messages.studioLayout.faqQ1Answer", { formats: listShippableKindPitches().map((p) => t(p.titleKey).toLowerCase()).join(", ") }) },
           { question: t("messages.studioLayout.faqQ2Question"), answer: t("messages.studioLayout.faqQ2Answer") },
           { question: t("messages.studioLayout.faqQ3Question"), answer: t("messages.studioLayout.faqQ3Answer") },
           { question: t("messages.studioLayout.faqQ4Question"), answer: t("messages.studioLayout.faqQ4Answer") },

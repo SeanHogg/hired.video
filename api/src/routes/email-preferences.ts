@@ -10,6 +10,7 @@
  *   PUT  /api/email/preferences/token/:token  — update prefs by token
  *   GET  /api/email/preferences/me            — load the signed-in user's prefs
  *   PUT  /api/email/preferences/me            — update the signed-in user's prefs
+ *   POST /api/email/webhooks/sendpulse        — provider bounce/complaint → hard suppression (public)
  */
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
@@ -17,6 +18,7 @@ import type { AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
 import { MarketingConsentService } from "../services/email/MarketingConsentService.js";
+import { extractHardSuppressions } from "../services/email/bounce-classifier.js";
 import { UpdatePreferencesSchema } from "../../../shared/email-consent.js";
 
 export const emailPreferencesRoutes = new Hono<AppEnv>();
@@ -103,6 +105,38 @@ emailPreferencesRoutes.put("/preferences/me", async (c) => {
   }
   const dto = await service().updateByEmail(caller.email, parsed.data, caller.userId);
   return c.json(ok(dto), 200);
+});
+
+// ── Provider bounce/complaint webhook (#1975) ───────────────────────────────
+//
+// Public — posted by the email provider (SendPulse), not a logged-in user.
+// Classifies hard bounces / spam complaints / blocks / provider-unsubscribes
+// and records each address onto the non-reversible `email_suppressions` list so
+// it drops out of every future marketing send. Soft/transient signals are
+// ignored. When `EMAIL_WEBHOOK_SECRET` is set the caller must present it as
+// `?key=` (configure the same value on the provider's webhook URL); when unset
+// the endpoint is open (dev/test) — the worst a forged call can do is suppress
+// an address from MARKETING mail, never leak data.
+emailPreferencesRoutes.post("/webhooks/sendpulse", async (c) => {
+  const required =
+    process.env.EMAIL_WEBHOOK_SECRET ||
+    ((globalThis as any).__ENV?.EMAIL_WEBHOOK_SECRET as string | undefined) ||
+    "";
+  if (required && c.req.query("key") !== required) {
+    return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Bad webhook key" } }, 401);
+  }
+  const body = await c.req.json().catch(() => null);
+  const suppressions = extractHardSuppressions(body);
+  if (suppressions.length > 0) {
+    const svc = service();
+    // Sequential, idempotent (ON CONFLICT DO NOTHING) — webhook batches are
+    // tiny (a handful of events per POST), so no fan-out concern.
+    for (const s of suppressions) {
+      await svc.recordHardSuppression(s.email, `webhook:${s.reason}`);
+    }
+  }
+  // Always 200 so the provider doesn't retry-storm on a partially-bad batch.
+  return c.json(ok({ suppressed: suppressions.length }), 200);
 });
 
 export default emailPreferencesRoutes;

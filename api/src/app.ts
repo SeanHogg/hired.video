@@ -263,6 +263,7 @@ export function createApp() {
     "/api/campaigns/click",
     "/api/email/unsubscribe",
     "/api/email/preferences/token",
+    "/api/email/webhooks",
     // Geo-IP surface for the dynamic Privacy / Terms / Cookie pages
     // and any other surface that needs the visitor's country before
     // they've signed in.

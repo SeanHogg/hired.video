@@ -87,9 +87,9 @@ import { jobService, type JobSummary } from "@/lib/services/job-service";
 import { advertisingService, type JobBoost, type AdvertisingStats } from "@/lib/services/advertising-service";
 import { studioService, type StudioProject, StudioProjectStatus, type VideoCampaign } from "@/lib/services/studio-service";
 
+import type { CampaignDTO } from "@shared/campaigns";
 import {
   EmailTemplateDTO,
-  EmailCampaignDTO,
   CommunicationTrackingDTO,
   ExternalContactDTO,
   CommunicationStats,
@@ -168,7 +168,7 @@ export default function Outreach() {
 
   // Data state
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplateDTO[]>([]);
-  const [emailCampaigns, setEmailCampaigns] = useState<EmailCampaignDTO[]>([]);
+  const [emailCampaigns, setEmailCampaigns] = useState<CampaignDTO[]>([]);
   const [communicationTracking, setCommunicationTracking] = useState<
     CommunicationTrackingDTO[]
   >([]);

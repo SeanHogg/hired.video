@@ -46,25 +46,11 @@ export enum EmailTemplateTargetRole {
   Employer = 3,
 }
 
-export enum EmailCampaignStatus {
-  Draft = 0,
-  Scheduled = 1,
-  Sending = 2,
-  Sent = 3,
-  Paused = 4,
-  Cancelled = 5,
-}
-
-export enum EmailDeliveryStatus {
-  Pending = 0,
-  Sent = 1,
-  Delivered = 2,
-  Opened = 3,
-  Clicked = 4,
-  Replied = 5,
-  Bounced = 6,
-  Failed = 7,
-}
+// EmailCampaignStatus + EmailCampaignDTO + EmailCampaignRecipientDTO +
+// EmailDeliveryStatus were retired with #1970 — the campaign engine's
+// string-status `CampaignDTO` (@shared/campaigns) is now the single shape for
+// every campaign surface (Outreach + SuperAdmin), so the numeric-enum legacy
+// types had no remaining consumers.
 
 export enum CommunicationTrackingType {
   Outbound = 0,
@@ -199,45 +185,6 @@ export interface EmailTemplateDTO {
   createdByUser?: UserProfile;
   creationDateTime?: string;
   updateDateTime?: string;
-}
-
-export interface EmailCampaignDTO {
-  id: string;
-  name: string;
-  description?: string;
-  emailTemplateId: string;
-  createdByUserId: string;
-  companyId?: string;
-  status: EmailCampaignStatus;
-  sentAt?: string;
-  totalRecipients: number;
-  emailsSent: number;
-  emailsDelivered: number;
-  emailsOpened: number;
-  emailsClicked: number;
-  repliesReceived: number;
-  emailTemplate?: EmailTemplateDTO;
-  createdByUser?: UserProfile;
-  recipients: EmailCampaignRecipientDTO[];
-  creationDateTime?: string;
-  updateDateTime?: string;
-}
-
-export interface EmailCampaignRecipientDTO {
-  id: string;
-  emailCampaignId: string;
-  email: string;
-  name?: string;
-  userId?: string;
-  personalizationData?: string;
-  status: EmailDeliveryStatus;
-  sentAt?: string;
-  deliveredAt?: string;
-  openedAt?: string;
-  clickedAt?: string;
-  repliedAt?: string;
-  errorMessage?: string;
-  user?: UserProfile;
 }
 
 export interface CommunicationTrackingDTO {

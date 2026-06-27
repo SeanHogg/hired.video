@@ -19,7 +19,7 @@ function userId(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
 }
 
-const { conversations, conversationParticipants, messages, emailTemplates, emailCampaigns, communicationTracking } = schema;
+const { conversations, conversationParticipants, messages, emailTemplates, communicationTracking } = schema;
 
 communicationRoutes.get("/conversations", async (c) => {
   const uid = userId(c);
@@ -191,10 +191,16 @@ communicationRoutes.delete("/email-templates/:templateId", async (c) => {
   return c.json(ok({ success: true }), 200);
 });
 
+// #1970 — user-facing Outreach campaign list. Returns the canonical
+// `CampaignDTO[]` (string status + stats + audience) from the engine, scoped
+// to the caller's own campaigns, so Outreach drives the same reusable
+// `<CampaignList>` as the SuperAdmin surface. The old handler returned raw DB
+// rows (numeric-enum-shaped, no stats/audience) for EVERY user's campaigns.
 communicationRoutes.get("/email-campaigns", async (c) => {
-  const db = getDb();
-  const rows = await db.select().from(emailCampaigns).orderBy(desc(emailCampaigns.createdAt));
-  return c.json(ok(rows), 200);
+  const uid = userId(c);
+  if (!uid) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
+  const campaigns = await CampaignService.create(getDb()).listByUser(uid);
+  return c.json(ok(campaigns), 200);
 });
 
 // #1971 — persist the recipients as a `list` audience so the campaign is

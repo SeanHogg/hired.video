@@ -158,6 +158,19 @@ export class CampaignService {
     });
   }
 
+  /** Campaigns created by one user — the user-facing Outreach surface (#1970).
+   *  Same DTO shape (string status + stats + audience) the SuperAdmin list
+   *  returns, so both surfaces drive the one reusable `<CampaignList>`. One
+   *  grouped stats query, then an in-memory filter to the user's rows — no
+   *  per-campaign N+1. */
+  async listByUser(userId: string): Promise<CampaignDTO[]> {
+    const [rows, statsMap] = await Promise.all([
+      this.repo.listCampaignsByUser(userId),
+      this.repo.statsByCampaign(),
+    ]);
+    return rows.map((r) => this.toDTO(r, statsMap.get(r.id) ?? EMPTY_STATS));
+  }
+
   async get(id: string): Promise<CampaignDTO | null> {
     const row = await this.repo.findCampaign(id);
     if (!row) return null;
