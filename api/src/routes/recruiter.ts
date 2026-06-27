@@ -24,6 +24,12 @@ import {
 	sanitizePlacementBackOffice,
 } from "../services/recruiter/placement-fee.js";
 import {
+	validateSplits,
+	normalizeOwnerType,
+	recruiterShareForPlacement,
+	type SplitShareRow,
+} from "../services/recruiter/placement-splits.js";
+import {
 	buildPlacementNotificationService,
 	isPlacementEvent,
 } from "../services/notifications/placement-notifications.js";
@@ -121,6 +127,11 @@ function rowToPlacement(row: PlacementRow) {
 		guaranteeEndDate: row.guaranteeEndDate?.toISOString() ?? null,
 		guaranteeMetStatus: row.guaranteeMetStatus ?? null,
 		notes: row.notes ?? null,
+		// #226 — Placement Type (FK → workspace_job_types). The frontend
+		// resolves the label from the job-types list it already fetches for
+		// the picker, so we expose only the id here (no extra join).
+		placementTypeId: row.placementTypeId ?? null,
+		placementKind: row.placementKind ?? null,
 		placedAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
 	};
@@ -444,8 +455,12 @@ recruiterRoutes.get("/interactions/:talentPoolId", async (c) => {
 recruiterRoutes.get("/placements/summary/commission", async (c) => {
 	const user = c.get("user");
 	const db = getDb();
-	const rows = await db
+
+	// Owned placements (counts stay owner-based: "placements I made").
+	const owned = await db
 		.select({
+			id: schema.placements.id,
+			recruiterId: schema.placements.recruiterId,
 			commissionAmount: schema.placements.commissionAmount,
 			commissionStatus: schema.placements.commissionStatus,
 			createdAt: schema.placements.createdAt,
@@ -453,28 +468,79 @@ recruiterRoutes.get("/placements/summary/commission", async (c) => {
 		.from(schema.placements)
 		.where(eq(schema.placements.recruiterId, user.sub));
 
+	// #228 — split-aware EARNINGS: every placement I'm a split owner on (even
+	// ones I don't own), joined for its fee + status. A placement with splits
+	// pays each owner their bps share; one without pays its owner the full fee.
+	const mySplitPlacements = await db
+		.select({
+			id: schema.placements.id,
+			recruiterId: schema.placements.recruiterId,
+			commissionAmount: schema.placements.commissionAmount,
+			commissionStatus: schema.placements.commissionStatus,
+			percentBps: schema.placementSplits.percentBps,
+			ownerUserId: schema.placementSplits.ownerUserId,
+		})
+		.from(schema.placementSplits)
+		.innerJoin(schema.placements, eq(schema.placementSplits.placementId, schema.placements.id))
+		.where(eq(schema.placementSplits.ownerUserId, user.sub));
+
+	// Which owned placements have ANY splits → those pay via the split table,
+	// not via ownership (avoids double-counting + zeroes fully-delegated ones).
+	const ownedIds = owned.map((r) => r.id);
+	const splitPlacementIds = new Set<string>();
+	if (ownedIds.length > 0) {
+		const flagged = await db
+			.selectDistinct({ placementId: schema.placementSplits.placementId })
+			.from(schema.placementSplits)
+			.where(inArray(schema.placementSplits.placementId, ownedIds));
+		for (const r of flagged) splitPlacementIds.add(r.placementId);
+	}
+
+	const splitsByPlacement = new Map<string, SplitShareRow[]>();
+	for (const r of mySplitPlacements) {
+		const arr = splitsByPlacement.get(r.id) ?? [];
+		arr.push({ ownerUserId: r.ownerUserId, percentBps: r.percentBps });
+		splitsByPlacement.set(r.id, arr);
+	}
+
 	const now = new Date();
 	const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 	const startOfYear = new Date(now.getFullYear(), 0, 1);
 
 	let totalEarned = 0, totalPending = 0, totalPaid = 0;
 	let placementsThisMonth = 0, placementsThisYear = 0;
-	for (const r of rows) {
-		const amt = Number(r.commissionAmount) || 0;
-		totalEarned += amt;
-		if (r.commissionStatus === "Paid") totalPaid += amt;
-		else totalPending += amt;
+	const addEarning = (amount: number, status: string) => {
+		totalEarned += amount;
+		if (status === "Paid") totalPaid += amount;
+		else totalPending += amount;
+	};
+
+	// Owned placements WITHOUT splits → full fee to me. (Counts use all owned.)
+	for (const r of owned) {
+		if (!splitPlacementIds.has(r.id)) addEarning(Number(r.commissionAmount) || 0, r.commissionStatus);
 		if (r.createdAt >= startOfMonth) placementsThisMonth++;
 		if (r.createdAt >= startOfYear) placementsThisYear++;
 	}
+	// Placements I'm split into (owned or not) → my bps share.
+	for (const r of mySplitPlacements) {
+		const share = recruiterShareForPlacement({
+			placementId: r.id,
+			ownerRecruiterId: r.recruiterId,
+			commissionAmount: Number(r.commissionAmount) || 0,
+			viewerUserId: user.sub,
+			splitsByPlacement,
+		});
+		addEarning(share, r.commissionStatus);
+	}
+
 	return c.json(responseEnvelope({
 		totalEarned,
 		totalPending,
 		totalPaid,
-		totalPlacements: rows.length,
+		totalPlacements: owned.length,
 		placementsThisMonth,
 		placementsThisYear,
-		averagePlacementValue: rows.length > 0 ? totalEarned / rows.length : 0,
+		averagePlacementValue: owned.length > 0 ? totalEarned / owned.length : 0,
 	}));
 });
 
@@ -585,6 +651,11 @@ recruiterRoutes.put("/placements/:id", async (c) => {
 		.set({
 			...sanitizePlacementBackOffice(body),
 			...(body.notes !== undefined ? { notes: body.notes } : {}),
+			// #226 — allow re-tagging the Placement Type post-create. `""`/null
+			// clears it; a uuid sets it. Anything else is ignored.
+			...(body.placementTypeId !== undefined
+				? { placementTypeId: typeof body.placementTypeId === "string" && body.placementTypeId ? body.placementTypeId : null }
+				: {}),
 			updatedAt: new Date(),
 		} as any)
 		.where(
@@ -690,6 +761,93 @@ recruiterRoutes.get("/placements/:id", async (c) => {
 		.limit(1);
 	if (!row) return c.json(responseEnvelope(null), 404);
 	return c.json(responseEnvelope(rowToPlacement(row)));
+});
+
+// ── #228 Placement splits ───────────────────────────────────────────────────
+/** Owner-guard: the caller must own the placement to read/write its splits. */
+async function assertOwnsPlacement(db: ReturnType<typeof getDb>, placementId: string, userId: string) {
+	const [row] = await db
+		.select({ id: schema.placements.id })
+		.from(schema.placements)
+		.where(and(eq(schema.placements.id, placementId), eq(schema.placements.recruiterId, userId)))
+		.limit(1);
+	return Boolean(row);
+}
+
+// GET /placements/:id/splits — the split rows for a placement (owner only).
+recruiterRoutes.get("/placements/:id/splits", async (c) => {
+	const user = c.get("user");
+	const id = c.req.param("id");
+	const db = getDb();
+	if (!(await assertOwnsPlacement(db, id, user.sub))) return c.json(responseEnvelope(null), 404);
+	const rows = await db
+		.select({
+			id: schema.placementSplits.id,
+			placementId: schema.placementSplits.placementId,
+			ownerUserId: schema.placementSplits.ownerUserId,
+			ownerType: schema.placementSplits.ownerType,
+			percentBps: schema.placementSplits.percentBps,
+			ownerName: schema.users.name,
+		})
+		.from(schema.placementSplits)
+		.leftJoin(schema.users, eq(schema.placementSplits.ownerUserId, schema.users.id))
+		.where(eq(schema.placementSplits.placementId, id))
+		.orderBy(desc(schema.placementSplits.percentBps));
+	return c.json(responseEnvelope(rows));
+});
+
+// PUT /placements/:id/splits — replace-all the split set (owner only). Empty
+// array clears splits (owner takes the full fee). Non-empty must total 100%.
+const SplitsBodySchema = z.object({
+	splits: z.array(
+		z.object({
+			ownerUserId: UuidLikeSchema,
+			ownerType: z.string().max(24).optional(),
+			percentBps: z.number().int().min(1).max(10_000),
+		}),
+	).max(20),
+});
+recruiterRoutes.put("/placements/:id/splits", async (c) => {
+	const user = c.get("user");
+	const id = c.req.param("id");
+	const db = getDb();
+	if (!(await assertOwnsPlacement(db, id, user.sub))) return c.json(responseEnvelope(null), 404);
+
+	const parsed = SplitsBodySchema.safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success) {
+		return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid splits", details: parsed.error.flatten() } }, 400);
+	}
+	const splits = parsed.data.splits.map((s) => ({
+		ownerUserId: s.ownerUserId,
+		ownerType: normalizeOwnerType(s.ownerType),
+		percentBps: s.percentBps,
+	}));
+	const valid = validateSplits(splits);
+	if (!valid.ok) {
+		return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: valid.reason } }, 400);
+	}
+
+	// Replace-all: clear then re-insert so the set is always exactly what was sent.
+	await db.delete(schema.placementSplits).where(eq(schema.placementSplits.placementId, id));
+	if (splits.length > 0) {
+		await db.insert(schema.placementSplits).values(
+			splits.map((s) => ({ placementId: id, ownerUserId: s.ownerUserId, ownerType: s.ownerType, percentBps: s.percentBps })) as any,
+		);
+	}
+	const rows = await db
+		.select({
+			id: schema.placementSplits.id,
+			placementId: schema.placementSplits.placementId,
+			ownerUserId: schema.placementSplits.ownerUserId,
+			ownerType: schema.placementSplits.ownerType,
+			percentBps: schema.placementSplits.percentBps,
+			ownerName: schema.users.name,
+		})
+		.from(schema.placementSplits)
+		.leftJoin(schema.users, eq(schema.placementSplits.ownerUserId, schema.users.id))
+		.where(eq(schema.placementSplits.placementId, id))
+		.orderBy(desc(schema.placementSplits.percentBps));
+	return c.json(responseEnvelope(rows));
 });
 
 // PUT /placements/:id/commission — update commission status

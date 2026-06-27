@@ -65,6 +65,7 @@ import AcceptInvitation from "./pages/AcceptInvitation";
 
 // Lazy load non-critical pages
 const PlacementDetail = lazy(() => import("./pages/recruiter/PlacementDetail"));
+const PlacementsList = lazy(() => import("./pages/recruiter/PlacementsList"));
 const ForAgencies = lazy(() => import("./pages/ForAgencies"));
 const WorkforceGuide = lazy(() => import("./pages/guides/WorkforceGuide"));
 const FeaturedCreators = lazy(() => import("./pages/FeaturedCreators"));
@@ -731,6 +732,7 @@ const App = () => (
                           no auth required. Anonymous guests can join. */}
                       <Route path="/play/:token" element={<PlayInvite />} />
                       <Route path="/dashboard" element={<Home />} />
+                      <Route path="/recruiter/placements" element={<PlacementsList />} />
                       <Route path="/recruiter/placements/:id" element={<PlacementDetail />} />
                       <Route path="/points" element={<PointsPage />} />
                       <Route path="/rewards" element={<RewardsPage />} />

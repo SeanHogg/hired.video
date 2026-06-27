@@ -739,6 +739,13 @@ export const PAGE_SEO: Record<string, SEOData> = {
       isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
     },
   },
+  "/recruiter/placements": {
+    title: "Placements & Commission — hired.video",
+    description:
+      "Track every placement you've made, commission earned across fee splits, and bulk-record multiple placements against a job.",
+    keywords:
+      "placements, recruiter commission, fee splits, placement tracking, staffing back office",
+  },
   "/recruit/pipeline": {
     title: "Candidate Pipeline — hired.video",
     description:

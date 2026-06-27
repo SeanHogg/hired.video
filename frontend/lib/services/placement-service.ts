@@ -23,6 +23,10 @@ const PlacementDTOSchema = z.object({
   guaranteeEndDate: z.string().nullish(),
   guaranteeMetStatus: z.boolean().nullish(),
   notes: z.string().nullish(),
+  // #226 — Placement Type (FK → workspace_job_types); label resolved from the
+  // job-types list. #229 back-office kind.
+  placementTypeId: z.string().nullish(),
+  placementKind: z.string().nullish(),
   placedAt: z.string(),
   updatedAt: z.string(),
 });
@@ -93,16 +97,84 @@ export interface PlacementFilters {
   pageSize?: number;
 }
 
+// #226 — Placement Type taxonomy option (workspace_job_types row).
+export interface PlacementJobType {
+  id: string;
+  label: string;
+}
+
+// #228 — one split row of a placement's fee.
+export interface PlacementSplit {
+  id?: string;
+  ownerUserId: string;
+  ownerType: string;
+  percentBps: number;
+  ownerName?: string | null;
+}
+
+export interface BulkPlacementRow {
+  candidateUserId?: string;
+  candidateName?: string;
+  jobId?: string;
+  jobTitle?: string;
+  companyName?: string;
+  submissionId?: string;
+  startDate?: string;
+  annualSalary?: number;
+  feeMode?: "flat" | "percent";
+  feeFlatCents?: number;
+  feePercentBps?: number;
+  commissionPercentage?: number;
+  guaranteePeriodDays?: number;
+  notes?: string;
+  placementTypeId?: string | null;
+}
+
 export const placementService = {
   async recordPlacement(request: RecordPlacementRequest): Promise<PlacementDTO> {
     const response = await apiClient.post('/api/Recruiter/placements', request);
     const parsed = PlacementResponseSchema.parse(response);
-    
+
     if (!parsed.success || !parsed.data) {
       throw new Error(parsed.errorMessage || 'Failed to record placement');
     }
-    
+
     return parsed.data;
+  },
+
+  // #225 — bulk save N placements (potentially against one job) in one call.
+  async bulkRecordPlacements(rows: BulkPlacementRow[]): Promise<PlacementDTO[]> {
+    const response = await apiClient.post('/api/Recruiter/placements/bulk', { placements: rows });
+    const parsed = PlacementListResponseSchema.parse(response);
+    if (!parsed.success || !parsed.data) {
+      throw new Error(parsed.errorMessage || 'Failed to save placements');
+    }
+    return parsed.data;
+  },
+
+  // #226 — Placement Type picker options (tenant job-type taxonomy).
+  async getJobTypes(): Promise<PlacementJobType[]> {
+    const response = await apiClient.get<{ data?: { jobTypes?: Array<{ id: string; label: string }> } }>(
+      '/api/taxonomies/job-types',
+    );
+    const list = (response as any)?.data?.jobTypes ?? (response as any)?.jobTypes ?? [];
+    return Array.isArray(list) ? list.map((j: any) => ({ id: String(j.id), label: String(j.label) })) : [];
+  },
+
+  // #228 — placement fee splits.
+  async getSplits(placementId: string): Promise<PlacementSplit[]> {
+    const response = await apiClient.get<{ data?: PlacementSplit[] }>(
+      `/api/Recruiter/placements/${placementId}/splits`,
+    );
+    return ((response as any)?.data ?? []) as PlacementSplit[];
+  },
+
+  async setSplits(placementId: string, splits: PlacementSplit[]): Promise<PlacementSplit[]> {
+    const response = await apiClient.put<{ data?: PlacementSplit[] }>(
+      `/api/Recruiter/placements/${placementId}/splits`,
+      { splits: splits.map((s) => ({ ownerUserId: s.ownerUserId, ownerType: s.ownerType, percentBps: s.percentBps })) },
+    );
+    return ((response as any)?.data ?? []) as PlacementSplit[];
   },
 
   async getPlacements(filters?: PlacementFilters): Promise<PlacementDTO[]> {

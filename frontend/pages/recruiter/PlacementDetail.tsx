@@ -12,6 +12,9 @@ import {
   Printer,
   Upload,
   CheckCircle2,
+  Users,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -26,6 +29,11 @@ import {
   type DeskMarginRow,
   type PlacementDocument,
 } from "@/lib/services/workforce-service";
+import {
+  placementService,
+  type PlacementJobType,
+  type PlacementSplit,
+} from "@/lib/services/placement-service";
 
 /**
  * Placement detail screen (#1443).
@@ -46,6 +54,7 @@ interface PlacementRow {
   jobTitle: string | null;
   status: string;
   placementKind: string | null;
+  placementTypeId: string | null;
   startDate: string | null;
   endDate: string | null;
   billRateHourly: string | null;
@@ -55,11 +64,12 @@ interface PlacementRow {
   msaRef: string | null;
 }
 
-type TabKey = "overview" | "documents" | "timesheets" | "margin";
+type TabKey = "overview" | "splits" | "documents" | "timesheets" | "margin";
 
 /** Module-scope tab defs carry a stable i18n key resolved at render. */
 const TABS: { key: string; labelKey: string; icon: PageHeaderTab["icon"] }[] = [
   { key: "overview", labelKey: "tabs.overview", icon: Briefcase },
+  { key: "splits", labelKey: "labels.placement.splits", icon: Users },
   { key: "documents", labelKey: "labels.placement.documents", icon: FileText },
   { key: "timesheets", labelKey: "labels.placement.timesheets", icon: Clock },
   { key: "margin", labelKey: "labels.placement.margin", icon: DollarSign },
@@ -157,6 +167,7 @@ export default function PlacementDetail() {
         <TabSwitcher activeTab={activeTab} onChange={setActiveTab} />
 
         {activeTab === "overview" && <OverviewTab placement={placement} onUpdated={setPlacement} toast={toast} />}
+        {activeTab === "splits" && <SplitsTab placementId={placement.id} recruiterId={placement.recruiterId} recruiterName={placement.recruiterName} toast={toast} />}
         {activeTab === "documents" && <DocumentsTab placementId={placement.id} toast={toast} />}
         {activeTab === "timesheets" && <TimesheetsTab placementId={placement.id} candidateId={placement.candidateId} toast={toast} />}
         {activeTab === "margin" && <MarginTab placementId={placement.id} toast={toast} />}
@@ -207,6 +218,15 @@ function OverviewTab({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<Partial<PlacementRow>>({});
+  // #226 — Placement Type taxonomy options for the picker (loaded once).
+  const [jobTypes, setJobTypes] = useState<PlacementJobType[]>([]);
+  useEffect(() => {
+    placementService.getJobTypes().then(setJobTypes).catch(() => setJobTypes([]));
+  }, []);
+  const placementTypeLabel = useMemo(
+    () => jobTypes.find((j) => j.id === placement.placementTypeId)?.label ?? null,
+    [jobTypes, placement.placementTypeId],
+  );
 
   const fmtRate = (rate: string | null) =>
     rate
@@ -217,6 +237,7 @@ function OverviewTab({
   const startEdit = () => {
     setForm({
       placementKind: placement.placementKind,
+      placementTypeId: placement.placementTypeId,
       billRateHourly: placement.billRateHourly,
       payRateHourly: placement.payRateHourly,
       currency: placement.currency,
@@ -282,6 +303,20 @@ function OverviewTab({
                 <option value="direct_hire">Direct hire</option>
               </select>
             </label>
+            {/* #226 — Placement Type (tenant job-type taxonomy → fee/overtime defaults). */}
+            <label className="space-y-1">
+              <span className="text-muted-foreground text-xs">{t("labels.placement.type")}</span>
+              <select
+                value={(form.placementTypeId) ?? ""}
+                onChange={(e) => set("placementTypeId", e.target.value)}
+                className="w-full rounded border border-border px-2 py-1 text-sm"
+              >
+                <option value="">{t("labels.placement.typeNone")}</option>
+                {jobTypes.map((jt) => (
+                  <option key={jt.id} value={jt.id}>{jt.label}</option>
+                ))}
+              </select>
+            </label>
             <label className="space-y-1">
               <span className="text-muted-foreground text-xs">{t("labels.placement.billRate")}</span>
               <Input type="number" value={(form.billRateHourly) ?? ""} onChange={(e) => set("billRateHourly", e.target.value)} />
@@ -320,6 +355,10 @@ function OverviewTab({
             <div>
               <div className="text-muted-foreground text-xs">{t("fields.currency.label")}</div>
               <div>{placement.currency ?? "USD"}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">{t("labels.placement.type")}</div>
+              <div>{placementTypeLabel ?? "—"}</div>
             </div>
             <div>
               <div className="text-muted-foreground text-xs">{t("labels.start")}</div>
@@ -602,6 +641,162 @@ function MarginTab({ placementId, toast }: { placementId: string; toast: ReturnT
               {" "}{t("labels.placement.billableHoursYtd", { hours: row.billableHoursYTD })}
             </div>
           </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * #228 — Placement fee splits. The commission engine fans the placement's fee
+ * out across these rows (recruiter / sourcer / manager). A placement either
+ * has NO splits (the owning recruiter takes the whole fee) or a set summing to
+ * exactly 100%. The owning recruiter is pre-seeded at 100% when none exist.
+ */
+function SplitsTab({
+  placementId,
+  recruiterId,
+  recruiterName,
+  toast,
+}: {
+  placementId: string;
+  recruiterId: string;
+  recruiterName: string;
+  toast: ReturnType<typeof useToast>["toast"];
+}) {
+  const { t } = useTranslation();
+  const [rows, setRows] = useState<PlacementSplit[] | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const seedOwner = (): PlacementSplit => ({
+    ownerUserId: recruiterId,
+    ownerType: "recruiter",
+    percentBps: 10000,
+    ownerName: recruiterName,
+  });
+
+  useEffect(() => {
+    placementService
+      .getSplits(placementId)
+      .then((s) => setRows(s.length > 0 ? s : [seedOwner()]))
+      .catch(() => setRows([seedOwner()]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placementId, recruiterId, recruiterName]);
+
+  const totalBps = (rows ?? []).reduce((n, r) => n + (Number.isFinite(r.percentBps) ? r.percentBps : 0), 0);
+  const balanced = totalBps === 10000;
+
+  const update = (i: number, patch: Partial<PlacementSplit>) =>
+    setRows((prev) => (prev ? prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)) : prev));
+  const removeRow = (i: number) => setRows((prev) => (prev ? prev.filter((_, idx) => idx !== i) : prev));
+  const addRow = () =>
+    setRows((prev) => [...(prev ?? []), { ownerUserId: "", ownerType: "recruiter", percentBps: 0 }]);
+
+  const save = async () => {
+    if (!rows) return;
+    setSaving(true);
+    try {
+      const saved = await placementService.setSplits(placementId, rows.filter((r) => r.ownerUserId));
+      setRows(saved.length > 0 ? saved : [seedOwner()]);
+      toast({ title: t("messages.placement.splitsSaved") });
+    } catch (e) {
+      toast({ title: t("messages.placement.splitsSaveFailed"), description: String((e as Error).message), variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const clearSplits = async () => {
+    setSaving(true);
+    try {
+      await placementService.setSplits(placementId, []);
+      setRows([seedOwner()]);
+      toast({ title: t("messages.placement.splitsCleared") });
+    } catch (e) {
+      toast({ title: t("messages.placement.splitsSaveFailed"), description: String((e as Error).message), variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!rows) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-sm text-muted-foreground flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> {t("messages.placement.loading")}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle>{t("headings.placement.splits")}</CardTitle>
+          <CardDescription>{t("messages.placement.splitsHelp")}</CardDescription>
+        </div>
+        <Badge variant={balanced ? "default" : "destructive"}>
+          {t("labels.placement.splitTotal", { percent: (totalBps / 100).toFixed(0) })}
+        </Badge>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {rows.map((r, i) => (
+          <div key={i} className="flex flex-wrap items-end gap-2">
+            <label className="space-y-1 flex-1 min-w-[180px]">
+              <span className="text-muted-foreground text-xs">{t("labels.placement.splitOwner")}</span>
+              <Input
+                value={r.ownerName ?? r.ownerUserId}
+                onChange={(e) => update(i, { ownerUserId: e.target.value, ownerName: null })}
+                placeholder={t("labels.placement.splitOwnerPlaceholder")}
+                disabled={i === 0 && r.ownerUserId === recruiterId}
+              />
+            </label>
+            <label className="space-y-1 w-[140px]">
+              <span className="text-muted-foreground text-xs">{t("labels.placement.splitRole")}</span>
+              <select
+                value={r.ownerType}
+                onChange={(e) => update(i, { ownerType: e.target.value })}
+                className="w-full rounded border border-border px-2 py-[7px] text-sm"
+              >
+                <option value="recruiter">{t("labels.placement.roleRecruiter")}</option>
+                <option value="sourcer">{t("labels.placement.roleSourcer")}</option>
+                <option value="manager">{t("labels.placement.roleManager")}</option>
+                <option value="other">{t("labels.placement.roleOther")}</option>
+              </select>
+            </label>
+            <label className="space-y-1 w-[110px]">
+              <span className="text-muted-foreground text-xs">{t("labels.placement.splitPercent")}</span>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={Math.round(r.percentBps / 100)}
+                onChange={(e) => update(i, { percentBps: Math.max(0, Math.min(100, Number(e.target.value) || 0)) * 100 })}
+              />
+            </label>
+            {rows.length > 1 && (
+              <Button variant="ghost" size="icon" className="text-destructive" onClick={() => removeRow(i)} aria-label={t("actions.delete")}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        ))}
+        <div className="flex flex-wrap items-center gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={addRow}>
+            <Plus className="h-4 w-4 mr-1" /> {t("actions.placement.addSplit")}
+          </Button>
+          <div className="flex-1" />
+          <Button variant="ghost" size="sm" onClick={clearSplits} disabled={saving}>
+            {t("actions.placement.clearSplits")}
+          </Button>
+          <Button size="sm" onClick={save} disabled={saving || !balanced}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+            {t("actions.save", { defaultValue: "Save" })}
+          </Button>
+        </div>
+        {!balanced && (
+          <p className="text-xs text-destructive">{t("messages.placement.splitsMustTotal")}</p>
         )}
       </CardContent>
     </Card>
