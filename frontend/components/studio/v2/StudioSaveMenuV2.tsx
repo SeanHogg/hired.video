@@ -30,6 +30,7 @@
  * both editors.
  */
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
   Copy,
@@ -137,6 +138,7 @@ export default function StudioSaveMenuV2({
   className,
 }: StudioSaveMenuV2Props) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [copied, setCopied] = useState<"editor" | "share" | null>(null);
 
   async function copyTo(kind: "editor" | "share") {
@@ -148,10 +150,15 @@ export default function StudioSaveMenuV2({
     try {
       await navigator.clipboard.writeText(url);
       setCopied(kind);
-      toast({ title: kind === "share" ? "Share link copied" : "Editor link copied" });
+      toast({
+        title:
+          kind === "share"
+            ? t("studio.saveMenu.shareLinkCopied")
+            : t("studio.saveMenu.editorLinkCopied"),
+      });
       setTimeout(() => setCopied(null), 1500);
     } catch {
-      toast({ title: "Couldn't copy link", variant: "destructive" });
+      toast({ title: t("studio.saveMenu.copyFailed"), variant: "destructive" });
     }
   }
 
@@ -159,8 +166,8 @@ export default function StudioSaveMenuV2({
   const destinations = publishDestinationsFor(mediaKind);
 
   const publishHint = hasVideo
-    ? `Publishes the rendered ${ui.badgeLabel.toLowerCase()} to the chosen destination.`
-    : "Renders + uploads first, then publishes to the chosen destination.";
+    ? t("studio.saveMenu.publishHintRendered", { kind: ui.badgeLabel.toLowerCase() })
+    : t("studio.saveMenu.publishHintRender");
 
   // Busy state covers both the draft save and the render — either one in
   // flight should grey the cluster so the user can't fire a second action
@@ -183,8 +190,8 @@ export default function StudioSaveMenuV2({
             className="h-7 rounded-l-none border-l border-primary-foreground/20 px-1.5 shrink-0"
             disabled={busy}
             onClick={(e) => e.stopPropagation()}
-            aria-label="Save options"
-            title="Save options"
+            aria-label={t("studio.saveMenu.saveOptions")}
+            title={t("studio.saveMenu.saveOptions")}
           >
             <ChevronDown className="w-3.5 h-3.5" />
           </Button>
@@ -198,7 +205,7 @@ export default function StudioSaveMenuV2({
           {publications && publications.some((p) => p.status === "published") && (
             <>
               <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                Published to
+                {t("studio.saveMenu.publishedTo")}
               </DropdownMenuLabel>
               <div className="px-1 pb-1">
                 <PublishedToList
@@ -212,7 +219,7 @@ export default function StudioSaveMenuV2({
             </>
           )}
           <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            Export
+            {t("studio.saveMenu.export")}
           </DropdownMenuLabel>
           <DropdownMenuItem
             onClick={(e) => {
@@ -220,20 +227,24 @@ export default function StudioSaveMenuV2({
               onExport();
             }}
             disabled={exporting || !hasContent}
-            title={hasContent ? `Render + download ${ui.badgeLabel.toLowerCase()}` : "Add a widget to export"}
+            title={
+              hasContent
+                ? t("studio.saveMenu.exportTitle", { kind: ui.badgeLabel.toLowerCase() })
+                : t("studio.saveMenu.exportEmptyTitle")
+            }
           >
             {exporting ? (
               <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
             ) : (
               <Download className="w-3.5 h-3.5 mr-2" />
             )}
-            {exporting ? "Exporting…" : ui.exportVerb}
+            {exporting ? t("studio.saveMenu.exporting") : ui.exportVerb}
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
 
           <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            Share
+            {t("studio.saveMenu.share")}
           </DropdownMenuLabel>
           {/* Two link variants: the public share URL (what you'd send
               a viewer — uses the vanity slug when one exists) and the
@@ -248,7 +259,7 @@ export default function StudioSaveMenuV2({
             disabled={!projectId}
             title={
               !projectId
-                ? "Save the project first to get a link"
+                ? t("studio.saveMenu.saveFirstTooltip")
                 : `/v/${slug || projectId}`
             }
           >
@@ -257,7 +268,9 @@ export default function StudioSaveMenuV2({
             ) : (
               <Copy className="w-3.5 h-3.5 mr-2" />
             )}
-            {projectId ? "Copy share link" : "Save first to get a link"}
+            {projectId
+              ? t("studio.saveMenu.copyShareLink")
+              : t("studio.saveMenu.saveFirstForLink")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={(e) => {
@@ -265,14 +278,14 @@ export default function StudioSaveMenuV2({
               void copyTo("editor");
             }}
             disabled={!projectId}
-            title={!projectId ? "Save the project first to get a link" : undefined}
+            title={!projectId ? t("studio.saveMenu.saveFirstTooltip") : undefined}
           >
             {copied === "editor" ? (
               <Check className="w-3.5 h-3.5 mr-2 text-emerald-600" />
             ) : (
               <Copy className="w-3.5 h-3.5 mr-2" />
             )}
-            Copy editor link
+            {t("studio.saveMenu.copyEditorLink")}
           </DropdownMenuItem>
 
           {/* Publish section self-hides when the kind has no destinations
@@ -284,7 +297,7 @@ export default function StudioSaveMenuV2({
               <DropdownMenuSeparator />
 
               <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                Publish
+                {t("studio.saveMenu.publish")}
               </DropdownMenuLabel>
               <p className="text-[10px] text-muted-foreground px-2 pb-1.5 leading-tight">
                 {publishHint}
@@ -295,8 +308,10 @@ export default function StudioSaveMenuV2({
                 // already-published state. Every other destination uses the
                 // registry's static label. ONE label-source per row.
                 const baseLabel = dest.id === "profile"
-                  ? (isPublishedToProfile ? "Remove from profile" : "Publish to profile")
-                  : `Publish to ${dest.label}`;
+                  ? (isPublishedToProfile
+                      ? t("studio.saveMenu.removeFromProfile")
+                      : t("studio.saveMenu.publishToProfile"))
+                  : t("studio.saveMenu.publishToDestination", { dest: dest.label });
                 return (
                   <PublishItem
                     key={dest.id}
@@ -319,7 +334,7 @@ export default function StudioSaveMenuV2({
             <>
               <DropdownMenuSeparator />
               <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                More
+                {t("studio.saveMenu.more")}
               </DropdownMenuLabel>
               {moreItems}
             </>
@@ -344,17 +359,26 @@ function PublishItem({
   onClick: (() => void) | undefined;
   hasVideo: boolean;
 }) {
+  const { t } = useTranslation();
   const disabled = !onClick;
   return (
     <DropdownMenuItem
       onClick={onClick}
       disabled={disabled}
-      title={disabled ? "Coming soon — render pipeline pending" : !hasVideo ? "Will render + upload, then publish" : undefined}
+      title={
+        disabled
+          ? t("studio.saveMenu.publishSoonTooltip")
+          : !hasVideo
+            ? t("studio.saveMenu.publishWillRenderTooltip")
+            : undefined
+      }
     >
       <Icon className="w-3.5 h-3.5 mr-2" />
       {label}
       {disabled && (
-        <span className="ml-auto text-[10px] text-muted-foreground">soon</span>
+        <span className="ml-auto text-[10px] text-muted-foreground">
+          {t("studio.saveMenu.soon")}
+        </span>
       )}
     </DropdownMenuItem>
   );

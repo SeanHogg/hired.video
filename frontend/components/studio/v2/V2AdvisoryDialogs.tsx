@@ -41,6 +41,7 @@ import {
   timelineToCanvasState,
 } from "@/lib/studio/editor-v2/timeline-emit";
 import { voiceoverLayers, type CanvasState } from "@/lib/studio/editor-v2/canvas-state";
+import type { MediaKind } from "@shared/media-kinds";
 import type { VideoScript } from "@/types/video-script";
 import {
   analyzeDelivery,
@@ -84,6 +85,10 @@ interface Props {
    *  script. The host converts via `scriptToCanvasState` and resets
    *  the editor's history. */
   onRestoreCanvasFromScript: (next: CanvasState) => void;
+  /** The project's media kind — threaded to the analytics dashboard so it
+   *  reports against the right artifact kind instead of defaulting to
+   *  "video" (#1141). */
+  mediaKind?: MediaKind;
 }
 
 export default function V2AdvisoryDialogs({
@@ -91,6 +96,7 @@ export default function V2AdvisoryDialogs({
   videoId,
   state,
   onRestoreCanvasFromScript,
+  mediaKind,
 }: Props) {
   // Every dialog here needs a project id — there's nothing to operate
   // on without one. Self-gate so the consumer doesn't need a
@@ -105,7 +111,7 @@ export default function V2AdvisoryDialogs({
         onRestoreCanvasFromScript={onRestoreCanvasFromScript}
       />
       <ReviewCommentsTrigger projectId={projectId} />
-      <AnalyticsTrigger projectId={projectId} />
+      <AnalyticsTrigger projectId={projectId} mediaKind={mediaKind} />
       <ATSTrigger projectId={projectId} state={state} videoId={videoId ?? null} />
       <AsyncInterviewTrigger />
       <SkillsDemoTrigger state={state} />
@@ -165,7 +171,13 @@ function ReviewCommentsTrigger({ projectId }: { projectId: string }) {
 
 // ── Analytics — full-page component wrapped in a Dialog ────────────────
 
-function AnalyticsTrigger({ projectId }: { projectId: string | null }) {
+function AnalyticsTrigger({
+  projectId,
+  mediaKind,
+}: {
+  projectId: string | null;
+  mediaKind?: MediaKind;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -185,7 +197,7 @@ function AnalyticsTrigger({ projectId }: { projectId: string | null }) {
         </DialogHeader>
         {projectId ? (
           <Suspense fallback={null}>
-            <VideoAnalyticsDashboard projectId={projectId} />
+            <VideoAnalyticsDashboard projectId={projectId} mediaKind={mediaKind} />
           </Suspense>
         ) : (
           <p className="py-6 text-center text-xs text-muted-foreground">

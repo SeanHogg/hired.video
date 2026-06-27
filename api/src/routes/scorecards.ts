@@ -23,6 +23,7 @@ import { decisionRoutes } from "./scorecards/decisions.js";
 import { competencyRoutes } from "./scorecards/competencies.js";
 import { reliabilityRoutes, assignmentRoutes } from "./scorecards/sla.js";
 import { biasRoutes } from "./scorecards/bias.js";
+import { visibilityRoutes } from "./scorecards/visibility.js";
 import {
   stageQuestionRoutes,
   takeHomeRoutes,
@@ -45,6 +46,7 @@ scorecardRoutes.route("/competencies", competencyRoutes(buildService));
 scorecardRoutes.route("/reliability", reliabilityRoutes(buildService));
 scorecardRoutes.route("/assignments", assignmentRoutes(buildService));
 scorecardRoutes.route("/bias-check", biasRoutes);
+scorecardRoutes.route("/visibility", visibilityRoutes);
 scorecardRoutes.route("/stage-questions", stageQuestionRoutes(buildService));
 scorecardRoutes.route("/take-home", takeHomeRoutes(buildService));
 scorecardRoutes.route("/coverage", coverageRoutes(buildService));

@@ -70,6 +70,10 @@ export const jobItems = pgTable("job_items", {
    *  so jobs survive video cleanup. The job DTO exposes this id and the
    *  detail page mounts `<StudioVideoSurface mode="lazy" videoId={...}/>`. */
   videoProjectId: uuid("video_project_id"),
+  /** #241 — per-job hiring-manager scorecard-visibility override. Null
+   *  inherits `company_profiles.scorecard_hm_visibility_default`. One of
+   *  always_show_hm | always_hide_hm | hide_hm_until_submit. */
+  scorecardHmVisibility: varchar("scorecard_hm_visibility", { length: 24 }),
   /** Latest sentiment score from the Sentiment Analysis tool run
    *  against this job's description text. Null until the tool has been
    *  run against a SAVED job — pasted-text runs never write here, see

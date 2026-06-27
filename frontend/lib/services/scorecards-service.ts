@@ -632,4 +632,29 @@ export const scorecardsService = {
     return (await apiClient.patch<Competency>(`/api/scorecards/competencies/${id}`, patch))
       .data!;
   },
+
+  // ─── #241 Hiring-manager scorecard visibility ───────────────────────────
+  async getJobScorecardVisibility(
+    jobId: string,
+  ): Promise<{ override: ScorecardHmVisibility | null; companyDefault: ScorecardHmVisibility; effective: ScorecardHmVisibility }> {
+    return (await apiClient.get(`/api/scorecards/visibility/job/${jobId}`)).data as any;
+  },
+  async setJobScorecardVisibility(jobId: string, mode: ScorecardHmVisibility | null): Promise<void> {
+    await apiClient.put(`/api/scorecards/visibility/job/${jobId}`, { mode });
+  },
+  async getCompanyScorecardVisibility(companyId: string): Promise<{ default: ScorecardHmVisibility }> {
+    return (await apiClient.get(`/api/scorecards/visibility/company/${companyId}`)).data as any;
+  },
+  async setCompanyScorecardVisibility(companyId: string, mode: ScorecardHmVisibility): Promise<void> {
+    await apiClient.put(`/api/scorecards/visibility/company/${companyId}`, { mode });
+  },
 };
+
+/** #241 — the three hiring-manager scorecard-visibility modes (mirrors the
+ *  backend `SCORECARD_HM_VISIBILITY_MODES`). */
+export const SCORECARD_HM_VISIBILITY_MODES = [
+  "always_show_hm",
+  "always_hide_hm",
+  "hide_hm_until_submit",
+] as const;
+export type ScorecardHmVisibility = (typeof SCORECARD_HM_VISIBILITY_MODES)[number];

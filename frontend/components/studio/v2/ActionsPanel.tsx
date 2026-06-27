@@ -381,6 +381,7 @@ export default function ActionsPanel(props: ActionsPanelProps) {
             projectId={props.persistedProjectId}
             videoId={props.videoId ?? null}
             state={props.state}
+            mediaKind={props.mediaKind}
             onRestoreCanvasFromScript={(next) => props.onRestoreCanvas?.(next)}
           />
         </Suspense>

@@ -36,6 +36,16 @@ export interface UseCollapsibleSectionsOptions<TId extends string = string> {
    *  Content) expanded on first paint, while everything else stays
    *  collapsed. Persisted state always wins over this. */
   initialOpen?: ReadonlySet<TId>;
+  /** One-shot migration (#657): section ids to force-OPEN exactly once when
+   *  `migrationVersion` advances past the version last seen in localStorage.
+   *  Unlike `initialOpen` (which persisted state overrides), this is applied
+   *  ON TOP of restored state — so a section whose `defaultOpen` flipped to
+   *  true after users already persisted a collapsed map becomes visible once,
+   *  without wiping their other collapse choices. No-op without `storageKey`. */
+  migrateOpen?: ReadonlySet<TId>;
+  /** Bump this whenever `migrateOpen` should re-fire. Stored per `storageKey`
+   *  as `${storageKey}:mv`; the migration runs while stored < this. */
+  migrationVersion?: number;
 }
 
 export function useCollapsibleSections<TId extends string>(
@@ -45,6 +55,8 @@ export function useCollapsibleSections<TId extends string>(
   const defaultClosed = opts?.defaultClosed ?? false;
   const storageKey = opts?.storageKey;
   const initialOpen = opts?.initialOpen;
+  const migrateOpen = opts?.migrateOpen;
+  const migrationVersion = opts?.migrationVersion ?? 0;
   const [openIds, setOpenIds] = useState<Set<TId>>(() => {
     if (storageKey && typeof window !== "undefined") {
       try {
@@ -53,11 +65,25 @@ export function useCollapsibleSections<TId extends string>(
           const parsed = JSON.parse(raw) as unknown;
           if (Array.isArray(parsed)) {
             const allowed = new Set<TId>(ids);
-            return new Set<TId>(
+            const restored = new Set<TId>(
               parsed.filter((id): id is TId =>
                 typeof id === "string" && allowed.has(id as TId),
               ),
             );
+            // One-shot migration: force-open the `migrateOpen` ids when this
+            // surface's migration version has advanced past what's stored
+            // (#657). Read-only here; the `:mv` marker is written in an effect.
+            if (migrateOpen && migrateOpen.size > 0) {
+              const storedMv = Number(
+                window.localStorage.getItem(`${storageKey}:mv`) ?? 0,
+              );
+              if (migrationVersion > storedMv) {
+                for (const id of migrateOpen) {
+                  if (allowed.has(id)) restored.add(id);
+                }
+              }
+            }
+            return restored;
           }
         }
       } catch {
@@ -79,6 +105,23 @@ export function useCollapsibleSections<TId extends string>(
       // ignore quota errors
     }
   }, [storageKey, openIds]);
+
+  // Stamp the migration version once it's been applied so the one-shot
+  // force-open doesn't re-fire on every mount (#657).
+  useEffect(() => {
+    if (!storageKey || typeof window === "undefined") return;
+    if (!migrateOpen || migrateOpen.size === 0 || migrationVersion <= 0) return;
+    try {
+      const storedMv = Number(
+        window.localStorage.getItem(`${storageKey}:mv`) ?? 0,
+      );
+      if (migrationVersion > storedMv) {
+        window.localStorage.setItem(`${storageKey}:mv`, String(migrationVersion));
+      }
+    } catch {
+      // ignore quota errors
+    }
+  }, [storageKey, migrateOpen, migrationVersion]);
 
   const isOpen = useCallback((id: TId) => openIds.has(id), [openIds]);
   const toggle = useCallback((id: TId) => {

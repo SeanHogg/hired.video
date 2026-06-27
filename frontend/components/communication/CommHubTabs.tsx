@@ -11,8 +11,10 @@
  * reviews fetch is on-demand — no app-wide poll.
  */
 import { useTranslation } from "react-i18next";
+import { CheckCheck } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InboxPanel } from "@/components/communication/InboxPanel";
 import { ReviewsInboxPanel } from "@/components/communication/ReviewsInboxPanel";
@@ -65,6 +67,23 @@ export function CommHubTabs({
       </TabsList>
 
       <TabsContent value="inbox" className="mt-0 flex min-h-0 flex-1 flex-col">
+        {/* The tab strip replaces InboxPanel's own header (`hideHeader`), which
+            is where "Mark all read" used to live — re-surface it here as a
+            compact action so the bell popover keeps one-tap clear-all (#2255).
+            Self-gates on unread count so it vanishes when nothing's unread. */}
+        {hub.unreadCount > 0 && (
+          <div className="flex justify-end px-2 pb-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={hub.markAllRead}
+              className="h-7 px-2 text-xs text-muted-foreground"
+            >
+              <CheckCheck className="mr-1 h-3.5 w-3.5" />
+              {t("inbox.markAllRead")}
+            </Button>
+          </div>
+        )}
         <InboxPanel
           hub={hub}
           heightClassName={heightClassName}

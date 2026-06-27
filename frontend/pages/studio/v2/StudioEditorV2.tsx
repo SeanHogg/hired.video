@@ -181,6 +181,7 @@ import { resumeService } from "@/lib/services/resume-service";
 import { jobService } from "@/lib/services/job-service";
 import {
   contentToCreateJob,
+  contentToUpdateJob,
   emptyJobContent,
   jobItemToContent,
   type JobDocumentContent,
@@ -3352,7 +3353,10 @@ export default function StudioEditorV2() {
             // to the job row — creating it on the first save of a fresh draft.
             const jobContent = documentEntityContent as unknown as JobDocumentContent;
             if (documentState.entityId) {
-              await jobService.updateJob(documentState.entityId, jobContent);
+              await jobService.updateJob(
+                documentState.entityId,
+                contentToUpdateJob(jobContent),
+              );
             } else if (jobContent.title.trim()) {
               // First save of a fresh job_doc draft — create the row (strict
               // CreateJobSchema needs title + description). Skip until a title

@@ -176,7 +176,12 @@ const CONTAINER_STYLE_SECTION: WidgetInspectorSection = {
               }
             />
           </Field>
-          <Field label="Radius">
+          {/* Labelled "Container radius" to disambiguate from a shape's own
+              "Corner radius" (ShapeWidgetParams.cornerRadius) — for a
+              shape-rect both round visually, so the scope must read off the
+              label (#657). This rounds the outer container wrapper; the shape
+              field rounds the drawn shape. */}
+          <Field label="Container radius">
             <NumberField
               value={cs.borderRadius ?? 0}
               min={0}

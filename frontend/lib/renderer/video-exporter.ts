@@ -10,6 +10,7 @@ import type { CompiledVideo } from "../compiler/types";
 import { renderFrame } from "./frame-renderer";
 import { scheduleClipsToDestination, type ClipScheduleHandle } from "../audio/clip-scheduler";
 import { normalizeAudioClips } from "../audio/normalize-clips";
+import { reportClientError } from "../error-report";
 import type { VideoAudio, VoiceoverConfig } from "../../types/video-script";
 
 export interface ExportOptions {
@@ -45,12 +46,45 @@ export interface ExportOptions {
  * Publish path can `instanceof RenderAudioContextError` to offer a
  * "try silent render?" fallback.
  */
+/** Device / WebAudio snapshot captured when an audio render fails (#718) —
+ *  so repeat failures aren't indistinguishable from first ones and we can see
+ *  whether they cluster around a sample rate, channel count, or context state
+ *  (Bluetooth headset swap, Windows session change, browser quirk). */
+export interface AudioRenderDiagnostics {
+  contextState?: string;
+  sampleRate?: number;
+  baseLatency?: number;
+  outputChannelCount?: number;
+}
+
+/** Best-effort snapshot of an AudioContext for the diagnostics field. Never
+ *  throws — a partial/empty snapshot is better than masking the real error. */
+export function snapshotAudioContext(
+  ctx?: AudioContext | null,
+): AudioRenderDiagnostics | undefined {
+  if (!ctx) return undefined;
+  try {
+    return {
+      contextState: ctx.state,
+      sampleRate: ctx.sampleRate,
+      baseLatency: (ctx as { baseLatency?: number }).baseLatency,
+      outputChannelCount: ctx.destination?.channelCount,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 export class RenderAudioContextError extends Error {
   readonly cause?: unknown;
-  constructor(message: string, cause?: unknown) {
+  /** Device/WebAudio snapshot at failure time (#718). Absent when the context
+   *  couldn't even be constructed. */
+  readonly diagnostics?: AudioRenderDiagnostics;
+  constructor(message: string, cause?: unknown, diagnostics?: AudioRenderDiagnostics) {
     super(message);
     this.name = "RenderAudioContextError";
     this.cause = cause;
+    this.diagnostics = diagnostics;
   }
 }
 
@@ -264,6 +298,7 @@ async function exportMediaRecorderWithAudio(
         new RenderAudioContextError(
           "Audio device error during render. Try a different output device, close other apps using audio, or render again.",
           ev,
+          snapshotAudioContext(audioCtx),
         ),
       );
     };
@@ -466,6 +501,20 @@ export async function exportVideo(
       return await exportMediaRecorderWithAudio(compiledVideo, audio, opts);
     } catch (err) {
       if (opts.allowSilentFallback && err instanceof RenderAudioContextError) {
+        // Ship the device/WebAudio snapshot to telemetry before recovering, so
+        // we can tell whether failures cluster around a specific device /
+        // sample rate instead of all looking identical (#718). Fire-and-forget
+        // through the standard client-error seam — no new endpoint, and a
+        // failed report never blocks the render's silent recovery.
+        void reportClientError({
+          message: `Render audio failure (silent fallback): ${err.message}`,
+          source: "manual",
+          severity: "warning",
+          context: {
+            kind: "render-audio-failure",
+            audioDiagnostics: err.diagnostics ?? null,
+          },
+        }).catch(() => {});
         // Strip audio + voiceover and re-enter exportVideo — drops into
         // the WebCodecs / silent MediaRecorder branch below.
         return exportVideo(compiledVideo, {

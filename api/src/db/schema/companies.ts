@@ -67,6 +67,11 @@ export const companyProfiles = pgTable("company_profiles", {
   ownerId: uuid("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 100 }).unique(),
+  /** #241 — company-wide default for hiring-manager scorecard visibility;
+   *  per-job `job_items.scorecard_hm_visibility` overrides it. */
+  scorecardHmVisibilityDefault: varchar("scorecard_hm_visibility_default", { length: 24 })
+    .notNull()
+    .default("always_show_hm"),
   description: text("description"),
   website: varchar("website", { length: 500 }),
   logoUrl: text("logo_url"),

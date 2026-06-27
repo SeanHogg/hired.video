@@ -15,9 +15,12 @@ import { InterviewKitEditor } from "@/components/scorecards/InterviewKitEditor";
 import { CompetencyLibraryEditor } from "@/components/scorecards/CompetencyLibraryEditor";
 import { InterviewerReliabilityPanel } from "@/components/scorecards/InterviewerReliabilityPanel";
 import { CalibrationManager } from "@/components/scorecards/CalibrationManager";
+import ScorecardVisibilityPanel from "@/components/scorecards/ScorecardVisibilityPanel";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 
 export default function ScorecardsPage() {
+  const { t } = useTranslation();
   const location = useLocation();
   const { companyId, loading, hasNoCompany } = useCurrentCompanyScope();
   const peopleTabs = usePeopleTabs();
@@ -62,6 +65,7 @@ export default function ScorecardsPage() {
                 <TabsTrigger value="kits">Interview kits</TabsTrigger>
                 <TabsTrigger value="competencies">Competency library</TabsTrigger>
                 <TabsTrigger value="calibration">Calibration</TabsTrigger>
+                <TabsTrigger value="visibility">{t("scorecardVisibility.tab")}</TabsTrigger>
               </TabsList>
               <TabsContent value="templates" className="mt-4">
                 <ScorecardTemplateEditor companyId={companyId} />
@@ -74,6 +78,9 @@ export default function ScorecardsPage() {
               </TabsContent>
               <TabsContent value="calibration" className="mt-4">
                 <CalibrationManager companyId={companyId} />
+              </TabsContent>
+              <TabsContent value="visibility" className="mt-4">
+                <ScorecardVisibilityPanel scope="company" id={companyId} />
               </TabsContent>
             </Tabs>
           )}

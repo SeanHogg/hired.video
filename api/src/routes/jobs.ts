@@ -52,6 +52,10 @@ export const CreateJobSchema = z.object({
   // column (or the `details` jsonb bag). Keep this list and that mapper
   // in lockstep.
   company: z.string().max(255).optional(),
+  // (Studio document-canvas hero image #2218 is declared once above as
+  // `heroImageUrl: OptionalUrlSchema` — the duplicate stale lenient copy that
+  // used to sit here was removed 2026-06-27; it silently overrode the
+  // OptionalUrlSchema validation, so `""` was persisted instead of cleared.)
   responsibilities: z.array(z.string()).optional(),
   requirements: z.array(z.string()).optional(),
   qualifications: z.array(z.string()).optional(),

@@ -38,7 +38,8 @@ function randomInviteToken(): string {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
-import { getDb } from "../../db/index.js";
+import { eq } from "drizzle-orm";
+import { getDb, schema } from "../../db/index.js";
 import {
   resolveCompanyScope,
   userCanAccessCompany,
@@ -54,6 +55,11 @@ import {
   filterSubmissionsForRequester,
   maskCandidateIdentity,
 } from "./blindReview.js";
+import {
+  filterSubmissionsForHm,
+  resolveHmVisibility,
+  type ScorecardHmVisibility,
+} from "./hmVisibility.js";
 import type {
   CreateDecisionInput,
   CreateKitInput,
@@ -119,7 +125,36 @@ export interface ScorecardsServiceDeps {
   repo: IScorecardsRepository;
   canAccessCompany: (userId: string, companyId: string) => Promise<boolean>;
   getCompanyIdsForUser: (userId: string) => Promise<string[]>;
+  /** #241 — effective HM scorecard-visibility for a (company, job). Injected
+   *  so tests stay off the DB; the default impl reads + caches the config. */
+  resolveJobHmVisibility?: (companyId: string, jobId: string | null) => Promise<ScorecardHmVisibility>;
   now?: () => Date;
+}
+
+// NOT cached: the config is two PK-indexed lookups read at most once per
+// panel view (listSubmissions), and a read-through cache here would need
+// cross-job invalidation whenever a company changes its default — not worth
+// it for a rarely-read, tiny value. Direct reads keep correctness simple.
+async function defaultResolveJobHmVisibility(
+  companyId: string,
+  jobId: string | null,
+): Promise<ScorecardHmVisibility> {
+  const db = getDb();
+  const [company] = await db
+    .select({ d: schema.companyProfiles.scorecardHmVisibilityDefault })
+    .from(schema.companyProfiles)
+    .where(eq(schema.companyProfiles.id, companyId))
+    .limit(1);
+  let jobOverride: string | null = null;
+  if (jobId) {
+    const [job] = await db
+      .select({ v: schema.jobItems.scorecardHmVisibility })
+      .from(schema.jobItems)
+      .where(eq(schema.jobItems.id, jobId))
+      .limit(1);
+    jobOverride = (job?.v as string | null) ?? null;
+  }
+  return resolveHmVisibility(jobOverride, company?.d ?? null);
 }
 
 export function defaultScorecardsServiceDeps(): ScorecardsServiceDeps {
@@ -128,6 +163,7 @@ export function defaultScorecardsServiceDeps(): ScorecardsServiceDeps {
     canAccessCompany: userCanAccessCompany,
     getCompanyIdsForUser: async (userId: string) =>
       (await resolveCompanyScope(userId)).companyIds,
+    resolveJobHmVisibility: defaultResolveJobHmVisibility,
     now: () => new Date(),
   };
 }
@@ -438,20 +474,55 @@ export class ScorecardsService {
     const out: ScorecardSubmissionRow[] = [];
     for (const [key, bucket] of grouped) {
       const kit = key === "_none" ? null : kitCache.get(key) ?? null;
-      const filtered = filterSubmissionsForRequester(bucket, kit, userId);
-      out.push(
-        ...filtered.map((s) => maskCandidateIdentity(s, kit, s.evaluatorUserId === userId)),
-      );
+      const isEvaluator = bucket.some((s) => s.evaluatorUserId === userId);
+      if (isEvaluator) {
+        // Evaluator viewer — blind-review peer-hiding + candidate masking.
+        const filtered = filterSubmissionsForRequester(bucket, kit, userId);
+        out.push(
+          ...filtered.map((s) => maskCandidateIdentity(s, kit, s.evaluatorUserId === userId)),
+        );
+      } else {
+        // #241 — hiring-manager / non-evaluator viewer: the job's HM-visibility
+        // mode governs whether they see the panel's scorecards.
+        const mode = await this.resolveHmVisibilityForKit(kit);
+        out.push(...filterSubmissionsForHm(bucket, mode, false));
+      }
     }
     return out;
+  }
+
+  /** #241 — resolve the effective HM scorecard-visibility for a kit's job.
+   *  Ungoverned (no kit) submissions are always visible. */
+  private async resolveHmVisibilityForKit(
+    kit: InterviewKitRow | null,
+  ): Promise<ScorecardHmVisibility> {
+    if (!kit || !this.deps.resolveJobHmVisibility) return "always_show_hm";
+    return this.deps.resolveJobHmVisibility(kit.companyId, kit.jobId ?? null);
   }
 
   async getSubmission(userId: string, id: string): Promise<SubmissionWithRatings> {
     const sub = await this.deps.repo.findSubmissionById(id);
     if (!sub) throw new ServiceError("NOT_FOUND", "Submission not found");
     await this.loadTemplate(userId, sub.templateId);
-    const ratings = await this.deps.repo.findRatingsForSubmission(sub.id);
     const kit = await this.resolveKitForSubmission(sub);
+
+    // #241 — a non-evaluator (HM) viewer must clear the job's visibility gate
+    // before reading a single scorecard, so the detail route can't bypass the
+    // list-level gating.
+    if (sub.evaluatorUserId !== userId) {
+      const mode = await this.resolveHmVisibilityForKit(kit);
+      if (mode === "always_hide_hm") {
+        throw new ServiceError("FORBIDDEN", "Scorecards are hidden for hiring managers on this job");
+      }
+      if (mode === "hide_hm_until_submit") {
+        const panel = await this.deps.repo.findSubmissionsForApplication(sub.applicationId);
+        if (filterSubmissionsForHm(panel, mode, false).length === 0) {
+          throw new ServiceError("FORBIDDEN", "Scorecards unlock once the panel completes");
+        }
+      }
+    }
+
+    const ratings = await this.deps.repo.findRatingsForSubmission(sub.id);
     const view = maskCandidateIdentity(sub, kit, sub.evaluatorUserId === userId);
     return { ...view, ratings };
   }

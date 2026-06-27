@@ -162,7 +162,22 @@ export default function ProjectDetailsSheet({
           keywords,
           socialCardImage,
         });
-        lastSavedRef.current = snapshot;
+        // Reconcile the slug from the authoritative save response: the server
+        // carries forward the prior slug when the field is cleared and
+        // uniquifies on collision (studio.ts), so the row's real slug can
+        // differ from what we sent. Mirror it back into the field — otherwise
+        // the UI shows "" (or a stale value) while the row keeps a slug, and
+        // it silently reappears on reload (#911). Guard against clobbering a
+        // slug the user kept editing during the round-trip by only adopting it
+        // when the field still holds exactly what we sent.
+        const savedSlug = res.data?.slug ?? slug;
+        setSlug((cur) => (cur === slug ? savedSlug : cur));
+        lastSavedRef.current = JSON.stringify({
+          metaDescription,
+          slug: savedSlug,
+          keywords,
+          socialCardImage,
+        });
         setStatus("saved");
         if (res.data) onChange?.(res.data);
       } catch (err) {

@@ -14,6 +14,11 @@ import { LeftPanelSection } from "../LeftPanelScroller";
 import { useCollapsibleSections } from "@/lib/hooks/useCollapsibleSections";
 import type { InspectorSection } from "./types";
 
+/** Bumped whenever a section's `defaultOpen` flips to true and existing users
+ *  (who persisted a collapsed map) should see it once. v1 reveals Container
+ *  style / Radius, flipped open 2026-05-15 (#657). */
+const INSPECTOR_LAYOUT_MIGRATION = 1;
+
 export interface InspectorSectionListProps<Ctx> {
   sections: InspectorSection<Ctx>[];
   ctx: Ctx;
@@ -38,6 +43,12 @@ export default function InspectorSectionList<Ctx>({
     storageKey,
     defaultClosed: true,
     initialOpen: defaultOpenIds,
+    // One-shot reveal for sections whose `defaultOpen` was flipped to true
+    // after users had already persisted a collapsed map — e.g. Container
+    // style / Radius (#657). Bump INSPECTOR_LAYOUT_MIGRATION when a future
+    // flip needs the same treatment.
+    migrateOpen: defaultOpenIds,
+    migrationVersion: INSPECTOR_LAYOUT_MIGRATION,
   });
   return (
     <>

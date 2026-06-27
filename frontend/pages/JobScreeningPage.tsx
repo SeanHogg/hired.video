@@ -10,6 +10,7 @@ import { useParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import EntityEditShell from "@/components/EntityEditShell";
 import { JobScreeningCard } from "@/components/jobs/JobScreeningCard";
+import ScorecardVisibilityPanel from "@/components/scorecards/ScorecardVisibilityPanel";
 import { jobService } from "@/lib/services/job-service";
 import { useJobPermissions } from "@/hooks/use-job-permissions";
 import { usePageChrome } from "@/lib/seo";
@@ -53,7 +54,11 @@ export default function JobScreeningPage() {
       notFound={!loading && !job}
     >
       {job && permissions.canEdit && (
-        <JobScreeningCard jobId={job.id} jobTitle={job.title} />
+        <div className="space-y-4">
+          <JobScreeningCard jobId={job.id} jobTitle={job.title} />
+          {/* #241 — per-job hiring-manager scorecard visibility override. */}
+          <ScorecardVisibilityPanel scope="job" id={job.id} />
+        </div>
       )}
     </EntityEditShell>
   );

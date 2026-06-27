@@ -30,6 +30,7 @@ import {
   JOB_STATUS_OPTIONS,
   WORK_SETTING_OPTIONS,
 } from "@/lib/constants/enums";
+import { SENIORITY_LABELS, SENIORITY_LEVELS } from "@shared/seniority";
 
 export type FieldType =
   | "text"
@@ -61,6 +62,13 @@ function enumFieldOptions(
 ): FieldOption[] {
   return opts.map((o) => ({ value: String(o.value), label: o.label }));
 }
+
+/** String-valued options for the job seniority select — the canonical SSoT
+ *  levels (#2090), with a leading "Not specified" so a posting can clear it. */
+const SENIORITY_FIELD_OPTIONS: FieldOption[] = [
+  { value: "", label: "Not specified" },
+  ...SENIORITY_LEVELS.map((lvl) => ({ value: lvl, label: SENIORITY_LABELS[lvl] })),
+];
 
 /** Declarative validation a field carries so render + edit + save-gate share
  *  ONE rule set (#1916). Checks only fire on a NON-empty value (so they never
@@ -266,6 +274,10 @@ const JOB_SECTION_SCHEMAS: Record<string, DocumentSectionSchema> = {
   details: objectSchema("details", "Role details", [
     { key: "employmentType", label: "Employment type", type: "multiselect", numeric: true, options: enumFieldOptions(EMPLOYMENT_TYPE_OPTIONS) },
     { key: "workSetting", label: "Work setting", type: "select", numeric: true, options: enumFieldOptions(WORK_SETTING_OPTIONS) },
+    // Seniority is the canonical string SSoT (#2090/#2218), NOT a numeric
+    // taxonomy — a plain (non-`numeric`) select whose values are the canonical
+    // lowercase levels, so the value round-trips through `contentToUpdateJob`.
+    { key: "seniority", label: "Seniority", type: "select", options: SENIORITY_FIELD_OPTIONS },
     { key: "status", label: "Status", type: "select", numeric: true, options: enumFieldOptions(JOB_STATUS_OPTIONS) },
     { key: "hiringTarget", label: "Openings", type: "number", validate: { min: 1 } },
   ]),

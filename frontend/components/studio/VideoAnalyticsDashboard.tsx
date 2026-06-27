@@ -4,11 +4,10 @@
  * so callers in the editor / outreach surfaces don't need to know which
  * polymorphic kind to pass.
  *
- * Consumers that already know the project's mediaKind (e.g. ContentTab
- * which iterates the StudioProject DTO) pass it through; legacy callers
- * that only have a `projectId` default to "video" — same behaviour as
- * pre-#1137. The default is the migration ramp for the older callers;
- * a future pass closes #1141 by threading mediaKind everywhere.
+ * Every live caller now threads the project's mediaKind (ContentTab from
+ * the StudioProject DTO, the editor advisory dialog from the canvas — #1141
+ * closed). The `"video"` fallback is retained only as a defensive default
+ * for any future caller that lacks the kind in scope.
  *
  * The legacy `/api/studio/analytics/projects/:id` endpoint stays mounted
  * during the migration bake window; the new endpoint serves identical
