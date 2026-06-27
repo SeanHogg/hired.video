@@ -242,6 +242,17 @@ export class JobService {
     return response.data;
   }
 
+  /** #154/#1493 — Archive (soft-delete) a job. Hides it from default
+   *  listings while preserving slug + analytics; owner only. */
+  async archiveJob(id: string): Promise<void> {
+    await apiClient.post(`/api/jobs/${id}/archive`, {});
+  }
+
+  /** #154/#1493 — Restore an archived job. Owner only. */
+  async unarchiveJob(id: string): Promise<void> {
+    await apiClient.post(`/api/jobs/${id}/unarchive`, {});
+  }
+
   /**
    * Get specific job by ID
    */

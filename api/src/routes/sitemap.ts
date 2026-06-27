@@ -9,14 +9,49 @@ import {
   getPopularRoles,
   getPopularCities,
 } from "../services/job/salary-popularity.js";
-// First-party marketplace template slugs — shared SSoT with the resume
-// preset descriptors + the prerender step, so the same /marketplace/
-// templates/<slug> pages that get prerendered also appear in the sitemap.
+import { getOrSetCached } from "../utils/edge-cache.js";
+// Resume-preset template slugs — the always-available fallback for the static
+// template list when the generated manifest can't be fetched. The full static
+// catalog (resume + studio-builtin) is the generated public/templates-
+// manifest.json; both prerender + this sitemap read it so the same
+// /marketplace/templates/<slug> pages are crawlable.
 import { RESUME_TEMPLATE_LISTINGS } from "../../../shared/marketplace-template-listings.js";
 
 export const sitemapRoutes = new Hono();
 
 const BASE = process.env.APP_URL ?? "https://hired.video";
+
+/**
+ * Slugs of every STATIC marketplace template (resume + studio-builtin), read
+ * from the generated, Pages-served manifest. Cached read-through (1h, matches
+ * the sitemap's own cache header); on any fetch/parse failure it degrades to
+ * the resume-preset slugs from the shared SSoT so the sitemap never loses the
+ * core template pages. Creator-published templates are queried from the DB
+ * separately.
+ */
+async function getStaticTemplateSlugs(): Promise<string[]> {
+  const fallback = () => RESUME_TEMPLATE_LISTINGS.map((l) => l.slug);
+  try {
+    return await getOrSetCached<string[]>({
+      key: "sitemap:static-template-slugs:v1",
+      ttlSeconds: 3600,
+      loader: async () => {
+        const res = await fetch(`${BASE}/templates-manifest.json`, {
+          cf: { cacheTtl: 3600, cacheEverything: true },
+        } as RequestInit);
+        if (!res.ok) throw new Error(`manifest HTTP ${res.status}`);
+        const rows = (await res.json()) as Array<{ slug?: string }>;
+        const slugs = Array.isArray(rows)
+          ? rows.map((r) => r?.slug).filter((s): s is string => !!s)
+          : [];
+        if (slugs.length === 0) throw new Error("manifest empty");
+        return slugs;
+      },
+    });
+  } catch {
+    return fallback();
+  }
+}
 
 function url(loc: string, lastmod?: string, changefreq = "weekly", priority = "0.7") {
   return `  <url>
@@ -143,9 +178,10 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
       .filter(Boolean)
   )].slice(0, 200) as string[];
 
-  const [popularRoles, popularCities] = await Promise.all([
+  const [popularRoles, popularCities, staticTemplateSlugs] = await Promise.all([
     getPopularRoles(40),
     getPopularCities(20),
+    getStaticTemplateSlugs(),
   ]);
 
   const urls: string[] = [
@@ -185,10 +221,10 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
     // Programmatic SEO: resume guide pages (legacy slug derivation).
     ...jobSlugs.map((s) => url(`/resume-guide/${s}`, now, "weekly", "0.8")),
 
-    // First-party marketplace template pages (resume presets) — static SSoT,
-    // also prerendered with per-template meta + JSON-LD.
-    ...RESUME_TEMPLATE_LISTINGS.map((tpl) =>
-      url(`/marketplace/templates/${tpl.slug}`, now, "monthly", "0.7"),
+    // Static marketplace template pages (resume + studio-builtin) — from the
+    // generated manifest, also prerendered with per-template meta + JSON-LD.
+    ...staticTemplateSlugs.map((slug) =>
+      url(`/marketplace/templates/${slug}`, now, "monthly", "0.7"),
     ),
 
     // Creator-published marketplace template pages (public, slugged).

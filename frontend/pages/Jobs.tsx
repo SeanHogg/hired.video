@@ -194,6 +194,7 @@ export default function Jobs() {
   const { effective: urlQuery } = useSearchQueryParam();
   const urlEmploymentType = searchParams.get("employmentType") ?? "";
   const urlExperienceLevel = searchParams.get("experienceLevel") ?? "";
+  const urlWorkSetting = searchParams.get("workSetting") ?? "";
   const urlRemote = searchParams.get("remote") ?? "";
   const urlSalaryMin = searchParams.get("salaryMin") ?? "";
   const urlSalaryMax = searchParams.get("salaryMax") ?? "";
@@ -222,6 +223,16 @@ export default function Jobs() {
         { value: "executive", label: t("labels.experienceLevel.executive") },
       ],
     },
+    {
+      key: "workSetting",
+      label: t("fields.workSetting.label"),
+      type: "select",
+      options: [
+        { value: "onsite", label: t("labels.workSetting.onsite") },
+        { value: "remote", label: t("labels.workSetting.remote") },
+        { value: "hybrid", label: t("labels.workSetting.hybrid") },
+      ],
+    },
     { key: "salary", label: t("labels.salaryRangeLabel"), type: "number-range" },
   ]);
 
@@ -230,6 +241,7 @@ export default function Jobs() {
     if (urlQuery) initial.search = urlQuery;
     if (urlEmploymentType) initial.employmentType = urlEmploymentType;
     if (urlExperienceLevel) initial.experienceLevel = urlExperienceLevel;
+    if (urlWorkSetting) initial.workSetting = urlWorkSetting;
     if (urlRemote) initial.remote = urlRemote === "true";
     if (urlSalaryMin) initial.salaryMin = parseInt(urlSalaryMin, 10);
     if (urlSalaryMax) initial.salaryMax = parseInt(urlSalaryMax, 10);
@@ -242,6 +254,7 @@ export default function Jobs() {
       search: urlQuery,
       employmentType: urlEmploymentType || undefined,
       experienceLevel: urlExperienceLevel || undefined,
+      workSetting: urlWorkSetting || undefined,
       remote: urlRemote ? urlRemote === "true" : undefined,
       salaryMin: urlSalaryMin ? parseInt(urlSalaryMin, 10) : undefined,
       salaryMax: urlSalaryMax ? parseInt(urlSalaryMax, 10) : undefined,
@@ -251,6 +264,7 @@ export default function Jobs() {
     urlQuery,
     urlEmploymentType,
     urlExperienceLevel,
+    urlWorkSetting,
     urlRemote,
     urlSalaryMin,
     urlSalaryMax,
@@ -380,6 +394,7 @@ export default function Jobs() {
         radiusKm: geoFilter.radiusKm ?? undefined,
         employmentType: searchFilters.employmentType || undefined,
         experienceLevel: searchFilters.experienceLevel || undefined,
+        workSetting: searchFilters.workSetting || undefined,
         isRemote: geoFilter.remote ?? searchFilters.remote ?? undefined,
         sector: sectorFilter ?? undefined,
         page: currentPage,
@@ -583,6 +598,20 @@ export default function Jobs() {
   };
 
 
+  // #1493 — Archive a job from the list. Archived jobs drop out of the
+  // default (public) listing, so we optimistically remove the row. Restore
+  // is reachable from the job's own detail page (still loadable by URL).
+  const handleArchiveJob = async (id: string, title: string) => {
+    try {
+      await jobService.archiveJob(id);
+      setJobs((prev) => prev.filter((j) => j.id !== id));
+      toast.success(t("messages.jobs.archived", { title }));
+    } catch (err) {
+      toast.error(t("messages.jobs.archiveFailed"));
+      console.error("Failed to archive job", err);
+    }
+  };
+
   const handleEditAlert = (alert: JobAlert) => {
     setEditAlert(alert);
     setAlertName(alert.name);
@@ -669,6 +698,9 @@ export default function Jobs() {
       onViewAnalytics: canManageJobs
         ? () => setAnalyticsJob({ id: job.id, title: job.title })
         : undefined,
+      onArchive: canManageJobs
+        ? () => handleArchiveJob(job.id, job.title)
+        : undefined,
       onDelete: canManageJobs
         ? () => setDeleteJobDialog({ id: job.id, title: job.title })
         : undefined,
@@ -696,6 +728,10 @@ export default function Jobs() {
         isRemote: job.isRemote || false,
         status: "active" as const,
         privacy: "public" as const,
+        // #2092 — surface work setting + hybrid day-split on the card badge.
+        workSetting: (job as any).workSetting,
+        onsiteDaysPerWeek: (job as any).onsiteDaysPerWeek ?? null,
+        remoteDaysPerWeek: (job as any).remoteDaysPerWeek ?? null,
         views: (job as any).views || 0,
         applications: (job as any).applications || 0,
         createdAt: (job as any).createdAt || "",

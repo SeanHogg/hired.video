@@ -27,6 +27,11 @@ import {
   Sparkles,
   Target,
   Users,
+  Pencil,
+  Plus,
+  Trash2,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { ToolShell } from "@/components/tools/ToolShell";
 import { Button } from "@/components/ui/button";
@@ -35,6 +40,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -115,6 +121,35 @@ export default function InterviewQuestions() {
 
   const [skills, setSkills] = useState<ExtractedSkill[]>([]);
   const [questions, setQuestions] = useState<GeneratedQuestion[]>([]);
+  // #970 — generated questions are editable before assignment: the recruiter
+  // can tweak wording, retime, reorder, delete, or add a custom question.
+  const [editing, setEditing] = useState(false);
+  const updateQuestion = (id: string, patch: Partial<GeneratedQuestion>) =>
+    setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, ...patch } : q)));
+  const removeQuestion = (id: string) =>
+    setQuestions((prev) => prev.filter((q) => q.id !== id));
+  const moveQuestion = (id: string, dir: -1 | 1) =>
+    setQuestions((prev) => {
+      const i = prev.findIndex((q) => q.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  const addQuestion = () =>
+    setQuestions((prev) => [
+      ...prev,
+      {
+        // Stable client-side id; the assign flow persists the text/timing, not the id.
+        id: `custom-${prev.length}-${prev.reduce((n, q) => n + q.text.length, 0)}`,
+        text: "",
+        category: "behavioral",
+        maxDurationSec: 120,
+        required: false,
+        skillLinks: [],
+      },
+    ]);
   // Authoritative target role + provenance returned by /generate. Used by
   // the AI Coach hand-off + the assign dialog so we ship the JD title /
   // resume role even when the user left the targetRole field blank.
@@ -503,6 +538,15 @@ export default function InterviewQuestions() {
                   <MessageSquare className="h-3.5 w-3.5" />
                   {t("actions.interviewQuestions.practiseInCoach")}
                 </Button>
+                <Button
+                  variant={editing ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setEditing((v) => !v)}
+                  className="gap-1"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  {editing ? t("actions.done") : t("actions.interviewQuestions.editQuestions")}
+                </Button>
                 {isRecruiterOrEmployer && (
                   <Button size="sm" onClick={() => setAssignOpen(true)} className="gap-1">
                     <Users className="h-3.5 w-3.5" />
@@ -523,28 +567,106 @@ export default function InterviewQuestions() {
                         <Badge variant="secondary" className="text-[10px]">
                           {q.category}
                         </Badge>
-                        <Badge variant="outline" className="text-[10px]">
-                          {q.maxDurationSec}s
-                        </Badge>
-                        {q.required && (
+                        {editing ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Input
+                              type="number"
+                              min={30}
+                              max={600}
+                              value={q.maxDurationSec}
+                              onChange={(e) =>
+                                updateQuestion(q.id, {
+                                  maxDurationSec: Math.max(30, Math.min(600, Number(e.target.value) || 0)),
+                                })
+                              }
+                              className="h-6 w-20 text-xs"
+                              aria-label={t("labels.interviewQuestions.maxSecondsAria")}
+                            />
+                            <span className="text-[10px] text-muted-foreground">s</span>
+                          </span>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px]">
+                            {q.maxDurationSec}s
+                          </Badge>
+                        )}
+                        {q.required && !editing && (
                           <Badge variant="destructive" className="text-[10px]">
                             {t("labels.interviewQuestions.required")}
                           </Badge>
                         )}
+                        {editing && (
+                          <label className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <Checkbox
+                              checked={q.required}
+                              onCheckedChange={(v) => updateQuestion(q.id, { required: v === true })}
+                            />
+                            {t("labels.interviewQuestions.required")}
+                          </label>
+                        )}
                       </div>
-                      <p className="text-sm">{q.text}</p>
+                      {editing ? (
+                        <Textarea
+                          value={q.text}
+                          onChange={(e) => updateQuestion(q.id, { text: e.target.value })}
+                          rows={2}
+                          className="text-sm"
+                          placeholder={t("labels.interviewQuestions.questionPlaceholder")}
+                        />
+                      ) : (
+                        <p className="text-sm">{q.text}</p>
+                      )}
                       {q.skillLinks.length > 0 && (
                         <p className="text-xs text-muted-foreground mt-1.5">
                           {t("labels.interviewQuestions.probes", { skills: q.skillLinks.join(", ") })}
                         </p>
                       )}
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => handleCopyOne(q)}>
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
+                    {editing ? (
+                      <div className="flex items-center gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          disabled={i === 0}
+                          onClick={() => moveQuestion(q.id, -1)}
+                          aria-label={t("labels.interviewQuestions.moveUp")}
+                        >
+                          <ArrowUp className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          disabled={i === questions.length - 1}
+                          onClick={() => moveQuestion(q.id, 1)}
+                          aria-label={t("labels.interviewQuestions.moveDown")}
+                        >
+                          <ArrowDown className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => removeQuestion(q.id)}
+                          aria-label={t("actions.delete")}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button variant="ghost" size="sm" onClick={() => handleCopyOne(q)}>
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
+              {editing && (
+                <Button variant="outline" size="sm" onClick={addQuestion} className="gap-1">
+                  <Plus className="h-3.5 w-3.5" />
+                  {t("actions.interviewQuestions.addQuestion")}
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}

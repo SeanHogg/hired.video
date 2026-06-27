@@ -14,16 +14,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-// First-party marketplace template listings — the SSoT shared with the
-// resume preset descriptors (frontend/types/resume-template.ts) and the
-// XML sitemap (api/src/routes/sitemap.ts). Imported here so each
-// /marketplace/templates/<slug> page is prerendered with its own meta +
-// JSON-LD + crawlable body. Run via `tsx` (see package.json build script)
-// so this `.js` specifier resolves to the shared `.ts` module.
-import {
-  RESUME_TEMPLATE_LISTINGS,
-  relatedResumeListings,
-} from '../../shared/marketplace-template-listings.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -324,10 +314,42 @@ function breadcrumbSchema(items) {
   };
 }
 
+/** Templates most related to `listing`, ranked by shared industry / tags /
+ *  kind — mirrors getRelatedTemplates() in lib/templates/registry.ts so the
+ *  prerendered links match the client-rendered ones. Backfills so the list is
+ *  never empty (no orphan pages). */
+function relatedFromManifest(listing, all, limit = 6) {
+  const tags = new Set((listing.tags ?? []).map((x) => String(x).toLowerCase()));
+  const score = (o) => {
+    let s = 0;
+    if (listing.industry && o.industry && listing.industry === o.industry) s += 3;
+    for (const t of o.tags ?? []) if (tags.has(String(t).toLowerCase())) s += 1;
+    if (o.kind === listing.kind) s += 1;
+    return s;
+  };
+  const scored = all
+    .filter((o) => o.slug !== listing.slug)
+    .map((o) => ({ o, s: score(o) }))
+    .sort((a, b) => b.s - a.s);
+  const hit = scored.filter((x) => x.s > 0).map((x) => x.o);
+  if (hit.length >= limit) return hit.slice(0, limit);
+  const rest = scored
+    .filter((x) => x.s === 0)
+    .map((x) => x.o)
+    .sort((a, b) => Number(b.kind === listing.kind) - Number(a.kind === listing.kind));
+  return [...hit, ...rest].slice(0, limit);
+}
+
+/** Eyebrow tag for the generated OG card, by template kind. */
+function templateEyebrow(kind) {
+  if (kind === 'resume') return 'Resume Template';
+  return 'Studio Template';
+}
+
 /** The in-#root crawlable fallback for a template page: breadcrumb links, the
  *  H1, the description, and the related-template + browse links. Mirrors what
  *  MarketplaceTemplatePreview renders client-side. */
-function templateRootHtml({ name, industry, description, slug, related }) {
+function templateRootHtml({ name, industry, description, related }) {
   const crumbs =
     `<nav aria-label="Breadcrumb"><a href="/">Home</a> › ` +
     `<a href="/search?category=templates">Templates</a> › ` +
@@ -335,14 +357,14 @@ function templateRootHtml({ name, industry, description, slug, related }) {
   const relatedItems = related
     .map(
       (r) =>
-        `<li><a href="${CANONICAL_TEMPLATE_PATH(r.slug)}">${escapeHtml(r.name)} — ${escapeHtml(r.industry)}</a></li>`,
+        `<li><a href="${CANONICAL_TEMPLATE_PATH(r.slug)}">${escapeHtml(r.name)}${r.industry ? ` — ${escapeHtml(r.industry)}` : ''}</a></li>`,
     )
     .join('');
   return (
     `${crumbs}` +
     `<main>` +
     `<h1>${escapeHtml(name)}</h1>` +
-    `<p>${escapeHtml(industry)}</p>` +
+    (industry ? `<p>${escapeHtml(industry)}</p>` : '') +
     `<p>${escapeHtml(description)}</p>` +
     `<h2>More templates like this</h2>` +
     `<ul>${relatedItems}</ul>` +
@@ -351,26 +373,28 @@ function templateRootHtml({ name, industry, description, slug, related }) {
   );
 }
 
-/** Build the prerender descriptor for one first-party resume template. */
-function templateRoute(listing) {
-  const { slug, name, industry, description } = listing;
-  const related = relatedResumeListings(slug, 6);
+/** Build the prerender descriptor for one static marketplace template, given
+ *  the full manifest (for related-link computation). */
+function templateRoute(listing, all) {
+  const { slug, name, industry, blurb, kind } = listing;
+  const description = blurb || `Preview the "${name}" template on hired.video — apply it to any of your work.`;
+  const related = relatedFromManifest(listing, all, 6);
   const url = `${CANONICAL_ORIGIN}${CANONICAL_TEMPLATE_PATH(slug)}`;
   const title = `${name} — hired.video Marketplace`;
   return {
     path: CANONICAL_TEMPLATE_PATH(slug),
     title,
     description,
-    eyebrow: 'Resume Template',
+    eyebrow: templateEyebrow(kind),
     jsonLd: [
-      productSchema({ name, description, category: industry, url }),
+      productSchema({ name, description, category: industry || 'Templates', url }),
       breadcrumbSchema([
         { name: 'Home', url: '/' },
         { name: 'Templates', url: '/search?category=templates' },
         { name, url: CANONICAL_TEMPLATE_PATH(slug) },
       ]),
     ],
-    rootHtml: templateRootHtml({ name, industry, description, slug, related }),
+    rootHtml: templateRootHtml({ name, industry, description, related }),
   };
 }
 
@@ -382,8 +406,21 @@ function main() {
 
   const baseHtml = fs.readFileSync(ENTRY_HTML, 'utf8');
 
-  // Static marketing routes + one page per first-party marketplace template.
-  const templateRoutes = RESUME_TEMPLATE_LISTINGS.map(templateRoute);
+  // Static marketing routes + one page per static marketplace template. The
+  // template list is the generated manifest (public/templates-manifest.json,
+  // emitted by generate-templates-manifest.mjs from the real registry SSoT)
+  // so resume + studio-builtin templates are covered with zero duplication.
+  // Creator-published (DB) templates are dynamic — discovered via the sitemap
+  // + client-side meta injection, not build-time prerender.
+  const MANIFEST_PATH = path.resolve(__dirname, '../public/templates-manifest.json');
+  if (!fs.existsSync(MANIFEST_PATH)) {
+    console.error(
+      `[prerender] Missing ${MANIFEST_PATH}. Run generate-templates-manifest.mjs before prerender (see package.json build script).`,
+    );
+    process.exit(1);
+  }
+  const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
+  const templateRoutes = manifest.map((listing) => templateRoute(listing, manifest));
   const allRoutes = [...ROUTES, ...templateRoutes];
 
   for (const r of allRoutes) {

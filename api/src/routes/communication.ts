@@ -197,20 +197,44 @@ communicationRoutes.get("/email-campaigns", async (c) => {
   return c.json(ok(rows), 200);
 });
 
+// #1971 — persist the recipients as a `list` audience so the campaign is
+// actually sendable. The old handler inserted a bare row with no `audience`
+// and dropped `recipients` entirely, so the now-real `/send` (which delegates
+// to CampaignService.schedule) 400'd with "no audience selected". Route the
+// create through the canonical engine instead of a raw insert.
 communicationRoutes.post("/email-campaigns", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const db = getDb();
-  const [created] = await db
-    .insert(emailCampaigns)
-    .values({
-      name: String(body.name ?? "Campaign"),
-      templateId: body.templateId,
-      subject: String(body.subject ?? ""),
-      status: String(body.status ?? "draft"),
-      scheduledAt: body.scheduledAt ? new Date(String(body.scheduledAt)) : null,
-      sentAt: body.sentAt ? new Date(String(body.sentAt)) : null,
-    } as any)
-    .returning();
+  const uid = userId(c);
+  if (!uid) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
+
+  const body = await c.req.json().catch(() => ({} as any));
+  const rawRecipients = Array.isArray(body.recipients) ? body.recipients : [];
+  const recipients = rawRecipients
+    .filter((r: any) => r && typeof r.email === "string" && r.email.includes("@"))
+    .map((r: any) => ({
+      email: String(r.email),
+      ...(r.name ? { name: String(r.name).slice(0, 255) } : {}),
+    }));
+
+  // The dialog creates a template first, then passes its id. Accept either the
+  // legacy `templateId` or the dialog's `emailTemplateId`.
+  const templateId = (body.templateId ?? body.emailTemplateId) || null;
+  // CreateCampaignSchema requires a non-empty subject; the email's real
+  // subject comes from the attached template at render time (resolveContent
+  // falls back to it), so the campaign name is a safe placeholder.
+  const subject = String(body.subject || body.name || "Campaign").slice(0, 500);
+
+  const service = CampaignService.create(getDb());
+  const created = await service.create(
+    {
+      name: String(body.name ?? "Campaign").slice(0, 255),
+      subject,
+      description: body.description ? String(body.description).slice(0, 1000) : undefined,
+      templateId,
+      audience: recipients.length > 0 ? { kind: "list", recipients } : undefined,
+      status: "draft",
+    },
+    { createdByUserId: uid },
+  );
   return c.json(ok(created), 201);
 });
 

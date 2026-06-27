@@ -1,0 +1,980 @@
+[
+  {
+    "slug": "hired-default",
+    "kind": "resume",
+    "name": "Hired Video (Default)",
+    "blurb": "Signature hired.video layout — gradient hero with embedded video resume, timeline work history, and cross-section career overview.",
+    "industry": "All",
+    "tags": [
+      "All"
+    ]
+  },
+  {
+    "slug": "payroll-iron-gray",
+    "kind": "resume",
+    "name": "Payroll & Finance — Iron Gray",
+    "blurb": "Classic two-column print layout with sober serif headings — ATS-friendly for payroll, accounting, and financial analyst roles.",
+    "industry": "Finance / Payroll",
+    "tags": [
+      "Finance / Payroll"
+    ]
+  },
+  {
+    "slug": "risk-asphalt",
+    "kind": "resume",
+    "name": "Risk & Consulting — Asphalt",
+    "blurb": "Dark, assertive two-column layout with ALL-CAPS headings — signals gravitas for risk, audit, compliance, and consulting.",
+    "industry": "Risk / Consulting",
+    "tags": [
+      "Risk / Consulting"
+    ]
+  },
+  {
+    "slug": "executive-taupe",
+    "kind": "resume",
+    "name": "Executive — Trusted Taupe",
+    "blurb": "Spacious single-column serif layout with elegant divider headings — built for CXO, VP, and Director-level narratives.",
+    "industry": "Executive / C-Suite",
+    "tags": [
+      "Executive / C-Suite"
+    ]
+  },
+  {
+    "slug": "intern-education-first",
+    "kind": "resume",
+    "name": "New Grad — Education First",
+    "blurb": "Education leads, projects and coursework shine — optimized for interns, recent grads, and anyone with limited work history.",
+    "industry": "Intern / New Grad",
+    "tags": [
+      "Intern / New Grad"
+    ]
+  },
+  {
+    "slug": "hospitality-amber",
+    "kind": "resume",
+    "name": "Hospitality — Warm Amber",
+    "blurb": "Warm, approachable amber palette with ALL-CAPS headings — suited to hospitality, retail, customer success, and service roles.",
+    "industry": "Hospitality / Retail",
+    "tags": [
+      "Hospitality / Retail"
+    ]
+  },
+  {
+    "slug": "creative-minimal",
+    "kind": "resume",
+    "name": "Creative — Minimal Slate",
+    "blurb": "Ultra-minimal monospace layout with generous whitespace — product designers, creative directors, and indie makers.",
+    "industry": "Creative / Product",
+    "tags": [
+      "Creative / Product"
+    ]
+  },
+  {
+    "slug": "software-engineer-graphite",
+    "kind": "resume",
+    "name": "Software Engineer — Dev Graphite",
+    "blurb": "Two-column developer-focused layout with monospace accents — tech stack and projects sidebar, achievement-led work history.",
+    "industry": "Software / Engineering",
+    "tags": [
+      "Software / Engineering"
+    ]
+  },
+  {
+    "slug": "healthcare-clinical-blue",
+    "kind": "resume",
+    "name": "Healthcare — Clinical Blue",
+    "blurb": "Credentials-forward two-column layout for nurses, physicians, and allied health — licenses and certifications above the fold.",
+    "industry": "Healthcare / Clinical",
+    "tags": [
+      "Healthcare / Clinical"
+    ]
+  },
+  {
+    "slug": "sales-growth-emerald",
+    "kind": "resume",
+    "name": "Sales — Growth Emerald",
+    "blurb": "Achievement-driven single-column layout with confident green accents — built for AEs, SDRs, sales leaders, and BD professionals.",
+    "industry": "Sales / Business Development",
+    "tags": [
+      "Sales / Business Development"
+    ]
+  },
+  {
+    "slug": "actor-headshot-hero",
+    "kind": "resume",
+    "name": "Actor — Headshot Hero",
+    "blurb": "Industry-standard actor one-pager — large headshot, projects-first credits (film / TV / theatre), training, special skills, reps + contact.",
+    "industry": "Film / Theatre / Television",
+    "tags": [
+      "Film / Theatre / Television"
+    ]
+  },
+  {
+    "slug": "director-filmography-serif",
+    "kind": "resume",
+    "name": "Director — Filmography Serif",
+    "blurb": "Print-style directorial CV — filmography-led with festival selections and awards above the fold, classic serif with divider headings.",
+    "industry": "Film / Television",
+    "tags": [
+      "Film / Television"
+    ]
+  },
+  {
+    "slug": "basic",
+    "kind": "studio-builtin",
+    "name": "Basic",
+    "blurb": "Start from scratch — describe one scene, generate the script.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "resume-doc",
+    "kind": "studio-builtin",
+    "name": "Resume (Document)",
+    "blurb": "Design a print-ready resume on the canvas — drag in sections, set Letter/Legal & orientation, export PDF.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "profile",
+    "kind": "studio-builtin",
+    "name": "Promote Yourself",
+    "blurb": "Profile-led video — bio, highlights, and any services you offer.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "resume",
+    "kind": "studio-builtin",
+    "name": "Video Resume",
+    "blurb": "Turn your work history into a 60-second video pitch.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "personal-brand",
+    "kind": "studio-builtin",
+    "name": "Personal Brand",
+    "blurb": "Tell your career story from scratch — no resume needed.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "skills-demo",
+    "kind": "studio-builtin",
+    "name": "Skills Demo",
+    "blurb": "Pick skills from your resume and visualize where you've used them.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "code-walkthrough",
+    "kind": "studio-builtin",
+    "name": "Code Walkthrough",
+    "blurb": "Screen + webcam walkthrough of your code, with snippets and project links.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "design-portfolio",
+    "kind": "studio-builtin",
+    "name": "Design Portfolio",
+    "blurb": "Showcase design projects with images and links — auto-pulled from your resume.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "data-analysis",
+    "kind": "studio-builtin",
+    "name": "Data Analysis",
+    "blurb": "Show insights from your data — paste a sample, pick a chart, narrate the takeaway.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "job-ad",
+    "kind": "studio-builtin",
+    "name": "Job Ad",
+    "blurb": "Promote an open role. Pick a job to auto-fill the script.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "job-doc",
+    "kind": "studio-builtin",
+    "name": "Job Posting (Document)",
+    "blurb": "Write a print-ready job posting on the canvas — pick a layout, drag in sections, export PDF.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "article-doc",
+    "kind": "studio-builtin",
+    "name": "Article (Document)",
+    "blurb": "Write an article on the canvas — text, images, and dividers on a print-ready page; export PDF.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "blog-doc",
+    "kind": "studio-builtin",
+    "name": "Blog Post (Document)",
+    "blurb": "Draft a blog post on the canvas — free-form text and images on a page; export PDF.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "company-promo",
+    "kind": "studio-builtin",
+    "name": "Promote Your Company",
+    "blurb": "Showcase your company to candidates. Pick one of your companies to auto-fill the script.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "sizzle-reel",
+    "kind": "studio-builtin",
+    "name": "Sizzle Reel",
+    "blurb": "Drop clips + a music bed. We pick the best moments and cut to the beat.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "tool-promo",
+    "kind": "studio-builtin",
+    "name": "Tool Promo",
+    "blurb": "One-scene 30s promo for a tool from the catalog — screen + voiceover.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "course-lesson-explainer",
+    "kind": "studio-builtin",
+    "name": "Course Lesson — Explainer",
+    "blurb": "Teach one concept end-to-end. Opens with a learning objective, ends with a summary + knowledge check.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "course-lesson-demo",
+    "kind": "studio-builtin",
+    "name": "Course Lesson — Demo",
+    "blurb": "Show, don't tell. Screen + webcam capture for a software walkthrough that becomes a lesson.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "course-lesson-walkthrough",
+    "kind": "studio-builtin",
+    "name": "Course Lesson — Worked Example",
+    "blurb": "Worked-example pedagogy: a problem, a solution path, the trade-offs, a generalised takeaway.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "self-tape",
+    "kind": "studio-builtin",
+    "name": "Self-tape audition",
+    "blurb": "Slate, scene read, and a clean outro — the industry-standard self-tape layout.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "monologue",
+    "kind": "studio-builtin",
+    "name": "Monologue",
+    "blurb": "Single-take dramatic monologue with captions for casting reviewers.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "showreel",
+    "kind": "studio-builtin",
+    "name": "Actor showreel",
+    "blurb": "Multi-scene reel of your best clips — opens with credits, cuts on the beat.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "director-pitch",
+    "kind": "studio-builtin",
+    "name": "Director's pitch",
+    "blurb": "Treatment-style pitch for a film or series — logline, tone, characters, ask.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "casting-call",
+    "kind": "studio-builtin",
+    "name": "Casting call",
+    "blurb": "Director-facing call: describe the role, submission window, and how to send a self-tape.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "podcast-trailer",
+    "kind": "studio-builtin",
+    "name": "Podcast trailer",
+    "blurb": "60-second show trailer — hook, what listeners get, where to subscribe.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "podcast-episode",
+    "kind": "studio-builtin",
+    "name": "Podcast episode",
+    "blurb": "Full-length episode — intro music, chaptered segments, outro CTA.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "podcast-interview",
+    "kind": "studio-builtin",
+    "name": "Podcast interview",
+    "blurb": "Two-host / guest format — multi-track audio for guest, host, and music.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "voice-audition-reel",
+    "kind": "studio-builtin",
+    "name": "Voice audition reel",
+    "blurb": "30–60 sec multi-style demo for casting agents — characters, tones, accents.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "voice-ivr-prompt",
+    "kind": "studio-builtin",
+    "name": "IVR / voicemail prompt",
+    "blurb": "Short business prompt — greeting, menu options, hold message.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "voice-audiobook-chapter",
+    "kind": "studio-builtin",
+    "name": "Audiobook chapter",
+    "blurb": "Long-form chapter read — chapter title slate, paced narration, soft outro.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "product-promo",
+    "kind": "studio-builtin",
+    "name": "Product / service promo",
+    "blurb": "30-second promotional video for any product, service, event, or sale.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "game-3d-world",
+    "kind": "studio-builtin",
+    "name": "3D World",
+    "blurb": "Roblox-style 3D world — drop blocks, place a goal, invite friends to play.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "endless-runner",
+    "kind": "studio-builtin",
+    "name": "Mini-game · Endless runner",
+    "blurb": "Side-scrolling 2D jump-and-dodge — your sprite, your obstacles, your music.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "quiz-game",
+    "kind": "studio-builtin",
+    "name": "Mini-game · Quiz",
+    "blurb": "2D multiple-choice trivia — title screen, questions, scoring, leaderboard.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "memory-match",
+    "kind": "studio-builtin",
+    "name": "Mini-game · Memory match",
+    "blurb": "2D card-matching memory game — flip pairs, beat the clock, share your time.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "drawing-blank",
+    "kind": "studio-builtin",
+    "name": "Blank canvas",
+    "blurb": "Start from scratch — brush, eraser, fill, layers, AI prompt. 1024×1024.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "drawing-social-square",
+    "kind": "studio-builtin",
+    "name": "Social post (1:1)",
+    "blurb": "1080×1080 square — Instagram / LinkedIn / X. Layers + AI generation.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "drawing-og-card",
+    "kind": "studio-builtin",
+    "name": "OG / link preview card",
+    "blurb": "1200×630 — the link-preview thumbnail social sites scrape from your page.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "animation-logo-loop",
+    "kind": "studio-builtin",
+    "name": "Logo loop",
+    "blurb": "Square brand bug — 512×512, 24fps, 8 frames. Spin / wipe / pulse.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "animation-spinner",
+    "kind": "studio-builtin",
+    "name": "Loading spinner",
+    "blurb": "Tiny 256² spinner — 30fps, 6 frames. Drop-in animated loading GIF.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "animation-reaction",
+    "kind": "studio-builtin",
+    "name": "Reaction GIF",
+    "blurb": "480² meme reaction — 15fps, 12 frames. Perfect for Twitter / Reddit.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "animation-explainer",
+    "kind": "studio-builtin",
+    "name": "Explainer loop",
+    "blurb": "640×360 16:9 — 12fps 'on 2s' hand-drawn cadence, 16 frames.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "cad-floor-plan",
+    "kind": "studio-builtin",
+    "name": "Floor plan",
+    "blurb": "A2 landscape (594×420mm) · 1:50 scale · grid 100mm.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "cad-part-drawing",
+    "kind": "studio-builtin",
+    "name": "Part drawing",
+    "blurb": "A3 landscape (420×297mm) · 1:1 scale · grid 5mm — mechanical part w/ dimensions.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "cad-electrical-schematic",
+    "kind": "studio-builtin",
+    "name": "Electrical schematic",
+    "blurb": "A3 landscape · grid 2.54mm (0.1\" — IC pitch) · for circuits + breadboard layouts.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "cad-blueprint",
+    "kind": "studio-builtin",
+    "name": "Blueprint",
+    "blurb": "A1 landscape (841×594mm) · 1:100 scale · grid 250mm — large-format architectural.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "cad3d-part",
+    "kind": "studio-builtin",
+    "name": "Mechanical part (3D)",
+    "blurb": "Blank 3D scene · mm units — model a part from primitive solids, export STL / STEP.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "cad3d-massing",
+    "kind": "studio-builtin",
+    "name": "Architectural massing",
+    "blurb": "Blank 3D scene · m units — block out a building massing study from extruded volumes.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "cad3d-product",
+    "kind": "studio-builtin",
+    "name": "Product concept",
+    "blurb": "Blank 3D scene — rough a product concept from primitives, render a PNG for the pitch.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "ad-iab-mpu-300x250",
+    "kind": "studio-builtin",
+    "name": "IAB Medium Rectangle 300×250",
+    "blurb": "MPU — the most-bought IAB unit. Sidebar + in-article placement.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "ad-iab-large-rect-336x280",
+    "kind": "studio-builtin",
+    "name": "IAB Large Rectangle 336×280",
+    "blurb": "Slightly larger than the MPU — more headline room, same intent.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "ad-iab-leaderboard-728x90",
+    "kind": "studio-builtin",
+    "name": "IAB Leaderboard 728×90",
+    "blurb": "Top-of-page horizontal banner — wide, short, single-line message.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "ad-iab-half-page-300x600",
+    "kind": "studio-builtin",
+    "name": "IAB Half-Page 300×600",
+    "blurb": "Tall sidebar — high-impact desktop unit with room for storytelling.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "ad-iab-skyscraper-160x600",
+    "kind": "studio-builtin",
+    "name": "IAB Wide Skyscraper 160×600",
+    "blurb": "Side-rail vertical — narrow column, stacked content top → bottom.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "ad-iab-billboard-970x250",
+    "kind": "studio-builtin",
+    "name": "IAB Billboard 970×250",
+    "blurb": "Top-of-page hero on premium publishers — wide, tall, maximum impact.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "ad-iab-mobile-banner-320x50",
+    "kind": "studio-builtin",
+    "name": "IAB Mobile Banner 320×50",
+    "blurb": "Sticky bottom-of-screen mobile banner — one line, one CTA.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "ad-iab-large-mobile-320x100",
+    "kind": "studio-builtin",
+    "name": "IAB Large Mobile 320×100",
+    "blurb": "Mobile in-feed — twice the height of the sticky, room for a headline + supporting line.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "ad-og-link-card-1200x630",
+    "kind": "studio-builtin",
+    "name": "Link-share card 1200×630",
+    "blurb": "Open Graph preview card — the thumbnail LinkedIn / FB / X scrape from your URL.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "ad-social-reel-9x16",
+    "kind": "studio-builtin",
+    "name": "Reels / TikTok / Shorts ad",
+    "blurb": "Vertical 1080×1920 ad spec — full-screen mobile, sound-on hook in 3s.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "ad-meta-in-feed-4x5",
+    "kind": "studio-builtin",
+    "name": "Meta In-Feed 4:5 ad",
+    "blurb": "1080×1350 portrait — Meta's 2026 gold-standard in-feed ad spec.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "ad-pinterest-pin-2x3",
+    "kind": "studio-builtin",
+    "name": "Pinterest Pin (2:3)",
+    "blurb": "1000×1500 video Pin — top-of-pin hook, large text, vertical layout.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "ad-youtube-bumper-6s",
+    "kind": "studio-builtin",
+    "name": "YouTube Bumper (6s)",
+    "blurb": "Non-skippable 6-second 16:9 ad — one beat, one CTA, that's it.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "ad-outdoor-billboard-4x1",
+    "kind": "studio-builtin",
+    "name": "Outdoor billboard (4:1)",
+    "blurb": "1920×480 — roadside / digital-signage spec. 5-word rule.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "comic-hero",
+    "kind": "studio-builtin",
+    "name": "Hero / Action comic",
+    "blurb": "Classic superhero arc — big poses, bold colours, exclamation-mark SFX.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "comic-noir",
+    "kind": "studio-builtin",
+    "name": "Noir / Detective comic",
+    "blurb": "Smoky, monochrome, hard-boiled voiceover. The case is your career.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "comic-scifi",
+    "kind": "studio-builtin",
+    "name": "Sci-Fi / Cyberpunk comic",
+    "blurb": "Neon, chrome, neural nets. Your skills are the augmentations.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "comic-fantasy",
+    "kind": "studio-builtin",
+    "name": "Fantasy / Quest comic",
+    "blurb": "Maps, scrolls, mythic quests. Your CV is the chronicle.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "comic-romance",
+    "kind": "studio-builtin",
+    "name": "Romance comic",
+    "blurb": "Hearts, sparkles, sincere voiceover. Make them fall for your story.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "comic-slice",
+    "kind": "studio-builtin",
+    "name": "Slice-of-Life comic",
+    "blurb": "Quiet, warm, observational. Real life with a soft glow.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "comic-manga",
+    "kind": "studio-builtin",
+    "name": "Manga / Shonen comic",
+    "blurb": "Speed lines, dramatic eyes, declared-aloud goals. Your career arc — but shonen.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "comic-horror",
+    "kind": "studio-builtin",
+    "name": "Horror / Gothic comic",
+    "blurb": "Inky shadows, creeping dread, a slow reveal. Make the reader want to look away — then read on.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "comic-comedy",
+    "kind": "studio-builtin",
+    "name": "Comedy / Cartoon comic",
+    "blurb": "Goofy, bouncy, big takes. Sell yourself with a punchline.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "comic-retro80s",
+    "kind": "studio-builtin",
+    "name": "Retro 80s / Synthwave comic",
+    "blurb": "Chrome, grid, sunset. Career narrative as VHS cover art.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "comic-webtoon",
+    "kind": "studio-builtin",
+    "name": "Webtoon / Modern comic",
+    "blurb": "Vertical-scroll, soft colour, expressive close-ups. The native social comic.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "comic-adventure",
+    "kind": "studio-builtin",
+    "name": "Adventure / Pulp comic",
+    "blurb": "Maps, planes, derring-do. Indiana-Jones-ing your way through your career.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "icomic-branching-pitch",
+    "kind": "studio-builtin",
+    "name": "Branching career pitch",
+    "blurb": "Let the reader choose which of your strengths to explore — each path is its own short comic.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "icomic-choose-path",
+    "kind": "studio-builtin",
+    "name": "Choose-your-path story",
+    "blurb": "A classic choose-your-own-adventure — readers pick the route through your story.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  },
+  {
+    "slug": "icomic-case-study",
+    "kind": "studio-builtin",
+    "name": "Interactive case study",
+    "blurb": "A recruiter picks a scenario and sees how you'd handle it — branch per decision.",
+    "industry": null,
+    "tags": [
+      "video",
+      "studio"
+    ]
+  }
+]

@@ -10,7 +10,7 @@
 
 import {
   Eye, Edit, Trash2, MoreHorizontal, Mail,
-  History, BarChart3, Pencil,
+  History, BarChart3, Pencil, Archive, ArchiveRestore,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +41,13 @@ interface JobActionsMenuProps {
   onEmbed?: () => void;
   onViewToolHistory?: () => void;
   onViewAnalytics?: () => void;
+  /** #154/#1493 — Archive / Restore. Soft-delete that hides the job from
+   *  default listings while preserving slug + analytics. Owner only; the
+   *  item shows "Archive Job" when `isArchived` is falsy and "Restore from
+   *  Archive" when true. */
+  isArchived?: boolean;
+  onArchive?: () => void;
+  onUnarchive?: () => void;
   onTrack?: () => void;
   onContactOwner?: () => void;
   /** Owner-only — `POST /api/jobs/:id/clone`. Backend appends " (Copy)" to
@@ -68,6 +75,9 @@ export function JobActionsMenu({
   onEmbed,
   onViewToolHistory,
   onViewAnalytics,
+  isArchived = false,
+  onArchive,
+  onUnarchive,
   onTrack,
   onContactOwner,
   onClone,
@@ -78,9 +88,11 @@ export function JobActionsMenu({
   align = "end",
 }: JobActionsMenuProps): JSX.Element | null {
   const showRunTool = isOwner && !!jobId;
+  const showArchive =
+    isOwner && ((isArchived && !!onUnarchive) || (!isArchived && !!onArchive));
   const hasOwnerActions =
     isOwner &&
-    (onEdit || onRename || onClone || onDelete || showRunTool || onViewToolHistory || onViewAnalytics);
+    (onEdit || onRename || onClone || onDelete || showRunTool || onViewToolHistory || onViewAnalytics || showArchive);
   const hasPublicActions =
     onView || onShare || onCopyLink || onShowQR || onEmbed || onTrack || onContactOwner;
 
@@ -173,6 +185,24 @@ export function JobActionsMenu({
           <DropdownMenuItem onClick={onContactOwner}>
             <Mail className="w-4 h-4 mr-2" />
             Contact Recruiter
+          </DropdownMenuItem>
+        )}
+
+        {/* #154/#1493 — Archive / Restore. Owner only. Self-gates on
+            `showArchive`; label flips on `isArchived`. */}
+        {showArchive && (
+          <DropdownMenuItem onClick={isArchived ? onUnarchive : onArchive}>
+            {isArchived ? (
+              <>
+                <ArchiveRestore className="w-4 h-4 mr-2" />
+                Restore from Archive
+              </>
+            ) : (
+              <>
+                <Archive className="w-4 h-4 mr-2" />
+                Archive Job
+              </>
+            )}
           </DropdownMenuItem>
         )}
 

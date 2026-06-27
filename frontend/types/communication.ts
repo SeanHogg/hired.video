@@ -342,6 +342,9 @@ export interface UpdateEmailTemplateRequest extends CreateEmailTemplateRequest {
 export interface CreateEmailCampaignRequest {
   name: string;
   description?: string;
+  /** Email subject. Forwarded so the persisted campaign carries a real
+   *  subject (#1971); falls back to the template's subject at send time. */
+  subject?: string;
   emailTemplateId: string;
   recipients: EmailCampaignRecipientRequest[];
 }

@@ -131,6 +131,7 @@ export default function PersonalizeMessageDialog({
       });
       const campaign = await communicationService.createEmailCampaign({
         name: campaignName,
+        subject,
         emailTemplateId: template.id,
         recipients: [
           {

@@ -9,6 +9,7 @@ import {
   BookmarkCheck,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { workSettingLabel } from "@/lib/jobs/work-setting-label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
@@ -56,6 +57,8 @@ interface JobCardProps {
   onViewToolHistory?: () => void;
   /** Owner-only — opens the delete confirmation dialog. */
   onDelete?: () => void;
+  /** Owner-only — archives (soft-deletes) the job (#1493). */
+  onArchive?: () => void;
   /** Owner-only override for Clone. Defaults to calling
    *  `jobService.cloneJob(job.id)` and navigating to the clone's edit page,
    *  so most callers don't need to pass this. */
@@ -85,6 +88,7 @@ export default function JobCard({
   onViewAnalytics,
   onViewToolHistory,
   onDelete,
+  onArchive,
   onClone,
   onShare,
   onCopyLink,
@@ -189,6 +193,22 @@ export default function JobCard({
     badges.push(visibilityHeaderBadge(job.privacy));
   }
 
+  // #2092 — work setting (onsite/remote/hybrid + hybrid day-split). Read off
+  // the metadata bag so callers that don't carry it simply omit the badge.
+  const wsLabel = workSettingLabel(
+    t,
+    (job as any).workSetting,
+    (job as any).onsiteDaysPerWeek,
+    (job as any).remoteDaysPerWeek,
+  );
+  if (wsLabel) {
+    badges.push({
+      text: wsLabel,
+      variant: "outline" as const,
+      className: "text-xs",
+    });
+  }
+
   // The actions footer is rendered through JobActionsMenu (which mirrors
   // ResumeActionsMenu) so the action set stays consistent across entities.
   // Callers can still override with `actions` for surfaces with bespoke
@@ -271,6 +291,7 @@ export default function JobCard({
               : undefined
           }
           onClone={isOwned ? (onClone ?? handleCloneJob) : undefined}
+          onArchive={isOwned ? onArchive : undefined}
           onDelete={isOwned ? onDelete : undefined}
           extraMenuItems={extraMenuItems}
         />

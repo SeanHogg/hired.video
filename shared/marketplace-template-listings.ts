@@ -1,28 +1,26 @@
 /**
- * First-party marketplace template listings — single source of truth for the
- * *listing-level* metadata (slug, name, industry, description) of the
- * templates hired.video itself publishes to the marketplace.
+ * First-party RESUME template listings — single source of truth for the
+ * *listing-level* copy (slug, name, industry, description) of the resume
+ * presets hired.video publishes to the marketplace.
  *
  * Why this lives in `shared/` (a leaf module with zero runtime imports):
- * three separate surfaces need the same slug + copy and must agree, and two
- * of them live outside the frontend bundle —
  *
- *   1. frontend/types/resume-template.ts  — the resume preset descriptors
+ *   1. frontend/types/resume-template.ts — the resume preset descriptors
  *      consume `resumeListing(slug)` so the render copy and the marketplace
  *      copy never drift (DRY: one source for name/industry/description).
- *   2. frontend/scripts/prerender.mjs     — build-time prerender of each
- *      /marketplace/templates/<slug> page (meta + JSON-LD + crawlable body).
- *   3. api/src/routes/sitemap.ts          — emits the same slugs into the
- *      public XML sitemap so crawlers can discover every template page.
+ *   2. api/src/routes/sitemap.ts — uses these slugs as the always-available
+ *      fallback when the generated template manifest can't be fetched.
+ *
+ * The FULL static catalog (resume + studio-builtin) used by the prerender and
+ * the sitemap is the generated `public/templates-manifest.json`, emitted by
+ * frontend/scripts/generate-templates-manifest.mjs from the live registry —
+ * so studio-builtin templates are covered without hand-duplicating
+ * catalog.tsx's React-coupled data here. Creator-published templates (DB
+ * `studio_templates` rows) are dynamic and enumerated straight from the
+ * database by the sitemap.
  *
  * Adding a first-party resume template = add one entry here + reference it
- * from the descriptor in resume-template.ts. The prerender + sitemap pick it
- * up automatically — no third edit, no drift.
- *
- * Creator-published templates (DB `studio_templates` rows) are NOT listed
- * here — they are dynamic and enumerated straight from the database by the
- * sitemap. Studio-builtin catalog recipes are tracked as a follow-up to move
- * their listing metadata into a shared SSoT (see ROADMAP gap register).
+ * from the descriptor in resume-template.ts.
  */
 
 export type MarketplaceTemplateKind = "resume";
@@ -164,40 +162,4 @@ export function resumeListing(slug: string): {
     );
   }
   return { name: l.name, industry: l.industry, description: l.description };
-}
-
-/** Every first-party template slug — consumed by the sitemap generator. */
-export function firstPartyTemplateSlugs(): string[] {
-  return RESUME_TEMPLATE_LISTINGS.map((l) => l.slug);
-}
-
-/** Coarse industry tokens (lower-cased words) for overlap scoring. */
-function industryTokens(industry: string): string[] {
-  return industry
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((w) => w.length > 1 && w !== "all");
-}
-
-/**
- * Other first-party resume listings most related to `slug`, ranked by shared
- * industry tokens (falls back to remaining listings so the related grid is
- * never empty — keeps every template page internally linked, not orphaned).
- */
-export function relatedResumeListings(
-  slug: string,
-  limit = 6,
-): MarketplaceTemplateListing[] {
-  const self = BY_SLUG[slug];
-  if (!self) return [];
-  const selfTokens = new Set(industryTokens(self.industry));
-  const scored = RESUME_TEMPLATE_LISTINGS.filter((l) => l.slug !== slug).map(
-    (l) => ({
-      listing: l,
-      score: industryTokens(l.industry).filter((t) => selfTokens.has(t)).length,
-    }),
-  );
-  // Highest overlap first; ties keep catalog order (stable sort).
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map((s) => s.listing);
 }

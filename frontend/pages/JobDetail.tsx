@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   MoreVertical,
   ClipboardCheck,
+  Building2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -29,6 +30,8 @@ import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 import JobScoreBadges from "@/components/tools/JobScoreBadges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { ArchiveRestore } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { jobService } from "@/lib/services/job-service";
 import { isUuid } from "@shared/value-types";
@@ -49,6 +52,7 @@ import { useUgcSeo } from "@/lib/seo-ugc";
 import { SAMPLE_JOB } from "@/lib/sample-job";
 import { DEFAULT_JOB_DESCRIPTOR, getJobTemplateById } from "@/types/job-template";
 import { mapApiJobToUI, type UIJob } from "@/lib/jobs/api-job-mapper";
+import { workSettingLabel } from "@/lib/jobs/work-setting-label";
 import TextNarrator from "@/components/audio/TextNarrator";
 import { textFromJobDescription } from "@/lib/audio/narrator-text";
 
@@ -62,6 +66,7 @@ export default function JobDetail() {
   const [searchParams] = useSearchParams();
 
   const [job, setJob] = useState<UIJob | null>(null);
+  const [archivedAt, setArchivedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isTracked, setIsTracked] = useState<boolean>(false);
@@ -103,6 +108,9 @@ export default function JobDetail() {
 
         if (!isMounted) return;
         setJob(mapApiJobToUI(apiJob));
+        // #1493 — archived jobs are still reachable by URL for the owner so
+        // they can restore. UIJob drops `archivedAt`, so capture it raw.
+        setArchivedAt(apiJob?.archivedAt ?? null);
       } catch (e) {
         if (!isMounted) return;
         setError(t("errors.loadJobFailed"));
@@ -301,6 +309,31 @@ export default function JobDetail() {
               <div className="px-4 md:px-6 pt-3">
                 <PageHeader tabs={jobTabs} activeTabKey={activeJobTab} className="mb-0" />
               </div>
+              {/* #1493 — owner-only restore banner. Archived jobs are hidden
+                  from listings but still reachable by URL so the owner can
+                  bring them back. */}
+              {isOwner && archivedAt && (
+                <div className="mx-4 md:mx-6 mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                  <span>{t("messages.jobs.archivedBanner")}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      if (!job?.id) return;
+                      try {
+                        await jobService.unarchiveJob(job.id);
+                        setArchivedAt(null);
+                        toast.success(t("messages.jobs.restored"));
+                      } catch {
+                        toast.error(t("messages.jobs.restoreFailed"));
+                      }
+                    }}
+                  >
+                    <ArchiveRestore className="h-4 w-4 mr-1" />
+                    {t("actions.jobs.restore")}
+                  </Button>
+                </div>
+              )}
               {/* Owner / viewer action toolbar — only on the Overview leaf; the
                   Candidates / Reports panels carry their own controls. The job
                   content sections are produced by DeclarativeJobRenderer below,
@@ -347,6 +380,14 @@ export default function JobDetail() {
                     ? formatTz(job.createdAt, dateOnly)
                     : "Unknown date"}
                 </span>
+                {/* #2092 — work setting + hybrid day-split (e.g. "Hybrid (2
+                    on-site / 3 remote)"), localized via the shared formatter. */}
+                {workSettingLabel(t, job.data.workSetting, job.data.onsiteDaysPerWeek, job.data.remoteDaysPerWeek) && (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <Building2 className="h-3.5 w-3.5" />
+                    {workSettingLabel(t, job.data.workSetting, job.data.onsiteDaysPerWeek, job.data.remoteDaysPerWeek)}
+                  </span>
+                )}
                 {job.expiresAt && (
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                     <Calendar className="h-3.5 w-3.5" />

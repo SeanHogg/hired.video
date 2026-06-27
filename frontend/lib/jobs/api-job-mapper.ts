@@ -57,6 +57,11 @@ export interface UIJobData {
   experienceLevel?: string;
   salaryMin?: number;
   salaryMax?: number;
+  /** #2092 — canonical work setting (onsite/remote/hybrid) + the weekly
+   *  hybrid day-split, surfaced via `workSettingLabel`. */
+  workSetting?: string;
+  onsiteDaysPerWeek?: number | null;
+  remoteDaysPerWeek?: number | null;
 }
 
 export interface UIJob {
@@ -78,6 +83,9 @@ export interface UIJob {
    *  the rule from `user.role`, which silently drifted from the backend
    *  and was leaking manage-UI to non-owners. */
   viewerCanManage?: boolean;
+  /** #1778 — attached Studio video project id (job_ad / recruiter_brand /
+   *  company_promo). Drives the lazy `StudioVideoSurface` on JobDetail. */
+  videoProjectId?: string | null;
   data: UIJobData;
 }
 
@@ -115,6 +123,7 @@ export function mapApiJobToUI(apiJob: any): UIJob {
     userId: j.createdBy || j.userId,
     sentimentScore: j.sentimentScore ?? null,
     viewerCanManage: j.viewerCanManage === true,
+    videoProjectId: j.videoProjectId ?? null,
     data: {
       title: j.title || parsed.title || "",
       description: j.description || parsed.description || "",
@@ -159,6 +168,9 @@ export function mapApiJobToUI(apiJob: any): UIJob {
       experienceLevel: j.experienceLevel,
       salaryMin: j.salaryMin,
       salaryMax: j.salaryMax,
+      workSetting: j.workSetting ?? (j.isRemote ? "remote" : undefined),
+      onsiteDaysPerWeek: j.onsiteDaysPerWeek ?? null,
+      remoteDaysPerWeek: j.remoteDaysPerWeek ?? null,
       contactEmail: j.contactEmail,
       applicationDeadline: j.applicationDeadline,
     },

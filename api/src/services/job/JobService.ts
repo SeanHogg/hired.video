@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { classifyJobSector } from "../../../../shared/sectors.js";
 import { normalizeEmploymentType } from "../../../../shared/employment-types.js";
@@ -457,6 +457,11 @@ export async function getPublicJobs(filters?: JobQuery,
 
   const whereClause = and(
     eq(jobItems.isActive, true),
+    // #154/#1493 — archived jobs are soft-deleted: the archive route stamps
+    // `archivedAt` but does NOT flip `isActive`, so without this clause an
+    // archived ("hidden from default listings") job kept showing in public
+    // search. Exclude them here so archive actually hides the row.
+    isNull((jobItems as any).archivedAt),
     filters?.search ? buildSearchClause(filters.search) : undefined,
     // The free-text `location` ilike stays as a *fallback* when no
     // structured allowlist is set — preserves search for legacy rows

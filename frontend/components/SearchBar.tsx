@@ -54,6 +54,8 @@ export interface SearchFilters {
 
   // Job filters
   employmentType?: string;
+  /** #2092 — onsite / remote / hybrid work-setting facet. */
+  workSetting?: string;
   remote?: boolean;
   salaryMin?: number;
   salaryMax?: number;
