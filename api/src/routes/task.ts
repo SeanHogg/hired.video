@@ -3,8 +3,13 @@ import { eq, and, desc, isNull } from "drizzle-orm";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { withGamification } from "../domains/gamification/with-gamification.js";
-import { isCompletedStatus, toTaskDto } from "../services/productivity/task-dto.js";
+import { withGamificationBadges } from "../domains/gamification/with-gamification.js";
+import {
+  isCompletedStatus,
+  isColumnCompleted,
+  legacyStatusToColumn,
+  toTaskDto,
+} from "../services/productivity/task-dto.js";
 import { getOrCreateDefaultBoard } from "../services/productivity/default-board.js";
 
 const { tasks } = schema;
@@ -13,6 +18,14 @@ export const taskRoutes = new Hono<AppEnv>();
 
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };
+}
+
+/** Serialise a task row, attaching `badgesUnlocked` only when the save
+ *  unlocked at least one badge so the client can refresh immediately
+ *  instead of waiting for the 60s poll (#1135). */
+function taskWithBadges(row: Parameters<typeof toTaskDto>[0], badgesUnlocked: string[]) {
+  const dto = toTaskDto(row);
+  return badgesUnlocked.length > 0 ? { ...dto, badgesUnlocked } : dto;
 }
 
 taskRoutes.get("/", async (c) => {
@@ -78,34 +91,45 @@ taskRoutes.post("/save", async (c) => {
 
     if (existing) {
       const existingMeta = (existing.metadata as Record<string, unknown> | null) ?? {};
-      const wasCompleted = isCompletedStatus(existingMeta.legacyStatus);
-      const nowCompleted = isCompletedStatus(metadata.legacyStatus);
+      const mergedMeta = { ...(existingMeta as object), ...metadata } as Record<string, unknown>;
+      const nextStatus = legacyStatusToColumn(mergedMeta.legacyStatus);
+      // #1001 — completion is now read off the canonical `status` column.
+      // `wasCompleted` also honours the legacy metadata so a row written
+      // before this migration (column still default "todo" but metadata
+      // says completed) is treated as already-complete → no award re-fire.
+      const wasCompleted =
+        isColumnCompleted(existing.status) || isCompletedStatus(existingMeta.legacyStatus);
+      const nowCompleted = isColumnCompleted(nextStatus);
 
       const [updated] = await db
         .update(tasks)
         .set({
           title: typeof body.text === "string" && body.text.length > 0 ? body.text : existing.title,
           description: typeof body.description === "string" ? body.description : existing.description,
-          metadata: { ...(existingMeta as object), ...metadata },
+          metadata: mergedMeta,
+          status: nextStatus,
+          completedAt: nowCompleted ? (existing.completedAt ?? new Date()) : null,
           updatedAt: new Date(),
         } as any)
         .where(eq(tasks.id, existingId))
         .returning();
 
+      let badgesUnlocked: string[] = [];
       if (!wasCompleted && nowCompleted) {
         const taskType = typeof metadata.taskType === "number"
           ? metadata.taskType
           : typeof existingMeta.taskType === "number" ? existingMeta.taskType : 0;
-        await withGamification(c, "task-close", (game, role, uid) =>
+        badgesUnlocked = await withGamificationBadges(c, "task-close", (game, role, uid) =>
           game.onTaskClosed({ userId: uid, role, taskId: updated.id, taskType }),
         );
       }
 
-      return c.json(ok(toTaskDto(updated)), 200);
+      return c.json(ok(taskWithBadges(updated, badgesUnlocked)), 200);
     }
   }
 
   const boardId = await getOrCreateDefaultBoard(userId, db);
+  const createdCompleted = isCompletedStatus(metadata.legacyStatus);
   const [created] = await db
     .insert(tasks)
     .values({
@@ -115,19 +139,22 @@ taskRoutes.post("/save", async (c) => {
       title: typeof body.text === "string" && body.text.length > 0 ? body.text : "Task",
       description: typeof body.description === "string" ? body.description : null,
       metadata,
+      status: legacyStatusToColumn(metadata.legacyStatus),
+      completedAt: createdCompleted ? new Date() : null,
     } as any)
     .returning();
 
   // First-write-already-completed (rare but valid: e.g. importing
   // historic completed tasks). Treat as a completion event.
-  if (isCompletedStatus(metadata.legacyStatus)) {
+  let createdBadges: string[] = [];
+  if (createdCompleted) {
     const taskType = typeof metadata.taskType === "number" ? metadata.taskType : 0;
-    await withGamification(c, "task-create-closed", (game, role, uid) =>
+    createdBadges = await withGamificationBadges(c, "task-create-closed", (game, role, uid) =>
       game.onTaskClosed({ userId: uid, role, taskId: created.id, taskType }),
     );
   }
 
-  return c.json(ok(toTaskDto(created)), 200);
+  return c.json(ok(taskWithBadges(created, createdBadges)), 200);
 });
 
 taskRoutes.delete("/:id", async (c) => {
@@ -176,33 +203,40 @@ taskRoutes.post("/:id", async (c) => {
 
   if (existing) {
     const existingMeta = (existing.metadata as Record<string, unknown> | null) ?? {};
-    const wasCompleted = isCompletedStatus(existingMeta.legacyStatus);
-    const nowCompleted = isCompletedStatus(metadata.legacyStatus);
+    const mergedMeta = { ...(existingMeta as object), ...metadata } as Record<string, unknown>;
+    const nextStatus = legacyStatusToColumn(mergedMeta.legacyStatus);
+    const wasCompleted =
+      isColumnCompleted(existing.status) || isCompletedStatus(existingMeta.legacyStatus);
+    const nowCompleted = isColumnCompleted(nextStatus);
 
     const [updated] = await db
       .update(tasks)
       .set({
         title: typeof body.text === "string" && body.text.length > 0 ? body.text : existing.title,
         description: typeof body.description === "string" ? body.description : existing.description,
-        metadata: { ...(existingMeta as object), ...metadata },
+        metadata: mergedMeta,
+        status: nextStatus,
+        completedAt: nowCompleted ? (existing.completedAt ?? new Date()) : null,
         updatedAt: new Date(),
       } as any)
       .where(eq(tasks.id, id))
       .returning();
 
+    let badgesUnlocked: string[] = [];
     if (!wasCompleted && nowCompleted) {
       const taskType = typeof metadata.taskType === "number"
         ? metadata.taskType
         : typeof existingMeta.taskType === "number" ? existingMeta.taskType : 0;
-      await withGamification(c, "task-close", (game, role, uid) =>
+      badgesUnlocked = await withGamificationBadges(c, "task-close", (game, role, uid) =>
         game.onTaskClosed({ userId: uid, role, taskId: updated.id, taskType }),
       );
     }
 
-    return c.json(ok(toTaskDto(updated)), 200);
+    return c.json(ok(taskWithBadges(updated, badgesUnlocked)), 200);
   }
 
   const boardId = await getOrCreateDefaultBoard(userId, db);
+  const createdCompleted = isCompletedStatus(metadata.legacyStatus);
   const [created] = await db
     .insert(tasks)
     .values({
@@ -212,15 +246,18 @@ taskRoutes.post("/:id", async (c) => {
       title: typeof body.text === "string" && body.text.length > 0 ? body.text : "Task",
       description: typeof body.description === "string" ? body.description : null,
       metadata,
+      status: legacyStatusToColumn(metadata.legacyStatus),
+      completedAt: createdCompleted ? new Date() : null,
     } as any)
     .returning();
 
-  if (isCompletedStatus(metadata.legacyStatus)) {
+  let createdBadges: string[] = [];
+  if (createdCompleted) {
     const taskType = typeof metadata.taskType === "number" ? metadata.taskType : 0;
-    await withGamification(c, "task-create-closed", (game, role, uid) =>
+    createdBadges = await withGamificationBadges(c, "task-create-closed", (game, role, uid) =>
       game.onTaskClosed({ userId: uid, role, taskId: created.id, taskType }),
     );
   }
 
-  return c.json(ok(toTaskDto(created)), 200);
+  return c.json(ok(taskWithBadges(created, createdBadges)), 200);
 });

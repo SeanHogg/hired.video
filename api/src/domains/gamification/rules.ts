@@ -141,6 +141,9 @@ export const ACTIONS = {
   EVENT_CREATED: "event.created",
   EVENT_REGISTERED: "event.registered",
   EVENT_ATTENDED: "event.attended",
+  // #1258 — a connection between two people who attended the same event
+  // (within 30d) was accepted. Rewards the networking the event drove.
+  EVENT_CONNECTION_MADE: "event.connection.made",
 
   // Bookings / sessions (host completes a session; guest books one).
   BOOKING_SESSION_COMPLETED: "booking.session.completed",
@@ -404,6 +407,15 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
     dailyCapPoints: 100,
     source: "event",
   },
+  [ACTIONS.EVENT_CONNECTION_MADE]: {
+    key: ACTIONS.EVENT_CONNECTION_MADE,
+    label: "Connected with someone you met at an event",
+    roles: GENERAL_EARNING_ROLES,
+    points: 30,
+    category: "earn",
+    dailyCapPoints: 150,
+    source: "event",
+  },
 
   // ── Bookings / sessions (gap #1966) ─────────────────────────────────
   // Completing a hosted session is the marketplace-quality signal worth
@@ -663,6 +675,7 @@ export const STREAK_SIGNAL_ACTIONS: ReadonlySet<ActionKey> = new Set<ActionKey>(
   ACTIONS.EVENT_CREATED,
   ACTIONS.EVENT_REGISTERED,
   ACTIONS.EVENT_ATTENDED,
+  ACTIONS.EVENT_CONNECTION_MADE,
   ACTIONS.BOOKING_SESSION_COMPLETED,
   ACTIONS.BOOKING_SESSION_BOOKED,
   ACTIONS.ARTICLE_PUBLISHED,

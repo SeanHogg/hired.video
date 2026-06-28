@@ -29,6 +29,7 @@ import {
 } from "./errors";
 import { logApiCall } from "./logger";
 import { runtimeConfig } from "./runtime-config";
+import { signalBadgeRefresh } from "./badges/refresh";
 import {
   API_ERROR_EVENT,
   type ApiErrorEvent,
@@ -695,6 +696,18 @@ export class ApiClient {
           // Non-DOM environment (tests, SSR); skip.
         }
       }
+    }
+
+    // #1135 — any award-firing endpoint that echoes `badgesUnlocked`
+    // (top-level or on its data payload) triggers an immediate badge-list
+    // refresh, so the unlock celebration fires within the same render cycle
+    // instead of lagging up to 60s on BadgeUnlockToaster's poll. DRY seam:
+    // routes opt in just by returning the field — no per-call-site wiring.
+    const unlocked =
+      (apiResponse as { badgesUnlocked?: unknown }).badgesUnlocked ??
+      (apiResponse.data as { badgesUnlocked?: unknown } | null | undefined)?.badgesUnlocked;
+    if (Array.isArray(unlocked) && unlocked.length > 0) {
+      signalBadgeRefresh();
     }
 
     console.log(

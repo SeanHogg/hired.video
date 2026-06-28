@@ -24,6 +24,7 @@ import { getDb } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
 import { pickScoringRole, type ScoringRole } from "../../../../shared/user-roles.js";
 import { GamificationService } from "./index.js";
+import type { AwardOutcome } from "./points-engine.js";
 
 /** Cloudflare Worker env shape that survives the `Bindings` type-erasure
  *  the redemption engine needs (TREMENDOUS_*). Not all bindings are
@@ -80,5 +81,33 @@ export async function withGamification(
       userId,
       error: e instanceof Error ? e.message : String(e),
     });
+  }
+}
+
+/** #1135 — like `withGamification` but returns the slugs of badges newly
+ *  unlocked by the award, so a route can echo `badgesUnlocked` in its
+ *  response and the client refreshes the badge list immediately (no 60s
+ *  poll lag). Always resolves (never throws): returns `[]` on any miss
+ *  (no user/role, non-award outcome, or error). */
+export async function withGamificationBadges(
+  c: Context<AppEnv>,
+  label: string,
+  fn: (game: GamificationService, role: ScoringRole, userId: string) => Promise<AwardOutcome>,
+): Promise<string[]> {
+  const userId = c.var.user?.sub;
+  if (!userId) return [];
+
+  const role = pickScoringRole(c.var.user?.roles);
+  if (!role) return [];
+
+  try {
+    const outcome = await fn(gamificationFromContext(c), role, userId);
+    return outcome.status === "awarded" ? outcome.badgesUnlocked : [];
+  } catch (e) {
+    console.warn(`[gamification] ${label} failed`, {
+      userId,
+      error: e instanceof Error ? e.message : String(e),
+    });
+    return [];
   }
 }

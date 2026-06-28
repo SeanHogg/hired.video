@@ -9,7 +9,7 @@
  *
  * See migration 0122_events_coffee_shared_tasks.sql for storage layout.
  */
-import { z } from "zod";
+import { z } from "zod";
 import { UuidLikeSchema } from "./validation.js";
 import { ContentLocationSetSchema } from "./content-locations.js";
 
@@ -173,6 +173,9 @@ export interface ResolvedEvent {
   hostUserId: string;
   hostName: string | null;
   hostAvatarUrl: string | null;
+  /** #1260 — true when the host has a verified account; drives the
+   *  verification check rendered next to the host name on the detail page. */
+  hostIsVerified: boolean;
   coHosts: Array<{ userId: string; name: string | null; avatarUrl: string | null }>;
   registrationQuestions: RegistrationQuestion[] | null;
   publishedAt: string | null;

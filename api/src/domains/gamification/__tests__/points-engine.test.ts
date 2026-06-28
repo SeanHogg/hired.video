@@ -222,6 +222,33 @@ describe("points-engine — badge unlock hook", () => {
       ["studio_creator_first"],
     );
   });
+
+  it("returns newly-unlocked badge slugs on the award outcome (#1135)", async () => {
+    const { engine, repo } = build();
+    const user = uid();
+    repo.seedBadge({ slug: "first_application", name: "In the Arena" });
+    const out = await engine.awardForAction(ACTIONS.APPLICATION_SUBMITTED, {
+      ...seeker(user),
+      refId: "app-1",
+    });
+    assert.equal(out.status, "awarded");
+    if (out.status === "awarded") {
+      assert.deepEqual(out.badgesUnlocked, ["first_application"]);
+    }
+  });
+
+  it("returns an empty badgesUnlocked array when no badge crosses (#1135)", async () => {
+    const { engine } = build();
+    // event.connection.made has no badge rule, so nothing unlocks.
+    const out = await engine.awardForAction(ACTIONS.EVENT_CONNECTION_MADE, {
+      ...seeker(uid()),
+      refId: "conn-1",
+    });
+    assert.equal(out.status, "awarded");
+    if (out.status === "awarded") {
+      assert.deepEqual(out.badgesUnlocked, []);
+    }
+  });
 });
 
 describe("points-engine — task streak routes the On Fire badge (#1136)", () => {

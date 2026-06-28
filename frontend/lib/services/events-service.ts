@@ -24,6 +24,19 @@ export interface EventAttendeePublic {
   checkedIn: boolean;
 }
 
+/** Host-only pending-approval row (#1257). Carries the attendee row id so
+ *  the host can approve/reject inline. */
+export interface EventPendingAttendee {
+  attendeeId: string;
+  userId: string | null;
+  name: string;
+  avatarUrl: string | null;
+  guestEmail: string | null;
+  plusOneCount: number;
+  customAnswers: Record<string, unknown> | null;
+  rsvpedAt: string;
+}
+
 export interface EventCategory {
   id: string;
   slug: string;
@@ -106,6 +119,15 @@ export const eventsService = {
   async listAttendees(id: string): Promise<{ count: number; attendees: EventAttendeePublic[] }> {
     const res = await apiClient.get<{ count: number; attendees: EventAttendeePublic[] }>(
       `/api/events/${id}/attendees`,
+    );
+    return res.data ?? { count: 0, attendees: [] };
+  },
+
+  async listPendingAttendees(
+    id: string,
+  ): Promise<{ count: number; attendees: EventPendingAttendee[] }> {
+    const res = await apiClient.get<{ count: number; attendees: EventPendingAttendee[] }>(
+      `/api/events/${id}/attendees/pending`,
     );
     return res.data ?? { count: 0, attendees: [] };
   },

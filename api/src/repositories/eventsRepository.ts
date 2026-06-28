@@ -86,6 +86,10 @@ export interface IEventsRepository {
   upsertAttendee(input: EventAttendeeInsert): Promise<EventAttendeeRow>;
   updateAttendeeStatus(id: string, status: string, cancelledAt?: Date | null): Promise<void>;
   countAttendees(eventId: string, status?: string): Promise<number>;
+  /** #1258 — the id of an event BOTH users attended (rsvpStatus 'going')
+   *  with an RSVP since `since`, or null if they share none. Powers the
+   *  "you met at an event" connection-acceptance points award. */
+  findSharedRecentEvent(userIdA: string, userIdB: string, since: Date): Promise<string | null>;
 
   // ── Co-hosts ───────────────────────────────────────────────────────
   findCoHostsByEvent(eventId: string): Promise<EventCoHostRow[]>;
@@ -197,6 +201,39 @@ export class EventsRepository implements IEventsRepository {
       .where(and(eq(eventAttendees.eventId, eventId), eq(eventAttendees.userId, userId)))
       .limit(1);
     return (row as EventAttendeeRow | undefined) ?? null;
+  }
+
+  async findSharedRecentEvent(
+    userIdA: string,
+    userIdB: string,
+    since: Date,
+  ): Promise<string | null> {
+    // Self-join event_attendees on event_id where both users have a
+    // 'going' RSVP since `since`. One indexed read per side (idx on
+    // user_id, rsvped_at); bounded to a single shared id.
+    const a = this.db
+      .select({ eventId: eventAttendees.eventId })
+      .from(eventAttendees)
+      .where(
+        and(
+          eq(eventAttendees.userId, userIdA),
+          eq(eventAttendees.rsvpStatus, "going"),
+          gte(eventAttendees.rsvpedAt, since),
+        ),
+      );
+    const [row] = await this.db
+      .select({ eventId: eventAttendees.eventId })
+      .from(eventAttendees)
+      .where(
+        and(
+          eq(eventAttendees.userId, userIdB),
+          eq(eventAttendees.rsvpStatus, "going"),
+          gte(eventAttendees.rsvpedAt, since),
+          inArray(eventAttendees.eventId, a),
+        ),
+      )
+      .limit(1);
+    return (row as { eventId: string } | undefined)?.eventId ?? null;
   }
 
   async findAttendeesByEvent(eventId: string, status?: string): Promise<EventAttendeeRow[]> {

@@ -132,7 +132,13 @@ export default function DocumentStage({
             footer (<DocumentToolbar>), not here. ── */
       <div
         ref={sheetRef}
-        className="relative origin-top shadow-xl ring-1 ring-black/10"
+        // `force-light-scope` pins color-scheme + the design tokens to light
+        // for the whole sheet (the same mechanism the read-only renderers use).
+        // The sheet is fixed white paper, so under the app's dark theme its
+        // inline-editing controls (SectionEditor inputs) would otherwise inherit
+        // the dark theme.text onto a dark native field background and become
+        // unreadable. Pinning light makes inputs white-bg/dark-text again.
+        className="force-light-scope relative origin-top shadow-xl ring-1 ring-black/10"
         style={{
           width,
           minHeight: height,

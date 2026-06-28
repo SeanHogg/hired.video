@@ -177,6 +177,8 @@ export class EventService {
       hostUserId: row.hostUserId ?? row.userId,
       hostName: host ? this.displayName(host) : null,
       hostAvatarUrl: (host as any)?.avatarUrl ?? null,
+      // #1260 — verified-account signal for the host card check.
+      hostIsVerified: Boolean((host as any)?.emailVerified),
       coHosts: coHosts.map((c, i) => ({
         userId: c.userId,
         name: coHostUsers[i] ? this.displayName(coHostUsers[i]!) : null,

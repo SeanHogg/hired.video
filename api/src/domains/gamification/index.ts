@@ -361,6 +361,21 @@ export class GamificationService {
     });
   }
 
+  /** #1258 — both sides of a connection accepted between two people who
+   *  attended the same event earn once. Caller passes a userId per side
+   *  (roles resolved from the db); refId combines the connection + user so
+   *  each side earns exactly once and a re-accept can't double-pay. */
+  async onEventConnectionMade(
+    args: { userId: string; connectionId: string; eventId: string },
+  ): Promise<AwardOutcome> {
+    return this.awardWithRoleLookup(ACTIONS.EVENT_CONNECTION_MADE, {
+      userId: args.userId,
+      refId: `event_conn:${args.connectionId}:${args.userId}`,
+      refType: "user_connection",
+      metadata: { eventId: args.eventId, connectionId: args.connectionId },
+    });
+  }
+
   /** Host earns for completing a session; refId = booking id. */
   async onSessionCompleted(args: AwardArgs & { bookingId: string }): Promise<AwardOutcome> {
     return this.award(ACTIONS.BOOKING_SESSION_COMPLETED, {

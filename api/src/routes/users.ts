@@ -8,6 +8,7 @@ import { getDb, schema } from "../db/index.js";
 import { bumpSearchVersion } from "../utils/search-cache.js";
 import { getOrSetCached, invalidateCachedKey } from "../utils/edge-cache.js";
 import { buildRepos } from "../repositories/index.js";
+import { gamificationFromContext } from "../domains/gamification/with-gamification.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { sendConnectionRequestEmail } from "../services/adapters/email.js";
@@ -902,6 +903,28 @@ userRoutes.put("/connections/:id/accept", async (c) => {
           target: { id: updated.id, type: "connection" },
         },
       ).catch((err) => console.error("[connections] accept notification failed:", err));
+
+      // #1258 — if both users attended the same event in the last 30 days,
+      // reward the networking the event drove (both sides earn once).
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const sharedEventId = await repos.events
+        .findSharedRecentEvent(me, updated.fromUserId, thirtyDaysAgo)
+        .catch(() => null);
+      if (sharedEventId) {
+        const game = gamificationFromContext(c);
+        await Promise.all([
+          game
+            .onEventConnectionMade({ userId: me, connectionId: updated.id, eventId: sharedEventId })
+            .catch(() => undefined),
+          game
+            .onEventConnectionMade({
+              userId: updated.fromUserId,
+              connectionId: updated.id,
+              eventId: sharedEventId,
+            })
+            .catch(() => undefined),
+        ]);
+      }
     } catch (err) {
       console.error("[connections] accept side effects failed:", err);
     }

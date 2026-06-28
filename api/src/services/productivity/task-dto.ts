@@ -18,6 +18,20 @@ export function isCompletedStatus(status: unknown): boolean {
   return typeof status === "number" && COMPLETED_STATUSES.has(status);
 }
 
+/** Canonical kanban column status derived from the legacy numeric status.
+ *  Completed (Closed=4 / Completed=6) → "done"; everything else → "todo".
+ *  Keeps the Drizzle `tasks.status` column in sync with the legacy
+ *  `metadata.legacyStatus` the frontend still writes, so completion can be
+ *  read off the typed column instead of jsonb metadata (gap #1001). */
+export function legacyStatusToColumn(status: unknown): "todo" | "done" {
+  return isCompletedStatus(status) ? "done" : "todo";
+}
+
+/** True when the canonical `tasks.status` column marks the task complete. */
+export function isColumnCompleted(status: string | null | undefined): boolean {
+  return status === "done";
+}
+
 export type TaskDto = {
   id: string;
   text: string;

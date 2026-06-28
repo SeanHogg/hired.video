@@ -147,6 +147,18 @@ async function evaluateOne(
     );
   const refundsSinceFirstEarn = ((refundRow as { c: number } | undefined)?.c) ?? 0;
 
+  // #1117 — device-fingerprint cluster size. Sourced from the same repo
+  // helper the live award path uses (counts OTHER accounts sharing any of
+  // this user's session device fingerprints). Best-effort: a query failure
+  // leaves the value undefined so the heuristic no-ops rather than aborting
+  // the whole sweep for one user.
+  let accountsOnDeviceFingerprint: number | undefined;
+  try {
+    accountsOnDeviceFingerprint = await repos.points.countAccountsOnDeviceFingerprint(userId);
+  } catch {
+    accountsOnDeviceFingerprint = undefined;
+  }
+
   // Re-use the per-minute close buckets the engine already shapes;
   // pass empty arrays since the burst heuristic only fires inline (we
   // don't need to re-evaluate it here — it auto-suspends synchronously).
@@ -158,11 +170,7 @@ async function evaluateOne(
     recentLedgerSample: [],
     redemptionsLast24hValueCents,
     accountsOnSignupIp,
-    // Device fingerprint cluster: not wired yet (extension telemetry
-    // table doesn't aggregate by fingerprint). Logged as a Gap Register
-    // follow-up; sweep just leaves the value undefined so the heuristic
-    // no-ops.
-    accountsOnDeviceFingerprint: undefined,
+    accountsOnDeviceFingerprint,
     refundsSinceFirstEarn,
   });
 }

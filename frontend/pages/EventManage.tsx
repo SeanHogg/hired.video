@@ -40,6 +40,7 @@ import {
   eventsService,
   type EventAnalytics,
   type EventAttendeePublic,
+  type EventPendingAttendee,
 } from "@/lib/services/events-service";
 import type { ResolvedEvent } from "@shared/events";
 
@@ -299,28 +300,99 @@ function Stat({ label, value }: { label: string; value: number }) {
 }
 
 function ApprovalQueue({ eventId, onChange }: { eventId: string; onChange: () => void }) {
-  // Lightweight: re-fetch attendees from list endpoint (only returns 'going'),
-  // so for pending approval we need the host-only listing. The MVP here is a
-  // placeholder — full pending-approval list endpoint is a small follow-up
-  // (gap #1255 — host attendee management).
+  const { t } = useTranslation();
+  const [pending, setPending] = useState<EventPendingAttendee[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    setFailed(false);
+    eventsService
+      .listPendingAttendees(eventId)
+      .then((res) => setPending(res.attendees))
+      .catch(() => setFailed(true))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, [eventId]);
+
+  const act = async (attendeeId: string, decision: "approve" | "reject") => {
+    setBusyId(attendeeId);
+    try {
+      if (decision === "approve") await eventsService.approveAttendee(eventId, attendeeId);
+      else await eventsService.rejectAttendee(eventId, attendeeId);
+      setPending((prev) => prev.filter((p) => p.attendeeId !== attendeeId));
+      onChange();
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        {t("events.manage.approval.loading")}
+      </div>
+    );
+  }
+  if (failed) {
+    return (
+      <div className="text-sm text-destructive">
+        {t("events.manage.approval.error")}{" "}
+        <button type="button" onClick={load} className="underline">
+          {t("events.manage.approval.retry")}
+        </button>
+      </div>
+    );
+  }
+  if (pending.length === 0) {
+    return <div className="text-sm text-muted-foreground">{t("events.manage.approval.empty")}</div>;
+  }
+
   return (
-    <div className="text-sm text-muted-foreground">
-      Approval list UI coming in a follow-up. Use{" "}
-      <a
-        href={`/api/events/${eventId}/attendees/export.csv`}
-        className="text-blue-600 underline"
-      >
-        the CSV export
-      </a>{" "}
-      to see all attendees including pending approvals; then approve via the
-      attendee detail API.
-      <button
-        type="button"
-        onClick={onChange}
-        className="ml-2 underline text-xs"
-      >
-        Refresh
-      </button>
-    </div>
+    <ul className="divide-y">
+      {pending.map((a) => (
+        <li key={a.attendeeId} className="flex items-center gap-3 py-2">
+          <Avatar className="w-8 h-8">
+            {a.avatarUrl ? <AvatarImage src={a.avatarUrl} alt={a.name} /> : null}
+            <AvatarFallback>{a.name.charAt(0) || "?"}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium truncate">{a.name}</div>
+            {(a.guestEmail || a.plusOneCount > 0) && (
+              <div className="text-xs text-muted-foreground truncate">
+                {a.guestEmail}
+                {a.plusOneCount > 0
+                  ? ` · ${t("events.manage.approval.plusOnes", { count: a.plusOneCount })}`
+                  : ""}
+              </div>
+            )}
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busyId === a.attendeeId}
+            onClick={() => act(a.attendeeId, "approve")}
+          >
+            <CheckCircle2 className="w-4 h-4 mr-1" />
+            {t("events.manage.approval.approve")}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busyId === a.attendeeId}
+            onClick={() => act(a.attendeeId, "reject")}
+          >
+            <XCircle className="w-4 h-4 mr-1" />
+            {t("events.manage.approval.reject")}
+          </Button>
+        </li>
+      ))}
+    </ul>
   );
 }

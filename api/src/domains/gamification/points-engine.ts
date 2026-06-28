@@ -49,7 +49,16 @@ export interface AwardContext {
 }
 
 export type AwardOutcome =
-  | { status: "awarded"; delta: number; balance: number; ledgerId: string }
+  | {
+      status: "awarded";
+      delta: number;
+      balance: number;
+      ledgerId: string;
+      /** #1135 — slugs of badges newly unlocked by THIS award, so the
+       *  caller can return them and the client refreshes the badge list
+       *  immediately instead of waiting for the 60s poll. Empty when none. */
+      badgesUnlocked: string[];
+    }
   | { status: "no-op"; reason: AwardSkipReason };
 
 export type AwardSkipReason =
@@ -172,8 +181,9 @@ export class PointsEngine {
 
     const updatedBalance = await this.repo.applyBalanceDelta(ctx.userId, pointsToAward, "earn");
 
-    await this.maybeAdvanceStreak(action, ctx);
-    await this.maybeUnlockBadges(rule.key, ctx.userId);
+    const badgesUnlocked: string[] = [];
+    await this.maybeAdvanceStreak(action, ctx, badgesUnlocked);
+    await this.maybeUnlockBadges(rule.key, ctx.userId, badgesUnlocked);
 
     // Run fraud heuristics for user-task completions only (v1 scope).
     if (rule.key === ACTIONS.TASK_COMPLETE_USER) {
@@ -185,6 +195,7 @@ export class PointsEngine {
       delta: pointsToAward,
       balance: updatedBalance.balance,
       ledgerId: inserted.id,
+      badgesUnlocked,
     };
   }
 
@@ -259,7 +270,24 @@ export class PointsEngine {
     });
   }
 
-  private async maybeAdvanceStreak(action: string, ctx: AwardContext): Promise<void> {
+  /** Calls the badge-unlock hook and records the slug into `collector`
+   *  (when provided) so the awarding call can surface newly-unlocked
+   *  badges to the client (#1135). */
+  private async emitBadgeUnlock(
+    userId: string,
+    slug: string,
+    collector?: string[],
+  ): Promise<void> {
+    if (!this.opts.onBadgeUnlock) return;
+    await this.opts.onBadgeUnlock(userId, slug);
+    collector?.push(slug);
+  }
+
+  private async maybeAdvanceStreak(
+    action: string,
+    ctx: AwardContext,
+    badgesUnlocked?: string[],
+  ): Promise<void> {
     if (!STREAK_SIGNAL_ACTIONS.has(action as ActionKey)) return;
 
     const timezone = this.opts.getUserTimezone
@@ -313,14 +341,18 @@ export class PointsEngine {
     // the SOLE source of the streak milestone badges. Shares the same
     // activityDate so the day boundary is identical to the general streak.
     if (action === ACTIONS.TASK_COMPLETE_SYSTEM || action === ACTIONS.TASK_COMPLETE_USER) {
-      await this.maybeAdvanceTaskStreak(ctx, activityDate);
+      await this.maybeAdvanceTaskStreak(ctx, activityDate, badgesUnlocked);
     }
   }
 
   /** Advance the task-completion streak and award the milestone BADGE only.
    *  The engagement points for the day were already paid by the general
    *  streak, so this grants no second bonus ledger row. */
-  private async maybeAdvanceTaskStreak(ctx: AwardContext, activityDate: string): Promise<void> {
+  private async maybeAdvanceTaskStreak(
+    ctx: AwardContext,
+    activityDate: string,
+    badgesUnlocked?: string[],
+  ): Promise<void> {
     const current = await this.repo.findTaskStreak(ctx.userId);
     const out = rollStreak({
       current: current
@@ -342,12 +374,16 @@ export class PointsEngine {
       lastBonusMilestone: out.next.lastBonusMilestone,
     });
 
-    if (out.milestoneAwarded?.badgeSlug && this.opts.onBadgeUnlock) {
-      await this.opts.onBadgeUnlock(ctx.userId, out.milestoneAwarded.badgeSlug);
+    if (out.milestoneAwarded?.badgeSlug) {
+      await this.emitBadgeUnlock(ctx.userId, out.milestoneAwarded.badgeSlug, badgesUnlocked);
     }
   }
 
-  private async maybeUnlockBadges(action: string, userId: string): Promise<void> {
+  private async maybeUnlockBadges(
+    action: string,
+    userId: string,
+    badgesUnlocked?: string[],
+  ): Promise<void> {
     if (!this.opts.onBadgeUnlock) return;
     const [counters, totalEarns, earned] = await Promise.all([
       this.repo.findCounters(userId),
@@ -375,7 +411,7 @@ export class PointsEngine {
     });
 
     for (const slug of toUnlock) {
-      await this.opts.onBadgeUnlock(userId, slug);
+      await this.emitBadgeUnlock(userId, slug, badgesUnlocked);
     }
   }
 

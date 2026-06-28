@@ -305,6 +305,52 @@ eventRoutes.get("/:id/attendees", async (c) => {
   return c.json(success({ count: out.length, attendees: out }), 200);
 });
 
+// ─── GET /:id/attendees/pending — host-only approval queue (#1257) ─────
+// Returns the attendee rows awaiting approval (approvalStatus='pending')
+// with the requester's identity + custom answers, so the host can approve
+// or reject inline instead of round-tripping through the CSV export.
+eventRoutes.get("/:id/attendees/pending", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const deps = buildApiDeps(getEnv(c));
+  const eventId = c.req.param("id");
+  const event = await deps.repos.events.findById(eventId);
+  if (!event) return c.json(error("NOT_FOUND", "Event not found"), 404);
+
+  const isHost = event.hostUserId === userId || event.userId === userId;
+  const coHosts = await deps.repos.events.findCoHostsByEvent(event.id);
+  const isCoHost = coHosts.some((ch) => ch.userId === userId);
+  if (!isHost && !isCoHost) {
+    return c.json(error("FORBIDDEN", "Host or co-host access required"), 403);
+  }
+
+  const all = await deps.repos.events.findAttendeesByEvent(eventId);
+  const pending = all.filter((a) => a.approvalStatus === "pending");
+  const users = await Promise.all(
+    pending.map((a) => (a.userId ? deps.repos.users.findById(a.userId) : Promise.resolve(null))),
+  );
+  const out = pending.map((a, i) => {
+    const u = users[i] as any;
+    return {
+      attendeeId: a.id,
+      userId: a.userId,
+      name:
+        u?.profile?.displayName ||
+        [u?.firstName, u?.lastName].filter(Boolean).join(" ") ||
+        a.guestName ||
+        a.guestEmail ||
+        "Guest",
+      avatarUrl: u?.avatarUrl ?? null,
+      guestEmail: a.guestEmail ?? null,
+      plusOneCount: a.plusOneCount,
+      customAnswers: a.customAnswers ?? null,
+      rsvpedAt: a.rsvpedAt.toISOString(),
+    };
+  });
+  return c.json(success({ count: out.length, attendees: out }), 200);
+});
+
 // ─── POST /:id/attendees/:attendeeId/approve|reject|check-in ───────────
 const attendeeActionSchema = z.object({});
 

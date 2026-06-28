@@ -13,7 +13,8 @@ import { useBreadcrumbs } from "@/lib/seo";
 import { useUgcSeo } from "@/lib/seo-ugc";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Calendar, MapPin, Users, Video, Share2, ExternalLink, Sparkles } from "lucide-react";
+import { Calendar, MapPin, Users, Video, Share2, ExternalLink, Sparkles, BadgeCheck } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { eventsService, type EventAttendeePublic } from "@/lib/services/events-service";
 import { RsvpButton } from "@/components/events/RsvpButton";
 import { EventBadge } from "@/components/events/EventBadge";
@@ -21,6 +22,7 @@ import { AttendeeMatches } from "@/components/events/AttendeeMatches";
 import type { ResolvedEvent } from "@shared/events";
 
 export default function EventDetail() {
+  const { t } = useTranslation();
   const params = useParams<{ idOrSlug: string }>();
   const idOrSlug = params.idOrSlug ?? "";
 
@@ -239,7 +241,15 @@ export default function EventDetail() {
                     {event.hostName?.charAt(0) ?? "?"}
                   </AvatarFallback>
                 </Avatar>
-                <span className="font-medium">{event.hostName ?? "Host"}</span>
+                <span className="font-medium inline-flex items-center gap-1">
+                  {event.hostName ?? "Host"}
+                  {event.hostIsVerified && (
+                    <BadgeCheck
+                      className="w-4 h-4 text-sky-600 flex-shrink-0"
+                      aria-label={t("events.detail.hostVerified")}
+                    />
+                  )}
+                </span>
               </Link>
               {event.coHosts.length > 0 && (
                 <div className="mt-3 text-xs text-muted-foreground">
