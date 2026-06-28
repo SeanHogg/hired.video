@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, History, ShieldCheck, Loader2, Coins, RotateCcw, KeyRound, Wrench, Sparkles, Undo2, FileText, Stethoscope, Trash2, Ban, X } from "lucide-react";
+import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, History, ShieldCheck, Loader2, Coins, RotateCcw, KeyRound, Wrench, Sparkles, Undo2, FileText, Stethoscope, Trash2, Ban, X, Gift, UserPlus, Users } from "lucide-react";
+import { ReferralGroups } from "@/components/admin/ReferralGroups";
 import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import { UserHistorySheet } from "@/components/admin/UserHistorySheet";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
@@ -75,6 +76,16 @@ interface PlanOverrideInfo {
   originalPlanName: string;
 }
 
+interface ReferralInfo {
+  referrerUserId: string;
+  referrerName: string;
+  referrerEmail: string;
+  referralCode: string;
+  referredAt: string;
+  converted: boolean;
+  convertedAt: string | null;
+}
+
 interface ApiUser {
   id: string;
   name: string;
@@ -100,6 +111,7 @@ interface ApiUser {
   toolTokensUsed: number;
   resumeCount: number;
   planOverride: PlanOverrideInfo | null;
+  referral: ReferralInfo | null;
 }
 
 function formatTokens(n: number): string {
@@ -131,6 +143,12 @@ export default function UserManagement() {
   // SuperAdmin-only (the chip is hidden for non-SA), mirroring the
   // server-side gate on the underlying flag.
   const [editorialFilter, setEditorialFilter] = useState(false);
+  // Referred filter — restricts the list to users who signed up via an
+  // affiliate referral link. SuperAdmin-only chip.
+  const [referredFilter, setReferredFilter] = useState(false);
+  // View mode — "list" is the flat user table; "grouped" buckets referred
+  // users under the affiliate who referred them. SuperAdmin-only.
+  const [viewMode, setViewMode] = useState<"list" | "grouped">("list");
   const [users, setUsers] = useState<ApiUser[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -144,6 +162,7 @@ export default function UserManagement() {
     inactive: number;
     banned: number;
     admins: number;
+    referred: number;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -195,6 +214,7 @@ export default function UserManagement() {
       if (roleFilter !== "all") params.set("role", roleFilter);
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (editorialFilter) params.set("editorial", "true");
+      if (referredFilter) params.set("referred", "true");
 
       const res = await apiClient.get<{ users: ApiUser[]; total: number; page: number; limit: number }>(
         `/api/admin/impersonate/users?${params.toString()}`
@@ -206,7 +226,7 @@ export default function UserManagement() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, roleFilter, statusFilter, editorialFilter, t]);
+  }, [page, search, roleFilter, statusFilter, editorialFilter, referredFilter, t]);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
@@ -223,6 +243,7 @@ export default function UserManagement() {
         inactive: number;
         banned: number;
         admins: number;
+        referred: number;
       }>("/api/admin/impersonate/users/stats");
       setStats(res.data);
     } catch {
@@ -243,7 +264,7 @@ export default function UserManagement() {
   // Clear selection whenever the visible set changes — paginating or
   // filtering replaces the users on screen, and a lingering selection from
   // the previous view would act on rows the admin can no longer see.
-  useEffect(() => { setSelectedIds(new Set()); }, [page, search, roleFilter, statusFilter, editorialFilter]);
+  useEffect(() => { setSelectedIds(new Set()); }, [page, search, roleFilter, statusFilter, editorialFilter, referredFilter]);
 
   // Debounce search
   const [searchInput, setSearchInput] = useState("");
@@ -542,6 +563,7 @@ export default function UserManagement() {
   const suspendedCount = stats?.suspended ?? users.filter(u => u.isSuspended).length;
   const inactiveCount = stats?.inactive ?? Math.max(0, total - activeCount - suspendedCount);
   const adminCount = stats?.admins ?? users.filter(u => u.role === "admin" || u.isSuperAdmin).length;
+  const referredCount = stats?.referred ?? users.filter(u => u.referral).length;
   const totalUsersDisplay = stats?.total ?? total;
   const totalPages = Math.ceil(total / limit);
 
@@ -563,12 +585,13 @@ export default function UserManagement() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         {[
           { label: t("status.activeStatus"),    count: activeCount,    color: "text-green-600" },
           { label: t("status.suspendedStatus"), count: suspendedCount, color: "text-red-600"   },
           { label: t("status.inactiveStatus"),  count: inactiveCount,  color: "text-yellow-600"},
           { label: t("labels.admin") + "s",     count: adminCount,     color: "text-purple-600" },
+          { label: t("labels.referred"),        count: referredCount,  color: "text-brand-purple" },
         ].map(({ label, count, color }) => (
           <Card key={label}>
             <CardContent className="pt-4 pb-3">
@@ -579,12 +602,45 @@ export default function UserManagement() {
         ))}
       </div>
 
+      {/* View toggle — flat user list vs. referred-users-grouped-by-referrer.
+          SuperAdmin-only; the grouped view is backed by the SA-gated
+          /users/referrals endpoint. */}
+      {isSuperAdmin && (
+        <div className="inline-flex rounded-md border p-0.5 bg-muted/40">
+          <Button
+            type="button"
+            variant={viewMode === "list" ? "default" : "ghost"}
+            size="sm"
+            className="h-8"
+            aria-pressed={viewMode === "list"}
+            onClick={() => setViewMode("list")}
+          >
+            <Users className="h-3.5 w-3.5 mr-1.5" />
+            {t("labels.allUsers")}
+          </Button>
+          <Button
+            type="button"
+            variant={viewMode === "grouped" ? "default" : "ghost"}
+            size="sm"
+            className="h-8"
+            aria-pressed={viewMode === "grouped"}
+            onClick={() => setViewMode("grouped")}
+          >
+            <Gift className="h-3.5 w-3.5 mr-1.5" />
+            {t("labels.groupByReferrer")}
+          </Button>
+        </div>
+      )}
+
+      {viewMode === "grouped" && <ReferralGroups />}
+
       {/* Filters — sticky on sm+ so they remain visible when the user
           scrolls the table. top-16 sits flush under the fixed top
           Navigation. The bg + ring pulls the row over the table beneath
           so rows don't bleed through under the controls. Pinned height
           is filter-input (40px) + py-3 ×2 (24px) = 64px → so the table
           header below uses top-32 (128px = 64 nav + 64 filters). */}
+      {viewMode === "list" && (
       <div className="sm:sticky sm:top-16 z-30 bg-background sm:py-3 sm:-my-3">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
@@ -639,8 +695,24 @@ export default function UserManagement() {
               {t("labels.editorial")}
             </Button>
           )}
+          {/* Referred filter chip — SuperAdmin-only. Restricts the list to
+              users who signed up via an affiliate referral link. */}
+          {isSuperAdmin && (
+            <Button
+              type="button"
+              variant={referredFilter ? "default" : "outline"}
+              size="sm"
+              className="h-10 whitespace-nowrap"
+              aria-pressed={referredFilter}
+              onClick={() => { setReferredFilter((v) => !v); setPage(1); }}
+            >
+              <Gift className="h-3.5 w-3.5 mr-1.5" />
+              {t("labels.referred")}
+            </Button>
+          )}
         </div>
       </div>
+      )}
 
       {/* Bulk action bar — appears when ≥1 user is selected. */}
       {selectedIds.size > 0 && canDelete && (
@@ -694,7 +766,7 @@ export default function UserManagement() {
       )}
 
       {/* Error */}
-      {error && (
+      {viewMode === "list" && error && (
         <div className="text-center text-destructive py-4">
           {error}
           <Button variant="ghost" size="sm" className="ml-2" onClick={loadUsers}>{t("actions.retry")}</Button>
@@ -709,6 +781,7 @@ export default function UserManagement() {
           desktop). The horizontal scroll for narrow viewports is
           accepted as a tradeoff; admin users on mobile are rare and
           can scroll the page itself. */}
+      {viewMode === "list" && (
       <Card>
         <Table wrapperClassName="overflow-visible">
           {/* top-32 = 8rem = 128px = 64 (fixed Navigation) + 64
@@ -775,6 +848,26 @@ export default function UserManagement() {
                       <div>
                         <p className="font-medium text-sm">{user.name}</p>
                         <p className="text-xs text-muted-foreground">{user.email}</p>
+                        {/* Referral indicator — shown when this user signed up
+                            via an affiliate link. Tooltip carries the referrer
+                            + conversion status; the badge is the at-a-glance
+                            "this was a referral" cue. */}
+                        {user.referral && (
+                          <span
+                            className="mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900 dark:text-fuchsia-200"
+                            title={
+                              t("messages.referredByTooltip", {
+                                name: user.referral.referrerName || user.referral.referrerEmail,
+                                code: user.referral.referralCode,
+                              }) +
+                              (user.referral.converted ? `\n${t("labels.converted")}` : "")
+                            }
+                          >
+                            <Gift className="h-2.5 w-2.5" />
+                            {t("labels.referredBy", { name: user.referral.referrerName || user.referral.referrerEmail })}
+                            {user.referral.converted && <UserPlus className="h-2.5 w-2.5 opacity-80" />}
+                          </span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -1005,6 +1098,7 @@ export default function UserManagement() {
           </TableBody>
         </Table>
       </Card>
+      )}
 
       {/* Grant Tokens dialog */}
       <Dialog open={grantTarget !== null} onOpenChange={(open) => !open && setGrantTarget(null)}>
@@ -1184,7 +1278,7 @@ export default function UserManagement() {
       )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {viewMode === "list" && totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             {t("labels.pageOfWithUsers", { page, totalPages, total })}

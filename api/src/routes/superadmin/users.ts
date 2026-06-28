@@ -25,6 +25,7 @@ import {
   bulkDeleteUsers,
   getAdminUsersStats,
 } from "../../services/adminUsers.js";
+import { getReferredUsersGrouped } from "../../services/adminReferrals.js";
 import { assignModuleToUser, removeModuleFromUser } from "../../services/auth/adminModules.js";
 
 const HistoryQuerySchema = z.object({
@@ -41,6 +42,8 @@ const UserSearchSchema = z.object({
   status: z.enum(["active", "suspended", "banned"]).optional(),
   // Restrict the list to editorial / house authors (users.is_system = true).
   editorial: z.coerce.boolean().optional(),
+  // Restrict the list to users referred via an affiliate link.
+  referred: z.coerce.boolean().optional(),
 });
 
 // Bulk-action cap mirrors the page size — the /admin/users UI can only
@@ -109,6 +112,12 @@ userMgmtRoutes.get("/", async (c) => {
 // before /:id so the literal segment wins the route match.
 userMgmtRoutes.get("/stats", async (c) => {
   return c.json(ok(await getAdminUsersStats()), 200);
+});
+
+// /referrals — referred users grouped under the affiliate who referred them
+// ("group by referrer" view). Literal segment, mounted before /:id.
+userMgmtRoutes.get("/referrals", async (c) => {
+  return c.json(ok(await getReferredUsersGrouped()), 200);
 });
 
 userMgmtRoutes.get("/:id", async (c) => {

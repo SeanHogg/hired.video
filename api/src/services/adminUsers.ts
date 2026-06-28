@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, ilike, inArray, lt, or, sql, sum, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, exists, gte, ilike, inArray, lt, or, sql, sum, type SQL } from "drizzle-orm";
 import { isDeepStrictEqual } from "node:util";
 import { getDb, schema } from "../db/index.js";
 import { AUDIT_ACTIONS } from "../utils/audit.js";
@@ -17,6 +17,7 @@ import {
 } from "../domains/planOverride/resolver.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { reclaimVideoR2 } from "./storage/reclaim-video-r2.js";
+import { loadReferralsForUsers, countReferredUsers } from "./adminReferrals.js";
 
 /** Deps this module actually needs. Services declare a narrow `Pick<ApiDeps, …>`
  *  so tests mock only the surface the function touches (ISP). Production
@@ -38,6 +39,10 @@ export interface UserSearchParams {
   // (users.is_system = true). These are the first-party authors whose
   // content renders as "Editorial" rather than community UGC.
   editorial?: boolean;
+  // When true, restrict the list to users who signed up via an affiliate
+  // referral link (i.e. have an affiliate_referrals row). Powers the
+  // "Referred only" filter on /admin/users.
+  referred?: boolean;
 }
 
 interface RawPlanOverrideRow {
@@ -88,7 +93,7 @@ async function loadPlanOverridesForUsers(
 }
 
 export async function searchUsers(
-  { page = 1, limit = 50, search, role, status, editorial }: UserSearchParams,
+  { page = 1, limit = 50, search, role, status, editorial, referred }: UserSearchParams,
   deps: AdminUsersDeps = defaultApiDeps(),
 ) {
   // One residual direct-db call remains for toolRuns analytics below —
@@ -101,6 +106,18 @@ export async function searchUsers(
   if (search) conditions.push(or(ilike(schema.users.email, `%${search}%`), ilike(schema.users.name, `%${search}%`)));
   if (role) conditions.push(eq(schema.users.role, role));
   if (editorial) conditions.push(eq(schema.users.isSystem, true));
+  // Referred-only: keep users with at least one inbound affiliate referral.
+  // Correlated EXISTS so the count + page queries share the same predicate.
+  if (referred) {
+    conditions.push(
+      exists(
+        db
+          .select({ x: sql`1` })
+          .from(schema.affiliateReferrals)
+          .where(eq(schema.affiliateReferrals.referredUserId, schema.users.id)),
+      ),
+    );
+  }
   if (status === "active") conditions.push(eq(schema.users.isActive, true));
   if (status === "suspended") conditions.push(eq(schema.users.isSuspended, true));
   // Ban = hidden by default. Banned users only surface when the admin
@@ -142,7 +159,7 @@ export async function searchUsers(
   const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
-  const [subRows, usageRows, balanceRows, toolRunRows, overrideRows, resumeCountRows] = await Promise.all([
+  const [subRows, usageRows, balanceRows, toolRunRows, overrideRows, resumeCountRows, referralByUser] = await Promise.all([
     // Active/trialing subscriptions joined with their plan row.
     deps.repos.subscriptions.findActiveByUserIds(userIds),
     // Monthly token burn in the current billing window.
@@ -169,6 +186,9 @@ export async function searchUsers(
     loadPlanOverridesForUsers(db, userIds),
     // Resume counts drive the "Resumes" column.
     deps.repos.resumes.countByOwnerBulk(userIds),
+    // Referral attribution — drives the "Referred by …" indicator. Batch
+    // load (no N+1); degrades to an empty map on any failure (see loader).
+    loadReferralsForUsers(db, userIds),
   ]);
 
   const subByUser = new Map(subRows.map((r) => [r.userId, r]));
@@ -224,6 +244,9 @@ export async function searchUsers(
       toolRunCount: toolStats?.runs ?? 0,
       toolTokensUsed: toolStats?.tokens ?? 0,
       resumeCount: resumeCountByUser.get(u.id) ?? 0,
+      // Referral attribution — null when the user didn't sign up via an
+      // affiliate link. Drives the "Referred by …" indicator on the list.
+      referral: referralByUser.get(u.id) ?? null,
       // Override provenance — the /admin/users UI renders a badge when
       // the effective plan comes from an override so ops can tell at a
       // glance why a user sees a non-default plan/limit.
@@ -409,6 +432,7 @@ export interface AdminUsersStats {
   inactive: number;    // is_active=false AND is_suspended=false AND is_banned=false
   banned: number;      // is_banned=true
   admins: number;      // role='admin' OR is_super_admin=true (excluding banned)
+  referred: number;    // distinct users with an inbound affiliate referral
 }
 
 /**
@@ -423,18 +447,23 @@ export interface AdminUsersStats {
 export async function getAdminUsersStats(): Promise<AdminUsersStats> {
   const db = getDb();
   const u = schema.users;
-  // One round-trip: a single SELECT with conditional sums per status
-  // bucket is cheaper than five COUNTs and keeps subrequest usage at 1.
-  const [row] = await db
-    .select({
-      total: sql<number>`sum(case when ${u.isBanned} = false then 1 else 0 end)::int`,
-      active: sql<number>`sum(case when ${u.isActive} = true and ${u.isSuspended} = false and ${u.isBanned} = false then 1 else 0 end)::int`,
-      suspended: sql<number>`sum(case when ${u.isSuspended} = true and ${u.isBanned} = false then 1 else 0 end)::int`,
-      inactive: sql<number>`sum(case when ${u.isActive} = false and ${u.isSuspended} = false and ${u.isBanned} = false then 1 else 0 end)::int`,
-      banned: sql<number>`sum(case when ${u.isBanned} = true then 1 else 0 end)::int`,
-      admins: sql<number>`sum(case when (${u.role} = 'admin' or ${u.isSuperAdmin} = true) and ${u.isBanned} = false then 1 else 0 end)::int`,
-    })
-    .from(u);
+  // One round-trip for the user-table buckets: a single SELECT with
+  // conditional sums per status bucket is cheaper than five COUNTs and keeps
+  // subrequest usage at 1. The referred count lives in a sibling table, so
+  // it runs as a second best-effort query in parallel (degrades to 0).
+  const [[row], referred] = await Promise.all([
+    db
+      .select({
+        total: sql<number>`sum(case when ${u.isBanned} = false then 1 else 0 end)::int`,
+        active: sql<number>`sum(case when ${u.isActive} = true and ${u.isSuspended} = false and ${u.isBanned} = false then 1 else 0 end)::int`,
+        suspended: sql<number>`sum(case when ${u.isSuspended} = true and ${u.isBanned} = false then 1 else 0 end)::int`,
+        inactive: sql<number>`sum(case when ${u.isActive} = false and ${u.isSuspended} = false and ${u.isBanned} = false then 1 else 0 end)::int`,
+        banned: sql<number>`sum(case when ${u.isBanned} = true then 1 else 0 end)::int`,
+        admins: sql<number>`sum(case when (${u.role} = 'admin' or ${u.isSuperAdmin} = true) and ${u.isBanned} = false then 1 else 0 end)::int`,
+      })
+      .from(u),
+    countReferredUsers(db),
+  ]);
 
   return {
     total: Number(row?.total ?? 0),
@@ -443,6 +472,7 @@ export async function getAdminUsersStats(): Promise<AdminUsersStats> {
     inactive: Number(row?.inactive ?? 0),
     banned: Number(row?.banned ?? 0),
     admins: Number(row?.admins ?? 0),
+    referred,
   };
 }
 
