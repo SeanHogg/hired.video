@@ -9,7 +9,8 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
+import { useBreadcrumbs } from "@/lib/seo";
+import { useUgcSeo } from "@/lib/seo-ugc";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Calendar, MapPin, Users, Video, Share2, ExternalLink, Sparkles } from "lucide-react";
@@ -28,7 +29,10 @@ export default function EventDetail() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  useSEO("/events/:idOrSlug");
+  // Per-event title/description + Event JSON-LD (falls back to the static
+  // /events/:idOrSlug PAGE_SEO while the event loads). `ResolvedEvent` is a
+  // structural superset of the adapter's EventRecord.
+  useUgcSeo("event", event);
   useBreadcrumbs(
     event
       ? [

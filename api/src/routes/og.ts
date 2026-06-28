@@ -1,10 +1,13 @@
 import { Hono } from "hono";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, or, inArray } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { isUuid } from "../../../shared/value-types.js";
 import { renderCourseCoverSvg, escapeXmlText as escapeXml } from "../../../shared/course-cover.js";
 import { getCourseDiagram } from "../../../shared/course-diagrams.js";
+// Shared schema.org JSON-LD builders (SSoT) — the same ones the frontend
+// injects client-side, so crawler-injected and client-injected JSON-LD agree.
+import { generateStructuredData, splitJobLocation } from "../../../shared/structured-data.js";
 
 const {
   videos,
@@ -16,6 +19,9 @@ const {
   creatorProfiles,
   userProfiles,
   articles,
+  jobItems,
+  courses,
+  scheduledEvents,
 } = schema;
 
 export const ogRoutes = new Hono<AppEnv>();
@@ -495,25 +501,22 @@ ogRoutes.get("/v/:videoId/meta", async (c) => {
     title,
     description,
     image: thumbnailUrl,
-    // VideoObject for crawler-side injection (Cloudflare Pages Function).
-    // Mirrors generateStructuredData.videoObject in frontend/lib/seo.ts —
-    // keep the two in sync. embedUrl is the watch page: it's the ONE player
+    // VideoObject for crawler-side injection (Cloudflare Pages Function), via
+    // the shared SSoT builder. embedUrl is the watch page: the ONE player
     // surface valid for every mediaKind, including live-rendered canvas
     // projects (the standalone /embed/video/frame only resolves once a video
     // is baked to MP4/YouTube, so it would be a dead link for those). The
     // watch page + the always-present thumbnailUrl satisfy Google's video
     // requirements for all kinds.
     jsonLd: [
-      {
-        "@context": "https://schema.org",
-        "@type": "VideoObject",
+      generateStructuredData.videoObject({
         name: meta.title ?? `${kindCopy.noun} on hired.video`,
-        url: `https://hired.video/v/${videoId}`,
         description: description.slice(0, 200),
         thumbnailUrl,
-        ...(meta.uploadDate ? { uploadDate: meta.uploadDate } : {}),
+        uploadDate: meta.uploadDate ?? undefined,
         embedUrl: `https://hired.video/v/${videoId}`,
-      },
+        url: `https://hired.video/v/${videoId}`,
+      }),
     ],
   });
 });
@@ -688,31 +691,20 @@ ogRoutes.get("/article/:userRef/:slug/meta", async (c) => {
     title,
     description,
     image,
-    // Article JSON-LD — mirrors generateStructuredData.article in
-    // frontend/lib/seo.ts; keep the two in sync.
+    // Article JSON-LD via the shared SSoT builder.
     jsonLd: [
-      {
-        "@context": "https://schema.org",
-        "@type": "Article",
+      generateStructuredData.article({
+        type: "Article",
         headline: row.title,
-        mainEntityOfPage: { "@type": "WebPage", "@id": pageUrl },
+        description,
         image,
         url: pageUrl,
-        description,
-        ...(row.publishedAt ? { datePublished: row.publishedAt.toISOString() } : {}),
-        ...(row.updatedAt || row.publishedAt
-          ? { dateModified: (row.updatedAt ?? row.publishedAt)!.toISOString() }
-          : {}),
-        ...(row.authorName
-          ? { author: { "@type": "Person", name: row.authorName, url: `https://hired.video/people/${authorRef}` } }
-          : {}),
-        ...(Array.isArray(row.tags) && row.tags.length > 0 ? { keywords: row.tags.join(", ") } : {}),
-        publisher: {
-          "@type": "Organization",
-          name: "hired.video",
-          logo: { "@type": "ImageObject", url: "https://hired.video/og-image.svg" },
-        },
-      },
+        datePublished: row.publishedAt ? row.publishedAt.toISOString() : undefined,
+        dateModified: (row.updatedAt ?? row.publishedAt)?.toISOString(),
+        authorName: row.authorName ?? undefined,
+        authorUrl: row.authorName ? `https://hired.video/people/${authorRef}` : undefined,
+        keywords: Array.isArray(row.tags) && row.tags.length > 0 ? (row.tags as string[]) : undefined,
+      }),
     ],
   });
 });
@@ -769,18 +761,286 @@ ogRoutes.get("/person/:userRef/meta", async (c) => {
     description,
     image,
     jsonLd: [
-      {
-        "@context": "https://schema.org",
-        "@type": "ProfilePage",
+      generateStructuredData.profilePage({
+        name,
+        headline: headline || undefined,
+        image: row.avatarUrl ? image : undefined,
         url: pageUrl,
-        mainEntity: {
-          "@type": "Person",
-          name,
-          ...(headline ? { jobTitle: headline } : {}),
-          ...(row.avatarUrl ? { image } : {}),
-          url: pageUrl,
-        },
-      },
+      }),
+    ],
+  });
+});
+
+/** Absolutize a possibly-relative stored image path onto the worker origin
+ *  (the SPA host doesn't proxy /api or /uploads). Already-absolute URLs pass
+ *  through. Shared by the entity meta endpoints below. */
+function absImg(o: string, path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (path.startsWith("http")) return path;
+  return `${o}${path.startsWith("/") ? "" : "/"}${path}`;
+}
+
+// ─── GET /job/:id/meta ──────────────────────────────────────────────────────
+// Crawler-facing JobPosting (Google for Jobs) + OG meta for /jobs/:id.
+ogRoutes.get("/job/:id/meta", async (c) => {
+  const { id } = c.req.param();
+  const db = getDb();
+  const o = new URL(c.req.url).origin;
+  c.header("Cache-Control", "public, max-age=300, s-maxage=3600");
+  if (!isUuid(id)) return c.json({ title: null, description: null, image: null, jsonLd: [] });
+
+  const [row] = await db
+    .select({
+      title: jobItems.title,
+      description: jobItems.description,
+      company: jobItems.company,
+      location: jobItems.location,
+      jobType: jobItems.jobType,
+      salaryMin: jobItems.salaryMin,
+      salaryMax: jobItems.salaryMax,
+      salaryCurrency: jobItems.salaryCurrency,
+      skillsRequired: jobItems.skillsRequired,
+      isRemote: jobItems.isRemote,
+      isActive: jobItems.isActive,
+      expiresAt: jobItems.expiresAt,
+      createdAt: jobItems.createdAt,
+      heroImageUrl: jobItems.heroImageUrl,
+      companyName: companyProfiles.name,
+      companyLogo: companyProfiles.logoUrl,
+      companyWebsite: companyProfiles.website,
+    })
+    .from(jobItems)
+    .leftJoin(companyProfiles, eq(companyProfiles.id, jobItems.companyId))
+    .where(eq(jobItems.id, id))
+    .limit(1);
+
+  // Don't index inactive/closed roles (Google flags expired postings).
+  if (!row || row.isActive === false) {
+    return c.json({ title: null, description: null, image: null, jsonLd: [] });
+  }
+
+  const companyName = row.companyName ?? row.company ?? "a company";
+  const title = `${row.title} at ${companyName} — hired.video`;
+  const description = ((row.description ?? "").replace(/\s+/g, " ").trim().slice(0, 200))
+    || `${row.title} at ${companyName}. Apply on hired.video.`;
+  const logo = absImg(o, row.companyLogo);
+  const image = absImg(o, row.heroImageUrl)
+    ?? logo
+    ?? `${o}/api/og/page?${new URLSearchParams({ title: row.title, eyebrow: "JOB", subtitle: companyName }).toString()}`;
+  const num = (v: unknown) => (v == null ? undefined : Number(v));
+  // jobItems stores a single combined location string — split it into
+  // city/state/country so non-remote roles emit a proper PostalAddress.
+  const geo = row.isRemote ? {} : splitJobLocation(row.location);
+
+  return c.json({
+    title,
+    description,
+    image,
+    jsonLd: [
+      generateStructuredData.jobPosting({
+        id,
+        title: row.title,
+        description: row.description || row.title,
+        postedDate: row.createdAt ?? undefined,
+        validThrough: row.expiresAt ?? undefined,
+        employmentType: row.jobType ?? undefined,
+        companyName,
+        companyLogoUrl: logo ?? undefined,
+        companyWebsite: row.companyWebsite ?? undefined,
+        isRemote: !!row.isRemote,
+        city: geo.city,
+        state: geo.state,
+        country: geo.country,
+        salaryMin: num(row.salaryMin),
+        salaryMax: num(row.salaryMax),
+        salaryCurrency: row.salaryCurrency ?? undefined,
+        skills: Array.isArray(row.skillsRequired) ? (row.skillsRequired as string[]) : undefined,
+        url: `https://hired.video/jobs/${id}`,
+      }),
+    ],
+  });
+});
+
+// ─── GET /company/:idOrSlug/meta ─────────────────────────────────────────────
+// Crawler-facing Organization (+ aggregateRating) + OG meta for /companies/:id.
+ogRoutes.get("/company/:idOrSlug/meta", async (c) => {
+  const { idOrSlug } = c.req.param();
+  const db = getDb();
+  const o = new URL(c.req.url).origin;
+  c.header("Cache-Control", "public, max-age=300, s-maxage=3600");
+
+  const [row] = await db
+    .select({
+      id: companyProfiles.id,
+      name: companyProfiles.name,
+      tagline: companyProfiles.tagline,
+      description: companyProfiles.description,
+      website: companyProfiles.website,
+      logoUrl: companyProfiles.logoUrl,
+      headquarters: companyProfiles.headquarters,
+      reviewCount: companyProfiles.reviewCount,
+      reviewAvg: companyProfiles.reviewAvgOverall,
+    })
+    .from(companyProfiles)
+    .where(isUuid(idOrSlug) ? eq(companyProfiles.id, idOrSlug) : eq(companyProfiles.slug, idOrSlug))
+    .limit(1);
+
+  if (!row) return c.json({ title: null, description: null, image: null, jsonLd: [] });
+
+  const title = `${row.name} Company Profile — hired.video`;
+  const description = (row.tagline ?? row.description ?? "").trim().slice(0, 200)
+    || `${row.name} on hired.video.`;
+  const hq = (row.headquarters ?? null) as { city?: string | null; state?: string | null } | null;
+  const address = hq?.city ? `${hq.city}${hq.state ? `, ${hq.state}` : ""}` : undefined;
+
+  return c.json({
+    title,
+    description,
+    image: `${o}/api/og/companies/${row.id}`,
+    jsonLd: [
+      generateStructuredData.organization({
+        name: row.name,
+        description: row.description,
+        website: row.website,
+        logo: absImg(o, row.logoUrl),
+        address,
+        reviewCount: row.reviewCount,
+        reviewAvgOverall: row.reviewAvg == null ? undefined : Number(row.reviewAvg),
+      }),
+    ],
+  });
+});
+
+// ─── GET /course/:userRef/:slug/meta ─────────────────────────────────────────
+// Crawler-facing Course + OG meta for /courses/:authorSlug/:courseSlug.
+ogRoutes.get("/course/:userRef/:slug/meta", async (c) => {
+  const { userRef, slug } = c.req.param();
+  const db = getDb();
+  const o = new URL(c.req.url).origin;
+  c.header("Cache-Control", "public, max-age=300, s-maxage=3600");
+
+  let authorUserId: string | null = isUuid(userRef) ? userRef : null;
+  if (!authorUserId) {
+    const [p] = await db
+      .select({ userId: userProfiles.userId })
+      .from(userProfiles)
+      .where(eq(userProfiles.customUrlSlug, userRef))
+      .limit(1);
+    authorUserId = p?.userId ?? null;
+  }
+  if (!authorUserId) return c.json({ title: null, description: null, image: null, jsonLd: [] });
+
+  const [row] = await db
+    .select({
+      title: courses.title,
+      summary: courses.summary,
+      description: courses.description,
+      coverImageUrl: courses.coverImageUrl,
+      category: courses.category,
+      authorName: users.name,
+      authorSlug: userProfiles.customUrlSlug,
+      authorId: users.id,
+    })
+    .from(courses)
+    .innerJoin(users, eq(courses.userId, users.id))
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(and(
+      eq(courses.userId, authorUserId),
+      eq(courses.slug, slug),
+      eq(courses.status, "published"),
+      eq(users.emailVerified, true),
+    ))
+    .limit(1);
+
+  if (!row) return c.json({ title: null, description: null, image: null, jsonLd: [] });
+
+  const authorRef = row.authorSlug ?? row.authorId;
+  const pageUrl = `https://hired.video/courses/${authorRef}/${slug}`;
+  const title = `${row.title} — Course by ${row.authorName ?? "a creator"} | hired.video`;
+  const description = (row.summary ?? row.description ?? "").trim().slice(0, 200)
+    || `Learn ${row.title} on hired.video.`;
+  const image = absImg(o, row.coverImageUrl)
+    ?? `${o}/api/og/courses?${new URLSearchParams({ title: row.title, ...(row.category ? { category: row.category } : {}) }).toString()}`;
+
+  return c.json({
+    title,
+    description,
+    image,
+    jsonLd: [
+      generateStructuredData.course({
+        name: row.title,
+        description,
+        image,
+        instructorName: row.authorName ?? undefined,
+        instructorUrl: `https://hired.video/people/${authorRef}`,
+        url: pageUrl,
+      }),
+    ],
+  });
+});
+
+// ─── GET /event/:idOrSlug/meta ───────────────────────────────────────────────
+// Crawler-facing Event + OG meta for /events/:idOrSlug. Only PUBLIC events
+// resolve (unlisted = link-only, not indexable; private = never).
+ogRoutes.get("/event/:idOrSlug/meta", async (c) => {
+  const { idOrSlug } = c.req.param();
+  const db = getDb();
+  const o = new URL(c.req.url).origin;
+  c.header("Cache-Control", "public, max-age=300, s-maxage=3600");
+
+  const [row] = await db
+    .select({
+      id: scheduledEvents.id,
+      title: scheduledEvents.title,
+      description: scheduledEvents.description,
+      startAt: scheduledEvents.startAt,
+      endAt: scheduledEvents.endAt,
+      location: scheduledEvents.location,
+      meetingUrl: scheduledEvents.meetingUrl,
+      eventFormat: scheduledEvents.eventFormat,
+      coverImageUrl: scheduledEvents.coverImageUrl,
+      slug: scheduledEvents.slug,
+      status: scheduledEvents.status,
+      hostName: users.name,
+    })
+    .from(scheduledEvents)
+    .leftJoin(users, eq(users.id, scheduledEvents.hostUserId))
+    .where(and(
+      isUuid(idOrSlug) ? eq(scheduledEvents.id, idOrSlug) : eq(scheduledEvents.slug, idOrSlug),
+      eq(scheduledEvents.visibility, "public"),
+      inArray(scheduledEvents.type, ["event", "coffee"]),
+    ))
+    .limit(1);
+
+  if (!row) return c.json({ title: null, description: null, image: null, jsonLd: [] });
+
+  const ref = row.slug ?? row.id;
+  const pageUrl = `https://hired.video/events/${ref}`;
+  const title = `${row.title} — hired.video`;
+  const description = (row.description ?? "").replace(/\s+/g, " ").trim().slice(0, 200)
+    || `${row.title} — a networking event on hired.video.`;
+  const image = absImg(o, row.coverImageUrl)
+    ?? `${o}/api/og/page?${new URLSearchParams({ title: row.title, eyebrow: "EVENT" }).toString()}`;
+  const mode = (row.eventFormat === "remote" || row.eventFormat === "hybrid") ? row.eventFormat : "in_person";
+
+  return c.json({
+    title,
+    description,
+    image,
+    jsonLd: [
+      generateStructuredData.event({
+        name: row.title,
+        description,
+        startDate: row.startAt ? row.startAt.toISOString() : undefined,
+        endDate: row.endAt ? row.endAt.toISOString() : undefined,
+        url: pageUrl,
+        image,
+        locationName: row.location ?? undefined,
+        onlineUrl: row.meetingUrl ?? undefined,
+        attendanceMode: mode as "in_person" | "remote" | "hybrid",
+        organizerName: row.hostName ?? undefined,
+        isCancelled: row.status === "cancelled",
+      }),
     ],
   });
 });

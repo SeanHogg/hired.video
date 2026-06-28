@@ -4,7 +4,7 @@
 
 import { Hono } from "hono";
 import { getDb, schema } from "../db/index.js";
-import { and, eq, desc, isNotNull } from "drizzle-orm";
+import { and, eq, desc, isNotNull, inArray, ne } from "drizzle-orm";
 import {
   getPopularRoles,
   getPopularCities,
@@ -158,7 +158,7 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
   const reqOrigin = new URL(c.req.url).origin;
 
   // Fetch dynamic content (limit to recent 500 of each to keep sitemap manageable)
-  const [jobs, companies, publicUsers, creatorTemplates, publicProjects, publishedArticles] = await Promise.allSettled([
+  const [jobs, companies, publicUsers, creatorTemplates, publicProjects, publishedArticles, publishedCourses, publicEvents] = await Promise.allSettled([
     db
       .select({ id: schema.jobItems.id, title: schema.jobItems.title, updatedAt: schema.jobItems.updatedAt })
       .from(schema.jobItems)
@@ -243,6 +243,42 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
       ))
       .orderBy(desc(schema.articles.updatedAt))
       .limit(500),
+
+    // Published courses — surfaced at /courses/:authorSlug/:slug (Course
+    // rich result now injected for crawlers via /api/og/course/.../meta).
+    db
+      .select({
+        slug: schema.courses.slug,
+        userId: schema.courses.userId,
+        authorSlug: schema.userProfiles.customUrlSlug,
+        updatedAt: schema.courses.updatedAt,
+      })
+      .from(schema.courses)
+      .innerJoin(schema.users, eq(schema.users.id, schema.courses.userId))
+      .leftJoin(schema.userProfiles, eq(schema.userProfiles.userId, schema.courses.userId))
+      .where(and(
+        eq(schema.courses.status, "published"),
+        eq(schema.users.emailVerified, true),
+      ))
+      .orderBy(desc(schema.courses.updatedAt))
+      .limit(500),
+
+    // Public networking events — surfaced at /events/:slug (Event rich
+    // result now injected for crawlers). Public + non-cancelled only.
+    db
+      .select({
+        id: schema.scheduledEvents.id,
+        slug: schema.scheduledEvents.slug,
+        updatedAt: schema.scheduledEvents.updatedAt,
+      })
+      .from(schema.scheduledEvents)
+      .where(and(
+        eq(schema.scheduledEvents.visibility, "public"),
+        inArray(schema.scheduledEvents.type, ["event", "coffee"]),
+        ne(schema.scheduledEvents.status, "cancelled"),
+      ))
+      .orderBy(desc(schema.scheduledEvents.updatedAt))
+      .limit(500),
   ]);
 
   const jobRows = jobs.status === "fulfilled" ? jobs.value : [];
@@ -251,6 +287,8 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
   const creatorTemplateRows = creatorTemplates.status === "fulfilled" ? creatorTemplates.value : [];
   const projectRows = publicProjects.status === "fulfilled" ? publicProjects.value : [];
   const articleRows = publishedArticles.status === "fulfilled" ? publishedArticles.value : [];
+  const courseRows = publishedCourses.status === "fulfilled" ? publishedCourses.value : [];
+  const eventRows = publicEvents.status === "fulfilled" ? publicEvents.value : [];
 
   // Resume-guide slugs keep their legacy derivation so historical URLs
   // stay stable. Salary URLs now ride off the canonical popular-roles /
@@ -324,6 +362,18 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
       .map((a) =>
         url(`/articles/${a.authorSlug ?? a.userId}/${a.slug}`, a.updatedAt?.toISOString(), "weekly", "0.6"),
       ),
+
+    // Published courses — Course rich result + crawlable URL.
+    ...courseRows
+      .filter((co) => !!co.slug)
+      .map((co) =>
+        url(`/courses/${co.authorSlug ?? co.userId}/${co.slug}`, co.updatedAt?.toISOString(), "weekly", "0.6"),
+      ),
+
+    // Public events — Event rich result + crawlable URL.
+    ...eventRows.map((e) =>
+      url(`/events/${e.slug ?? e.id}`, e.updatedAt?.toISOString(), "weekly", "0.5"),
+    ),
 
     // Public studio projects as video-sitemap entries (thumbnail handed to
     // Google so the video is indexable). Kept last so the <video:*> blocks

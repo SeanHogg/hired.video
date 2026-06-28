@@ -57,7 +57,8 @@ export type UgcKind =
   | "course"
   | "channel"
   | "shareToken"
-  | "companyReviews";
+  | "companyReviews"
+  | "event";
 
 export type UgcSeoBuilder<R> = (record: R, pathname: string) => SEOData | null;
 
@@ -359,6 +360,22 @@ export interface ShareTokenRecord {
   /** Display title; share pages don't expose record data publicly. */
   title: string;
   description?: string | null;
+}
+
+/** Subset of `ResolvedEvent` (@shared/events) the SEO adapter needs. */
+export interface EventRecord {
+  id: string;
+  title: string;
+  description?: string | null;
+  slug?: string | null;
+  coverImageUrl?: string | null;
+  startAt?: string | null;
+  endAt?: string | null;
+  location?: string | null;
+  meetingUrl?: string | null;
+  eventFormat?: "in_person" | "remote" | "hybrid" | string | null;
+  hostName?: string | null;
+  cancelledAt?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -730,5 +747,35 @@ registerUgcSeo<ShareTokenRecord>("shareToken", (share) => {
     description,
     ...mirrorOg(title, description),
     robots: "noindex, nofollow",
+  };
+});
+
+registerUgcSeo<EventRecord>("event", (event, pathname) => {
+  const title = `${event.title} — hired.video`;
+  const description =
+    clip(event.description) || `${event.title} — a networking event on hired.video.`;
+  const image = event.coverImageUrl ? buildImageUrl(event.coverImageUrl) : undefined;
+  const mode =
+    event.eventFormat === "remote" || event.eventFormat === "hybrid"
+      ? event.eventFormat
+      : "in_person";
+  return {
+    title,
+    description,
+    ...mirrorOg(title, description),
+    ...(image ? { ogImage: image } : {}),
+    structuredData: generateStructuredData.event({
+      name: event.title,
+      description: clip(event.description, 200),
+      startDate: event.startAt ?? undefined,
+      endDate: event.endAt ?? undefined,
+      url: absUrl(pathname),
+      image: image ?? undefined,
+      locationName: event.location ?? undefined,
+      onlineUrl: event.meetingUrl ?? undefined,
+      attendanceMode: mode as "in_person" | "remote" | "hybrid",
+      organizerName: event.hostName ?? undefined,
+      isCancelled: !!event.cancelledAt,
+    }),
   };
 });
