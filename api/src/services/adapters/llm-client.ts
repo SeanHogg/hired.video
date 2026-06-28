@@ -316,6 +316,16 @@ export interface LLMFailoverEvent {
   vendor: string;
   /** HTTP status the failover attempt returned, or 0 for embedded errors. */
   code: number;
+  /** Coarse failure class the gateway assigned this attempt (SDK ≥0.8.2):
+   *  `rate_limit | timeout | auth | server_error | client_error | network |
+   *  skipped`. Structured signal we classify on instead of regex-sniffing
+   *  the (often scrubbed) upstream message — a `client_error` cascade is a
+   *  deterministic request-shape rejection (e.g. schema too complex), NOT a
+   *  transient rate-limit. Undefined on older gateways. Surfaced in the
+   *  support payload too. */
+  kind?: string;
+  /** Wall-clock the gateway spent on this attempt, ms (SDK ≥0.8.2). */
+  durationMs?: number;
 }
 
 /** What the dispatch loop tried for one profile. Captured per attempt
@@ -399,10 +409,12 @@ export class LLMDispatchError extends Error {
 /** A 429 `cascade_exhausted` whose underlying upstream error is actually
  *  a vendor schema rejection (most commonly Gemini's `400: The specified
  *  schema produces a constraint that has too many states for serving`)
- *  is NOT a transient rate-limit — retrying never helps. The gateway
- *  surfaces the wrapped upstream message inside the 429's `message`, so
- *  we sniff for the schema signal there and reclassify as `schema`. That
- *  routes the user to an honest `502 AI_INVALID_RESPONSE` ("the AI
+ *  is NOT a transient rate-limit — retrying never helps. Text fallback
+ *  for older gateways that still inline the wrapped upstream message in
+ *  the 429's `message` (newer gateways scrub it — {@link
+ *  isRequestShapeCascade} is the structured primary). Reclassifies as
+ *  `schema`, which routes the user to an honest `502 AI_INVALID_RESPONSE`
+ *  ("the AI
  *  couldn't produce a complete response") instead of "providers are at
  *  capacity, retry in a minute" — which is false and sends them down a
  *  dead-end retry loop. See gap #1802 (and #1801 for the root cause that
@@ -414,6 +426,25 @@ export function looksLikeSchemaRejection(message: string): boolean {
     /invalid\s+schema/i.test(message) ||
     /response[_ ]?schema/i.test(message)
   );
+}
+
+/** Structured (text-free) counterpart to {@link looksLikeSchemaRejection},
+ *  using the gateway's per-attempt `FailoverEvent.kind` (SDK ≥0.8.2). True
+ *  when a cascade exhausted because EVERY concrete upstream attempt
+ *  rejected the REQUEST itself (`client_error` / 4xx) and none was an
+ *  actual capacity (`rate_limit`) or `timeout` failure — i.e. the failure
+ *  is deterministic request-shape (schema too complex, context too long)
+ *  and will not resolve by retrying on another model. `skipped` attempts
+ *  (never dispatched) are not evidence either way. Preferred over the
+ *  message heuristic because the SDK warns upstream error text "is NOT
+ *  exposed to callers" on newer gateways. See gap #1802. */
+export function isRequestShapeCascade(
+  failovers: ReadonlyArray<LLMFailoverEvent> | undefined,
+): boolean {
+  if (!failovers || failovers.length === 0) return false;
+  const concrete = failovers.filter((f) => f.kind && f.kind !== "skipped");
+  if (concrete.length === 0) return false;
+  return concrete.every((f) => f.kind === "client_error");
 }
 
 /** Classify a single attempt's error so the dispatch chain can roll up
@@ -438,17 +469,26 @@ function classifyAttemptError(
     else if (status === 401 || status === 403) kind = "auth";
     else if (status === 429 || err.code === "rate_limit" || err.code === "plan_token_limit_exceeded") kind = "rate_limit";
     else if (status >= 500) kind = "network";
-    // #1802 — a 429-wrapped cascade (or an opaque error) can be hiding a
-    // permanent vendor schema rejection. Reclassify so the rollup +
-    // route UX are honest (502 schema, not 503 retry-in-a-minute).
-    if ((kind === "rate_limit" || kind === "unknown") && looksLikeSchemaRejection(err.message)) {
-      kind = "schema";
-    }
     const failovers = err.failovers?.map((f) => ({
       model: f.model,
       vendor: f.vendor,
       code: f.code,
+      kind: f.kind,
+      durationMs: f.durationMs,
     }));
+    // #1802 — a 429-wrapped cascade (or an opaque error) can be hiding a
+    // permanent, request-shape vendor rejection (e.g. Gemini's `400 too
+    // many states` schema error): retrying never helps. Prefer the
+    // structured failover trail (SDK ≥0.8.2) since upstream text may be
+    // scrubbed; fall back to the message heuristic for older gateways
+    // that still inline it. Reclassify so the rollup + route UX are
+    // honest (502 schema, not 503 retry-in-a-minute).
+    if (
+      (kind === "rate_limit" || kind === "unknown") &&
+      (isRequestShapeCascade(failovers) || looksLikeSchemaRejection(err.message))
+    ) {
+      kind = "schema";
+    }
     // Prefer the SDK's top-level `vendor` (always set on dispatch errors
     // in ≥0.8 — sourced from the gateway's catalog so consumers never
     // parse model ids). Fall back to the last cascade-trail entry only
@@ -873,6 +913,20 @@ export function createLLMClient(
           vendor: cls.vendor ?? resolvedVendor,
         };
         attempts.push(attempt);
+        // Short-circuit on a gateway-signalled terminal error (SDK ≥0.8):
+        // `terminal` means "won't resolve by retrying on a different model"
+        // (tenant token-cap exhausted, idempotent replay, …). Walking the
+        // rest of the chain just burns latency + per-attempt cost on calls
+        // that are guaranteed to hit the same cap. Stop and surface the
+        // trail we have. Gap #2263.
+        if (err instanceof BuilderforceApiError && err.terminal) {
+          console.warn(
+            `[llm-client ${correlationId}] ${opts.useCase} ${profile.model} ` +
+              `failed terminally (${cls.kind}${cls.status ? ` ${cls.status}` : ""}); ` +
+              `short-circuiting ${opts.chain.length - 1 - i} remaining profile(s)`,
+          );
+          break;
+        }
         if (i < opts.chain.length - 1) {
           console.warn(
             `[llm-client ${correlationId}] ${opts.useCase} ${profile.model} ` +

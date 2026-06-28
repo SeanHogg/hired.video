@@ -13,7 +13,7 @@
  *   • "object" — one object's fields, at a nested key (resume `basics`) or the
  *     content root (the flat job record).
  */
-import { Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { FieldGroupEditor } from "@/components/studio/fields/FieldGroupEditor";
 import { SECTION_IMPORTERS } from "@/components/studio/document/section-importers";
 import type { DocumentEntityContent, DocumentEntityKind } from "@/lib/studio/editor-v2/document-state";
@@ -80,8 +80,24 @@ function ArrayEditor({
     const next = items.map((it, i) => (i === idx ? { ...it, [key]: value } : it));
     onChange(writeItems(content, schema.sectionKey, next));
   };
-  const addItem = () => {
-    onChange(writeItems(content, schema.sectionKey, [...items, schema.newItem()]));
+  // Insert a fresh item at a specific index (clamped). `at === items.length`
+  // appends — the "Add" button's behaviour — while a per-item "Insert below"
+  // drops the new item right after that row so the user can build their list
+  // in order instead of always appending to the bottom.
+  const insertItemAt = (at: number) => {
+    const idx = Math.max(0, Math.min(at, items.length));
+    const next = [...items.slice(0, idx), schema.newItem(), ...items.slice(idx)];
+    onChange(writeItems(content, schema.sectionKey, next));
+  };
+  // Reorder a single item up/down within its section — the item-level mirror of
+  // the section-block Move up/down in DocumentStage. Each item carries a stable
+  // `id`, so swapping positions preserves skill-evidence / metaData binding.
+  const moveItem = (idx: number, dir: "up" | "down") => {
+    const to = dir === "up" ? idx - 1 : idx + 1;
+    if (to < 0 || to >= items.length) return;
+    const next = [...items];
+    [next[idx], next[to]] = [next[to], next[idx]];
+    onChange(writeItems(content, schema.sectionKey, next));
   };
   const importItems = (incoming: Item[]) => {
     onChange(writeItems(content, schema.sectionKey, [...items, ...incoming]));
@@ -100,23 +116,62 @@ function ArrayEditor({
           key={(item.id as string) ?? idx}
           className="relative rounded border border-border p-2"
         >
-          <button
-            type="button"
-            aria-label={`Remove ${schema.itemNoun}`}
-            className="absolute right-1 top-1 p-1 text-muted-foreground hover:text-red-600"
-            onClick={(e) => {
-              e.stopPropagation();
-              removeItem(idx);
-            }}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          {/* Per-item action bar — reorder + insert + remove, mirroring the
+              section-block bar in DocumentStage so items move "like sections". */}
+          <div className="absolute right-1 top-1 flex items-center gap-0.5">
+            <button
+              type="button"
+              aria-label={`Move ${schema.itemNoun} up`}
+              disabled={idx === 0}
+              className="p-1 text-muted-foreground hover:text-brand-purple disabled:cursor-not-allowed disabled:opacity-30"
+              onClick={(e) => {
+                e.stopPropagation();
+                moveItem(idx, "up");
+              }}
+            >
+              <ArrowUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label={`Move ${schema.itemNoun} down`}
+              disabled={idx === items.length - 1}
+              className="p-1 text-muted-foreground hover:text-brand-purple disabled:cursor-not-allowed disabled:opacity-30"
+              onClick={(e) => {
+                e.stopPropagation();
+                moveItem(idx, "down");
+              }}
+            >
+              <ArrowDown className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label={`Insert ${schema.itemNoun} below`}
+              className="p-1 text-muted-foreground hover:text-brand-purple"
+              onClick={(e) => {
+                e.stopPropagation();
+                insertItemAt(idx + 1);
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label={`Remove ${schema.itemNoun}`}
+              className="p-1 text-muted-foreground hover:text-red-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                removeItem(idx);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
           <FieldGroupEditor
             fields={schema.fields}
             values={item}
             onChange={(key, value) => setItem(idx, key, value)}
             crossFieldErrors={validateDateRange(schema, item)}
-            className="pr-6"
+            className="pr-24 pt-5"
           />
         </div>
       ))}
@@ -126,7 +181,7 @@ function ArrayEditor({
           className="inline-flex items-center gap-1 rounded border border-dashed border-border px-2 py-1 text-xs text-muted-foreground hover:border-brand-purple hover:text-brand-purple"
           onClick={(e) => {
             e.stopPropagation();
-            addItem();
+            insertItemAt(items.length);
           }}
         >
           <Plus className="h-3.5 w-3.5" />

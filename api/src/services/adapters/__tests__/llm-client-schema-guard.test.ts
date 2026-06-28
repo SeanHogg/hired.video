@@ -25,6 +25,7 @@ import { ResumeContentSchema } from "../../../../../shared/resume.js";
 import {
   deriveStrictJsonSchema,
   estimateSchemaStates,
+  isRequestShapeCascade,
   looksLikeSchemaRejection,
 } from "../llm-client.js";
 
@@ -101,5 +102,38 @@ describe("looksLikeSchemaRejection", () => {
       looksLikeSchemaRejection("429 Too Many Requests: rate limit exceeded, retry later"),
       false,
     );
+  });
+});
+
+describe("isRequestShapeCascade (structured failover signal — gap #1802)", () => {
+  const fo = (vendor: string, kind?: string) => ({ model: `${vendor}/m`, vendor, code: 0, kind });
+
+  it("flags a cascade where every concrete attempt is a 4xx client_error", () => {
+    // Mirrors the Gemini `400 too many states` cascade: every upstream
+    // rejected the REQUEST shape, none was rate-limited.
+    assert.equal(
+      isRequestShapeCascade([fo("openrouter", "client_error"), fo("googleai", "client_error")]),
+      true,
+    );
+  });
+
+  it("ignores `skipped` attempts but still flags the dispatched client_errors", () => {
+    assert.equal(
+      isRequestShapeCascade([fo("a", "skipped"), fo("googleai", "client_error")]),
+      true,
+    );
+  });
+
+  it("does NOT flag when any concrete attempt was an actual rate_limit", () => {
+    assert.equal(
+      isRequestShapeCascade([fo("openrouter", "rate_limit"), fo("googleai", "client_error")]),
+      false,
+    );
+  });
+
+  it("does NOT flag an empty / kind-less (older-gateway) trail", () => {
+    assert.equal(isRequestShapeCascade(undefined), false);
+    assert.equal(isRequestShapeCascade([]), false);
+    assert.equal(isRequestShapeCascade([fo("openrouter")]), false);
   });
 });
