@@ -50,6 +50,9 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [description, setDescription] = useState("");
+  // #2068 GAP-1 — one bullet per line; serialised to string[] on save.
+  const [outcomesInput, setOutcomesInput] = useState("");
+  const [requirementsInput, setRequirementsInput] = useState("");
   const [category, setCategory] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
@@ -133,6 +136,8 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
     setTitle("");
     setSummary("");
     setDescription("");
+    setOutcomesInput("");
+    setRequirementsInput("");
     setCategory("");
     setTagsInput("");
     setCoverImageUrl("");
@@ -150,6 +155,8 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
     setTitle(c.title);
     setSummary(c.summary ?? "");
     setDescription(c.description ?? "");
+    setOutcomesInput((c.learningOutcomes ?? []).join("\n"));
+    setRequirementsInput((c.requirements ?? []).join("\n"));
     setCategory(c.category ?? "");
     setTagsInput((c.tags ?? []).join(", "));
     setCoverImageUrl(c.coverImageUrl ?? "");
@@ -251,6 +258,8 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
     title: title.trim(),
     summary: summary.trim() || undefined,
     description: description.trim() || undefined,
+    learningOutcomes: outcomesInput.split("\n").map((s) => s.trim()).filter(Boolean),
+    requirements: requirementsInput.split("\n").map((s) => s.trim()).filter(Boolean),
     category: category.trim() || undefined,
     tags: tagsInput.split(",").map((t) => t.trim()).filter(Boolean),
     coverImageUrl: coverImageUrl.trim() || undefined,
@@ -553,6 +562,28 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
               onChange={(e) => setDescription(e.target.value)}
               rows={10}
               placeholder="What learners will know by the end. Outline modules and lessons."
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="outcomes">{t("course.detail.whatYouWillLearn")}</Label>
+            <Textarea
+              id="outcomes"
+              value={outcomesInput}
+              onChange={(e) => setOutcomesInput(e.target.value)}
+              rows={4}
+              placeholder={t("courses.manager.outcomesPlaceholder")}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="requirements">{t("course.detail.requirements")}</Label>
+            <Textarea
+              id="requirements"
+              value={requirementsInput}
+              onChange={(e) => setRequirementsInput(e.target.value)}
+              rows={3}
+              placeholder={t("courses.manager.requirementsPlaceholder")}
             />
           </div>
 

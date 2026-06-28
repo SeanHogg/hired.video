@@ -77,11 +77,24 @@ export interface MemberRow {
   overdueCount: number;
 }
 
+/** Canonical gradebook column — the union of every active assignment in the
+ *  cohort, so the grid header is stable regardless of which member is first
+ *  and member-specific assignments still get a column (#2068 GAP-6). */
+export interface GradebookColumn {
+  assignmentId: string;
+  title: string;
+  subjectType: "course" | "path";
+  required: boolean;
+  memberSpecific: boolean;
+}
+
 export interface CohortAnalytics {
   cohortId: string;
   generatedAt: string;
   memberCount: number;
   assignmentCount: number;
+  /** Full ordered column set for the gradebook grid. */
+  assignments: GradebookColumn[];
   summary: {
     completed: number;
     inProgress: number;
@@ -291,11 +304,21 @@ export class CohortAnalyticsService {
       };
     });
 
+    // Canonical column set — every active assignment, ordered as fetched.
+    const columns: GradebookColumn[] = assignments.map((a) => ({
+      assignmentId: a.id,
+      title: titleById.get(a.subjectId) ?? "Untitled",
+      subjectType: a.subjectType as "course" | "path",
+      required: a.required,
+      memberSpecific: a.memberId !== null,
+    }));
+
     return {
       cohortId,
       generatedAt: now.toISOString(),
       memberCount: members.length,
       assignmentCount: assignments.length,
+      assignments: columns,
       summary: {
         completed: sumCompleted,
         inProgress: sumInProgress,

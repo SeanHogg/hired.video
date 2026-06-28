@@ -960,6 +960,17 @@ export const PAGE_SEO: Record<string, SEOData> = {
       isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
     },
   },
+  "/learn/dashboard": {
+    title: "My Learning — hired.video",
+    description:
+      "Your learning dashboard: courses in progress, assigned training, completed courses, earned certificates, points, and the XP leaderboard — all in one place.",
+    keywords:
+      "my learning dashboard, learner progress, course progress, learning certificates, XP leaderboard, assigned training",
+    ogTitle: "My Learning — hired.video",
+    ogDescription:
+      "Track your courses, progress, certificates, points, and XP ranking on hired.video.",
+    ogImage: "https://hired.video/og-image.svg",
+  },
   "/courses/review-queue": {
     title: "Course Review Queue — hired.video",
     description:

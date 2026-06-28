@@ -170,6 +170,106 @@ learningGoalsRoutes.get("/:id/recommendations", async (c) => {
   return c.json(success(items), 200);
 });
 
+// POST /api/learning-goals/:id/generate-path — #2068 GAP-3.
+// Materialise a DRAFT learning_path from the goal: pull keyword candidates,
+// have the LLM pick + order the courses that form a coherent path and name it,
+// then persist a draft path the learner can refine + publish. Falls back to the
+// top keyword courses + a goal-derived title when the LLM is unavailable.
+learningGoalsRoutes.post("/:id/generate-path", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const db = getDb();
+  const id = c.req.param("id");
+  const [goal] = await db
+    .select()
+    .from(schema.learningGoals)
+    .where(and(eq(schema.learningGoals.id, id), eq(schema.learningGoals.userId, userId)))
+    .limit(1);
+  if (!goal) return c.json(error("NOT_FOUND", "Goal not found"), 404);
+
+  const candidates = await recommendCoursesForText(goal.goalText, 12);
+  if (candidates.length === 0) {
+    return c.json(error("NO_COURSES", "No published courses match this goal yet"), 422);
+  }
+
+  const llm = hasAnyLLMProviderKey(c.env as any)
+    ? createLLMClient(c.env as any, c.var.user ?? null)
+    : null;
+
+  let plan: { title: string; summary: string; orderedCourseIds: string[] } | null = null;
+  if (llm) plan = await llmPlanPath(llm, goal.goalText, candidates).catch(() => null);
+
+  // Fallback: top keyword courses in keyword order, generic goal-derived title.
+  const validIds = new Set(candidates.map((c2) => c2.id));
+  const orderedIds = (plan?.orderedCourseIds ?? [])
+    .filter((cid) => validIds.has(cid));
+  const finalIds = (orderedIds.length > 0 ? orderedIds : candidates.slice(0, 5).map((c2) => c2.id));
+  const title = (plan?.title?.trim() || `Path: ${goal.goalText}`).slice(0, 255);
+  const summary = (plan?.summary?.trim() || `A learning path toward "${goal.goalText}".`).slice(0, 1000);
+
+  const baseSlug =
+    title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) ||
+    "learning-path";
+  const slug = `${baseSlug}-${crypto.randomUUID().slice(0, 8)}`;
+
+  const [path] = await db
+    .insert(schema.learningPaths)
+    .values({
+      userId,
+      slug,
+      title,
+      summary,
+      status: "draft",
+      tags: [],
+    } as any)
+    .returning();
+
+  await db.insert(schema.learningPathCourses).values(
+    finalIds.map((courseId, i) => ({
+      pathId: path.id,
+      courseId,
+      displayOrder: i,
+      isRequired: true,
+    })) as any,
+  );
+
+  return c.json(
+    success({ path, courseCount: finalIds.length, generatedByLlm: Boolean(plan) }),
+    201,
+  );
+});
+
+// Ask the LLM to assemble a coherent ordered path from the candidate courses.
+async function llmPlanPath(
+  llm: ReturnType<typeof createLLMClient>,
+  goalText: string,
+  candidates: Array<{ id: string; title: string; summary: string | null; category: string | null; difficulty: string | null }>,
+): Promise<{ title: string; summary: string; orderedCourseIds: string[] }> {
+  const list = candidates
+    .map(
+      (c2, i) =>
+        `${i + 1}. id=${c2.id} | ${c2.title}${c2.difficulty ? ` (${c2.difficulty})` : ""}${c2.summary ? ` — ${c2.summary.slice(0, 140)}` : ""}`,
+    )
+    .join("\n");
+  const { data } = await llm.callJson(
+    "course_recommend",
+    {
+      useCase: "course_recommend",
+      systemPrompt:
+        "You design a learning path: pick ONLY the candidate courses that build toward the learner's goal and order them from foundational to advanced. Give the path a short title and a one-sentence summary. Use ONLY the supplied course ids; never invent ids; drop irrelevant courses.",
+      userMessage: `Learner goal: "${goalText}"\n\nCandidate courses:\n${list}\n\nReturn { title, summary, orderedCourseIds } — orderedCourseIds foundational-first.`,
+      responseFormat: "json_object",
+    },
+    z.object({
+      title: z.string(),
+      summary: z.string(),
+      orderedCourseIds: z.array(z.string()),
+    }),
+  );
+  return data;
+}
+
 // Re-rank keyword candidates by relevance to the goal. Returns an ordered list
 // of course ids (best first) or throws → caller falls back to keyword order.
 async function llmRerankCandidates(

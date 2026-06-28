@@ -14,6 +14,7 @@ import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   Award,
   BookOpen,
+  Check,
   Clock,
   GraduationCap,
   Loader2,
@@ -60,6 +61,8 @@ interface CourseDetail {
   tags?: string[];
   difficulty: "beginner" | "intermediate" | "advanced" | null;
   estimatedMinutes: number | null;
+  learningOutcomes?: string[];
+  requirements?: string[];
   priceCents: number | null;
   issuesCertificate: boolean;
   passingScorePct: number | null;
@@ -424,6 +427,36 @@ export default function CoursePublicDetail() {
                   </p>
                 </CardContent>
               </BaseCard>
+              {course.learningOutcomes && course.learningOutcomes.length > 0 && (
+                <BaseCard hover={false}>
+                  <CardContent className="pt-6 space-y-3">
+                    <h2 className="font-semibold">{t("course.detail.whatYouWillLearn")}</h2>
+                    <ul className="grid sm:grid-cols-2 gap-2">
+                      {course.learningOutcomes.map((o, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                          <Check className="w-4 h-4 mt-0.5 text-emerald-600 flex-shrink-0" />
+                          <span>{o}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </BaseCard>
+              )}
+              {course.requirements && course.requirements.length > 0 && (
+                <BaseCard hover={false}>
+                  <CardContent className="pt-6 space-y-3">
+                    <h2 className="font-semibold">{t("course.detail.requirements")}</h2>
+                    <ul className="space-y-1.5">
+                      {course.requirements.map((r, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                          <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-muted-foreground/50 flex-shrink-0" />
+                          <span>{r}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </BaseCard>
+              )}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <FactCard label="Level" value={course.difficulty ?? "All levels"} />
                 <FactCard label="Duration" value={duration ?? "Self-paced"} />

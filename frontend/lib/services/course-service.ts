@@ -15,6 +15,9 @@ export interface Course {
   tags: string[];
   difficulty: CourseDifficulty | null;
   estimatedMinutes: number | null;
+  /** #2068 GAP-1 — structured "What you'll learn" / "Requirements" bullets. */
+  learningOutcomes?: string[];
+  requirements?: string[];
   status: CourseStatus;
   publishedAt: string | null;
   priceCents: number;
@@ -49,6 +52,8 @@ export interface CreateCourseInput {
   tags?: string[];
   difficulty?: CourseDifficulty;
   estimatedMinutes?: number;
+  learningOutcomes?: string[];
+  requirements?: string[];
   priceCents?: number;
   priceVisible?: boolean;
   issuesCertificate?: boolean;

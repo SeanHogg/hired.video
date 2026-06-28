@@ -66,6 +66,10 @@ export const courses = pgTable(
     tags: jsonb("tags").$type<string[]>().default([]).notNull(),
     difficulty: varchar("difficulty", { length: 32 }),
     estimatedMinutes: integer("estimated_minutes"),
+    // #2068 GAP-1 — structured "What you'll learn" / "Requirements" bullet
+    // lists (ordered string arrays), distinct from the free-text description.
+    learningOutcomes: jsonb("learning_outcomes").$type<string[]>().default([]).notNull(),
+    requirements: jsonb("requirements").$type<string[]>().default([]).notNull(),
 
     status: varchar("status", { length: 32 }).default("draft").notNull(),
     publishedAt: timestamp("published_at", { withTimezone: true }),

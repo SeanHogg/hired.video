@@ -12,7 +12,8 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Loader2, Sparkles, Target, X } from "lucide-react";
+import { Loader2, Sparkles, Target, Wand2, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ import { CardContent } from "@/components/ui/card";
 import CourseMarketplaceCard from "@/components/CourseMarketplaceCard";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/lib/auth";
+import { generateGoalPath } from "@/lib/courses/courses-api";
 import {
   learningGoalsService,
   type LearningGoal,
@@ -125,9 +127,21 @@ function GoalWithRecommendations({
   goal: LearningGoal;
   onClear: () => void;
 }) {
+  const { t } = useTranslation();
   const { data: recs = [], isLoading } = useQuery({
     queryKey: ["learning-goals", "recs", goal.id, goal.goalText],
     queryFn: () => learningGoalsService.recommendations(goal.id),
+  });
+
+  // #2068 GAP-3 — materialise a draft learning path from this goal via the LLM.
+  const generatePlan = useMutation({
+    mutationFn: () => generateGoalPath(goal.id),
+    onSuccess: (res) =>
+      toast({
+        title: t("learn.goalPlan.created"),
+        description: res.path.title,
+      }),
+    onError: () => toast({ title: t("learn.goalPlan.error"), variant: "destructive" }),
   });
 
   return (
@@ -161,9 +175,27 @@ function GoalWithRecommendations({
           </p>
         ) : (
           <>
-            <p className="text-sm text-muted-foreground">
-              Recommended to reach your goal:
-            </p>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <p className="text-sm text-muted-foreground">
+                Recommended to reach your goal:
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => generatePlan.mutate()}
+                disabled={generatePlan.isPending}
+              >
+                {generatePlan.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Wand2 className="h-3.5 w-3.5" />
+                )}
+                {generatePlan.isPending
+                  ? t("learn.goalPlan.generating")
+                  : t("learn.goalPlan.generate")}
+              </Button>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {recs.map((course) => (
                 <CourseMarketplaceCard key={course.id} item={course} />

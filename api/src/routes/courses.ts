@@ -59,6 +59,7 @@ import { CertificateService } from "../services/learning/certificate-service.js"
 import { forwardStatementForUser } from "../services/learning/lrs-forwarder.js";
 import { evaluateCourseCompletion } from "../services/learning/course-completion.js";
 import { gamificationFromContext, withGamification } from "../domains/gamification/with-gamification.js";
+import { NotificationService } from "../services/notifications/notificationService.js";
 import { getJwtSecret } from "../utils/jwt.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
 import { bumpSearchVersion } from "../utils/search-cache.js";
@@ -74,6 +75,7 @@ const {
   userProfiles,
   coursePrerequisites,
   learningPathCourses,
+  learningPaths,
   scormCmiStates,
   xapiStatements,
   studioProjects,
@@ -184,6 +186,9 @@ const CreateCourseSchema = z.object({
   tags: z.array(z.string().max(60)).max(20).optional(),
   difficulty: z.enum(COURSE_DIFFICULTIES).optional(),
   estimatedMinutes: z.number().int().min(0).max(100_000).optional(),
+  // #2068 GAP-1 — structured outcome / requirement bullet lists.
+  learningOutcomes: z.array(z.string().min(1).max(200)).max(20).optional(),
+  requirements: z.array(z.string().min(1).max(200)).max(20).optional(),
   priceCents: z.number().int().min(0).optional(),
   priceVisible: z.boolean().optional(),
   issuesCertificate: z.boolean().optional(),
@@ -489,6 +494,8 @@ courseRoutes.get("/public/:userIdOrSlug/:slug", async (c) => {
       tags: row.course.tags,
       difficulty: row.course.difficulty,
       estimatedMinutes: row.course.estimatedMinutes,
+      learningOutcomes: row.course.learningOutcomes ?? [],
+      requirements: row.course.requirements ?? [],
       priceCents: row.course.priceVisible ? row.course.priceCents : null,
       issuesCertificate: row.course.issuesCertificate,
       passingScorePct: row.course.passingScorePct,
@@ -561,6 +568,8 @@ courseRoutes.post("/", async (c) => {
     tags: parsed.data.tags ?? [],
     difficulty: parsed.data.difficulty ?? null,
     estimatedMinutes: parsed.data.estimatedMinutes ?? null,
+    learningOutcomes: parsed.data.learningOutcomes ?? [],
+    requirements: parsed.data.requirements ?? [],
     priceCents: parsed.data.priceCents ?? 0,
     priceVisible: parsed.data.priceVisible ?? true,
     issuesCertificate: parsed.data.issuesCertificate ?? false,
@@ -752,7 +761,8 @@ courseRoutes.patch("/:id", async (c) => {
   const patch: Record<string, unknown> = { updatedAt: new Date() };
   for (const k of [
     "title", "summary", "description", "coverImageUrl", "category", "tags",
-    "difficulty", "estimatedMinutes", "priceCents", "priceVisible",
+    "difficulty", "estimatedMinutes", "learningOutcomes", "requirements",
+    "priceCents", "priceVisible",
     "issuesCertificate", "passingScorePct", "slug", "assignedReviewerId",
     "themeId", "themeTokens",
   ] as const) {
@@ -1293,6 +1303,8 @@ courseRoutes.patch("/enrollments/:enrollmentId/progress", async (c) => {
     .where(eq(courseLessons.courseId, existing.courseId));
 
   const [courseRow] = await db.select({
+      title: courses.title,
+      slug: courses.slug,
       passingScorePct: courses.passingScorePct,
       issuesCertificate: courses.issuesCertificate,
     })
@@ -1347,6 +1359,17 @@ courseRoutes.patch("/enrollments/:enrollmentId/progress", async (c) => {
         metadata: { finalScorePct },
       }),
     );
+
+    // #2068 GAP-8 — course-completed notification (preference-gated + best-effort).
+    await NotificationService.notify({
+      userId,
+      type: "course",
+      title: "Course completed",
+      message: courseRow?.title ?? "You finished a course",
+      url: courseRow?.slug ? `/courses/${courseRow.slug}` : "/learn/dashboard",
+      refType: "course",
+      refId: existing.courseId,
+    }).catch(() => undefined);
 
     // Auto-issue cert if the course offers one.
     if (courseRow?.issuesCertificate) {
@@ -1411,6 +1434,20 @@ courseRoutes.patch("/enrollments/:enrollmentId/progress", async (c) => {
               pathId: slot.pathId,
               enrollmentId: pathEnrollmentId,
             });
+            // #2068 GAP-8 — learning-path-completed notification.
+            const [pathRow] = await db.select({ title: learningPaths.title, slug: learningPaths.slug })
+              .from(learningPaths)
+              .where(eq(learningPaths.id, slot.pathId))
+              .limit(1);
+            await NotificationService.notify({
+              userId,
+              type: "course",
+              title: "Learning path completed",
+              message: pathRow?.title ?? "You finished a learning path",
+              url: pathRow?.slug ? `/learning-paths/${pathRow.slug}` : "/learn/dashboard",
+              refType: "learning_path",
+              refId: slot.pathId,
+            }).catch(() => undefined);
           }
         }
       }

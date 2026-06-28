@@ -10,6 +10,7 @@
  * Everything routes through /api/cohorts/* (CohortService → canActFor).
  */
 import { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -227,6 +228,7 @@ function CohortCard({
 }
 
 function CohortDetail({ cohortId, onChanged }: { cohortId: string; onChanged: () => void }) {
+  const { t } = useTranslation();
   const [cohort, setCohort] = useState<Cohort | null>(null);
   const [members, setMembers] = useState<CohortMemberRow[]>([]);
   const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
@@ -395,49 +397,80 @@ function CohortDetail({ cohortId, onChanged }: { cohortId: string; onChanged: ()
         </Card>
       </div>
 
-      {/* Progress grid */}
+      {/* Gradebook grid (#2068 GAP-6) — columns from the canonical assignment
+          set so member-specific assignments + first-member subsets align. */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Progress</CardTitle></CardHeader>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">{t("cohort.gradebook.title")}</CardTitle>
+        </CardHeader>
         <CardContent className="overflow-x-auto">
-          {!analytics || analytics.members.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Add members and assignments to see progress here.</p>
+          {!analytics || analytics.members.length === 0 || analytics.assignments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("cohort.gradebook.empty")}</p>
           ) : (
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="text-left text-muted-foreground border-b">
-                  <th className="py-2 pr-3 font-medium">Learner</th>
-                  <th className="py-2 px-3 font-medium">Done</th>
-                  {analytics.members[0].items.map((it) => (
-                    <th key={it.assignmentId} className="py-2 px-3 font-medium max-w-[160px] truncate" title={it.title}>{it.title}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.members.map((m) => (
-                  <tr key={m.memberId} className="border-b last:border-0">
-                    <td className="py-2 pr-3">
-                      <div className="truncate max-w-[180px]">{m.name ?? m.email ?? "Member"}</div>
-                      {!m.linked && <span className="text-xs text-muted-foreground/70">no account</span>}
-                    </td>
-                    <td className="py-2 px-3 whitespace-nowrap">{m.completedCount}/{m.totalCount}</td>
-                    {m.items.map((it) => {
-                      const meta = STATUS_META[it.status] ?? STATUS_META.not_started;
-                      const Icon = it.overdue && it.status !== "completed" ? AlertTriangle : meta.Icon;
-                      const cls = it.overdue && it.status !== "completed" ? "text-destructive" : meta.cls;
-                      return (
-                        <td key={it.assignmentId} className="py-2 px-3">
-                          <span className={`inline-flex items-center gap-1 ${cls}`} title={meta.label}>
-                            <Icon className="h-4 w-4" />
-                            {it.status === "in_progress" && <span className="text-xs">{Math.round(it.fraction * 100)}%</span>}
-                            {it.status === "completed" && it.scorePct != null && <span className="text-xs">{it.scorePct}%</span>}
-                          </span>
-                        </td>
-                      );
-                    })}
+            <>
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="text-left text-muted-foreground border-b">
+                    <th className="py-2 pr-3 font-medium">{t("cohort.gradebook.member")}</th>
+                    <th className="py-2 px-3 font-medium whitespace-nowrap">
+                      {t("learn.dashboard.completed")}
+                    </th>
+                    {analytics.assignments.map((col) => (
+                      <th
+                        key={col.assignmentId}
+                        className="py-2 px-3 font-medium max-w-[160px] truncate"
+                        title={col.title}
+                      >
+                        {col.title}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {analytics.members.map((m) => {
+                    const cellByAssignment = new Map(m.items.map((it) => [it.assignmentId, it]));
+                    return (
+                      <tr key={m.memberId} className="border-b last:border-0">
+                        <td className="py-2 pr-3">
+                          <div className="truncate max-w-[180px]">{m.name ?? m.email ?? t("cohort.gradebook.member")}</div>
+                          {!m.linked && (
+                            <span className="text-xs text-muted-foreground/70">
+                              {t("cohort.gradebook.notLinked")}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 whitespace-nowrap">
+                          {t("cohort.gradebook.completed", { done: m.completedCount, total: m.totalCount })}
+                        </td>
+                        {analytics.assignments.map((col) => {
+                          const it = cellByAssignment.get(col.assignmentId);
+                          if (!it) {
+                            return (
+                              <td key={col.assignmentId} className="py-2 px-3 text-muted-foreground/40">
+                                —
+                              </td>
+                            );
+                          }
+                          const meta = STATUS_META[it.status] ?? STATUS_META.not_started;
+                          const Icon = it.overdue && it.status !== "completed" ? AlertTriangle : meta.Icon;
+                          const cls = it.overdue && it.status !== "completed" ? "text-destructive" : meta.cls;
+                          return (
+                            <td key={col.assignmentId} className="py-2 px-3">
+                              <span className={`inline-flex items-center gap-1 ${cls}`} title={meta.label}>
+                                <Icon className="h-4 w-4" />
+                                {it.status === "in_progress" && <span className="text-xs">{Math.round(it.fraction * 100)}%</span>}
+                                {it.status === "completed" && it.scorePct != null && <span className="text-xs">{it.scorePct}%</span>}
+                              </span>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <p className="text-xs text-muted-foreground mt-3">{t("cohort.gradebook.legend")}</p>
+            </>
           )}
         </CardContent>
       </Card>

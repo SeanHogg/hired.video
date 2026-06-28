@@ -201,6 +201,7 @@ const MarketplaceTemplatePreview = lazy(() => import("./pages/MarketplaceTemplat
 const VoicePublicDetail = lazy(() => import("./pages/marketplace/VoicePublicDetail"));
 const CoursePublicDetail = lazy(() => import("./pages/marketplace/CoursePublicDetail"));
 const CourseLearner = lazy(() => import("./pages/CourseLearner"));
+const LearnerDashboard = lazy(() => import("./pages/LearnerDashboard"));
 const CourseCheckout = lazy(() => import("./pages/CourseCheckout"));
 const CourseReviewQueue = lazy(() => import("./pages/CourseReviewQueue"));
 const Wishlist = lazy(() => import("./pages/Wishlist"));
@@ -1125,6 +1126,7 @@ const App = () => (
                           page's Continue-learning CTA. Authed-only;
                           self-gates on the requester owning the
                           enrollment row (API 404s otherwise). */}
+                      <Route path="/learn/dashboard" element={<RequireAuth><LearnerDashboard /></RequireAuth>} />
                       <Route path="/learn/:enrollmentId" element={<CourseLearner />} />
                       {/* Learner home (#1889, folded into ?tab=learning) +
                           educator classrooms (#1890) live as tabs on /tools,

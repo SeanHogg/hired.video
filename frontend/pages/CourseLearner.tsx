@@ -41,6 +41,7 @@ import {
   Lock,
   Package,
   Pencil,
+  Sparkles,
   Video,
 } from "lucide-react";
 import Markdown from "@/components/Markdown";
@@ -56,6 +57,8 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { courseCategoryLabel } from "@/lib/course-category";
 import { signalBadgeRefresh } from "@/lib/badges/refresh";
+import { useAI } from "@/lib/ai-context";
+import { createGeneralContext } from "@/lib/utils/ai-context-helpers";
 import ScormPlayer from "@/components/courses/ScormPlayer";
 import TextNarrator from "@/components/audio/TextNarrator";
 import { useCoursePermissions } from "@/hooks/use-course-permissions";
@@ -85,7 +88,8 @@ const LESSON_TYPE_LABEL_KEY: Record<CourseLessonSourceType, string> = {
 
 export default function CourseLearner() {
   const { enrollmentId } = useParams<{ enrollmentId: string }>();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const { openAIWithPageContextAndMessage } = useAI();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -258,6 +262,20 @@ export default function CourseLearner() {
     if (!activeLesson) return;
     void applyLessonPassed(activeLesson.id);
   }, [activeLesson, applyLessonPassed]);
+
+  // #2068 GAP-2 — open the AI coach scoped to the current course + lesson.
+  // `coachPriming` is rendered into the (always-resent) system prompt, so the
+  // coach stays on-topic for the active lesson across turns; the primed first
+  // message kicks off the conversation.
+  const askCoach = useCallback(() => {
+    if (!data || !activeLesson) return;
+    const ctx = createGeneralContext(user?.role, "course-learn");
+    ctx.coachPriming = `The learner is studying the lesson "${activeLesson.title}" in the course "${data.course.title}". Act as a learning coach scoped to this material: explain concepts, answer questions, and quiz them on this lesson.`;
+    openAIWithPageContextAndMessage(
+      ctx,
+      t("learn.coach.prime", { lesson: activeLesson.title, course: data.course.title }),
+    );
+  }, [data, activeLesson, user, openAIWithPageContextAndMessage, t]);
 
   if (!isAuthenticated) {
     return <Navigate to={`/login?returnTo=${encodeURIComponent(`/learn/${enrollmentId ?? ""}`)}`} replace />;
@@ -437,6 +455,16 @@ export default function CourseLearner() {
                           {t("actions.edit")}
                         </Button>
                       )}
+                      {/* #2068 GAP-2 — learning-scoped AI coach launcher. */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={askCoach}
+                        title={t("learn.coach.ask")}
+                      >
+                        <Sparkles className="h-4 w-4 mr-1" />
+                        {t("learn.coach.ask")}
+                      </Button>
                       {/* SCORM lessons mark complete on their own Commit event;
                           every other type gets the explicit Mark Complete button. */}
                       {activeLesson.sourceType !== "scorm_package" && (

@@ -214,11 +214,20 @@ export interface LearnerAssignment {
   passed: boolean;
 }
 
+export interface GradebookColumn {
+  assignmentId: string;
+  title: string;
+  subjectType: "course" | "path";
+  required: boolean;
+  memberSpecific: boolean;
+}
+
 export interface CohortAnalytics {
   cohortId: string;
   generatedAt: string;
   memberCount: number;
   assignmentCount: number;
+  assignments: GradebookColumn[];
   summary: { completed: number; inProgress: number; notStarted: number; overdue: number; completionRate: number };
   members: Array<{
     memberId: string;
@@ -275,3 +284,71 @@ export const joinCohortByCode = (joinCode: string) =>
 /** The educator's own learning paths (for the assignment picker). */
 export const listMyPaths = () =>
   call<Array<{ id: string; title: string; slug: string }>>(`/learning-paths/me`);
+
+// ── Learner dashboard + XP leaderboard (#2068 GAP-4 + GAP-5) ─────────────
+
+export interface LearnerCourseRow {
+  enrollmentId: string;
+  courseId: string;
+  title: string;
+  slug: string;
+  coverImageUrl: string | null;
+  pct: number;
+  passed: boolean;
+}
+
+export interface LearnerCertificateRow {
+  id: string;
+  certNumber: string;
+  courseTitle: string | null;
+  courseSlug: string | null;
+  issuedAt: string;
+}
+
+export interface LearnerDashboard {
+  stats: {
+    activeCourses: number;
+    completedCourses: number;
+    certificates: number;
+    points: number;
+    streak: number;
+    badges: number;
+  };
+  continueLearning: LearnerCourseRow[];
+  completed: LearnerCourseRow[];
+  certificates: LearnerCertificateRow[];
+  assigned: LearnerAssignment[];
+}
+
+export const getLearnerDashboard = () => call<LearnerDashboard>(`/learning/dashboard`);
+
+export interface XpLeaderboardEntry {
+  rank: number;
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+  points: number;
+}
+
+export interface XpLeaderboard {
+  scope: "global" | "cohort";
+  entries: XpLeaderboardEntry[];
+  viewer: { rank: number; points: number } | null;
+}
+
+export const getXpLeaderboard = (
+  scope: "global" | "cohort" = "global",
+  opts: { cohortId?: string; limit?: number } = {},
+) => {
+  const qs = new URLSearchParams({ scope });
+  if (opts.cohortId) qs.set("cohortId", opts.cohortId);
+  if (opts.limit) qs.set("limit", String(opts.limit));
+  return call<XpLeaderboard>(`/learning/leaderboard?${qs.toString()}`);
+};
+
+/** #2068 GAP-3 — materialise a draft learning path from a goal. */
+export const generateGoalPath = (goalId: string) =>
+  call<{ path: { id: string; slug: string; title: string }; courseCount: number; generatedByLlm: boolean }>(
+    `/learning-goals/${goalId}/generate-path`,
+    { method: "POST", body: JSON.stringify({}) },
+  );

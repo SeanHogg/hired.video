@@ -582,4 +582,38 @@ export class FakePointsRepo implements IPointsRepository {
   async topEarners(): Promise<Array<{ userId: string; lifetimeEarned: number; balance: number }>> {
     return [];
   }
+
+  async findStreaksAtRisk(
+    lastActiveYmd: string,
+    minStreak: number,
+    limit: number,
+  ): Promise<Array<{ userId: string; currentStreak: number }>> {
+    return [...this.streaks.values()]
+      .filter(
+        (s) => s.lastActivityDate === lastActiveYmd && s.currentStreak >= minStreak,
+      )
+      .slice(0, limit)
+      .map((s) => ({ userId: s.userId, currentStreak: s.currentStreak }));
+  }
+
+  async topByLifetimeEarned(
+    limit: number,
+    userIds?: string[],
+  ): Promise<Array<{ userId: string; lifetimeEarned: number }>> {
+    if (userIds && userIds.length === 0) return [];
+    const set = userIds ? new Set(userIds) : null;
+    return [...this.balances.values()]
+      .filter((b) => !b.isSuspended && (!set || set.has(b.userId)))
+      .sort((a, b) => b.lifetimeEarned - a.lifetimeEarned)
+      .slice(0, limit)
+      .map((b) => ({ userId: b.userId, lifetimeEarned: b.lifetimeEarned }));
+  }
+
+  async countAheadByLifetimeEarned(threshold: number, userIds?: string[]): Promise<number> {
+    if (userIds && userIds.length === 0) return 0;
+    const set = userIds ? new Set(userIds) : null;
+    return [...this.balances.values()].filter(
+      (b) => !b.isSuspended && b.lifetimeEarned > threshold && (!set || set.has(b.userId)),
+    ).length;
+  }
 }

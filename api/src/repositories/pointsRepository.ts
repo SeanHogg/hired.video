@@ -105,6 +105,14 @@ export interface IPointsRepository {
 
   // ── streaks ─────────────────────────────────────────────────────────
   findStreak(userId: string): Promise<PointsStreakRow | null>;
+  /** #2068 GAP-8 — streaks "at risk": currentStreak ≥ `minStreak` and the
+   *  last active day is exactly `lastActiveYmd` (i.e. nothing logged today
+   *  yet), so a reminder nudge can fire before the streak breaks. */
+  findStreaksAtRisk(
+    lastActiveYmd: string,
+    minStreak: number,
+    limit: number,
+  ): Promise<Array<{ userId: string; currentStreak: number }>>;
   upsertStreak(
     userId: string,
     patch: {
@@ -230,6 +238,17 @@ export interface IPointsRepository {
     openFraudFlags: number;
   }>;
   topEarners(limit: number): Promise<Array<{ userId: string; lifetimeEarned: number; balance: number }>>;
+  /** #2068 GAP-4 — XP leaderboard: top earners by lifetime points,
+   *  excluding fraud-suspended accounts. When `userIds` is provided the
+   *  ranking is scoped to that set (cohort leaderboard). */
+  topByLifetimeEarned(
+    limit: number,
+    userIds?: string[],
+  ): Promise<Array<{ userId: string; lifetimeEarned: number }>>;
+  /** #2068 GAP-4 — count of non-suspended accounts strictly ahead of
+   *  `threshold` lifetime points (so a viewer's rank = count + 1), scoped to
+   *  `userIds` when provided. Powers "Your rank: #N" beyond the visible top. */
+  countAheadByLifetimeEarned(threshold: number, userIds?: string[]): Promise<number>;
 }
 
 export class PointsRepository implements IPointsRepository {
@@ -454,6 +473,27 @@ export class PointsRepository implements IPointsRepository {
       .where(eq(pointsStreaks.userId, userId))
       .limit(1);
     return (row as PointsStreakRow) ?? null;
+  }
+
+  async findStreaksAtRisk(
+    lastActiveYmd: string,
+    minStreak: number,
+    limit: number,
+  ): Promise<Array<{ userId: string; currentStreak: number }>> {
+    const rows = await this.db
+      .select({
+        userId: pointsStreaks.userId,
+        currentStreak: pointsStreaks.currentStreak,
+      })
+      .from(pointsStreaks)
+      .where(
+        and(
+          eq(pointsStreaks.lastActivityDate, lastActiveYmd),
+          gte(pointsStreaks.currentStreak, minStreak),
+        ),
+      )
+      .limit(limit);
+    return rows as Array<{ userId: string; currentStreak: number }>;
   }
 
   async upsertStreak(
@@ -1003,5 +1043,41 @@ export class PointsRepository implements IPointsRepository {
       .orderBy(desc(userPointsBalance.lifetimeEarned))
       .limit(limit);
     return rows as Array<{ userId: string; lifetimeEarned: number; balance: number }>;
+  }
+
+  async topByLifetimeEarned(limit: number, userIds?: string[]) {
+    // Exclude fraud-suspended accounts; scope to userIds when provided
+    // (cohort leaderboard). An empty userIds array means "no one" → [].
+    if (userIds && userIds.length === 0) return [];
+    const conds = [eq(userPointsBalance.isSuspended, false)];
+    if (userIds && userIds.length > 0) {
+      conds.push(inArray(userPointsBalance.userId, userIds));
+    }
+    const rows = await this.db
+      .select({
+        userId: userPointsBalance.userId,
+        lifetimeEarned: userPointsBalance.lifetimeEarned,
+      })
+      .from(userPointsBalance)
+      .where(and(...conds))
+      .orderBy(desc(userPointsBalance.lifetimeEarned))
+      .limit(limit);
+    return rows as Array<{ userId: string; lifetimeEarned: number }>;
+  }
+
+  async countAheadByLifetimeEarned(threshold: number, userIds?: string[]): Promise<number> {
+    if (userIds && userIds.length === 0) return 0;
+    const conds = [
+      eq(userPointsBalance.isSuspended, false),
+      sql`${userPointsBalance.lifetimeEarned} > ${threshold}`,
+    ];
+    if (userIds && userIds.length > 0) {
+      conds.push(inArray(userPointsBalance.userId, userIds));
+    }
+    const [row] = await this.db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(userPointsBalance)
+      .where(and(...conds));
+    return (row as { c: number } | undefined)?.c ?? 0;
   }
 }

@@ -188,6 +188,7 @@ import { campaignDollarsRoutes } from "./routes/campaign-dollars.js";
 import { learningPathRoutes } from "./routes/learning-paths.js";
 import { cohortRoutes } from "./routes/cohorts.js";
 import { learningGoalsRoutes } from "./routes/learning-goals.js";
+import { learningRoutes } from "./routes/learning.js";
 import { verifyRoutes } from "./routes/verify.js";
 import { legalRoutes } from "./routes/legal.js";
 import { advertisingRoutes } from "./routes/advertising.js";
@@ -936,6 +937,7 @@ export function createApp() {
   app.route("/api/learning-paths", learningPathRoutes);
   app.route("/api/cohorts", cohortRoutes);
   app.route("/api/learning-goals", learningGoalsRoutes);
+  app.route("/api/learning", learningRoutes);
   app.route("/api/verify", verifyRoutes);
   app.route("/api/legal", legalRoutes);
   app.route("/api/advertising", advertisingRoutes);
