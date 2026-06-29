@@ -8,18 +8,10 @@
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Loader2, MessageSquare, Inbox as InboxIcon, ArrowRight } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { safeRelativeTime } from "@/lib/relative-time";
 import { useMyReviews, type ReviewInboxEntry } from "@/hooks/use-my-reviews";
-
-function safeRelativeTime(iso: string): string {
-  try {
-    return formatDistanceToNow(new Date(iso), { addSuffix: true });
-  } catch {
-    return "";
-  }
-}
 
 function ReviewRow({
   entry,

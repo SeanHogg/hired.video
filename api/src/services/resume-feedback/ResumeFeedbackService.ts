@@ -184,6 +184,16 @@ export class ResumeFeedbackService {
     return this.hydrateCounts(rows, { includeToken: true });
   }
 
+  /** Owner: every feedback session on ONE of my resumes (the per-resume manager
+   *  surface). Scoped to the caller by `ownerId` so a non-owner gets nothing,
+   *  never another user's reviews. Tokens included so the owner can copy links. */
+  async listResumeReviews(ownerId: string, resumeId: string): Promise<ResumeReviewDTO[]> {
+    const rows = (await this.deps.repo.listReviewsForResume(resumeId)).filter(
+      (r) => r.ownerId === ownerId,
+    );
+    return this.hydrateCounts(rows, { includeToken: true });
+  }
+
   async listReviewerReviews(reviewerId: string): Promise<ResumeReviewDTO[]> {
     const rows = await this.deps.repo.listReviewsForReviewer(reviewerId);
     return this.hydrateCounts(rows, { includeToken: false });

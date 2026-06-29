@@ -3,7 +3,7 @@
  *
  * Owner endpoints (authenticated):
  *   POST   /reviews                         create a review (share a resume)
- *   GET    /reviews                         reviews I own
+ *   GET    /reviews[?resumeId=]             reviews I own (optionally one resume)
  *   GET    /reviews/:id                     review detail (resume + feedback)
  *   POST   /reviews/:id/complete            close the review
  *   POST   /reviews/:id/cancel              cancel the review
@@ -250,8 +250,14 @@ resumeFeedbackRoutes.post("/reviews/invite", async (c) => {
 resumeFeedbackRoutes.get("/reviews", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Sign in required"), 401);
+  // `?resumeId=` scopes to the per-resume feedback-session manager; otherwise
+  // returns every review I own (the Communication Hub "Reviews" tab).
+  const resumeId = c.req.query("resumeId");
   try {
-    return c.json(success(await buildService().listOwnerReviews(userId)), 200);
+    const reviews = resumeId
+      ? await buildService().listResumeReviews(userId, resumeId)
+      : await buildService().listOwnerReviews(userId);
+    return c.json(success(reviews), 200);
   } catch (e) {
     return mapError(c, e);
   }

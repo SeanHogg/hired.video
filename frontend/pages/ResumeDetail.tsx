@@ -52,7 +52,7 @@ import { useResumePermissions } from "@/hooks/use-resume-permissions";
 import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
 import { downloadResume } from "@/lib/resume-download";
 import { resumeService } from "@/lib/services/resume-service";
-import { resumeFeedbackService } from "@/lib/services/resume-feedback-service";
+import FeedbackSessionsDialog from "@/components/studio/review/FeedbackSessionsDialog";
 import { useUgcSeo } from "@/lib/seo-ugc";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
 import { resumeEditorPath } from "@/lib/studio/resume-editor-link";
@@ -198,7 +198,7 @@ export default function ResumeDetail() {
   // set only on an explicit user pick, so the saved layout renders verbatim on
   // first load and only re-skins when the user switches templates (#1883).
   const [layoutTemplateOverrideId, setLayoutTemplateOverrideId] = useState<string | null>(null);
-  const [requestingFeedback, setRequestingFeedback] = useState(false);
+  const [feedbackSessionsOpen, setFeedbackSessionsOpen] = useState(false);
 
   useArtifactViewTracking({
     artifactKind: "resume",
@@ -558,30 +558,19 @@ export default function ResumeDetail() {
                     variant="outline"
                     size="sm"
                     className="h-7 gap-1"
-                    disabled={requestingFeedback}
-                    title="Share this resume for feedback"
-                    onClick={async () => {
-                      setRequestingFeedback(true);
-                      try {
-                        const created = await resumeFeedbackService.createReview({
-                          resumeId: resume.id,
-                          source: "self_share",
-                        });
-                        navigate(`/resume-review/${created.id}`);
-                      } catch {
-                        toast({
-                          title: "Couldn't start a review",
-                          description: "Please try again.",
-                          variant: "destructive",
-                        });
-                      } finally {
-                        setRequestingFeedback(false);
-                      }
-                    }}
+                    title={t("feedbackSessions.openButton")}
+                    onClick={() => setFeedbackSessionsOpen(true)}
                   >
                     <MessageSquare className="w-3.5 h-3.5" />
-                    Get feedback
+                    {t("feedbackSessions.getFeedback")}
                   </Button>
+                )}
+                {isOwner && resume && (
+                  <FeedbackSessionsDialog
+                    resumeId={resume.id}
+                    open={feedbackSessionsOpen}
+                    onOpenChange={setFeedbackSessionsOpen}
+                  />
                 )}
                 {/* Listen-to-this-resume pill — slots inline with the
                     toolbar buttons. Self-gates: returns null when Web

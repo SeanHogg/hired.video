@@ -56,6 +56,14 @@ export class ResumeFeedbackService {
     return res.data;
   }
 
+  /** Owner: every feedback session on ONE resume — the per-resume manager. */
+  async listResumeReviews(resumeId: string): Promise<ResumeReviewDTO[]> {
+    const res = await apiClient.get<ResumeReviewDTO[]>(
+      `${BASE}/reviews?resumeId=${encodeURIComponent(resumeId)}`,
+    );
+    return res.data;
+  }
+
   /** Reviewer: reviews assigned to me. */
   async listAssigned(): Promise<ResumeReviewDTO[]> {
     const res = await apiClient.get<ResumeReviewDTO[]>(`${BASE}/assigned`);
