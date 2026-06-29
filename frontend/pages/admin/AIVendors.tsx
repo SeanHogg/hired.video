@@ -32,6 +32,7 @@ import {
   Server,
   ListChecks,
   DollarSign,
+  Repeat,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -109,6 +110,20 @@ interface SubstitutionsResponse {
   bySwap: SubstitutionSwap[];
 }
 
+interface SchemaRetryRow {
+  featureKey: string | null;
+  totalRetries: number;
+  calls: number;
+  lastSeen: string | null;
+}
+
+interface SchemaRetriesResponse {
+  windowDays: number;
+  since: string;
+  totalRetries: number;
+  byFeature: SchemaRetryRow[];
+}
+
 interface ModelsResponse {
   configured?: boolean;
   data?: { id?: string; name?: string; [k: string]: unknown }[];
@@ -141,6 +156,19 @@ function useSubstitutions(days: number) {
     queryFn: async () => {
       const res = await apiClient.get<SubstitutionsResponse>(
         `/api/admin/impersonate/ai/substitutions?days=${days}`,
+      );
+      return res.data;
+    },
+  });
+}
+
+function useSchemaRetries(days: number) {
+  return useQuery({
+    queryKey: ["admin", "ai", "schema-retries", days],
+    staleTime: STALE_MS,
+    queryFn: async () => {
+      const res = await apiClient.get<SchemaRetriesResponse>(
+        `/api/admin/impersonate/ai/schema-retries?days=${days}`,
       );
       return res.data;
     },
@@ -220,9 +248,11 @@ function GatewayNotConfigured({ what }: { what: string }) {
 
 export default function AIVendors() {
   const [subWindow, setSubWindow] = useState(7);
+  const [retryWindow, setRetryWindow] = useState(7);
   const [usageWindow, setUsageWindow] = useState(30);
 
   const subs = useSubstitutions(subWindow);
+  const retries = useSchemaRetries(retryWindow);
   const useCases = useUseCases();
   const catalog = useCatalogAudit();
   const models = useModels();
@@ -230,6 +260,7 @@ export default function AIVendors() {
 
   const refreshAll = () => {
     subs.refetch();
+    retries.refetch();
     useCases.refetch();
     catalog.refetch();
     models.refetch();
@@ -362,6 +393,95 @@ export default function AIVendors() {
                       </TableCell>
                     </TableRow>
                   )}
+                </TableBody>
+              </Table>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── 1b. JSON-schema conformance retries (closes #2159) ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Repeat className="h-4 w-4" /> JSON-schema conformance retries
+            <div className="ml-auto flex gap-1.5">
+              {[7, 30].map((d) => (
+                <Button
+                  key={d}
+                  size="sm"
+                  variant={retryWindow === d ? "default" : "outline"}
+                  onClick={() => setRetryWindow(d)}
+                >
+                  {d}d
+                </Button>
+              ))}
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Strict-mode (<code>json_schema</code>) calls whose first vendor
+            response fails the schema get re-asked server-side by the gateway.
+            Features with high retry counts burn gateway budget conforming to
+            their strict schemas — candidates for a looser schema or lenient
+            ingest.
+          </p>
+          {retries.isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-semibold tabular-nums">
+                  {retries.data?.totalRetries ?? 0}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  schema retries in the last{" "}
+                  {retries.data?.windowDays ?? retryWindow} days
+                  {retries.data?.since && (
+                    <> · since {fmtDate(retries.data.since)}</>
+                  )}
+                </span>
+              </div>
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Feature</TableHead>
+                    <TableHead className="text-right">Retries</TableHead>
+                    <TableHead className="text-right">Calls</TableHead>
+                    <TableHead>Last seen</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {retries.data?.byFeature?.map((r, i) => (
+                    <TableRow key={`${r.featureKey}-${i}`}>
+                      <TableCell className="text-xs font-medium">
+                        {r.featureKey ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {r.totalRetries}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {r.calls}
+                      </TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">
+                        {fmtDate(r.lastSeen)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!retries.isLoading &&
+                    (retries.data?.byFeature?.length ?? 0) === 0 && (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4}
+                          className="text-center text-sm text-muted-foreground"
+                        >
+                          No schema retries in this window — strict-mode
+                          responses conformed on the first try.
+                        </TableCell>
+                      </TableRow>
+                    )}
                 </TableBody>
               </Table>
             </>

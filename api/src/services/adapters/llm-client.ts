@@ -154,6 +154,15 @@ export interface LLMUsage {
    *  request/response bodies) while the detail itself stays builder-side.
    *  Undefined for the no-key mock path and older gateway responses. */
   traceId?: string;
+  /** How many vendor-side `json_schema` conformance retries the gateway
+   *  performed for this call (`_builderforce.schemaRetries`, Builderforce
+   *  SDK ≥0.8). Strict-mode (`response_format: json_schema`) calls whose
+   *  first vendor response failed the schema get re-asked server-side; a
+   *  high count for a feature means that feature is burning gateway budget
+   *  conforming to its strict schema. SA-only telemetry — NOT projected to
+   *  consumers (`toClientUsage` strips it). Undefined when the call wasn't
+   *  strict-mode, didn't retry, or ran on an older gateway. See gap #2159. */
+  schemaRetries?: number;
 }
 
 /** Consumer-facing projection of {@link LLMUsage}. Token counts plus the
@@ -344,6 +353,14 @@ export interface LLMDispatchAttempt {
   /** Gateway request id (`x-request-id` header). Quote in support tickets
    *  to correlate with gateway-side logs. */
   requestId?: string;
+  /** Gateway-minted trace id for this attempt (`error.details.correlationId`,
+   *  SDK ≥0.8.2) — the SAME id the gateway returns as `_builderforce.traceId`
+   *  on success. This is the AUTHORITATIVE id Builderforce support resolves
+   *  server-side (every model attempt, every exception, request/response
+   *  bodies); our locally-minted `correlationId` was only ever sent TO the
+   *  gateway as request metadata. Unset for pre-dispatch / non-Builderforce
+   *  throws. See gap #1810. */
+  traceId?: string;
   /** Truncated error message for human readers. */
   message: string;
   /** Classifier so callers can branch UX on it. */
@@ -451,13 +468,14 @@ export function isRequestShapeCascade(
  *  to a single classification. Centralised so the JSON-schema vs
  *  rate-limit vs timeout branching never drifts between dispatch and
  *  the route-level error helpers. */
-function classifyAttemptError(
+export function classifyAttemptError(
   err: unknown,
 ): {
   kind: LLMDispatchAttempt["kind"];
   status?: number;
   code?: string;
   requestId?: string;
+  traceId?: string;
   message: string;
   vendor?: string;
   failovers?: ReadonlyArray<LLMFailoverEvent>;
@@ -498,11 +516,19 @@ function classifyAttemptError(
       ?? (failovers && failovers.length > 0
         ? failovers[failovers.length - 1].vendor
         : undefined);
+    // #1810 — the gateway's authoritative trace id lives on the error path
+    // as `details.correlationId` (same value it returns as
+    // `_builderforce.traceId` on success). Capture it so the dispatch error
+    // can quote the id Builderforce support resolves server-side, instead
+    // of our locally-minted request-metadata id.
+    const traceId = (err.details as { correlationId?: string } | null | undefined)
+      ?.correlationId;
     return {
       kind,
       status,
       code: err.code,
       requestId: err.requestId,
+      traceId,
       message: err.message,
       vendor,
       failovers,
@@ -606,6 +632,7 @@ function normalizeUsage(
   requestedModel: string,
   resolvedModel: string | undefined,
   traceId: string | undefined,
+  schemaRetries: number | undefined,
 ): LLMUsage {
   return {
     promptTokens: raw?.prompt_tokens ?? 0,
@@ -614,6 +641,10 @@ function normalizeUsage(
     model: resolvedModel ?? requestedModel,
     requestedModel,
     ...(traceId ? { traceId } : {}),
+    // SA-only strict-mode conformance telemetry (#2159). Only stamp when the
+    // gateway actually reported a count so the charge path / usage-ledger
+    // metadata stays absent (not `0`) for non-strict calls.
+    ...(schemaRetries !== undefined ? { schemaRetries } : {}),
   };
 }
 
@@ -861,6 +892,7 @@ export function createLLMClient(
           profile.model,
           res._builderforce?.resolvedModel ?? res.model,
           res._builderforce?.traceId,
+          res._builderforce?.schemaRetries,
         );
         // #515 — silent substitution alarm. The gateway docs (SDK 0.4.0)
         // treat `model` as a hint and reserve the right to substitute on
@@ -936,14 +968,25 @@ export function createLLMClient(
         }
       }
     }
-    // Every profile in the chain failed. Log the full structured
-    // trail at error level so SA can pull it from logs even if the
-    // route forgets to surface attempts in its 503 body.
+    // Every profile in the chain failed. Prefer the gateway's authoritative
+    // trace id (`details.correlationId`, captured per attempt) for the
+    // user-facing error so Builderforce support can resolve it server-side;
+    // fall back to our locally-minted request-metadata id only when no
+    // attempt carried a gateway trace (pre-dispatch / non-Builderforce
+    // throws). Gap #1810. Both ids are logged below so our own logs stay
+    // cross-referenceable either way.
+    // Each profile is an independent gateway call with its OWN trace id, so
+    // take the LAST one that carried a trace — the terminal failure the user
+    // actually hit. Per-attempt traces are surfaced individually in the
+    // support payload (llm-error.ts) so every call in the chain stays
+    // resolvable.
+    const gatewayTraceId = [...attempts].reverse().find((a) => a.traceId)?.traceId;
     console.error(`[llm-client ${correlationId}] dispatch exhausted`, {
       useCase: opts.useCase,
+      gatewayTraceId,
       attempts,
     });
-    throw new LLMDispatchError(opts.useCase, attempts, correlationId);
+    throw new LLMDispatchError(opts.useCase, attempts, gatewayTraceId ?? correlationId);
   }
 
   return {

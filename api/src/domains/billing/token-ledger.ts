@@ -165,6 +165,12 @@ export const tokenLedger: TokenLedger = {
           ...(substituted
             ? { substituted: true, requestedModel: usage.requestedModel, resolvedModel: usage.model }
             : {}),
+          // #2159 — stamp the gateway's json_schema conformance-retry count so
+          // SA can dashboard which features burn budget on strict-mode retries.
+          // Only present when the gateway actually retried (>0), so the
+          // /schema-retries projection's `IS NOT NULL` filter selects exactly
+          // the strict-mode calls that cost something.
+          ...(usage.schemaRetries ? { schemaRetries: usage.schemaRetries } : {}),
         },
       });
     } catch (err) {

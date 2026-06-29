@@ -21,8 +21,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { z } from "zod";
+import { BuilderforceApiError } from "@seanhogg/builderforce-sdk";
 import { ResumeContentSchema } from "../../../../../shared/resume.js";
 import {
+  classifyAttemptError,
   deriveStrictJsonSchema,
   estimateSchemaStates,
   isRequestShapeCascade,
@@ -135,5 +137,63 @@ describe("isRequestShapeCascade (structured failover signal — gap #1802)", () 
     assert.equal(isRequestShapeCascade(undefined), false);
     assert.equal(isRequestShapeCascade([]), false);
     assert.equal(isRequestShapeCascade([fo("openrouter")]), false);
+  });
+});
+
+describe("classifyAttemptError — integrated dispatch classification", () => {
+  const cascade = (
+    failovers: Array<{ vendor: string; code: number; kind?: string }>,
+    extra: { message?: string; correlationId?: string } = {},
+  ) =>
+    new BuilderforceApiError(
+      extra.message ?? "cascade_exhausted",
+      429,
+      "cascade_exhausted",
+      {
+        correlationId: extra.correlationId ?? "llm-gateway-trace-1",
+        failovers: failovers.map((f) => ({ model: `${f.vendor}/m`, ...f })),
+      },
+      "req-1",
+      { vendor: failovers[failovers.length - 1]?.vendor },
+    );
+
+  it("captures the gateway trace id from details.correlationId — gap #1810", () => {
+    const cls = classifyAttemptError(
+      cascade([{ vendor: "googleai", code: 429, kind: "rate_limit" }], {
+        correlationId: "llm-abc-123",
+      }),
+    );
+    assert.equal(cls.traceId, "llm-abc-123");
+  });
+
+  it("reclassifies an all-client_error 429 cascade as `schema` (structured) — gap #1802", () => {
+    const cls = classifyAttemptError(
+      cascade([
+        { vendor: "openrouter", code: 400, kind: "client_error" },
+        { vendor: "googleai", code: 400, kind: "client_error" },
+      ]),
+    );
+    assert.equal(cls.kind, "schema");
+    assert.equal(cls.status, 429);
+    assert.equal(cls.vendor, "googleai");
+  });
+
+  it("reclassifies via the message fallback when the gateway inlined the text", () => {
+    const cls = classifyAttemptError(
+      cascade([{ vendor: "googleai", code: 429 }], {
+        message: '[googleai] 400: "...produces a constraint that has too many states for serving"',
+      }),
+    );
+    assert.equal(cls.kind, "schema");
+  });
+
+  it("leaves a genuine rate-limit cascade as `rate_limit`", () => {
+    const cls = classifyAttemptError(
+      cascade([
+        { vendor: "openrouter", code: 429, kind: "rate_limit" },
+        { vendor: "cerebras", code: 429, kind: "rate_limit" },
+      ]),
+    );
+    assert.equal(cls.kind, "rate_limit");
   });
 });

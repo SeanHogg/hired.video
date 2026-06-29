@@ -57,6 +57,12 @@ export interface LLMErrorAttempt {
   status?: number;
   code?: string;
   requestId?: string;
+  /** Gateway-minted trace id for THIS attempt (`details.correlationId`).
+   *  Each profile is a separate gateway call with its own trace, so the
+   *  per-attempt id lets support resolve any single hop server-side, not
+   *  just the terminal one carried on the top-level `correlationId`. See
+   *  gap #1810. */
+  traceId?: string;
   message: string;
   /** Upstream vendor that handled this attempt (openrouter / cerebras /
    *  nvidia / ollama / googleai / …). See `LLMDispatchAttempt.vendor`
@@ -112,6 +118,7 @@ export function summarizeDispatchError(err: unknown): LLMErrorPayload | null {
           status: last.status,
           code: last.code,
           requestId: last.requestId,
+          traceId: last.traceId,
           message: last.message.slice(0, MAX_ATTEMPT_MESSAGE_CHARS),
           vendor: last.vendor,
           failovers: last.failovers,
@@ -124,6 +131,7 @@ export function summarizeDispatchError(err: unknown): LLMErrorPayload | null {
       status: a.status,
       code: a.code,
       requestId: a.requestId,
+      traceId: a.traceId,
       message: a.message.slice(0, MAX_ATTEMPT_MESSAGE_CHARS),
       vendor: a.vendor,
       failovers: a.failovers,

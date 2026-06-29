@@ -156,3 +156,83 @@ aiVendorRoutes.get("/substitutions", async (c) => {
     }),
   );
 });
+
+// One per-feature aggregate row the /schema-retries query produces.
+export interface SchemaRetryRow {
+  featureKey: string | null;
+  totalRetries: number;
+  calls: number;
+  lastSeen: string | null;
+}
+
+/** Pure response-shaper for the /schema-retries projection. Coerces the raw
+ *  DB aggregate rows (counts arrive as strings from `::int`/`sum` casts over
+ *  the wire driver) to numbers and rolls up the grand total. Extracted so the
+ *  shaping is unit-testable without a JSONB-group-by-capable fake DB — the
+ *  route is a thin DB read + this. #2159. */
+export function shapeSchemaRetries(
+  rows: ReadonlyArray<{
+    featureKey: string | null;
+    totalRetries: number | string | null;
+    calls: number | string | null;
+    lastSeen: string | null;
+  }>,
+): { totalRetries: number; byFeature: SchemaRetryRow[] } {
+  const byFeature: SchemaRetryRow[] = rows.map((r) => ({
+    featureKey: r.featureKey,
+    totalRetries: Number(r.totalRetries ?? 0),
+    calls: Number(r.calls ?? 0),
+    lastSeen: r.lastSeen,
+  }));
+  const totalRetries = byFeature.reduce((acc, r) => acc + r.totalRetries, 0);
+  return { totalRetries, byFeature };
+}
+
+// GET /schema-retries — #2159 — gateway json_schema conformance-retry budget.
+// Strict-mode (`response_format: json_schema`) calls whose first vendor
+// response fails the schema get re-asked server-side by the gateway; the count
+// surfaces on the success path as `_builderforce.schemaRetries`. Every charged
+// AI call stamps that count onto its `usage_ledger` (event_type='ai_tokens')
+// metadata when it's non-zero (token-ledger.charge → servicesProcessor.meter).
+// This reads that projection back, bucketed by feature, so SA can see which
+// features burn budget conforming to their strict schemas — the same family of
+// gateway-observability metric as /substitutions. Default 7-day window.
+aiVendorRoutes.get("/schema-retries", async (c) => {
+  const days = Number(c.req.query("days") ?? "7");
+  const windowDays = Number.isFinite(days) ? days : 7;
+  const since = new Date(Date.now() - windowDays * 86_400_000);
+  const db = getDb();
+  const { usageLedger } = schema;
+
+  const retriedCond = and(
+    eq(usageLedger.eventType, "ai_tokens"),
+    gte(usageLedger.createdAt, since),
+    // Stamped only when the gateway actually retried (>0), so presence of the
+    // key is the filter. `::int > 0` belt-and-suspenders against a stray 0.
+    sql`(${usageLedger.metadata}->>'schemaRetries') IS NOT NULL`,
+    sql`(${usageLedger.metadata}->>'schemaRetries')::int > 0`,
+  );
+
+  const grouped = await db
+    .select({
+      featureKey: sql<string>`${usageLedger.metadata}->>'featureKey'`,
+      totalRetries: sql<number>`sum((${usageLedger.metadata}->>'schemaRetries')::int)::int`,
+      calls: sql<number>`count(*)::int`,
+      lastSeen: sql<string>`max(${usageLedger.createdAt})`,
+    })
+    .from(usageLedger)
+    .where(retriedCond)
+    .groupBy(sql`${usageLedger.metadata}->>'featureKey'`)
+    .orderBy(desc(sql`sum((${usageLedger.metadata}->>'schemaRetries')::int)`));
+
+  const { totalRetries, byFeature } = shapeSchemaRetries(grouped);
+
+  return c.json(
+    success({
+      windowDays,
+      since: since.toISOString(),
+      totalRetries,
+      byFeature,
+    }),
+  );
+});

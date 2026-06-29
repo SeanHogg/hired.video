@@ -149,7 +149,6 @@ export const TailorResponseSchema = z.object({
   changes: z.array(TailorChangeSchema).default([]),
   summaryRecommendations: coerceToString,
 });
-export type TailorResponse = z.infer<typeof TailorResponseSchema>;
 
 export const InsightsResponseSchema = z.object({
   overallFit: z.enum(["strong", "good", "fair", "weak"]),
@@ -169,61 +168,81 @@ export const InsightsResponseSchema = z.object({
 
 // ─── Lenient ingest specs ─────────────────────────────────────────────────
 //
-// Free-tier models drift on the strict enums baked into TailorResponse
-// (`section`) and InsightsResponse (`overallFit`, `missingSkills.importance`).
-// Each spec owns a lenient wire schema where the drift-prone fields
-// accept `string`, plus a `coerce` step that maps any free-form value
-// onto a canonical bucket via the shared `coerceEnum` helper. The
-// strict canonical schemas (above) stay in place at the storage / wire
-// boundary — handlers receive the canonical shape from `callJsonLenient`.
+// Free-tier models drift on the strict enums baked into InsightsResponse
+// (`overallFit`, `missingSkills.importance`). Each spec owns a lenient wire
+// schema where the drift-prone fields accept `string`, plus a `coerce` step
+// that maps any free-form value onto a canonical bucket via the shared
+// `coerceEnum` helper. The strict canonical schemas (above) stay in place at
+// the storage / wire boundary — handlers receive the canonical shape from
+// `callJsonLenient`.
 
-const SECTION_ALLOWED = [
-  "basics", "work", "education", "skills", "projects", "volunteer",
-  "awards", "certificates", "publications", "languages", "interests", "references",
-] as const;
-const SECTION_ALIASES: Record<string, (typeof SECTION_ALLOWED)[number]> = {
-  experience: "work", employment: "work", positions: "work", roles: "work",
-  certs: "certificates", certification: "certificates", certifications: "certificates",
-  publication: "publications", paper: "publications", papers: "publications",
-  award: "awards", honors: "awards", honor: "awards",
-  interest: "interests", hobby: "interests", hobbies: "interests",
-  reference: "references",
-  language: "languages",
-  edu: "education",
-  skill: "skills", competencies: "skills", competency: "skills",
-  project: "projects",
-  basic: "basics", profile: "basics", header: "basics", contact: "basics",
-};
-
-const LenientTailorChangeSchema = z.object({
-  section: z.string().min(1),
-  before: z.string(),
-  after: z.string(),
-  why: z.string(),
+// ─── Tailor edit contract (gap #2109 — diff-only output) ───────────────────
+//
+// The model NO LONGER echoes the whole tailored resume. It returns a small
+// set of structured EDITS; the server applies them to the source document
+// (see `applyResumeEdits`) and re-derives the full `tailoredResume` + the
+// human-readable `changes[]` trail. Two wins over the old full-echo schema:
+//   • the request's strict `responseSchema` shrinks from the entire
+//     `ResumeContentSchema` (~163 decoding states — which Gemini rejected
+//     with `400 too many states`, gap #1801) to a handful of fields, so
+//     strict-mode vendor conformance works again;
+//   • completion tokens roughly halve — the model writes only what changed,
+//     not a verbatim copy of every untouched section.
+//
+// The op-set is deliberately ADDITIVE: there is no "remove entry" operation,
+// so no work/education entry can ever be dropped — the preservation guarantee
+// the JSON pipeline exists to enforce now holds by construction.
+//
+// Flat (non-discriminated) shape on purpose: free-tier models fudge the
+// `op`/`section` strings, so we keep the wire schema permissive and let
+// `applyResumeEdits` interpret + coerce defensively (unmatched / unknown
+// edits are skipped, never fatal).
+const TailorEditSchema = z.object({
+  /** basics | highlights | summary | skills (normalised in applyResumeEdits). */
+  op: z.string().min(1),
+  /** For highlights/summary: which list to target — work | volunteer | projects. */
+  section: z.string().optional(),
+  /** Natural key of the target entry — work[].name / volunteer[].organization
+   *  / projects[].name, copied verbatim from the input so the server can
+   *  locate it. */
+  match: z.string().optional(),
+  /** basics headline. */
+  label: z.string().optional(),
+  /** basics professional summary, OR a work/volunteer/project entry summary. */
+  summary: z.string().optional(),
+  /** Full replacement highlight list for the matched entry. */
+  highlights: z.array(z.string()).optional(),
+  /** Full replacement skills section. */
+  skills: z
+    .array(
+      z.object({
+        name: z.string(),
+        level: z.string().optional(),
+        keywords: z.array(z.string()).default([]),
+      }),
+    )
+    .optional(),
+  /** One-sentence justification, surfaced in the derived changes[] trail. */
+  why: z.string().optional(),
 });
+export type TailorEdit = z.infer<typeof TailorEditSchema>;
 
-const LenientTailorResponseSchema = z.object({
+export const TailorEditResponseSchema = z.object({
   oldScore: z.number().min(0).max(100),
   newScore: z.number().min(0).max(100),
-  tailoredResume: ResumeContentSchema,
-  changes: z.array(LenientTailorChangeSchema).default([]),
+  edits: z.array(TailorEditSchema).default([]),
   summaryRecommendations: coerceToString,
 });
+export type TailorEditResponse = z.infer<typeof TailorEditResponseSchema>;
 
-export const TailorResponseIngest = defineLenientIngest({
-  name: "MatchTailorResponse",
-  ingest: LenientTailorResponseSchema,
-  coerce: (wire): TailorResponse => ({
-    ...wire,
-    changes: wire.changes.map((c) => ({
-      ...c,
-      section: coerceEnum(c.section, {
-        allowed: SECTION_ALLOWED,
-        aliases: SECTION_ALIASES,
-        fallback: "basics",
-      }),
-    })),
-  }),
+/** Lenient ingest for the tailor edits. The wire schema is already
+ *  permissive (string `op`/`section`, every field optional), so the coerce
+ *  step is the identity — all interpretation/normalisation lives in
+ *  `applyResumeEdits` where it can be unit-tested in isolation. */
+export const TailorEditResponseIngest = defineLenientIngest({
+  name: "MatchTailorEdits",
+  ingest: TailorEditResponseSchema,
+  coerce: (wire): TailorEditResponse => wire,
 });
 
 const FIT_ALLOWED = ["strong", "good", "fair", "weak"] as const;
@@ -835,34 +854,36 @@ export interface TailorPromptOutput {
   responseFormat: "json_object";
 }
 
-const TAILOR_JSON_SYSTEM_PROMPT = `You are an expert resume writer. Your job is to:
-1. Score the original resume against the job (0-100).
-2. Tailor the resume JSON to better match the job requirements.
-3. Score the tailored resume (should be higher than the original).
-4. Document every change you make with a justification.
+const TAILOR_JSON_SYSTEM_PROMPT = `You are an expert resume writer. Tailor a candidate's resume to a job by returning a SMALL set of structured EDITS — never the whole resume.
 
-CRITICAL RULES — violations are rejected and retried:
-- Preserve ALL work experiences. Never remove an entry from work[]. Never change a company's "name".
-- Preserve ALL education entries. Never remove an entry from education[]. Never change an institution's "institution".
-- Reorder and rephrase work[].highlights to emphasise skills and keywords the job requires.
-- Add missing keywords naturally when the candidate's actual experience supports them; never fabricate employers, degrees, titles, or metrics.
-- Keep the JSON Resume shape intact — every section the input had must survive in the output.
-- Populate the changes[] array with one entry per modification, each with a before/after snippet and a why justification.
-
-OUTPUT — return JSON exactly matching this shape (no code fences, no commentary):
+Return JSON exactly matching this shape (no code fences, no commentary):
 {
-  "oldScore": <number 0-100>,
-  "newScore": <number 0-100>,
-  "tailoredResume": <full JSON Resume object with basics/work/education/skills/...>,
-  "changes": [{ "section": "<basics|work|education|skills|projects|volunteer|awards|certificates|publications|languages|interests|references>", "before": "<original text or JSON fragment>", "after": "<modified text or JSON fragment>", "why": "<1 sentence justification>" }],
+  "oldScore": <number 0-100>,     // the original resume's fit for the job
+  "newScore": <number 0-100>,     // the fit after your edits (should be higher)
+  "edits": [ ... ],               // ONLY the changes you make; omit anything left unchanged
   "summaryRecommendations": "<3-5 bullet points describing the biggest changes>"
-}`;
+}
+
+Each entry in "edits" is ONE of these shapes:
+  { "op": "basics", "label": "<new headline>", "summary": "<new professional summary>", "why": "<1 sentence>" }
+  { "op": "highlights", "section": "work"|"volunteer"|"projects", "match": "<exact name>", "highlights": ["<bullet>", ...], "why": "<1 sentence>" }
+  { "op": "summary", "section": "work"|"volunteer"|"projects", "match": "<exact name>", "summary": "<new entry summary>", "why": "<1 sentence>" }
+  { "op": "skills", "skills": [{ "name": "<skill>", "level": "<optional>", "keywords": ["<kw>", ...] }], "why": "<1 sentence>" }
+
+RULES:
+- "match" MUST be copied EXACTLY from the resume's work[].name, volunteer[].organization, or projects[].name — that is how the server locates the entry. An edit whose "match" is not found is ignored.
+- For a "highlights" edit, return the FULL replacement list for that entry (reordered/rephrased), not a partial list.
+- Reorder and rephrase to emphasise the skills and keywords the job requires, using the candidate's ACTUAL experience. Never invent employers, degrees, titles, dates, or metrics.
+- You CANNOT remove or rename a job or school — there is no such operation; every part of the resume you do not edit is preserved verbatim.
+- Emit an edit ONLY for something you actually change. Fewer, high-impact edits beat many trivial ones.`;
 
 /**
- * Build the JSON-in-JSON tailor prompt. The job + resume go into the
- * user message as pretty-printed JSON so the LLM can reason about
- * structure (sections, arrays, nested objects) rather than having to
- * re-derive it from a flat text blob.
+ * Build the tailor prompt. The job + resume go into the user message as
+ * pretty-printed JSON so the LLM can reason about structure (sections,
+ * arrays, nested objects) and copy exact `match` keys. The model returns a
+ * compact edit list (gap #2109) — the server applies it via
+ * `applyResumeEdits` and re-derives the full tailored document, so the
+ * model never has to echo the whole resume back.
  *
  * Temperature comes from USE_CASE_PROFILES["match_tailor"] — this is a
  * structured-output task, not a creative one, so it's tuned cold there.
@@ -874,7 +895,7 @@ export function buildTailorPrompt(input: TailorPromptInput): TailorPromptOutput 
   const resumeJson = JSON.stringify(resume, null, 2);
 
   const priorSection = priorRecommendations
-    ? `\n\nPRIOR ANALYSIS (address these gaps — each one MUST be fixed in the tailored resume):\n${priorRecommendations}\n`
+    ? `\n\nPRIOR ANALYSIS (address these gaps — each one MUST be reflected in your edits):\n${priorRecommendations}\n`
     : "";
 
   const userMessage = [
@@ -885,7 +906,7 @@ export function buildTailorPrompt(input: TailorPromptInput): TailorPromptOutput 
     resumeJson,
     priorSection,
     "",
-    "Return valid JSON matching the output schema. The tailoredResume MUST include every work[].name and education[].institution from the input resume.",
+    "Return JSON with oldScore, newScore, an `edits` array (only the changes you make), and summaryRecommendations. Copy every `match` value EXACTLY from the resume above.",
   ].join("\n");
 
   return {
@@ -937,13 +958,157 @@ export function strengthenPrompt(
 }
 
 // ---------------------------------------------------------------------------
+// applyResumeEdits — turn the model's compact edit list into the full
+// tailored document + the human-readable changes[] trail. Gap #2109.
+// ---------------------------------------------------------------------------
+
+/** Top-level sections whose entries carry editable highlights/summary. */
+const EDIT_SECTION_ALLOWED = ["work", "volunteer", "projects"] as const;
+type EditSection = (typeof EDIT_SECTION_ALLOWED)[number];
+
+const EDIT_SECTION_ALIASES: Record<string, EditSection> = {
+  experience: "work", employment: "work", positions: "work", roles: "work", job: "work", jobs: "work",
+  project: "projects",
+  volunteering: "volunteer", volunteer_work: "volunteer",
+};
+
+/** Natural key the model must echo in `match` to target an entry. Work +
+ *  projects key on `name`; volunteer on `organization` (its JSON Resume key). */
+function entryNaturalKey(section: EditSection, entry: Record<string, unknown>): string {
+  if (section === "volunteer") return String(entry.organization ?? "");
+  return String(entry.name ?? "");
+}
+
+/** Normalise the free-form `op` a model returns onto the canonical op set.
+ *  Returns null for anything unrecognised so `applyResumeEdits` can skip it. */
+function normalizeEditOp(op: string): "basics" | "highlights" | "summary" | "skills" | null {
+  const o = op.trim().toLowerCase();
+  if (["basics", "header", "profile", "contact", "headline"].includes(o)) return "basics";
+  if (["highlights", "highlight", "bullet", "bullets", "bulletpoints"].includes(o)) return "highlights";
+  if (["summary", "description", "blurb"].includes(o)) return "summary";
+  if (["skills", "skill", "skillset"].includes(o)) return "skills";
+  return null;
+}
+
+/**
+ * Apply the model's structured edits to a deep clone of the source resume,
+ * producing the tailored document AND the `changes[]` trail (`before` is the
+ * AUTHORITATIVE original value read from the source, not a model claim).
+ *
+ * The op-set is deliberately additive — there is NO "remove entry"
+ * operation, so no work/education entry can ever be dropped (the guarantee
+ * the JSON pipeline exists to enforce now holds by construction). Unmatched
+ * / unknown / no-op edits are skipped, never fatal.
+ *
+ * Pure — no I/O, no mutation of `source`. Exported for unit tests.
+ */
+export function applyResumeEdits(
+  source: ResumeContent,
+  edits: TailorEdit[],
+): { content: ResumeContent; changes: TailorChange[] } {
+  // Deep clone via JSON round-trip — ResumeContent is pure JSON, and this
+  // guarantees we never alias the caller's source object.
+  const content = JSON.parse(JSON.stringify(source)) as ResumeContent;
+  const changes: TailorChange[] = [];
+  const norm = (s: string) => s.trim().toLowerCase();
+
+  for (const edit of edits) {
+    const op = normalizeEditOp(edit.op);
+    if (!op) continue;
+    const why = (edit.why ?? "").trim();
+
+    if (op === "basics") {
+      const b = (content.basics ?? {}) as Record<string, unknown>;
+      if (typeof edit.label === "string" && edit.label !== (b.label ?? "")) {
+        changes.push({ section: "basics", before: String(b.label ?? ""), after: edit.label, why });
+        b.label = edit.label;
+      }
+      if (typeof edit.summary === "string" && edit.summary !== (b.summary ?? "")) {
+        changes.push({ section: "basics", before: String(b.summary ?? ""), after: edit.summary, why });
+        b.summary = edit.summary;
+      }
+      content.basics = b as ResumeContent["basics"];
+      continue;
+    }
+
+    if (op === "skills") {
+      if (Array.isArray(edit.skills)) {
+        const before = (content.skills ?? []).map((s) => s.name).filter(Boolean).join(", ");
+        const after = edit.skills.map((s) => s.name).filter(Boolean).join(", ");
+        content.skills = edit.skills.map((s) => ({
+          name: s.name,
+          level: s.level ?? "",
+          keywords: s.keywords ?? [],
+        })) as ResumeContent["skills"];
+        changes.push({ section: "skills", before, after, why });
+      }
+      continue;
+    }
+
+    // highlights | summary — locate one entry by its natural key.
+    const section = coerceEnum(edit.section ?? "", {
+      allowed: EDIT_SECTION_ALLOWED,
+      aliases: EDIT_SECTION_ALIASES,
+      fallback: "work",
+    });
+    const arr = content[section] as Array<Record<string, unknown>> | undefined;
+    if (!Array.isArray(arr) || arr.length === 0) continue;
+    const matchKey = norm(edit.match ?? "");
+    if (!matchKey) continue;
+    const target = arr.find((e) => norm(entryNaturalKey(section, e)) === matchKey);
+    if (!target) continue; // unmatched → skip (never creates/removes entries)
+
+    if (op === "highlights" && Array.isArray(edit.highlights)) {
+      const before = (Array.isArray(target.highlights) ? (target.highlights as string[]) : []).join("\n");
+      const after = edit.highlights.join("\n");
+      if (before !== after) {
+        target.highlights = edit.highlights;
+        changes.push({ section, before, after, why });
+      }
+    } else if (op === "summary" && typeof edit.summary === "string") {
+      if (String(target.summary ?? "") !== edit.summary) {
+        changes.push({ section, before: String(target.summary ?? ""), after: edit.summary, why });
+        target.summary = edit.summary;
+      }
+    }
+  }
+
+  return { content, changes };
+}
+
+/** List the exact natural keys the model can target, so a retry can fix
+ *  edits whose `match` didn't resolve to any entry. */
+export function strengthenEditMatchPrompt(
+  prompt: TailorPromptOutput,
+  resume: ResumeContent,
+): TailorPromptOutput {
+  const keys = (section: EditSection, names: string[]) =>
+    names.length > 0 ? `  ${section}: ${names.map((n) => `"${n}"`).join(", ")}` : null;
+  const lines = [
+    keys("work", (resume.work ?? []).map((w) => w.name ?? "").filter(Boolean)),
+    keys("volunteer", (resume.volunteer ?? []).map((v) => v.organization ?? "").filter(Boolean)),
+    keys("projects", (resume.projects ?? []).map((p) => p.name ?? "").filter(Boolean)),
+  ].filter(Boolean);
+
+  const block = [
+    "",
+    "NONE of your edits matched a real entry — the `match` values did not line up with the resume. Use EXACTLY these keys (copy verbatim):",
+    ...lines,
+  ].join("\n");
+
+  return { ...prompt, userMessage: `${prompt.userMessage}\n${block}` };
+}
+
+// ---------------------------------------------------------------------------
 // handleTailor — tailor the resume AND save it as a variation in one shot.
 //
 // One network call from the client, one consolidated response. The endpoint
 // owns the full workflow:
 //   1. Resolve the source resume + job (structured JSON, no flat-text).
-//   2. Call the LLM with retry-on-validation-failure (max 2 attempts).
-//   3. Validate the tailored JSON preserves every work/education entry.
+//   2. Ask the LLM for a compact EDIT list (gap #2109) — not the whole resume.
+//   3. Apply the edits to the source → full `tailoredResume` + `changes[]`,
+//      then validate the assembled document (defensive; edits can't drop
+//      entries). Retry once if no edit matched a real entry.
 //   4. Persist the tailored resume as a variation under the source's
 //      master via the shared `saveVariationFromContent` helper.
 //   5. Return `{ oldScore, newScore, tailoredResume, changes,
@@ -1012,6 +1177,7 @@ export async function handleTailor(
   const maxAttempts = 2;
   let attempt = 0;
   let lastValidation: TailorValidationResult | null = null;
+  let noApplicableChanges = false;
   let lastError: string | undefined;
   // Capture the raw thrown object too so the dispatch trail (model
   // chain, gateway requestIds, classification) survives to the 503
@@ -1025,15 +1191,40 @@ export async function handleTailor(
       const { data: result } = await deps.llm.callJsonLenient(
         "match_tailor",
         prompt,
-        TailorResponseIngest,
+        TailorEditResponseIngest,
       );
 
-      const validation = validateTailorOutput(resumeV2.content, result.tailoredResume);
-      lastValidation = validation;
+      // Apply the model's edits to the source → full tailored document +
+      // the authoritative changes[] trail. Edits can't drop entries, so the
+      // tailored resume preserves every work/education entry by construction.
+      const { content: tailoredResume, changes } = applyResumeEdits(
+        resumeV2.content,
+        result.edits,
+      );
 
+      // Defensive re-validation: the apply step never removes entries, but
+      // assemble-then-validate so a malformed `skills` edit (or any future
+      // op) can't slip a shape regression through to storage.
+      const validation = validateTailorOutput(resumeV2.content, tailoredResume);
+      lastValidation = validation;
       if (!validation.valid) {
         prompt = strengthenPrompt(prompt, validation);
         continue;
+      }
+
+      // The model returned edits but none matched a real entry (bad `match`
+      // keys) → nothing changed. Retry once naming the exact keys.
+      if (changes.length === 0 && result.edits.length > 0 && attempt < maxAttempts) {
+        prompt = strengthenEditMatchPrompt(prompt, resumeV2.content);
+        continue;
+      }
+
+      // Nothing applied even after the retry (or the model returned zero
+      // edits). Don't persist a byte-identical copy — surface a 422 so the
+      // client can prompt a retry instead of creating a no-op variation.
+      if (changes.length === 0) {
+        noApplicableChanges = true;
+        break;
       }
 
       // Persist the tailored resume as a variation under the source's
@@ -1047,7 +1238,7 @@ export async function handleTailor(
         auth.userId,
         resumeV2.id,
         {
-          content: result.tailoredResume as unknown as Record<string, unknown>,
+          content: tailoredResume as unknown as Record<string, unknown>,
           title: variationTitle,
           description: jobIdResolved ? `Generated for ${parsedJob.title}` : undefined,
         },
@@ -1073,8 +1264,8 @@ export async function handleTailor(
       return ok({
         oldScore: result.oldScore,
         newScore: result.newScore,
-        tailoredResume: result.tailoredResume,
-        changes: result.changes,
+        tailoredResume,
+        changes,
         summaryRecommendations: result.summaryRecommendations,
         resumeId: resumeV2.id,
         sourceUrl,
@@ -1090,6 +1281,18 @@ export async function handleTailor(
       // is the one breaking. Bail early.
       break;
     }
+  }
+
+  // The model ran fine but produced no applicable edits (after a retry).
+  // Distinct from an LLM/transport failure — surface a 422 the client can
+  // turn into "your resume already matches well, try another job" rather
+  // than persisting an identical no-op variation.
+  if (noApplicableChanges) {
+    return fail(
+      422,
+      "NO_APPLICABLE_CHANGES",
+      "The AI couldn't find changes to make for this job — your resume may already be a strong match. Try a different job or resume.",
+    );
   }
 
   // Map LLMDispatchError → a structured AI_* envelope using the

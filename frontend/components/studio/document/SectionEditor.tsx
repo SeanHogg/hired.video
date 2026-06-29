@@ -171,7 +171,7 @@ function ArrayEditor({
             values={item}
             onChange={(key, value) => setItem(idx, key, value)}
             crossFieldErrors={validateDateRange(schema, item)}
-            className="pr-24 pt-5"
+            className="pt-6"
           />
         </div>
       ))}

@@ -19,10 +19,12 @@ import {
   resolveJobV2,
   resolveResumeV2,
   validateTailorOutput,
+  applyResumeEdits,
   buildTailorPrompt,
   strengthenPrompt,
   TailorResponseSchema,
   type MatchDeps,
+  type TailorEdit,
 } from "../job/match-handlers.js";
 import type { LLMClient } from "../../services/adapters/llm-client.js";
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
@@ -289,20 +291,22 @@ describe("resolveJobV2 / resolveResumeV2", () => {
 // handleTailor — happy path + error paths
 // ---------------------------------------------------------------------------
 
+// Edit payloads the model returns under the diff-only contract (gap #2109).
+function basicsEdit(summary: string, why = "Lead with TS"): TailorEdit {
+  return { op: "basics", summary, why };
+}
+function highlightsEdit(match: string, highlights: string[], why = "emphasise perf"): TailorEdit {
+  return { op: "highlights", section: "work", match, highlights, why };
+}
+
 describe("handleTailor — happy path", () => {
-  it("returns the tailored resume, scores, changes, and persists a variation", async () => {
-    const tailored = tailoredFromSeed({
-      basics: {
-        ...seedResumeRow().content.basics,
-        summary: "TypeScript-forward senior engineer focused on React/Next.js perf.",
-      },
-    });
+  it("applies the edits, derives changes, persists a variation, and preserves every entry", async () => {
     const { client, calls } = makeFakeLLM(() => ({
       oldScore: 60,
       newScore: 85,
-      tailoredResume: tailored,
-      changes: [
-        { section: "basics", before: "Senior frontend engineer", after: "TypeScript-forward senior engineer", why: "Lead with TS" },
+      edits: [
+        basicsEdit("TypeScript-forward senior engineer focused on React/Next.js perf."),
+        highlightsEdit("Acme", ["Cut LCP 4.2s→1.8s with a Next.js redesign.", "Migrated Redux→Zustand (-18% bundle)."]),
       ],
       summaryRecommendations: "- Rewrote summary for TypeScript emphasis",
     }));
@@ -322,47 +326,46 @@ describe("handleTailor — happy path", () => {
     assert.equal(data.resumeId, RESUME_ID);
     assert.equal(data.sourceUrl, "https://example.com/jobs/42");
 
-    // Tailored resume JSON is echoed back in full
+    // Server-applied edits: basics.summary updated, every entry preserved.
     assert.equal(data.tailoredResume.basics.name, "Jane Doe");
+    assert.match(data.tailoredResume.basics.summary, /TypeScript-forward/);
     assert.equal(data.tailoredResume.work.length, 2);
-    assert.equal(data.changes.length, 1);
+    assert.deepEqual(
+      data.tailoredResume.work[0].highlights,
+      ["Cut LCP 4.2s→1.8s with a Next.js redesign.", "Migrated Redux→Zustand (-18% bundle)."],
+    );
+    // changes[] is derived server-side from the edits (before = authoritative original).
+    assert.equal(data.changes.length, 2);
+    assert.ok(data.changes.some((c: any) => c.section === "basics" && /8 years/.test(c.before)));
     assert.match(data.summaryRecommendations, /TypeScript/);
 
     // Variation is persisted server-side and returned
     assert.ok(data.variationId, "variationId must be present");
     assert.equal(data.variationTitle, "Senior Frontend Engineer - GlobalCo");
 
-    // No markdown anywhere in the response
+    // No markdown, and the model never echoed a whole tailoredResume
     assert.equal(typeof data.markdownResume, "undefined");
-
-    // Exactly one LLM call — no parallel legacy path any more
     assert.equal(calls.length, 1);
 
-    // DB saw an insert for the new variation
     const insertedVariations = (deps as any)._calls.filter(
       (c: any) => c.kind === "insert" && c.table === "resume_information",
     );
     assert.equal(insertedVariations.length, 1);
   });
 
-  it("retries with a strengthened prompt when work entries are dropped, then succeeds", async () => {
-    const good = tailoredFromSeed();
-    const dropped = ResumeContentSchema.parse({ ...good, work: [good.work[0]] });
-
+  it("retries with a key-list prompt when no edit matched a real entry, then succeeds", async () => {
     const { client, calls } = makeFakeLLM([
       () => ({
         oldScore: 50,
         newScore: 70,
-        tailoredResume: dropped,
-        changes: [],
-        summaryRecommendations: "- first attempt dropped TechStart",
+        edits: [highlightsEdit("NonExistentCo", ["unmatched bullet"])],
+        summaryRecommendations: "- first attempt missed",
       }),
       () => ({
         oldScore: 50,
         newScore: 80,
-        tailoredResume: good,
-        changes: [],
-        summaryRecommendations: "- restored TechStart",
+        edits: [highlightsEdit("Acme", ["Now correctly targeting Acme."])],
+        summaryRecommendations: "- fixed the match key",
       }),
     ]);
 
@@ -374,19 +377,18 @@ describe("handleTailor — happy path", () => {
     const res = await handleTailor(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
     assert.equal(res.status, 200);
     assert.equal(calls.length, 2);
-    assert.match(calls[1].userMessage, /VALIDATION FAILURE/);
+    assert.match(calls[1].userMessage, /NONE of your edits matched/);
+    // The strengthen block lists the exact work keys to copy.
+    assert.match(calls[1].userMessage, /"Acme"/);
     assert.match(calls[1].userMessage, /"TechStart"/);
   });
 
-  it("returns 400 VALIDATION_ERROR when the LLM fails validation after every retry", async () => {
-    const good = tailoredFromSeed();
-    const dropped = ResumeContentSchema.parse({ ...good, work: [good.work[0]] });
+  it("returns 422 NO_APPLICABLE_CHANGES when no edit ever matches", async () => {
     const { client, calls } = makeFakeLLM(() => ({
       oldScore: 50,
-      newScore: 70,
-      tailoredResume: dropped,
-      changes: [],
-      summaryRecommendations: "- dropped TechStart",
+      newScore: 50,
+      edits: [highlightsEdit("GhostCorp", ["never applies"])],
+      summaryRecommendations: "- nothing landed",
     }));
 
     const deps = buildDeps({
@@ -395,11 +397,15 @@ describe("handleTailor — happy path", () => {
       jobs: [seedJobRow()],
     });
     const res = await handleTailor(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
-    assert.equal(res.status, 400);
-    const body = res.body as any;
-    assert.equal(body.error.code, "VALIDATION_ERROR");
-    assert.deepEqual(body.error.details.missingWorkEntries, ["TechStart"]);
+    assert.equal(res.status, 422);
+    assert.equal((res.body as any).error.code, "NO_APPLICABLE_CHANGES");
     assert.equal(calls.length, 2);
+
+    // No no-op variation was persisted.
+    const insertedVariations = (deps as any)._calls.filter(
+      (c: any) => c.kind === "insert" && c.table === "resume_information",
+    );
+    assert.equal(insertedVariations.length, 0);
   });
 
   it("returns 503 AI_ERROR when no LLM client is configured", async () => {
@@ -413,7 +419,7 @@ describe("handleTailor — happy path", () => {
   });
 
   it("returns 404 NOT_FOUND when the job does not exist", async () => {
-    const { client } = makeFakeLLM(() => ({ oldScore: 0, newScore: 0, tailoredResume: tailoredFromSeed(), changes: [], summaryRecommendations: "" }));
+    const { client } = makeFakeLLM(() => ({ oldScore: 0, newScore: 0, edits: [], summaryRecommendations: "" }));
     const deps = buildDeps({
       llm: client,
       resumes: [seedResumeRow()],
@@ -424,7 +430,7 @@ describe("handleTailor — happy path", () => {
   });
 
   it("returns 404 NOT_FOUND when the resume does not exist", async () => {
-    const { client } = makeFakeLLM(() => ({ oldScore: 0, newScore: 0, tailoredResume: tailoredFromSeed(), changes: [], summaryRecommendations: "" }));
+    const { client } = makeFakeLLM(() => ({ oldScore: 0, newScore: 0, edits: [], summaryRecommendations: "" }));
     const deps = buildDeps({
       llm: client,
       resumes: [],
@@ -438,8 +444,7 @@ describe("handleTailor — happy path", () => {
     const { client, calls } = makeFakeLLM(() => ({
       oldScore: 40,
       newScore: 70,
-      tailoredResume: tailoredFromSeed(),
-      changes: [],
+      edits: [basicsEdit("Tailored for the pasted platform-engineering role.", "match the JD")],
       summaryRecommendations: "- tailored for the pasted description",
     }));
     const deps = buildDeps({
@@ -463,6 +468,69 @@ describe("handleTailor — happy path", () => {
     const deps = buildDeps({ resumes: [seedResumeRow()], jobs: [seedJobRow()] });
     const res = await handleTailor(deps, null, { jobId: JOB_ID, resumeId: RESUME_ID });
     assert.equal(res.status, 401);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyResumeEdits — the diff-only apply engine (gap #2109)
+// ---------------------------------------------------------------------------
+
+describe("applyResumeEdits", () => {
+  const source = () => seedResumeRow().content as ResumeContent;
+
+  it("applies a basics summary edit and records an authoritative before/after change", () => {
+    const { content, changes } = applyResumeEdits(source(), [
+      { op: "basics", summary: "New TS-forward summary.", why: "TS" },
+    ]);
+    assert.equal(content.basics?.summary, "New TS-forward summary.");
+    assert.equal(changes.length, 1);
+    assert.match(changes[0].before, /8 years/); // pulled from the real source, not the model
+    assert.equal(changes[0].after, "New TS-forward summary.");
+  });
+
+  it("replaces highlights on the matched work entry and preserves all entries", () => {
+    const { content, changes } = applyResumeEdits(source(), [
+      { op: "highlights", section: "work", match: "Acme", highlights: ["A", "B"], why: "x" },
+    ]);
+    assert.equal(content.work.length, 2);
+    assert.deepEqual(content.work[0].highlights, ["A", "B"]);
+    assert.deepEqual(content.work[1].highlights, source().work[1].highlights); // untouched
+    assert.equal(changes.length, 1);
+    assert.equal(changes[0].section, "work");
+  });
+
+  it("matches case-insensitively and via a section alias", () => {
+    const { changes } = applyResumeEdits(source(), [
+      { op: "bullets", section: "experience", match: "acme", highlights: ["X"], why: "y" },
+    ]);
+    assert.equal(changes.length, 1);
+  });
+
+  it("skips an edit whose match resolves to no entry (never creates/removes)", () => {
+    const before = source();
+    const { content, changes } = applyResumeEdits(before, [
+      { op: "highlights", section: "work", match: "Nope Inc", highlights: ["X"], why: "y" },
+    ]);
+    assert.equal(changes.length, 0);
+    assert.deepEqual(content.work, before.work);
+  });
+
+  it("ignores unknown ops and never mutates the source object", () => {
+    const before = source();
+    const snapshot = JSON.stringify(before);
+    const { changes } = applyResumeEdits(before, [{ op: "delete_everything" } as TailorEdit]);
+    assert.equal(changes.length, 0);
+    assert.equal(JSON.stringify(before), snapshot); // source untouched (deep clone)
+  });
+
+  it("replaces the skills section wholesale", () => {
+    const { content, changes } = applyResumeEdits(source(), [
+      { op: "skills", skills: [{ name: "Go", keywords: ["k8s"] }], why: "role needs Go" },
+    ]);
+    assert.equal(content.skills.length, 1);
+    assert.equal(content.skills[0].name, "Go");
+    assert.equal(changes.length, 1);
+    assert.equal(changes[0].section, "skills");
   });
 });
 
