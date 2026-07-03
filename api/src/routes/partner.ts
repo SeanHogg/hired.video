@@ -44,7 +44,8 @@ import { handleCreateResume } from "../services/resume/ResumeService.js";
 import { buildResumeParserPort } from "../services/resume/deps.js";
 import { buildRepos } from "../repositories/index.js";
 import { refreshDiffPercentFor } from "../services/resume/view.js";
-import { looksLikeBinaryText, stripResumeControlChars } from "../services/resume/parse.js";
+import { tryParseJsonResume, parseResumeWithRegex } from "../services/resume/parse.js";
+import { extractResumeText } from "../services/resume/extractFile.js";
 import {
   PARTNER_EMBED_KINDS,
   PARTNER_EMBED_THEMES,
@@ -52,18 +53,14 @@ import {
   type PartnerScope,
 } from "../../../shared/partner.js";
 
-/** Content types we can't turn into text in-Worker yet (no PDF/DOCX byte
- *  extractor here — that's a roadmap item). Partners send extracted `rawText`
- *  or structured `content` for these until then. */
-const BINARY_RESUME_MIME_RE = /pdf|msword|officedocument|octet-stream/i;
-
-/** Decode a base64 (optionally data-URL) résumé `file` to plain `rawText`.
- *  Enforces the size ceiling and rejects binary formats with a typed code so
- *  the SDK can branch. */
-function decodePartnerResumeFile(
+/** Decode a base64 (optionally data-URL) résumé `file` and extract its text.
+ *  PDF/DOCX are extracted server-side; unsupported binaries return a typed code
+ *  so the SDK can branch. Enforces the decoded-size ceiling. */
+async function decodePartnerResumeFile(
   file: string,
   contentType: string | undefined,
-): { ok: true; rawText: string } | { ok: false; status: 413 | 415 | 422; code: string; message: string } {
+  filename: string | undefined,
+): Promise<{ ok: true; rawText: string } | { ok: false; status: 413 | 415 | 422; code: string; message: string }> {
   const b64 = file.includes(",") ? file.slice(file.indexOf(",") + 1) : file;
   let bytes: Uint8Array;
   try {
@@ -78,33 +75,17 @@ function decodePartnerResumeFile(
       ok: false,
       status: 413,
       code: "PAYLOAD_TOO_LARGE",
-      message: `Résumé file exceeds ${PARTNER_RESUME_UPLOAD_MAX_BYTES} bytes. Send extracted text via \`rawText\` for large files.`,
+      message: `Résumé file exceeds ${PARTNER_RESUME_UPLOAD_MAX_BYTES} bytes.`,
     };
   }
-  if (contentType && BINARY_RESUME_MIME_RE.test(contentType)) {
-    return {
-      ok: false,
-      status: 415,
-      code: "UNSUPPORTED_MEDIA_TYPE",
-      message:
-        "Binary résumés (PDF/DOC/DOCX) can't be parsed server-side yet. Extract the text client-side and send it as `rawText` (or `content`).",
-    };
+  const extracted = await extractResumeText(bytes, { contentType, filename });
+  // `in`-narrowing (not `!extracted.ok`) — this codebase is non-strict, where a
+  // boolean discriminant doesn't narrow a union; the structural `in` check does.
+  if ("code" in extracted) {
+    const status = extracted.code === "UNSUPPORTED_MEDIA_TYPE" ? 415 : 422;
+    return { ok: false, status, code: extracted.code, message: extracted.message };
   }
-  const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
-  if (looksLikeBinaryText(text)) {
-    return {
-      ok: false,
-      status: 415,
-      code: "UNSUPPORTED_MEDIA_TYPE",
-      message:
-        "`file` decoded to binary, not text. Only text/JSON files parse server-side; send PDF/DOCX text as `rawText`.",
-    };
-  }
-  const rawText = stripResumeControlChars(text).trim();
-  if (!rawText) {
-    return { ok: false, status: 422, code: "INVALID_RESUME", message: "`file` decoded to empty text." };
-  }
-  return { ok: true, rawText };
+  return { ok: true, rawText: extracted.text };
 }
 
 export const partnerRoutes = new Hono<AppEnv>();
@@ -122,9 +103,14 @@ function partnerResumeDeps() {
   const now = () => new Date();
   return {
     repo: buildRepos(getDb(), now).resumes,
-    parser: buildResumeParserPort(async (text: string) => ({
-      basics: { summary: text },
-    })),
+    // Structure partner text with the AI-free path: JSON Resume if it parses,
+    // else the regex parser (skills/work/education), so a pasted or PDF/DOCX-
+    // extracted résumé yields real fields — not a summary blob. No AI (partner
+    // requests carry no user to bill a model call to).
+    parser: buildResumeParserPort(async (text: string) => {
+      const jsonResume = tryParseJsonResume(text);
+      return jsonResume ?? parseResumeWithRegex(text);
+    }),
     diff: { refresh: refreshDiffPercentFor },
     now,
   };
@@ -144,26 +130,29 @@ const ResumeWriteBody = z.object({
   title: z.string().min(1).max(200).default("Resume"),
   content: z.record(z.string(), z.unknown()).optional(),
   rawText: z.string().max(60_000).optional(),
-  /** Base64 (optionally a data: URL). */
-  file: z.string().max(400_000).optional(),
+  /** Base64 (optionally a data: URL). ~14M chars ≈ 10 MB decoded. */
+  file: z.string().max(14_000_000).optional(),
   filename: z.string().max(255).optional(),
   contentType: z.string().max(120).optional(),
   privacy: z.enum(["public", "unlisted", "private"]).optional(),
 });
 type ResumeWriteInput = z.infer<typeof ResumeWriteBody>;
 
-/** Normalize a résumé write to `{ content | rawText }`, decoding `file` when
- *  that's the only source. ONE resolver for create + uploadResume (DRY). */
-function resolveResumeWrite(
+/** Normalize a résumé write to `{ content | rawText }`, extracting `file`
+ *  (PDF/DOCX/text) when that's the only source. ONE resolver for create +
+ *  uploadResume (DRY). */
+async function resolveResumeWrite(
   r: ResumeWriteInput,
-): { ok: true; data: { title: string; content?: Record<string, unknown>; rawText?: string; privacy?: "public" | "unlisted" | "private" } }
-  | { ok: false; status: 400 | 413 | 415 | 422; code: string; message: string } {
+): Promise<
+  | { ok: true; data: { title: string; content?: Record<string, unknown>; rawText?: string; privacy?: "public" | "unlisted" | "private" } }
+  | { ok: false; status: 400 | 413 | 415 | 422; code: string; message: string }
+> {
   const base = { title: r.title, privacy: r.privacy };
   if (r.content) return { ok: true, data: { ...base, content: r.content } };
   if (r.rawText) return { ok: true, data: { ...base, rawText: r.rawText } };
   if (r.file) {
-    const decoded = decodePartnerResumeFile(r.file, r.contentType);
-    if (!decoded.ok) return decoded;
+    const decoded = await decodePartnerResumeFile(r.file, r.contentType, r.filename);
+    if ("code" in decoded) return decoded; // in-narrowing (non-strict tsconfig)
     return { ok: true, data: { ...base, rawText: decoded.rawText } };
   }
   return {
@@ -230,10 +219,11 @@ partnerRoutes.post("/v1/job-seekers", partnerAuth("write:job_seekers"), async (c
   // Optional first resume — reuse the canonical write path.
   let resumeId: string | null = null;
   if (parsed.data.resume) {
-    const resolved = resolveResumeWrite(parsed.data.resume);
+    const resolved = await resolveResumeWrite(parsed.data.resume);
     // A malformed résumé must not orphan the just-created account — surface the
     // decode error but keep the account (the partner can retry uploadResume).
-    if (!resolved.ok) {
+    // `in`-narrowing: non-strict tsconfig won't narrow on `!resolved.ok`.
+    if ("code" in resolved) {
       return c.json(
         success({
           userId: result.userId,
@@ -285,8 +275,8 @@ partnerRoutes.post("/v1/job-seekers/:userId/resumes", partnerAuth("write:resumes
   if (!parsed.success) {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
-  const resolved = resolveResumeWrite(parsed.data);
-  if (!resolved.ok) {
+  const resolved = await resolveResumeWrite(parsed.data);
+  if ("code" in resolved) { // in-narrowing (non-strict tsconfig)
     return c.json(error(resolved.code, resolved.message), resolved.status as any);
   }
 

@@ -3,6 +3,23 @@
 All notable changes to `@seanhogg/hired-video-sdk` are documented here. This
 project follows [Semantic Versioning](https://semver.org).
 
+## 0.3.0
+
+### Added
+
+- **PDF & DOCX résumé upload now parse server-side.** `uploadResume` /
+  `create({ resume: { file } })` accept **PDF** and **DOCX** files directly —
+  the server extracts the text (PDF text layer via `unpdf`; DOCX via its
+  document XML) and structures it (skills / work / education) with no AI cost.
+  No SDK call change — the same `file` you already send now works for PDF/DOCX.
+- Max `file` size raised to **10 MB** (was 256 KB) to fit real PDF/DOCX résumés.
+
+### Notes
+
+- Still unsupported: legacy binary `.doc` (OLE) and scanned/image PDFs with no
+  text layer — these return `UNSUPPORTED_MEDIA_TYPE` (415) / `INVALID_RESUME`
+  (422); save as PDF/DOCX or send extracted `rawText`.
+
 ## 0.2.0
 
 Partner-integration hardening — accurate types + documented contracts for the

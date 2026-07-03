@@ -57,18 +57,20 @@ export type PartnerEmbedTheme = (typeof PARTNER_EMBED_THEMES)[number];
 export const PARTNER_RESUME_STATUSES = ["ready", "parsing", "none"] as const;
 export type PartnerResumeStatus = (typeof PARTNER_RESUME_STATUSES)[number];
 
-/** Accepted MIME types for a partner résumé `file` upload. Text/JSON is parsed
- *  in-Worker (no AI); PDF/DOCX byte-extraction is a roadmap item — until then
- *  partners send extracted `rawText` or structured `content`. */
+/** Accepted MIME types for a partner résumé `file` upload. PDF + DOCX are
+ *  extracted to text server-side (unpdf / docx unzip); text/JSON parse directly.
+ *  Legacy binary `.doc` (OLE) and images are not supported — send `rawText`. */
 export const PARTNER_RESUME_UPLOAD_MIME_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
   "text/plain",
   "application/json",
   "application/vnd.hired.jsonresume+json",
 ] as const;
 
-/** Max decoded size of a partner résumé `file` upload (bytes). Matches the
- *  60k-char rawText ceiling with headroom for base64/UTF-8 overhead. */
-export const PARTNER_RESUME_UPLOAD_MAX_BYTES = 256 * 1024;
+/** Max decoded size of a partner résumé `file` upload (bytes). Sized for real
+ *  PDF/DOCX résumés (a few MB) with headroom. */
+export const PARTNER_RESUME_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 
 /**
  * Machine-readable error codes the partner API returns in the envelope
