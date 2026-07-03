@@ -79,7 +79,9 @@ async function decodePartnerResumeFile(
     };
   }
   const extracted = await extractResumeText(bytes, { contentType, filename });
-  if (!extracted.ok) {
+  // `in`-narrowing (not `!extracted.ok`) — this codebase is non-strict, where a
+  // boolean discriminant doesn't narrow a union; the structural `in` check does.
+  if ("code" in extracted) {
     const status = extracted.code === "UNSUPPORTED_MEDIA_TYPE" ? 415 : 422;
     return { ok: false, status, code: extracted.code, message: extracted.message };
   }
@@ -150,7 +152,7 @@ async function resolveResumeWrite(
   if (r.rawText) return { ok: true, data: { ...base, rawText: r.rawText } };
   if (r.file) {
     const decoded = await decodePartnerResumeFile(r.file, r.contentType, r.filename);
-    if (!decoded.ok) return decoded;
+    if ("code" in decoded) return decoded; // in-narrowing (non-strict tsconfig)
     return { ok: true, data: { ...base, rawText: decoded.rawText } };
   }
   return {
@@ -220,7 +222,8 @@ partnerRoutes.post("/v1/job-seekers", partnerAuth("write:job_seekers"), async (c
     const resolved = await resolveResumeWrite(parsed.data.resume);
     // A malformed résumé must not orphan the just-created account — surface the
     // decode error but keep the account (the partner can retry uploadResume).
-    if (!resolved.ok) {
+    // `in`-narrowing: non-strict tsconfig won't narrow on `!resolved.ok`.
+    if ("code" in resolved) {
       return c.json(
         success({
           userId: result.userId,
@@ -273,7 +276,7 @@ partnerRoutes.post("/v1/job-seekers/:userId/resumes", partnerAuth("write:resumes
     return c.json(error("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
   const resolved = await resolveResumeWrite(parsed.data);
-  if (!resolved.ok) {
+  if ("code" in resolved) { // in-narrowing (non-strict tsconfig)
     return c.json(error(resolved.code, resolved.message), resolved.status as any);
   }
 

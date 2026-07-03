@@ -65,8 +65,11 @@ async function extractPdf(bytes: Uint8Array): Promise<ExtractResult> {
   const { extractText, getDocumentProxy } = await import("unpdf");
   try {
     const pdf = await getDocumentProxy(bytes);
+    // `mergePages: true` → `text` is a single string. Guard for arrays too in
+    // case a future unpdf widens the type, without a `never`-narrowing pitfall.
     const { text } = await extractText(pdf, { mergePages: true });
-    const clean = stripResumeControlChars(typeof text === "string" ? text : text.join("\n")).trim();
+    const merged = Array.isArray(text) ? (text as string[]).join("\n") : text;
+    const clean = stripResumeControlChars(merged).trim();
     if (!clean) {
       return {
         ok: false,
@@ -138,8 +141,10 @@ export async function extractResumeText(
     };
   }
 
-  // Fall through: treat as text/JSON if it decodes cleanly.
-  const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+  // Fall through: treat as text/JSON if it decodes cleanly. No options object —
+  // newer @types/node types TextDecoder options as requiring `ignoreBOM`; the
+  // default decoder is already non-fatal, which is what we want.
+  const text = new TextDecoder("utf-8").decode(bytes);
   if (looksLikeBinaryText(text)) {
     return {
       ok: false,
