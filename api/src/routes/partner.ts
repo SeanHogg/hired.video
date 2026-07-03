@@ -3,10 +3,9 @@
  *
  * Every route here authenticates with a partner API key (see partnerAuth
  * middleware), NOT a user JWT. `/api/partner` is in PUBLIC_PREFIXES so the JWT
- * layer skips it. The one exception is `GET /v1/embed/resolve`, which is
- * authenticated by a short-lived signed embed token (the iframe has no key).
+ * layer skips it.
  *
- * Surface (SDK: `@hiredvideo/sdk`):
+ * Surface (SDK: `@seanhogg/hired-video-sdk`):
  *   GET    /v1/me                          — whoami (validate a key)
  *   POST   /v1/job-seekers                 — create a Hired.Video account
  *   POST   /v1/job-seekers/:id/resumes     — upload/create a resume
@@ -14,8 +13,8 @@
  *   POST   /v1/connect                     — begin connecting an existing account
  *   GET    /v1/connections                 — list the partner's connections
  *   DELETE /v1/connections/:userId         — revoke a connection
- *   POST   /v1/embed-tokens                — mint an embed token for the iframe
- *   GET    /v1/embed/resolve?token=        — (public) resolve an embed token
+ *   POST   /v1/embed-tokens                — mint an embed token; returns an
+ *          embedUrl on the canonical /embedded/resume/:id?pt= page
  */
 import { Hono } from "hono";
 import { z } from "zod";
@@ -29,7 +28,7 @@ import {
   createJobSeekerForPartner,
   connectExistingAccount,
   getProfileForPartner,
-  buildPartnerProfilePayload,
+  getPrimaryResumeId,
 } from "../services/partner/jobSeekers.js";
 import {
   requireActiveConnection,
@@ -39,7 +38,7 @@ import {
   partnerProfileCacheKey,
   ConnectionRequiredError,
 } from "../services/partner/connections.js";
-import { mintEmbedToken, verifyEmbedToken, EmbedTokenError } from "../services/partner/tokens.js";
+import { mintEmbedToken } from "../services/partner/tokens.js";
 import { handleCreateResume } from "../services/resume/ResumeService.js";
 import { buildResumeParserPort } from "../services/resume/deps.js";
 import { buildRepos } from "../repositories/index.js";
@@ -279,44 +278,26 @@ partnerRoutes.post("/v1/embed-tokens", partnerAuth("read:profile"), async (c) =>
     throw e;
   }
   const { token, expiresAt } = await mintEmbedToken(partnerId, parsed.data.userId, parsed.data.kind);
+  // The embed reuses the canonical `/embedded/resume/:identifier` page — the
+  // token rides as `?pt=` and grants owner-level read of the connected job
+  // seeker's (possibly private) resume. No bespoke partner embed page/endpoint.
+  const resumeId = await getPrimaryResumeId(parsed.data.userId);
   const base = (
     process?.env?.FRONTEND_URL || (globalThis as any).__ENV?.FRONTEND_URL || "https://hired.video"
   ).replace(/\/$/, "");
+  const embedUrl = resumeId
+    ? `${base}/embedded/resume/${resumeId}?pt=${encodeURIComponent(token)}`
+    : null;
   return c.json(
     success({
       token,
       kind: parsed.data.kind,
-      embedUrl: `${base}/embedded/profile/${token}`,
+      resumeId,
+      embedUrl,
       expiresAt: expiresAt.toISOString(),
     }),
     200,
   );
-});
-
-// ── GET /v1/embed/resolve?token= — PUBLIC, token-authenticated ──────────────
-// The iframe (embedded on the partner's site) fetches this. Auth IS the signed
-// token; we re-check the connection is still active so a job seeker's revoke
-// cuts off live embeds even within a token's TTL.
-partnerRoutes.get("/v1/embed/resolve", async (c) => {
-  const token = c.req.query("token");
-  let payload;
-  try {
-    payload = await verifyEmbedToken(token);
-  } catch (e) {
-    const msg = e instanceof EmbedTokenError ? e.message : "Invalid embed token.";
-    return c.json(error("UNAUTHORIZED", msg), 401);
-  }
-  try {
-    await requireActiveConnection(payload.p, payload.u);
-  } catch (e) {
-    if (e instanceof ConnectionRequiredError) {
-      return c.json(error("REVOKED", "This job seeker has revoked access."), 403);
-    }
-    throw e;
-  }
-  const profile = await buildPartnerProfilePayload(payload.u, { includeEmail: false });
-  if (!profile) return c.json(error("NOT_FOUND", "Profile not found"), 404);
-  return c.json(success({ kind: payload.k, ...profile }), 200);
 });
 
 partnerRoutes.all("*", (c) =>

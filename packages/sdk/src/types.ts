@@ -112,7 +112,11 @@ export interface CreateEmbedTokenInput {
 export interface EmbedToken {
   token: string;
   kind: PartnerEmbedKind;
-  /** Ready-to-iframe URL. */
-  embedUrl: string;
+  /** The resume the embed renders (the connected user's active/master resume),
+   *  or null if they have none yet. */
+  resumeId: string | null;
+  /** Ready-to-iframe URL (canonical resume embed page with the token attached).
+   *  Null when the user has no resume to embed. */
+  embedUrl: string | null;
   expiresAt: string;
 }

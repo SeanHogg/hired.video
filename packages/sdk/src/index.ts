@@ -8,6 +8,6 @@
 export { HiredClient } from "./client.js";
 export type { HiredClientOptions } from "./client.js";
 export { HiredApiError, HiredConfigError } from "./errors.js";
-export { mountHiredProfile, buildEmbedUrl } from "./embed.js";
+export { mountHiredProfile } from "./embed.js";
 export type { MountHiredProfileOptions, HiredEmbedHandle } from "./embed.js";
 export * from "./types.js";

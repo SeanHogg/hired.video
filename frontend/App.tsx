@@ -311,7 +311,6 @@ const BookingsHost = lazy(() => import("./pages/bookings/BookingsHost"));
 const ArticlesIndex = lazy(() => import("./pages/ArticlesIndex"));
 const ArticleView = lazy(() => import("./pages/ArticleView"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
-const EmbeddedPartnerProfile = lazy(() => import("./pages/EmbeddedPartnerProfile"));
 const ConnectAuthorize = lazy(() => import("./pages/ConnectAuthorize"));
 const EmbeddedStudioProject = lazy(() => import("./pages/EmbeddedStudioProject"));
 const SharedCandidateResume = lazy(() => import("./pages/SharedCandidateResume"));
@@ -1257,11 +1256,6 @@ const App = () => (
                       <Route
                         path="/embedded/resumes/:identifier"
                         element={<EmbeddedResume />}
-                      />
-                      {/* Partner-embedded profile (keyless token) — bare iframe page */}
-                      <Route
-                        path="/embedded/profile/:token"
-                        element={<EmbeddedPartnerProfile />}
                       />
                       {/* #696 — project-keyed studio embed: works for any
                           public project, including ones with no published

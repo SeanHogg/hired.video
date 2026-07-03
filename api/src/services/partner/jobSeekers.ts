@@ -13,6 +13,7 @@ import { hashPassword } from "../../routes/auth.js";
 import { getOrSetCached } from "../../utils/edge-cache.js";
 import { buildRepos } from "../../repositories/index.js";
 import { rowToResume } from "../../handlers/resume-serializer.js";
+import { getDefaultProfileSections } from "../../../../shared/profile-sections.js";
 import {
   upsertConnection,
   findUserByEmail,
@@ -105,6 +106,15 @@ export async function createJobSeekerForPartner(
     .returning({ id: users.id });
 
   if (!user) throw new Error("Failed to create job seeker account.");
+
+  // Seed the user_profiles row with role-based section-visibility defaults —
+  // the same seed handleRegister does, so partner-created accounts render
+  // /people/[id] identically to organic signups (was missing before).
+  await db
+    .insert(userProfiles)
+    .values({ userId: user.id, profileSections: getDefaultProfileSections("job_seeker") } as any)
+    .onConflictDoNothing({ target: userProfiles.userId })
+    .catch(() => undefined);
 
   const connection = await upsertConnection(
     {
@@ -212,11 +222,7 @@ export async function buildPartnerProfilePayload(
   // surface. Read via the repo so serialization matches every other surface.
   const repo = buildRepos(db).resumes;
   const rows = await repo.findAllForOwner(userId);
-  const chosen =
-    rows.find((r) => (r as any).isActive) ??
-    rows.find((r) => (r as any).isMaster) ??
-    rows[0] ??
-    null;
+  const chosen = selectPrimaryResume(rows as Array<any>);
 
   return {
     user: {
@@ -231,6 +237,21 @@ export async function buildPartnerProfilePayload(
     },
     resume: chosen ? rowToResume(chosen, { isOwner: false, isWatched: false, viewCount: 0 }) : null,
   };
+}
+
+/** Pick the resume a partner surfaces — the active one, else master, else the
+ *  first. ONE selection rule shared by the profile payload and embed minting. */
+export function selectPrimaryResume<T extends { isActive?: boolean; isMaster?: boolean }>(
+  rows: T[],
+): T | null {
+  return rows.find((r) => r.isActive) ?? rows.find((r) => r.isMaster) ?? rows[0] ?? null;
+}
+
+/** The identifier the partner embed iframe points at (reuses the canonical
+ *  `/embedded/resume/:identifier` surface). Null when the user has no resume. */
+export async function getPrimaryResumeId(userId: string, db = getDb()): Promise<string | null> {
+  const rows = await buildRepos(db).resumes.findAllForOwner(userId);
+  return selectPrimaryResume(rows as Array<{ id: string; isActive?: boolean; isMaster?: boolean }>)?.id ?? null;
 }
 
 /**

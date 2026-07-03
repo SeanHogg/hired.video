@@ -289,10 +289,13 @@ export class ResumeService {
     return response.data;
   }
 
-  /** Get resume for embedding (server bypasses privacy checks for this endpoint). */
-  async getResumeForEmbed(identifier: string): Promise<FrontendResume> {
+  /** Get resume for embedding (server bypasses privacy checks for this endpoint).
+   *  `partnerToken` (?pt=) is an optional partner embed token that grants read
+   *  of a consented job seeker's private resume for a partner-platform embed. */
+  async getResumeForEmbed(identifier: string, partnerToken?: string): Promise<FrontendResume> {
+    const qs = partnerToken ? `?pt=${encodeURIComponent(partnerToken)}` : "";
     const response = await apiClient.get<FrontendResume>(
-      `/api/resumes/embedded/${identifier}`,
+      `/api/resumes/embedded/${identifier}${qs}`,
       ResumeSchema as any,
     );
     return response.data;

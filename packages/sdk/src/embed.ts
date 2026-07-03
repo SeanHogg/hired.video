@@ -1,18 +1,16 @@
 /**
  * Framework-agnostic embed helper. Renders a connected job seeker's Hired.Video
- * profile/resume inside an iframe. Use this in plain JS / Vue / Svelte / etc.;
- * React users can use `@seanhogg/hired-video-sdk/react` instead.
+ * resume inside an iframe. Use this in plain JS / Vue / Svelte / etc.; React
+ * users can use `@seanhogg/hired-video-sdk/react` instead.
  *
- * The `token` must be minted server-side via `HiredClient.createEmbedToken` and
- * handed to the browser — the partner API key is NEVER exposed here.
+ * Pass the `embedUrl` returned by `HiredClient.createEmbedToken` — it points at
+ * the canonical Hired.Video embed surface with the short-lived token attached.
+ * The partner API key is NEVER exposed here.
  */
-const DEFAULT_BASE_URL = "https://hired.video";
 
 export interface MountHiredProfileOptions {
-  /** Short-lived embed token from `HiredClient.createEmbedToken`. */
-  token: string;
-  /** API origin (must match the one that minted the token). */
-  baseUrl?: string;
+  /** The `embedUrl` from `HiredClient.createEmbedToken`. */
+  embedUrl: string;
   /** iframe height (px or any CSS length). Default "720px". */
   height?: string | number;
   /** iframe title for accessibility. Default "Hired.Video profile". */
@@ -34,17 +32,13 @@ function resolveTarget(target: string | HTMLElement): HTMLElement {
   return el;
 }
 
-/** Build the embed iframe URL from a token. */
-export function buildEmbedUrl(token: string, baseUrl: string = DEFAULT_BASE_URL): string {
-  return `${baseUrl.replace(/\/$/, "")}/embedded/profile/${encodeURIComponent(token)}`;
-}
-
 /**
  * Mount the Hired.Video profile embed into `target` and return a handle.
  *
  * ```js
  * import { mountHiredProfile } from "@seanhogg/hired-video-sdk";
- * const embed = mountHiredProfile("#hired-profile", { token });
+ * // embedUrl came from your server: hired.createEmbedToken({ userId })
+ * const embed = mountHiredProfile("#hired-profile", { embedUrl });
  * // later: embed.destroy();
  * ```
  */
@@ -52,10 +46,10 @@ export function mountHiredProfile(
   target: string | HTMLElement,
   options: MountHiredProfileOptions,
 ): HiredEmbedHandle {
-  if (!options?.token) throw new Error("Hired.Video embed: `token` is required.");
+  if (!options?.embedUrl) throw new Error("Hired.Video embed: `embedUrl` is required.");
   const container = resolveTarget(target);
   const iframe = document.createElement("iframe");
-  iframe.src = buildEmbedUrl(options.token, options.baseUrl);
+  iframe.src = options.embedUrl;
   iframe.title = options.title ?? "Hired.Video profile";
   iframe.loading = "lazy";
   iframe.style.width = "100%";

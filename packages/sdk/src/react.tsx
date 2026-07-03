@@ -1,19 +1,16 @@
 /**
- * @seanhogg/hired-video-sdk/react — React components for embedding a Hired.Video profile
- * or resume. `react` is a peer dependency (not bundled).
+ * @seanhogg/hired-video-sdk/react — React component for embedding a Hired.Video
+ * profile/resume. `react` is a peer dependency (not bundled).
  *
- * The `token` must be minted server-side via `HiredClient.createEmbedToken`;
- * pass it to the component. Renders a responsive iframe pointing at the
+ * Pass the `embedUrl` returned by `HiredClient.createEmbedToken` (minted
+ * server-side). Renders a responsive iframe pointing at the canonical
  * Hired.Video embed surface.
  */
 import * as React from "react";
-import { buildEmbedUrl } from "./embed.js";
 
 export interface HiredProfileEmbedProps {
-  /** Short-lived embed token from `HiredClient.createEmbedToken`. */
-  token: string;
-  /** API origin (must match the one that minted the token). */
-  baseUrl?: string;
+  /** The `embedUrl` from `HiredClient.createEmbedToken`. */
+  embedUrl: string;
   /** iframe height (px number or CSS length). Default 720. */
   height?: string | number;
   /** iframe title for accessibility. */
@@ -29,22 +26,21 @@ export interface HiredProfileEmbedProps {
  *
  * ```tsx
  * import { HiredProfileEmbed } from "@seanhogg/hired-video-sdk/react";
- * <HiredProfileEmbed token={token} height={800} />
+ * // embedUrl came from your server: hired.createEmbedToken({ userId })
+ * <HiredProfileEmbed embedUrl={embedUrl} height={800} />
  * ```
  */
 export function HiredProfileEmbed({
-  token,
-  baseUrl,
+  embedUrl,
   height = 720,
   title = "Hired.Video profile",
   className,
   style,
   onLoad,
 }: HiredProfileEmbedProps): React.ReactElement {
-  const src = buildEmbedUrl(token, baseUrl);
   return (
     <iframe
-      src={src}
+      src={embedUrl}
       title={title}
       loading="lazy"
       className={className}
@@ -60,7 +56,5 @@ export function HiredProfileEmbed({
   );
 }
 
-/** Alias — `HiredResumeEmbed` renders the same surface (the embed page shows
- *  the profile header + resume together). Kept as a named export so partner
- *  code reads intentfully when they only care about the resume. */
+/** Alias — the embed surface shows the job seeker's profile + resume together. */
 export { HiredProfileEmbed as HiredResumeEmbed };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { Share2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +16,11 @@ import { isUuid } from "@shared/value-types";
 
 export default function EmbeddedResume() {
   const { identifier } = useParams<{ identifier: string }>();
+  // `?pt=` — partner embed token. When present, the job seeker consented to a
+  // partner platform embedding this (possibly private) resume; the server grants
+  // read via the token. Same page serves first-party and partner embeds.
+  const [searchParams] = useSearchParams();
+  const partnerToken = searchParams.get("pt") ?? undefined;
   const [user, setUser] = useState<UserProfile | null>(null);
   const [resume, setResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,7 +35,7 @@ export default function EmbeddedResume() {
     }
 
     loadResumeData();
-  }, [identifier]);
+  }, [identifier, partnerToken]);
 
   const loadResumeData = async () => {
     try {
@@ -41,8 +46,9 @@ export default function EmbeddedResume() {
       let resumeData: Resume | null = null;
 
       // First attempt: use the embed endpoint which bypasses auth/privacy
+      // (or grants partner-token access to a consented private resume).
       try {
-        resumeData = await resumeService.getResumeForEmbed(identifier);
+        resumeData = await resumeService.getResumeForEmbed(identifier, partnerToken);
       } catch (err) {
         console.log("Embedded endpoint failed, will try fallback logic", err);
       }

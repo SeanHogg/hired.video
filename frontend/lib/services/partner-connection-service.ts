@@ -3,18 +3,16 @@
  *
  * Consumes the "partner platform" consent API. A partner platform can ask a
  * hired.video job seeker to connect their existing account (OAuth-style consent
- * flow) and, once authorized, embed the seeker's profile/resume on the partner
- * site via a keyless token.
+ * flow); the job seeker approves/revokes here. The embed itself reuses the
+ * canonical `/embedded/resume/:identifier` page (with a `?pt=` partner token),
+ * so there is no embed resolver in this service.
  *
- * All authenticated methods go through the shared `apiClient`, so they inherit
- * the standard `{ success, data }` envelope handling + Bearer token injection.
- * `resolveEmbed` hits a PUBLIC endpoint that ignores auth — the apiClient still
- * attaches the token if one is present, which the endpoint simply ignores.
+ * All methods go through the shared `apiClient`, inheriting the standard
+ * `{ success, data }` envelope handling + Bearer token injection.
  */
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
-import type { Resume as FrontendResume } from "@/types/resume";
 
 // ============================================================================
 // SCHEMAS
@@ -73,35 +71,6 @@ export type PartnerConnection = z.infer<typeof PartnerConnectionSchema>;
 const StatusResponseSchema = z.object({
   status: PartnerConnectionStatusSchema,
 });
-
-/** User summary returned by the public embed resolver. */
-export const PartnerEmbedUserSchema = z.object({
-  id: z.string(),
-  name: z.string().nullable().optional(),
-  email: z.string().nullable().optional(),
-  handle: z.string().nullable().optional(),
-  headline: z.string().nullable().optional(),
-  location: z.string().nullable().optional(),
-  avatarUrl: z.string().nullable().optional(),
-  videoPitchUrl: z.string().nullable().optional(),
-});
-export type PartnerEmbedUser = z.infer<typeof PartnerEmbedUserSchema>;
-
-/**
- * Public embed payload (GET /api/partner/v1/embed/resolve). `resume` matches
- * the canonical Resume shape (same `rowToResume` serializer as the resume
- * embed endpoint); validated loosely as the full ResumeSchema is heavy and
- * the renderer is defensive about missing fields.
- */
-export const PartnerEmbedPayloadSchema = z.object({
-  kind: z.enum(["profile", "resume"]),
-  user: PartnerEmbedUserSchema,
-  resume: z.any().nullable(),
-});
-export type PartnerEmbedPayload = Omit<
-  z.infer<typeof PartnerEmbedPayloadSchema>,
-  "resume"
-> & { resume: FrontendResume | null };
 
 // ============================================================================
 // SCOPE LABELS
@@ -166,20 +135,6 @@ export class PartnerConnectionService {
       StatusResponseSchema,
     );
     return response.data.status;
-  }
-
-  /**
-   * Resolve a public embed token → profile/resume payload. Uses the PUBLIC
-   * endpoint (no auth required); the apiClient may still attach a Bearer
-   * token, which the endpoint ignores. Throws on revoked/expired tokens
-   * (401/403) so the embed page can render its "no longer available" state.
-   */
-  async resolveEmbed(token: string): Promise<PartnerEmbedPayload> {
-    const response = await apiClient.get(
-      `/api/partner/v1/embed/resolve?token=${encodeURIComponent(token)}`,
-      PartnerEmbedPayloadSchema,
-    );
-    return response.data as PartnerEmbedPayload;
   }
 }
 

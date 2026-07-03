@@ -63,6 +63,8 @@ import {
   handleWatchResume,
 } from "../services/resume/ResumeService.js";
 import { buildResumeDeps } from "../services/resume/deps.js";
+import { verifyEmbedToken } from "../services/partner/tokens.js";
+import { requireActiveConnection } from "../services/partner/connections.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
 import { computeDiffPercent } from "../utils/resume-diff.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
@@ -928,11 +930,37 @@ resumeRoutes.get("/validateslug", async (c) => {
 // embeds, social feed). Owners can additionally embed their own private resumes.
 // View recording is skipped — embeds would otherwise inflate analytics with
 // every pageload of a page containing an embed.
+/** Resolve a partner embed token → the user id it grants owner-level read for,
+ *  or null if the token is invalid/expired or the connection was revoked. */
+async function partnerEmbedViewer(pt: string): Promise<string | null> {
+  try {
+    const payload = await verifyEmbedToken(pt);
+    await requireActiveConnection(payload.p, payload.u);
+    return payload.u;
+  } catch {
+    return null;
+  }
+}
+
 resumeRoutes.get("/embedded/:identifier", async (c) => {
+  // Partner embed (?pt=<embed token>): a job seeker who consented to a partner
+  // platform can have their resume — even a PRIVATE one — embedded there. The
+  // signed token grants owner-level read for THAT user only, so this one
+  // endpoint + the EmbeddedResume page serve partner embeds too (no bespoke
+  // partner embed surface). requireActiveConnection re-checks consent so a
+  // revoke cuts off live embeds; handleGetResume still enforces that the
+  // resume belongs to the token's user (viewerId === row.userId), so a swapped
+  // identifier can't leak someone else's private resume.
+  let viewerId = c.var.user?.sub ?? null;
+  const pt = c.req.query("pt");
+  if (pt) {
+    const grantedUserId = await partnerEmbedViewer(pt);
+    if (grantedUserId) viewerId = grantedUserId;
+  }
   const result = await handleGetResume(
     buildResumeDeps(() => Promise.resolve({})),
     {
-      viewerId: c.var.user?.sub ?? null,
+      viewerId,
       ipHash: hashClientIp(c),
       ipCountry: ipCountryFromCtx(c),
       referrer: c.req.header("referer") ?? c.req.header("referrer") ?? null,

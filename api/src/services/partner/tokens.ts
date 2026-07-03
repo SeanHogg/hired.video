@@ -4,9 +4,10 @@
  * the partner's system-to-system key to the browser.
  *
  * Flow: the partner's backend calls POST /api/partner/v1/embed-tokens (partner
- * key auth, active connection required) → receives a token → passes it to their
- * frontend → the iframe hits the PUBLIC /embedded/profile/:token surface, which
- * verifies the token here and re-checks the connection is still active.
+ * key auth, active connection required) → receives an embedUrl on the canonical
+ * /embedded/resume/:id?pt=<token> page → passes it to their frontend → the
+ * iframe loads it; GET /api/resumes/embedded/:id verifies the token here (via
+ * partnerEmbedViewer) and re-checks the connection is still active.
  *
  * Format: `<base64url(payload)>.<hmacHex>` where payload = {p,u,k,exp}.
  * Reuses the shared HMAC primitive (keyed by JWT_SECRET) so mint/verify can't

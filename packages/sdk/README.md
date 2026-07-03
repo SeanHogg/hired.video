@@ -74,10 +74,12 @@ server-side, hand it to your frontend, and render an iframe.
 **Server:**
 
 ```ts
-const { token, embedUrl } = await hired.createEmbedToken({
+const { embedUrl } = await hired.createEmbedToken({
   userId,
   kind: "profile", // or "resume"
 });
+// Pass `embedUrl` to your frontend. It renders the job seeker's resume via
+// Hired.Video's canonical embed page with a short-lived token attached.
 ```
 
 **React:**
@@ -85,7 +87,7 @@ const { token, embedUrl } = await hired.createEmbedToken({
 ```tsx
 import { HiredProfileEmbed } from "@seanhogg/hired-video-sdk/react";
 
-<HiredProfileEmbed token={token} height={800} />;
+<HiredProfileEmbed embedUrl={embedUrl} height={800} />;
 ```
 
 **Anywhere (vanilla JS):**
@@ -93,12 +95,13 @@ import { HiredProfileEmbed } from "@seanhogg/hired-video-sdk/react";
 ```js
 import { mountHiredProfile } from "@seanhogg/hired-video-sdk";
 
-const embed = mountHiredProfile("#hired-profile", { token });
+const embed = mountHiredProfile("#hired-profile", { embedUrl });
 // embed.destroy() to remove it
 ```
 
 The embed re-checks consent on every load, so a revoked connection stops
-rendering immediately even within a token's lifetime.
+rendering immediately even within a token's lifetime. `embedUrl` is `null`
+if the job seeker has no resume yet.
 
 ## API
 
