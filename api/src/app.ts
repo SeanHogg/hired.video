@@ -133,6 +133,7 @@ import { adsRoutes } from "./routes/ads.js";
 import { apiKeyRoutes } from "./routes/apikeys.js";
 import { partnerRoutes } from "./routes/partner.js";
 import { partnerConsentRoutes } from "./routes/partner-consent.js";
+import { partnerAccountRoutes } from "./routes/partner-account.js";
 import { adminPartnerRoutes } from "./routes/admin-partners.js";
 import { listsRoutes } from "./routes/lists.js";
 import { followUpRoutes } from "./routes/followups.js";
@@ -848,6 +849,7 @@ export function createApp() {
   // revoke surface; `/api/admin/partners` is SuperAdmin key issuance.
   app.route("/api/partner", partnerRoutes);
   app.route("/api/partner-consent", partnerConsentRoutes);
+  app.route("/api/partner-account", partnerAccountRoutes);
   app.route("/api/admin/partners", adminPartnerRoutes);
   // SuperAdmin management portal — impersonation sessions, user management, modules, audit
   // Must be mounted BEFORE /api/admin to avoid the admin catch-all intercepting these routes.

@@ -1,7 +1,7 @@
 /**
  * Framework-agnostic embed helper. Renders a connected job seeker's Hired.Video
  * profile/resume inside an iframe. Use this in plain JS / Vue / Svelte / etc.;
- * React users can use `@hiredvideo/sdk/react` instead.
+ * React users can use `@seanhogg/hired-video-sdk/react` instead.
  *
  * The `token` must be minted server-side via `HiredClient.createEmbedToken` and
  * handed to the browser — the partner API key is NEVER exposed here.
@@ -43,7 +43,7 @@ export function buildEmbedUrl(token: string, baseUrl: string = DEFAULT_BASE_URL)
  * Mount the Hired.Video profile embed into `target` and return a handle.
  *
  * ```js
- * import { mountHiredProfile } from "@hiredvideo/sdk";
+ * import { mountHiredProfile } from "@seanhogg/hired-video-sdk";
  * const embed = mountHiredProfile("#hired-profile", { token });
  * // later: embed.destroy();
  * ```

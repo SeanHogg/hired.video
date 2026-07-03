@@ -19,8 +19,11 @@ import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import {
   createPartner,
   listPartners,
+  listPartnersByStatus,
   getPartner,
   setPartnerStatus,
+  approvePartner,
+  rejectPartner,
 } from "../services/partner/partners.js";
 import {
   createPartnerApiKey,
@@ -28,14 +31,49 @@ import {
   revokePartnerApiKey,
 } from "../services/partner/keys.js";
 import { listConnectionsForPartner } from "../services/partner/connections.js";
+import { notifyOwnerApproved, notifyOwnerRejected } from "../services/partner/emails.js";
+import { getDb, schema } from "../db/index.js";
+import { eq } from "drizzle-orm";
 import { PARTNER_SCOPES, DEFAULT_PARTNER_SCOPES, type PartnerScope } from "../../../shared/partner.js";
 
 export const adminPartnerRoutes = new Hono<AppEnv>();
 
 adminPartnerRoutes.use("*", superAdminMiddleware);
 
+/** Look up a partner owner's email so approval/rejection notices reach them. */
+async function ownerEmail(ownerUserId: string | null): Promise<string | null> {
+  if (!ownerUserId) return null;
+  const db = getDb();
+  const [u] = await db
+    .select({ email: schema.users.email })
+    .from(schema.users)
+    .where(eq(schema.users.id, ownerUserId))
+    .limit(1);
+  return u?.email ?? null;
+}
+
 adminPartnerRoutes.get("/", async (c) => {
-  return c.json(success({ partners: await listPartners() }), 200);
+  const status = c.req.query("status");
+  const partners = status ? await listPartnersByStatus(status) : await listPartners();
+  return c.json(success({ partners }), 200);
+});
+
+// POST /:id/approve — approve a pending request + email the owner.
+adminPartnerRoutes.post("/:id/approve", async (c) => {
+  const partner = await approvePartner(c.req.param("id"), c.var.user?.sub ?? "");
+  if (!partner) return c.json(error("NOT_FOUND", "Partner not found"), 404);
+  const email = await ownerEmail(partner.ownerUserId);
+  if (email) await notifyOwnerApproved(partner, { email }).catch(() => undefined);
+  return c.json(success({ partner }), 200);
+});
+
+// POST /:id/reject — reject a pending request + email the owner.
+adminPartnerRoutes.post("/:id/reject", async (c) => {
+  const partner = await rejectPartner(c.req.param("id"));
+  if (!partner) return c.json(error("NOT_FOUND", "Partner not found"), 404);
+  const email = await ownerEmail(partner.ownerUserId);
+  if (email) await notifyOwnerRejected(partner, { email }).catch(() => undefined);
+  return c.json(success({ partner }), 200);
 });
 
 const CreatePartnerBody = z.object({

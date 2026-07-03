@@ -1,5 +1,5 @@
 /**
- * @hiredvideo/sdk/react — React components for embedding a Hired.Video profile
+ * @seanhogg/hired-video-sdk/react — React components for embedding a Hired.Video profile
  * or resume. `react` is a peer dependency (not bundled).
  *
  * The `token` must be minted server-side via `HiredClient.createEmbedToken`;
@@ -28,7 +28,7 @@ export interface HiredProfileEmbedProps {
  * Embed a connected job seeker's Hired.Video profile + resume.
  *
  * ```tsx
- * import { HiredProfileEmbed } from "@hiredvideo/sdk/react";
+ * import { HiredProfileEmbed } from "@seanhogg/hired-video-sdk/react";
  * <HiredProfileEmbed token={token} height={800} />
  * ```
  */

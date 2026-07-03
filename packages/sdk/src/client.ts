@@ -140,7 +140,7 @@ export class HiredClient {
   /**
    * Mint a short-lived embed token for a connected job seeker. Pass the
    * returned `embedUrl` (or `token`) to your frontend to render the profile in
-   * an iframe (see the `@hiredvideo/sdk/react` entry or `mountHiredProfile`).
+   * an iframe (see the `@seanhogg/hired-video-sdk/react` entry or `mountHiredProfile`).
    */
   createEmbedToken(input: CreateEmbedTokenInput): Promise<EmbedToken> {
     return this.request("POST", "/api/partner/v1/embed-tokens", input);

@@ -16,12 +16,17 @@ CREATE TABLE IF NOT EXISTS "partners" (
   "contact_email" varchar(255),
   "website_url" text,
   "logo_url" text,
+  "owner_user_id" uuid REFERENCES "users"("id") ON DELETE CASCADE,
+  "request_note" text,
   "status" varchar(20) DEFAULT 'active' NOT NULL,
+  "approved_at" timestamptz,
+  "approved_by" uuid REFERENCES "users"("id") ON DELETE SET NULL,
   "created_by" uuid REFERENCES "users"("id") ON DELETE SET NULL,
   "created_at" timestamptz DEFAULT now() NOT NULL,
   "updated_at" timestamptz DEFAULT now() NOT NULL
 );
 CREATE INDEX IF NOT EXISTS "idx_partners_status" ON "partners" ("status");
+CREATE INDEX IF NOT EXISTS "idx_partners_owner" ON "partners" ("owner_user_id");
 
 CREATE TABLE IF NOT EXISTS "partner_api_keys" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

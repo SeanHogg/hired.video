@@ -46,14 +46,26 @@ export const partners = pgTable(
     // knows who they're authorizing) and logo.
     websiteUrl: text("website_url"),
     logoUrl: text("logo_url"),
-    // "active" | "suspended" — a suspended partner's keys stop authenticating.
+    // The account owner who REQUESTED partner access (self-service flow). They
+    // manage their own API keys once approved. Null for admin-provisioned
+    // partners. One partner per owner is enforced at the request route.
+    ownerUserId: uuid("owner_user_id").references(() => users.id, { onDelete: "cascade" }),
+    // Free-text justification supplied with the request (shown to the admin).
+    requestNote: text("request_note"),
+    // "pending" (awaiting SuperAdmin approval) | "active" | "suspended" |
+    // "rejected". Only "active" partners' keys authenticate.
     status: varchar("status", { length: 20 }).default("active").notNull(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
     // SuperAdmin who provisioned the partner (audit).
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [index("idx_partners_status").on(t.status)],
+  (t) => [
+    index("idx_partners_status").on(t.status),
+    index("idx_partners_owner").on(t.ownerUserId),
+  ],
 );
 
 export const partnerApiKeys = pgTable(

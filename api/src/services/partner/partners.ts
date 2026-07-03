@@ -16,7 +16,10 @@ export interface PartnerView {
   contactEmail: string | null;
   websiteUrl: string | null;
   logoUrl: string | null;
+  ownerUserId: string | null;
+  requestNote: string | null;
   status: string;
+  approvedAt: Date | null;
   createdAt: Date;
 }
 
@@ -28,7 +31,10 @@ export function toPartnerView(row: PartnerRow): PartnerView {
     contactEmail: row.contactEmail,
     websiteUrl: row.websiteUrl,
     logoUrl: row.logoUrl,
+    ownerUserId: row.ownerUserId,
+    requestNote: row.requestNote,
     status: row.status,
+    approvedAt: row.approvedAt,
     createdAt: row.createdAt,
   };
 }
@@ -42,6 +48,16 @@ function slugify(input: string): string {
     .slice(0, 80);
 }
 
+async function uniqueSlug(base: string, db: ReturnType<typeof getDb>): Promise<string> {
+  const baseSlug = slugify(base) || `partner-${Date.now().toString(36)}`;
+  const existing = await db
+    .select({ id: partners.id })
+    .from(partners)
+    .where(eq(partners.slug, baseSlug))
+    .limit(1);
+  return existing.length > 0 ? `${baseSlug}-${crypto.randomUUID().slice(0, 6)}` : baseSlug;
+}
+
 export interface CreatePartnerInput {
   name: string;
   slug?: string;
@@ -49,16 +65,14 @@ export interface CreatePartnerInput {
   websiteUrl?: string | null;
   logoUrl?: string | null;
   createdBy?: string | null;
+  /** Admin-provisioned partners are active immediately; requests are pending. */
+  status?: "active" | "pending";
 }
 
+/** Admin-provisioned partner (active immediately). */
 export async function createPartner(input: CreatePartnerInput, db = getDb()): Promise<PartnerView> {
-  const baseSlug = slugify(input.slug || input.name) || `partner-${Date.now().toString(36)}`;
-  // Ensure slug uniqueness — append a short suffix on collision.
-  let slug = baseSlug;
-  const existing = await db.select({ id: partners.id }).from(partners).where(eq(partners.slug, slug)).limit(1);
-  if (existing.length > 0) {
-    slug = `${baseSlug}-${crypto.randomUUID().slice(0, 6)}`;
-  }
+  const slug = await uniqueSlug(input.slug || input.name, db);
+  const status = input.status ?? "active";
   const [row] = await db
     .insert(partners)
     .values({
@@ -67,10 +81,80 @@ export async function createPartner(input: CreatePartnerInput, db = getDb()): Pr
       contactEmail: input.contactEmail ?? null,
       websiteUrl: input.websiteUrl ?? null,
       logoUrl: input.logoUrl ?? null,
+      status,
+      approvedAt: status === "active" ? new Date() : null,
       createdBy: input.createdBy ?? null,
     } as any)
     .returning();
   return toPartnerView(row as PartnerRow);
+}
+
+export interface RequestPartnerInput {
+  ownerUserId: string;
+  name: string;
+  contactEmail?: string | null;
+  websiteUrl?: string | null;
+  requestNote?: string | null;
+}
+
+/** Self-service partner-access request from an account owner → status pending. */
+export async function requestPartner(input: RequestPartnerInput, db = getDb()): Promise<PartnerView> {
+  const slug = await uniqueSlug(input.name, db);
+  const [row] = await db
+    .insert(partners)
+    .values({
+      name: input.name,
+      slug,
+      contactEmail: input.contactEmail ?? null,
+      websiteUrl: input.websiteUrl ?? null,
+      ownerUserId: input.ownerUserId,
+      requestNote: input.requestNote ?? null,
+      status: "pending",
+    } as any)
+    .returning();
+  return toPartnerView(row as PartnerRow);
+}
+
+/** The partner owned by a given account owner (self-service surface). */
+export async function getPartnerByOwner(ownerUserId: string, db = getDb()): Promise<PartnerView | null> {
+  const [row] = await db
+    .select()
+    .from(partners)
+    .where(eq(partners.ownerUserId, ownerUserId))
+    .orderBy(desc(partners.createdAt))
+    .limit(1);
+  return row ? toPartnerView(row as PartnerRow) : null;
+}
+
+export async function approvePartner(
+  partnerId: string,
+  approvedBy: string,
+  db = getDb(),
+): Promise<PartnerView | null> {
+  const [row] = await db
+    .update(partners)
+    .set({ status: "active", approvedAt: new Date(), approvedBy, updatedAt: new Date() } as any)
+    .where(eq(partners.id, partnerId))
+    .returning();
+  return row ? toPartnerView(row as PartnerRow) : null;
+}
+
+export async function rejectPartner(partnerId: string, db = getDb()): Promise<PartnerView | null> {
+  const [row] = await db
+    .update(partners)
+    .set({ status: "rejected", updatedAt: new Date() } as any)
+    .where(eq(partners.id, partnerId))
+    .returning();
+  return row ? toPartnerView(row as PartnerRow) : null;
+}
+
+export async function listPartnersByStatus(status: string, db = getDb()): Promise<PartnerView[]> {
+  const rows = await db
+    .select()
+    .from(partners)
+    .where(eq(partners.status, status))
+    .orderBy(desc(partners.createdAt));
+  return rows.map((r) => toPartnerView(r as PartnerRow));
 }
 
 export async function getPartner(partnerId: string, db = getDb()): Promise<PartnerView | null> {
