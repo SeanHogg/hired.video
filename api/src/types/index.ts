@@ -112,6 +112,9 @@ import type { Context } from "hono";
 
 export interface Variables {
   user: JwtPayload;
+  /** Set by partnerAuthMiddleware on `/api/partner/*` — the authenticated
+   *  external partner (system-to-system key auth), never a logged-in user. */
+  partner?: { partnerId: string; keyId: string; scopes: string[] };
 }
 
 export type AppEnv = { Bindings: Env; Variables: Variables };

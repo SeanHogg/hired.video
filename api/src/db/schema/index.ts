@@ -93,3 +93,5 @@ export * from "./roleFeatureAccess.js";
 export * from "./usageTracking.js";
 export * from "./social.js";
 export * from "./tenantIntegrations.js";
+
+export * from "./partners.js";

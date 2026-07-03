@@ -131,6 +131,9 @@ import { calibrationRoutes } from "./routes/calibration.js";
 import { oauthRoutes } from "./routes/oauth.js";
 import { adsRoutes } from "./routes/ads.js";
 import { apiKeyRoutes } from "./routes/apikeys.js";
+import { partnerRoutes } from "./routes/partner.js";
+import { partnerConsentRoutes } from "./routes/partner-consent.js";
+import { adminPartnerRoutes } from "./routes/admin-partners.js";
 import { listsRoutes } from "./routes/lists.js";
 import { followUpRoutes } from "./routes/followups.js";
 import { hiringOnboardingRoutes } from "./routes/onboarding-hiring.js";
@@ -375,6 +378,11 @@ export function createApp() {
     // (validated in the handler), not a user session. The loader + iframe
     // frame live under /embed/* (outside /api, so no auth gate).
     "/api/embed/v1",
+    // Partner system-to-system API (SDK). Authenticated by a partner API key
+    // in partnerAuthMiddleware, not a user session — same posture as the embed
+    // data API. The `/v1` suffix keeps this from also matching the
+    // user-authenticated `/api/partner-consent/*` surface.
+    "/api/partner/v1",
     "/api/whitelabel/portal",
     "/api/whitelabel/demo-request",
     "/api/whitelabel/roi-calculator",
@@ -835,6 +843,12 @@ export function createApp() {
   app.route("/api/references", referenceRoutes);
   app.route("/api/network", networkRoutes);
   app.route("/api/passwordmanagement", passwordManagementRoutes);
+  // Partner platform (SDK). `/api/partner/v1` is key-authenticated (public
+  // prefix); `/api/partner-consent` is the JOB SEEKER's JWT-gated approve/
+  // revoke surface; `/api/admin/partners` is SuperAdmin key issuance.
+  app.route("/api/partner", partnerRoutes);
+  app.route("/api/partner-consent", partnerConsentRoutes);
+  app.route("/api/admin/partners", adminPartnerRoutes);
   // SuperAdmin management portal — impersonation sessions, user management, modules, audit
   // Must be mounted BEFORE /api/admin to avoid the admin catch-all intercepting these routes.
   app.route("/api/admin/impersonate", superadminRoutes);
