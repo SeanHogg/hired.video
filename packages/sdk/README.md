@@ -1,8 +1,8 @@
 # @seanhogg/hired-video-sdk
 
 Official **Hired.Video** partner SDK. Let your platform create and connect
-Hired.Video job-seeker accounts, upload resumes, keep profiles in sync, and
-embed a job seeker's profile/resume UI directly in your product.
+Hired.Video job-seeker accounts, upload résumés, keep profiles in sync, and
+embed a job seeker's profile/résumé UI directly in your product.
 
 Built for platforms like **builderforce.ai** that want to display Hired.Video
 talent and hire them in-app.
@@ -16,9 +16,9 @@ npm install @seanhogg/hired-video-sdk
 1. Sign in to Hired.Video, open **Settings → Partner Access**, and
    **request partner access** (account owners only).
 2. A Hired.Video admin reviews and approves the request (you'll get an email).
-3. Back in **Settings → Partner Access**, **generate an API key**
-   (`hvpk_…`). Store it as a server-side secret — it is shown only once and
-   must never reach a browser.
+3. Back in **Settings → Partner Access**, **generate an API key** (`hvpk_…`).
+   Store it as a server-side secret — it is shown only once and must never
+   reach a browser.
 
 ## Quick start (server-side)
 
@@ -27,111 +27,261 @@ import { HiredClient } from "@seanhogg/hired-video-sdk";
 
 const hired = new HiredClient({ apiKey: process.env.HIRED_API_KEY! });
 
-// 1. Create a Hired.Video job-seeker account for one of your users.
+// Create (find-or-create) a Hired.Video job-seeker for one of your users.
 const created = await hired.jobSeekers.create({
   email: "jane@example.com",
   name: "Jane Doe",
   externalUserId: "your-user-123",
-  resume: { rawText: resumePlainText }, // or { content: jsonResume }
+  resume: { rawText: resumePlainText }, // or { content: jsonResume } or { file }
 });
-// → { userId, connectionId, status, claimUrl, resumeId }
+// → { userId, connectionId, status, claimUrl, resumeId, alreadyExisted }
 // Send `claimUrl` to the job seeker so they can log in and set a password.
 
-// 2. Add another resume later.
-await hired.jobSeekers.uploadResume(created.userId, {
-  title: "Senior Engineer resume",
-  content: jsonResumeDocument,
-});
-
-// 3. Read the live profile (reflects edits the job seeker makes on Hired.Video).
-const profile = await hired.jobSeekers.getProfile(created.userId);
+// Read the live, typed profile (skills etc. for prefill).
+const { profile, resumeStatus, updatedAt } = await hired.jobSeekers.getProfile(created.userId);
+// profile.skills → string[]  (prefill freelancer_profiles.skills)
 ```
 
-## Connecting an existing Hired.Video account
+---
 
-If the person already has a Hired.Video account, you can't take it over —
-the **job seeker must consent**. Start the flow and redirect them to the
-returned hosted consent screen:
+# Partner integration reference
+
+Answers to the common integration questions, with the exact request/response
+contracts. All types below are shipped in `dist/index.d.ts` — no local mirror
+needed.
+
+## 1. Résumé upload — text, JSON, or a file
+
+A résumé can be supplied three ways, in priority order: structured `content`
+(JSON Resume), `rawText`, or a `file`.
 
 ```ts
-const { consentUrl } = await hired.connect({
-  email: "existing@example.com",
-  externalUserId: "your-user-456",
-  redirectUrl: "https://your-app.com/after-connect",
+// (a) Structured JSON Resume — preferred, no parsing needed.
+await hired.jobSeekers.uploadResume(userId, { content: jsonResumeDoc });
+
+// (b) Plain text — parsed server-side (no AI) into JSON Resume.
+await hired.jobSeekers.uploadResume(userId, { rawText: extractedText });
+
+// (c) A file — pass a Blob/File/ArrayBuffer/Uint8Array or a base64 string.
+await hired.jobSeekers.uploadResume(userId, {
+  file: pdfBlob,           // the SDK base64-encodes it for you
+  filename: "jane.pdf",
+  contentType: "application/pdf",
 });
-// Redirect the job seeker to `consentUrl`. Once they approve, the connection
-// becomes active and you can read/embed their profile.
 ```
 
-The job seeker can review and revoke any connection at any time from their
-Hired.Video settings.
+**Supported `file` formats today:** `text/plain`, `application/json`. The
+server parses these in-Worker with no AI cost. **Max decoded size: 256 KB.**
 
-## Embedding a profile / resume
+> **PDF / DOC / DOCX are not yet parsed server-side.** They are rejected with
+> `HiredApiError.code === "UNSUPPORTED_MEDIA_TYPE"` (HTTP 415). Until server-side
+> binary extraction ships, **extract the text client-side** (you already render
+> the file) and send it as `rawText`. Server-side PDF/DOCX extraction is on the
+> roadmap; this SDK's `file` API won't change when it lands — the same call will
+> simply start accepting those MIME types.
 
-Never expose your API key to the browser. Mint a **short-lived embed token**
-server-side, hand it to your frontend, and render an iframe.
+On `create`, a `file` that can't be ingested does **not** fail account
+creation — you get the account plus `resumeError: { code, message }`, and can
+retry `uploadResume` later.
 
-**Server:**
+## 2. `getProfile` response schema
+
+`getProfile(userId)` returns a stable, documented shape (`ProfilePayload`):
 
 ```ts
-const { embedUrl } = await hired.createEmbedToken({
+{
+  user: { id, name, email, handle, headline, location, avatarUrl, videoPitchUrl },
+  profile: {                       // ← flat extract for prefill / display
+    skills: string[],
+    headline: string | null,
+    summary: string | null,
+    location: string | null,
+    experience: Array<{ company, position, startDate, endDate, summary, highlights }>,
+    education:  Array<{ institution, area, studyType, startDate, endDate }>,
+  },
+  resumeStatus: "ready" | "parsing" | "none",
+  updatedAt: string | null,        // ISO; also the ETag (see §6)
+  resume: Record<string, unknown> | null,   // raw JSON Resume of the active résumé
+}
+```
+
+Prefill `freelancer_profiles.skills` from `profile.skills` and render from
+`profile.experience` / `profile.education`. `profile` is derived from the active
+(or master) résumé, so it stays in sync with edits the job seeker makes on
+Hired.Video.
+
+## 3. Embed token contract
+
+```ts
+const { embedUrl, expiresAt } = await hired.createEmbedToken({
   userId,
-  kind: "profile", // or "resume"
+  kind: "profile",     // "profile" | "resume"
+  theme: "auto",       // "auto" | "light" | "dark"  (optional)
+  locale: "en",        // BCP-47 (optional)
 });
-// Pass `embedUrl` to your frontend. It renders the job seeker's resume via
-// Hired.Video's canonical embed page with a short-lived token attached.
 ```
 
-**React:**
+- **(a) TTL & single-use.** Tokens are **HMAC-signed, stateless, and expire 15
+  minutes** after minting (`expiresAt` is returned). They are **not single-use**
+  — the same `embedUrl` renders until it expires. Mint one per page render.
+- **(b) Params.** `kind` is `"profile" | "resume"`. Optional `theme`
+  (`auto`/`light`/`dark`) and `locale` are forwarded to the embed page as query
+  params. `embedUrl` is `null` when the job seeker has no résumé.
+- **(c) Framing / allowed origins.** The embed page is served with
+  `Content-Security-Policy: frame-ancestors` restricted to Hired.Video +
+  registered partner origins. **Send us the origins to allow-list**
+  (`https://builderforce.ai`, `https://*.builderforce.ai`). It works in a
+  partitioned/credentialless iframe. Until your origins are registered, the
+  frame may be blocked by CSP.
+- **(d) Authorization scope.** The token is **viewer-authorization-scoped**: it
+  encodes `{partnerId, userId, kind, exp}` and is only accepted for the exact
+  `userId` you minted it for, **and only while your connection to that user is
+  `active`**. The embed re-checks consent on every load, so a revoked connection
+  stops rendering immediately even within the token's lifetime. An employer on
+  your platform can safely view a candidate through a token you mint
+  server-side — they can only ever see users who consented to your platform, and
+  only the visibility the job seeker allows.
+
+Render it:
 
 ```tsx
 import { HiredProfileEmbed } from "@seanhogg/hired-video-sdk/react";
-
 <HiredProfileEmbed embedUrl={embedUrl} height={800} />;
 ```
 
-**Anywhere (vanilla JS):**
-
 ```js
 import { mountHiredProfile } from "@seanhogg/hired-video-sdk";
-
-const embed = mountHiredProfile("#hired-profile", { embedUrl });
-// embed.destroy() to remove it
+const embed = mountHiredProfile("#hired-profile", { embedUrl }); // embed.destroy() to remove
 ```
 
-The embed re-checks consent on every load, so a revoked connection stops
-rendering immediately even within a token's lifetime. `embedUrl` is `null`
-if the job seeker has no resume yet.
+## 4. Claim flow & status semantics
 
-## API
+`create` returns `{ status, claimUrl, connectionId, resumeId, alreadyExisted }`.
 
-### `new HiredClient({ apiKey, baseUrl?, fetch? })`
+- **`status`** is the *connection* lifecycle: `"active" | "pending" | "revoked"`.
+  A **partner-created** account is `active` immediately (consent is implicit —
+  you made the account). A **connect()**-ed existing account is `pending` until
+  the job seeker approves.
+- **The profile/embed are populated before the user claims.** The account and
+  its résumé exist the moment `create` returns `resumeId`; `claimUrl` only lets
+  the *person* log in and set a password — it is not a gate on your reads.
+- **The "ready" signal** is `getProfile().resumeStatus === "ready"` (or a
+  non-null `resumeId`). Show "résumé pending" while `resumeStatus` is `"none"`
+  or `"parsing"`.
+
+## 5. Idempotency / find-or-create
+
+`create` is **idempotent on `externalUserId`**. A repeat call (re-registration,
+retry, at-least-once webhook) returns the existing account with
+`alreadyExisted: true` — it does not error or duplicate the résumé. You can also
+reconcile explicitly:
+
+```ts
+try {
+  const ref = await hired.jobSeekers.getByExternalUserId("your-user-123");
+  // → { userId, connectionId, externalUserId, status, source }
+} catch (e) {
+  if (HiredApiError.is(e) && e.code === "NOT_FOUND") { /* never provisioned */ }
+}
+```
+
+## 6. Keeping your cache fresh (polling contract)
+
+Signed webhooks (`resume.updated`, `profile.updated`, `account.claimed`) are on
+the roadmap. **Until then, poll `getProfile` with the documented cache contract:**
+
+- Every `getProfile` response includes `updatedAt` (ISO) and the endpoint sets a
+  matching **`ETag`** header.
+- Send `If-None-Match: "<updatedAt>"` and you get a cheap **`304 Not Modified`**
+  when nothing changed — refresh your cached extract only when `updatedAt` moves.
+- Recommended cadence: on-demand (when an employer views the profile) plus a
+  daily reconcile. Reads are edge-cached server-side, so polling is cheap.
+
+## 7. `connect()` → learning the resulting userId
+
+After the hosted consent flow completes, map your `externalUserId` → the
+Hired.Video `userId` with **`getByExternalUserId`** (or `connections.list()`
+filtered by `externalUserId`). `connect()` itself also returns the `userId` and
+`connectionId` up front (status `pending`); the same ids are stable once the
+job seeker approves — poll `getByExternalUserId` until `status === "active"`.
+
+## 8. Scopes & error codes
+
+Each method requires one scope on your key:
+
+| method | scope |
+| --- | --- |
+| `jobSeekers.create` | `write:job_seekers` |
+| `jobSeekers.uploadResume` | `write:resumes` |
+| `jobSeekers.getProfile` · `createEmbedToken` | `read:profile` |
+| `jobSeekers.getByExternalUserId` · `connections.list` | `read:connections` |
+| `connect` · `connections.revoke` | `write:connections` |
+
+Missing-scope calls throw `HiredApiError` with code `FORBIDDEN_SCOPE`. Every
+error exposes `.status`, `.code` (a `HiredErrorCode`), `.message`, `.details`:
+
+```ts
+type HiredErrorCode =
+  | "VALIDATION_ERROR"      // 400
+  | "UNAUTHORIZED"          // 401 — bad/missing key
+  | "FORBIDDEN"             // 403 — no active connection
+  | "FORBIDDEN_SCOPE"       // 403 — key lacks the scope
+  | "NOT_FOUND"             // 404
+  | "EMAIL_EXISTS"          // 409 — use connect() instead
+  | "ALREADY_EXISTS"        // idempotent hit — safe to treat as success
+  | "UNSUPPORTED_MEDIA_TYPE"// 415 — binary file; send rawText
+  | "PAYLOAD_TOO_LARGE"     // 413 — file > 256 KB
+  | "RATE_LIMITED"          // 429 — reserved (see below)
+  | "INVALID_RESUME";       // 422 — file decoded to no usable content
+```
+
+```ts
+import { HiredApiError } from "@seanhogg/hired-video-sdk";
+try {
+  await hired.jobSeekers.create({ email, name, externalUserId });
+} catch (e) {
+  if (HiredApiError.is(e) && e.isAlreadyExists) return; // duplicate → treat as success
+  throw e;
+}
+```
+
+**Rate limits:** there is **no per-key rate limit enforced today**; the
+`RATE_LIMITED` code is reserved so your handling is future-proof. Be a good
+citizen — cache reads (see §6) and avoid tight loops.
+
+## 9. Types & PII / retention
+
+- **Types.** All inputs/outputs are shipped as accurate `.d.ts` — delete any
+  local mirror.
+- **Résumé data is PII.** A partner-created account and its résumé are a
+  first-class Hired.Video account the job seeker fully owns and can edit or
+  delete. **`connections.revoke(userId)`** cuts off *your* access immediately
+  (reads/embeds 403 at once) but does **not** delete the person's account or
+  résumé — it's their data. The job seeker can revoke your connection themselves
+  at any time from their Hired.Video settings, and can delete their account
+  outright, which removes the résumé everywhere.
+
+---
+
+## API surface
 
 | method | description |
 | --- | --- |
 | `me()` | Validate the key; returns the partner + granted scopes. |
-| `jobSeekers.create(input)` | Create an account (+ optional first resume). |
-| `jobSeekers.uploadResume(userId, input)` | Add a resume to a connected account. |
-| `jobSeekers.getProfile(userId)` | Read the live profile + active resume. |
+| `jobSeekers.create(input)` | Create/find an account (+ optional first résumé). |
+| `jobSeekers.uploadResume(userId, input)` | Add a résumé (content / rawText / file). |
+| `jobSeekers.getProfile(userId)` | Live profile + typed `profile` extract + `resumeStatus`. |
+| `jobSeekers.getByExternalUserId(externalUserId)` | Reconcile your id → Hired.Video account. |
 | `connect(input)` | Begin connecting an existing account → `consentUrl`. |
 | `connections.list()` | List every connected job seeker. |
-| `connections.revoke(userId)` | Drop a connection. |
-| `createEmbedToken(input)` | Mint a short-lived embed token. |
-
-All methods return the payload directly and throw `HiredApiError`
-(`.status`, `.code`, `.message`) on failure.
-
-### Scopes
-
-A key is granted a subset of: `write:job_seekers`, `write:resumes`,
-`read:profile`, `write:connections`, `read:connections`. Calls missing a
-required scope throw `HiredApiError` with code `FORBIDDEN_SCOPE`.
+| `connections.revoke(userId)` | Drop a connection (cuts off your access). |
+| `createEmbedToken(input)` | Mint a short-lived embed token → `embedUrl`. |
 
 ## Security notes
 
-- The **API key is server-side only**. Use `createEmbedToken` + the embed
-  token for anything that touches the browser.
-- Creating an account you don't control requires the returned `claimUrl`;
+- The **API key is server-side only**. Use `createEmbedToken` + the embed token
+  for anything that touches the browser.
+- Creating an account you don't control still requires the returned `claimUrl`;
   connecting an existing account always requires the job seeker's consent.
 - Every connection is revocable by the job seeker.
 

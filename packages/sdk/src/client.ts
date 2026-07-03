@@ -5,6 +5,8 @@ import type {
   CreateJobSeekerInput,
   CreateJobSeekerResult,
   UploadResumeInput,
+  ResumeFileSource,
+  JobSeekerRef,
   ConnectInput,
   ConnectResult,
   PartnerConnection,
@@ -14,6 +16,33 @@ import type {
 } from "./types.js";
 
 const DEFAULT_BASE_URL = "https://hired.video";
+
+/** Base64-encode a résumé file source (runtime-agnostic: Node 18+, browser,
+ *  Workers — uses `btoa`, no `Buffer`). A string is assumed already base64. */
+async function toBase64(source: ResumeFileSource): Promise<string> {
+  if (typeof source === "string") return source;
+  let bytes: Uint8Array;
+  if (source instanceof Uint8Array) bytes = source;
+  else if (source instanceof ArrayBuffer) bytes = new Uint8Array(source);
+  else if (typeof Blob !== "undefined" && source instanceof Blob)
+    bytes = new Uint8Array(await source.arrayBuffer());
+  else
+    throw new HiredConfigError(
+      "Unsupported `file` — pass a Blob, File, ArrayBuffer, Uint8Array, or base64 string.",
+    );
+  let binary = "";
+  const CHUNK = 0x8000; // chunk so String.fromCharCode(...) never blows the stack
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+/** Normalize a résumé input for the wire: encode a non-string `file` to base64. */
+async function encodeResumeInput(input: UploadResumeInput): Promise<UploadResumeInput> {
+  if (input.file === undefined || typeof input.file === "string") return input;
+  return { ...input, file: await toBase64(input.file) };
+}
 
 export interface HiredClientOptions {
   /** Your partner API key (`hvpk_...`). Server-side ONLY — never ship this to
@@ -101,17 +130,40 @@ export class HiredClient {
 
   jobSeekers = {
     /** Create a Hired.Video job-seeker account (optionally with a first
-     *  resume). Returns a one-time `claimUrl` for the job seeker to log in. */
-    create: (input: CreateJobSeekerInput): Promise<CreateJobSeekerResult> =>
-      this.request("POST", "/api/partner/v1/job-seekers", input),
+     *  resume). Returns a one-time `claimUrl` for the job seeker to log in.
+     *  Idempotent on `externalUserId`: a repeat call returns the existing
+     *  account with `alreadyExisted: true` instead of erroring. */
+    create: async (input: CreateJobSeekerInput): Promise<CreateJobSeekerResult> => {
+      const body = input.resume
+        ? { ...input, resume: await encodeResumeInput(input.resume) }
+        : input;
+      return this.request("POST", "/api/partner/v1/job-seekers", body);
+    },
 
-    /** Add a resume to a CONNECTED account. Requires an active connection. */
-    uploadResume: (userId: string, input: UploadResumeInput): Promise<Record<string, unknown>> =>
-      this.request("POST", `/api/partner/v1/job-seekers/${encodeURIComponent(userId)}/resumes`, input),
+    /** Add a resume to a CONNECTED account. Requires an active connection.
+     *  Accepts structured `content`, `rawText`, or a `file` (text/JSON). */
+    uploadResume: async (
+      userId: string,
+      input: UploadResumeInput,
+    ): Promise<Record<string, unknown>> =>
+      this.request(
+        "POST",
+        `/api/partner/v1/job-seekers/${encodeURIComponent(userId)}/resumes`,
+        await encodeResumeInput(input),
+      ),
 
-    /** Read a connected job seeker's live profile + active resume. */
+    /** Read a connected job seeker's live profile + active resume + a typed
+     *  `profile` extract (skills/experience/education) + `resumeStatus`. */
     getProfile: (userId: string): Promise<ProfilePayload> =>
       this.request("GET", `/api/partner/v1/job-seekers/${encodeURIComponent(userId)}/profile`),
+
+    /** Resolve your own `externalUserId` → the Hired.Video account + connection
+     *  status (find-or-reconcile). Throws `NOT_FOUND` if never provisioned. */
+    getByExternalUserId: (externalUserId: string): Promise<JobSeekerRef> =>
+      this.request(
+        "GET",
+        `/api/partner/v1/job-seekers/by-external/${encodeURIComponent(externalUserId)}`,
+      ),
   };
 
   /**

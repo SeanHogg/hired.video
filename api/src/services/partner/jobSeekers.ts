@@ -17,10 +17,11 @@ import { getDefaultProfileSections } from "../../../../shared/profile-sections.j
 import {
   upsertConnection,
   findUserByEmail,
+  getConnectionByExternalUserId,
   partnerProfileCacheKey,
   type PartnerConnectionRow,
 } from "./connections.js";
-import type { PartnerScope } from "../../../../shared/partner.js";
+import type { PartnerResumeStatus, PartnerScope } from "../../../../shared/partner.js";
 
 const { users, userProfiles } = schema;
 
@@ -66,7 +67,15 @@ export interface CreateJobSeekerInput {
 }
 
 export type CreateJobSeekerResult =
-  | { ok: true; userId: string; connection: PartnerConnectionRow; claimUrl: string }
+  | {
+      ok: true;
+      userId: string;
+      connection: PartnerConnectionRow;
+      claimUrl: string;
+      /** True when this externalUserId was already provisioned — the call was a
+       *  no-op idempotent hit, not a fresh account. */
+      alreadyExisted: boolean;
+    }
   | { ok: false; code: "EMAIL_EXISTS"; userId: string };
 
 /**
@@ -80,6 +89,19 @@ export async function createJobSeekerForPartner(
   db = getDb(),
 ): Promise<CreateJobSeekerResult> {
   const email = input.email.toLowerCase().trim();
+
+  // Idempotency (#5): a repeat create for the same externalUserId (retry, at-
+  // least-once webhook, re-registration) returns the EXISTING account instead
+  // of erroring, so callers can treat create as find-or-create. Keyed on
+  // (partnerId, externalUserId) — the partner's own id for the user.
+  if (input.externalUserId) {
+    const prior = await getConnectionByExternalUserId(input.partnerId, input.externalUserId, db);
+    if (prior) {
+      const claimUrl = await issueClaimLink(email, input.name || email, db);
+      return { ok: true, userId: prior.userId, connection: prior, claimUrl, alreadyExisted: true };
+    }
+  }
+
   const existing = await findUserByEmail(email, db);
   if (existing) {
     // Don't silently take over an existing account — the partner must run the
@@ -129,7 +151,7 @@ export async function createJobSeekerForPartner(
   );
 
   const claimUrl = await issueClaimLink(email, input.name || email, db);
-  return { ok: true, userId: user.id, connection, claimUrl };
+  return { ok: true, userId: user.id, connection, claimUrl, alreadyExisted: false };
 }
 
 export interface ConnectExistingInput {
@@ -177,6 +199,34 @@ export async function connectExistingAccount(
 }
 
 // ── Live profile payload (partner read + embed) ─────────────────────────────
+export interface PartnerExperienceItem {
+  company: string;
+  position: string;
+  startDate: string | null;
+  endDate: string | null;
+  summary: string | null;
+  highlights: string[];
+}
+
+export interface PartnerEducationItem {
+  institution: string;
+  area: string | null;
+  studyType: string | null;
+  startDate: string | null;
+  endDate: string | null;
+}
+
+/** Flat, typed extract for skill-prefill + display — derived from the active
+ *  résumé so a partner never has to parse JSON Resume themselves (#2). */
+export interface PartnerProfileSummary {
+  skills: string[];
+  headline: string | null;
+  summary: string | null;
+  location: string | null;
+  experience: PartnerExperienceItem[];
+  education: PartnerEducationItem[];
+}
+
 export interface PartnerProfilePayload {
   user: {
     id: string;
@@ -188,7 +238,94 @@ export interface PartnerProfilePayload {
     avatarUrl: string | null;
     videoPitchUrl: string | null;
   };
+  /** Documented, stable extract for prefill/display (#2). */
+  profile: PartnerProfileSummary;
+  /** Whether the résumé is populated yet (#4). */
+  resumeStatus: PartnerResumeStatus;
+  /** ISO timestamp of the most recent résumé/profile change — poll/ETag key
+   *  for keeping a cached copy fresh (#6 polling contract). */
+  updatedAt: string | null;
   resume: ReturnType<typeof rowToResume> | null;
+}
+
+/** Case-insensitive field read (JSON Resume lowercase vs legacy PascalCase). */
+function ci(obj: Record<string, unknown> | null | undefined, key: string): unknown {
+  if (!obj) return undefined;
+  return obj[key] ?? obj[key.charAt(0).toUpperCase() + key.slice(1)];
+}
+
+function str(v: unknown): string | null {
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+/**
+ * Derive the flat {@link PartnerProfileSummary} from a résumé's JSON content.
+ * Pure — no DB/AI — so it's identical for the API read and the embed. Handles
+ * both JSON Resume (lowercase) and legacy PascalCase keys.
+ */
+export function deriveStructuredProfile(
+  content: Record<string, unknown> | null | undefined,
+  fallback: { headline: string | null; location: string | null },
+): PartnerProfileSummary {
+  const basics = (ci(content, "basics") ?? {}) as Record<string, unknown>;
+
+  // Skills: JSON Resume `skills[]` is [{ name, keywords[] }] | string[].
+  const skillSet = new Set<string>();
+  const rawSkills = ci(content, "skills");
+  if (Array.isArray(rawSkills)) {
+    for (const s of rawSkills) {
+      if (typeof s === "string") {
+        if (s.trim()) skillSet.add(s.trim());
+      } else if (s && typeof s === "object") {
+        const name = str(ci(s as Record<string, unknown>, "name"));
+        if (name) skillSet.add(name);
+        const kw = ci(s as Record<string, unknown>, "keywords");
+        if (Array.isArray(kw)) for (const k of kw) if (typeof k === "string" && k.trim()) skillSet.add(k.trim());
+      }
+    }
+  }
+
+  const experience: PartnerExperienceItem[] = (
+    Array.isArray(ci(content, "work")) ? (ci(content, "work") as unknown[]) : []
+  ).map((w) => {
+    const j = (w ?? {}) as Record<string, unknown>;
+    const highlights = ci(j, "highlights");
+    return {
+      company: str(ci(j, "name")) ?? str(ci(j, "company")) ?? "",
+      position: str(ci(j, "position")) ?? str(ci(j, "title")) ?? "",
+      startDate: str(ci(j, "startDate")),
+      endDate: str(ci(j, "endDate")),
+      summary: str(ci(j, "summary")),
+      highlights: Array.isArray(highlights) ? highlights.filter((h): h is string => typeof h === "string") : [],
+    };
+  });
+
+  const education: PartnerEducationItem[] = (
+    Array.isArray(ci(content, "education")) ? (ci(content, "education") as unknown[]) : []
+  ).map((e) => {
+    const ed = (e ?? {}) as Record<string, unknown>;
+    return {
+      institution: str(ci(ed, "institution")) ?? str(ci(ed, "school")) ?? "",
+      area: str(ci(ed, "area")),
+      studyType: str(ci(ed, "studyType")),
+      startDate: str(ci(ed, "startDate")),
+      endDate: str(ci(ed, "endDate")),
+    };
+  });
+
+  const loc = ci(basics, "location") as Record<string, unknown> | null | undefined;
+  const locFromResume = loc
+    ? [str(ci(loc, "city")), str(ci(loc, "region")) ?? str(ci(loc, "countryCode"))].filter(Boolean).join(", ")
+    : "";
+
+  return {
+    skills: [...skillSet],
+    headline: fallback.headline ?? str(ci(basics, "label")),
+    summary: str(ci(basics, "summary")),
+    location: fallback.location ?? (locFromResume || null),
+    experience,
+    education,
+  };
 }
 
 /**
@@ -224,6 +361,13 @@ export async function buildPartnerProfilePayload(
   const rows = await repo.findAllForOwner(userId);
   const chosen = selectPrimaryResume(rows as Array<any>);
 
+  const content = (chosen?.content ?? null) as Record<string, unknown> | null;
+  const profile = deriveStructuredProfile(content, {
+    headline: u.headline ?? null,
+    location: u.location ?? null,
+  });
+  const chosenUpdatedAt = chosen?.updatedAt ?? chosen?.createdAt ?? null;
+
   return {
     user: {
       id: u.id,
@@ -235,7 +379,39 @@ export async function buildPartnerProfilePayload(
       avatarUrl: u.avatarUrl ?? null,
       videoPitchUrl: u.videoPitchUrl ?? null,
     },
+    profile,
+    resumeStatus: chosen ? "ready" : "none",
+    updatedAt: chosenUpdatedAt ? new Date(chosenUpdatedAt).toISOString() : null,
     resume: chosen ? rowToResume(chosen, { isOwner: false, isWatched: false, viewCount: 0 }) : null,
+  };
+}
+
+/**
+ * Resolve a partner's externalUserId → the Hired.Video account + connection
+ * status (#5/#7). Returns null when the partner has never provisioned/connected
+ * that externalUserId. Reads the connection directly (no active-connection
+ * gate) so a partner can learn the mapping even while a connect() consent is
+ * still `pending`.
+ */
+export async function getByExternalUserIdForPartner(
+  partnerId: string,
+  externalUserId: string,
+  db = getDb(),
+): Promise<{
+  userId: string;
+  connectionId: string;
+  externalUserId: string | null;
+  status: string;
+  source: string;
+} | null> {
+  const conn = await getConnectionByExternalUserId(partnerId, externalUserId, db);
+  if (!conn) return null;
+  return {
+    userId: conn.userId,
+    connectionId: conn.id,
+    externalUserId: conn.externalUserId,
+    status: conn.status,
+    source: conn.source,
   };
 }
 
