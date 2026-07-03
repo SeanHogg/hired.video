@@ -23,6 +23,7 @@ import {
   Sparkles,
   Activity,
   Cpu,
+  Plug,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminPermissions, type AdminResource } from "@/lib/admin-permissions";
@@ -57,6 +58,7 @@ const TABS: { resource: AdminResource; label: string; href: string; icon: React.
   { resource: "accountAnalytics", label: "Active Users", href: "/admin/active-users", icon: Activity },
   { resource: "extensionTelemetry", label: "Extension", href: "/admin/extension-telemetry", icon: Puzzle },
   { resource: "aiVendors", label: "AI Vendors", href: "/admin/ai-vendors", icon: Cpu },
+  { resource: "partners", label: "Partners", href: "/admin/partners", icon: Plug },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

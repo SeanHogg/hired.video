@@ -78,6 +78,8 @@ import RecruitSharingSettings from "@/components/recruit/RecruitSharingSettings"
 import PromoteWithoutAuthToggle from "@/components/settings/PromoteWithoutAuthToggle";
 import ConfidentialModeToggle from "@/components/settings/ConfidentialModeToggle";
 import ProfileSectionsSettingsCard from "@/components/settings/ProfileSectionsSettingsCard";
+import ConnectedPlatformsCard from "@/components/settings/ConnectedPlatformsCard";
+import PartnerAccessCard from "@/components/settings/PartnerAccessCard";
 import VendorIntegrationsCard from "@/components/settings/VendorIntegrationsCard";
 import { AccountAuditLogPanel } from "@/components/settings/AccountAuditLogPanel";
 import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
@@ -1255,6 +1257,14 @@ function SettingsContent() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Third-party partner platforms the user has connected to
+                    their account — manage/revoke access here. */}
+                <ConnectedPlatformsCard />
+
+                {/* Self-service partner platform access — request access, then
+                    self-issue API keys once approved. */}
+                <PartnerAccessCard />
               </TabsContent>
 
               {/* Profile Sections Tab — role-defaulted visibility for /people/[id] sections */}

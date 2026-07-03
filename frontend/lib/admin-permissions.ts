@@ -33,7 +33,8 @@ export type AdminResource =
   | "moderation"
   | "accountAnalytics"
   | "extensionTelemetry"
-  | "aiVendors";
+  | "aiVendors"
+  | "partners";
 
 /** CRUD grants per role per admin resource */
 const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> = {
@@ -64,6 +65,9 @@ const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> =
     // SuperAdmin-only — gateway/vendor observability (model substitutions,
     // use-case profiles, catalog drift, usage). Not granted to plain admins.
     aiVendors: ["read"],
+    // SuperAdmin-only — partner platform access requests + governance
+    // (approve/reject/suspend). Not granted to plain admins.
+    partners: ["read", "update"],
   },
   [USER_ROLES.ADMIN]: {
     dashboard: ["read"],
@@ -139,6 +143,7 @@ export const ADMIN_RESOURCES: AdminResource[] = [
   "accountAnalytics",
   "extensionTelemetry",
   "aiVendors",
+  "partners",
 ];
 
 export const CRUD_LABELS: Record<CrudAction, string> = {
@@ -170,4 +175,5 @@ export const RESOURCE_LABELS: Record<AdminResource, string> = {
   accountAnalytics: "Account Analytics",
   extensionTelemetry: "Extension Telemetry",
   aiVendors: "AI Vendors",
+  partners: "Partners",
 };

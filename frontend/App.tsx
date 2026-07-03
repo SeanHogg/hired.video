@@ -311,6 +311,8 @@ const BookingsHost = lazy(() => import("./pages/bookings/BookingsHost"));
 const ArticlesIndex = lazy(() => import("./pages/ArticlesIndex"));
 const ArticleView = lazy(() => import("./pages/ArticleView"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
+const EmbeddedPartnerProfile = lazy(() => import("./pages/EmbeddedPartnerProfile"));
+const ConnectAuthorize = lazy(() => import("./pages/ConnectAuthorize"));
 const EmbeddedStudioProject = lazy(() => import("./pages/EmbeddedStudioProject"));
 const SharedCandidateResume = lazy(() => import("./pages/SharedCandidateResume"));
 const SharedPitchDeck = lazy(() => import("./pages/SharedPitchDeck"));
@@ -347,6 +349,7 @@ const AIVendors = lazy(() => import("./pages/admin/AIVendors"));
 const SystemSettings = lazy(() => import("./pages/admin/SystemSettings"));
 const ModerationQueue = lazy(() => import("./pages/admin/ModerationQueue"));
 const AdminAccountAnalytics = lazy(() => import("./pages/admin/AccountAnalytics"));
+const AdminPartners = lazy(() => import("./pages/admin/Partners"));
 const PointsPage = lazy(() => import("./pages/Points"));
 const AdminPoints = lazy(() => import("./pages/admin/Points"));
 const RewardsPage = lazy(() => import("./pages/Rewards"));
@@ -1176,6 +1179,7 @@ const App = () => (
                       <Route path="/admin/settings"          element={<AdminLayout><SystemSettings /></AdminLayout>} />
                       <Route path="/admin/moderation"        element={<AdminLayout><ModerationQueue /></AdminLayout>} />
                       <Route path="/admin/account-analytics" element={<AdminLayout><AdminAccountAnalytics /></AdminLayout>} />
+                      <Route path="/admin/partners"          element={<AdminLayout><AdminPartners /></AdminLayout>} />
                       <Route path="/admin/points"            element={<AdminLayout><AdminPoints /></AdminLayout>} />
                       <Route path="/admin/page-embeds"       element={<AdminLayout><PageEmbeds /></AdminLayout>} />
                       <Route path="/admin/help-mappings"     element={<AdminLayout><HelpMappings /></AdminLayout>} />
@@ -1183,6 +1187,8 @@ const App = () => (
                       <Route path="/admin/product-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
 
                       <Route path="/settings" element={<Settings />} />
+                      {/* Partner consent screen — self-gates auth (redirects to login) */}
+                      <Route path="/connect/authorize" element={<ConnectAuthorize />} />
                       <Route path="/settings/ads"     element={<PaidMediaPage />} />
                       <Route path="/settings/connections" element={<ConnectionsPage />} />
                       <Route path="/superadmin/ads"   element={<SuperAdminPaidMediaPage />} />
@@ -1251,6 +1257,11 @@ const App = () => (
                       <Route
                         path="/embedded/resumes/:identifier"
                         element={<EmbeddedResume />}
+                      />
+                      {/* Partner-embedded profile (keyless token) — bare iframe page */}
+                      <Route
+                        path="/embedded/profile/:token"
+                        element={<EmbeddedPartnerProfile />}
                       />
                       {/* #696 — project-keyed studio embed: works for any
                           public project, including ones with no published

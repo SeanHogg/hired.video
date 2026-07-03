@@ -219,6 +219,14 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "affiliate program, career affiliate, saas affiliate, resume affiliate, referral commission",
   },
+  // Partner platform consent screen. A partner sends the job seeker here to
+  // approve connecting to their existing account. Noindex-adjacent (behind
+  // auth) but still needs a real title/description for the tab + share cards.
+  "/connect/authorize": {
+    title: "Authorize connection — hired.video",
+    description:
+      "Review and approve a partner platform's request to connect to your hired.video account.",
+  },
   // Owner reference management (#1677). Confidential, selectively-shared
   // references for the senior-exec audience — moved here from an inline
   // useSEO override on References.tsx (gap #1968).
