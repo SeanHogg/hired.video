@@ -70,15 +70,15 @@ await hired.jobSeekers.uploadResume(userId, {
 });
 ```
 
-**Supported `file` formats today:** `text/plain`, `application/json`. The
-server parses these in-Worker with no AI cost. **Max decoded size: 256 KB.**
+**Supported `file` formats:** **PDF**, **DOCX**, `text/plain`, and
+`application/json`. PDF and DOCX are extracted to text server-side (PDF via a
+text layer, DOCX via its document XML) and then structured (skills / work /
+education) with no AI cost. **Max decoded size: 10 MB.**
 
-> **PDF / DOC / DOCX are not yet parsed server-side.** They are rejected with
-> `HiredApiError.code === "UNSUPPORTED_MEDIA_TYPE"` (HTTP 415). Until server-side
-> binary extraction ships, **extract the text client-side** (you already render
-> the file) and send it as `rawText`. Server-side PDF/DOCX extraction is on the
-> roadmap; this SDK's `file` API won't change when it lands — the same call will
-> simply start accepting those MIME types.
+> **Not supported:** legacy binary `.doc` (OLE), and image/scanned résumés with
+> no text layer. These return `HiredApiError.code === "UNSUPPORTED_MEDIA_TYPE"`
+> (415) or `INVALID_RESUME` (422) — save as PDF/DOCX or send extracted `rawText`.
+> A scanned PDF with no selectable text also returns `INVALID_RESUME`.
 
 On `create`, a `file` that can't be ingested does **not** fail account
 creation — you get the account plus `resumeError: { code, message }`, and can
@@ -229,8 +229,8 @@ type HiredErrorCode =
   | "NOT_FOUND"             // 404
   | "EMAIL_EXISTS"          // 409 — use connect() instead
   | "ALREADY_EXISTS"        // idempotent hit — safe to treat as success
-  | "UNSUPPORTED_MEDIA_TYPE"// 415 — binary file; send rawText
-  | "PAYLOAD_TOO_LARGE"     // 413 — file > 256 KB
+  | "UNSUPPORTED_MEDIA_TYPE"// 415 — unsupported file (.doc/image); send PDF/DOCX/rawText
+  | "PAYLOAD_TOO_LARGE"     // 413 — file > 10 MB
   | "RATE_LIMITED"          // 429 — reserved (see below)
   | "INVALID_RESUME";       // 422 — file decoded to no usable content
 ```

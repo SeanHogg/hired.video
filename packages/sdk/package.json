@@ -1,6 +1,6 @@
 {
   "name": "@seanhogg/hired-video-sdk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Official Hired.Video partner SDK — create & connect job-seeker accounts, upload resumes, and embed profiles/resumes on your platform.",
   "license": "MIT",
   "type": "module",
