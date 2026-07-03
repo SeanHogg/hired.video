@@ -78,6 +78,32 @@ export async function getConnectionById(
   return (row as PartnerConnectionRow) ?? null;
 }
 
+/**
+ * Resolve a connection by the partner's OWN id for the user (`externalUserId`).
+ * The SSoT lookup behind idempotent create and `jobSeekers.getByExternalUserId`
+ * — lets a partner reconcile their user → the Hired.Video userId without
+ * storing the mapping themselves. Most-recent first (externalUserId is not
+ * unique-constrained, though create keeps it 1:1 per partner).
+ */
+export async function getConnectionByExternalUserId(
+  partnerId: string,
+  externalUserId: string,
+  db = getDb(),
+): Promise<PartnerConnectionRow | null> {
+  const [row] = await db
+    .select()
+    .from(partnerConnections)
+    .where(
+      and(
+        eq(partnerConnections.partnerId, partnerId),
+        eq(partnerConnections.externalUserId, externalUserId),
+      ),
+    )
+    .orderBy(desc(partnerConnections.createdAt))
+    .limit(1);
+  return (row as PartnerConnectionRow) ?? null;
+}
+
 export interface UpsertConnectionInput {
   partnerId: string;
   userId: string;
