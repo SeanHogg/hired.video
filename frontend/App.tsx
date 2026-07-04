@@ -166,6 +166,7 @@ const AdminSecurity = lazy(() => import("./pages/admin/AdminSecurity"));
 const Contact = lazy(() => import("./pages/Contact"));
 const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
 const LearningPlatform = lazy(() => import("./pages/LearningPlatform"));
+const LearningPortability = lazy(() => import("./pages/LearningPortability"));
 // CHRO People Operations (hired-video extraction): marketing landing +
 // the paid in-app roster / 1:1s surfaces.
 const PeopleOperations = lazy(() => import("./pages/PeopleOperations"));
@@ -872,6 +873,7 @@ const App = () => (
                       />
                       <Route path="/affiliate-program" element={<AffiliateProgram />} />
                       <Route path="/learning-platform" element={<LearningPlatform />} />
+                      <Route path="/learning/portability" element={<RequireVerified><LearningPortability /></RequireVerified>} />
                       {/* CHRO People Operations — public marketing + paid in-app surfaces */}
                       <Route path="/people-operations" element={<PeopleOperations />} />
                       <Route path="/people/roster" element={<RequireVerified><PeopleRoster /></RequireVerified>} />

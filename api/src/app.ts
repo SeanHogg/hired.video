@@ -196,6 +196,7 @@ import { learningRoutes } from "./routes/learning.js";
 import { verifyRoutes } from "./routes/verify.js";
 import { xapiLrsRoutes } from "./routes/xapi-lrs.js";
 import { lrsCredentialRoutes } from "./routes/lrs-credentials.js";
+import { learningPortabilityRoutes } from "./routes/learning-portability.js";
 import { legalRoutes } from "./routes/legal.js";
 import { advertisingRoutes } from "./routes/advertising.js";
 import { paidMediaRoutes } from "./routes/paid-media.js";
@@ -961,9 +962,11 @@ export function createApp() {
   app.route("/api/learning-paths", learningPathRoutes);
   app.route("/api/cohorts", cohortRoutes);
   app.route("/api/learning-goals", learningGoalsRoutes);
-  // LRS credential management is authenticated (owner-scoped) — register it
-  // BEFORE the /api/learning learner router so its concrete sub-path wins.
+  // LRS credential management + tenant portability are authenticated
+  // (owner-scoped) — register them BEFORE the /api/learning learner router so
+  // their concrete sub-paths win.
   app.route("/api/learning/lrs-credentials", lrsCredentialRoutes);
+  app.route("/api/learning/portability", learningPortabilityRoutes);
   app.route("/api/learning", learningRoutes);
   app.route("/api/verify", verifyRoutes);
   // Conformant xAPI 1.0.3 LRS. In PUBLIC_PREFIXES (below) so the JWT layer

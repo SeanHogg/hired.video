@@ -228,6 +228,15 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "SCORM hosting, xAPI, Tin Can API, LRS, learning record store, SCORM Cloud alternative, SCORM import export, cmi5, AICC, LMS migration",
   },
+  // Authenticated migration console — export a tenant's courses/records or
+  // import an xAPI archive from another platform. Behind auth.
+  "/learning/portability": {
+    title: "Import & Export Learning Data — hired.video",
+    description:
+      "Export your courses, learner results, and xAPI statement history in portable formats, or import an xAPI archive from another platform. No lock-in.",
+    keywords:
+      "learning data export, xAPI export, SCORM import, LMS migration, learner records portability",
+  },
   // Partner platform consent screen. A partner sends the job seeker here to
   // approve connecting to their existing account. Noindex-adjacent (behind
   // auth) but still needs a real title/description for the tab + share cards.

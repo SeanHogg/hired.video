@@ -352,3 +352,55 @@ export const generateGoalPath = (goalId: string) =>
     `/learning-goals/${goalId}/generate-path`,
     { method: "POST", body: JSON.stringify({}) },
   );
+
+// ── Tenant portability (#2281) — export/import learning content + records ─────
+
+/** The three export artifacts, keyed by kind → { path, filename }. Single
+ *  source so the download button, filename, and endpoint never drift apart. */
+export const LEARNING_EXPORT_KINDS = {
+  manifest: { path: "/learning/portability/export/manifest", filename: "learning-manifest.json" },
+  results: { path: "/learning/portability/export/results.csv", filename: "learning-results.csv" },
+  statements: { path: "/learning/portability/export/statements", filename: "learning-statements.json" },
+} as const;
+
+export type LearningExportKind = keyof typeof LEARNING_EXPORT_KINDS;
+
+/** Fetch an export artifact as a Blob (these endpoints return RAW payloads, not
+ *  the `{ data }` envelope, so `call()` can't be used). Auth headers are
+ *  attached like every other client call. */
+export async function fetchLearningExport(kind: LearningExportKind): Promise<{ blob: Blob; filename: string }> {
+  const { path, filename } = LEARNING_EXPORT_KINDS[kind];
+  const url = apiUrl(path);
+  const headers = new Headers();
+  for (const [k, v] of Object.entries(standardAuthHeaders(url))) headers.set(k, v);
+  const res = await fetch(url, { headers, credentials: "include" });
+  if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+  return { blob: await res.blob(), filename };
+}
+
+export interface LrsCredentialView {
+  id: string;
+  label: string;
+  keyId: string;
+  permission: "read_write" | "read" | "write";
+  active: boolean;
+}
+
+/** The owner's LRS credentials — the import target the statements land under. */
+export const listLrsCredentials = () =>
+  call<{ endpoint: string; credentials: LrsCredentialView[] }>("/learning/lrs-credentials");
+
+/** Issue a new LRS credential. The plaintext `secret` is returned ONCE. */
+export const createLrsCredential = (label: string, permission: "read_write" | "read" | "write" = "read_write") =>
+  call<{ credential: LrsCredentialView; secret: string; basicAuth: string; endpoint: string }>(
+    "/learning/lrs-credentials",
+    { method: "POST", body: JSON.stringify({ label, permission }) },
+  );
+
+/** Bulk-import an xAPI statement array (or a full export envelope) into one of
+ *  the owner's LRS credentials. */
+export const importLearningStatements = (credentialId: string, statements: Record<string, unknown>[]) =>
+  call<{ imported: number }>("/learning/portability/import/statements", {
+    method: "POST",
+    body: JSON.stringify({ credentialId, statements }),
+  });
