@@ -35,7 +35,7 @@ import type {
   UpdateResumeRequest,
   ResumeSectionMeta,
 } from "@/types/resume";
-import { MetaType } from "@/types/resume";
+import { MetaType, workEntryTags } from "@/types/resume";
 
 
 
@@ -531,6 +531,18 @@ export default function ResumeViewer({
                           )}
                         </div>
                         <p className="text-primary font-medium">{work.name}</p>
+                        {workEntryTags(work).length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {workEntryTags(work).map((tag) => (
+                              <span
+                                key={tag.key}
+                                className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                              >
+                                {t(tag.key)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
 
 	                    <ItemMediaStrip
 	                      itemId={work.id}

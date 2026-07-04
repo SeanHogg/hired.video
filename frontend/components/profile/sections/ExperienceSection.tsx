@@ -7,7 +7,7 @@ import {
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Work } from "@/types/resume";
+import { workEntryTags, type Work, type WorkEntryTag } from "@/types/resume";
 import SectionEditButton from "./SectionEditButton";
 
 interface TimelineItemProps {
@@ -17,6 +17,8 @@ interface TimelineItemProps {
   endDate: string;
   description?: string;
   highlights?: string[];
+  /** Employment / location chips (already resolved to i18n keys). */
+  tags?: WorkEntryTag[];
   isLast?: boolean;
 }
 
@@ -27,6 +29,7 @@ function TimelineItem({
   endDate,
   description,
   highlights,
+  tags,
   isLast = false,
 }: TimelineItemProps) {
   const { t } = useTranslation();
@@ -59,6 +62,18 @@ function TimelineItem({
             <div className="flex-1">
               <h3 className="font-semibold text-lg leading-tight">{title}</h3>
               <p className="text-primary font-medium">{subtitle}</p>
+              {tags && tags.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag.key}
+                      className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                    >
+                      {t(tag.key)}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="text-right">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -127,6 +142,7 @@ export default function ExperienceSection({ work, isOwner, onEdit }: ExperienceS
                 endDate={item.endDate || "Present"}
                 description={item.summary}
                 highlights={item.highlights}
+                tags={workEntryTags(item)}
                 isLast={index === work.length - 1}
               />
             ))}

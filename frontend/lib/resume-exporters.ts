@@ -12,7 +12,7 @@
 // - Text: plain serializer from ResumeContent.
 // - JSON: raw resume content.
 
-import type { Resume, ResumeContent } from "@/types/resume";
+import { workEntryTags, type Resume, type ResumeContent } from "@/types/resume";
 import { slugify } from "@shared/slugify";
 import { alertDialog } from "@/lib/dialogs";
 import i18n from "@/lib/i18n/i18n";
@@ -91,6 +91,8 @@ export function resumeToPlainText(content: ResumeContent): string {
   const work = (content.work ?? []).map((w) => {
     const header = `${w.position || ""} — ${w.name || ""} (${dateRange(w.startDate, w.endDate || "Present")})`;
     const lines = [header];
+    const tags = workEntryTags(w).map((t) => t.label);
+    if (tags.length) lines.push(`  ${tags.join(" · ")}`);
     if (w.summary) lines.push(`  ${w.summary}`);
     (w.highlights ?? []).forEach((h) => lines.push(`  • ${h}`));
     return lines.join("\n");
@@ -193,14 +195,18 @@ function resumeToWordHtml(content: ResumeContent): string {
     ${inner}`;
   };
 
-  const work = (content.work ?? []).map((w) => `
+  const work = (content.work ?? []).map((w) => {
+    const tags = workEntryTags(w).map((t) => t.label);
+    return `
     <div style="margin-bottom:8pt;">
       <div><b>${esc(w.position || "")}</b> — ${esc(w.name || "")}
         <span style="float:right;color:#555;">${esc(dateRange(w.startDate, w.endDate || "Present"))}</span>
       </div>
+      ${tags.length ? `<div style="color:#555;font-size:9pt;">${esc(tags.join(" · "))}</div>` : ""}
       ${w.summary ? `<div>${esc(w.summary)}</div>` : ""}
       ${w.highlights && w.highlights.length > 0 ? `<ul style="margin:4pt 0 0 16pt;">${w.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
-    </div>`).join("");
+    </div>`;
+  }).join("");
 
   const edu = (content.education ?? []).map((e) => {
     const title = `${e.studyType || ""} ${e.area ? "in " + e.area : ""}`.trim();

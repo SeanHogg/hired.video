@@ -78,6 +78,18 @@ import { z } from "zod";
 // for the branding rationale.
 import type { Slug } from "./value-types.js";
 import { ResumeScoresSchema } from "./scores.js";
+import {
+  EMPLOYMENT_TYPES,
+  EMPLOYMENT_TYPE_LABELS,
+  normalizeEmploymentType,
+  type EmploymentType,
+} from "./employment-types.js";
+import {
+  WORK_SETTINGS,
+  WORK_SETTING_LABELS,
+  normalizeWorkSetting,
+  type WorkSetting,
+} from "./work-settings.js";
 export const SlugSchema = z
   .string()
   .min(3, "Slug must be at least 3 characters")
@@ -134,6 +146,27 @@ export type Basics = z.infer<typeof BasicsSchema>;
  */
 const interactiveCanvasField = z.unknown().optional();
 
+/**
+ * How a role is performed — Remote / On-site / Hybrid — on a resume work
+ * entry, or "" when the job-seeker hasn't said. Reuses the work-setting SSoT
+ * (shared/work-settings.ts): any spelling folds to canonical kebab, and an
+ * unknown value degrades to "" so healing a legacy/imported blob never throws.
+ */
+export const ResumeWorkSettingSchema = z.preprocess(
+  (v) => (v == null || v === "" ? "" : (normalizeWorkSetting(String(v)) ?? "")),
+  z.union([z.enum(WORK_SETTINGS), z.literal("")]),
+);
+
+/**
+ * Engagement type — Full-time / Part-time / Contract … — on a resume work
+ * entry, or "" when unspecified. Reuses the employment-type SSoT
+ * (shared/employment-types.ts); "Contractor" folds to "contract" for free.
+ */
+export const ResumeEmploymentTypeSchema = z.preprocess(
+  (v) => (v == null || v === "" ? "" : (normalizeEmploymentType(String(v)) ?? "")),
+  z.union([z.enum(EMPLOYMENT_TYPES), z.literal("")]),
+);
+
 export const WorkSchema = z.object({
   id: z.string().optional(),
   name: z.string().default(""),
@@ -142,10 +175,56 @@ export const WorkSchema = z.object({
   summary: z.string().default(""),
   startDate: z.string().default(""),
   endDate: z.string().default(""),
+  // Where + how the role was performed. Optional (absent → "") so every
+  // existing resume blob validates unchanged; canonical vocabularies are the
+  // shared work-setting / employment-type SSoTs.
+  locationType: ResumeWorkSettingSchema,
+  employmentType: ResumeEmploymentTypeSchema,
   highlights: z.array(z.string()).default([]),
   interactive: interactiveCanvasField,
 });
 export type Work = z.infer<typeof WorkSchema>;
+
+/** One display chip for a work entry's employment / location type. */
+export interface WorkEntryTag {
+  /** i18n flat key (e.g. "labels.workSetting.remote"); i18n-aware surfaces
+   *  translate this. */
+  key: string;
+  /** English SSoT label — fallback + for plain surfaces (exports) that don't
+   *  run i18n. */
+  label: string;
+}
+
+/** kebab-case → camelCase, to map a canonical employment type ("full-time")
+ *  onto its existing i18n label key segment ("fullTime"). */
+function kebabToCamel(s: string): string {
+  return s.replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase());
+}
+
+/**
+ * The employment + location chips for a work entry — the single source every
+ * renderer (templates, profile, viewer, exports) reads so the same two facts
+ * show the same way everywhere (DRY). Employment first, then location; an
+ * unspecified field yields no chip.
+ */
+export function workEntryTags(
+  w: Pick<Work, "employmentType" | "locationType">,
+): WorkEntryTag[] {
+  const tags: WorkEntryTag[] = [];
+  if (w.employmentType) {
+    tags.push({
+      key: `labels.employmentType.${kebabToCamel(w.employmentType)}`,
+      label: EMPLOYMENT_TYPE_LABELS[w.employmentType as EmploymentType],
+    });
+  }
+  if (w.locationType) {
+    tags.push({
+      key: `labels.workSetting.${w.locationType}`,
+      label: WORK_SETTING_LABELS[w.locationType as WorkSetting],
+    });
+  }
+  return tags;
+}
 
 export const VolunteerSchema = z.object({
   id: z.string().optional(),

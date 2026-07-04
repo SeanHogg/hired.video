@@ -38,6 +38,7 @@ import ResumeAnalyticsDialog from "@/components/ResumeAnalyticsDialog";
 import ResumeStatsSheet from "@/components/ResumeStatsSheet";
 import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 import SkillNetwork from "@/components/SkillNetwork";
+import { Career360ResumeCard } from "@/components/career360/Career360ResumeCard";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenuItem,
@@ -781,6 +782,11 @@ export default function ResumeDetail() {
                     />
                   );
                 })()}
+                {!isSample && (
+                  <div className="px-4 sm:px-6 pt-2 pb-4">
+                    <Career360ResumeCard isOwner={isOwner} />
+                  </div>
+                )}
                 <div className="px-4 sm:px-6 pb-8">
                   <SkillNetwork
                     resumeData={resume.content}

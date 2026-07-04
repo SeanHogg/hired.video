@@ -21,6 +21,7 @@ import { success, error } from "../types/index.js";
 import { checkTokenBudget } from "../middleware/token-budget.js";
 import {
   EvaluateRequestSchema,
+  ResolveItemRequestSchema,
   SelectTargetRequestSchema,
 } from "../../../shared/career360-types.js";
 import {
@@ -28,6 +29,7 @@ import {
   evaluateItem,
   getCareer360State,
   selectTarget,
+  setItemResolved,
   suggestTargets,
 } from "../services/career360/Career360Service.js";
 import { aiFailure as sharedAiFailure } from "../services/adapters/llm-error.js";
@@ -123,6 +125,31 @@ career360Routes.post("/evaluate", async (c) => {
       return c.json(error("NOT_FOUND", "That gap or step is no longer in your plan — refresh the page."), 404);
     }
     return aiFailure("[career360/evaluate]", err, c);
+  }
+});
+
+career360Routes.post("/resolve", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = ResolveItemRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Provide itemId, kind, and resolved."), 400);
+  }
+
+  try {
+    const selected = await setItemResolved({ userId, request: parsed.data });
+    return c.json(success({ selected }), 200);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === "NO_TARGET") {
+      return c.json(error("NOT_FOUND", "Pick a target first — there's nothing to update."), 404);
+    }
+    if (msg === "ITEM_NOT_FOUND") {
+      return c.json(error("NOT_FOUND", "That gap or step is no longer in your plan — refresh the page."), 404);
+    }
+    return c.json(error("INTERNAL_ERROR", "Couldn't update that item."), 500);
   }
 });
 

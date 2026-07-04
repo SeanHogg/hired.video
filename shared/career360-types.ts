@@ -199,6 +199,22 @@ export const TargetRubricSchema = z.object({
 });
 export type TargetRubric = z.infer<typeof TargetRubricSchema>;
 
+/** A gap or roadmap step the seeker has marked as resolved / done —
+ *  either because a re-evaluation flipped it to "closed" or because they
+ *  know they've already handled it. Resolved items stay in the plan (so
+ *  the history is auditable) but drop out of the active gap counts,
+ *  goal-fit signal, and the wheel's outer ring. `verdict` records the
+ *  re-evaluation that prompted the resolve, when there was one. */
+export const ResolvedItemSchema = z.object({
+  /** Refers to a Gap.id or RoadmapStep.id in the same SelectedTarget. */
+  itemId: z.string().min(1),
+  kind: z.enum(["gap", "step"]),
+  /** The re-evaluation verdict at the time of resolving, if any. */
+  verdict: z.enum(["closed", "partial", "open", "uncertain"]).optional(),
+  resolvedAt: z.string(),
+});
+export type ResolvedItem = z.infer<typeof ResolvedItemSchema>;
+
 export const SelectedTargetSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -211,8 +227,31 @@ export const SelectedTargetSchema = z.object({
   gaps: z.array(GapSchema),
   roadmap: z.array(RoadmapStepSchema),
   lastRefreshedAt: z.string(),
+  /** Gaps / steps the seeker has marked done. Defaulted so docs persisted
+   *  before this field parse cleanly as "nothing resolved yet". */
+  resolvedItems: z.array(ResolvedItemSchema).default([]),
 });
 export type SelectedTarget = z.infer<typeof SelectedTargetSchema>;
+
+/** True when the given gap/step id is in the target's resolved set. Pure
+ *  helper shared by the wheel-health rollup, the roadmap rows, and the
+ *  resume-view card so "is this done?" is decided in exactly one place. */
+export function isCareerItemResolved(
+  target: Pick<SelectedTarget, "resolvedItems">,
+  kind: "gap" | "step",
+  itemId: string,
+): boolean {
+  return (target.resolvedItems ?? []).some(
+    (r) => r.kind === kind && r.itemId === itemId,
+  );
+}
+
+/** The subset of a target's gaps that are still open (not resolved). The
+ *  single source for "active gaps" used by readiness, goal-fit, wheel
+ *  health, and the card's counts. */
+export function openGaps(target: Pick<SelectedTarget, "gaps" | "resolvedItems">): Gap[] {
+  return target.gaps.filter((g) => !isCareerItemResolved(target, "gap", g.id));
+}
 
 export const CareerTargetDocSchema = z.object({
   suggested: z.array(TargetSuggestionSchema).optional(),
@@ -325,3 +364,16 @@ export const EvaluateRequestSchema = z.union([
   z.object({ roadmapStepId: z.string().min(1) }),
 ]);
 export type EvaluateRequest = z.infer<typeof EvaluateRequestSchema>;
+
+/** Toggle a single gap or roadmap step's resolved state. Persists onto
+ *  the saved plan (unlike `evaluate`, which is read-only) so the seeker
+ *  can permanently retire an item the re-evaluation showed is no longer
+ *  an issue. */
+export const ResolveItemRequestSchema = z.object({
+  itemId: z.string().min(1),
+  kind: z.enum(["gap", "step"]),
+  resolved: z.boolean(),
+  /** Optional re-evaluation verdict to stamp on the resolved record. */
+  verdict: z.enum(["closed", "partial", "open", "uncertain"]).optional(),
+});
+export type ResolveItemRequest = z.infer<typeof ResolveItemRequestSchema>;

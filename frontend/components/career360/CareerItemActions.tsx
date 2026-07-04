@@ -17,7 +17,8 @@
 // `canEvaluate` / `canAddTask` booleans.
 
 import { useState } from "react";
-import { Check, ListTodo, Loader2, RefreshCw } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Check, CheckCircle2, ListTodo, Loader2, RefreshCw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,12 +26,13 @@ import { cn } from "@/lib/utils";
 import { career360Service } from "@/lib/services/career360-service";
 import { taskService } from "@/lib/services/task-service";
 import { TaskType, ProductivityItemStatus } from "@/types/task";
-import type {
-  EvaluateRequest,
-  EvaluationResult,
-  Gap,
-  RoadmapStep,
-  SelectedTarget,
+import {
+  isCareerItemResolved,
+  type EvaluateRequest,
+  type EvaluationResult,
+  type Gap,
+  type RoadmapStep,
+  type SelectedTarget,
 } from "@shared/career360-types";
 
 type Source =
@@ -43,27 +45,32 @@ interface Props {
    *  completion against the master resume). */
   target: SelectedTarget;
   source: Source;
+  /** Raised after a resolve/reopen persists so the host can swap in the
+   *  freshly-saved target (updated `resolvedItems`). When omitted the
+   *  mark-done control is hidden — the row is read-only. */
+  onTargetUpdated?: (next: SelectedTarget) => void;
 }
 
 const VERDICT_STYLES: Record<EvaluationResult["verdict"], string> = {
-  closed: "bg-emerald-50 text-emerald-800 border-emerald-200",
-  partial: "bg-amber-50 text-amber-800 border-amber-200",
-  open: "bg-blue-50 text-blue-800 border-blue-200",
+  closed: "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-200 dark:border-emerald-900",
+  partial: "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900",
+  open: "bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-200 dark:border-blue-900",
   uncertain: "bg-muted text-foreground border-border",
 };
 
-const VERDICT_LABEL: Record<EvaluationResult["verdict"], string> = {
-  closed: "Already met",
-  partial: "Partially met",
-  open: "Still open",
-  uncertain: "Need more info",
-};
-
-export function CareerItemActions({ target, source }: Props) {
+export function CareerItemActions({ target, source, onTargetUpdated }: Props) {
+  const { t } = useTranslation();
   const [evaluating, setEvaluating] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const [verdict, setVerdict] = useState<EvaluationResult | null>(null);
   const [added, setAdded] = useState(false);
+
+  const itemId = source.kind === "gap" ? source.gap.id : source.step.id;
+  const resolved = isCareerItemResolved(target, source.kind, itemId);
+
+  const verdictLabel = (v: EvaluationResult["verdict"]) =>
+    t(`tools.career360.item.verdict.${v}`);
 
   const handleEvaluate = async () => {
     if (evaluating) return;
@@ -79,9 +86,9 @@ export function CareerItemActions({ target, source }: Props) {
       const code = err?.context?.serverCode ?? err?.code;
       const msg = err?.context?.serverMessage ?? err?.message;
       if (code === "NOT_FOUND") {
-        toast.error(msg ?? "That item is no longer in your plan — refresh the page.");
+        toast.error(msg ?? t("tools.career360.item.evalStale"));
       } else {
-        toast.error(msg ?? "Couldn't re-evaluate this item right now.");
+        toast.error(msg ?? t("tools.career360.item.evalFailed"));
       }
     } finally {
       setEvaluating(false);
@@ -94,11 +101,36 @@ export function CareerItemActions({ target, source }: Props) {
     try {
       await taskService.createTask(buildTaskRequest(target, source));
       setAdded(true);
-      toast.success("Added to your Tasks");
+      toast.success(t("tools.career360.item.toastAdded"));
     } catch (err) {
-      toast.error("Couldn't add to Tasks. Please try again.");
+      toast.error(t("tools.career360.item.toastAddFailed"));
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleToggleResolved = async () => {
+    if (resolving || !onTargetUpdated) return;
+    const next = !resolved;
+    setResolving(true);
+    try {
+      const updated = await career360Service.resolve({
+        itemId,
+        kind: source.kind,
+        resolved: next,
+        verdict: verdict?.verdict,
+      });
+      onTargetUpdated(updated);
+      toast.success(
+        next
+          ? t("tools.career360.item.toastResolved")
+          : t("tools.career360.item.toastReopened"),
+      );
+    } catch (err: any) {
+      const msg = err?.context?.serverMessage ?? err?.message;
+      toast.error(msg ?? t("tools.career360.item.toastResolveFailed"));
+    } finally {
+      setResolving(false);
     }
   };
 
@@ -110,21 +142,45 @@ export function CareerItemActions({ target, source }: Props) {
           size="sm"
           onClick={handleEvaluate}
           disabled={evaluating}
-          title="Re-check this against my profile and resume"
+          title={t("tools.career360.item.reevaluateTitle")}
         >
           {evaluating ? (
             <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
           ) : (
             <RefreshCw className="mr-1 h-3.5 w-3.5" />
           )}
-          Re-evaluate
+          {t("tools.career360.item.reevaluate")}
         </Button>
+        {onTargetUpdated && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleToggleResolved}
+            disabled={resolving}
+            title={
+              resolved
+                ? t("tools.career360.item.reopenTitle")
+                : t("tools.career360.item.markDoneTitle")
+            }
+          >
+            {resolving ? (
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : resolved ? (
+              <Undo2 className="mr-1 h-3.5 w-3.5" />
+            ) : (
+              <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-emerald-600" />
+            )}
+            {resolved
+              ? t("tools.career360.item.reopen")
+              : t("tools.career360.item.markDone")}
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"
           onClick={handleAddToTasks}
           disabled={adding || added}
-          title="Add to my Tasks board"
+          title={t("tools.career360.item.addToTasksTitle")}
         >
           {adding ? (
             <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -133,7 +189,7 @@ export function CareerItemActions({ target, source }: Props) {
           ) : (
             <ListTodo className="mr-1 h-3.5 w-3.5" />
           )}
-          {added ? "Added" : "Add to Tasks"}
+          {added ? t("tools.career360.item.added") : t("tools.career360.item.addToTasks")}
         </Button>
       </div>
       {verdict && (
@@ -145,8 +201,15 @@ export function CareerItemActions({ target, source }: Props) {
         >
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-              {VERDICT_LABEL[verdict.verdict]}
+              {verdictLabel(verdict.verdict)}
             </Badge>
+            {/* A "closed" verdict is the strongest cue to retire the item —
+                nudge the seeker toward mark-done right where they'll read it. */}
+            {verdict.verdict === "closed" && !resolved && onTargetUpdated && (
+              <span className="text-[11px] opacity-80">
+                {t("tools.career360.item.closedHint")}
+              </span>
+            )}
           </div>
           <p>{verdict.explanation}</p>
           {verdict.evidence.length > 0 && (

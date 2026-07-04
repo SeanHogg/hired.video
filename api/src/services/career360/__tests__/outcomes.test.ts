@@ -68,6 +68,7 @@ function docWithGaps(severities: Gap["severity"][]): CareerTargetDoc {
       gaps,
       roadmap: [],
       lastRefreshedAt: "2026-01-01T00:00:00.000Z",
+      resolvedItems: [],
     },
   };
 }
@@ -196,5 +197,28 @@ describe("computeOutcomes — goal fit", () => {
     );
     assert.ok(Math.abs((out.rate ?? 0) - 0.5) < 1e-9);
     assert.equal(out.health, "moderate");
+  });
+
+  it("excludes resolved gaps — resolving both high gaps lifts fit to 'good'", () => {
+    // Two high gaps would score 'poor'; marking both resolved leaves no
+    // open gap, so goal-fit reads 'unknown' (nothing left to measure).
+    const doc = docWithGaps(["high", "high"]);
+    doc.selected!.resolvedItems = [
+      { itemId: "gap_0", kind: "gap", resolvedAt: "2026-01-02T00:00:00.000Z" },
+      { itemId: "gap_1", kind: "gap", resolvedAt: "2026-01-02T00:00:00.000Z" },
+    ];
+    const out = signal(computeOutcomes(NO_FUNNEL, doc), "goal-fit");
+    assert.equal(out.health, "unknown");
+    assert.equal(out.sampleSize, 0);
+  });
+
+  it("resolving one of two high gaps still leaves the open one 'poor'", () => {
+    const doc = docWithGaps(["high", "high"]);
+    doc.selected!.resolvedItems = [
+      { itemId: "gap_0", kind: "gap", resolvedAt: "2026-01-02T00:00:00.000Z" },
+    ];
+    const out = signal(computeOutcomes(NO_FUNNEL, doc), "goal-fit");
+    assert.equal(out.health, "poor");
+    assert.equal(out.sampleSize, 1);
   });
 });

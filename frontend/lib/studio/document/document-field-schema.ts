@@ -30,6 +30,8 @@ import {
   WORK_SETTING_OPTIONS,
 } from "@/lib/constants/enums";
 import { SENIORITY_LABELS, SENIORITY_LEVELS } from "@shared/seniority";
+import { EMPLOYMENT_TYPE_LABELS } from "@shared/employment-types";
+import { WORK_SETTING_LABELS } from "@shared/work-settings";
 
 export type FieldType =
   | "text"
@@ -168,11 +170,32 @@ export const BASICS_FIELDS: SectionFieldDef[] = [
   { key: "summary", label: "Summary", type: "textarea" },
 ];
 
+/** Resume work-entry selects — canonical string values (kebab), stored on the
+ *  `Work` entry as `locationType` / `employmentType`. A leading "Not specified"
+ *  clears the field (stored as ""). Labels reuse the shared SSoT so the editor,
+ *  templates, and job forms all read one vocabulary. Location offers every work
+ *  setting; employment is the job-seeker-facing subset (full/part-time, contract
+ *  — "Contractor" folds to "contract" via the shared normalizer). */
+const RESUME_LOCATION_TYPE_OPTIONS: FieldOption[] = [
+  { value: "", label: "Not specified" },
+  { value: "remote", label: WORK_SETTING_LABELS.remote },
+  { value: "onsite", label: WORK_SETTING_LABELS.onsite },
+  { value: "hybrid", label: WORK_SETTING_LABELS.hybrid },
+];
+const RESUME_EMPLOYMENT_TYPE_OPTIONS: FieldOption[] = [
+  { value: "", label: "Not specified" },
+  { value: "full-time", label: EMPLOYMENT_TYPE_LABELS["full-time"] },
+  { value: "part-time", label: EMPLOYMENT_TYPE_LABELS["part-time"] },
+  { value: "contract", label: EMPLOYMENT_TYPE_LABELS.contract },
+];
+
 const WORK_FIELDS: SectionFieldDef[] = [
   { key: "position", label: "Title", type: "text" },
   { key: "name", label: "Company", type: "text" },
   { key: "startDate", label: "Start", type: "date" },
   { key: "endDate", label: "End", type: "date" },
+  { key: "employmentType", label: "Employment", type: "select", options: RESUME_EMPLOYMENT_TYPE_OPTIONS },
+  { key: "locationType", label: "Location", type: "select", options: RESUME_LOCATION_TYPE_OPTIONS },
   { key: "summary", label: "Summary", type: "textarea" },
   { key: "highlights", label: "Highlights", type: "list" },
 ];

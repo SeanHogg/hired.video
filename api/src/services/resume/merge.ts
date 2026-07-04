@@ -404,7 +404,7 @@ export function computeHighlightDiff(
  *  sides may hold meaningful values that differ — the merger would
  *  otherwise silently keep target's value, hiding the divergence. */
 const SCALAR_FIELDS_BY_SECTION: Record<string, string[]> = {
-  work:         ["startDate", "endDate", "summary", "url", "position", "name"],
+  work:         ["startDate", "endDate", "summary", "url", "position", "name", "employmentType", "locationType"],
   volunteer:    ["startDate", "endDate", "summary", "url", "position", "organization"],
   education:    ["startDate", "endDate", "score", "url", "area", "studyType", "institution"],
   projects:     ["startDate", "endDate", "description", "url", "entity", "type", "name"],
@@ -896,7 +896,8 @@ function mergeSingleItem(
   const scalarFields = ["url", "name", "position", "institution", "area", "studyType",
     "score", "title", "date", "awarder", "issuer", "publisher", "releaseDate",
     "language", "fluency", "description", "entity", "type", "organization",
-    "startDate", "endDate", "level", "reference", "summary"];
+    "startDate", "endDate", "level", "reference", "summary",
+    "employmentType", "locationType"];
   for (const field of scalarFields) {
     const choice = scalarChoices?.[field];
     if (choice === "source" && source[field]) {

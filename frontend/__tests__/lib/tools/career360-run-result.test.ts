@@ -46,6 +46,7 @@ function target(gaps: Gap[]): SelectedTarget {
     gaps,
     roadmap: [],
     lastRefreshedAt: "2026-06-07T00:00:00.000Z",
+    resolvedItems: [],
   };
 }
 

@@ -14,7 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import type { ResumeData } from "@/types/resume";
+import { workEntryTags, type ResumeData } from "@/types/resume";
 import {
   calculateResumeDuration,
   formatResumeDateRange,
@@ -44,6 +44,8 @@ interface TimelineItem {
     startDate: string;
     endDate: string;
     duration?: string;
+    /** Employment / location chips (work entries only). */
+    tags?: string[];
     icon: React.ReactNode;
 }
 
@@ -65,6 +67,7 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
             organization?: string;
             startDate?: string;
             endDate?: string;
+            tags?: string[];
             showDuration?: boolean;
             showTypeBadge?: boolean;
             isCurrent?: boolean;
@@ -77,6 +80,7 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
             organization,
             startDate = '',
             endDate = '',
+            tags,
             showDuration = true,
             showTypeBadge = false,
             isCurrent = false,
@@ -126,6 +130,15 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                         {organization && (
                             <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{organization}</p>
                         )}
+                        {tags && tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                                {tags.map((tag) => (
+                                    <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                         {shouldShowDates(startDate, endDate) && (
                             <div className="text-xs text-muted-foreground">
                                 <div>{formatDateRange(startDate, endDate)}</div>
@@ -171,6 +184,7 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
             startDate: w.startDate,
             endDate: w.endDate,
             duration: calculateDuration(w.startDate, w.endDate),
+            tags: workEntryTags(w).map(t => t.label),
             icon: <Briefcase className="h-4 w-4" />,
         }));
 
@@ -499,6 +513,7 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                 organization={item.organization}
                                                 startDate={item.startDate}
                                                 endDate={item.endDate}
+                                                tags={item.tags}
                                                 showDuration={true}
                                                 showTypeBadge={true}
                                                 isCurrent={(item.type === 'work' || item.type === 'volunteer' || item.type === 'project') && (!item.endDate || item.endDate.trim() === '' || item.endDate.trim().toLowerCase() === 'present')}
@@ -550,6 +565,7 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                     organization={work.name}
                                                     startDate={work.startDate}
                                                     endDate={work.endDate}
+                                                    tags={workEntryTags(work).map(t => t.label)}
                                                     showDuration={true}
                                                     showTypeBadge={false}
                                                     isCurrent={!work.endDate || work.endDate.trim() === '' || work.endDate.trim().toLowerCase() === 'present'}

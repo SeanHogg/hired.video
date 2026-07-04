@@ -24,6 +24,7 @@ import {
   ResumeSummarySchema,
   ResumePrivacySchema,
   ResumeWithOwnershipSchema,
+  workEntryTags,
 } from "../../../../shared/resume.js";
 import {
   rowToResume,
@@ -116,6 +117,60 @@ describe("ResumeContentSchema", () => {
     assert.equal(parsed.work?.[0]?.startDate, "");
     assert.equal(parsed.work?.[0]?.endDate, "");
     assert.deepEqual(parsed.work?.[0]?.highlights, []);
+    // Employment / location type default to "" (unspecified) when absent.
+    assert.equal(parsed.work?.[0]?.employmentType, "");
+    assert.equal(parsed.work?.[0]?.locationType, "");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Work entry: employment / location type (#full-CRUD)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("WorkSchema employment / location type", () => {
+  it("keeps canonical kebab values as-is", () => {
+    const parsed = ResumeContentSchema.parse({
+      work: [{ name: "Acme", position: "CTO", employmentType: "full-time", locationType: "remote" }],
+    });
+    assert.equal(parsed.work?.[0]?.employmentType, "full-time");
+    assert.equal(parsed.work?.[0]?.locationType, "remote");
+  });
+
+  it("folds legacy / free-text spellings to canonical (Contractor→contract, On-site→onsite, WFH→remote)", () => {
+    const parsed = ResumeContentSchema.parse({
+      work: [
+        { name: "A", position: "x", employmentType: "Contractor", locationType: "On-site" },
+        { name: "B", position: "y", employmentType: "Full Time", locationType: "WFH" },
+      ],
+    });
+    assert.equal(parsed.work?.[0]?.employmentType, "contract");
+    assert.equal(parsed.work?.[0]?.locationType, "onsite");
+    assert.equal(parsed.work?.[1]?.employmentType, "full-time");
+    assert.equal(parsed.work?.[1]?.locationType, "remote");
+  });
+
+  it("degrades an unrecognized value to \"\" instead of throwing (heal never rejects a stored blob)", () => {
+    const parsed = ResumeContentSchema.safeParse({
+      work: [{ name: "A", position: "x", employmentType: "nonsense", locationType: "space-station" }],
+    });
+    assert.equal(parsed.success, true);
+    assert.equal(parsed.data?.work?.[0]?.employmentType, "");
+    assert.equal(parsed.data?.work?.[0]?.locationType, "");
+  });
+
+  it("workEntryTags emits employment-then-location chips with i18n keys + labels, and none for empty fields", () => {
+    assert.deepEqual(
+      workEntryTags({ employmentType: "part-time", locationType: "hybrid" }),
+      [
+        { key: "labels.employmentType.partTime", label: "Part-time" },
+        { key: "labels.workSetting.hybrid", label: "Hybrid" },
+      ],
+    );
+    assert.deepEqual(workEntryTags({ employmentType: "", locationType: "" }), []);
+    assert.deepEqual(
+      workEntryTags({ employmentType: "", locationType: "remote" }),
+      [{ key: "labels.workSetting.remote", label: "Remote" }],
+    );
   });
 });
 

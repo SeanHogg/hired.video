@@ -31,7 +31,7 @@ import {
 } from "@/lib/resume-template-themes";
 import ItemSkillBadges from "@/components/ItemSkillBadges";
 import ItemMediaStrip from "@/components/ItemMediaStrip";
-import type { Resume } from "@/types/resume";
+import { workEntryTags, type Resume } from "@/types/resume";
 import type {
   CardStyle,
   ResumeBlock,
@@ -270,6 +270,8 @@ interface TimelineItemProps {
   endDate?: string;
   description?: string;
   highlights?: string[];
+  /** Small badges (employment / location type) shown under the subtitle. */
+  tags?: string[];
   icon: React.ComponentType<any>;
   isLast?: boolean;
   theme: ThemeStyles;
@@ -280,6 +282,23 @@ interface TimelineItemProps {
   footer?: React.ReactNode;
 }
 
+/** Employment / location badges shared by both work entry layouts (DRY). */
+function EntryTags({ tags, theme }: { tags?: string[]; theme: ThemeStyles }) {
+  if (!tags || tags.length === 0) return null;
+  return (
+    <div className="mt-1 flex flex-wrap gap-1.5">
+      {tags.map((tag) => (
+        <span
+          key={tag}
+          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${theme.accentBgSoft} ${theme.accentText}`}
+        >
+          {tag}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function TimelineItem({
   title,
   subtitle,
@@ -287,6 +306,7 @@ function TimelineItem({
   endDate,
   description,
   highlights,
+  tags,
   icon: Icon,
   isLast,
   theme,
@@ -307,6 +327,7 @@ function TimelineItem({
             <div className="flex-1">
               <h3 className="font-semibold text-lg leading-tight">{title}</h3>
               <p className={`${theme.accentText} font-medium`}>{subtitle}</p>
+              <EntryTags tags={tags} theme={theme} />
             </div>
             <div className="text-right">
               {range && (
@@ -341,7 +362,7 @@ function TimelineItem({
   );
 }
 
-function ListEntry({ title, subtitle, startDate, endDate, description, highlights, theme, footer }: Omit<TimelineItemProps, "icon" | "isLast">) {
+function ListEntry({ title, subtitle, startDate, endDate, description, highlights, tags, theme, footer }: Omit<TimelineItemProps, "icon" | "isLast">) {
   const range = dateRange(startDate, endDate);
   return (
     <div className="py-3 border-b last:border-b-0">
@@ -349,6 +370,7 @@ function ListEntry({ title, subtitle, startDate, endDate, description, highlight
         <div className="min-w-0">
           <div className="font-semibold">{title}</div>
           {subtitle && <div className={`text-sm ${theme.accentText}`}>{subtitle}</div>}
+          <EntryTags tags={tags} theme={theme} />
         </div>
         {range && <div className="text-sm text-muted-foreground whitespace-nowrap">{range}</div>}
       </div>
@@ -752,6 +774,7 @@ function renderSectionBody(
                 endDate={w.endDate || "Present"}
                 description={w.summary}
                 highlights={section.showHighlights ? w.highlights : undefined}
+                tags={workEntryTags(w).map((t) => t.label)}
                 icon={Building}
                 isLast={idx === sorted.length - 1}
                 theme={theme}
@@ -772,6 +795,7 @@ function renderSectionBody(
               endDate={w.endDate || "Present"}
               description={w.summary}
               highlights={section.showHighlights ? w.highlights : undefined}
+              tags={workEntryTags(w).map((t) => t.label)}
               theme={theme}
               footer={itemFooter(w.id)}
             />

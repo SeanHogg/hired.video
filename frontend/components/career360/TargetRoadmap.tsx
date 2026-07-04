@@ -24,7 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { getCatalogTool } from "@/data/tools-catalog";
 import { CareerItemActions } from "@/components/career360/CareerItemActions";
-import type { Gap, RoadmapStep, SelectedTarget } from "@shared/career360-types";
+import { isCareerItemResolved, type Gap, type RoadmapStep, type SelectedTarget } from "@shared/career360-types";
 
 interface Props {
   selected: SelectedTarget;
@@ -37,6 +37,10 @@ interface Props {
    *  in one place — the Roadmap just raises the gap, the page builds
    *  the prompt + context. */
   onCoachGap: (gap: Gap) => void;
+  /** Raised after a gap/step resolve persists so the host can swap in the
+   *  freshly-saved target. When omitted, rows render read-only (no
+   *  mark-done control). */
+  onTargetUpdated?: (next: SelectedTarget) => void;
 }
 
 const SEVERITY_STYLES: Record<Gap["severity"], string> = {
@@ -52,15 +56,22 @@ export function TargetRoadmap({
   onRefresh,
   onClear,
   onCoachGap,
+  onTargetUpdated,
 }: Props) {
   const { t } = useTranslation();
+  // Resolved gaps sink to the bottom; within each group, high severity
+  // first. Resolving a gap should feel like clearing it off the top of
+  // the list rather than deleting the record.
   const orderedGaps = useMemo(
     () =>
       [...selected.gaps].sort((a, b) => {
+        const resA = isCareerItemResolved(selected, "gap", a.id) ? 1 : 0;
+        const resB = isCareerItemResolved(selected, "gap", b.id) ? 1 : 0;
+        if (resA !== resB) return resA - resB;
         const rank = (s: Gap["severity"]) => (s === "high" ? 0 : s === "medium" ? 1 : 2);
         return rank(a.severity) - rank(b.severity);
       }),
-    [selected.gaps],
+    [selected],
   );
 
   const stepsByHorizon = useMemo(() => {
@@ -219,14 +230,25 @@ export function TargetRoadmap({
         <CardContent className="space-y-2">
           {orderedGaps.map((gap) => {
             const tool = gap.toolId ? getCatalogTool(gap.toolId) : undefined;
+            const resolved = isCareerItemResolved(selected, "gap", gap.id);
             return (
               <div
                 key={gap.id}
-                className="rounded-md border p-3 hover:bg-accent/40 transition-colors"
+                className={cn(
+                  "rounded-md border p-3 transition-colors",
+                  resolved
+                    ? "opacity-60 bg-muted/30"
+                    : "hover:bg-accent/40",
+                )}
               >
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex-1 min-w-[220px]">
                     <div className="flex items-center gap-2 flex-wrap">
+                      {resolved && (
+                        <Badge className="text-[10px] bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-900">
+                          {t("tools.career360.item.resolved")}
+                        </Badge>
+                      )}
                       <Badge
                         variant="outline"
                         className={cn("text-[10px]", SEVERITY_STYLES[gap.severity])}
@@ -236,7 +258,9 @@ export function TargetRoadmap({
                       <Badge variant="secondary" className="text-[10px]">
                         {t(`tools.career360.roadmap.category.${gap.category}`)}
                       </Badge>
-                      <span className="font-medium text-sm">{gap.label}</span>
+                      <span className={cn("font-medium text-sm", resolved && "line-through")}>
+                        {gap.label}
+                      </span>
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
                       <p>
@@ -278,6 +302,7 @@ export function TargetRoadmap({
                   <CareerItemActions
                     target={selected}
                     source={{ kind: "gap", gap }}
+                    onTargetUpdated={onTargetUpdated}
                   />
                 </div>
               </div>
@@ -303,29 +328,45 @@ export function TargetRoadmap({
                   {t(`tools.career360.roadmap.horizon.${h}`)}
                 </h4>
                 <ol className="space-y-2">
-                  {steps.map((step) => (
-                    <li key={step.id} className="rounded-md border p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="font-medium text-sm">{step.title}</p>
-                        {step.closesGapIds.length > 0 && (
-                          <Badge variant="secondary" className="text-[10px] shrink-0">
-                            {t("tools.career360.roadmap.closesGaps", {
-                              count: step.closesGapIds.length,
-                            })}
-                          </Badge>
+                  {steps.map((step) => {
+                    const resolved = isCareerItemResolved(selected, "step", step.id);
+                    return (
+                      <li
+                        key={step.id}
+                        className={cn("rounded-md border p-3", resolved && "opacity-60 bg-muted/30")}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className={cn("font-medium text-sm", resolved && "line-through")}>
+                            {step.title}
+                          </p>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {resolved && (
+                              <Badge className="text-[10px] bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-900">
+                                {t("tools.career360.item.resolved")}
+                              </Badge>
+                            )}
+                            {step.closesGapIds.length > 0 && (
+                              <Badge variant="secondary" className="text-[10px]">
+                                {t("tools.career360.roadmap.closesGaps", {
+                                  count: step.closesGapIds.length,
+                                })}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        {step.detail && (
+                          <p className="text-xs text-muted-foreground mt-1">{step.detail}</p>
                         )}
-                      </div>
-                      {step.detail && (
-                        <p className="text-xs text-muted-foreground mt-1">{step.detail}</p>
-                      )}
-                      <div className="mt-2 pt-2 border-t border-border/60">
-                        <CareerItemActions
-                          target={selected}
-                          source={{ kind: "step", step }}
-                        />
-                      </div>
-                    </li>
-                  ))}
+                        <div className="mt-2 pt-2 border-t border-border/60">
+                          <CareerItemActions
+                            target={selected}
+                            source={{ kind: "step", step }}
+                            onTargetUpdated={onTargetUpdated}
+                          />
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ol>
               </div>
             );

@@ -38,6 +38,10 @@ export {
   CreateResumeSchema,
   UpdateResumeSchema,
   MergeSectionTypeSchema,
+  // Work entry employment / location type
+  ResumeWorkSettingSchema,
+  ResumeEmploymentTypeSchema,
+  workEntryTags,
 } from "@shared/resume";
 
 export type {
@@ -67,6 +71,7 @@ export type {
   CreateResumeRequest,
   UpdateResumeRequest,
   MergeSectionType,
+  WorkEntryTag,
 } from "@shared/resume";
 
 // Keep the old `ResumeData` name as a legacy alias of `ResumeContent`

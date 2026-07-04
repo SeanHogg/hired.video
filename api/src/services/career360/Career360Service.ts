@@ -29,6 +29,7 @@ import {
   GapSchema,
   SuggestTargetsResponseSchema,
   TargetRubricSchema,
+  openGaps,
   type CareerTargetDoc,
   type Career360Outcomes,
   type Career360StateResponse,
@@ -37,6 +38,8 @@ import {
   type Gap,
   type OutcomeSegmentId,
   type OutcomeSignal,
+  type ResolveItemRequest,
+  type ResolvedItem,
   type RoadmapStep,
   type ScoreHistorySeries,
   type SelectedTarget,
@@ -328,6 +331,9 @@ Build the plan.`;
     gaps,
     roadmap,
     lastRefreshedAt: new Date().toISOString(),
+    // A fresh plan re-stamps every gap/step id, so prior resolved marks
+    // no longer reference anything — start clean.
+    resolvedItems: [],
   };
 
   const next: CareerTargetDoc = {
@@ -385,6 +391,52 @@ ${item.prompt}`;
   );
 
   return result.data;
+}
+
+/** Toggle a single gap/step's resolved state and persist it onto the
+ *  saved plan. Unlike `evaluateItem` (read-only), this mutates the doc so
+ *  the seeker can permanently retire an item a re-evaluation showed is no
+ *  longer a real gap. Returns the updated target so the client can render
+ *  without a second round-trip. */
+export async function setItemResolved(args: {
+  userId: string;
+  request: ResolveItemRequest;
+}): Promise<SelectedTarget> {
+  const { userId, request } = args;
+  const doc = await loadDoc(userId);
+  const selected = doc?.selected;
+  if (!selected) {
+    throw new Error("NO_TARGET");
+  }
+
+  // Validate the item still exists in the current plan so a stale client
+  // can't resolve a phantom id.
+  const exists =
+    request.kind === "gap"
+      ? selected.gaps.some((g) => g.id === request.itemId)
+      : selected.roadmap.some((s) => s.id === request.itemId);
+  if (!exists) {
+    throw new Error("ITEM_NOT_FOUND");
+  }
+
+  const others = (selected.resolvedItems ?? []).filter(
+    (r) => !(r.kind === request.kind && r.itemId === request.itemId),
+  );
+  const nextResolved: ResolvedItem[] = request.resolved
+    ? [
+        ...others,
+        {
+          itemId: request.itemId,
+          kind: request.kind,
+          verdict: request.verdict,
+          resolvedAt: new Date().toISOString(),
+        },
+      ]
+    : others;
+
+  const nextSelected: SelectedTarget = { ...selected, resolvedItems: nextResolved };
+  await persistDoc(userId, { ...doc, selected: nextSelected });
+  return nextSelected;
 }
 
 function resolveEvaluationItem(
@@ -879,7 +931,9 @@ function funnelSignal(
  *  fit score (1 = no high-severity gaps). No active target / no gaps →
  *  "unknown". */
 function goalFitSignal(doc: CareerTargetDoc | null): OutcomeSignal {
-  const gaps = doc?.selected?.gaps ?? [];
+  // Only OPEN gaps count against goal-fit — resolving a gap should lift
+  // the signal, mirroring the outer ring dropping the segment.
+  const gaps = doc?.selected ? openGaps(doc.selected) : [];
   if (!doc?.selected || gaps.length === 0) {
     return { id: "goal-fit", health: "unknown", rate: null, sampleSize: gaps.length };
   }

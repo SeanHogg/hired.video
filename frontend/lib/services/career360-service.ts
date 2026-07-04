@@ -16,6 +16,7 @@ import {
   type CareerTargetDoc,
   type EvaluateRequest,
   type EvaluationResult,
+  type ResolveItemRequest,
   type SelectedTarget,
   type SelectTargetRequest,
   type ScoreHistorySeries,
@@ -55,6 +56,10 @@ const SelectResponseSchema = z.object({
 
 const EvaluateResponseSchema = z.object({
   evaluation: EvaluationResultSchema,
+});
+
+const ResolveResponseSchema = z.object({
+  selected: z.lazy(() => CareerTargetDocSchema.shape.selected.unwrap()),
 });
 
 export class Career360Service {
@@ -99,6 +104,18 @@ export class Career360Service {
       EvaluateResponseSchema,
     );
     return res.data.evaluation;
+  }
+
+  /** Mark a gap or roadmap step done (or reopen it). Persists onto the
+   *  saved plan and returns the updated target so the caller can render
+   *  immediately. */
+  async resolve(request: ResolveItemRequest): Promise<SelectedTarget> {
+    const res = await apiClient.post(
+      "/api/career360/resolve",
+      request,
+      ResolveResponseSchema,
+    );
+    return res.data.selected;
   }
 }
 
