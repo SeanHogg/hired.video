@@ -577,14 +577,12 @@ export function buildFakeDb(seed: Record<string, Row[]> = {}): FakeDbHandle {
                 updated.push(row);
               }
               calls.push({ kind: "update", table: name, set: values });
-              return {
-                returning(_cols?: unknown) {
-                  return Promise.resolve(updated);
-                },
-                then(resolveFn: any) {
-                  resolveFn(updated);
-                },
-              };
+              // Return a real Promise (so `.then`/`.catch`/`.finally` all work
+              // like drizzle's thenable query builder) with `.returning`
+              // attached for the `UPDATE ... RETURNING` form.
+              const result: any = Promise.resolve(updated);
+              result.returning = (_cols?: unknown) => Promise.resolve(updated);
+              return result;
             },
           };
         },
@@ -596,11 +594,17 @@ export function buildFakeDb(seed: Record<string, Row[]> = {}): FakeDbHandle {
       return {
         where(c: unknown) {
           const pred = compilePredicate(c);
+          const removed = rows.filter((r) => pred(r));
           const kept = rows.filter((r) => !pred(r));
           rows.length = 0;
           for (const r of kept) rows.push(r);
           calls.push({ kind: "delete", table: name });
-          return Promise.resolve();
+          // DELETE ... RETURNING is real Postgres; mirror it so handlers that
+          // branch on "did anything get deleted" can be tested. Stays awaitable
+          // (real Promise) with `.returning` attached for the RETURNING form.
+          const result: any = Promise.resolve();
+          result.returning = (_cols?: unknown) => Promise.resolve(removed.slice());
+          return result;
         },
       };
     },

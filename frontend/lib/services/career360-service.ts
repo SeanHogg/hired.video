@@ -13,13 +13,11 @@ import {
   EvaluationResultSchema,
   SuggestTargetsResponseSchema,
   TargetSuggestionSchema,
-  type CareerTargetDoc,
   type EvaluateRequest,
   type EvaluationResult,
   type ResolveItemRequest,
   type SelectedTarget,
   type SelectTargetRequest,
-  type ScoreHistorySeries,
 } from "@shared/career360-types";
 import { apiClient } from "../api-client";
 

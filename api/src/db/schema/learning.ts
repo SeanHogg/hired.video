@@ -432,3 +432,107 @@ export const learningGoals = pgTable(
 
 export type LearningGoal = typeof learningGoals.$inferSelect;
 export type NewLearningGoal = typeof learningGoals.$inferInsert;
+
+// ===========================================================================
+// Conformant xAPI 1.0.3 LRS (migration 0490)
+//
+// A SECOND, tenant-scoped, spec-conformant statement + document store that is
+// DECOUPLED from internal enrollments — so an external tool (or a company
+// transitioning in/out) can talk to us as a real xAPI LRS with its own
+// Basic-auth credential, actors that are arbitrary xAPI Agents, and the full
+// statement/state/profile REST surface. The internal `xapiStatements` store
+// (user_id NOT NULL, above) stays the SSoT for OUR learners' gamification +
+// cert rollups; this store is the platform LRS.
+// ===========================================================================
+
+export const LRS_PERMISSIONS = ["read_write", "read", "write"] as const;
+export type LrsPermission = (typeof LRS_PERMISSIONS)[number];
+
+export const lrsCredentials = pgTable(
+  "lrs_credentials",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerUserId: uuid("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    ownerCompanyId: uuid("owner_company_id").references(() => companyProfiles.id, { onDelete: "cascade" }),
+    label: varchar("label", { length: 200 }).notNull(),
+    // Basic-auth username. Public, safe to display. `lrs_<hex>`.
+    keyId: varchar("key_id", { length: 48 }).notNull(),
+    // SHA-256 hex of the Basic-auth password. Secret returned once, never stored raw.
+    secretHash: text("secret_hash").notNull(),
+    permission: varchar("permission", { length: 16 }).default("read_write").notNull(),
+    active: boolean("active").default(true).notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("uq_lrs_credentials_key_id").on(t.keyId),
+    index("idx_lrs_credentials_owner_user").on(t.ownerUserId, t.createdAt),
+    index("idx_lrs_credentials_owner_company").on(t.ownerCompanyId, t.createdAt),
+  ],
+);
+
+export type LrsCredential = typeof lrsCredentials.$inferSelect;
+export type NewLrsCredential = typeof lrsCredentials.$inferInsert;
+
+export const lrsStatements = pgTable(
+  "lrs_statements",
+  {
+    // xAPI Statement id — client-provided on PUT, minted on POST when absent.
+    id: uuid("id").primaryKey(),
+    credentialId: uuid("credential_id").notNull().references(() => lrsCredentials.id, { onDelete: "cascade" }),
+    // Canonical actor inverse-functional identifier for the ?agent= filter.
+    actorIfi: text("actor_ifi").notNull(),
+    verbId: text("verb_id").notNull(),
+    objectId: text("object_id"),
+    objectType: varchar("object_type", { length: 40 }).default("Activity").notNull(),
+    registration: uuid("registration"),
+    statement: jsonb("statement").$type<Record<string, unknown>>().notNull(),
+    voided: boolean("voided").default(false).notNull(),
+    voidedById: uuid("voided_by_id"),
+    stored: timestamp("stored", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_lrs_statements_cred_stored").on(t.credentialId, t.stored),
+    index("idx_lrs_statements_cred_actor").on(t.credentialId, t.actorIfi, t.stored),
+    index("idx_lrs_statements_cred_verb").on(t.credentialId, t.verbId, t.stored),
+    index("idx_lrs_statements_cred_object").on(t.credentialId, t.objectId, t.stored),
+    index("idx_lrs_statements_cred_reg").on(t.credentialId, t.registration),
+  ],
+);
+
+export type LrsStatement = typeof lrsStatements.$inferSelect;
+export type NewLrsStatement = typeof lrsStatements.$inferInsert;
+
+export const LRS_DOCUMENT_TYPES = ["state", "activity_profile", "agent_profile"] as const;
+export type LrsDocumentType = (typeof LRS_DOCUMENT_TYPES)[number];
+
+export const lrsDocuments = pgTable(
+  "lrs_documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    credentialId: uuid("credential_id").notNull().references(() => lrsCredentials.id, { onDelete: "cascade" }),
+    docType: varchar("doc_type", { length: 20 }).notNull(),
+    // Empty-string sentinels (NOT null) so the composite unique index treats
+    // "absent" as one value — Postgres treats NULLs as distinct, breaking upsert.
+    activityId: text("activity_id").default("").notNull(),
+    agentIfi: text("agent_ifi").default("").notNull(),
+    registration: text("registration").default("").notNull(),
+    documentKey: text("document_key").notNull(),
+    contentType: varchar("content_type", { length: 255 }).default("application/json").notNull(),
+    content: text("content").notNull(),
+    etag: text("etag").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("uq_lrs_documents_key").on(
+      t.credentialId, t.docType, t.activityId, t.agentIfi, t.registration, t.documentKey,
+    ),
+    index("idx_lrs_documents_lookup").on(t.credentialId, t.docType, t.activityId, t.agentIfi, t.updatedAt),
+  ],
+);
+
+export type LrsDocument = typeof lrsDocuments.$inferSelect;
+export type NewLrsDocument = typeof lrsDocuments.$inferInsert;

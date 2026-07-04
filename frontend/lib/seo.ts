@@ -219,6 +219,15 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "affiliate program, career affiliate, saas affiliate, resume affiliate, referral commission",
   },
+  // SCORM + xAPI hosting platform — the SCORM-Cloud alternative. Migrate
+  // training in and out without lock-in; host and track SCORM/xAPI content.
+  "/learning-platform": {
+    title: "SCORM & xAPI Hosting Platform — hired.video",
+    description:
+      "Move your training in — and out — without lock-in. Host, play, and track SCORM 1.2/2004 and xAPI (Tin Can) content with a conformant LRS, plus full import/export. A SCORM Cloud alternative.",
+    keywords:
+      "SCORM hosting, xAPI, Tin Can API, LRS, learning record store, SCORM Cloud alternative, SCORM import export, cmi5, AICC, LMS migration",
+  },
   // Partner platform consent screen. A partner sends the job seeker here to
   // approve connecting to their existing account. Noindex-adjacent (behind
   // auth) but still needs a real title/description for the tab + share cards.

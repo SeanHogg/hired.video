@@ -194,6 +194,8 @@ import { cohortRoutes } from "./routes/cohorts.js";
 import { learningGoalsRoutes } from "./routes/learning-goals.js";
 import { learningRoutes } from "./routes/learning.js";
 import { verifyRoutes } from "./routes/verify.js";
+import { xapiLrsRoutes } from "./routes/xapi-lrs.js";
+import { lrsCredentialRoutes } from "./routes/lrs-credentials.js";
 import { legalRoutes } from "./routes/legal.js";
 import { advertisingRoutes } from "./routes/advertising.js";
 import { paidMediaRoutes } from "./routes/paid-media.js";
@@ -269,6 +271,12 @@ export function createApp() {
     "/api/email/unsubscribe",
     "/api/email/preferences/token",
     "/api/email/webhooks",
+    // Conformant xAPI 1.0.3 LRS — external tools authenticate with an
+    // LRS-specific Basic-auth credential (lrs_credentials), NOT a hired.video
+    // JWT, so the whole surface bypasses the platform auth layer. Same posture
+    // as /api/partner. NOTE: the AUTHENTICATED credential-manager lives at
+    // /api/learning/lrs-credentials and is deliberately NOT matched here.
+    "/api/xapi",
     // Geo-IP surface for the dynamic Privacy / Terms / Cookie pages
     // and any other surface that needs the visitor's country before
     // they've signed in.
@@ -953,8 +961,14 @@ export function createApp() {
   app.route("/api/learning-paths", learningPathRoutes);
   app.route("/api/cohorts", cohortRoutes);
   app.route("/api/learning-goals", learningGoalsRoutes);
+  // LRS credential management is authenticated (owner-scoped) — register it
+  // BEFORE the /api/learning learner router so its concrete sub-path wins.
+  app.route("/api/learning/lrs-credentials", lrsCredentialRoutes);
   app.route("/api/learning", learningRoutes);
   app.route("/api/verify", verifyRoutes);
+  // Conformant xAPI 1.0.3 LRS. In PUBLIC_PREFIXES (below) so the JWT layer
+  // skips it — the surface authenticates with its own LRS Basic-auth credential.
+  app.route("/api/xapi", xapiLrsRoutes);
   app.route("/api/legal", legalRoutes);
   app.route("/api/advertising", advertisingRoutes);
   // #169 — Campaign $ redemption store. Read-only balance + tx surface
