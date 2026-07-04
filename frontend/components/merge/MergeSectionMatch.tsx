@@ -51,6 +51,8 @@ const FIELD_LABELS: Record<string, string> = {
   fluency: "Fluency",
   level: "Level",
   reference: "Reference",
+  employmentType: "Employment",
+  locationType: "Location",
 };
 
 function humaniseFieldName(field: string): string {
