@@ -28,6 +28,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { ForbiddenError } from "../../middleware/errorHandler.js";
 import { PayoutLedgerService } from "../payout/PayoutLedgerService.js";
+import { NotificationService } from "../notifications/notificationService.js";
 import { resolveEmployerCompanyIds, getActiveTimeEntry } from "../workforce/index.js";
 import { getOrCreateDefaultBoard } from "../productivity/default-board.js";
 import {
@@ -217,6 +218,20 @@ export class ActivityService {
         metadata: { activity: { assignedAt: new Date().toISOString(), assignedByUserId: employerUserId } },
       } as any)
       .returning();
+    // Message the hired person that they've been given work to do. Best-effort
+    // (in-app notification + pref-gated push); never blocks the assignment.
+    void NotificationService.notify({
+      userId: input.workerUserId,
+      type: "assignment",
+      title: `New activity assigned: ${row.title}`,
+      message:
+        input.payType === "hourly"
+          ? "You've been assigned paid hourly work. Track your time and submit it for approval to get paid."
+          : "You've been assigned a paid activity. Mark it done and submit it for approval to get paid.",
+      url: "/tasks",
+      refType: "activity",
+      refId: row.id,
+    });
     return this.toDto(row, 0);
   }
 
@@ -276,6 +291,18 @@ export class ActivityService {
       } as any)
       .where(eq(tasks.id, taskId))
       .returning();
+    if (earnedCents > 0) {
+      const dollars = (earnedCents / 100).toFixed(2);
+      void NotificationService.notify({
+        userId: row.userId,
+        type: "system",
+        title: `Activity approved — $${dollars} added to your balance`,
+        message: `"${row.title}" was approved. $${dollars} was credited to your payouts balance.`,
+        url: "/settings?tab=payouts",
+        refType: "activity",
+        refId: taskId,
+      });
+    }
     return this.toDto(updated, trackedSec);
   }
 
@@ -301,6 +328,15 @@ export class ActivityService {
       } as any)
       .where(eq(tasks.id, taskId))
       .returning();
+    void NotificationService.notify({
+      userId: row.userId,
+      type: "assignment",
+      title: `Changes requested on: ${row.title}`,
+      message: reason,
+      url: "/tasks",
+      refType: "activity",
+      refId: taskId,
+    });
     return this.toDto(updated, await this.trackedSecFor(taskId, db));
   }
 
