@@ -28,6 +28,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { apiClient } from "@/lib/api-client";
+import { LockedAccountsPanel } from "@/components/admin/security/LockedAccountsPanel";
+import { BotBlockGlobe } from "@/components/admin/security/BotBlockGlobe";
+import { RegionWaitlistTable } from "@/components/admin/security/RegionWaitlistTable";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -286,6 +289,12 @@ export default function Security() {
           </TableBody>
         </Table>
       </Card>
+
+      {/* Operator security surfaces — folded in from the former standalone
+          /admin/security page (#2278). Each panel self-gates to SuperAdmin. */}
+      <LockedAccountsPanel />
+      <BotBlockGlobe />
+      <RegionWaitlistTable />
     </div>
   );
 }

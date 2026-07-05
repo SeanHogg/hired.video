@@ -162,7 +162,6 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const PrivacyOptOut = lazy(() => import("./pages/PrivacyOptOut"));
 const SecurityPage = lazy(() => import("./pages/Security"));
 const SecuritySessions = lazy(() => import("./pages/SecuritySessions"));
-const AdminSecurity = lazy(() => import("./pages/admin/AdminSecurity"));
 const Contact = lazy(() => import("./pages/Contact"));
 const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
 const LearningPlatform = lazy(() => import("./pages/LearningPlatform"));
@@ -355,6 +354,48 @@ const PointsPage = lazy(() => import("./pages/Points"));
 const AdminPoints = lazy(() => import("./pages/admin/Points"));
 const RewardsPage = lazy(() => import("./pages/Rewards"));
 import AdminLayout from "./components/admin/AdminLayout";
+import AdminSection from "./components/admin/AdminSection";
+import { ADMIN_GROUPS, ADMIN_LEGACY_REDIRECTS } from "./lib/admin-nav";
+
+// Consolidated admin groups → their `?view=` segment content (#2277). Keyed by
+// AdminGroup.id then segment `view` ("" for single-view groups). Pages stay
+// lazy; AdminSection mounts only the active node.
+const ADMIN_SECTION_ELEMENTS: Record<string, Record<string, ReactNode>> = {
+  dashboard: { "": <ProductDashboard /> },
+  users: { registered: <UserManagement />, live: <ActiveUsers /> },
+  companies: { "": <CompanyManagement /> },
+  access: { roles: <RolesPermissions />, modules: <RoleAccessManager /> },
+  feed: {
+    notifications: <FeedManagement />,
+    dashboard: <DashboardFeedCuration />,
+    campaigns: <CampaignManager />,
+  },
+  studio: {
+    content: <StudioManagement />,
+    embeds: <PageEmbeds />,
+    social: <SocialAccountsPage />,
+  },
+  jobs: { "": <JobsManagement /> },
+  insights: {
+    accounts: <AdminAccountAnalytics />,
+    tools: <ToolUsage />,
+    extension: <ExtensionTelemetry />,
+  },
+  trust: {
+    moderation: <ModerationQueue />,
+    security: <Security />,
+    audit: <AuditLog />,
+  },
+  billing: { "": <BillingManagement /> },
+  modules: { "": <ModuleManagement /> },
+  partners: { "": <AdminPartners /> },
+  system: {
+    settings: <SystemSettings />,
+    storage: <StorageManagement />,
+    workers: <Workers />,
+    "ai-vendors": <AIVendors />,
+  },
+};
 
 // Loading component
 const PageLoader = () => (
@@ -1157,36 +1198,27 @@ const App = () => (
                           state. */}
                       <Route path="/verify/:certNumber" element={<CertificateVerify />} />
                       <Route path="/account" element={<Navigate to="/settings" replace />} />
-                      {/* Admin routes — wrapped in AdminLayout horizontal tab bar */}
-                      <Route path="/admin/dashboard"         element={<AdminLayout><ProductDashboard /></AdminLayout>} />
-                      <Route path="/admin/feed"              element={<AdminLayout><FeedManagement /></AdminLayout>} />
-                      <Route path="/admin/dashboard-feed"    element={<AdminLayout><DashboardFeedCuration /></AdminLayout>} />
-                      <Route path="/admin/role-access"       element={<AdminLayout><RoleAccessManager /></AdminLayout>} />
-                      <Route path="/admin/social-accounts"   element={<AdminLayout><SocialAccountsPage /></AdminLayout>} />
-                      <Route path="/admin/active-users"      element={<AdminLayout><ActiveUsers /></AdminLayout>} />
-                      <Route path="/admin/campaigns"         element={<AdminLayout><CampaignManager /></AdminLayout>} />
-                      <Route path="/admin/users"             element={<AdminLayout><UserManagement /></AdminLayout>} />
-                      <Route path="/admin/companies"         element={<AdminLayout><CompanyManagement /></AdminLayout>} />
-                      <Route path="/admin/roles"             element={<AdminLayout><RolesPermissions /></AdminLayout>} />
-                      <Route path="/admin/jobs"              element={<AdminLayout><JobsManagement /></AdminLayout>} />
-                      <Route path="/admin/studio"            element={<AdminLayout><StudioManagement /></AdminLayout>} />
-                      <Route path="/admin/storage"           element={<AdminLayout><StorageManagement /></AdminLayout>} />
-                      <Route path="/admin/billing"           element={<AdminLayout><BillingManagement /></AdminLayout>} />
-                      <Route path="/admin/modules"           element={<AdminLayout><ModuleManagement /></AdminLayout>} />
-                      <Route path="/admin/audit"             element={<AdminLayout><AuditLog /></AdminLayout>} />
-                      <Route path="/admin/workers"           element={<AdminLayout><Workers /></AdminLayout>} />
-                      <Route path="/admin/security"          element={<AdminLayout><Security /></AdminLayout>} />
-                      <Route path="/admin/tool-usage"        element={<AdminLayout><ToolUsage /></AdminLayout>} />
-                      <Route path="/admin/extension-telemetry" element={<AdminLayout><ExtensionTelemetry /></AdminLayout>} />
-                      <Route path="/admin/ai-vendors"        element={<AdminLayout><AIVendors /></AdminLayout>} />
-                      <Route path="/admin/settings"          element={<AdminLayout><SystemSettings /></AdminLayout>} />
-                      <Route path="/admin/moderation"        element={<AdminLayout><ModerationQueue /></AdminLayout>} />
-                      <Route path="/admin/account-analytics" element={<AdminLayout><AdminAccountAnalytics /></AdminLayout>} />
-                      <Route path="/admin/partners"          element={<AdminLayout><AdminPartners /></AdminLayout>} />
+                      {/* Admin routes — consolidated into grouped tabs, each with
+                          in-page `?view=` segments (#2277). One route per group;
+                          AdminSection renders the segment pills + active view. */}
+                      {ADMIN_GROUPS.map((g) => (
+                        <Route
+                          key={g.id}
+                          path={g.path}
+                          element={
+                            <AdminLayout>
+                              <AdminSection group={g} elements={ADMIN_SECTION_ELEMENTS[g.id]} />
+                            </AdminLayout>
+                          }
+                        />
+                      ))}
+                      {/* Legacy `/admin/*` paths → consolidated group + `?view=` */}
+                      {Object.entries(ADMIN_LEGACY_REDIRECTS).map(([from, to]) => (
+                        <Route key={from} path={from} element={<Navigate to={to} replace />} />
+                      ))}
+                      {/* Admin pages reachable by direct URL only (not in the tab bar) */}
                       <Route path="/admin/points"            element={<AdminLayout><AdminPoints /></AdminLayout>} />
-                      <Route path="/admin/page-embeds"       element={<AdminLayout><PageEmbeds /></AdminLayout>} />
                       <Route path="/admin/help-mappings"     element={<AdminLayout><HelpMappings /></AdminLayout>} />
-                      {/* Legacy redirect */}
                       <Route path="/admin/product-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
 
                       <Route path="/settings" element={<Settings />} />
@@ -1214,7 +1246,6 @@ const App = () => (
                       <Route path="/do-not-sell" element={<Navigate to="/privacy/opt-out" replace />} />
                       <Route path="/security" element={<SecurityPage />} />
                       <Route path="/security/sessions" element={<SecuritySessions />} />
-                      <Route path="/admin/security" element={<AdminSecurity />} />
                       <Route
                         path="/insights/privacy-policy"
                         element={<PrivacyPolicy />}
