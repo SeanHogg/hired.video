@@ -2998,6 +2998,285 @@ BLOG_POSTS.push({
   ],
 });
 
+// ── 52. Voice Marketplace & AI Voiceover (Studio) ────────────────────────────
+BLOG_POSTS.push({
+  slug: "add-ai-voiceover-to-your-video-resume",
+  title: "Add a Studio-Quality AI Voiceover to Your Video Resume — Free, In Your Browser",
+  description:
+    "Narrate your video resume in a natural AI voice without a microphone or a recording studio. Here's how browser-based voiceover, per-scene scripts, and voice cloning work on hired.video.",
+  publishedAt: "2026-05-28",
+  updatedAt: "2026-07-04",
+  readingTime: 8,
+  author: "hired.video",
+  toolSlug: "studio",
+  toolName: "hired.video Studio",
+  toolUrl: "/studio",
+  keywords:
+    "AI voiceover, text to speech video resume, free AI narration, voice cloning, browser text to speech, video resume voiceover, AI voice generator",
+  heroAlt: "A video resume timeline with per-scene voiceover scripts and a waveform",
+  category: "Creator Studio",
+  studioTemplateFiles: ["video-resume-hook-led"],
+  sections: [
+    {
+      heading: "You Don't Need a Microphone to Sound Professional",
+      body: "The hardest part of a video resume isn't the words — it's saying them out loud, on camera, without stumbling. A shaky voiceover or a noisy room can undo an otherwise great script. hired.video removes that barrier entirely: you type your script, pick a voice, and get clean, evenly-paced narration in seconds.\n\nEverything runs inside your browser. There's no upload, no cloud rendering queue, and no per-minute fee — the speech is generated on your own device using WebGPU-accelerated AI voices. That means your script never leaves your machine to be narrated, and you can regenerate a line as many times as you like at zero cost.",
+    },
+    {
+      heading: "Four Voice Engines, One Click Away",
+      body: "Different moments call for different voices, so Studio ships four narration engines you can switch between per project:\n\n**Instant system voices** — the fastest option, great for a quick draft or a first pass.\n\n**Kokoro-82M** — a warm, natural-sounding neural voice that reads long scripts without the robotic cadence older text-to-speech is known for.\n\n**Piper** — crisp, fast, and lightweight, ideal when you want a clear delivery on a modest device.\n\n**VibeVoice** — the cloning engine, for when you want the narration to sound like *you* (more on that below).\n\nEach voice supports speed control and word-level timing, so the captions on screen light up in sync with the narration automatically.",
+    },
+    {
+      heading: "Write Once, Narrate Scene by Scene",
+      body: "Studio keeps a separate, editable script for every scene in your video. Rework the hook without touching the closing call-to-action. Tweak one sentence and regenerate just that line — the rest of your voiceover stays exactly as it was.\n\nBecause the timing is captured at the word level, your on-screen captions, chapter markers, and scene transitions all stay locked to the narration. Change the script and everything downstream re-times itself, so you're never hand-nudging caption timings after an edit.",
+    },
+    {
+      heading: "Clone Your Own Voice — Or Earn From It",
+      body: "With the VibeVoice engine you can create a personal voice clone and narrate every project in your own voice, even the scripts you write at 2 a.m. and would never want to record live. Your clone is bound to your account under a perpetual personal license, and our consent terms (ToS §9a) make ownership and permission explicit — you clone your voice, nobody else's.\n\nCreators can go a step further and list a voice in the marketplace. When someone licenses it, you keep the majority of every sale — the split favors the creator, with the small card fee passed to the buyer, not deducted from your earnings. It's a genuinely passive way to monetize a distinctive voice.",
+    },
+    {
+      heading: "How to Add a Voiceover in Under Two Minutes",
+      body: "1. **Open Studio** and create or open a video resume project.\n2. **Write your script** in the scene panel — or let the AI storyboard generate a first draft from your resume.\n3. **Pick a voice engine** and adjust the speed to match your energy.\n4. **Click generate** — the narration is produced on your device, and captions time themselves to it.\n5. **Preview, tweak, and export** in 720p, 1080p, or 4K, then publish straight to YouTube or download for LinkedIn.\n\nNo studio, no retakes, no awkward re-recording. Just your story, told in a voice you're proud of.",
+    },
+  ],
+  faq: [
+    {
+      question: "Is the AI voiceover really free?",
+      answer:
+        "Yes. The neural voices run in your browser using WebGPU, so generating narration costs nothing per minute and works offline once the voice loads. You can regenerate lines as many times as you like without a usage meter.",
+    },
+    {
+      question: "Will an AI voiceover sound robotic?",
+      answer:
+        "The modern engines (Kokoro-82M, Piper, and VibeVoice) are a generation ahead of classic text-to-speech. They read with natural pacing and inflection, and you can fine-tune speed to match your delivery. For the most authentic result, clone your own voice with VibeVoice.",
+    },
+    {
+      question: "Can I make money from a voice clone?",
+      answer:
+        "Yes. Creators can list a voice clone in the marketplace and keep the majority of every license sale — the split favors the creator and the card fee is passed to the buyer. Our consent terms require that you only clone a voice you own and have the right to license.",
+    },
+  ],
+});
+
+// ── 53. References showcase ───────────────────────────────────────────────────
+BLOG_POSTS.push({
+  slug: "turn-your-references-into-a-job-winning-asset",
+  title: "Stop Emailing References as an Afterthought — Turn Them Into a Job-Winning Asset",
+  description:
+    "Most candidates treat references as a formality. Here's how to collect, verify, and showcase references that quietly close the deal — with full control over what stays private.",
+  publishedAt: "2026-06-11",
+  updatedAt: "2026-07-02",
+  readingTime: 7,
+  author: "hired.video",
+  toolSlug: "references",
+  toolName: "References",
+  toolUrl: "/references",
+  keywords:
+    "professional references, how to list references, reference page, job references, verified references, references on resume, showcase references",
+  heroAlt: "A references page with verified endorsements and per-section privacy controls",
+  category: "Career Strategy",
+  sections: [
+    {
+      heading: "References Are the Most Underused Part of Your Application",
+      body: "By the time an employer asks for references, they're already leaning toward yes — a strong reference either seals that or quietly unravels it. Yet most candidates scramble at the last minute, texting an old manager \"can I put you down?\" and hoping the phone call goes well.\n\nA better approach: build a standing set of references you've already collected, worded the way you'd want a hiring manager to read them, and ready to share the moment you're asked. hired.video gives you one place to gather, organize, and present them — so references become a proactive asset instead of a last-minute liability.",
+    },
+    {
+      heading: "Collect Once, Reuse for Every Application",
+      body: "Instead of re-requesting references for each job, you build a durable library. Add the people who'll speak for you, capture their relationship and title, and store the endorsement text alongside your resume. When a new opportunity comes up, the work is already done — you're not chasing anyone.\n\nBecause your references live next to your resumes in one account, you can attach the right people to the right variant: your engineering references for a technical role, your leadership references for a management role.",
+    },
+    {
+      heading: "You Decide What's Public — Down to the Field",
+      body: "References are sensitive, so hired.video defaults to private and puts you in control. You choose whether references appear on your public profile at all, and when they do, the public view is deliberately trimmed to non-identifying details — enough to signal credibility without exposing a referrer's personal contact information to the open internet.\n\nThat means you can show \"a former VP of Engineering endorses this candidate\" on your profile while keeping the full contact details reserved for verified employers who genuinely need them. It's social proof without oversharing.",
+    },
+    {
+      heading: "Pull References Straight Into Your Resume",
+      body: "When you're building or tailoring a resume in the studio, your saved references are one click away — import them as a section without retyping a word. The same source of truth powers your public profile, your references page, and your resume documents, so an update in one place keeps everything consistent.\n\nNo more maintaining a separate \"references available upon request\" line and a scattered list of contacts in your notes app. It's all connected.",
+    },
+  ],
+  faq: [
+    {
+      question: "Should I put references on my resume?",
+      answer:
+        "Not the full contact details — those go to employers who ask. But a signal that you have credible references (with titles and relationships) can strengthen a profile. hired.video lets you show a trimmed, non-identifying version publicly and keep the private details for verified employers.",
+    },
+    {
+      question: "Are my references' contact details exposed publicly?",
+      answer:
+        "No. References default to private. If you choose to show them publicly, the public view is limited to non-identifying details. Full contact information is reserved for verified employers, so you get social proof without exposing anyone's personal data.",
+    },
+    {
+      question: "Can I use different references for different jobs?",
+      answer:
+        "Yes. Build one library and attach the most relevant people to each resume variant — technical references for engineering roles, leadership references for management roles — then import them into the matching resume in a click.",
+    },
+  ],
+});
+
+// ── 54. Learning, certificates & XP ──────────────────────────────────────────
+BLOG_POSTS.push({
+  slug: "earn-verifiable-certificates-and-level-up-your-career",
+  title: "Earn Verifiable Certificates and Actually Level Up — Not Just Collect PDFs",
+  description:
+    "Most online courses hand you a PDF nobody can verify. hired.video Learning gives you tamper-proof certificates, a structured path to a real goal, and momentum that keeps you going.",
+  publishedAt: "2026-06-24",
+  updatedAt: "2026-07-04",
+  readingTime: 8,
+  author: "hired.video",
+  toolSlug: "learning",
+  toolName: "hired.video Learning",
+  toolUrl: "/learn/dashboard",
+  keywords:
+    "verifiable certificate, online course certificate, learning path, SCORM course, professional development, upskilling, career learning, course completion certificate",
+  heroAlt: "A learner dashboard showing a learning path, XP, streak, and a verifiable certificate",
+  category: "Learning",
+  sections: [
+    {
+      heading: "A Certificate Nobody Can Verify Is Just a Picture",
+      body: "You finish a course, download a PDF, and add it to your profile — but when an employer clicks it, there's no way to confirm it's real. That's the quiet weakness of most online learning: the credential is unverifiable, so it carries almost no weight.\n\nhired.video issues certificates that an employer can actually check. Each one is cryptographically signed, so anyone you share it with can confirm it was issued to you, for that course, on that date — and that it hasn't been altered. Your effort turns into a credential that holds up under scrutiny.",
+    },
+    {
+      heading: "Start From a Goal, Not a Random Course",
+      body: "Learning sticks when it's pointed at something. Instead of picking courses at random, you tell hired.video the goal — \"become a front-end engineer,\" \"move into people management\" — and it assembles a structured path of the right courses in the right order.\n\nBehind the scenes this is a real learning-path engine, not a static playlist: prerequisites are respected, and your progress unlocks the next step. You always know what to do next and why it matters for where you're trying to go.",
+    },
+    {
+      heading: "Momentum, Built In",
+      body: "The reason most people abandon online courses isn't difficulty — it's losing momentum. hired.video Learning is designed to keep you moving. You earn points for progress, build a daily streak, and unlock badges as you hit milestones. A leaderboard lets you measure your pace against your cohort or the whole community when you want a push.\n\nYour learner dashboard pulls it all into one view: what you're enrolled in, what's due, how far along you are, your streak, your points, and the certificates you've already earned. Open it and you immediately know your next move.",
+    },
+    {
+      heading: "An AI Coach That Knows What You're Studying",
+      body: "Stuck on a concept? The built-in AI coach is aware of the exact course and lesson you're on, so you can ask a question in plain language and get an answer grounded in what you're actually learning — no copying context into a separate chatbot.\n\nIt's the difference between a generic search and a tutor who's been reading over your shoulder. Ask it to re-explain a topic, quiz you, or connect a lesson to your career goal.",
+    },
+    {
+      heading: "For Employers and Educators, Too",
+      body: "The same system powers structured training for teams and classrooms. Employers can author their own courses and learning paths, assign them, and track completion; educators can run cohorts with a gradebook that keeps every learner's assignments aligned. Certificates issued through that flow carry the same verifiable signature — so internal training produces credentials that mean something outside the company, too.",
+    },
+  ],
+  faq: [
+    {
+      question: "How is a hired.video certificate verifiable?",
+      answer:
+        "Each certificate is cryptographically signed when issued. Anyone you share it with can confirm it was genuinely issued to you, for that course, on that date, and that it hasn't been tampered with — unlike a plain PDF that anyone could edit.",
+    },
+    {
+      question: "Do I have to pick courses one at a time?",
+      answer:
+        "No. Tell hired.video your goal and it assembles a structured learning path — the right courses in the right order, with prerequisites respected. You can still enroll in individual courses, but the path keeps you pointed at an outcome.",
+    },
+    {
+      question: "Can my company create its own courses?",
+      answer:
+        "Yes. Employers and educators can author courses and learning paths, assign them, run cohorts with a gradebook, and track completion. Certificates from those courses carry the same verifiable signature as public ones.",
+    },
+  ],
+});
+
+// ── 55. Candidate Packet + Anonymize (recruiter → hiring manager) ─────────────
+BLOG_POSTS.push({
+  slug: "send-hiring-managers-a-bias-free-candidate-packet",
+  title: "How to Send Hiring Managers a Clean, Bias-Free Candidate Packet",
+  description:
+    "Forwarding a pile of resumes as email attachments makes recruiters look disorganized — and invites bias. Here's how to package a shortlist into one polished, optionally anonymized packet.",
+  publishedAt: "2026-07-01",
+  updatedAt: "2026-07-04",
+  readingTime: 7,
+  author: "hired.video",
+  toolSlug: "hiring-workspace",
+  toolName: "Hiring Workspace",
+  toolUrl: "/services/hiring",
+  keywords:
+    "candidate packet, blind resume review, anonymize resume, recruiter to hiring manager, shortlist presentation, reduce hiring bias, candidate submission",
+  heroAlt: "A multi-candidate packet being exported to PDF with names and photos anonymized",
+  category: "Recruiter Tools",
+  sections: [
+    {
+      heading: "The Problem With Forwarding Resumes",
+      body: "A hiring manager opens your email to find four PDF attachments in four different formats, each laid out differently, one of them a scanned image. They skim the first two, lose the thread, and reply \"let's discuss.\" The momentum you built sourcing those candidates evaporates in the inbox.\n\nThe fix is presentation. When your shortlist arrives as a single, consistently formatted packet — every candidate on the same template, easy to compare side by side — the hiring manager can actually make a decision. hired.video turns a shortlist into exactly that, in a couple of clicks.",
+    },
+    {
+      heading: "One Packet, Every Candidate, Same Format",
+      body: "Select the candidates you want to present and hired.video assembles them into a single packet with a shared, professional layout. No wrestling with mismatched resume formats, no reformatting anyone's work history by hand — everyone is rendered through the same clean chrome, so differences in *content* stand out instead of differences in *formatting*.\n\nThe packet prints straight to PDF, so you can attach one tidy document or drop it into your ATS. It's the same polished print system that powers the platform's invoices and timesheets, so what the hiring manager sees looks deliberate, not dashed off.",
+    },
+    {
+      heading: "Anonymize to Reduce Bias — and Get Better Shortlists Reviewed Fairly",
+      body: "Structured, blind review is one of the most effective ways to reduce bias in early screening. hired.video lets you anonymize the packet with a toggle: names, photos, and other identifying details are hidden, so the hiring manager evaluates skills, experience, and results first.\n\nThis protects your candidates and your process. It also tends to produce a fairer, more defensible shortlist — the manager forms an opinion on the substance, and you can reveal identities once the evaluation is grounded in merit. For regulated or DEI-conscious organizations, a repeatable anonymized-review step is a meaningful trust signal.",
+    },
+    {
+      heading: "How to Build and Send a Packet",
+      body: "1. **Open your hiring workspace** and go to your candidate shortlist.\n2. **Select the candidates** you want to present.\n3. **Choose your options** — pick a layout and toggle anonymize on if you want a blind review.\n4. **Generate the packet** — every candidate is rendered on the same template and combined into one document.\n5. **Export to PDF** and share it with the hiring manager or attach it to your ATS.\n\nWhat used to be an afternoon of copy-paste and formatting is now a two-minute step that makes your whole desk look more professional.",
+    },
+  ],
+  faq: [
+    {
+      question: "What is a candidate packet?",
+      answer:
+        "It's a single document that presents your shortlisted candidates in one consistent, professional format — instead of forwarding separate, mismatched resume files. hired.video assembles the packet and exports it to PDF so a hiring manager can compare candidates side by side.",
+    },
+    {
+      question: "How does anonymizing a packet help?",
+      answer:
+        "Hiding names, photos, and other identifying details lets the hiring manager evaluate skills and experience first, which reduces early-stage bias and produces a fairer, more defensible shortlist. You can reveal identities once the evaluation is grounded in merit.",
+    },
+    {
+      question: "Can I put the packet into my ATS?",
+      answer:
+        "Yes. The packet exports as a standard PDF, so you can attach it to a candidate record in your ATS, email it to a hiring manager, or archive it with the rest of your submission history.",
+    },
+  ],
+});
+
+// ── 56. Paid team activities (hire → assign → track → approve → pay) ──────────
+BLOG_POSTS.push({
+  slug: "hire-assign-and-pay-for-work-in-one-place",
+  title: "Hire, Assign, Track, and Pay for Work — All in One Place",
+  description:
+    "Juggling a freelancer's task list in one app, their timesheet in another, and payment in a third is where work falls through the cracks. Here's how to run the whole loop on hired.video.",
+  publishedAt: "2026-07-04",
+  updatedAt: "2026-07-05",
+  readingTime: 7,
+  author: "hired.video",
+  toolSlug: "team-activities",
+  toolName: "Team Activities",
+  toolUrl: "/team",
+  keywords:
+    "hire freelancer, assign tasks, track work, approve and pay, paid activities, freelance management, contractor payments, work assignment platform",
+  heroAlt: "A team activities board moving work from assigned to submitted to approved to paid",
+  category: "Recruiting Ops",
+  sections: [
+    {
+      heading: "The Handoff Problem",
+      body: "You find someone great, agree on the work, and then the process fragments: the brief lives in a chat thread, the progress lives in their head, the invoice arrives by email, and payment happens in yet another tool. Every seam is a place for work to stall or a payment to be forgotten.\n\nhired.video closes that loop. Hiring, assigning, tracking, approving, and paying all happen on one connected surface — so nothing depends on remembering to move information between apps. The person doing the work and the person paying for it are looking at the same board.",
+    },
+    {
+      heading: "From \"You're Hired\" to \"You're Paid\" Without Leaving the App",
+      body: "Once someone is engaged, you assign them an activity — a defined piece of paid work with clear expectations. They see it in their own view, do the work, and submit it for review. You approve it. Payment accrues automatically against that approved work. No separate invoice to chase, no reconciling a timesheet against a to-do list.\n\nBecause each step is a real status the whole team can see, there's never ambiguity about whether something is in progress, waiting on you, or done and owed. The board *is* the source of truth.",
+    },
+    {
+      heading: "Everyone Sees Their Own Slice",
+      body: "The person you've hired gets a focused view of exactly what's assigned to them and what they've submitted — no clutter, no access to things that aren't theirs. You get the manager's view: what's outstanding, what's waiting on your approval, and what's accrued to pay.\n\nThat clean separation matters. Contributors aren't overwhelmed by the whole operation, and you aren't fielding \"what should I work on?\" messages. Assign it once and it shows up where it needs to.",
+    },
+    {
+      heading: "Approvals You Can Stand Behind",
+      body: "Money should move on approved work, not on trust alone. hired.video keeps a clear record: the activity was assigned, submitted, reviewed, and approved — and the payout is tied to that trail. If a question ever comes up about what was paid and why, the answer is right there in the activity's history.\n\nThe result is a workflow that scales past one or two contractors without turning into a spreadsheet you dread opening. You spend your time deciding what needs doing, not administering how it got tracked and paid.",
+    },
+  ],
+  faq: [
+    {
+      question: "How does paying for work happen on hired.video?",
+      answer:
+        "When you approve a submitted activity, payment accrues against that approved work automatically and is recorded in the payout ledger. You're paying on reviewed-and-approved work with a clear trail, not chasing separate invoices.",
+    },
+    {
+      question: "Does the person I hire see everything?",
+      answer:
+        "No. Contributors get a focused view of only the activities assigned to them and what they've submitted. Managers get the full board — outstanding work, items waiting on approval, and what's accrued to pay.",
+    },
+    {
+      question: "Why keep hiring, tracking, and payment in one tool?",
+      answer:
+        "Every handoff between separate apps is a place for work to stall or a payment to slip. Running the whole loop — assign, track, submit, approve, pay — on one board means the whole team shares a single source of truth and nothing depends on manually moving data between tools.",
+    },
+  ],
+});
+
 export function getBlogPost(slug: string): BlogPost | undefined {
   return BLOG_POSTS.find((p) => p.slug === slug);
 }
