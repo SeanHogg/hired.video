@@ -121,7 +121,7 @@ export default function TeamActivities(): JSX.Element {
                         {t("activities.team.confirmReject")}
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => { setRejectingId(null); setRejectReason(""); }}>
-                        {t("common.cancel")}
+                        {t("actions.cancel")}
                       </Button>
                     </div>
                   ) : (
@@ -149,7 +149,7 @@ export default function TeamActivities(): JSX.Element {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="text-sm text-muted-foreground">{t("common.loading")}</div>
+              <div className="text-sm text-muted-foreground">{t("status.loading")}</div>
             ) : activities.length === 0 ? (
               <div className="text-sm text-muted-foreground">{t("activities.team.empty")}</div>
             ) : (

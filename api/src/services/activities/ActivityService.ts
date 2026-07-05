@@ -47,6 +47,7 @@ const {
   userCompanyRoleAssociations,
   users,
   companyProfiles,
+  placements,
 } = schema;
 
 type TaskRow = typeof tasks.$inferSelect;
@@ -440,6 +441,20 @@ export class ActivityService {
         .limit(1);
       if (hired) return;
     }
+    // (c) the worker is the placed candidate on an active placement the caller
+    // recruits for, or that belongs to this company.
+    const [placed] = await db
+      .select({ id: placements.id })
+      .from(placements)
+      .where(
+        and(
+          eq(placements.candidateId, workerUserId),
+          sql`${placements.status} NOT IN ('cancelled', 'ended', 'terminated')`,
+          sql`(${placements.recruiterId} = ${employerUserId} OR ${placements.companyId} = ${companyId})`,
+        ),
+      )
+      .limit(1);
+    if (placed) return;
     throw new ForbiddenError("You can only assign activities to people you've hired or employ");
   }
 

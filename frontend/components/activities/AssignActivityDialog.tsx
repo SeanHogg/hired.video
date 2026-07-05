@@ -163,7 +163,7 @@ export default function AssignActivityDialog({
                   <SelectValue
                     placeholder={
                       workersLoading
-                        ? t("common.loading")
+                        ? t("status.loading")
                         : t("activities.assign.workerPlaceholder")
                     }
                   />
@@ -276,7 +276,7 @@ export default function AssignActivityDialog({
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
-            {t("common.cancel")}
+            {t("actions.cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={!canSubmit}>
             {busy ? (

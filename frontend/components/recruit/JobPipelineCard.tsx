@@ -26,6 +26,7 @@ import {
 } from "@/lib/services/job-pipeline-service";
 import PersonalizeMessageDialog from "@/components/recruit/PersonalizeMessageDialog";
 import SendScreeningDialog from "@/components/jobs/SendScreeningDialog";
+import AssignActivityButton from "@/components/activities/AssignActivityButton";
 
 /** Fire-and-forget touchpoint log — never blocks the click handler. */
 function logTouchpointSafe(jobId: string, entryId: string, type: "email" | "sms") {
@@ -202,6 +203,16 @@ export default function JobPipelineCard({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Hired → put them to work. AssignActivityButton self-gates on the
+          viewer's role; we only surface it once the candidate is hired and
+          has a linked account to own the activity. */}
+      {entry.stage === "hired" && entry.candidateUserId && (
+        <AssignActivityButton
+          className="w-full"
+          worker={{ userId: entry.candidateUserId, name: entry.candidateName }}
+        />
+      )}
 
       {entry.tags.length > 0 && (
         <div className="flex flex-wrap gap-1">

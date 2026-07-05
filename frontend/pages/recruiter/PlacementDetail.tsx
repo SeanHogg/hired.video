@@ -34,6 +34,7 @@ import {
   type PlacementJobType,
   type PlacementSplit,
 } from "@/lib/services/placement-service";
+import AssignActivityButton from "@/components/activities/AssignActivityButton";
 
 /**
  * Placement detail screen (#1443).
@@ -154,6 +155,10 @@ export default function PlacementDetail() {
                   {placement.jobTitle ?? "—"} {placement.companyName ? `· ${placement.companyName}` : ""}
                 </CardDescription>
               </div>
+              {/* Put this placed worker to work — self-gates on role. */}
+              <AssignActivityButton
+                worker={{ userId: placement.candidateId, name: placement.candidateName }}
+              />
             </div>
           </CardHeader>
         </Card>
