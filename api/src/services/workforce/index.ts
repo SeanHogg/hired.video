@@ -379,7 +379,19 @@ export async function submitTimesheet(
   const periodEnd = periodEndDateObj.toISOString().slice(0, 10);
 
   const entries = await getWeekEntries(userId, periodStart, db);
-  const closedEntries = entries.filter((e) => e.endedAt && e.status !== "submitted" && e.status !== "approved");
+  // Paid activities (tasks.pay_type set) are paid per-activity on approval via
+  // ActivityService, NOT through the weekly timesheet. Exclude their entries so
+  // a person who is both an employee and an activity worker is never
+  // double-paid (once here, once on activity approval).
+  const { filterOutActivityTaskIds } = await import("../activities/ActivityService.js");
+  const activityTaskIds = await filterOutActivityTaskIds(entries.map((e) => e.taskId), db);
+  const closedEntries = entries.filter(
+    (e) =>
+      e.endedAt &&
+      e.status !== "submitted" &&
+      e.status !== "approved" &&
+      !(e.taskId && activityTaskIds.has(e.taskId)),
+  );
   if (closedEntries.length === 0) {
     throw new ForbiddenError("No closed entries to submit for this week");
   }

@@ -115,6 +115,7 @@ import { skillExtractorRoutes } from "./routes/skill-extractor.js";
 import { toolRunsRoutes } from "./routes/tool-runs.js";
 import { sentimentRoutes } from "./routes/sentiment.js";
 import { taskRoutes } from "./routes/task.js";
+import { activityRoutes } from "./routes/activities.js";
 import { pointsRoutes } from "./routes/points.js";
 import { feedRoutes } from "./routes/feed.js";
 import { salaryRoutes } from "./routes/salary.js";
@@ -829,6 +830,7 @@ export function createApp() {
   app.route("/api/featureflag", featureFlagRoutes);
   app.route("/api/bootstrap", bootstrapRoutes);
   app.route("/api/task", taskRoutes);
+  app.route("/api/activities", activityRoutes);
   app.route("/api/points", pointsRoutes);
   app.route("/api/upload", uploadRoutes);
   app.route("/api/communication", communicationRoutes);

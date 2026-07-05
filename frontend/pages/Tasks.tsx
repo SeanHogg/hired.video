@@ -76,6 +76,7 @@ const EventDiscoveryPanel = lazy(() =>
   })),
 );
 import { TimesheetTab } from "@/components/timesheet/TimesheetTab";
+import MyActivities from "@/components/activities/MyActivities";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { cn } from "@/lib/utils";
@@ -727,6 +728,9 @@ export default function Tasks() {
         {surfaceNav}
         <div className="p-4 md:p-6">
           <div className="space-y-6">
+            {/* Paid activities assigned by an employer — self-gates to null
+                when the worker has none, so it's safe to mount here too. */}
+            <MyActivities />
             <TimesheetTab />
           </div>
         </div>
@@ -738,6 +742,9 @@ export default function Tasks() {
     <AppShell bgClassName="bg-background">
       <div className="p-4 md:p-6">
           <div className="space-y-6">
+            {/* Paid activities an employer assigned to this worker (timer +
+                submit). Self-gating: renders nothing when there are none. */}
+            <MyActivities />
             {/* One action panel: surface tabs + search + type/status filters
                 + view-axis toggle + Add task, all in the single sticky band. */}
             <PageHeader

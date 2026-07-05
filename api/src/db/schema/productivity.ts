@@ -72,6 +72,20 @@ export const tasks = pgTable(
     // gig poster reads progress by querying tasks on gigProjectId (any owner).
     gigProjectId: uuid("gig_project_id"),
     gigMilestoneId: uuid("gig_milestone_id"),
+    // ── Paid activities (migration 0492) ───────────────────────────────────
+    // When payType IS NOT NULL this task is a compensated "activity" an
+    // employer assigned to a hired worker. The task is owned by the worker
+    // (userId); assignedByUserId is the employer, companyId the company
+    // context. On approval the worker is credited via PayoutLedgerService
+    // (source_kind='task'). See shared/activities.ts for the enums + money
+    // math; services/activities/ActivityService.ts owns the lifecycle.
+    payType: varchar("pay_type", { length: 8 }), // hourly | fixed
+    rateCents: integer("rate_cents"), // hourly rate, minor units
+    amountCents: integer("amount_cents"), // fixed price, minor units
+    payCurrency: varchar("pay_currency", { length: 8 }).default("USD").notNull(),
+    assignedByUserId: uuid("assigned_by_user_id"), // → users.id (employer)
+    companyId: uuid("company_id"), // → company_profiles.id (company context)
+    activityStatus: varchar("activity_status", { length: 12 }), // assigned | submitted | approved | rejected
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },

@@ -47,6 +47,7 @@ export const EARNINGS_SOURCE_BY_LEDGER_KIND: Record<string, EarningsSourceMeta> 
   article_pool_distribution: { source: "article", label: "Articles" },
   article: { source: "article", label: "Articles" },
   timesheet: { source: "contract", label: "Contract work" },
+  task: { source: "contract", label: "Contract work" },
 };
 
 /** Stable display order for the breakdown rows. */

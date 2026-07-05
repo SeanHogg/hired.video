@@ -781,6 +781,13 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "placements, recruiter commission, fee splits, placement tracking, staffing back office",
   },
+  "/team": {
+    title: "Team Activities — hired.video",
+    description:
+      "Assign paid activities to the people you've hired — hourly or fixed — track their time, approve the work, and pay them. The simple way to put a new hire to work, even part-time.",
+    keywords:
+      "assign work, paid activities, hourly tasks, timesheet approval, pay contractors, part-time work",
+  },
   "/recruit/pipeline": {
     title: "Candidate Pipeline — hired.video",
     description:
