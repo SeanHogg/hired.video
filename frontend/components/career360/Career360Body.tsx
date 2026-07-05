@@ -19,6 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import {
   CareerHealthWheel,
   HEALTH_FILL_COLORS,
@@ -288,7 +289,14 @@ interface MasterResumeRef {
   summary?: string;
 }
 
-export function Career360Body() {
+interface Career360BodyProps {
+  /** "page" (default) = full-width two-column layout for the /tools page.
+   *  "panel" = compact single-row wheel+legend for the resume-view
+   *  slide-out, where vertical space is at a premium. */
+  variant?: "page" | "panel";
+}
+
+export function Career360Body({ variant = "page" }: Career360BodyProps = {}) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const healthLabels = useHealthLabels();
@@ -579,125 +587,170 @@ export function Career360Body() {
     return <Career360Marketing outer={outer} inner={inner} />;
   }
 
-  return (
-    <div className="space-y-6 mt-4">
-      {/* #442 — Inline notice for zero-resume seekers. Self-gates
-          on `!masterResume`. The wheel + target picker stay
-          interactive (target gap analysis works without a resume); the
-          notice gives the seeker an on-ramp to build one before clicking
-          a segment, instead of the segment-click hitting an LLM that says
-          "paste your resume". */}
-      {!masterResume && (
-        <Card className="border-amber-300/60 bg-amber-50/40 dark:bg-amber-950/20">
-          <CardContent className="p-4 flex items-start gap-3 text-sm">
-            <div className="flex-1">
-              <div className="font-medium">{t("tools.career360.gateTitle")}</div>
-              <p className="text-muted-foreground mt-1">
-                {t("tools.career360.gateBody")}
-              </p>
+  const isPanel = variant === "panel";
+
+  // #442 — Inline notice for zero-resume seekers. Self-gates on
+  // `!masterResume`. The wheel + target picker stay interactive (target
+  // gap analysis works without a resume); the notice gives the seeker an
+  // on-ramp to build one before clicking a segment.
+  const gateEl = !masterResume ? (
+    <Card className="border-amber-300/60 bg-amber-50/40 dark:bg-amber-950/20">
+      <CardContent className="p-4 flex items-start gap-3 text-sm">
+        <div className="flex-1">
+          <div className="font-medium">{t("tools.career360.gateTitle")}</div>
+          <p className="text-muted-foreground mt-1">
+            {t("tools.career360.gateBody")}
+          </p>
+        </div>
+        <Button asChild size="sm" variant="default" className="shrink-0">
+          <Link to="/resume-builder">{t("tools.career360.gateCta")}</Link>
+        </Button>
+      </CardContent>
+    </Card>
+  ) : null;
+
+  const wheelEl = (
+    <div className="flex items-center justify-center">
+      <div className={cn("w-full aspect-square", isPanel ? "max-w-[300px]" : "max-w-[560px]")}>
+        <CareerHealthWheel
+          outer={outer}
+          inner={inner}
+          onSegmentClick={(seg) => {
+            const found = [...outer, ...inner].find((s) => s.id === seg.id);
+            if (found) openCoachForSegment(found);
+          }}
+        />
+      </div>
+    </div>
+  );
+
+  const legendEl = (
+    <div className="space-y-3">
+      <h3 className="font-semibold text-sm">{t("tools.career360.legendHeading")}</h3>
+      <div className="space-y-1.5 text-sm">
+        {(["good", "moderate", "poor", "unknown"] as const).map((h) => (
+          <div key={h} className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span
+                className="inline-block h-3 w-3 rounded-sm"
+                style={{ backgroundColor: HEALTH_FILL_COLORS[h] }}
+              />
+              <span>{healthLabels[h]}</span>
             </div>
-            <Button asChild size="sm" variant="default" className="shrink-0">
-              <Link to="/resume-builder">{t("tools.career360.gateCta")}</Link>
-            </Button>
+            <Badge variant="secondary" className="font-mono">
+              {counts[h]}
+            </Badge>
+          </div>
+        ))}
+      </div>
+      {!selected && (
+        <p className="text-xs text-muted-foreground">
+          {t("tools.career360.legendPickTargetHint")}
+        </p>
+      )}
+    </div>
+  );
+
+  const pickerEl = !selected ? (
+    <>
+      <Separator />
+      <TargetPicker
+        suggestions={suggestions}
+        isSuggesting={suggesting}
+        isSelecting={selecting}
+        onRefresh={handleSuggest}
+        onChoose={handleSelect}
+        onCustom={handleCustomTarget}
+      />
+    </>
+  ) : null;
+
+  const stampsEl = history.length > 0 ? (
+    <Card>
+      <CardContent className="p-4 space-y-3">
+        <h3 className="font-semibold text-sm">{t("tools.career360.stampsHeading")}</h3>
+        <p className="text-xs text-muted-foreground">
+          {t("tools.career360.stampsCaption")}
+        </p>
+        <div
+          className={cn(
+            "pt-1",
+            // In the panel, trend sparklines read fine side-by-side, so
+            // grid them to fill the width instead of a tall single column.
+            isPanel
+              ? "grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3"
+              : "space-y-3",
+          )}
+        >
+          {history.map((series: ScoreHistorySeries) => (
+            <div key={series.toolId}>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="font-medium">{series.label}</span>
+                <span className="text-muted-foreground">
+                  {t("tools.career360.runCount", { count: series.points.length })}
+                </span>
+              </div>
+              <ScoreHistorySparkline series={series} />
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  ) : null;
+
+  const roadmapEl = selected ? (
+    <TargetRoadmap
+      selected={selected}
+      isRefreshing={selecting}
+      isClearing={clearing}
+      onRefresh={handleRefreshPlan}
+      onClear={handleClearTarget}
+      onCoachGap={openCoachForGap}
+      onTargetUpdated={handleTargetUpdated}
+    />
+  ) : null;
+
+  if (isPanel) {
+    // Compact single-row layout: wheel + legend share one row so the
+    // narrower slide-out has no dead vertical space beside the wheel.
+    return (
+      <div className="space-y-6 mt-4">
+        {gateEl}
+        <Card>
+          <CardContent className="p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row gap-6 sm:items-center">
+              <div className="sm:w-[300px] shrink-0">{wheelEl}</div>
+              <div className="flex-1 min-w-0">{legendEl}</div>
+            </div>
+            {pickerEl}
           </CardContent>
         </Card>
-      )}
+        {stampsEl}
+        {roadmapEl}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 mt-4">
+      {gateEl}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6">
         <Card>
           <CardContent className="p-6 space-y-6">
-            <div className="flex items-center justify-center">
-              <div className="w-full max-w-[560px] aspect-square">
-                <CareerHealthWheel
-                  outer={outer}
-                  inner={inner}
-                  onSegmentClick={(seg) => {
-                    const found = [...outer, ...inner].find((s) => s.id === seg.id);
-                    if (found) openCoachForSegment(found);
-                  }}
-                />
-              </div>
-            </div>
-            {!selected && (
-              <>
-                <Separator />
-                <TargetPicker
-                  suggestions={suggestions}
-                  isSuggesting={suggesting}
-                  isSelecting={selecting}
-                  onRefresh={handleSuggest}
-                  onChoose={handleSelect}
-                  onCustom={handleCustomTarget}
-                />
-              </>
-            )}
+            {wheelEl}
+            {pickerEl}
           </CardContent>
         </Card>
 
         <div className="space-y-4">
           <Card>
-            <CardContent className="p-4 space-y-3">
-              <h3 className="font-semibold text-sm">{t("tools.career360.legendHeading")}</h3>
-              <div className="space-y-1.5 text-sm">
-                {(["good", "moderate", "poor", "unknown"] as const).map((h) => (
-                  <div key={h} className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="inline-block h-3 w-3 rounded-sm"
-                        style={{ backgroundColor: HEALTH_FILL_COLORS[h] }}
-                      />
-                      <span>{healthLabels[h]}</span>
-                    </div>
-                    <Badge variant="secondary" className="font-mono">
-                      {counts[h]}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-              {!selected && (
-                <p className="text-xs text-muted-foreground">
-                  {t("tools.career360.legendPickTargetHint")}
-                </p>
-              )}
-            </CardContent>
+            <CardContent className="p-4 space-y-3">{legendEl}</CardContent>
           </Card>
-
-          {history.length > 0 && (
-            <Card>
-              <CardContent className="p-4 space-y-3">
-                <h3 className="font-semibold text-sm">{t("tools.career360.stampsHeading")}</h3>
-                <p className="text-xs text-muted-foreground">
-                  {t("tools.career360.stampsCaption")}
-                </p>
-                <div className="space-y-3 pt-1">
-                  {history.map((series: ScoreHistorySeries) => (
-                    <div key={series.toolId}>
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="font-medium">{series.label}</span>
-                        <span className="text-muted-foreground">
-                          {t("tools.career360.runCount", { count: series.points.length })}
-                        </span>
-                      </div>
-                      <ScoreHistorySparkline series={series} />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {stampsEl}
         </div>
       </div>
 
-      {selected && (
-        <TargetRoadmap
-          selected={selected}
-          isRefreshing={selecting}
-          isClearing={clearing}
-          onRefresh={handleRefreshPlan}
-          onClear={handleClearTarget}
-          onCoachGap={openCoachForGap}
-          onTargetUpdated={handleTargetUpdated}
-        />
-      )}
+      {roadmapEl}
     </div>
   );
 }

@@ -187,6 +187,26 @@ export function applyDocumentTemplate(
     mode: "flow",
     ...spec,
   }));
+
+  // A template is structure, not content — so the resume Header (`basics`)
+  // block, which carries the person's identity (name / title / contact /
+  // summary) and drives the rendered hero, must survive a template swap.
+  // Resume template options are built from `TEMPLATE_PRESETS`, whose
+  // `sections` never include `basics` (the hero is `descriptor.hero`, not a
+  // body section), so applying one would otherwise wipe the Header block and
+  // strand the resume with no hero — `descriptorFromResumeDocument` disables
+  // the hero when no `basics` block is present ("switching templates drops the
+  // header"). Carry the existing Header over (keeping its id + bound content)
+  // when the incoming template doesn't supply one. If the user had explicitly
+  // removed the Header on the canvas, there is nothing to carry, so their
+  // choice is respected.
+  const existingBasics = state.pages[0]?.blocks.find(
+    (b) => b.mode === "flow" && b.sectionKey === "basics",
+  );
+  const templateHasBasics = blocks.some((b) => b.sectionKey === "basics");
+  const nextBlocks =
+    existingBasics && !templateHasBasics ? [existingBasics, ...blocks] : blocks;
+
   return {
     ...state,
     theme: { ...option.theme },
@@ -197,7 +217,7 @@ export function applyDocumentTemplate(
     ...(option.pageSize ? { pageSize: option.pageSize } : {}),
     ...(option.orientation ? { orientation: option.orientation } : {}),
     ...(typeof option.columns === "number" ? { columns: option.columns } : {}),
-    pages: state.pages.map((p, i) => (i === 0 ? { ...p, blocks } : p)),
+    pages: state.pages.map((p, i) => (i === 0 ? { ...p, blocks: nextBlocks } : p)),
   };
 }
 

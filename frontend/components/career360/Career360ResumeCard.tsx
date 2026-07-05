@@ -160,7 +160,7 @@ export function Career360ResumeCard({ isOwner }: Props) {
       <Sheet open={open} onOpenChange={handleOpenChange}>
         <SheetContent
           side="right"
-          className="w-full sm:max-w-2xl overflow-y-auto p-6"
+          className="w-full sm:max-w-4xl overflow-y-auto p-6"
         >
           <SheetHeader className="mb-2">
             <SheetTitle className="flex items-center gap-2">
@@ -172,8 +172,10 @@ export function Career360ResumeCard({ isOwner }: Props) {
             </SheetDescription>
           </SheetHeader>
           {/* Mount the full tool only while the panel is open so it fetches
-              fresh state each time and doesn't run in the background. */}
-          {open && <Career360Body />}
+              fresh state each time and doesn't run in the background. The
+              "panel" variant packs the wheel + legend onto one row so the
+              narrower surface has no dead vertical space. */}
+          {open && <Career360Body variant="panel" />}
         </SheetContent>
       </Sheet>
     </>

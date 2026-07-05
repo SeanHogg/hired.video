@@ -70,12 +70,53 @@ describe("applyDocumentTemplate", () => {
     const option = documentTemplatesForEntity("resume").find((o) => o.id === "hired-default")!;
     const next = applyDocumentTemplate(state, option, idFactory);
 
-    expect(next.pages[0].blocks).toHaveLength(option.sections.length);
+    // The preserved Header (`basics`) block leads; the rest are the template's
+    // sections (see the header-preservation test below).
+    const templateBlocks = next.pages[0].blocks.filter((b) => b.sectionKey !== "basics");
+    expect(templateBlocks).toHaveLength(option.sections.length);
     // Each block gets a unique id + flow mode + the spec's binding.
     const ids = next.pages[0].blocks.map((b) => b.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(next.pages[0].blocks.every((b) => b.mode === "flow")).toBe(true);
     expect(next.pages[0].blocks[0].sectionKey ?? next.pages[0].blocks[0].component).toBeTruthy();
+  });
+
+  it("preserves the resume Header (basics) block across a template swap", () => {
+    // Regression: resume template options never carry a `basics` section (the
+    // hero is `descriptor.hero`, not a body section), so applying one used to
+    // wipe the Header block — stranding the resume with no rendered hero
+    // ("switching templates drops the header"). The Header must survive, keep
+    // its id, and lead the block list.
+    const state = blank("resume");
+    const basicsBefore = state.pages[0].blocks.find((b) => b.sectionKey === "basics")!;
+    expect(basicsBefore).toBeTruthy();
+
+    const option = documentTemplatesForEntity("resume").find((o) => o.id === "software-engineer-graphite")!;
+    const next = applyDocumentTemplate(state, option, idFactory);
+
+    const basicsAfter = next.pages[0].blocks.filter((b) => b.sectionKey === "basics");
+    expect(basicsAfter).toHaveLength(1);
+    expect(basicsAfter[0].id).toBe(basicsBefore.id); // same block, preserved content
+    expect(next.pages[0].blocks[0].sectionKey).toBe("basics"); // header leads
+  });
+
+  it("respects an explicitly-removed Header — does not resurrect it on swap", () => {
+    // If the user removed the Header on the canvas, applying a template must
+    // not bring it back (the template is structure; the user's content choice
+    // stands). `descriptorFromResumeDocument` then keeps the hero hidden.
+    const base = blank("resume");
+    const state: DocumentState = {
+      ...base,
+      pages: [
+        {
+          ...base.pages[0],
+          blocks: base.pages[0].blocks.filter((b) => b.sectionKey !== "basics"),
+        },
+      ],
+    };
+    const option = documentTemplatesForEntity("resume").find((o) => o.id === "hired-default")!;
+    const next = applyDocumentTemplate(state, option, idFactory);
+    expect(next.pages[0].blocks.some((b) => b.sectionKey === "basics")).toBe(false);
   });
 
   it("adopts the template theme", () => {
