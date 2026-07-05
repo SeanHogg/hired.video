@@ -237,9 +237,12 @@ class WorkforceService {
     ));
   }
 
-  /** Employer's shared AI token pool + per-member usage/sub-caps (#1679). */
-  getTokenPool() {
-    return unwrap(apiClient.get<TokenPoolView>("/api/workforce/token-pool"));
+  /** Employer's shared AI token pool + per-member usage/sub-caps (#1679).
+   *  Resolves to null when the caller manages no workspace (an empty state,
+   *  not an error — the endpoint returns 200 with `pool: null`). */
+  async getTokenPool(): Promise<TokenPoolView | null> {
+    const { pool } = await unwrap(apiClient.get<{ pool: TokenPoolView | null }>("/api/workforce/token-pool"));
+    return pool;
   }
 
   /** Set (number) or clear (null) a member's monthly AI-token sub-cap. */

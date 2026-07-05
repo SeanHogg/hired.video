@@ -40,6 +40,7 @@ import { ExtensionsSettings } from "@/components/ExtensionsSettings";
 import { EmailSettingsTab } from "@/components/email/EmailSettingsTab";
 import { EmailPreferencesPanel } from "@/components/email/EmailPreferencesPanel";
 import { WorkforceSettings } from "@/components/workforce/WorkforceSettings";
+import { SocialConnectionsList } from "@/components/social/SocialConnectionsList";
 import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1489,9 +1490,11 @@ function SettingsContent() {
                     only — the card self-hides (returns null) on a 403. */}
                 <VendorIntegrationsCard />
 
-                {/* Social publishing connections (PRD §5.0, Lane B). The full
-                    connect/disconnect surface lives at /settings/connections;
-                    this card is the discoverable entry point. */}
+                {/* Social publishing connections (PRD §5.0, Lane B). The
+                    connectable platforms render inline here via the shared
+                    <SocialConnectionsList> (same surface as
+                    /settings/connections) so members can connect an account
+                    without clicking through. */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -1503,9 +1506,7 @@ function SettingsContent() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <Button asChild variant="outline">
-                      <Link to="/settings/connections">{t("actions.manageConnectedAccounts")}</Link>
-                    </Button>
+                    <SocialConnectionsList />
                   </CardContent>
                 </Card>
 

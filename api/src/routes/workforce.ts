@@ -351,9 +351,15 @@ workforceRoutes.post("/integrations/:provider/disconnect", async (c) => {
 workforceRoutes.get("/token-pool", async (c) => {
   const userId = getCurrentUserId(c);
   if (!userId) return unauthorized(c);
+  // A caller who manages no workspace simply has no pool to show — return an
+  // absent view (200, `pool: null`) rather than a 403, matching every sibling
+  // workforce endpoint (/roster, /approval-queue, /desk-margin, …) which
+  // degrades to empty data for the same user. The old 403 was the one card
+  // in the surface that raised the global api-error toast + "Report this
+  // error" prompt for a normal empty state, generating support-ticket noise.
+  // The <TokenPoolCard/> self-gates (renders null) when `pool` is null.
   const view = await getCompanyTokenPoolView(userId);
-  if (!view) return c.json(error("FORBIDDEN", "No workspace to manage"), 403);
-  return c.json(success(view), 200);
+  return c.json(success({ pool: view }), 200);
 });
 
 // PATCH /api/workforce/members/:userId/token-limit — set/clear a member's

@@ -77,6 +77,12 @@ function TokenPoolCard() {
     setLoading(true);
     try {
       const view = await workforceService.getTokenPool();
+      // null = caller manages no workspace (a normal empty state, returned as
+      // 200) → self-gate out. A thrown error (network/etc.) also hides below.
+      if (!view) {
+        setHidden(true);
+        return;
+      }
       setPool(view);
       setDrafts(
         Object.fromEntries(
@@ -84,7 +90,6 @@ function TokenPoolCard() {
         ),
       );
     } catch {
-      // 403 = caller manages no workspace → self-gate out.
       setHidden(true);
     } finally {
       setLoading(false);
