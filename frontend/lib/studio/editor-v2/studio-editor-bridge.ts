@@ -16,8 +16,9 @@
 // drive them — the server-side `/api/mcp` endpoint cannot.
 //
 // Self-gating: studio tools self-describe via `requiresStudioEditor` and
-// are only exposed to the model when `getStudioEditor()` is non-null
-// (i.e. an editor is actually mounted). One predicate, no prop-drilling.
+// are only exposed to the model when `getStudioEditor()` is non-null AND
+// the handle's `supportsScenes` / `supportsRecording` flags are true
+// (canvas-state authoring kinds — not game / image / animation).
 
 import type { WidgetKind } from "./canvas-state";
 import type { RecordingActionId } from "@/lib/studio/recording-modes";
@@ -46,6 +47,19 @@ export interface StudioEditorHandle {
   /** Active mediaKind (video / podcast / comic / game / …). Tools use it
    *  to validate which widgets are insertable for this project. */
   mediaKind: string;
+  /**
+   * True when this project kind authors a timeline / canvas-state that
+   * can take a screen/webcam recording. Game, image, animation, CAD and
+   * document kinds are false — `getCoachToolSpecs` hides studio_start_recording
+   * (#1911).
+   */
+  supportsRecording: boolean;
+  /**
+   * True when this project kind has scenes the studio_* scene/widget tools
+   * can drive. Same kinds as `supportsRecording` today (canvas-state
+   * authoring). False → those tools are not advertised (#1911).
+   */
+  supportsScenes: boolean;
   /** Id of the scene the editor is currently focused on. */
   getActiveSceneId: () => string;
   /** Snapshot of the scene list so the model can reference scene ids. */

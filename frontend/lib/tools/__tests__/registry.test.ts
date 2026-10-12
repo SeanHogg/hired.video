@@ -58,7 +58,39 @@ import {
   registerForm,
   unregisterForm,
 } from "../active-form-bridge";
+import {
+  registerStudioEditor,
+  unregisterStudioEditor,
+  type StudioEditorHandle,
+} from "@/lib/studio/editor-v2/studio-editor-bridge";
 import type { NormalizedToolRunResult } from "../types";
+
+function stubStudioEditor(
+  mediaKind: string,
+  extras?: Partial<StudioEditorHandle>,
+): StudioEditorHandle {
+  return {
+    projectId: "p1",
+    mediaKind,
+    supportsScenes: extras?.supportsScenes ?? true,
+    supportsRecording: extras?.supportsRecording ?? true,
+    getActiveSceneId: () => "s1",
+    listScenes: () => [],
+    insertableWidgetKinds: () => [],
+    insertWidget: () => {},
+    addScene: () => "s2",
+    duplicateScene: () => {},
+    deleteScene: () => {},
+    reorderScenes: () => {},
+    setActiveScene: () => {},
+    setSceneBackground: () => {},
+    addImageWidget: () => {},
+    addVideoWidget: () => {},
+    captureScreenshot: () => {},
+    openRecorder: () => {},
+    ...extras,
+  };
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // getCoachToolSpecs — exposed-to-LLM view of the registry
@@ -70,9 +102,9 @@ describe("getCoachToolSpecs", () => {
     // getCoachToolSpecs applies two self-gates we must mirror or the
     // expectation drifts the moment a gated tool is added:
     //   • `requiresSuperAdmin` — default view is non-SA, so SA tools are out.
-    //   • `requiresStudioEditor` — only exposed when a Studio editor is
-    //     mounted in the tab; no editor is mounted in this unit test, so
-    //     those tools (record / insert-widget / add-scene, etc.) are out.
+    //   • `requiresStudioEditor` — only exposed when a CanvasState-authoring
+    //     Studio editor is mounted; no editor is mounted in this unit test,
+    //     so those tools (record / insert-widget / add-scene, etc.) are out.
     const expectedNames = toolRegistry
       .filter((t) => t.parameters)
       .filter((t) => !t.requiresSuperAdmin)
@@ -137,6 +169,35 @@ describe("getCoachToolSpecs", () => {
       expect(s.function.parameters.type).toBe("object");
       expect(typeof s.function.parameters.properties).toBe("object");
     }
+  });
+
+  describe("studio_* tools vs media kind (#1911)", () => {
+    afterEach(() => {
+      unregisterStudioEditor();
+    });
+
+    it("exposes studio_* tools for a timeline/canvas-authoring editor (video)", () => {
+      registerStudioEditor(stubStudioEditor("video", { supportsScenes: true, supportsRecording: true }));
+      const names = getCoachToolSpecs().map((s) => s.function.name);
+      expect(names).toContain("studio_start_recording");
+      expect(names).toContain("studio_list_scenes");
+      expect(names).toContain("studio_insert_widget");
+    });
+
+    it("hides studio_* tools for a game editor even though a handle is mounted", () => {
+      registerStudioEditor(stubStudioEditor("game", { supportsScenes: false, supportsRecording: false }));
+      const names = getCoachToolSpecs().map((s) => s.function.name);
+      expect(names).not.toContain("studio_start_recording");
+      expect(names).not.toContain("studio_list_scenes");
+      expect(names).not.toContain("studio_insert_widget");
+      expect(names).not.toContain("studio_add_image");
+    });
+
+    it("hides studio_* tools for an image editor", () => {
+      registerStudioEditor(stubStudioEditor("image", { supportsScenes: false, supportsRecording: false }));
+      const names = getCoachToolSpecs().map((s) => s.function.name);
+      expect(names.filter((n) => n.startsWith("studio_"))).toEqual([]);
+    });
   });
 });
 

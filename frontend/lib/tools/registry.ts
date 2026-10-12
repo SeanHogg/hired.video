@@ -935,7 +935,13 @@ async function runStudioStartRecording(ctx: ToolRunContext): Promise<NormalizedT
   // The browser requires a user gesture for screen/camera capture, so we
   // can't silently start recording from a tool call — we surface the
   // armed recorder and let the user hit Record.
-  requireStudioEditor().openRecorder(mode, { asScene: true });
+  const editor = requireStudioEditor();
+  if (!editor.supportsRecording) {
+    throw new Error(
+      "Recording isn't available for this project type. Open a video, podcast, voice, or comic in Studio.",
+    );
+  }
+  editor.openRecorder(mode, { asScene: true });
   const label =
     mode === "webcam" ? "webcam" : mode === "screen-pip" ? "screen + webcam" : "screen";
   return {
@@ -1535,6 +1541,7 @@ export const toolRegistry: ToolDefinition[] = [
     route: "/studio",
     inputs: ["video"],
     requiresStudioEditor: true,
+    requiresRecording: true,
     parameters: {
       type: "object",
       properties: {
@@ -1559,6 +1566,7 @@ export const toolRegistry: ToolDefinition[] = [
     route: "/studio",
     inputs: ["video"],
     requiresStudioEditor: true,
+    requiresScenes: true,
     parameters: {
       type: "object",
       properties: {
@@ -1584,6 +1592,7 @@ export const toolRegistry: ToolDefinition[] = [
     route: "/studio",
     inputs: ["video"],
     requiresStudioEditor: true,
+    requiresScenes: true,
     parameters: { type: "object", properties: {}, additionalProperties: false },
     run: runStudioListScenes,
   },
@@ -1596,6 +1605,7 @@ export const toolRegistry: ToolDefinition[] = [
     route: "/studio",
     inputs: ["video"],
     requiresStudioEditor: true,
+    requiresScenes: true,
     parameters: { type: "object", properties: {}, additionalProperties: false },
     run: runStudioAddScene,
   },
@@ -1608,6 +1618,7 @@ export const toolRegistry: ToolDefinition[] = [
     route: "/studio",
     inputs: ["video"],
     requiresStudioEditor: true,
+    requiresScenes: true,
     parameters: {
       type: "object",
       properties: { sceneId: { type: "string", description: "Id of the scene to duplicate." } },
@@ -1625,6 +1636,7 @@ export const toolRegistry: ToolDefinition[] = [
     route: "/studio",
     inputs: ["video"],
     requiresStudioEditor: true,
+    requiresScenes: true,
     parameters: {
       type: "object",
       properties: { sceneId: { type: "string", description: "Id of the scene to delete." } },
@@ -1642,6 +1654,7 @@ export const toolRegistry: ToolDefinition[] = [
     route: "/studio",
     inputs: ["video"],
     requiresStudioEditor: true,
+    requiresScenes: true,
     parameters: {
       type: "object",
       properties: {
@@ -1665,6 +1678,7 @@ export const toolRegistry: ToolDefinition[] = [
     route: "/studio",
     inputs: ["video"],
     requiresStudioEditor: true,
+    requiresScenes: true,
     parameters: {
       type: "object",
       properties: { sceneId: { type: "string", description: "Id of the scene to make active." } },
@@ -1682,6 +1696,7 @@ export const toolRegistry: ToolDefinition[] = [
     route: "/studio",
     inputs: ["video"],
     requiresStudioEditor: true,
+    requiresScenes: true,
     parameters: {
       type: "object",
       properties: {
@@ -1702,6 +1717,7 @@ export const toolRegistry: ToolDefinition[] = [
     route: "/studio",
     inputs: ["video"],
     requiresStudioEditor: true,
+    requiresScenes: true,
     parameters: { type: "object", properties: {}, additionalProperties: false },
     run: runStudioCaptureScreenshot,
   },
@@ -1714,6 +1730,7 @@ export const toolRegistry: ToolDefinition[] = [
     route: "/studio",
     inputs: ["video"],
     requiresStudioEditor: true,
+    requiresScenes: true,
     parameters: {
       type: "object",
       properties: { url: { type: "string", description: "Public image URL to insert." } },
@@ -1731,6 +1748,7 @@ export const toolRegistry: ToolDefinition[] = [
     route: "/studio",
     inputs: ["video"],
     requiresStudioEditor: true,
+    requiresScenes: true,
     parameters: {
       type: "object",
       properties: {
@@ -1767,16 +1785,19 @@ export function getCoachToolSpecs(opts?: { superAdmin?: boolean }): Array<{
 }> {
   const superAdmin = opts?.superAdmin === true;
   // Studio editor tools only make sense — and only work — when an editor
-  // is mounted in this tab. Self-gate on the bridge so the model sees
-  // "record / insert widget / add scene" in /studio and nowhere else
-  // (no contextType plumbing needed; one predicate, computed here).
-  const studioEditorOpen = getStudioEditor() !== null;
+  // is mounted. Game / image / animation / CAD / document register a handle
+  // too, but `supportsRecording` / `supportsScenes` are false so the
+  // recorder and scene tools stay hidden (#1911).
+  const studioEditor = getStudioEditor();
+  const studioEditorOpen = studioEditor !== null;
   return toolRegistry
     .filter((t) => t.parameters)
     // SuperAdmin-only tools are never exposed to the model for other
     // users — the backend route enforces the same gate as a backstop.
     .filter((t) => (t.requiresSuperAdmin ? superAdmin : true))
     .filter((t) => (t.requiresStudioEditor ? studioEditorOpen : true))
+    .filter((t) => (t.requiresRecording ? studioEditor?.supportsRecording === true : true))
+    .filter((t) => (t.requiresScenes ? studioEditor?.supportsScenes === true : true))
     // Form-writing tools exist only while their form is open (and the
     // permission-gated bridge registered it).
     .filter((t) => (t.requiresActiveForm ? getActiveForm(t.requiresActiveForm) !== undefined : true))

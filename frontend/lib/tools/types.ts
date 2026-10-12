@@ -126,13 +126,27 @@ export interface ToolDefinition {
   /**
    * If true, this tool drives the Studio editor that is currently open in
    * the tab (via the module-level studio-editor bridge). It is exposed to
-   * the model ONLY when an editor is actually mounted — `getCoachToolSpecs`
-   * self-gates on `getStudioEditor()` — so the AI CHRO offers "record /
-   * insert widget / add scene" in /studio and nowhere else. Client-only:
-   * these mutate in-browser canvas state, so the server-side /api/mcp
-   * endpoint cannot run them.
+   * the model ONLY when an editor is actually mounted AND that editor
+   * authors via CanvasState (`supportsScenes`) — `getCoachToolSpecs`
+   * self-gates on the bridge — so the AI CHRO offers "record / insert
+   * widget / add scene" for video/podcast/comic and never for game /
+   * image / animation (#1911). Client-only: these mutate in-browser
+   * canvas state, so the server-side /api/mcp endpoint cannot run them.
    */
   requiresStudioEditor?: boolean;
+  /**
+   * If true, this tool needs the open Studio project's recorder (screen /
+   * webcam). `getCoachToolSpecs` hides it when the editor handle's
+   * `supportsRecording` is false — game / image / animation / CAD /
+   * document kinds don't author a timeline (#1911).
+   */
+  requiresRecording?: boolean;
+  /**
+   * If true, this tool needs canvas-state scenes (insert widget, add /
+   * duplicate / delete / reorder scenes, screenshot, add image/video).
+   * Hidden when `supportsScenes` is false on the open editor (#1911).
+   */
+  requiresScenes?: boolean;
   /**
    * The active-form id this tool writes through (`active-form-bridge.ts`).
    * The tool is exposed to the model ONLY while that form is registered —

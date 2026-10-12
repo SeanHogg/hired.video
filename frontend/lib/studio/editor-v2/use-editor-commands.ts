@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import type { MediaKind } from "@shared/media-kinds";
+import { mediaKindUsesCanvasStateAuthoring, type MediaKind } from "@shared/media-kinds";
 import type { ActionId, Selection } from "./editor-types";
 import { insertableWidgetKindsFor } from "./widget-catalog";
 import type { WidgetsMode } from "@/lib/studio/use-focus-left-panel";
@@ -157,9 +157,12 @@ export function useEditorCommands({
   // `stateRef`, so it never goes stale and never needs re-registering on
   // edits. Self-unregisters on unmount → tools fail loudly elsewhere.
   useEffect(() => {
+    const canvasAuthoring = mediaKindUsesCanvasStateAuthoring(currentMediaKind);
     const handle: StudioEditorHandle = {
       projectId: persistedProjectId,
       mediaKind: currentMediaKind,
+      supportsScenes: canvasAuthoring,
+      supportsRecording: canvasAuthoring,
       getActiveSceneId: () => activeSceneIdRef.current,
       listScenes: () =>
         stateRef.current.scenes.map((s) => ({
@@ -182,7 +185,14 @@ export function useEditorCommands({
       addVideoWidget: (url, durationSeconds) =>
         addMediaWidget("video", url, durationSeconds),
       captureScreenshot: () => placeScreenshot(),
-      openRecorder: (mode, opts) => openRecorder(mode, opts),
+      openRecorder: (mode, opts) => {
+        if (!canvasAuthoring) {
+          throw new Error(
+            "Recording isn't available for this project type. Open a video, podcast, voice, or comic in Studio.",
+          );
+        }
+        openRecorder(mode, opts);
+      },
     };
     registerStudioEditor(handle);
     return () => unregisterStudioEditor(handle);
