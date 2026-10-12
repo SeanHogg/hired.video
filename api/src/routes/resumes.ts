@@ -57,6 +57,7 @@ import { requireActiveConnection } from "../services/partner/connections.js";
 import {
   RESUME_BINARY_TEXT_MESSAGE,
   classifyResumeText,
+  expandScannedPdfUploads,
   extractUploadedResumeFiles,
 } from "../services/resume/uploadIntake.js";
 import { mergeFromFileHandler } from "./resume-merge-from-file.js";
@@ -519,7 +520,9 @@ resumeRoutes.post("/revise", anonResumeParseGate, attachTokenBudget(), async (c)
  * so this route and /parse read uploads identically. Server-side extraction
  * lets the Chrome extension POST raw bytes when its client-side extractor
  * can't read the file — keeping the extension bundle free of pdfjs (MV3 store
- * review avoids the `new Function` flag entirely).
+ * review avoids the `new Function` flag entirely). A scanned PDF (no text
+ * layer) unpacks to its embedded page JPEGs so vision OCR can read it the
+ * same way the browser-rasterised web path does (#2308).
  */
 resumeRoutes.post("/createfromfile", async (c) => {
   const user = c.var.user;
@@ -531,12 +534,16 @@ resumeRoutes.post("/createfromfile", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "No file provided."), 422);
   }
 
+  // Raw scanned PDFs unpack to page JPEGs *before* the OCR gate so a
+  // Chrome-extension bytes upload is metered the same as a browser raster.
+  const expanded = await expandScannedPdfUploads(files);
+
   // Image uploads spend vision OCR — same `resume_parse` gate + meter as
   // /extract-text and /merge/from-file (#2390).
-  const ocr = await gateUploadOcr(c, files, "createfromfile");
+  const ocr = await gateUploadOcr(c, expanded, "createfromfile");
   if (ocr.blocked) return ocr.blocked;
 
-  const intake = await extractUploadedResumeFiles(files, {
+  const intake = await extractUploadedResumeFiles(expanded, {
     ocrImage: (image) => ocrResumeImage(c, image),
   });
   if (intake.kind === "error") return c.json(fail("PARSE_FAILED", intake.message), 422);

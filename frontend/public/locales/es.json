@@ -12295,6 +12295,7 @@
   "integrationOAuth.invalidState": "Este enlace de conexión caducó o se inició en otro navegador",
   "integrationOAuth.failed": "No pudimos conectar tu cuenta",
   "integrationOAuth.scopesNotGranted": "Marca los dos permisos de YouTube en la pantalla de Google y vuelve a conectar",
+  "integrationOAuth.notConfigured": "La publicación en esta red aún no está activada. Estamos en ello. Por ahora, publica a través de tu perfil de hired.video.",
   "integrationOAuth.retry": "Cierra esta ventana e intenta conectarte de nuevo.",
   "integrationOAuth.backToStudio": "Volver a Studio",
   "studioFields.fullName": "Nombre completo",

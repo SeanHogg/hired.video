@@ -27,6 +27,11 @@ html
 # Environment files (local only)
 .env
 **/.env
+**/.env.*.local
+**/.env.local
+**/.dev.vars
+**/.dev.vars.*
+**/.build-env.local.json
 
 # Wrangler dev temp files
 .wrangler/

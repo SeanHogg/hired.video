@@ -12344,6 +12344,7 @@
   "integrationOAuth.invalidState": "Ce lien de connexion a expiré ou a été lancé dans un autre navigateur",
   "integrationOAuth.failed": "Nous n'avons pas pu connecter votre compte",
   "integrationOAuth.scopesNotGranted": "Cochez les deux autorisations YouTube sur l'écran de Google, puis reconnectez-vous",
+  "integrationOAuth.notConfigured": "La publication sur ce réseau n'est pas encore activée. Nous y travaillons. Pour l'instant, publiez via votre profil hired.video.",
   "integrationOAuth.retry": "Fermez cette fenêtre et réessayez de vous connecter.",
   "integrationOAuth.backToStudio": "Retour au Studio",
   "studioFields.fullName": "Nom complet",

@@ -96,7 +96,7 @@ function youTubeIdFromUrl(url: string): string | null {
 // Discriminated union so a studio-project-backed video keeps its
 // project id (lazy fetch hydrates the v2 canvas) while legacy
 // metaData URLs ride the same <StudioVideoSurface/> through its flat
-// mode — both routes mount the SAME player chrome the public /v/:id
+// mode — both routes mount the SAME player chrome the public /m/:id
 // page uses, so the resume header and the watch page never diverge.
 type VideoSlotItem =
   | { kind: "studio"; id: string; title: string; thumbnailUrl: string | null; videoUrl: string | null; youtubeVideoId: string | null }
@@ -113,7 +113,7 @@ function VideoSlot({ items }: { items: VideoSlotItem[] }) {
 
   // Map every item shape (studio project, metaData YouTube, metaData
   // MP4/WebM) onto a single <StudioVideoSurface/> mount. Both surfaces
-  // (this one + /v/:id) now resolve to the SAME render pipeline.
+  // (this one + /m/:id) now resolve to the SAME render pipeline.
   const player =
     current.kind === "studio" ? (
       <StudioVideoSurface
@@ -124,7 +124,7 @@ function VideoSlot({ items }: { items: VideoSlotItem[] }) {
         fallbackVideoUrl={current.videoUrl}
         fallbackYoutubeVideoId={current.youtubeVideoId}
         // #2128 — count CTA-hotzone clicks from the in-platform resume
-        // watch surface too (not just /v/:id). `current.id` is the studio
+        // watch surface too (not just /m/:id). `current.id` is the studio
         // project id the CtaHotzonesOverlay keys engagement on; without it
         // the overlay self-disables and owner analytics under-report clicks
         // that happen on the resume detail page.

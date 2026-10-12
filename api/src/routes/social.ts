@@ -35,6 +35,7 @@ import {
 import { resolveWorkspaceForWrite, WorkspaceForbiddenError } from "../services/studio/workspace.js";
 import { frontendBaseUrl } from "../utils/public-urls.js";
 import { socialConnectionServiceFor } from "../services/social/social-connection-factory.js";
+import { socialOAuthCallbackHandler } from "./social-oauth-callback.js";
 
 export const socialRoutes = new Hono<AppEnv>();
 
@@ -127,30 +128,12 @@ socialRoutes.get("/:platform/auth-url", async (c) => {
 
 // ─── OAuth callback (public — browser navigation) ────────────────────────────
 // Fixed path (platform rides the signed state) so only one redirect URI per
-// developer console needs registering. Self scope only — a managed-scope
-// state would be a mismatch (managed callbacks land on /api/admin/social).
-socialRoutes.get("/oauth/callback", async (c) => {
-  const base = frontendBaseUrl();
-  const dest = (status: string, platform = "", extra = "") =>
-    `${base}/settings/connections?status=${status}${platform ? `&platform=${platform}` : ""}${extra}`;
-
-  const code = c.req.query("code");
-  const state = c.req.query("state");
-  const platformErr = c.req.query("error") || c.req.query("error_description");
-  if (platformErr) return c.redirect(dest("error", "", `&reason=${encodeURIComponent(platformErr)}`));
-  if (!code || !state) return c.redirect(dest("error", "", "&reason=missing_code_or_state"));
-
-  try {
-    const { state: verified, handle } = await buildService(c).completeCallback(state, code);
-    if (verified.scope !== "self") return c.redirect(dest("error", verified.platform, "&reason=wrong_scope"));
-    const target = verified.redirectTo || dest("connected", verified.platform);
-    const sep = target.includes("?") ? "&" : "?";
-    return c.redirect(`${target}${sep}status=connected&platform=${verified.platform}${handle ? `&handle=${encodeURIComponent(handle)}` : ""}`);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return c.redirect(dest("error", "", `&reason=${encodeURIComponent(msg.slice(0, 200))}`));
-  }
-});
+// developer console needs registering. Every outcome returns to the state's
+// own redirectTo (e.g. /studio/linkedin/callback); see social-oauth-callback.ts.
+socialRoutes.get("/oauth/callback", socialOAuthCallbackHandler({
+  scope: "self",
+  fallbackPath: "/settings/connections",
+}));
 
 // ─── Disconnect ──────────────────────────────────────────────────────────────
 socialRoutes.post("/:platform/disconnect", async (c) => {

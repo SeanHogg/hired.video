@@ -81,7 +81,13 @@ function takePendingAuth(provider: ClientExchangedProvider): PendingAuth | null 
   }
 }
 
-export type IntegrationOAuthFailure = "denied" | "invalid_state" | "scopes_not_granted" | "exchange_failed";
+/** Mirrors the server's SocialCallbackFailure (api/src/routes/social-oauth-callback.ts). */
+export type IntegrationOAuthFailure =
+  | "denied"
+  | "invalid_state"
+  | "scopes_not_granted"
+  | "not_configured"
+  | "exchange_failed";
 
 export type IntegrationOAuthOutcome =
   | { ok: true; returnTo?: string }
@@ -91,6 +97,7 @@ const FAILURE_KEYS: Record<IntegrationOAuthFailure, string> = {
   denied: "integrationOAuth.denied",
   invalid_state: "integrationOAuth.invalidState",
   scopes_not_granted: "integrationOAuth.scopesNotGranted",
+  not_configured: "integrationOAuth.notConfigured",
   exchange_failed: "integrationOAuth.failed",
 };
 
@@ -116,9 +123,12 @@ export async function completeIntegrationOAuth(
   params: URLSearchParams,
 ): Promise<IntegrationOAuthOutcome> {
   if (!isClientExchanged(provider)) {
-    // The server already verified state and stored the tokens.
+    // The server already verified state and stored the tokens (or says why not).
+    const reason = params.get("reason");
     const outcome: IntegrationOAuthOutcome =
-      params.get("status") === "connected" ? { ok: true } : { ok: false, reason: "exchange_failed" };
+      params.get("status") === "connected"
+        ? { ok: true }
+        : { ok: false, reason: isIntegrationOAuthFailure(reason) ? reason : "exchange_failed" };
     broadcast(provider, outcome.ok);
     return outcome;
   }

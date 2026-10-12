@@ -12269,6 +12269,7 @@
   "integrationOAuth.invalidState": "This connection link expired or was started in another browser",
   "integrationOAuth.failed": "We couldn't connect your account",
   "integrationOAuth.scopesNotGranted": "Tick both YouTube permissions on Google's screen, then connect again",
+  "integrationOAuth.notConfigured": "Posting to this network isn't switched on yet. We're on it. Post through your hired.video profile for now.",
   "integrationOAuth.retry": "Close this window and try connecting again.",
   "integrationOAuth.backToStudio": "Back to Studio",
   "studioFields.fullName": "Full name",

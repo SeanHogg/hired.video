@@ -108,6 +108,14 @@ export const studioTemplates = pgTable(
     viewCount:       integer("view_count").notNull().default(0),
     purchaseCount:   integer("purchase_count").notNull().default(0),
     publishedAt:     timestamp("published_at", { withTimezone: true }),
+    /** Admin review queue (migration 0181; routes/admin-templates-review.ts).
+     *  draft | pending_review | approved | rejected. Declared so push keeps
+     *  them — they lived only in SQL and push planned to drop them. */
+    listingStatus:   varchar("listing_status", { length: 32 }).default("draft"),
+    ipAttestation:   text("ip_attestation"),
+    reviewNotes:     text("review_notes"),
+    approvedAt:      timestamp("approved_at", { withTimezone: true }),
+    rejectedAt:      timestamp("rejected_at", { withTimezone: true }),
     createdAt:       timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt:       timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

@@ -108,7 +108,7 @@ export default function StudioEditorV2({ loadedProject = null }: StudioEditorV2P
   const { t } = useTranslation();
   // Branding-policy inputs — `shouldShowBranding()` is the single seam every
   // surface reads; the export passes the resolved flag into `renderTimeline()`
-  // so the MP4 carries the SAME pill the editor + /v/<id> show.
+  // so the MP4 carries the SAME pill the editor + /m/<id> show.
   const subscription = useSubscription();
   const { removeBranding } = useRemoveBrandingFlag();
 

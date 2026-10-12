@@ -38,7 +38,7 @@ import {
   verifyState,
   type SocialOAuthState,
 } from "./social-oauth.js";
-import { encryptSocialSecret, decryptSocialSecret } from "./secrets.js";
+import { encryptSocialSecret, decryptSocialSecret, isSocialEncryptionConfigured } from "./secrets.js";
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
 
 export type SocialEnv = { SOCIAL_KMS_KEY?: string; PAID_MEDIA_KMS_KEY?: string };
@@ -100,10 +100,17 @@ export class SocialConnectionService {
     return new Set(ids.filter((p): p is SocialPlatform => p in SOCIAL_PLATFORM_META));
   }
 
+  /** Layer 1 is usable only when the developer app is configured AND the
+   *  token store can encrypt — otherwise consent would succeed and the
+   *  callback would have nowhere to put the tokens. */
+  private canConnect(platform: SocialPlatform): boolean {
+    return isPlatformConfigured(platform) && isSocialEncryptionConfigured(this.env);
+  }
+
   private managedState(platform: SocialPlatform, ready: Set<SocialPlatform>): ManagedLaneState {
     const meta = SOCIAL_PLATFORM_META[platform];
     if (!meta.supportsManagedLane) return "unsupported";
-    if (!isPlatformConfigured(platform)) return "not_configured"; // Layer 1 missing
+    if (!this.canConnect(platform)) return "not_configured"; // Layer 1 missing
     return ready.has(platform) ? "ready" : "not_connected";       // Layer 2 missing
   }
 
@@ -112,7 +119,7 @@ export class SocialConnectionService {
   private selfState(platform: SocialPlatform, connected: Set<SocialPlatform>): SelfLaneState {
     const meta = SOCIAL_PLATFORM_META[platform];
     if (!meta.supportsSelfLane) return "unsupported";
-    if (!isPlatformConfigured(platform)) return "not_configured"; // Layer 1 missing
+    if (!this.canConnect(platform)) return "not_configured"; // Layer 1 missing
     return connected.has(platform) ? "available" : "needs_connection";
   }
 
@@ -155,7 +162,7 @@ export class SocialConnectionService {
       const acct = byPlatform.get(platform);
       return {
         platform,
-        configured: isPlatformConfigured(platform),
+        configured: this.canConnect(platform),
         managed: this.managedState(platform, ready as Set<SocialPlatform>),
         account: acct
           ? { handle: acct.handle, status: acct.status, expiresAt: acct.accessTokenExpiresAt }
@@ -189,17 +196,23 @@ export class SocialConnectionService {
     if (!isPlatformConfigured(opts.platform)) {
       throw new SocialConnectionError("NOT_CONFIGURED", `${opts.platform} developer app is not configured`);
     }
+    if (!isSocialEncryptionConfigured(this.env)) {
+      throw new SocialConnectionError("NOT_CONFIGURED", "social token encryption key is not configured");
+    }
     return buildSocialAuthUrl(opts);
   }
 
   // ── OAuth: complete callback ───────────────────────────────────────────
 
-  /** Verify state, exchange code, encrypt + persist, invalidate caches.
-   *  Returns the verified state so the route can redirect appropriately. */
-  async completeCallback(rawState: string, code: string): Promise<{ state: SocialOAuthState; handle: string | null }> {
-    const state = await verifyState(rawState);
-    if (!state) throw new SocialConnectionError("INVALID_STATE", "OAuth state invalid or expired");
+  /** Verify the signed state FIRST, on its own, so the callback route knows
+   *  where to send the browser even when the exchange then fails. */
+  verifyCallbackState(rawState: string): Promise<SocialOAuthState | null> {
+    return verifyState(rawState);
+  }
 
+  /** Exchange code, encrypt + persist, invalidate caches, for an already
+   *  verified state. Returns the connected handle (null if unknown). */
+  async completeCallback(state: SocialOAuthState, code: string): Promise<{ handle: string | null }> {
     const tokens = await exchangeSocialCode(state, code);
 
     // Granular consent (Google) can return a token for a subset of the
@@ -249,7 +262,7 @@ export class SocialConnectionService {
       invalidateCachedKey(selfStatusKey(state.userId, state.companyId));
     }
 
-    return { state, handle: identity?.handle ?? null };
+    return { handle: identity?.handle ?? null };
   }
 
   // ── Disconnect ─────────────────────────────────────────────────────────

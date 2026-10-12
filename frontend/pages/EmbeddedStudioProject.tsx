@@ -1,6 +1,6 @@
 // Bare, chrome-less embed surface for a studio project (#696).
 //
-// The legacy embed snippet pointed an <iframe> at the public `/v/:id`
+// The legacy embed snippet pointed an <iframe> at the public `/m/:id`
 // page (full AppShell chrome) OR required a published `videos.id` render.
 // This route mounts ONLY the unified <StudioVideoSurface/> player, which
 // serves saved-but-unrendered projects straight from `studio_projects`,

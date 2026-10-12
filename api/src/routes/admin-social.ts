@@ -31,6 +31,7 @@ import {
 } from "../services/social/social-connection-service.js";
 import { frontendBaseUrl } from "../utils/public-urls.js";
 import { socialConnectionServiceFor } from "../services/social/social-connection-factory.js";
+import { socialOAuthCallbackHandler } from "./social-oauth-callback.js";
 
 const { adminAuditLog } = schema;
 
@@ -56,26 +57,11 @@ async function audit(actorId: string, action: string, platform: string) {
 // The callback is public (browser nav) — register it BEFORE the SA gate so
 // the middleware below doesn't 401 the redirect. The signed `managed`-scope
 // state can only have been minted by the SA-gated auth-url route.
-adminSocialRoutes.get("/oauth/callback", async (c) => {
-  const base = frontendBaseUrl();
-  const dest = (status: string, platform = "", extra = "") =>
-    `${base}/admin/social-accounts?status=${status}${platform ? `&platform=${platform}` : ""}${extra}`;
-
-  const code = c.req.query("code");
-  const state = c.req.query("state");
-  const platformErr = c.req.query("error") || c.req.query("error_description");
-  if (platformErr) return c.redirect(dest("error", "", `&reason=${encodeURIComponent(platformErr)}`));
-  if (!code || !state) return c.redirect(dest("error", "", "&reason=missing_code_or_state"));
-
-  try {
-    const { state: verified, handle } = await buildService(c).completeCallback(state, code);
-    if (verified.scope !== "managed") return c.redirect(dest("error", verified.platform, "&reason=wrong_scope"));
-    return c.redirect(dest("connected", verified.platform, handle ? `&handle=${encodeURIComponent(handle)}` : ""));
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return c.redirect(dest("error", "", `&reason=${encodeURIComponent(msg.slice(0, 200))}`));
-  }
-});
+const MANAGED_ACCOUNTS_PATH = "/admin/social-accounts";
+adminSocialRoutes.get("/oauth/callback", socialOAuthCallbackHandler({
+  scope: "managed",
+  fallbackPath: MANAGED_ACCOUNTS_PATH,
+}));
 
 // Everything else is SuperAdmin-gated.
 adminSocialRoutes.use("*", superAdminMiddleware);
@@ -100,7 +86,7 @@ adminSocialRoutes.get("/:platform/auth-url", async (c) => {
       scope: "managed",
       userId: c.var.user.sub as string, // the SuperAdmin connecting the brand account
       companyId: null,
-      redirectTo: `${frontendBaseUrl()}/admin/social-accounts`,
+      redirectTo: `${frontendBaseUrl()}${MANAGED_ACCOUNTS_PATH}`,
     });
     return c.json(success({ url }));
   } catch (err) {

@@ -11,7 +11,7 @@
  *   │ Curriculum │  Active lesson body                  │
  *   │  rail      │   • text_md      → ReactMarkdown     │
  *   │            │   • scorm_package → <ScormPlayer>    │
- *   │            │   • studio_video  → iframe at /v/<slug>│
+ *   │            │   • studio_video  → iframe at /m/<slug>│
  *   │            │   • external_url  → iframe           │
  *   │            │                                      │
  *   │            │  [Mark complete] (non-SCORM only)    │

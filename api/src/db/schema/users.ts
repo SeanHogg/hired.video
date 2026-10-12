@@ -70,6 +70,10 @@ export const users = pgTable("users", {
   mfaEnabled: boolean("mfa_enabled").default(false).notNull(),
   mfaSecret: text("mfa_secret"),
   stripeCustomerId: text("stripe_customer_id").unique(),
+  /** Provider-neutral copy of stripe_customer_id (migration 0125, phase 1 of a
+   *  rename that never finished). No code reads it yet; declared so push keeps
+   *  the column and its index instead of dropping them. */
+  providerCustomerId: text("provider_customer_id"),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }),
   // Pinned at registration so spam-investigation can answer "where did
@@ -121,6 +125,10 @@ export const users = pgTable("users", {
   uniqueIndex("uq_users_resume_forwarding_slug")
     .on(sql`lower((${t.resumeForwardingSlug})::text)`)
     .where(sql`resume_forwarding_slug IS NOT NULL`),
+  // Migration 0125 — partial unique on the provider-neutral customer id.
+  uniqueIndex("uq_users_provider_customer_id")
+    .on(t.providerCustomerId)
+    .where(sql`provider_customer_id IS NOT NULL`),
   check("users_profile_mode_check", sql`${t.profileMode} IN ('resume', 'channel', 'auto')`),
 ]);
 
