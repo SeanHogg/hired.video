@@ -211,6 +211,7 @@ export default function Outreach() {
 
   // Published content state
   const [publishedProjects, setPublishedProjects] = useState<StudioProject[]>([]);
+  const [studioProjects, setStudioProjects] = useState<StudioProject[]>([]);
   const [videoCampaigns, setVideoCampaigns] = useState<VideoCampaign[]>([]);
   const [showCampaignDialog, setShowCampaignDialog] = useState(false);
   const [campaignForm, setCampaignForm] = useState({ name: "", description: "", utmSource: "", utmMedium: "", utmCampaign: "" });
@@ -344,6 +345,7 @@ export default function Outreach() {
         setUserJobs(userJobsData);
         setAdStats(adStatsData);
         setActiveBoosts(boostsData);
+        setStudioProjects(studioProjectsData);
         setPublishedProjects(studioProjectsData.filter(
           (p: StudioProject) => p.status === StudioProjectStatus.Published || p.status === StudioProjectStatus.Exported || p.status === StudioProjectStatus.Completed,
         ));
@@ -839,6 +841,7 @@ export default function Outreach() {
                         setVideoCampaigns((prev) => prev.filter((c) => c.id !== id));
                       }}
                       onNavigateTo={(tab) => setActiveTab(tab)}
+                      studioProjects={studioProjects}
                     />
                   </TabsContent>
 
