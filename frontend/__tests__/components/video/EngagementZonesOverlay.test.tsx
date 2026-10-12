@@ -185,7 +185,7 @@ describe("EngagementZonesOverlay", () => {
       <EngagementZonesOverlay zones={[zone("thumbnail-stamp", THUMB.id, 0, 3)]} projectId={PROJECT_ID} playback={playbackAt(1)} />,
     );
     const link = await screen.findByRole("link", { name: /Watch video/ });
-    expect(link).toHaveAttribute("href", `/v/${PROJECT_ID}`);
+    expect(link).toHaveAttribute("href", `/m/${PROJECT_ID}`);
   });
 
   it("opens the review thread with its root selected", async () => {
