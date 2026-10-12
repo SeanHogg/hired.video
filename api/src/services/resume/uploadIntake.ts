@@ -10,13 +10,21 @@
  *
  * Multi-file is first class: a scanned PDF has no text layer, so the browser
  * rasterises its pages to images (lib/pdf-raster.ts) and uploads them as a
- * page sequence. Their OCR transcripts are joined in page order and parsed as
- * one resume.
+ * page sequence. Surfaces that POST the raw PDF (Chrome extension,
+ * /createfromfile, partner SDK) unpack embedded DCTDecode JPEGs and
+ * FlateDecode RGB/gray rasters the same way — Workers has no canvas, so
+ * we cannot rasterise, but phone/scanner PDFs almost always embed the
+ * page image. OCR transcripts are joined in page order.
  *
  * Pure of DB/HTTP. The vision call is injected (`ocrImage`) so this module
  * stays unit-testable and free of the LLM client.
  */
-import { extractResumeText } from "./extractFile.js";
+import {
+  extractPdfEmbeddedImages,
+  extractResumeText,
+  isPdfResumeBytes,
+  pdfEmbeddedImagesToFiles,
+} from "./extractFile.js";
 import { looksLikeBinaryText, stripResumeControlChars, tryParseJsonResume } from "./parse.js";
 import { mapWithConcurrency } from "../../utils/async.js";
 
@@ -63,6 +71,48 @@ export function isResumeImageFile(file: Pick<File, "type" | "name">): boolean {
 
 function isJsonFile(file: Pick<File, "type" | "name">): boolean {
   return file.type === "application/json" || (file.name ?? "").toLowerCase().endsWith(".json");
+}
+
+/**
+ * A scanned PDF (no text layer) whose pages are embedded JPEGs → those
+ * page images, named like the browser rasteriser (`<stem>-p1.jpg`). Text-
+ * layer PDFs, non-PDFs, and scans we cannot unpack are returned unchanged
+ * so the extractor / 422 path still owns them.
+ */
+export async function expandScannedPdfUploads(files: readonly File[]): Promise<File[]> {
+  const out: File[] = [];
+  for (const file of files) {
+    if (!(file instanceof File)) continue;
+    if (file.size === 0 || isResumeImageFile(file) || isJsonFile(file)) {
+      out.push(file);
+      continue;
+    }
+    const buf = await file.arrayBuffer().catch(() => null);
+    if (!buf) {
+      out.push(file);
+      continue;
+    }
+    const bytes = new Uint8Array(buf);
+    if (!isPdfResumeBytes(bytes, { contentType: file.type, filename: file.name })) {
+      out.push(file);
+      continue;
+    }
+    const extracted = await extractResumeText(bytes, {
+      contentType: file.type,
+      filename: file.name,
+    });
+    if (!("code" in extracted) || extracted.code !== "INVALID_RESUME") {
+      out.push(file);
+      continue;
+    }
+    const images = extractPdfEmbeddedImages(bytes);
+    if (images.length === 0) {
+      out.push(file);
+      continue;
+    }
+    out.push(...pdfEmbeddedImagesToFiles(images, file.name));
+  }
+  return out;
 }
 
 /** PDF / DOCX / text upload → plain text via the shared extractor. */
@@ -128,12 +178,17 @@ export async function extractUploadedResumeFiles(
       : { kind: "error", message: UPLOAD_EXTRACT_MESSAGES.INVALID_RESUME };
   }
 
+  // Raw scanned PDFs (no text layer) unpack to embedded page JPEGs so the
+  // image OCR path — and callers that OCR-gate on `isResumeImageFile` —
+  // see the same page sequence the browser uploads.
+  const expanded = await expandScannedPdfUploads(usable);
+
   // Files are read concurrently; results keep upload order so a rasterised
   // scan's pages still join in sequence.
   let done = 0;
-  const reads = await mapWithConcurrency(usable, OCR_CONCURRENCY, async (file) => {
+  const reads = await mapWithConcurrency(expanded, OCR_CONCURRENCY, async (file) => {
     const read = await readOneFile(file, deps);
-    deps.onFileRead?.(++done, usable.length);
+    deps.onFileRead?.(++done, expanded.length);
     return read;
   });
 

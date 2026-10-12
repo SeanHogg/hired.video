@@ -49,6 +49,8 @@ import { runResumeParse } from "../services/resume/parsePipeline.js";
 import { createAiTextCaller, hasAiTextProvider } from "../services/adapters/ai-text-caller.js";
 import { PARTNER_RESUME_AI_PARSE, buildPartnerTextParser } from "../services/partner/resumeTextParser.js";
 import { decodeResumeFilePayload, extractResumeText } from "../services/resume/extractFile.js";
+import { extractUploadedResumeFiles } from "../services/resume/uploadIntake.js";
+import { ocrResumeImage } from "./resume-parse.js";
 import {
   PARTNER_EMBED_KINDS,
   PARTNER_EMBED_THEMES,
@@ -57,12 +59,15 @@ import {
 } from "../../../shared/partner.js";
 
 /** Decode a résumé `file` (base64, data-URL, or raw PDF bytes) and extract
- *  its text. PDF/DOCX are extracted server-side; unsupported binaries return
- *  a typed code so the SDK can branch. Enforces the decoded-size ceiling. */
+ *  its text. PDF/DOCX are extracted server-side; a scanned PDF with no text
+ *  layer unpacks embedded page images and OCRs them the same way
+ *  `/createfromfile` does (#2308). Unsupported binaries return a typed code
+ *  so the SDK can branch. Enforces the decoded-size ceiling. */
 async function decodePartnerResumeFile(
   file: string,
   contentType: string | undefined,
   filename: string | undefined,
+  ocrImage: (image: File) => Promise<string>,
 ): Promise<{ ok: true; rawText: string } | { ok: false; status: 413 | 415 | 422; code: string; message: string }> {
   const decodedFile = decodeResumeFilePayload(file);
   // `in`-narrowing (non-strict tsconfig) — boolean discriminant doesn't narrow.
@@ -81,11 +86,20 @@ async function decodePartnerResumeFile(
   const extracted = await extractResumeText(bytes, { contentType, filename });
   // `in`-narrowing (not `!extracted.ok`) — this codebase is non-strict, where a
   // boolean discriminant doesn't narrow a union; the structural `in` check does.
-  if ("code" in extracted) {
-    const status = extracted.code === "UNSUPPORTED_MEDIA_TYPE" ? 415 : 422;
-    return { ok: false, status, code: extracted.code, message: extracted.message };
+  if (!("code" in extracted)) return { ok: true, rawText: extracted.text };
+  if (extracted.code === "UNSUPPORTED_MEDIA_TYPE") {
+    return { ok: false, status: 415, code: extracted.code, message: extracted.message };
   }
-  return { ok: true, rawText: extracted.text };
+  const name = filename?.trim() || "resume.bin";
+  const type = contentType?.trim() || "application/octet-stream";
+  const intake = await extractUploadedResumeFiles([new File([bytes], name, { type })], { ocrImage });
+  if (intake.kind === "error") {
+    return { ok: false, status: 422, code: "INVALID_RESUME", message: extracted.message };
+  }
+  if (intake.kind === "structured") {
+    return { ok: true, rawText: JSON.stringify(intake.content) };
+  }
+  return { ok: true, rawText: intake.text };
 }
 
 export const partnerRoutes = new Hono<AppEnv>();
@@ -164,6 +178,7 @@ type ResumeWriteInput = z.infer<typeof ResumeWriteBody>;
  *  uploadResume (DRY). */
 async function resolveResumeWrite(
   r: ResumeWriteInput,
+  ocrImage: (image: File) => Promise<string>,
 ): Promise<
   | { ok: true; data: { title: string; content?: Record<string, unknown>; rawText?: string; privacy?: "public" | "unlisted" | "private" } }
   | { ok: false; status: 400 | 413 | 415 | 422; code: string; message: string }
@@ -172,7 +187,7 @@ async function resolveResumeWrite(
   if (r.content) return { ok: true, data: { ...base, content: r.content } };
   if (r.rawText) return { ok: true, data: { ...base, rawText: r.rawText } };
   if (r.file) {
-    const decoded = await decodePartnerResumeFile(r.file, r.contentType, r.filename);
+    const decoded = await decodePartnerResumeFile(r.file, r.contentType, r.filename, ocrImage);
     if ("code" in decoded) return decoded; // in-narrowing (non-strict tsconfig)
     return { ok: true, data: { ...base, rawText: decoded.rawText } };
   }
@@ -240,7 +255,7 @@ partnerRoutes.post("/v1/job-seekers", partnerAuth("write:job_seekers"), async (c
   // Optional first resume — reuse the canonical write path.
   let resumeId: string | null = null;
   if (parsed.data.resume) {
-    const resolved = await resolveResumeWrite(parsed.data.resume);
+    const resolved = await resolveResumeWrite(parsed.data.resume, (image) => ocrResumeImage(c, image));
     // A malformed résumé must not orphan the just-created account — surface the
     // decode error but keep the account (the partner can retry uploadResume).
     // `in`-narrowing: non-strict tsconfig won't narrow on `!resolved.ok`.
@@ -296,7 +311,7 @@ partnerRoutes.post("/v1/job-seekers/:userId/resumes", partnerAuth("write:resumes
   if (!parsed.success) {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
-  const resolved = await resolveResumeWrite(parsed.data);
+  const resolved = await resolveResumeWrite(parsed.data, (image) => ocrResumeImage(c, image));
   if ("code" in resolved) { // in-narrowing (non-strict tsconfig)
     return c.json(error(resolved.code, resolved.message), resolved.status as any);
   }
