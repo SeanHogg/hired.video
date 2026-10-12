@@ -1,7 +1,7 @@
 // TemplatePlayer.tsx — press-play preview for marketplace templates.
 //
 // Studio-builtin templates pull their canvas straight from the v2
-// `seedCanvasFromTemplate(id)` source and play through `<CanvasStatePreview/>`
+// `seedCanvasFromTemplate(id)` source and play through `<TimelineFramePreview/>`
 // — the same component the editor's PreviewOverlay mounts. Single
 // source of truth for "what does template X look like playing", so the
 // marketplace preview and the editor preview can never drift.
@@ -12,7 +12,7 @@
 //   2. `videoScript` — the published v1 storyboard. Converted to a v2
 //      CanvasState via `scriptToCanvasState` (the SAME conversion the
 //      editor draft path runs on "Use") and played through the shared
-//      `<CanvasStatePreview/>`. This is what keeps script-only creator
+//      `<TimelineFramePreview/>`. This is what keeps script-only creator
 //      templates — e.g. the sector video-resume catalog — from showing a
 //      bare "No preview available" even though the studio plays them fine.
 //   3. neither — the creator's poster image, or a generic empty state.
@@ -30,7 +30,7 @@
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import CanvasStatePreview from "@/components/studio/v2/CanvasStatePreview";
+import TimelineFramePreview from "@/components/studio/v2/TimelineFramePreview";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
 import type { TemplateDef } from "@/lib/studio/templates/catalog";
 import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
@@ -69,7 +69,7 @@ export default function TemplatePlayer({ meta }: Props) {
 
 // Press-play player for any v2 CanvasState. Built-ins seed theirs from the
 // catalog; creator templates derive theirs from the published `videoScript`.
-// Both render through `<CanvasStatePreview/>` — the SAME component the editor's
+// Both render through `<TimelineFramePreview/>` — the SAME component the editor's
 // PreviewOverlay mounts — so marketplace preview and editor preview can't
 // drift. `poster` is the static still shown before playback; when omitted the
 // canvas itself (paused at frame 0) is the still.
@@ -99,7 +99,7 @@ function CanvasPreviewPlayer({
       {showPoster ? (
         poster
       ) : (
-        <CanvasStatePreview state={canvasState} playback={playback} />
+        <TimelineFramePreview state={canvasState} playback={playback} />
       )}
 
       {/* Initial press-play overlay — only before the first play. */}

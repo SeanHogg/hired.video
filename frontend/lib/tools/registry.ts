@@ -932,20 +932,20 @@ async function runStudioStartRecording(ctx: ToolRunContext): Promise<NormalizedT
   const mode: StudioRecordingMode = RECORDING_MODES.includes(raw as StudioRecordingMode)
     ? (raw as StudioRecordingMode)
     : "screen";
-  // The browser requires a user gesture for screen/camera capture, so we
-  // can't silently start recording from a tool call — we surface the
-  // armed recorder and let the user hit Record.
+  // Auto-start the live preview (getUserMedia). MediaRecorder itself still
+  // needs a click — the browser won't grant getDisplayMedia from a tool
+  // call — so the armed recorder's Record button is the remaining gesture.
   const editor = requireStudioEditor();
   if (!editor.supportsRecording) {
     throw new Error(
       "Recording isn't available for this project type. Open a video, podcast, voice, or comic in Studio.",
     );
   }
-  editor.openRecorder(mode, { asScene: true });
+  editor.openRecorder(mode, { asScene: true, autoStart: true });
   const label =
     mode === "webcam" ? "webcam" : mode === "screen-pip" ? "screen + webcam" : "screen";
   return {
-    summary: `Opened the ${label} recorder. Click Record to start — your recording becomes its own scene, so you can stitch slide → recording → slide on save.`,
+    summary: `Opened the ${label} recorder and started the live preview. Click Record to capture — your recording becomes its own scene, so you can stitch slide → recording → slide on save.`,
     raw: { kind: "studio_start_recording", mode },
   };
 }
@@ -1535,7 +1535,7 @@ export const toolRegistry: ToolDefinition[] = [
     id: "studio_start_recording",
     label: "Record",
     description:
-      "Open the Studio recorder so the user can capture a screen, webcam, or screen+webcam (picture-in-picture) clip. Use this whenever the user asks to 'screen record', 'record my screen', 'record a webcam clip', 'record a demo', etc. — do NOT tell them to find a button. The browser requires a click to start capture, so this surfaces the armed recorder; the finished recording becomes its OWN full-bleed scene, which save & publish stitches in sequence (slide → recording → slide).",
+      "Open the Studio recorder so the user can capture a screen, webcam, or screen+webcam (picture-in-picture) clip. Use this whenever the user asks to 'screen record', 'record my screen', 'record a webcam clip', 'record a demo', etc. — do NOT tell them to find a button. This surfaces the armed recorder and starts the live preview; the browser still requires a click on Record to begin capture. The finished recording becomes its OWN full-bleed scene, which save & publish stitches in sequence (slide → recording → slide).",
     icon: Clapperboard,
     accentClassName: "bg-brand-primary/10 text-brand-primary",
     route: "/studio",

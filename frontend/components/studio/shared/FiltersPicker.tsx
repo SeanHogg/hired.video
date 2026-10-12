@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { safariLacksCanvasFilter } from "@/lib/studio/canvas-filter-support";
 import {
   DEFAULT_FILTERS,
   FILTER_DEFS,
@@ -59,6 +60,11 @@ export default function FiltersPicker({
       >
         {t("studio.picker.resetFilters")}
       </Button>
+      {safariLacksCanvasFilter() && (
+        <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+          {t("studio.picker.safariFilterFallback")}
+        </p>
+      )}
     </div>
   );
 }

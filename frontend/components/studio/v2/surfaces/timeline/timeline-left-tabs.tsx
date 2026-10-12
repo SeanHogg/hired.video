@@ -48,7 +48,7 @@ export function timelineLeftTabs(ctx: TimelineSurfaceCtx): FocusLeftTab[] {
     patchAudioMix,
     patchAudioLayerMix,
   } = widgetActions;
-  const { openAction, handleOpenActionChange, recordAsScene, addRecordingScene } = commands;
+  const { openAction, handleOpenActionChange, recordAsScene, recorderAutoStart, addRecordingScene } = commands;
 
   const paletteProps = {
     onInsert: (kind: WidgetKind) => insertWidget(kind),
@@ -111,6 +111,7 @@ export function timelineLeftTabs(ctx: TimelineSurfaceCtx): FocusLeftTab[] {
                 openAction={openAction}
                 onOpenActionChange={handleOpenActionChange}
                 recordAsScene={recordAsScene}
+                autoStart={recorderAutoStart}
                 onAddRecordingScene={addRecordingScene}
                 currentTimeSec={playback.playhead}
                 state={state}

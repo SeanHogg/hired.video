@@ -90,6 +90,7 @@ export const videoPlugin = registerPlugin<VideoParams>({
         muted: data.muted,
         chromaKey: data.chromaKey ?? null,
         ...when("filter", filter || undefined),
+        ...when("grade", filter ? data.filters : undefined),
       },
     ];
   },

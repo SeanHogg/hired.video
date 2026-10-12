@@ -15,6 +15,7 @@
 import type { ChromaKeyParams } from "@/lib/studio/editor-v2/canvas-state";
 import type { LinkedContentKind, LinkedContentSummary } from "@/lib/studio/editor-v2/linked-content";
 import type { EngagementAssetKind } from "@/lib/studio/editor-v2/engagement-assets";
+import type { VideoFilters } from "@/lib/studio/video-filters";
 import type { Box } from "./frame";
 import type { Ctx2D } from "./frame-canvas";
 import type { RenderContext } from "./plugin";
@@ -69,8 +70,11 @@ export type DrawOp =
       mirror?: boolean;
       /** Screen-reader text for an image (WCAG 1.1.1). */
       alt?: string;
-      /** CSS filter for a per-widget colour grade (`filtersToCss`). */
+      /** CSS filter for a per-widget colour grade (`filtersToCss`).
+       *  Used when `ctx.filter` exists; the DOM stage always uses this. */
       filter?: string;
+      /** Structured grade for the pixel-math fallback (Safari < 18). */
+      grade?: VideoFilters;
       muted?: boolean;
       /** DOM-only: the export keys through the pixel pass instead. */
       chromaKey?: ChromaKeyParams | null;

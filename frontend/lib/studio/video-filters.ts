@@ -26,12 +26,12 @@ export interface FilterDef {
   max: number;
   step: number;
   defaultValue: number;
-  /** Convert the slider value to a CSS filter fragment. The scene filter
-   *  effect (lib/timeline/effects/scene-grade.ts) feeds the joined string
-   *  to `ctx.filter` for BOTH the playback preview and the export; where
-   *  `ctx.filter` is missing (older Safari) it runs the same CSS function
-   *  math on the pixel buffer (effects/filter-pixels.ts). The DOM editing
-   *  surface (CanvasStage) uses it as a CSS `filter` for live feedback. */
+  /** Convert the slider value to a CSS filter fragment. Scene grades
+   *  (scene-grade.ts) and per-widget media grades (paint-ops.ts) feed
+   *  the joined string to `ctx.filter`; where `ctx.filter` is missing
+   *  (Safari < 18, #2393) they run the same CSS function math on the
+   *  pixel buffer (effects/filter-pixels.ts). The DOM editing surface
+   *  (CanvasStage) uses it as a CSS `filter` for live feedback. */
   toCss(value: number): string;
 }
 

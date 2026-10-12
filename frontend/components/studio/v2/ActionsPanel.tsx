@@ -158,6 +158,10 @@ export interface ActionsPanelProps {
    *  for the `recordAsScene` path; falls back to `onAddVideoWidget`
    *  (overlay on the active scene) when absent. */
   onAddRecordingScene?: (url: string, durationSeconds: number) => void;
+  /** Auto-start the recorder's live preview (getUserMedia) when the sheet
+   *  opens. Set by the host for the AI CHRO / Alt+Shift+R / `?capture=`
+   *  paths. Tile-open leaves this false. MediaRecorder still needs Record. */
+  autoStart?: boolean;
   /** Preview-playback time in seconds. Threaded into
    *  ReviewCommentsDialog so a new review comment anchors to wherever
    *  the user is scrubbing in the preview (#654). */
@@ -377,6 +381,7 @@ function ActionSheet({
   onAddVideoWidget,
   onAddRecordingScene,
   recordAsScene,
+  autoStart,
   onAddVoiceover,
   onSetCaptions,
   onSetMusicFromBlob,
@@ -415,6 +420,7 @@ function ActionSheet({
             {recordingMode && (
               <WebcamRecorderWithUpload
                 mode={recordingMode}
+                autoStart={autoStart}
                 // In-panel source swap: switching re-targets the open
                 // sheet; the wrapper remounts the recorder keyed by mode.
                 onModeChange={(next) => onOpenAction(RECORDING_MODE_ACTION[next])}

@@ -15149,6 +15149,8 @@
   "studio.projectDetails.creating": "Creando…",
   "studio.projectDetails.create": "Crear",
   "studio.projectDetails.createCampaignHelp": "Crea una campaña con este proyecto. Puedes añadir más proyectos después.",
+  "studio.projectDetails.campaignsLoadFailed": "No se pudieron cargar las campañas.",
+  "studio.projectDetails.retryLoad": "Reintentar",
   "studio.projectDetails.toast.shareUrlCopied": "URL para compartir copiada",
   "studio.projectDetails.toast.noUtmTags": "Esta campaña aún no tiene etiquetas UTM.",
   "studio.projectDetails.toast.copyFailed": "No se pudo copiar",

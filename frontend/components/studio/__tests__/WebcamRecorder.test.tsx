@@ -673,3 +673,25 @@ describe("WebcamRecorder in-panel source picker", () => {
     expect(screen.getByRole("button", { name: /share screen/i })).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// autoStart — AI CHRO / host can arm the live preview on mount (#3090)
+// ---------------------------------------------------------------------------
+
+describe("autoStart (#3090)", () => {
+  it("arms the live webcam preview on mount without a click", async () => {
+    getUserMediaMock.mockResolvedValue(makeWebcamStream());
+    render(
+      <WebcamRecorder onRecordingComplete={vi.fn()} mode="webcam" autoStart />,
+    );
+    await screen.findByRole("button", { name: t("actions.record") });
+    expect(getUserMediaMock).toHaveBeenCalled();
+    expect(getDisplayMediaMock).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-arm when autoStart is omitted", () => {
+    render(<WebcamRecorder onRecordingComplete={vi.fn()} mode="webcam" />);
+    expect(getUserMediaMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /start camera/i })).toBeInTheDocument();
+  });
+});

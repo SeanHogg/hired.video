@@ -9,7 +9,7 @@
 //
 //   • Real YouTube id           → privacy-friendly nocookie iframe.
 //   • Baked MP4 (videoUrl)      → native <video> + CtaHotzonesOverlay.
-//   • Saved canvas, no MP4      → <CanvasStatePreview/> live off the V2
+//   • Saved canvas, no MP4      → <TimelineFramePreview/> live off the V2
 //                                 state (`timelineSpec`, or a stored V1
 //                                 script converted at read time — #666,
 //                                 #721). The "saved-but-unrendered" case.
@@ -34,7 +34,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Play } from "lucide-react";
 
-import CanvasStatePreview from "@/components/studio/v2/CanvasStatePreview";
+import TimelineFramePreview from "@/components/studio/v2/TimelineFramePreview";
 import PlaybackControls from "@/components/studio/v2/PlaybackControls";
 import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
 import AspectFrame from "@/components/AspectFrame";
@@ -432,7 +432,7 @@ function LazySurface({
 // caller passes the raw ready payload, NOT a "useStudioPlayer" boolean
 // it could compute itself. All surfaces — eager (public watch page),
 // lazy (cards, resume header, profile header), and the editor's
-// preview overlay — converge here, then mount <CanvasStatePreview/>
+// preview overlay — converge here, then mount <TimelineFramePreview/>
 // off `timelineSpec` so the canvas first frame is what every consumer
 // sees on mount.
 
@@ -461,7 +461,7 @@ function PublicVideoDispatch({
       ? ready.videoUrl
       : null;
   // The playback state is V2 CanvasState — the same shape the editor
-  // edits and <CanvasStatePreview/> renders. `timelineSpec` is
+  // edits and <TimelineFramePreview/> renders. `timelineSpec` is
   // authoritative; a project saved by the deleted V1 editor arrives as
   // `legacyScript` and is converted at read time (#721).
   const canvasState = useMemo<CanvasState | null>(
@@ -492,7 +492,7 @@ function PublicVideoDispatch({
   }
 
   // Studio-backed playback — canvas-state OR baked MP4. Mounts the
-  // same <CanvasStatePreview/> that the editor's preview overlay uses,
+  // same <TimelineFramePreview/> that the editor's preview overlay uses,
   // so the public watch page renders the IDENTICAL pixels the user
   // saw in the editor.
   if (canvasState || directVideoUrl) {
@@ -537,7 +537,7 @@ function PublicVideoDispatch({
 
 // ─── Public studio canvas wrapper ────────────────────────────────────────────
 // Owns the playback state for the public surface and mounts the same
-// <CanvasStatePreview/> + <PlaybackControls/> the editor preview uses,
+// <TimelineFramePreview/> + <PlaybackControls/> the editor preview uses,
 // wrapped in a rounded card.
 
 function PublicStudioCanvas({
@@ -634,7 +634,7 @@ function PublicStudioCanvas({
     ? `${canvasState.width}/${canvasState.height}`
     : "16/9";
 
-  // v2 canvas-state branch — mounts the SAME <CanvasStatePreview/> the
+  // v2 canvas-state branch — mounts the SAME <TimelineFramePreview/> the
   // editor's preview overlay and the marketplace TemplatePlayer use.
   // Single source of truth: what you see here is what the editor shows.
   if (canvasState) {
@@ -647,14 +647,14 @@ function PublicStudioCanvas({
           className={`overflow-hidden rounded-xl bg-black shadow-lg ${className ?? ""}`}
         >
           <div className="relative w-full" style={{ aspectRatio }}>
-            {/* CTA hot-zones now ride INSIDE <CanvasStatePreview/> (the
+            {/* CTA hot-zones now ride INSIDE <TimelineFramePreview/> (the
                 single on-screen renderer) so they stay clickable + aligned
                 to the stage in every layout — including the fullscreen
                 <PreviewOverlay/> below, which previously baked the CTA
                 pixels but never made them interactive. The overlay
                 self-gates (null outside any zone window) and self-fires
                 the cta-click analytics off `analyticsProjectId`. */}
-            <CanvasStatePreview
+            <TimelineFramePreview
               state={canvasState}
               playback={playback}
               ctaHotzones={hotzones ?? []}

@@ -7,10 +7,21 @@
  * Media is resolved through `PaintMedia`: the export passes its preloaded
  * cache (lib/timeline/effects/widget-plugins.ts), so this stays synchronous.
  */
+import { supportsCanvasFilter } from "@/lib/studio/canvas-filter-support";
+import {
+  DEFAULT_FILTERS,
+  isIdentityFilters,
+  type VideoFilters,
+} from "@/lib/studio/video-filters";
+import { applyFiltersToPixels } from "@/lib/timeline/effects/filter-pixels";
+import { context2d, createScratchPool } from "@/lib/timeline/scratch-canvas";
 import type { Box } from "./frame";
 import { roundedRectPath, type Ctx2D } from "./frame-canvas";
 import { fitRect, type DrawOp, type PathCmd, type Stroke } from "./draw-ops";
 import { fontShorthand, textBaselineOffset } from "./text-layout";
+
+const mediaGradeScratch = createScratchPool();
+let warnedWidgetFilterFallback = false;
 
 /** The drawable surface of a loaded image / video. */
 export type PaintableImage = CanvasImageSource & { naturalWidth: number; naturalHeight: number };
@@ -80,18 +91,62 @@ function paintMedia(ctx: Ctx2D, op: Extract<DrawOp, { op: "media" }>, media: Pai
   ctx.beginPath();
   ctx.rect(op.box.x, op.box.y, op.box.w, op.box.h);
   ctx.clip();
-  if (op.filter) {
-    // Compose with any blur the frame already set.
-    ctx.filter = ctx.filter && ctx.filter !== "none" ? `${ctx.filter} ${op.filter}` : op.filter;
-  }
   if (op.mirror) {
     const cx = op.box.x + op.box.w / 2;
     ctx.translate(cx, 0);
     ctx.scale(-1, 1);
     ctx.translate(-cx, 0);
   }
-  ctx.drawImage(el, dest.x, dest.y, dest.w, dest.h);
+  const grade = resolvedGrade(op);
+  if (op.filter && supportsCanvasFilter(ctx)) {
+    // Compose with any blur the frame already set.
+    ctx.filter = ctx.filter && ctx.filter !== "none" ? `${ctx.filter} ${op.filter}` : op.filter;
+    ctx.drawImage(el, dest.x, dest.y, dest.w, dest.h);
+  } else if (grade) {
+    paintMediaWithPixelGrade(ctx, el, dest, grade);
+  } else {
+    ctx.drawImage(el, dest.x, dest.y, dest.w, dest.h);
+  }
   ctx.restore();
+}
+
+function resolvedGrade(op: Extract<DrawOp, { op: "media" }>): VideoFilters | null {
+  if (!op.grade) return null;
+  const filters: VideoFilters = { ...DEFAULT_FILTERS, ...op.grade };
+  return isIdentityFilters(filters) ? null : filters;
+}
+
+/** Safari < 18 has no `ctx.filter`. Snapshot the fitted media into a
+ *  scratch, run the same W3C CSS-filter math scene grades use, then
+ *  blit the graded pixels. */
+function paintMediaWithPixelGrade(
+  ctx: Ctx2D,
+  el: CanvasImageSource,
+  dest: Box,
+  grade: VideoFilters,
+): void {
+  const w = Math.max(1, Math.round(dest.w));
+  const h = Math.max(1, Math.round(dest.h));
+  const scratch = mediaGradeScratch(ctx, w, h);
+  const sctx = scratch ? context2d(scratch) : null;
+  if (!scratch || !sctx) {
+    ctx.drawImage(el, dest.x, dest.y, dest.w, dest.h);
+    return;
+  }
+  sctx.clearRect(0, 0, w, h);
+  sctx.drawImage(el, 0, 0, w, h);
+  if (!warnedWidgetFilterFallback) {
+    warnedWidgetFilterFallback = true;
+    console.warn("[timeline] ctx.filter unsupported — widget filters use the pixel-math fallback");
+  }
+  try {
+    const image = sctx.getImageData(0, 0, w, h);
+    applyFiltersToPixels(image.data, w, h, grade);
+    sctx.putImageData(image, 0, 0);
+    ctx.drawImage(scratch, dest.x, dest.y, dest.w, dest.h);
+  } catch {
+    ctx.drawImage(el, dest.x, dest.y, dest.w, dest.h);
+  }
 }
 
 function paintOp(ctx: Ctx2D, op: DrawOp, media: PaintMedia): void {

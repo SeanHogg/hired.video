@@ -28,18 +28,15 @@ import {
   isIdentityFilters,
   type VideoFilters,
 } from "@/lib/studio/video-filters";
+import { supportsCanvasFilter } from "@/lib/studio/canvas-filter-support";
 import { context2d, createScratchPool, type Ctx2D } from "../scratch-canvas";
 import { applyFiltersToPixels } from "./filter-pixels";
 import { registerEffect } from "./registry";
 
+export { supportsCanvasFilter };
+
 const snapshotFor = createScratchPool();
 let warnedFallback = false;
-
-/** True when the context honours `ctx.filter`. Older Safari has no such
- *  property at all, so a plain `in` check is reliable. */
-export function supportsCanvasFilter(ctx: Ctx2D): boolean {
-  return "filter" in ctx;
-}
 
 /** Grade the composite already painted on `canvas` in place. */
 export function applySceneFilters(

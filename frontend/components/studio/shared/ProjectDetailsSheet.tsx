@@ -13,7 +13,7 @@
 
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { BarChart3, Loader2, Megaphone, MessageSquare, Plus, Send, Tag } from "lucide-react";
+import { AlertTriangle, BarChart3, Loader2, Megaphone, MessageSquare, Plus, RefreshCw, Send, Tag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import EntityDetailsSheet, {
@@ -124,6 +124,7 @@ export default function ProjectDetailsSheet({
   // Metrics tab, no reason to fetch /api/studio/campaigns up front.
   const [campaigns, setCampaigns] = useState<VideoCampaign[] | null>(null);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [campaignsError, setCampaignsError] = useState(false);
   const [campaignSaving, setCampaignSaving] = useState<string | null>(null);
   const [newCampaignName, setNewCampaignName] = useState("");
   const [creatingCampaign, setCreatingCampaign] = useState(false);
@@ -206,19 +207,19 @@ export default function ProjectDetailsSheet({
     if (campaigns !== null) return;
     let cancelled = false;
     setCampaignsLoading(true);
+    setCampaignsError(false);
     studioService
       .getCampaigns()
       .then((res) => {
         if (cancelled) return;
+        setCampaignsError(false);
         setCampaigns(res.data ?? []);
       })
       .catch(() => {
         if (cancelled) return;
-        // Empty list on failure so the section renders the "no campaigns yet"
-        // empty state rather than spinning forever. The toast surface is
-        // reserved for user-initiated actions; a silent first-load failure
-        // is the right trade-off here.
-        setCampaigns([]);
+        // Keep `campaigns` null so retry can re-run this effect. A silent
+        // empty list looked like "no campaigns yet" on a network failure.
+        setCampaignsError(true);
       })
       .finally(() => {
         if (!cancelled) setCampaignsLoading(false);
@@ -476,6 +477,11 @@ export default function ProjectDetailsSheet({
           project={project}
           campaigns={campaigns}
           campaignsLoading={campaignsLoading}
+          campaignsError={campaignsError}
+          onRetry={() => {
+            setCampaignsError(false);
+            setCampaigns(null);
+          }}
           campaignSaving={campaignSaving}
           onToggleMembership={toggleCampaignMembership}
           newCampaignName={newCampaignName}
@@ -544,6 +550,8 @@ function CampaignSection({
   project,
   campaigns,
   campaignsLoading,
+  campaignsError,
+  onRetry,
   campaignSaving,
   onToggleMembership,
   newCampaignName,
@@ -554,6 +562,8 @@ function CampaignSection({
   project: StudioProject;
   campaigns: VideoCampaign[] | null;
   campaignsLoading: boolean;
+  campaignsError: boolean;
+  onRetry: () => void;
   campaignSaving: string | null;
   onToggleMembership: (campaign: VideoCampaign, nextMember: boolean) => Promise<void>;
   newCampaignName: string;
@@ -567,6 +577,23 @@ function CampaignSection({
       <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
         {t("studio.projectDetails.loadingCampaigns")}
+      </div>
+    );
+  }
+  if (campaignsError && !campaigns) {
+    return (
+      <div
+        data-testid="campaigns-load-error"
+        className="space-y-3 rounded-md border border-dashed border-border bg-muted/20 py-6 px-4 text-sm"
+      >
+        <p className="flex items-center gap-2 text-destructive">
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+          {t("studio.projectDetails.campaignsLoadFailed")}
+        </p>
+        <Button type="button" size="sm" variant="outline" onClick={onRetry}>
+          <RefreshCw className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+          {t("studio.projectDetails.retryLoad")}
+        </Button>
       </div>
     );
   }

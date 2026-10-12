@@ -83,12 +83,13 @@ export interface StudioEditorHandle {
   addVideoWidget: (url: string, durationSeconds: number) => void;
   /** Open the browser screenshot picker and place the result. */
   captureScreenshot: () => void | Promise<void>;
-  /** Open the recorder armed to `mode`. Cannot auto-start capture — the
-   *  browser requires a user gesture for getDisplayMedia/getUserMedia —
-   *  so this surfaces the recorder UI for the user to hit Record.
+  /** Open the recorder armed to `mode`. `autoStart` (default true)
+   *  kicks off the camera/screen *preview* (`startPreview` / getUserMedia)
+   *  so the AI CHRO path doesn't leave a dead panel (#1909). The browser
+   *  still requires a user click for MediaRecorder itself.
    *  `asScene` (default true) makes the finished clip a new full-bleed
    *  scene; false keeps the legacy overlay-widget behaviour. */
-  openRecorder: (mode: StudioRecordingMode, opts?: { asScene?: boolean }) => void;
+  openRecorder: (mode: StudioRecordingMode, opts?: { asScene?: boolean; autoStart?: boolean }) => void;
 }
 
 // Single open editor per tab. A ref-cell rather than a Map (cf.

@@ -11,7 +11,7 @@ import { frameInputFromWidget, resolveFrame, type ResolvedFrame } from "@/lib/st
 import { applyFrameToCtx, type Ctx2D } from "@/lib/studio/widgets/frame-canvas";
 import { frameToCss } from "@/lib/studio/widgets/frame-css";
 import { INSERTABLE_WIDGET_KINDS } from "@/lib/studio/editor-v2/canvas-state";
-import { DEFAULT_FILTERS } from "@/lib/studio/video-filters";
+import { DEFAULT_FILTERS, filtersToCss } from "@/lib/studio/video-filters";
 import { NO_LOOKUPS, type DrawEnv } from "@/lib/studio/widgets/draw-ops";
 import { WIDGET_PLUGINS, pluginForEffectKind } from "@/lib/studio/widgets/registry";
 import { NO_MEDIA } from "@/lib/studio/widgets/paint-ops";
@@ -146,6 +146,26 @@ describe("plugin data the old switches dropped", () => {
       data: { ...widget.params.data, altText: "Team photo", filters: { ...DEFAULT_FILTERS, brightness: 1.2 } },
     };
     expect(WIDGET_PLUGINS.image.parse(WIDGET_PLUGINS.image.emit(params))).toEqual(params);
+  });
+
+  it("image draw emits CSS filter and structured grade for the Safari fallback (#2393)", () => {
+    const widget = defaultWidget("image");
+    if (widget.params.kind !== "image") throw new Error("expected image");
+    const filters = { ...DEFAULT_FILTERS, brightness: 1.2 };
+    const params = {
+      ...widget.params,
+      data: {
+        ...widget.params.data,
+        source: { kind: "url" as const, url: "https://example.com/a.png" },
+        filters,
+      },
+    };
+    const ops = WIDGET_PLUGINS.image.draw(params, { x: 0, y: 0, w: 100, h: 100 }, ENV);
+    expect(ops[0]).toMatchObject({
+      op: "media",
+      filter: filtersToCss(filters),
+      grade: filters,
+    });
   });
 
   it("video declares its chroma key as a pixel-pass effect", () => {

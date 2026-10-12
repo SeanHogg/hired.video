@@ -1,5 +1,6 @@
 /** Image widget plugin — URL-backed media fitted into the content box, with
- *  the per-widget colour grade (#596/#806) as a CSS filter on both sides. */
+ *  the per-widget colour grade (#596/#806/#2393) as a CSS filter (DOM +
+ *  `ctx.filter`) and a structured `grade` for the Safari < 18 pixel path. */
 import type { ImageWidgetParams, WidgetParams } from "@/lib/studio/editor-v2/canvas-state";
 import { filtersToCss, type VideoFilters } from "@/lib/studio/video-filters";
 import { stringOr } from "../frame";
@@ -76,6 +77,7 @@ export const imagePlugin = registerPlugin<ImageParams>({
         fit: data.fit,
         ...when("alt", data.altText),
         ...when("filter", filter || undefined),
+        ...when("grade", filter ? data.filters : undefined),
       },
     ];
   },

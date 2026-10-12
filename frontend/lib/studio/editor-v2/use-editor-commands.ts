@@ -83,6 +83,12 @@ export function useEditorCommands({
   // scene (ActionsPanel recorder tiles → false). Reset to false whenever
   // an action is opened through the panel's own tiles.
   const [recordAsScene, setRecordAsScene] = useState(false);
+  // Auto-start the recorder preview (getUserMedia) for the AI CHRO /
+  // Alt+Shift+R / `?capture=` paths. Tile-open resets this to false so
+  // clicking a recorder tile doesn't steal the camera.
+  const [recorderAutoStart, setRecorderAutoStart] = useState(
+    () => recordingModeForAction(defaultAction) !== null,
+  );
 
   // ───── Clipboard + keyboard shortcuts
   // Cut / copy / paste live in their own hook so the toolbar buttons
@@ -109,7 +115,10 @@ export function useEditorCommands({
         recordingModeForAction(openAction) !== null &&
         recordingModeForAction(next) !== null;
       setOpenAction(next);
-      if (!isSourceSwap) setRecordAsScene(false);
+      if (!isSourceSwap) {
+        setRecordAsScene(false);
+        setRecorderAutoStart(false);
+      }
     },
     [openAction],
   );
@@ -118,9 +127,10 @@ export function useEditorCommands({
   // The finished clip becomes its own full-bleed scene by default
   // (slide → recording → slide); pass `asScene: false` for overlay.
   const openRecorder = useCallback(
-    (mode: StudioRecordingMode, opts?: { asScene?: boolean }) => {
+    (mode: StudioRecordingMode, opts?: { asScene?: boolean; autoStart?: boolean }) => {
       showLeftWidgets("actions");
       setRecordAsScene(opts?.asScene ?? true);
+      setRecorderAutoStart(opts?.autoStart ?? true);
       setOpenAction(mode);
     },
     [showLeftWidgets],
@@ -235,7 +245,7 @@ export function useEditorCommands({
     onOpenRecorder: () => openRecorder("screen", { asScene: true }),
   });
 
-  return { clipboard, openAction, recordAsScene, handleOpenActionChange, addRecordingScene };
+  return { clipboard, openAction, recordAsScene, recorderAutoStart, handleOpenActionChange, addRecordingScene };
 }
 
 export type EditorCommands = ReturnType<typeof useEditorCommands>;

@@ -198,6 +198,32 @@ describe("getCoachToolSpecs", () => {
       const names = getCoachToolSpecs().map((s) => s.function.name);
       expect(names.filter((n) => n.startsWith("studio_"))).toEqual([]);
     });
+
+    it("studio_start_recording auto-starts the live preview (#3090)", async () => {
+      const openRecorder = vi.fn();
+      registerStudioEditor(
+        stubStudioEditor("video", { openRecorder, supportsRecording: true }),
+      );
+      const tool = getTool("studio_start_recording")!;
+      const result = await tool.run({ bound: {}, args: { mode: "webcam" } });
+      expect(openRecorder).toHaveBeenCalledWith("webcam", {
+        asScene: true,
+        autoStart: true,
+      });
+      expect(result.raw).toEqual({ kind: "studio_start_recording", mode: "webcam" });
+    });
+
+    it("studio_start_recording defaults to screen when mode is omitted", async () => {
+      const openRecorder = vi.fn();
+      registerStudioEditor(
+        stubStudioEditor("video", { openRecorder, supportsRecording: true }),
+      );
+      await getTool("studio_start_recording")!.run({ bound: {}, args: {} });
+      expect(openRecorder).toHaveBeenCalledWith("screen", {
+        asScene: true,
+        autoStart: true,
+      });
+    });
   });
 });
 
