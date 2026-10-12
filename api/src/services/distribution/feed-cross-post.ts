@@ -14,6 +14,7 @@ import { FEED_SUBJECT_STUDIO_PROJECT } from "../../repositories/socialPublishJob
 import { getDb, type Db } from "../../db/index.js";
 import { cdnUrl } from "../../utils/cdn.js";
 import { frontendBaseUrl } from "../../utils/public-urls.js";
+import { publicVideoPath } from "../../../../shared/public-paths.js";
 
 export interface FeedCrossPostInput {
   userId: string;
@@ -34,7 +35,7 @@ function hashtagsOf(text: string): Array<{ id: string; tagType: "Hashtag"; tagVa
 export async function crossPostToFeed(input: FeedCrossPostInput, db: Db = getDb()): Promise<string> {
   const content = input.caption.trim() || input.project.title;
   const publicUrl = input.project.isPublic
-    ? `${frontendBaseUrl()}/v/${input.project.slug || input.project.id}`
+    ? `${frontendBaseUrl()}${publicVideoPath(input.project.slug || input.project.id)}`
     : null;
   const row = await new MediaRepository(db).insertFeedPost({
     userId: input.userId,

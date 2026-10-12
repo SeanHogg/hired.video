@@ -14,6 +14,7 @@ import {
   hasCampaignUtm,
   pickProjectCampaign,
 } from "@shared/campaign-utm";
+import { campaignShareUrlFor } from "@/lib/campaigns/bake-utm";
 import { extractCtaHotzones } from "@shared/cta-hotzones";
 import { ctaHotzonesOf, extractInteractionZones } from "@/lib/studio/widgets/interactions";
 import {
@@ -68,7 +69,7 @@ describe("appendCampaignUtm", () => {
   it("leaves empty, relative, mailto and UTM-less cases untouched", () => {
     expect(appendCampaignUtm("", fallLaunch)).toBe("");
     expect(appendCampaignUtm(null, fallLaunch)).toBe("");
-    expect(appendCampaignUtm("/v/abc", fallLaunch)).toBe("/v/abc");
+    expect(appendCampaignUtm("/m/abc", fallLaunch)).toBe("/m/abc");
     expect(appendCampaignUtm("mailto:sam@acme.com", fallLaunch)).toBe("mailto:sam@acme.com");
     expect(appendCampaignUtm("https://acme.com", noUtm)).toBe("https://acme.com");
     expect(appendCampaignUtm("https://acme.com", null)).toBe("https://acme.com");
@@ -127,5 +128,13 @@ describe("bakeCampaignUtmIntoTimeline / Hotzones", () => {
       "https://hired.video/jobs/senior-designer?utm_source=newsletter&utm_medium=email&utm_campaign=oct-2026",
     );
     expect(bakeCampaignUtmIntoHotzones(zones, null)).toBe(zones);
+  });
+});
+
+describe("campaignShareUrlFor", () => {
+  it("builds the canonical /m/:id watch URL with campaign UTMs", () => {
+    expect(campaignShareUrlFor(PROJECT_ID, fallLaunch, { origin: "https://hired.video" })).toBe(
+      `https://hired.video/m/${PROJECT_ID}?utm_source=linkedin&utm_medium=video&utm_campaign=fall-launch-2026`,
+    );
   });
 });

@@ -46,7 +46,7 @@ const EDGE_HYPHENS = /^-+|-+$/g;
 /** Shape every slug must satisfy: lowercase ASCII alphanumerics with
  *  single-hyphen separators. Single source of truth used by:
  *   1. The save-draft Zod validator that accepts user-supplied slugs.
- *   2. The public `/v/:videoId` route's branch detector deciding
+ *   2. The public `/m/:videoId` route's branch detector deciding
  *      whether the param is a slug vs YouTube id.
  *   3. `isValidSlug` for ad-hoc checks (tests, future migrations).
  *  Anchored with `^…$` so it matches whole strings. */

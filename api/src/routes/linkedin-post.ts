@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { aiFailure } from "../services/adapters/llm-error.js";
+import { publicVideoPath } from "../../../shared/public-paths.js";
 
 export const linkedInPostRoutes = new Hono<AppEnv>();
 
@@ -19,7 +20,7 @@ const RequestSchema = z.object({
 
 function buildMockPost(videoId: string, videoTitle?: string) {
   const title = videoTitle ?? "My Video Resume";
-  const url = `https://hired.video/v/${videoId}`;
+  const url = `https://hired.video${publicVideoPath(videoId)}`;
   const hook = `🎬 I just created a video resume that says more in 30 seconds than a page of bullet points.`;
   const caption = [
     hook,
@@ -60,7 +61,7 @@ linkedInPostRoutes.post("/linkedin-post", async (c) => {
 
   let post: ReturnType<typeof buildMockPost> = buildMockPost(videoId, videoTitle);
   if (hasAnyLLMProviderKey(c.env)) {
-    const url = `https://hired.video/v/${videoId}`;
+    const url = `https://hired.video${publicVideoPath(videoId)}`;
     const systemPrompt = `You are a LinkedIn copywriter specialist. Write an engaging LinkedIn post for someone who just created a video resume.
 Rules:
 - 3-line hook (curiosity/story/achievement)

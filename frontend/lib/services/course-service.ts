@@ -106,7 +106,7 @@ export interface CourseLesson {
   studioProjectId: string | null;
   /** #1464 — published studio_projects.slug resolved server-side for
    *  studio_video lessons; the learner UI prefers it over the raw project
-   *  id for /v/ share links + analytics. Null when unresolved. */
+   *  id for /m/ share links + analytics. Null when unresolved. */
   studioSlug?: string | null;
   scormManifestUrl: string | null;
   scormEntryUrl: string | null;

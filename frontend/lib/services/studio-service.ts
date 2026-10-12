@@ -353,7 +353,7 @@ export interface PublishVideoRequest {
 // "Where has this project been published?" — one record per destination,
 // mirroring the api `PublicationRecord` (publication-service.ts). `destination`
 // is a shared `PublishDestinationId`; `externalUrl` is the view/preview link
-// (YouTube watch URL, LinkedIn post, on-platform /v/ link).
+// (YouTube watch URL, LinkedIn post, on-platform /m/ link).
 
 export const StudioPublicationSchema = z.object({
   id: z.string().optional(),

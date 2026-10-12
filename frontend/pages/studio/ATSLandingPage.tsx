@@ -1,5 +1,6 @@
 /**
- * ATS Landing Page — public shareable video resume page at /v/:slug
+ * ATS Landing Page — public shareable video resume page at /m/ats/:slug
+ * (`/v/ats/:slug` permanently redirects here, ROADMAP #1218).
  *
  * Features:
  *   - Video player with engagement tracking
@@ -9,7 +10,11 @@
  */
 
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Navigate, useLocation, useParams } from "react-router-dom";
+import {
+  canonicalMediaPath,
+  publicAtsSlugFrom,
+} from "../legacy-public-video-path";
 import { Linkedin, FileText, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,25 +31,36 @@ interface ATSData {
   linkedinUrl: string | null;
   viewCount: number;
   /** Studio project id — analytics aggregation key (migration 0085).
-   *  The /v/:slug URL is for routing; events still land on the project. */
+   *  The /m/ats/:slug URL is for routing; events still land on the project. */
   projectId: string;
 }
 
 export default function ATSLandingPage() {
-  const { slug } = useParams<{ slug: string }>();
+  const location = useLocation();
+  const params = useParams<{ slug: string }>();
+  const slug = publicAtsSlugFrom(params, location.pathname);
+  const canonical = canonicalMediaPath(
+    location.pathname,
+    location.search,
+    location.hash,
+  );
   const [data, setData] = useState<ATSData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!slug) return;
+    if (!slug || canonical) return;
 
     apiClient
       .get<ATSData>(`/api/studio/ats/${slug}`)
       .then((res) => setData(res.data))
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load"))
       .finally(() => setLoading(false));
-  }, [slug]);
+  }, [slug, canonical]);
+
+  if (canonical) {
+    return <Navigate to={canonical} replace />;
+  }
 
   if (loading) {
     return (

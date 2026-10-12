@@ -192,7 +192,7 @@ export function usePublishHandlers(args: UsePublishHandlersArgs) {
 
   // ───── Save-menu handlers (gated + toasts) ───────────────────────────────
 
-  // A "View" toast action: absolute links open in a new tab, /v/ in-app.
+  // A "View" toast action: absolute links open in a new tab, /m/ in-app.
   function viewAction(url: string | null | undefined) {
     if (!url) return undefined;
     return renderToastAction({

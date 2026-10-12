@@ -1,5 +1,5 @@
-import { Hono } from "hono";
-import { publicArticlePath } from "../../../shared/public-paths.js";
+import { Hono, type Context } from "hono";
+import { publicArticlePath, publicVideoPath } from "../../../shared/public-paths.js";
 import { eq, and, sql, or, inArray } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -148,11 +148,12 @@ function renderStars(avg: number): string {
   return "★".repeat(rounded) + "☆".repeat(5 - rounded);
 }
 
-// ─── GET /v/:videoId ──────────────────────────────────────────────────────────
-// Returns an OG image for the public video resume share page.
+// ─── GET /v/:videoId and /m/:videoId ──────────────────────────────────────────
+// Returns an OG image for the public watch/share page.
+// `/m/` is the canonical media path; `/v/` is kept for crawlers and old links.
 // If the video has a thumbnailUrl, redirects to it.
 // Otherwise, generates a simple SVG social card.
-ogRoutes.get("/v/:videoId", async (c) => {
+const handleOgVideoImage = async (c: Context<AppEnv>) => {
   const { videoId } = c.req.param();
   const db = getDb();
 
@@ -212,9 +213,11 @@ ogRoutes.get("/v/:videoId", async (c) => {
       "Cache-Control": "public, max-age=3600, s-maxage=86400",
     },
   });
-});
+};
+ogRoutes.get("/v/:videoId", handleOgVideoImage);
+ogRoutes.get("/m/:videoId", handleOgVideoImage);
 
-/** Shared lookup for the `/v/<id>` OG endpoints (#1216). Resolves the
+/** Shared lookup for the `/v/<id>` and `/m/<id>` OG endpoints (#1216 / #1218). Resolves the
  *  same data the public watch page uses: project row first (because v2
  *  projects play live off `timelineSpec` and never have a `videos` row
  *  until export, and non-video kinds never have one at all), then
@@ -514,7 +517,9 @@ ogRoutes.get("/creator/:userId", async (c) => {
 // are intentionally minimal — title + description are the two LinkedIn/X
 // preview cards actually surface.
 
-ogRoutes.get("/v/:videoId/meta", async (c) => {
+// ─── GET /v/:videoId/meta and /m/:videoId/meta ────────────────────────────────
+// JSON meta for the public watch page. `/m/` aliases `/v/` (crawlers + old links).
+const handleOgVideoMeta = async (c: Context<AppEnv>) => {
   const { videoId } = c.req.param();
   const db = getDb();
   // Resolve via the same kind-aware lookup the SVG card uses so the
@@ -556,12 +561,14 @@ ogRoutes.get("/v/:videoId/meta", async (c) => {
         description: description.slice(0, 200),
         thumbnailUrl,
         uploadDate: meta.uploadDate ?? undefined,
-        embedUrl: `https://hired.video/v/${videoId}`,
-        url: `https://hired.video/v/${videoId}`,
+        embedUrl: `https://hired.video${publicVideoPath(videoId)}`,
+        url: `https://hired.video${publicVideoPath(videoId)}`,
       }),
     ],
   });
-});
+};
+ogRoutes.get("/v/:videoId/meta", handleOgVideoMeta);
+ogRoutes.get("/m/:videoId/meta", handleOgVideoMeta);
 
 ogRoutes.get("/voice/:slug/meta", async (c) => {
   const { slug } = c.req.param();

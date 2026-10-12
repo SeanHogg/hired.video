@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
+import { publicAtsPath } from "../../../../shared/public-paths.js";
 import type { AppEnv } from "../../types/index.js";
 import { getDb } from "../../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../../services/adapters/llm-client.js";
@@ -76,7 +77,7 @@ ${parsed.data.scriptText.slice(0, 3000)}`,
     linkedinUrl: parsed.data.linkedinUrl ?? null,
   } as any).returning();
 
-  const pageUrl = `https://hired.video/v/${slug}`;
+  const pageUrl = `https://hired.video${publicAtsPath(slug)}`;
 
   return c.json(ok({
     id: atsPackage.id,

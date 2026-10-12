@@ -6,6 +6,7 @@ import { X, Copy, ExternalLink, Loader2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { apiClient } from "@/lib/api-client";
+import { publicVideoPath } from "@shared/public-paths";
 import { z } from "zod";
 
 interface Props {
@@ -29,7 +30,7 @@ export default function LinkedInPostModal({ videoId, videoTitle, onClose }: Prop
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const publicUrl = `https://hired.video/v/${videoId}`;
+  const publicUrl = `https://hired.video${publicVideoPath(videoId)}`;
 
   useEffect(() => {
     async function generate() {

@@ -288,6 +288,7 @@ const AsyncInterviewPage = lazy(() => import("./pages/studio/AsyncInterviewPage"
 const TakeHomeDeliveryPage = lazy(() => import("./pages/TakeHomeDeliveryPage"));
 const ResumeRoast = TOOL_PAGES["resume-roast"];
 const PublicVideoResume = lazy(() => import("./pages/PublicVideoResume"));
+const LegacyPublicVideoRedirect = lazy(() => import("./pages/LegacyPublicVideoRedirect"));
 const JobDetail = lazy(() => import("./pages/JobDetail"));
 // Job create / edit retired into the Studio (lib/routing/legacy-redirects.ts);
 // the dedicated screening route hosts the structured screening builder.
@@ -1285,11 +1286,11 @@ const App = () => (
                         element={<EmbeddedStudioProject />}
                       />
 
-                      {/* Public video resume page */}
-                      <Route path="/v/:videoId" element={<PublicVideoResume />} />
-
-                      {/* ATS-compatible shareable video resume landing page */}
-                      <Route path="/v/ats/:slug" element={<ATSLandingPage />} />
+                      {/* Public media watch pages (/m/); /v/ is a permanent alias */}
+                      <Route path="/m/ats/:slug" element={<ATSLandingPage />} />
+                      <Route path="/m/:videoId" element={<PublicVideoResume />} />
+                      <Route path="/v/ats/:slug" element={<LegacyPublicVideoRedirect />} />
+                      <Route path="/v/:videoId" element={<LegacyPublicVideoRedirect />} />
 
                       {/* Async video interview — candidate view */}
                       <Route path="/interview/:token" element={<AsyncInterviewPage />} />

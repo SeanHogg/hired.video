@@ -8,6 +8,7 @@
  */
 import type { VideoCampaign } from "@/lib/services/studio-service";
 import { appendCampaignUtm } from "@shared/campaign-utm";
+import { publicVideoPath } from "@shared/public-paths";
 
 export {
   appendCampaignUtm,
@@ -20,7 +21,7 @@ export {
  *  UTMs baked in. ONE call site (CampaignSection's "Copy share URL with
  *  UTM" button today) so the share-URL shape lives next to the UTM
  *  baker. The base URL pattern matches what `<StudioPlayer/>` renders
- *  links to (the unified `/v/:id` route established in #665). */
+ *  links to (canonical `/m/:id`; `/v/:id` is a legacy alias). */
 export function campaignShareUrlFor(
   projectId: string,
   campaign: Pick<
@@ -32,6 +33,6 @@ export function campaignShareUrlFor(
   const origin =
     options.origin ??
     (typeof window !== "undefined" ? window.location.origin : "");
-  const base = `${origin}/v/${encodeURIComponent(projectId)}`;
+  const base = `${origin}${publicVideoPath(projectId)}`;
   return appendCampaignUtm(base, campaign);
 }

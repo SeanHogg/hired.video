@@ -38,6 +38,7 @@ import {
   getPublicWatchCached,
 } from "../services/studio/public-watch-cache.js";
 import { STUDIO_PURPOSES } from "../../../shared/studio-purposes.js";
+import { publicVideoPath } from "../../../shared/public-paths.js";
 import { SCENE_TYPES, type SceneType } from "../../../shared/scene-types.js";
 import { MEDIA_KINDS } from "../../../shared/media-kinds.js";
 import { isUuid } from "../../../shared/value-types.js";
@@ -2886,12 +2887,12 @@ studioRoutes.patch("/projects/:projectId/status", async (c) => {
 
   // Record (or clear) the on-platform "profile" publication so the editor's
   // "Published to" list reflects where the project actually lives. The view
-  // URL is the public /v/<slug|id> link the share-menu also uses.
+  // URL is the public /m/<slug|id> link the share-menu also uses.
   if (isPublish) {
     await recordPublication({
       projectId,
       destination: "profile",
-      externalUrl: `/v/${dto.slug || projectId}`,
+      externalUrl: publicVideoPath(dto.slug || projectId),
       status: "published",
     }).catch(() => undefined);
   } else if (isUnpublish) {

@@ -78,7 +78,7 @@ describe("markPostedManually", () => {
       kind("INVALID_URL"),
     );
     await assert.rejects(
-      markPostedManually({ actorUserId: MAYA, projectId: PROJECT, destination: "profile", url: "https://hired.video/v/maya" }, d),
+      markPostedManually({ actorUserId: MAYA, projectId: PROJECT, destination: "profile", url: "https://hired.video/m/maya" }, d),
       kind("UNKNOWN_DESTINATION"),
     );
     await assert.rejects(

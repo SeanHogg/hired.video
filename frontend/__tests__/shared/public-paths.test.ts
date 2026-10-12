@@ -7,12 +7,14 @@ import {
   publicJobPath,
   publicProfilePath,
   publicResumePath,
+  publicAtsPath,
   publicVideoPath,
 } from "@shared/public-paths";
 
 describe("public paths", () => {
   it("builds each entity's public route", () => {
     expect(publicVideoPath("maria-alvarez-reel")).toBe("/m/maria-alvarez-reel");
+    expect(publicAtsPath("acme-pack")).toBe("/m/ats/acme-pack");
     expect(publicArticlePath("maria-alvarez", "how-i-landed-a-staff-role")).toBe("/articles/maria-alvarez/how-i-landed-a-staff-role");
     expect(publicArticleByIdPath("a1")).toBe("/articles/by-id/a1");
     expect(publicCompanyPath("acme")).toBe("/companies/acme");
@@ -23,6 +25,7 @@ describe("public paths", () => {
 
   it("encodes each segment so a stray character can't change the route", () => {
     expect(publicVideoPath("a/b?c")).toBe("/m/a%2Fb%3Fc");
+    expect(publicAtsPath("a/b?c")).toBe("/m/ats/a%2Fb%3Fc");
     expect(publicArticlePath("x y", "z#1")).toBe("/articles/x%20y/z%231");
   });
 });

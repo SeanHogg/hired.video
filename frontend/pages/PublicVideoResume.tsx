@@ -1,6 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { usePageChrome } from "@/lib/seo";
-import { useParams, Link } from "react-router-dom";
+import { Link, Navigate, useLocation, useParams } from "react-router-dom";
+import {
+  canonicalMediaPath,
+  publicMediaIdFrom,
+} from "./legacy-public-video-path";
 import { useTranslation } from "react-i18next";
 import { apiClient } from "@/lib/api-client";
 import { AppShell } from "@/components/AppShell";
@@ -34,7 +38,14 @@ function StatusPanel({ children }: { children: ReactNode }) {
 export default function PublicVideoResume() {
   usePageChrome();
   const { t } = useTranslation();
-  const { videoId } = useParams<{ videoId: string }>();
+  const location = useLocation();
+  const params = useParams<{ videoId?: string; id?: string; mediaId?: string }>();
+  const videoId = publicMediaIdFrom(params, location.pathname);
+  const canonical = canonicalMediaPath(
+    location.pathname,
+    location.search,
+    location.hash,
+  );
   const [video, setVideo] = useState<PublicVideo | null>(null);
   /** i18n key of the load error, if any. */
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +60,7 @@ export default function PublicVideoResume() {
   useUgcSeo("videoResume", video && isReady(video) ? video : null);
 
   useEffect(() => {
-    if (!videoId) return;
+    if (!videoId || canonical) return;
     apiClient
       .get(`/api/studio/public/${videoId}`)
       .then((res: any) => {
@@ -72,7 +83,11 @@ export default function PublicVideoResume() {
       })
       .catch(() => setError("seoLanding.publicVideo.notPublic"))
       .finally(() => setLoading(false));
-  }, [videoId]);
+  }, [videoId, canonical]);
+
+  if (canonical) {
+    return <Navigate to={canonical} replace />;
+  }
 
   if (loading) {
     return (

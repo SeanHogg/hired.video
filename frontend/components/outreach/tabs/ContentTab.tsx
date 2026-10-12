@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/outreach/shared/EmptyState";
 import { OutreachTabToolbar } from "@/components/outreach/shared/OutreachTabToolbar";
 import { type StudioProject, StudioProjectStatus } from "@/lib/services/studio-service";
+import { publicVideoPath } from "@shared/public-paths";
 import SocialShareRow from "@/components/SocialShareRow";
 import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
 import { useViewMode } from "@/lib/hooks/useViewMode";
@@ -43,10 +44,9 @@ export interface ContentTabProps {
 }
 
 // The public share URL prefers a YouTube id when published there, otherwise
-// the in-platform /v/:projectId route (served by the unified <StudioPlayer/>
-// post-#665).
+// the in-platform /m/:projectId watch page (legacy /v/:id is a SPA alias).
 const publicUrlFor = (project: StudioProject) =>
-  `https://hired.video/v/${project.youtubeVideoId ?? project.id}`;
+  `https://hired.video${publicVideoPath(project.youtubeVideoId ?? project.id)}`;
 
 export function ContentTab({ publishedProjects }: ContentTabProps) {
   const [expandedVideoId, setExpandedVideoId] = useState<string | null>(null);

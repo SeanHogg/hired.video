@@ -84,7 +84,7 @@ export default function StudioSaveMenuItems({
     if (!projectId) return;
     const url =
       kind === "share"
-        ? `${window.location.origin}/v/${encodeURIComponent(slug || projectId)}`
+        ? `${window.location.origin}${publicVideoPath(slug || projectId)}`
         : `${window.location.origin}/studio/${encodeURIComponent(projectId)}`;
     try {
       await navigator.clipboard.writeText(url);

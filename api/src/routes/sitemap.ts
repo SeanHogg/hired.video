@@ -3,7 +3,7 @@
 // Served at GET /sitemap.xml (public, no auth).
 
 import { Hono } from "hono";
-import { publicArticlePath, publicCompanyPath, publicJobPath, publicProfilePath } from "../../../shared/public-paths.js";
+import { publicArticlePath, publicCompanyPath, publicJobPath, publicProfilePath, publicVideoPath } from "../../../shared/public-paths.js";
 import { getDb, schema } from "../db/index.js";
 import { and, eq, desc, isNotNull, inArray, ne } from "drizzle-orm";
 import {
@@ -87,7 +87,7 @@ function videoUrlEntry(opts: {
   thumbnailLoc: string;
   lastmod?: string;
 }): string {
-  const player = `${BASE}/v/${opts.id}`;
+  const player = `${BASE}${publicVideoPath(opts.id)}`;
   return `  <url>
     <loc>${player}</loc>${opts.lastmod ? `\n    <lastmod>${opts.lastmod.slice(0, 10)}</lastmod>` : ""}
     <changefreq>weekly</changefreq>
@@ -217,7 +217,7 @@ async function buildSitemapXml(reqOrigin: string): Promise<string> {
       .orderBy(desc(schema.studioTemplates.updatedAt))
       .limit(500),
 
-    // Public studio projects (every mediaKind) — surfaced at /v/:id with a
+    // Public studio projects (every mediaKind) — surfaced at /m/:id with a
     // <video:video> entry so Google can index the video + its thumbnail.
     // emailVerified-gated to keep spam out of the index, same as profiles.
     db

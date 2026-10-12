@@ -23,6 +23,7 @@ import {
   generateATSPackage,
   type ATSPackage,
 } from "@/lib/services/studio-features-service";
+import { publicAtsPath } from "@shared/public-paths";
 
 // ---------------------------------------------------------------------------
 
@@ -138,7 +139,7 @@ export default function ATSPackageGenerator({
     );
   };
 
-  const pageUrl = pkg ? `https://hired.video/v/${pkg.slug}` : null;
+  const pageUrl = pkg ? `https://hired.video${publicAtsPath(pkg.slug)}` : null;
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (

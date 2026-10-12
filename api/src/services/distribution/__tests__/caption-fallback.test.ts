@@ -69,8 +69,8 @@ describe("generateSocialCaption fallback", () => {
   });
 
   it("puts a watch link in the template caption when one is given", () => {
-    const cap = buildTemplateCaption(source, "https://hired.video/v/abc");
-    assert.equal(cap.caption, "Watch: https://hired.video/v/abc");
+    const cap = buildTemplateCaption(source, "https://hired.video/m/abc");
+    assert.equal(cap.caption, "Watch: https://hired.video/m/abc");
   });
 
   it("parses JSON wrapped in extra prose and caps hashtags at 8", async () => {

@@ -6,13 +6,27 @@ import { useSEO } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
 import { NEW_KIT_PATH } from "@/lib/build-entry";
 import { MarketingHero, HERO_CTA_PRIMARY, HERO_CTA_LINK } from "@/components/marketing/MarketingHero";
+import { matchPublicMediaPath } from "./legacy-public-video-path";
+import PublicVideoResume from "./PublicVideoResume";
+import ATSLandingPage from "./studio/ATSLandingPage";
 
 const NotFound = () => {
   const location = useLocation();
+  // #1218 — belt-and-suspenders if a `/m/` watch URL misses the explicit
+  // App.tsx routes (e.g. a nested catch-all). Canonical watch is `/m/:id`.
+  const media = location.pathname.startsWith("/m/")
+    ? matchPublicMediaPath(location.pathname)
+    : null;
+  if (media?.kind === "media") return <PublicVideoResume />;
+  if (media?.kind === "ats") return <ATSLandingPage />;
+  return <NotFoundBody pathname={location.pathname} />;
+};
+
+const NotFoundBody = ({ pathname }: { pathname: string }) => {
   const { t } = useTranslation();
 
   // SEO: mark as noindex and set canonical to homepage to avoid indexation of 404 paths
-  useSEO(location.pathname, {
+  useSEO(pathname, {
     title: "404 Not Found — hired.video",
     description: "This page could not be found.",
     robots: "noindex, nofollow",
@@ -24,9 +38,9 @@ const NotFound = () => {
   useEffect(() => {
     console.error(
       "404 Error: User attempted to access non-existent route:",
-      location.pathname,
+      pathname,
     );
-  }, [location.pathname]);
+  }, [pathname]);
 
   return (
     <AppShell bgClassName="bg-background">

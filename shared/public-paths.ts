@@ -19,6 +19,11 @@ export function publicVideoPath(slugOrId: string): string {
   return `/m/${seg(slugOrId)}`;
 }
 
+/** ATS package landing (`ATSLandingPage`) at `/m/ats/<slug>` (legacy `/v/ats/<slug>`). */
+export function publicAtsPath(slug: string): string {
+  return `/m/ats/${seg(slug)}`;
+}
+
 /** A published article: `/articles/<author ref>/<slug>`. The author ref is
  *  the author's vanity slug or user id (`resolveUserRef` accepts both). */
 export function publicArticlePath(authorRef: string, slug: string): string {
