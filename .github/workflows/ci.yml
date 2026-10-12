@@ -402,6 +402,7 @@ jobs:
         # SeanHogg/hired.video, workflow ci.yml) is tried first; NPM_TOKEN
         # (granular, write, bypass-2FA) is the fallback until that is set up.
         run: |
+          set -o pipefail
           cd packages/sdk
           NAME=$(node -p "require('./package.json').name")
           VERSION=$(node -p "require('./package.json').version")
@@ -409,7 +410,11 @@ jobs:
             echo "$NAME@$VERSION already on npm — skipping publish."
           else
             echo "$NAME@$VERSION is new — publishing."
-            npm publish --access public
+            # whoami reports the NPM_TOKEN identity (OIDC is publish-only), and
+            # the verbose oidc/auth lines show which credential publish used —
+            # npm reports every write-permission refusal as a bare E404.
+            npm whoami || echo "NPM_TOKEN is not a valid npm credential"
+            npm publish --access public --loglevel verbose 2>&1 | grep -viE "^npm (verb|http) (fetch|cache|config|title|argv|logfile|cli|npm|node)"
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
