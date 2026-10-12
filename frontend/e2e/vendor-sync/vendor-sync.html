@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Vendor Sync E2E</title>
+  </head>
+  <!-- Test-only harness (#2167): served by the Vite dev server for
+       `npm run test:visual`. Not a build input, so it never ships.
+       Real MV3 --load-extension is blocked (auth-bridge / SW only
+       broadcast to hired.video + localhost:3000, not :4317), so this
+       page stubs the extension protocol and the vendor-sync API. -->
+  <body style="margin: 0">
+    <div id="root"></div>
+    <script type="module" src="./vendor-sync-harness.tsx"></script>
+  </body>
+</html>

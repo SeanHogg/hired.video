@@ -6,20 +6,22 @@
  */
 import { chromium, type FullConfig } from "@playwright/test";
 
-const HARNESS_PAGES = ["/e2e/visual/widget-parity.html"];
-
 export default async function warmUp(config: FullConfig): Promise<void> {
   const baseURL = config.projects[0]?.use.baseURL;
   if (!baseURL) return;
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
-    for (const path of HARNESS_PAGES) {
-      await page.goto(new URL(path, baseURL).toString(), { waitUntil: "load", timeout: 240_000 });
-      await page.waitForFunction(() => (window as unknown as { __parityReady?: boolean }).__parityReady === true, null, {
-        timeout: 240_000,
-      });
-    }
+    await page.goto(new URL("/e2e/visual/widget-parity.html", baseURL).toString(), { waitUntil: "load", timeout: 240_000 });
+    await page.waitForFunction(() => (window as unknown as { __parityReady?: boolean }).__parityReady === true, null, {
+      timeout: 240_000,
+    });
+    await page.goto(new URL("/e2e/vendor-sync/vendor-sync.html", baseURL).toString(), { waitUntil: "load", timeout: 240_000 });
+    await page.waitForFunction(
+      () => (window as unknown as { __vendorSyncReady?: boolean }).__vendorSyncReady === true,
+      null,
+      { timeout: 240_000 },
+    );
   } finally {
     await browser.close();
   }
