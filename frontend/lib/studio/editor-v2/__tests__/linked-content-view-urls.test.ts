@@ -11,7 +11,7 @@ import { LINKED_CONTENT_REGISTRY, type LinkedContentKind } from "@/lib/studio/ed
 const ID = "3f6c1d2e-8a41-4b6f-9a0e-2d5c7b9e1a44";
 
 const EXPECTED: Record<LinkedContentKind, string> = {
-  video: `/v/${ID}`,
+  video: `/m/${ID}`,
   article: `/articles/by-id/${ID}`,
   company: `/companies/${ID}`,
   job: `/jobs/${ID}`,
@@ -27,7 +27,7 @@ describe("linked-content viewUrl", () => {
   });
 
   it("a video links to its public watch page, not the editor", () => {
-    expect(LINKED_CONTENT_REGISTRY.video.viewUrl(ID)).toBe(`/v/${ID}`);
+    expect(LINKED_CONTENT_REGISTRY.video.viewUrl(ID)).toBe(`/m/${ID}`);
   });
 
   it.each(KINDS)("%s → its public page", (kind) => {
