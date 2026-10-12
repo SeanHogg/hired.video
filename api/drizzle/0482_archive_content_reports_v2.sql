@@ -1,0 +1,20 @@
+-- Migration 0482 — archive the orphaned `content_reports_v2` shadow table (#1835).
+--
+-- `content_reports_v2` was created by 0182 (#152) and once backed a duplicate
+-- `/api/reports` (contentReportsV2) route that SHADOWED the canonical
+-- `content_reports` flow. The route, its `routes/content-reports.ts`, and the
+-- `gapPass4` Drizzle schema/types were deleted when the shadowing was found —
+-- but the PHYSICAL table was left orphaned (no schema, no routes), possibly
+-- holding rows that landed there during the shadow window.
+--
+-- A clean DROP would lose those rows, and a straight migrate-into-`content_reports`
+-- is lossy (vocab differs: status `actioned`/`triaged` → `resolved_action_taken`/
+-- `reviewing`; reason `illegal` → `other`; entity kinds `company`/`comment`/`video`
+-- have NO canonical equivalent). So this migration takes the non-destructive
+-- archive path: rename the orphan out of the way. It is then no longer an active
+-- shadow, its data is preserved for a one-time manual triage into `content_reports`,
+-- and a final `DROP TABLE content_reports_v2_archived` can run after that review.
+--
+-- Idempotent: `IF EXISTS` makes a re-run (or an environment that never had the
+-- table) a no-op.
+ALTER TABLE IF EXISTS content_reports_v2 RENAME TO content_reports_v2_archived;

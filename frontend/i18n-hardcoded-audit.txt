@@ -1,0 +1,340 @@
+# Hardcoded user-facing text audit
+
+Scanned 645 .tsx files in pages/ and components/.
+
+Files with potential hardcoded text: 307
+
+Total potential instances: 2184
+
+## Top 30 files by hit count
+
+### /pages/TermsOfService.tsx (106)
+  L48 [inline-jsx] "Terms of Service"
+  L119 [inline-jsx] "1. Our Services"
+  L138 [inline-jsx] "Job matching and recruitment services"
+  L139 [inline-jsx] "Professional networking and communication features"
+  L140 [inline-jsx] "Career development resources and analytics"
+  L141 [inline-jsx] "Employer and recruiter tools for talent acquisition"
+  L173 [inline-jsx] "2. Intellectual Property Rights"
+  L208 [inline-jsx] "Access the Services"
+  …and 98 more
+
+### /pages/PrivacyPolicy.tsx (87)
+  L48 [inline-jsx] "Your Privacy Matters"
+  L80 [inline-jsx] "Your Data is Secure"
+  L90 [inline-jsx] "You Control Your Info"
+  L99 [inline-jsx] "Minimal Data Collection"
+  L108 [inline-jsx] "WE DO NOT SELL DATA"
+  L136 [inline-jsx] "Company Information"
+  L157 [inline-jsx] "Data Protection Officer"
+  L188 [inline-jsx] "• Regulation (EU) 2016/679 (GDPR)"
+  …and 79 more
+
+### /pages/People.tsx (58)
+  L873 [title] "Professional Network"
+  L929 [inline-jsx] "No connections yet"
+  L1001 [inline-jsx] "Try Again"
+  L1119 [inline-jsx] "No candidates in talent pool yet"
+  L1176 [title] "Submit to Job"
+  L1185 [title] "Log Interaction"
+  L1193 [title] "Edit"
+  L1205 [title] "Remove"
+  …and 50 more
+
+### /components/company/CompanyBuilder.tsx (49)
+  L291 [inline-jsx] "Basic Information"
+  L292 [inline-jsx] "Company name, logo, and general details"
+  L297 [inline-jsx] "Company Name *"
+  L302 [placeholder] "Company name"
+  L311 [inline-jsx] "Industry *"
+  L316 [placeholder] "e.g., Technology, Finance"
+  L328 [inline-jsx] "Company Size *"
+  L334 [placeholder] "Select company size"
+  …and 41 more
+
+### /pages/admin/ProductDashboard.tsx (47)
+  L430 [inline-jsx] "User Growth (Last 90 Days)"
+  L431 [inline-jsx] "Daily user registrations"
+  L463 [inline-jsx] "Job Growth (Last 90 Days)"
+  L464 [inline-jsx] "Daily job postings"
+  L499 [title] "Total Users"
+  L505 [title] "Active Users"
+  L511 [title] "New Users"
+  L521 [inline-jsx] "Account Types Distribution"
+  …and 39 more
+
+### /pages/ServicesManagement.tsx (46)
+  L229 [toast] "You"
+  L231 [toast] "Failed to join affiliate program. Please try again."
+  L273 [toast] "Failed to load services"
+  L289 [toast] "Failed to load inquiries"
+  L306 [toast] "Lead generation enabled — your services will appear on your profile."
+  L308 [toast] "Failed to enable lead generation"
+  L335 [toast] "Title is required"
+  L341 [toast] "Service updated"
+  …and 38 more
+
+### /components/studio/v2/inspector/widget-sections.tsx (43)
+  L79 [label] "Width"
+  L84 [label] "Height"
+  L89 [label] "Rotation"
+  L127 [label] "Border"
+  L138 [label] "Radius"
+  L147 [label] "Border width"
+  L154 [label] "Padding"
+  L199 [title] "Enter"
+  …and 35 more
+
+### /pages/CookiePolicy.tsx (34)
+  L120 [inline-jsx] "How We Use Cookies"
+  L234 [inline-jsx] "What Are Cookies?"
+  L273 [inline-jsx] "How We Use Cookies"
+  L277 [inline-jsx] "Essential Functions"
+  L279 [inline-jsx] "Keep you logged in during your session"
+  L280 [inline-jsx] "Remember your language and region preferences"
+  L281 [inline-jsx] "Ensure security and prevent fraud"
+  L282 [inline-jsx] "Enable core platform functionality"
+  …and 26 more
+
+### /pages/services/HiringOnboarding.tsx (33)
+  L385 [inline-jsx] "Hiring &amp; Onboarding"
+  L402 [inline-jsx] "View pricing"
+  L409 [label] "Drafts"
+  L410 [label] "Pending"
+  L411 [label] "Signed"
+  L412 [label] "Active checklists"
+  L444 [inline-jsx] "No offer letters yet"
+  L504 [title] "Delete offer"
+  …and 25 more
+
+### /pages/studio/StudioSidebar.tsx (33)
+  L425 [title] "Choose a template"
+  L426 [aria-label] "Choose a template"
+  L426 [label] "Choose a template"
+  L456 [title] "Open new video wizard"
+  L467 [title] "Hide sidebar"
+  L468 [aria-label] "Hide sidebar"
+  L468 [label] "Hide sidebar"
+  L502 [inline-jsx] "No projects yet"
+  …and 25 more
+
+### /components/account/AccountSettings.tsx (32)
+  L160 [inline-jsx] "Account Settings"
+  L185 [inline-jsx] "Company Name"
+  L192 [placeholder] "Enter company name"
+  L196 [inline-jsx] "Industry"
+  L201 [placeholder] "e.g., Technology, Healthcare"
+  L207 [inline-jsx] "Company Description"
+  L214 [placeholder] "Brief description of your company"
+  L221 [inline-jsx] "Website"
+  …and 24 more
+
+### /pages/AffiliateProgram.tsx (27)
+  L67 [inline-jsx] "Partner with hired.video"
+  L75 [inline-jsx] "AI-enhanced resume builder"
+  L76 [inline-jsx] "Guided creation, tailored keyword suggestions, and ATS-ready formats."
+  L82 [inline-jsx] "Video resumes that convert"
+  L83 [inline-jsx] "Record or upload compelling intros that increase response rates."
+  L89 [inline-jsx] "Collaboration tools"
+  L90 [inline-jsx] "Share, get feedback, and manage variations with master collections."
+  L96 [inline-jsx] "Analytics & insights"
+  …and 19 more
+
+### /components/SearchBar.tsx (26)
+  L186 [inline-jsx] "Role"
+  L194 [placeholder] "All roles"
+  L209 [inline-jsx] "Industry"
+  L220 [placeholder] "All industries"
+  L247 [placeholder] "All sizes"
+  L264 [inline-jsx] "Location"
+  L266 [placeholder] "City, State"
+  L276 [inline-jsx] "Skills"
+  …and 18 more
+
+### /components/creator/PayoutProfileForm.tsx (25)
+  L194 [inline-jsx] "Payouts are part of the Creator Program"
+  L228 [inline-jsx] "Payouts"
+  L237 [inline-jsx] "You are receiving payouts as"
+  L246 [inline-jsx] "An individual"
+  L248 [inline-jsx] "Sole prop, freelancer, contractor — anything in your own legal name."
+  L253 [inline-jsx] "A business"
+  L255 [inline-jsx] "LLC, corporation, partnership, or other registered entity."
+  L275 [inline-jsx] "Business legal name *"
+  …and 17 more
+
+### /pages/JobCreatePage.tsx (24)
+  L568 [title] "Create Job Posting"
+  L758 [inline-jsx] "Parsed Job Data"
+  L851 [inline-jsx] "Job Title *"
+  L854 [placeholder] "e.g., Senior Software Engineer"
+  L867 [inline-jsx] "Hero Image (Optional)"
+  L872 [alt] "Job hero preview"
+  L878 [title] "Choose job hero image"
+  L895 [title] "Choose job hero image"
+  …and 16 more
+
+### /components/ResumeViewer.tsx (24)
+  L100 [inline-jsx] "Resume data not available"
+  L101 [inline-jsx] "Unable to load resume information."
+  L110 [inline-jsx] "Resume content not available"
+  L111 [inline-jsx] "Resume data structure is incomplete."
+  L397 [aria-label] "Previous video"
+  L397 [label] "Previous video"
+  L409 [aria-label] "Next video"
+  L409 [label] "Next video"
+  …and 16 more
+
+### /pages/Jobs.tsx (22)
+  L748 [title] "Jobs"
+  L789 [inline-jsx] "No postings yet"
+  L922 [inline-jsx] "Try Again"
+  L1019 [inline-jsx] "No saved jobs yet"
+  L1134 [inline-jsx] "No applications yet"
+  L1195 [inline-jsx] "Resume Used:"
+  L1207 [inline-jsx] "Cover Letter:"
+  L1235 [inline-jsx] "Job Alerts"
+  …and 14 more
+
+### /pages/services/PitchDeckBuilder.tsx (22)
+  L415 [inline-jsx] "Deck not found"
+  L426 [inline-jsx] "Deck details"
+  L456 [inline-jsx] "Name"
+  L466 [inline-jsx] "Description"
+  L478 [inline-jsx] "Brand kit"
+  L488 [placeholder] "Pick a brand kit"
+  L501 [inline-jsx] "Default redaction"
+  L511 [placeholder] "Pick a profile"
+  …and 14 more
+
+### /pages/CompanyDetail.tsx (20)
+  L203 [inline-jsx] "Company Not Found"
+  L369 [aria-label] "More actions"
+  L369 [label] "More actions"
+  L594 [inline-jsx] "Culture & Values"
+  L599 [inline-jsx] "Our Culture"
+  L613 [inline-jsx] "Our Values"
+  L635 [inline-jsx] "Technologies We Use"
+  L686 [inline-jsx] "Additional Perks"
+  …and 12 more
+
+### /pages/studio/StudioLayout.tsx (20)
+  L215 [inline-jsx] "AI Script Generation"
+  L233 [inline-jsx] "Professional Video Output"
+  L251 [inline-jsx] "Share Everywhere"
+  L271 [inline-jsx] "How It Works"
+  L292 [inline-jsx] "One Studio, Every Use Case"
+  L311 [inline-jsx] "Built for Advertising, Not Just Resumes"
+  L316 [inline-jsx] "Brand Kits"
+  L325 [inline-jsx] "Video Analytics"
+  …and 12 more
+
+### /pages/tools/SalaryCalculator.tsx (20)
+  L379 [placeholder] "e.g., Software Engineer, Marketing Manager"
+  L390 [placeholder] "e.g., San Francisco, CA or New York, NY"
+  L409 [inline-jsx] "0 years"
+  L410 [inline-jsx] "20+ years"
+  L420 [placeholder] "Select education level"
+  L438 [placeholder] "Select industry"
+  L455 [placeholder] "e.g., Google, Microsoft, Startup"
+  L544 [inline-jsx] "Market Average"
+  …and 12 more
+
+### /pages/InterviewPractice.tsx (18)
+  L105 [inline-jsx] "AI Interview Practice"
+  L112 [inline-jsx] "Job Description"
+  L116 [placeholder] "Paste the job description here...&#10;&#10;Example:&#10;Senior Backend Engineer at Stripe&#10;• Desi"
+  L123 [inline-jsx] "Interview Type"
+  L191 [inline-jsx] "Your Interview Questions"
+  L428 [inline-jsx] "Camera not available"
+  L455 [inline-jsx] "Live transcript"
+  L456 [inline-jsx] "Listening..."
+  …and 10 more
+
+### /components/scorecards/ScorecardTemplateEditor.tsx (18)
+  L98 [inline-jsx] "Scorecard templates"
+  L109 [inline-jsx] "Loading…"
+  L196 [inline-jsx] "New scorecard template"
+  L200 [inline-jsx] "Template name"
+  L202 [placeholder] "e.g. Senior Software Engineer — Onsite"
+  L209 [inline-jsx] "Rating scale"
+  L224 [inline-jsx] "Role family (optional)"
+  L226 [placeholder] "Engineering"
+  …and 10 more
+
+### /components/studio/v2/ActionsPanel.tsx (18)
+  L123 [title] "Recording & Audio"
+  L129 [label] "Webcam"
+  L134 [label] "Screen"
+  L139 [label] "Screen + PiP"
+  L144 [label] "Voiceover"
+  L149 [label] "Original Music"
+  L156 [title] "Media"
+  L169 [title] "Add media to canvas"
+  …and 10 more
+
+### /pages/ArticlesManager.tsx (17)
+  L175 [inline-jsx] "setMode("list")}>Back to list"
+  L181 [inline-jsx] "Sign in to write articles"
+  L182 [inline-jsx] "navigate("/login")}>Sign in"
+  L192 [inline-jsx] "Enroll in the Articles Creator Program to publish"
+  L206 [inline-jsx] "No articles yet"
+  L252 [inline-jsx] "Title"
+  L253 [placeholder] "A clear, specific title"
+  L256 [inline-jsx] "Cover image (optional)"
+  …and 9 more
+
+### /components/outreach/tabs/CampaignsTab.tsx (17)
+  L79 [inline-jsx] "Campaigns"
+  L105 [title] "Campaign"
+  L112 [title] "Ad Set"
+  L130 [title] "ROAS Dashboard"
+  L141 [title] "Audience Targeting"
+  L147 [title] "Bid Strategies"
+  L153 [title] "Cross-Channel"
+  L161 [placeholder] "Search campaigns..."
+  …and 9 more
+
+### /pages/services/ServicesSettings.tsx (16)
+  L391 [inline-jsx] "Services Settings"
+  L404 [placeholder] "Company"
+  L592 [inline-jsx] "Agency name"
+  L598 [placeholder] "Contoso Staffing"
+  L618 [inline-jsx] "Primary colour"
+  L638 [inline-jsx] "Logo URL"
+  L649 [inline-jsx] "Tagline (optional)"
+  L655 [placeholder] "Senior engineering talent, matched precisely."
+  …and 8 more
+
+### /components/creator/CreatorWorkspace.tsx (16)
+  L211 [inline-jsx] "Your programs"
+  L212 [inline-jsx] "Enable or disable programs independently. Each has its own terms."
+  L254 [inline-jsx] "Creator profile"
+  L255 [inline-jsx] "These details surface on your public profile under the Services tab."
+  L258 [inline-jsx] "Display name"
+  L262 [inline-jsx] "Tagline"
+  L267 [inline-jsx] "Bio"
+  L290 [inline-jsx] "Portfolio"
+  …and 8 more
+
+### /components/ErrorBoundary.tsx (16)
+  L414 [inline-jsx] "Error Details"
+  L425 [inline-jsx] "Copied!"
+  L428 [inline-jsx] "Copy failed"
+  L435 [inline-jsx] "Error Message:"
+  L443 [inline-jsx] "Error Code:"
+  L452 [inline-jsx] "Status Code:"
+  L461 [inline-jsx] "Stack Trace:"
+  L470 [inline-jsx] "Context:"
+  …and 8 more
+
+### /components/renderable/InteractiveCanvasEditor.tsx (16)
+  L233 [title] "Delete"
+  L251 [inline-jsx] "Position & size (% of canvas)"
+  L274 [inline-jsx] "Canvas background"
+  L277 [placeholder] "(none) — try linear-gradient(135deg,#7c3aed,#2563eb)"
+  L323 [inline-jsx] "Text"
+  L334 [inline-jsx] "Image URL"
+  L346 [inline-jsx] "Video URL"
+  L358 [inline-jsx] "Audio URL"
+  …and 8 more
+

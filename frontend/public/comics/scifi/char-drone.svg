@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice">
+
+  <ellipse cx="200" cy="200" rx="80" ry="50" fill="#e0f2fe"/>
+  <circle cx="200" cy="200" r="22" fill="#fde047"/>
+  <circle cx="200" cy="200" r="10" fill="#0f172a"/>
+  <line x1="120" y1="200" x2="40"  y2="160" stroke="#e0f2fe" stroke-width="6"/>
+  <line x1="280" y1="200" x2="360" y2="160" stroke="#e0f2fe" stroke-width="6"/>
+  <circle cx="40"  cy="160" r="14" fill="#22d3ee"/>
+  <circle cx="360" cy="160" r="14" fill="#22d3ee"/>
+
+</svg>

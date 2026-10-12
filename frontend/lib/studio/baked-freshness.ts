@@ -1,0 +1,353 @@
+// baked-freshness.ts — single source of truth for "is the rendered MP4
+// at `state.videoUrl` still in sync with the current script?". The
+// project tiles and the Publish-to-* buttons (to label "Publish" vs
+// "Re-render & publish") read this — per the DRY rule the freshness rule
+// lives in one place so they can never disagree.
+//
+// The hash is intentionally narrow: it covers only the parts that
+// actually affect what a render would output (scene content, durations,
+// theme, audio, captions, voiceover binding, branding). UI-only fields
+// like `script._meta.savePipelineDisabled` are excluded so toggling
+// "skip generate" doesn't pretend the baked video is stale.
+//
+// A V1 script's hash was written by the deleted V1 render pipeline into
+// `script._meta.bakedHash` and is only read here now; V2 timelines carry
+// their own hash (`withBakedTimelineHash`). A miss means stale, not
+// corrupt: the UI degrades gracefully to the live canvas path.
+//
+// NOTE on asset-URL-content drift: if a scene references an R2 image
+// whose contents change at the same URL the hash won't notice and a
+// stale baked video would be served. Tracked in the Gap Register.
+
+import type { StudioProjectState } from "@/types/studio";
+import type {
+  AudioClip,
+  CaptionConfig,
+  SceneScript,
+  VideoAudio,
+  VideoScript,
+  VoiceoverConfig,
+} from "@/types/video-script";
+
+/** Stable, render-affecting projection of a VideoScript. Only fields in
+ *  here participate in the hash — adding a new render-affecting field
+ *  here is the same checklist item as adding it to the renderer. */
+interface HashableShape {
+  v: number;
+  video: {
+    duration: number;
+    fps: number;
+    resolution: string;
+    aspect: string;
+    codec?: string;
+    container?: string;
+    audioCodec?: string;
+    videoBitrate?: number;
+    audioBitrate?: number;
+    theme: {
+      colors: string[];
+      font: string;
+      motion: string;
+      transition: string;
+      background: string;
+      customBg?: string;
+      customBgType?: string;
+      filters?: Record<string, number>;
+    };
+    audio?: HashableAudio;
+  };
+  scenes: HashableScene[];
+  voiceover: HashableVoiceover | null;
+  captions: HashableCaptions | null;
+  /** Pro-only "no intro/outro/watermark" toggle changes the rendered
+   *  output, so it has to participate. Lives on the project state, not
+   *  the script — passed in alongside the script. */
+  removeBranding: boolean;
+}
+
+interface HashableAudio {
+  track: string;
+  label: string;
+  volume: number;
+  mix?: unknown;
+  clips?: Array<Pick<AudioClip, "id" | "track" | "label" | "startSec" | "endSec" | "volume">>;
+}
+
+interface HashableScene {
+  id: string;
+  start: number;
+  duration: number;
+  type: string;
+  inPoint?: number;
+  outPoint?: number;
+  sourceDuration?: number;
+  transitionIn?: string;
+  title?: string;
+  subtitle?: string;
+  text?: string | string[];
+  items?: string[];
+  skills?: string[];
+  accentColor?: string;
+  textColor?: string;
+  cardBackgroundColor?: string;
+  cardBorderColor?: string;
+  backgroundImage?: string;
+  backgroundMediaType?: string;
+  overlayMediaUrl?: string;
+  overlayMediaType?: string;
+  overlayMediaPosition?: string;
+  overlayMediaAnimation?: string;
+  sceneAudio?: string;
+  textAlign?: string;
+  contentPosition?: string;
+  imageAnimation?: string;
+  effects?: Array<{ kind: string; params: Record<string, unknown> }>;
+  sceneElements?: unknown[];
+  animation?: unknown;
+}
+
+interface HashableVoiceover {
+  enabled: boolean;
+  engine?: string;
+  voiceId: string;
+  voiceName: string;
+  speed: number;
+  /** Per-scene audio URLs — when these change the rendered audio track
+   *  changes too. Word timestamps are excluded (they're a side-product
+   *  of synthesis, not an input). */
+  sceneAudioUrls: Record<string, string | null>;
+}
+
+interface HashableCaptions {
+  enabled: boolean;
+  style: string;
+  cues: Array<{ start: number; end: number; text: string }>;
+}
+
+const HASH_VERSION = 1;
+
+/** djb2 — small, fast, stable across browsers. We don't need cryptographic
+ *  strength: a freshness check just needs collision-resistance among the
+ *  realistic distribution of script edits a single user makes. */
+function djb2(input: string): string {
+  let hash = 5381;
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) + hash + input.charCodeAt(i)) | 0;
+  }
+  // Mix with input length so a single-char trim still flips the hash.
+  return `${HASH_VERSION}-${(hash >>> 0).toString(36)}-${input.length.toString(36)}`;
+}
+
+function projectAudio(audio: VideoAudio | undefined): HashableAudio | undefined {
+  if (!audio) return undefined;
+  return {
+    track: audio.track,
+    label: audio.label,
+    volume: audio.volume,
+    mix: audio.mix,
+    clips: audio.clips?.map((c) => ({
+      id: c.id,
+      track: c.track,
+      label: c.label,
+      startSec: c.startSec,
+      endSec: c.endSec,
+      volume: c.volume,
+    })),
+  };
+}
+
+function projectScene(scene: SceneScript): HashableScene {
+  return {
+    id: scene.id,
+    start: scene.start,
+    duration: scene.duration,
+    type: scene.type,
+    inPoint: scene.inPoint,
+    outPoint: scene.outPoint,
+    sourceDuration: scene.sourceDuration,
+    transitionIn: scene.transitionIn,
+    title: scene.title,
+    subtitle: scene.subtitle,
+    text: scene.text,
+    items: scene.items,
+    skills: scene.skills,
+    accentColor: scene.accentColor,
+    textColor: scene.textColor,
+    cardBackgroundColor: scene.cardBackgroundColor,
+    cardBorderColor: scene.cardBorderColor,
+    backgroundImage: scene.backgroundImage,
+    backgroundMediaType: scene.backgroundMediaType,
+    overlayMediaUrl: scene.overlayMediaUrl,
+    overlayMediaType: scene.overlayMediaType,
+    overlayMediaPosition: scene.overlayMediaPosition,
+    overlayMediaAnimation: scene.overlayMediaAnimation,
+    sceneAudio: scene.sceneAudio,
+    textAlign: scene.textAlign,
+    contentPosition: scene.contentPosition,
+    imageAnimation: scene.imageAnimation,
+    effects: scene.effects?.map((e) => ({ kind: e.kind, params: e.params ?? {} })),
+    sceneElements: scene.sceneElements,
+    animation: scene.animation,
+  };
+}
+
+function projectVoiceover(vo: VoiceoverConfig | null | undefined): HashableVoiceover | null {
+  if (!vo) return null;
+  const sceneAudioUrls: Record<string, string | null> = {};
+  for (const [sceneId, entry] of Object.entries(vo.scenes ?? {})) {
+    sceneAudioUrls[sceneId] = entry?.audioUrl ?? null;
+  }
+  return {
+    enabled: vo.enabled,
+    engine: vo.engine,
+    voiceId: vo.voiceId,
+    voiceName: vo.voiceName,
+    speed: vo.speed,
+    sceneAudioUrls,
+  };
+}
+
+function projectCaptions(caps: CaptionConfig | null | undefined): HashableCaptions | null {
+  if (!caps) return null;
+  return {
+    enabled: caps.enabled,
+    style: caps.style,
+    cues: caps.cues.map((c) => ({ start: c.start, end: c.end, text: c.text })),
+  };
+}
+
+/** Stable JSON: sorts object keys top-down so insertion-order changes
+ *  don't perturb the hash. Arrays preserve order (ordering IS meaningful
+ *  for scenes and cues). */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const keys = Object.keys(value as Record<string, unknown>).sort();
+  const parts = keys.map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`);
+  return `{${parts.join(",")}}`;
+}
+
+export interface HashInput {
+  script: VideoScript;
+  /** Pro-only branding-removal toggle from project state. Affects the
+   *  rendered output, so it has to participate in the hash. */
+  removeBranding?: boolean;
+  voiceover?: VoiceoverConfig | null;
+  captions?: CaptionConfig | null;
+}
+
+/** Compute a stable, render-affecting hash of a script. */
+export function computeScriptHash(input: HashInput): string {
+  const { script } = input;
+  const shape: HashableShape = {
+    v: HASH_VERSION,
+    video: {
+      duration: script.video.duration,
+      fps: script.video.fps,
+      resolution: script.video.resolution,
+      aspect: script.video.aspect,
+      codec: script.video.codec,
+      container: script.video.container,
+      audioCodec: script.video.audioCodec,
+      videoBitrate: script.video.videoBitrate,
+      audioBitrate: script.video.audioBitrate,
+      theme: {
+        colors: script.video.theme.colorPalette,
+        font: script.video.theme.fontFamily,
+        motion: script.video.theme.motion,
+        transition: script.video.theme.transition,
+        background: script.video.theme.background,
+        customBg: script.video.theme.customBackground,
+        customBgType: script.video.theme.customBackgroundType,
+        filters: script.video.theme.filters as Record<string, number> | undefined,
+      },
+      audio: projectAudio(script.video.audio),
+    },
+    scenes: script.scenes.map(projectScene),
+    voiceover: projectVoiceover(input.voiceover),
+    captions: projectCaptions(input.captions),
+    removeBranding: input.removeBranding === true,
+  };
+  return djb2(stableStringify(shape));
+}
+
+/** True iff the project has a hosted video URL whose recorded hash
+ *  matches the script's current hash. */
+export function isBakedFresh(state: Pick<StudioProjectState, "script" | "videoUrl" | "voiceover" | "captions"> & {
+  removeBranding?: boolean;
+}): boolean {
+  if (!state.videoUrl) return false;
+  if (!state.script) return false;
+  const stamped = state.script._meta?.bakedHash;
+  if (!stamped) return false;
+  const current = computeScriptHash({
+    script: state.script,
+    voiceover: state.voiceover,
+    captions: state.captions,
+    removeBranding: state.removeBranding,
+  });
+  return stamped === current;
+}
+
+// ─── v2 timelineSpec freshness ──────────────────────────────────────────────
+//
+// V2 projects (kind="nle") have no `script` — their canvas lives in
+// `timelineSpec`. The bakedHash is stamped inside the spec under
+// `_meta.bakedHash` on successful render+upload, mirroring the v1
+// `script._meta.bakedHash` pattern so the render facade can write through
+// the same idiom.
+
+/** Compute a stable, render-affecting hash of a timelineSpec. Mirrors
+ *  computeScriptHash's pattern but operates on the whole timeline JSON
+ *  minus the meta envelope (so the hash doesn't include itself). */
+export function computeTimelineSpecHash(spec: unknown): string {
+  if (!spec || typeof spec !== "object") return djb2("");
+  const { _meta: _ignored, ...rest } = spec as Record<string, unknown>;
+  return djb2(stableStringify(rest));
+}
+
+/** Stamp the hash onto a timelineSpec's `_meta` so subsequent freshness
+ *  checks compare like-with-like. Pure — caller persists. */
+export function withBakedTimelineHash(spec: unknown, hash: string): unknown {
+  if (!spec || typeof spec !== "object") return spec;
+  const base = spec as Record<string, unknown>;
+  const meta = (base._meta as Record<string, unknown> | undefined) ?? {};
+  return { ...base, _meta: { ...meta, bakedHash: hash } };
+}
+
+/** True iff a v2 timelineSpec's stamped hash matches its current shape. */
+function isTimelineBakedFresh(spec: unknown): boolean {
+  if (!spec || typeof spec !== "object") return false;
+  const stamped = (spec as { _meta?: { bakedHash?: string } })._meta?.bakedHash;
+  if (!stamped) return false;
+  return stamped === computeTimelineSpecHash(spec);
+}
+
+// ─── Unified project-level freshness ────────────────────────────────────────
+//
+// Consumers outside the editor (project tiles, public surfaces, the
+// "Unpublished edits" badge) hold a `StudioProject` DTO, not the rich
+// editor `StudioProjectState`. Dispatches on `kind` so neither the v1
+// nor v2 surface has to branch — pass the project, get a boolean.
+
+export interface ProjectFreshnessInput {
+  kind?: "scene" | "nle";
+  script?: VideoScript | null;
+  timelineSpec?: unknown;
+  videoUrl?: string | null;
+}
+
+export function isProjectBakedFresh(project: ProjectFreshnessInput): boolean {
+  if (!project.videoUrl) return false;
+  if (project.kind === "nle") {
+    return isTimelineBakedFresh(project.timelineSpec);
+  }
+  // Default to v1 (kind defaults to "scene" per StudioProjectSchema).
+  if (!project.script) return false;
+  return isBakedFresh({
+    script: project.script,
+    videoUrl: project.videoUrl,
+    voiceover: null,
+    captions: null,
+  });
+}

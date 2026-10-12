@@ -1,0 +1,67 @@
+{
+  "video": {
+    "duration": 20,
+    "fps": 30,
+    "resolution": "720p",
+    "aspect": "16:9",
+    "theme": {
+      "colorPalette": ["#18181b", "#3f3f46", "#ffffff", "#a1a1aa"],
+      "fontFamily": "Inter, sans-serif",
+      "motion": "minimal",
+      "transition": "cut",
+      "background": "solid"
+    }
+  },
+  "scenes": [
+    {
+      "id": "intro",
+      "start": 0,
+      "duration": 5,
+      "type": "intro",
+      "title": "Your Name",
+      "subtitle": "Your Title",
+      "animation": {
+        "titleEnter":    { "type": "fadeIn", "start": 0.3, "duration": 0.5, "easing": "easeOut" },
+        "subtitleEnter": { "type": "fadeIn", "start": 0.6, "duration": 0.5, "easing": "easeOut" }
+      }
+    },
+    {
+      "id": "achievement",
+      "start": 5,
+      "duration": 5,
+      "type": "achievement",
+      "title": "Highlights",
+      "items": [
+        "3+ years of experience",
+        "Shipped products at scale",
+        "Strong collaborator"
+      ],
+      "animation": {
+        "titleEnter": { "type": "fadeIn", "start": 0.2, "duration": 0.4, "easing": "linear" },
+        "textEnter":  { "type": "fadeIn", "start": 0.5, "duration": 0.5, "easing": "linear" }
+      }
+    },
+    {
+      "id": "skills",
+      "start": 10,
+      "duration": 5,
+      "type": "skills",
+      "title": "Skills",
+      "skills": ["JavaScript", "Python", "React", "SQL"],
+      "animation": {
+        "titleEnter": { "type": "fadeIn", "start": 0.2, "duration": 0.4, "easing": "linear" },
+        "textEnter":  { "type": "fadeIn", "start": 0.5, "duration": 0.5, "easing": "linear" }
+      }
+    },
+    {
+      "id": "closing",
+      "start": 15,
+      "duration": 5,
+      "type": "closing",
+      "title": "Open to opportunities",
+      "animation": {
+        "titleEnter": { "type": "fadeIn", "start": 0.3, "duration": 0.5, "easing": "easeOut" }
+      }
+    }
+  ]
+}

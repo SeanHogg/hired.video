@@ -1,0 +1,101 @@
+import React from "react";
+import {
+  Wrench,
+  Mic,
+  Brain,
+  FileText,
+  Target,
+  ArrowRight,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+
+interface ToolsCTAProps {
+  variant?: "banner" | "compact";
+}
+
+export function ToolsCTA({ variant = "banner" }: ToolsCTAProps) {
+  const { t } = useTranslation();
+
+  const TOOL_LINKS = [
+    { to: "/interview", icon: Mic, label: t("labels.toolInterviewPractice"), short: t("labels.toolInterviewShort") },
+    { to: "/chat", icon: Brain, label: t("labels.toolAiCoach"), short: t("labels.toolAiCoach") },
+    { to: "/tools/resume-tailor", icon: FileText, label: t("labels.toolResumeTailor"), short: t("labels.toolResumeTailorShort") },
+    { to: "/tools/ai-resume-scorer", icon: Target, label: t("labels.toolResumeScorer"), short: t("labels.toolResumeScorerShort") },
+  ];
+
+  if (variant === "compact") {
+    return (
+      <Card className="border-primary/30 bg-background">
+        <CardHeader className="pb-2 pt-4 px-4">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+              <Wrench className="h-4 w-4 text-primary" />
+            </div>
+            <CardTitle className="text-sm font-semibold">{t("headings.sharpenYourEdge")}</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="px-4 pb-4">
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {TOOL_LINKS.map(({ to, icon: Icon, short }) => (
+              <Link key={to} to={to}>
+                <Badge variant="secondary" className="cursor-pointer hover:bg-primary/10 text-xs">
+                  <Icon className="h-3 w-3 mr-1" /> {short}
+                </Badge>
+              </Link>
+            ))}
+          </div>
+          <Link to="/tools">
+            <Button size="sm" className="w-full text-xs h-8">
+              {t("actions.exploreAllTools")}
+              <ArrowRight className="h-3 w-3 ml-1" />
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="border-primary/30 bg-background">
+      <CardContent className="p-4 sm:p-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Wrench className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-semibold text-lg">{t("headings.sharpenYourEdgeWithTools")}</h3>
+                <Badge className="bg-primary/10 text-primary hover:bg-primary/10">{t("labels.newBadge")}</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                {t("messages.sharpenYourEdgeDesc")}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {TOOL_LINKS.map(({ to, icon: Icon, label }) => (
+                  <Link key={to} to={to}>
+                    <Badge variant="secondary" className="cursor-pointer hover:bg-primary/10">
+                      <Icon className="h-3 w-3 mr-1" /> {label}
+                    </Badge>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+          <Link to="/tools" className="shrink-0">
+            <Button className="w-full lg:w-auto">
+              {t("actions.exploreAllTools")}
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default ToolsCTA;

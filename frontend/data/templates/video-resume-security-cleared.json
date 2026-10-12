@@ -1,0 +1,150 @@
+{
+  "video": {
+    "duration": 60,
+    "fps": 30,
+    "resolution": "720p",
+    "aspect": "16:9",
+    "theme": {
+      "colorPalette": [
+        "#111827",
+        "#ef4444",
+        "#1f2937",
+        "#fee2e2"
+      ],
+      "fontFamily": "Inter, sans-serif",
+      "motion": "moderate",
+      "transition": "fade",
+      "background": "solid"
+    }
+  },
+  "scenes": [
+    {
+      "id": "open",
+      "start": 0,
+      "duration": 5,
+      "type": "intro",
+      "title": "Armed security. EP-trained. 5 years protective work.",
+      "subtitle": "Your Name — Armed Guard Card #XXXXX",
+      "animation": {
+        "titleEnter": {
+          "type": "slideUp",
+          "start": 0.1,
+          "duration": 0.5,
+          "easing": "easeOut"
+        },
+        "subtitleEnter": {
+          "type": "fadeIn",
+          "start": 1.2,
+          "duration": 0.5,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "credentials",
+      "start": 5,
+      "duration": 13,
+      "type": "achievement",
+      "title": "Licensure & training",
+      "items": [
+        "State guard card (armed) — active",
+        "Executive Protection training, [provider]",
+        "TCCC + first aid current",
+        "Defensive driving cert"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "slideIn",
+          "start": 0.6,
+          "duration": 0.6,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "recent",
+      "start": 18,
+      "duration": 13,
+      "type": "achievement",
+      "title": "Recent engagements",
+      "items": [
+        "EP detail for [HNW principal] — 18 months",
+        "Corporate GSOC operator (overnight)",
+        "Armored transport, 2021–2022"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "slideIn",
+          "start": 0.6,
+          "duration": 0.6,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "bring",
+      "start": 31,
+      "duration": 13,
+      "type": "skills",
+      "title": "What I bring",
+      "skills": [
+        "Discretion + situational awareness on principal-facing detail",
+        "OSINT advance work + route planning",
+        "Clean firearms record, regular requal",
+        "Stays calm — the principal feels it"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "scaleIn",
+          "start": 0.5,
+          "duration": 0.6,
+          "easing": "spring"
+        }
+      }
+    },
+    {
+      "id": "ask",
+      "start": 44,
+      "duration": 16,
+      "type": "closing",
+      "title": "Open to EP / GSOC / corporate-security roles in [metro].",
+      "subtitle": "[email] · ready to interview.",
+      "animation": {
+        "titleEnter": {
+          "type": "slideUp",
+          "start": 0.2,
+          "duration": 0.5,
+          "easing": "easeOut"
+        },
+        "subtitleEnter": {
+          "type": "fadeIn",
+          "start": 0.9,
+          "duration": 0.4,
+          "easing": "easeOut"
+        }
+      }
+    }
+  ],
+  "_meta": {
+    "sector": "security",
+    "recommendation": "Guard card + firearms endorsement + specialty (EP, GSOC, armed transport) lead. Reliability signals (driving record, background) follow."
+  }
+}

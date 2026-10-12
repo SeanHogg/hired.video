@@ -1,0 +1,112 @@
+{
+  "video": {
+    "duration": 28,
+    "fps": 30,
+    "resolution": "720p",
+    "aspect": "16:9",
+    "theme": {
+      "colorPalette": ["#7c3aed", "#2563eb", "#e2e8f0", "#c4b5fd"],
+      "fontFamily": "Inter, sans-serif",
+      "motion": "moderate",
+      "transition": "fade",
+      "background": "gradient"
+    },
+    "audio": {
+      "track": "corporate-inspire",
+      "label": "Corporate Inspire",
+      "volume": 0.5,
+      "mix": {
+        "masterGain": 1.2,
+        "music": { "gain": 1.4, "fadeInSec": 1.5, "fadeOutSec": 2 },
+        "voiceover": { "gain": 0.8, "muted": true }
+      },
+      "clips": [
+        {
+          "id": "clip-lx9k2a-4f7q1",
+          "track": "corporate-inspire",
+          "label": "Corporate Inspire",
+          "startSec": 0,
+          "endSec": 14,
+          "volume": 0.9
+        },
+        {
+          "id": "clip-lx9k3b-8m2z0",
+          "track": "https://cdn.hired.video/studio/audio/7d1c0a3e-original-music.mp3",
+          "label": "Original Music — Upbeat",
+          "startSec": 14,
+          "endSec": 28,
+          "volume": 0.7,
+          "fadeInSec": 0.5,
+          "trimStartSec": 3
+        }
+      ]
+    },
+    "voiceover": {
+      "scenes": {
+        "intro": { "audioUrl": "https://cdn.hired.video/studio/voiceover/intro-kokoro.wav", "durationSec": 5.4, "voiceId": "af_heart" },
+        "achievement": { "audioUrl": "https://cdn.hired.video/studio/voiceover/achievement-kokoro.wav", "durationSec": 6.1, "voiceId": "af_heart" }
+      }
+    },
+    "purpose": "resume"
+  },
+  "scenes": [
+    {
+      "id": "intro",
+      "start": 0,
+      "duration": 7,
+      "type": "intro",
+      "title": "Dana Reyes",
+      "subtitle": "Senior Platform Engineer · Acme Cloud",
+      "animation": {
+        "titleEnter": { "type": "slideUp", "start": 0.2, "duration": 0.6, "easing": "easeOut" },
+        "subtitleEnter": { "type": "fadeIn", "start": 0.7, "duration": 0.5, "easing": "easeOut" }
+      },
+      "effects": [{ "type": "particles", "intensity": 0.4 }]
+    },
+    {
+      "id": "achievement",
+      "start": 7,
+      "duration": 7,
+      "type": "achievement",
+      "title": "Key Achievements",
+      "items": [
+        "Led team of 10 engineers shipping 2× faster",
+        "Reduced infrastructure costs by 40%",
+        "Launched product used by 100k+ users"
+      ],
+      "sceneAudio": "https://cdn.hired.video/studio/voiceover/achievement-kokoro.wav",
+      "sceneAudioLabel": "Achievement narration"
+    },
+    {
+      "id": "skills",
+      "start": 14,
+      "duration": 7,
+      "type": "skills",
+      "title": "Core Skills",
+      "skills": ["TypeScript", "React", "Node.js", "AWS", "System Design"],
+      "sceneElements": [
+        {
+          "id": "el-rec-1",
+          "kind": "audio",
+          "url": "https://cdn.hired.video/studio/recordings/skills-take2.webm",
+          "label": "Recorded take",
+          "box": { "x": 0, "y": 0, "w": 10, "h": 10 }
+        }
+      ]
+    },
+    {
+      "id": "closing",
+      "start": 21,
+      "duration": 7,
+      "type": "closing",
+      "title": "Let's Connect",
+      "subtitle": "linkedin.com/in/danareyes"
+    }
+  ],
+  "_name": "Dana — platform video",
+  "_prompt": "Create a professional 28-second video resume",
+  "_jobDescription": "Staff Platform Engineer at Initech",
+  "_purpose": "resume",
+  "_rev": 7,
+  "_meta": { "bakedHash": "b5e1f0", "savePipelineDisabled": ["render"] }
+}

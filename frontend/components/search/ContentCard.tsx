@@ -1,0 +1,113 @@
+import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { Newspaper, BookOpen, HelpCircle, ArrowRight } from "lucide-react";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import BaseCard from "@/components/ui/BaseCard";
+import { CardActions } from "@/components/ui/CardActions";
+import { buildShareAction } from "@/lib/card-share-action";
+import { articleCategoryI18nKey } from "@/lib/article-category";
+import type { DynamicCardAction } from "@/lib/dynamic-actions";
+import EntityMedia from "@/components/studio/EntityMedia";
+import MonoChip from "@/components/templates/MonoChip";
+import { MetaLine } from "@/components/content/ReadingLayout";
+
+// Unified search surfaces three static content types (articles, guides, FAQs)
+// alongside dynamic DB cards. They share this presentation so the search
+// results grid stays visually coherent regardless of source. Tools render via
+// the catalog-aware <ToolCard> instead so /search and /tools stay identical.
+interface ContentItem {
+  id: string;
+  type: "article" | "guide" | "faq";
+  title?: string;
+  name?: string;
+  summary?: string;
+  href?: string;
+  category?: string;
+  tier?: "free" | "pro";
+  readingTime?: number;
+  /** Author user id for `type === "article"` rows so the EntityMedia rail
+   *  can mount the author's studio projects + the create chip self-gates
+   *  via `useEntityOwnership` (gap #325). */
+  userId?: string;
+}
+
+// i18n keys resolved at render (this map is module-level, before the hook is
+// available). Icon stays here; label/cta are looked up per `item.type`.
+const TYPE_META = {
+  article: { icon: Newspaper, labelKey: "contentCard.type.article", ctaKey: "contentCard.cta.article" },
+  guide: { icon: BookOpen, labelKey: "contentCard.type.guide", ctaKey: "contentCard.cta.guide" },
+  faq: { icon: HelpCircle, labelKey: "contentCard.type.faq", ctaKey: "contentCard.cta.faq" },
+} as const;
+
+export default function ContentCard({ item }: { item: ContentItem }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const meta = TYPE_META[item.type];
+  const Icon = meta.icon;
+  const label = t(meta.labelKey);
+  const title = item.title ?? item.name ?? "";
+  const href = item.href ?? "#";
+
+  const cardActions: DynamicCardAction[] = [
+    {
+      id: "open",
+      label: t(meta.ctaKey),
+      variant: "secondary",
+      icon: ArrowRight,
+      onClick: () => navigate(href),
+    },
+    buildShareAction({
+      entityUrl: href,
+      shareTitle: title || undefined,
+      shareText: item.summary || undefined,
+      copySuccessDescription: t("contentCard.linkCopied", { label }),
+    }),
+  ];
+
+  return (
+    <BaseCard className="flex h-full flex-col rounded-[20px] hover:shadow-none hover:border-primary/50">
+      <CardHeader>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent text-primary">
+              <Icon className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <MonoChip>{label}</MonoChip>
+          </div>
+          {item.tier === "pro" && <MonoChip>{t("labels.pro")}</MonoChip>}
+        </div>
+        <CardTitle className="pt-2 text-[17px] leading-snug line-clamp-2">
+          <Link to={href} className="transition-colors hover:text-primary">
+            {title}
+          </Link>
+        </CardTitle>
+        {item.summary && (
+          <CardDescription className="pt-1 line-clamp-3">
+            {item.summary}
+          </CardDescription>
+        )}
+      </CardHeader>
+      <CardContent className="mt-auto space-y-3">
+        <MetaLine
+          parts={[
+            item.category && t(articleCategoryI18nKey(item.category), { defaultValue: item.category }),
+            item.readingTime ? t("contentCard.minRead", { count: item.readingTime }) : null,
+          ]}
+        />
+        {/* Articles get the EntityMedia rail so the author's video promos
+         *  / podcast episodes / linked studio projects surface inline (gap
+         *  #325). The component is collapsed-by-default so it costs nothing
+         *  until the viewer expands; the create chip self-gates against the
+         *  authenticated viewer = article author check via useEntityOwnership. */}
+        {item.type === "article" && (
+          <EntityMedia
+            subject={{ kind: "article", id: item.id }}
+            ownerUserId={item.userId ?? null}
+            className="mt-2"
+          />
+        )}
+      </CardContent>
+      <CardActions actions={cardActions} />
+    </BaseCard>
+  );
+}

@@ -1,0 +1,755 @@
+// GigService — freelance / gig marketplace domain logic (#101).
+//
+// Hybrid model (decided 2026-06-12):
+//   • gig_projects / gig_bids  — the marketplace: any user posts a brief with
+//     deliverable items, others bid, the owner awards one. (#101 backend)
+//   • gig_milestones           — the deliverable items, defined at post time,
+//     each carrying its own escrow amount + status machine.
+//   • tasks                    — on award, every milestone is materialised as
+//     a personal task owned by the winning creator, so they work the gig on
+//     the SAME reusable kanban board as their personal tasks (Content Creator
+//     → Gigs). The task ↔ milestone link (tasks.gig_milestone_id) keeps the
+//     two in lock-step: completing the task submits the milestone for the
+//     poster to approve + release escrow.
+//
+// Route handlers stay thin — all multi-table writes (award, status sync) live
+// here behind a transaction so the bridge can't half-apply.
+
+import { and, asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { getDb, schema } from "../../db/index.js";
+import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrCreateDefaultBoard } from "../productivity/default-board.js";
+import { toTaskDto, type TaskDto } from "../productivity/task-dto.js";
+
+const { gigProjects, gigBids, gigMilestones, gigDisputes, gigDisputeEvents, tasks, users, userProfiles } = schema;
+
+// Milestone states from which a dispute may be opened. 'pending' (not started)
+// and the terminal 'released'/'refunded' can't be disputed; 'disputed' is
+// already open.
+const DISPUTABLE_MILESTONE_STATUSES = new Set(["in_progress", "submitted", "approved"]);
+
+// Platform fee on released milestone escrow (gap #101).
+const GIG_PLATFORM_FEE_RATE = 0.1;
+
+// Read-through cache wiring. Gig writes are low-volume, so a single global
+// version token (bumped on every write) keeps all gig read keys fresh without
+// per-entity dependency tracking. The keyspace is unbounded (open-gig list,
+// per-user lists), so it rides the version token; the 60s TTL is a backstop.
+const GIG_VERSION_KEY = "gigs:version";
+const GIG_TTL_SECONDS = 60;
+
+// ── status vocabularies ──────────────────────────────────────────────────
+// Personal-task status (frontend ProductivityItemStatus): ToDo=1, InProgress=3,
+// Completed=6. We materialise gig work at ToDo and read completion at 6.
+const TASK_TODO = 1;
+const TASK_COMPLETED_STATUSES = new Set([4, 6]); // Closed | Completed
+
+/** Map a personal-task status → the gig milestone status it implies. The
+ *  poster-only states (approved / released) are never set from here. */
+function taskStatusToMilestone(legacyStatus: number): "pending" | "in_progress" | "submitted" {
+  if (TASK_COMPLETED_STATUSES.has(legacyStatus)) return "submitted";
+  if (legacyStatus === 3) return "in_progress";
+  return "pending";
+}
+
+export interface GigItemInput {
+  title: string;
+  description?: string;
+  amountCents: number;
+}
+
+export interface CreateGigInput {
+  title: string;
+  description: string;
+  requiredSkills?: string[];
+  budgetKind?: "fixed" | "hourly";
+  budgetMinCents: number;
+  budgetMaxCents: number;
+  estimatedDurationDays?: number;
+  deadline?: string | null;
+  items?: GigItemInput[];
+}
+
+export interface PlaceBidInput {
+  coverLetter: string;
+  proposedAmountCents: number;
+  proposedDurationDays?: number;
+}
+
+export class GigError extends Error {
+  constructor(
+    public code: "NOT_FOUND" | "FORBIDDEN" | "CONFLICT" | "VALIDATION_ERROR",
+    message: string,
+  ) {
+    super(message);
+    this.name = "GigError";
+  }
+}
+
+export class GigService {
+  private get db() {
+    return getDb();
+  }
+
+  // ── cache version token ────────────────────────────────────────────────────
+
+  /** Current global gig cache version (rotates on every write). */
+  private async version(): Promise<string> {
+    return getOrSetCached<string>({
+      key: GIG_VERSION_KEY,
+      ttlSeconds: 600,
+      loader: async () => `${Date.now()}-${Math.floor(Math.random() * 1e9)}`,
+    });
+  }
+
+  /** Drop the version token so every cached gig read key becomes unreachable.
+   *  Called by every gig write (incl. the escrow-release route handler). */
+  bumpVersion(): void {
+    invalidateCachedKey(GIG_VERSION_KEY);
+  }
+
+  // ── projects ─────────────────────────────────────────────────────────────
+
+  /** Create a brief + its deliverable items (milestones). Any user may post. */
+  async createProject(ownerUserId: string, input: CreateGigInput) {
+    if (input.budgetMaxCents < input.budgetMinCents) {
+      throw new GigError("VALIDATION_ERROR", "budgetMaxCents must be >= budgetMinCents");
+    }
+    const items = input.items ?? [];
+    const result = await this.db.transaction(async (tx) => {
+      const [project] = await tx
+        .insert(gigProjects)
+        .values({
+          ownerUserId,
+          title: input.title,
+          description: input.description,
+          requiredSkills: input.requiredSkills ?? [],
+          budgetKind: input.budgetKind ?? "fixed",
+          budgetMinCents: input.budgetMinCents,
+          budgetMaxCents: input.budgetMaxCents,
+          estimatedDurationDays: input.estimatedDurationDays ?? null,
+          status: "open",
+        })
+        .returning();
+
+      let milestones: (typeof gigMilestones.$inferSelect)[] = [];
+      if (items.length > 0) {
+        milestones = await tx
+          .insert(gigMilestones)
+          .values(
+            items.map((it, i) => ({
+              projectId: project.id,
+              ordinal: i,
+              title: it.title,
+              amountCents: it.amountCents,
+              description: it.description ?? null,
+              status: "pending" as const,
+            })),
+          )
+          .returning();
+      }
+      return { project, milestones };
+    });
+    this.bumpVersion();
+    return result;
+  }
+
+  /** Open briefs accepting bids — the public marketplace grid. Cached. */
+  async listOpenProjects(limit = 100) {
+    const v = await this.version();
+    return getOrSetCached<(typeof gigProjects.$inferSelect)[]>({
+      key: `gigs:open:v1:${limit}:${v}`,
+      ttlSeconds: GIG_TTL_SECONDS,
+      loader: () =>
+        this.db
+          .select()
+          .from(gigProjects)
+          .where(eq(gigProjects.status, "open"))
+          .orderBy(desc(gigProjects.createdAt))
+          .limit(limit),
+    });
+  }
+
+  /** The caller's own posted briefs (owner view). Cached per user. */
+  async listMyProjects(ownerUserId: string) {
+    const v = await this.version();
+    return getOrSetCached<(typeof gigProjects.$inferSelect)[]>({
+      key: `gigs:mine:v1:${ownerUserId}:${v}`,
+      ttlSeconds: GIG_TTL_SECONDS,
+      loader: () =>
+        this.db
+          .select()
+          .from(gigProjects)
+          .where(eq(gigProjects.ownerUserId, ownerUserId))
+          .orderBy(desc(gigProjects.createdAt)),
+    });
+  }
+
+  /** Project + its deliverable items. Public read (bids are owner-gated). Cached. */
+  async getProject(projectId: string) {
+    const v = await this.version();
+    const cached = await getOrSetCached<{
+      project: typeof gigProjects.$inferSelect;
+      milestones: (typeof gigMilestones.$inferSelect)[];
+    } | null>({
+      key: `gigs:detail:v1:${projectId}:${v}`,
+      ttlSeconds: GIG_TTL_SECONDS,
+      loader: async () => {
+        const [project] = await this.db
+          .select()
+          .from(gigProjects)
+          .where(eq(gigProjects.id, projectId))
+          .limit(1);
+        if (!project) return null;
+        const milestones = await this.db
+          .select()
+          .from(gigMilestones)
+          .where(eq(gigMilestones.projectId, projectId))
+          .orderBy(asc(gigMilestones.ordinal));
+        return { project, milestones };
+      },
+    });
+    if (!cached) throw new GigError("NOT_FOUND", "Project not found");
+    return cached;
+  }
+
+  // ── bids ───────────────────────────────────────────────────────────────
+
+  async placeBid(projectId: string, bidderUserId: string, input: PlaceBidInput) {
+    const [project] = await this.db
+      .select({ id: gigProjects.id, ownerUserId: gigProjects.ownerUserId, status: gigProjects.status })
+      .from(gigProjects)
+      .where(eq(gigProjects.id, projectId))
+      .limit(1);
+    if (!project) throw new GigError("NOT_FOUND", "Project not found");
+    if (project.ownerUserId === bidderUserId) {
+      throw new GigError("FORBIDDEN", "You can't bid on your own project");
+    }
+    if (project.status !== "open") {
+      throw new GigError("CONFLICT", "Project is not accepting bids");
+    }
+    const [row] = await this.db
+      .insert(gigBids)
+      .values({
+        projectId: project.id,
+        bidderUserId,
+        coverLetter: input.coverLetter,
+        proposedAmountCents: input.proposedAmountCents,
+        proposedDurationDays: input.proposedDurationDays ?? null,
+        status: "submitted",
+      })
+      .onConflictDoUpdate({
+        target: [gigBids.projectId, gigBids.bidderUserId],
+        set: {
+          coverLetter: input.coverLetter,
+          proposedAmountCents: input.proposedAmountCents,
+          proposedDurationDays: input.proposedDurationDays ?? null,
+          status: "submitted",
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    this.bumpVersion();
+    return row;
+  }
+
+  /** Owner-gated list of bids on a project, with bidder display name. */
+  async listBidsForProject(projectId: string, ownerUserId: string) {
+    const [project] = await this.db
+      .select({ ownerUserId: gigProjects.ownerUserId })
+      .from(gigProjects)
+      .where(eq(gigProjects.id, projectId))
+      .limit(1);
+    if (!project) throw new GigError("NOT_FOUND", "Project not found");
+    if (project.ownerUserId !== ownerUserId) {
+      throw new GigError("FORBIDDEN", "Only the project owner can view bids");
+    }
+    return this.db
+      .select({
+        bid: gigBids,
+        bidderName: users.name,
+        bidderAvatarUrl: userProfiles.avatarUrl,
+      })
+      .from(gigBids)
+      .leftJoin(users, eq(users.id, gigBids.bidderUserId))
+      .leftJoin(userProfiles, eq(userProfiles.userId, gigBids.bidderUserId))
+      .where(eq(gigBids.projectId, projectId))
+      .orderBy(asc(gigBids.proposedAmountCents));
+  }
+
+  /** Bids the caller has placed, each with its project summary. Cached per user. */
+  async listMyBids(bidderUserId: string) {
+    const v = await this.version();
+    return getOrSetCached<{ bid: typeof gigBids.$inferSelect; project: typeof gigProjects.$inferSelect }[]>({
+      key: `gigs:mybids:v1:${bidderUserId}:${v}`,
+      ttlSeconds: GIG_TTL_SECONDS,
+      loader: () =>
+        this.db
+          .select({ bid: gigBids, project: gigProjects })
+          .from(gigBids)
+          .innerJoin(gigProjects, eq(gigProjects.id, gigBids.projectId))
+          .where(eq(gigBids.bidderUserId, bidderUserId))
+          .orderBy(desc(gigBids.createdAt)),
+    });
+  }
+
+  /**
+   * Award a bid: mark it awarded, reject the competing bids, move the project
+   * to in_progress, and materialise every deliverable item as a personal task
+   * owned by the winning creator. Idempotent-safe via the unique index on
+   * tasks.gig_milestone_id (a retry skips already-bridged milestones).
+   */
+  async awardBid(bidId: string, ownerUserId: string) {
+    const [bid] = await this.db.select().from(gigBids).where(eq(gigBids.id, bidId)).limit(1);
+    if (!bid) throw new GigError("NOT_FOUND", "Bid not found");
+    const [project] = await this.db
+      .select()
+      .from(gigProjects)
+      .where(eq(gigProjects.id, bid.projectId))
+      .limit(1);
+    if (!project) throw new GigError("NOT_FOUND", "Project not found");
+    if (project.ownerUserId !== ownerUserId) throw new GigError("FORBIDDEN", "Owner only");
+    if (project.status !== "open") {
+      throw new GigError("CONFLICT", "Project already in progress / closed");
+    }
+
+    const boardId = await getOrCreateDefaultBoard(bid.bidderUserId, this.db);
+    const milestones = await this.db
+      .select()
+      .from(gigMilestones)
+      .where(eq(gigMilestones.projectId, project.id))
+      .orderBy(asc(gigMilestones.ordinal));
+
+    // Milestones already bridged in a prior (failed) award → don't double-insert.
+    const alreadyBridged = milestones.length
+      ? new Set(
+          (
+            await this.db
+              .select({ gigMilestoneId: tasks.gigMilestoneId })
+              .from(tasks)
+              .where(inArray(tasks.gigMilestoneId, milestones.map((m) => m.id)))
+          ).map((r) => r.gigMilestoneId),
+        )
+      : new Set<string | null>();
+
+    const nowIso = new Date().toISOString();
+    const endIso = project.estimatedDurationDays
+      ? new Date(Date.now() + project.estimatedDurationDays * 86_400_000).toISOString()
+      : undefined;
+
+    await this.db.transaction(async (tx) => {
+      await tx.update(gigBids).set({ status: "awarded", updatedAt: new Date() }).where(eq(gigBids.id, bid.id));
+      await tx
+        .update(gigBids)
+        .set({ status: "rejected", updatedAt: new Date() })
+        .where(and(eq(gigBids.projectId, project.id), eq(gigBids.status, "submitted")));
+      await tx
+        .update(gigProjects)
+        .set({ status: "in_progress", awardedBidId: bid.id, updatedAt: new Date() })
+        .where(eq(gigProjects.id, project.id));
+
+      const fresh = milestones.filter((m) => !alreadyBridged.has(m.id));
+      if (fresh.length > 0) {
+        await tx.insert(tasks).values(
+          fresh.map((m) => ({
+            boardId,
+            userId: bid.bidderUserId,
+            title: m.title,
+            description: m.description,
+            gigProjectId: project.id,
+            gigMilestoneId: m.id,
+            // Legacy DTO fields live in metadata. taskType 1 = Project.
+            metadata: {
+              start: nowIso,
+              end: endIso,
+              taskType: 1,
+              legacyStatus: TASK_TODO,
+              gigProjectId: project.id,
+              gigTitle: project.title,
+            } as Record<string, unknown>,
+          })) as any,
+        );
+        await tx
+          .update(gigMilestones)
+          .set({ status: "in_progress", updatedAt: new Date() })
+          .where(inArray(gigMilestones.id, fresh.map((m) => m.id)));
+      }
+    });
+
+    this.bumpVersion();
+    return { awarded: true, bidId: bid.id, projectId: project.id, tasksCreated: milestones.length };
+  }
+
+  // ── creator work board ────────────────────────────────────────────────────
+
+  /** The creator's awarded gig work — materialised tasks as TaskDTOs, plus the
+   *  parent projects so the Gigs tab can group + label. */
+  async listMyWork(creatorUserId: string): Promise<{
+    tasks: TaskDto[];
+    projects: { id: string; title: string; status: string }[];
+  }> {
+    const v = await this.version();
+    return getOrSetCached<{ tasks: TaskDto[]; projects: { id: string; title: string; status: string }[] }>({
+      key: `gigs:work:v1:${creatorUserId}:${v}`,
+      ttlSeconds: GIG_TTL_SECONDS,
+      loader: async () => {
+        const rows = await this.db
+          .select()
+          .from(tasks)
+          .where(and(eq(tasks.userId, creatorUserId), isNotNull(tasks.gigProjectId)))
+          .orderBy(desc(tasks.createdAt));
+        const dtos = rows.map(toTaskDto);
+
+        const projectIds = Array.from(new Set(rows.map((r) => r.gigProjectId).filter(Boolean) as string[]));
+        const projects = projectIds.length
+          ? await this.db
+              .select({ id: gigProjects.id, title: gigProjects.title, status: gigProjects.status })
+              .from(gigProjects)
+              .where(inArray(gigProjects.id, projectIds))
+          : [];
+        return { tasks: dtos, projects };
+      },
+    });
+  }
+
+  /**
+   * Update a gig work item's status (creator-driven, from the kanban). Writes
+   * the task's legacyStatus AND syncs the linked milestone so the poster sees
+   * progress. Creator-owned tasks only.
+   */
+  async updateWorkStatus(taskId: string, creatorUserId: string, legacyStatus: number): Promise<TaskDto> {
+    const [task] = await this.db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.id, taskId), eq(tasks.userId, creatorUserId), isNotNull(tasks.gigProjectId)))
+      .limit(1);
+    if (!task) throw new GigError("NOT_FOUND", "Gig work item not found");
+
+    const existingMeta = (task.metadata as Record<string, unknown> | null) ?? {};
+    const [updated] = await this.db
+      .update(tasks)
+      .set({
+        metadata: { ...existingMeta, legacyStatus },
+        completedAt: TASK_COMPLETED_STATUSES.has(legacyStatus) ? new Date() : null,
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(tasks.id, taskId))
+      .returning();
+
+    if (task.gigMilestoneId) {
+      // Never downgrade a milestone the poster already approved/released.
+      const [milestone] = await this.db
+        .select({ status: gigMilestones.status })
+        .from(gigMilestones)
+        .where(eq(gigMilestones.id, task.gigMilestoneId))
+        .limit(1);
+      const locked = milestone && ["approved", "released", "disputed"].includes(milestone.status);
+      if (!locked) {
+        await this.db
+          .update(gigMilestones)
+          .set({ status: taskStatusToMilestone(legacyStatus), updatedAt: new Date() })
+          .where(eq(gigMilestones.id, task.gigMilestoneId));
+      }
+    }
+    this.bumpVersion();
+    return toTaskDto(updated);
+  }
+
+  // ── milestones (poster-side escrow controls) ──────────────────────────────
+
+  async addMilestone(
+    projectId: string,
+    ownerUserId: string,
+    input: { ordinal?: number; title: string; amountCents: number; description?: string },
+  ) {
+    const [project] = await this.db
+      .select({ id: gigProjects.id, ownerUserId: gigProjects.ownerUserId })
+      .from(gigProjects)
+      .where(eq(gigProjects.id, projectId))
+      .limit(1);
+    if (!project) throw new GigError("NOT_FOUND", "Project not found");
+    if (project.ownerUserId !== ownerUserId) throw new GigError("FORBIDDEN", "Owner only");
+    const [row] = await this.db
+      .insert(gigMilestones)
+      .values({
+        projectId: project.id,
+        ordinal: input.ordinal ?? 0,
+        title: input.title,
+        amountCents: input.amountCents,
+        description: input.description ?? null,
+        status: "pending",
+      })
+      .returning();
+    this.bumpVersion();
+    return row;
+  }
+
+  async approveMilestone(milestoneId: string, ownerUserId: string) {
+    const milestone = await this.requireOwnedMilestone(milestoneId, ownerUserId);
+    const [row] = await this.db
+      .update(gigMilestones)
+      .set({ status: "approved", approvedAt: new Date(), updatedAt: new Date() })
+      .where(eq(gigMilestones.id, milestone.id))
+      .returning();
+    this.bumpVersion();
+    return row;
+  }
+
+  private async requireOwnedMilestone(milestoneId: string, ownerUserId: string) {
+    const [milestone] = await this.db
+      .select()
+      .from(gigMilestones)
+      .where(eq(gigMilestones.id, milestoneId))
+      .limit(1);
+    if (!milestone) throw new GigError("NOT_FOUND", "Milestone not found");
+    const [project] = await this.db
+      .select({ ownerUserId: gigProjects.ownerUserId, awardedBidId: gigProjects.awardedBidId })
+      .from(gigProjects)
+      .where(eq(gigProjects.id, milestone.projectId))
+      .limit(1);
+    if (!project || project.ownerUserId !== ownerUserId) throw new GigError("FORBIDDEN", "Owner only");
+    return milestone;
+  }
+
+  // ── escrow release (shared by the route + dispute resolution) ──────────────
+
+  /** Resolve the awarded creator's user id for a project, or null if unawarded. */
+  private async awardedBidderUserId(projectId: string): Promise<string | null> {
+    const [project] = await this.db
+      .select({ awardedBidId: gigProjects.awardedBidId })
+      .from(gigProjects)
+      .where(eq(gigProjects.id, projectId))
+      .limit(1);
+    if (!project?.awardedBidId) return null;
+    const [bid] = await this.db
+      .select({ bidderUserId: gigBids.bidderUserId })
+      .from(gigBids)
+      .where(eq(gigBids.id, project.awardedBidId))
+      .limit(1);
+    return bid?.bidderUserId ?? null;
+  }
+
+  /** Core escrow release: credit the bidder (minus the platform fee) and flip
+   *  the milestone to 'released'. Authority + releasable-state are the caller's
+   *  responsibility — the normal route gates on owner + 'approved'; dispute
+   *  resolution releases a 'disputed' milestone on the mediator's decision. */
+  private async releaseEscrowCore(
+    milestone: { id: string; amountCents: number; title: string },
+    bidderUserId: string,
+  ): Promise<{ grossCents: number; platformFeeCents: number; creatorCents: number }> {
+    const grossCents = milestone.amountCents;
+    const platformFeeCents = Math.round(grossCents * GIG_PLATFORM_FEE_RATE);
+    const creatorCents = grossCents - platformFeeCents;
+    const { payoutLedgerService } = await import("../payout/PayoutLedgerService.js");
+    await payoutLedgerService.recordAccrual({
+      userId: bidderUserId,
+      amountCents: creatorCents,
+      currency: "USD",
+      sourceKind: "service_order",
+      sourceId: milestone.id,
+      note: `Gig milestone "${milestone.title}" released (10% platform fee: $${(platformFeeCents / 100).toFixed(2)})`,
+    });
+    await this.db
+      .update(gigMilestones)
+      .set({ status: "released", releasedAt: new Date(), updatedAt: new Date() })
+      .where(eq(gigMilestones.id, milestone.id));
+    return { grossCents, platformFeeCents, creatorCents };
+  }
+
+  /** Owner-gated release of an approved milestone (the normal happy path). */
+  async releaseMilestoneEscrow(milestoneId: string, ownerUserId: string) {
+    const [milestone] = await this.db
+      .select()
+      .from(gigMilestones)
+      .where(eq(gigMilestones.id, milestoneId))
+      .limit(1);
+    if (!milestone) throw new GigError("NOT_FOUND", "Milestone not found");
+    if (milestone.status !== "approved") {
+      throw new GigError("CONFLICT", "Milestone must be approved before release");
+    }
+    const [project] = await this.db
+      .select({ ownerUserId: gigProjects.ownerUserId })
+      .from(gigProjects)
+      .where(eq(gigProjects.id, milestone.projectId))
+      .limit(1);
+    if (!project || project.ownerUserId !== ownerUserId) throw new GigError("FORBIDDEN", "Owner only");
+    const bidderUserId = await this.awardedBidderUserId(milestone.projectId);
+    if (!bidderUserId) throw new GigError("CONFLICT", "Project has no awarded bidder");
+
+    const payout = await this.releaseEscrowCore(milestone, bidderUserId);
+    this.bumpVersion();
+    return { milestone: { ...milestone, status: "released" }, payout, bidderUserId };
+  }
+
+  // ── disputes (#1768) ───────────────────────────────────────────────────────
+
+  /** Owner + awarded creator are the dispute participants. */
+  private async disputeParticipants(projectId: string): Promise<{ ownerUserId: string; creatorUserId: string | null }> {
+    const [project] = await this.db
+      .select({ ownerUserId: gigProjects.ownerUserId })
+      .from(gigProjects)
+      .where(eq(gigProjects.id, projectId))
+      .limit(1);
+    if (!project) throw new GigError("NOT_FOUND", "Project not found");
+    const creatorUserId = await this.awardedBidderUserId(projectId);
+    return { ownerUserId: project.ownerUserId, creatorUserId };
+  }
+
+  /** Open a dispute on a milestone. Either participant may open; the milestone
+   *  freezes into 'disputed' and the reason becomes the first timeline entry. */
+  async openDispute(milestoneId: string, byUserId: string, reason: string) {
+    const [milestone] = await this.db
+      .select()
+      .from(gigMilestones)
+      .where(eq(gigMilestones.id, milestoneId))
+      .limit(1);
+    if (!milestone) throw new GigError("NOT_FOUND", "Milestone not found");
+    const { ownerUserId, creatorUserId } = await this.disputeParticipants(milestone.projectId);
+    if (byUserId !== ownerUserId && byUserId !== creatorUserId) {
+      throw new GigError("FORBIDDEN", "Only the poster or the awarded creator can open a dispute");
+    }
+    if (!DISPUTABLE_MILESTONE_STATUSES.has(milestone.status)) {
+      throw new GigError("CONFLICT", `A ${milestone.status} milestone cannot be disputed`);
+    }
+
+    const dispute = await this.db.transaction(async (tx) => {
+      await tx
+        .update(gigMilestones)
+        .set({ status: "disputed", updatedAt: new Date() })
+        .where(eq(gigMilestones.id, milestone.id));
+      const [row] = await tx
+        .insert(gigDisputes)
+        .values({
+          milestoneId: milestone.id,
+          projectId: milestone.projectId,
+          openedByUserId: byUserId,
+          reason,
+          status: "open",
+        })
+        .returning();
+      await tx.insert(gigDisputeEvents).values({
+        disputeId: row.id,
+        authorUserId: byUserId,
+        kind: "evidence",
+        body: reason,
+      });
+      return row;
+    });
+
+    this.bumpVersion();
+    return dispute;
+  }
+
+  private async requireOpenDisputeParticipant(disputeId: string, userId: string, allowMediator: boolean) {
+    const [dispute] = await this.db
+      .select()
+      .from(gigDisputes)
+      .where(eq(gigDisputes.id, disputeId))
+      .limit(1);
+    if (!dispute) throw new GigError("NOT_FOUND", "Dispute not found");
+    const { ownerUserId, creatorUserId } = await this.disputeParticipants(dispute.projectId);
+    const isParticipant = userId === ownerUserId || userId === creatorUserId;
+    if (!isParticipant && !allowMediator) throw new GigError("FORBIDDEN", "Not a dispute participant");
+    return { dispute, ownerUserId, creatorUserId, isParticipant };
+  }
+
+  /** Append an evidence/comment entry to an open dispute's timeline. */
+  async addDisputeEvent(
+    disputeId: string,
+    authorUserId: string,
+    kind: "evidence" | "comment",
+    body: string,
+    attachments: Array<{ url: string; name?: string }> = [],
+  ) {
+    const { dispute } = await this.requireOpenDisputeParticipant(disputeId, authorUserId, false);
+    if (dispute.status !== "open") throw new GigError("CONFLICT", "Dispute is already resolved");
+    const [event] = await this.db
+      .insert(gigDisputeEvents)
+      .values({ disputeId, authorUserId, kind, body, attachments })
+      .returning();
+    this.bumpVersion();
+    return event;
+  }
+
+  /** Full dispute view (dispute + milestone + ordered timeline) for the latest
+   *  dispute on a milestone. Access = participants or a mediator (SuperAdmin). */
+  async getDisputeForMilestone(milestoneId: string, requesterUserId: string, isMediator: boolean) {
+    const [dispute] = await this.db
+      .select()
+      .from(gigDisputes)
+      .where(eq(gigDisputes.milestoneId, milestoneId))
+      .orderBy(desc(gigDisputes.createdAt))
+      .limit(1);
+    if (!dispute) throw new GigError("NOT_FOUND", "No dispute for this milestone");
+    const { ownerUserId, creatorUserId } = await this.disputeParticipants(dispute.projectId);
+    const isParticipant = requesterUserId === ownerUserId || requesterUserId === creatorUserId;
+    if (!isParticipant && !isMediator) throw new GigError("FORBIDDEN", "Not a dispute participant");
+    const events = await this.db
+      .select()
+      .from(gigDisputeEvents)
+      .where(eq(gigDisputeEvents.disputeId, dispute.id))
+      .orderBy(asc(gigDisputeEvents.createdAt));
+    return { dispute, events };
+  }
+
+  /** Mediator decision: 'release' pays the creator, 'refund' returns the
+   *  milestone to the poster. Closes the dispute. Caller verifies mediator
+   *  authority (SuperAdmin) before calling. */
+  async resolveDispute(
+    disputeId: string,
+    mediatorUserId: string,
+    resolution: "release" | "refund",
+    note: string,
+  ) {
+    const [dispute] = await this.db
+      .select()
+      .from(gigDisputes)
+      .where(eq(gigDisputes.id, disputeId))
+      .limit(1);
+    if (!dispute) throw new GigError("NOT_FOUND", "Dispute not found");
+    if (dispute.status !== "open") throw new GigError("CONFLICT", "Dispute is already resolved");
+    const [milestone] = await this.db
+      .select()
+      .from(gigMilestones)
+      .where(eq(gigMilestones.id, dispute.milestoneId))
+      .limit(1);
+    if (!milestone) throw new GigError("NOT_FOUND", "Milestone not found");
+
+    let payout: { grossCents: number; platformFeeCents: number; creatorCents: number } | null = null;
+    if (resolution === "release") {
+      const bidderUserId = await this.awardedBidderUserId(dispute.projectId);
+      if (!bidderUserId) throw new GigError("CONFLICT", "Project has no awarded bidder to pay");
+      payout = await this.releaseEscrowCore(milestone, bidderUserId);
+    } else {
+      await this.db
+        .update(gigMilestones)
+        .set({ status: "refunded", updatedAt: new Date() })
+        .where(eq(gigMilestones.id, milestone.id));
+    }
+
+    const now = new Date();
+    const [resolved] = await this.db
+      .update(gigDisputes)
+      .set({
+        status: "resolved",
+        resolution,
+        resolutionNote: note,
+        resolvedByUserId: mediatorUserId,
+        resolvedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(gigDisputes.id, dispute.id))
+      .returning();
+    await this.db.insert(gigDisputeEvents).values({
+      disputeId: dispute.id,
+      authorUserId: mediatorUserId,
+      kind: "decision",
+      body: `Resolved — escrow ${resolution === "release" ? "released to creator" : "refunded to poster"}. ${note}`,
+    });
+
+    this.bumpVersion();
+    return { dispute: resolved, payout };
+  }
+}
+
+export const gigService = new GigService();

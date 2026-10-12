@@ -1,0 +1,829 @@
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
+import { trackJobSeekerStage } from "@/lib/analytics/jobseeker-funnel";
+import { useQueryClient } from "@tanstack/react-query";
+import { logger } from "./logger";
+import { authService, type UserProfile, type ProfileUpdate, type EmailVerificationChallenge , TwoFactorChallenge as ServiceTwoFactorChallenge } from "./services/auth-service";
+import * as impersonationService from "./services/impersonation-service";
+import { fetchBootstrap } from "./services/bootstrap-service";
+import { clearInboxSeed } from "./inbox-seed";
+import { apiClient, setEmulationTokenGetter } from "./api-client";
+import { PersonaPreviewContext } from "@/providers/PersonaPreviewProvider";
+import { attributionPayload } from "./attribution";
+import { isGuestEmail } from "@shared/guest-accounts";
+
+// Role constants to avoid hardcoded strings
+import { USER_ROLES, type UserRole } from "@shared/user-roles";
+export { USER_ROLES, type UserRole };
+
+/**
+ * User interface for frontend context
+ * Extends UserProfile from API with computed/frontend-specific fields
+ */
+export interface User extends Omit<UserProfile, 'role' | 'createdAt' | 'updatedAt'> {
+  name: string; // Computed from firstName + lastName
+  role?: UserRole; // Typed enum instead of string
+  onboardingComplete: boolean; // Frontend-specific flag
+  avatar?: string; // Alias for profilePicture for backward compatibility
+}
+
+interface TwoFactorChallengeUI {
+  requiresTwoFactor: true;
+  email: string;
+  expiresAt: string;
+}
+
+interface EmailVerificationChallengeUI {
+  requiresEmailVerification: true;
+  email?: string;
+}
+
+// ── Impersonation session state ───────────────────────────────────────────────
+export interface ImpersonationSession {
+  sessionId: string;
+  token: string;           // emulation JWT — stored in memory only, never localStorage
+  targetUser: { id: string; email: string; name: string };
+  role: string;
+  startedAt: string;
+  expiresAt: string;
+  debuggerEnabled: boolean;
+}
+
+interface AuthContextType {
+  user: User | null;
+  isSuperAdmin: boolean;
+  // Impersonation
+  impersonationSession: ImpersonationSession | null;
+  isImpersonating: boolean;
+  startImpersonation: (targetUserId: string, reason: string, enableDebugger?: boolean) => Promise<ImpersonationSession>;
+  endImpersonation: () => Promise<void>;
+  switchImpersonationRole: (role: string) => Promise<void>;
+  // Auth
+  login: (
+    email: string,
+    password: string,
+    rememberMe?: boolean,
+    cfTurnstileToken?: string,
+  ) => Promise<true | TwoFactorChallengeUI | EmailVerificationChallengeUI>;
+  verifyTwoFactor: (code: string, trustDevice?: boolean) => Promise<boolean>;
+  resendTwoFactorCode: () => Promise<boolean>;
+  resendEmailVerification: () => Promise<boolean>;
+  loginWithToken: (token: string) => Promise<void>;
+  getVerificationStatus: () => Promise<{ email?: string; emailConfirmed: boolean; sentAt?: string; sendCount?: number }>;
+  signup: (
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string,
+    role?: UserRole,
+    referralCode?: string,
+    enableAffiliate?: boolean,
+    cfTurnstileToken?: string,
+    language?: string,
+  ) => Promise<void>;
+  logout: () => Promise<void>;
+  updateUserRole: (role: UserRole) => Promise<void>;
+  updateProfile: (updates: ProfileUpdate) => Promise<void>;
+  completeOnboarding: () => void;
+  /** Signed in with a REAL account (false for a guest session). */
+  isAuthenticated: boolean;
+  /** Signed in as a silent guest account (no email yet). Guests can build,
+   *  save and post to ONE destination; download and multi-destination
+   *  posting need a real account. */
+  isGuest: boolean;
+  /** Make sure there is a server identity: no-op when signed in (guest or
+   *  real), otherwise mints a guest session. Resolves false on failure. */
+  ensureGuestSession: () => Promise<boolean>;
+  isLoading: boolean;
+  isEmailVerified?: boolean;
+  refreshUser: () => Promise<void>;
+  apiCall: (url: string, options?: RequestInit) => Promise<any>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Helper function to convert UserProfile to User
+function userProfileToUser(profile: UserProfile): User {
+  const effectiveRole = profile.role as UserRole;
+
+  return {
+    id: profile.id,
+    email: profile.email,
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    name: `${profile.firstName} ${profile.lastName}`,
+    role: effectiveRole,
+    onboardingComplete: true, // Assume completed if profile exists
+    avatar: profile.profilePicture,
+    profilePicture: profile.profilePicture,
+    bio: profile.bio,
+    headline: profile.headline,
+    location: profile.location,
+    website: profile.website,
+    linkedIn: profile.linkedIn,
+    github: profile.github,
+    twitter: profile.twitter,
+    phone: profile.phone,
+    skills: profile.skills,
+    industries: profile.industries,
+    openToWork: profile.openToWork,
+    openToRemote: profile.openToRemote,
+    preferredRoles: profile.preferredRoles,
+    salaryExpectation: profile.salaryExpectation,
+    salaryCurrency: profile.salaryCurrency,
+    yearsOfExperience: profile.yearsOfExperience,
+    isDemo: profile.isDemo,
+    slug: profile.slug,
+    currentRole: profile.currentRole,
+    currentCompany: profile.currentCompany,
+  };
+}
+
+interface AuthProviderProps {
+  children: React.ReactNode;
+  initialUser?: User | null;
+}
+
+// Resend the verification email at most once per minute per browser, so landing
+// on the gate after login doesn't re-trigger a send on every mount.
+async function maybeResendVerificationEmail(sentAt?: string): Promise<void> {
+  const ONE_MINUTE_MS = 60_000;
+  try {
+    const lastSent = Number(localStorage.getItem("verify_email_last_sent_at") || 0);
+    const serverSentMs = sentAt ? new Date(sentAt).getTime() : 0;
+    const mostRecent = Math.max(lastSent, Number.isFinite(serverSentMs) ? serverSentMs : 0);
+    if (mostRecent && Date.now() - mostRecent < ONE_MINUTE_MS) return;
+
+    const ok = await authService.resendEmailVerification();
+    if (ok) localStorage.setItem("verify_email_last_sent_at", String(Date.now()));
+  } catch {
+    // Best-effort; the gate also exposes a manual resend button.
+  }
+}
+
+export function AuthProvider({ children, initialUser }: AuthProviderProps) {
+  const [user, setUser] = useState<User | null>(initialUser || null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isEmailVerified, setIsEmailVerified] = useState<boolean | undefined>(undefined);
+  // Impersonation session — stored in memory only (never localStorage)
+  const [impersonationSession, setImpersonationSession] = useState<ImpersonationSession | null>(null);
+  const impersonationTokenRef = useRef<string | null>(null);
+  const queryClient = useQueryClient();
+
+  // Register a module-level getter so apiClient can read the current emulation
+  // token on each outgoing request. Stored in a ref so the getter identity is
+  // stable across re-renders.
+  useEffect(() => {
+    impersonationTokenRef.current = impersonationSession?.token ?? null;
+  }, [impersonationSession?.token]);
+
+  useEffect(() => {
+    setEmulationTokenGetter(() => impersonationTokenRef.current);
+    return () => setEmulationTokenGetter(() => null);
+  }, []);
+
+  // Check auth consistency on every render - if we have a user but no auth token, clear the user
+  useEffect(() => {
+    if (user && !authService.isAuthenticated()) {
+      console.log(
+        "Auth Context: User exists but no auth token found, clearing user state",
+      );
+      setUser(null);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    // Check for stored user and token on mount
+    const initializeAuth = async () => {
+      try {
+        logger.info("AuthProvider: initializing auth");
+        if (authService.isAuthenticated()) {
+          logger.info("AuthProvider: authenticated; checking stored user");
+          const storedUser = authService.getStoredUser();
+          if (storedUser) {
+            logger.info(
+              "AuthProvider: found stored user; setting from storage (no /me fetch)",
+            );
+            setUser(userProfileToUser(storedUser));
+          } else {
+            // Do not call /users/me globally; defer to /profile page
+            logger.info(
+              "AuthProvider: no stored user; deferring /Users/me fetch until /profile",
+            );
+          }
+
+          // Single-round-trip bootstrap (gap #1367) — collapses
+          // verification-status + token-budget + feature-flags +
+          // unread-count into one /api/bootstrap call and seeds the
+          // downstream caches so per-slice hooks read from memory.
+          // Falls back to per-endpoint fetches on any sub-slice failure.
+          try {
+            const bootstrap = await fetchBootstrap();
+            if (isGuestEmail(storedUser?.email)) {
+              // Guests have no email to verify — never the verify gate.
+              setIsEmailVerified(true);
+            } else if (bootstrap?.verification) {
+              setIsEmailVerified(bootstrap.verification.emailConfirmed);
+              if (!bootstrap.verification.emailConfirmed) {
+                await maybeResendVerificationEmail(bootstrap.verification.sentAt);
+              }
+            } else {
+              const status = await authService.getVerificationStatus();
+              setIsEmailVerified(status.emailConfirmed);
+              if (!status.emailConfirmed) {
+                await maybeResendVerificationEmail(status.sentAt);
+              }
+            }
+          } catch (err) {
+            logger.warn?.("AuthProvider: bootstrap init failed", err);
+            setIsEmailVerified(undefined);
+          }
+
+          // Reclaim any orphaned impersonation session left behind by a page
+          // reload (emulation tokens are memory-only, so after a reload the
+          // backend row still exists but the frontend can no longer use it —
+          // ending it frees the SA to start a new session).
+          const storedForOrphanCheck = authService.getStoredUser();
+          if (storedForOrphanCheck?.role === USER_ROLES.SUPER_ADMIN) {
+            try {
+              const active = await impersonationService.getActiveImpersonation();
+              if (active?.id) {
+                await impersonationService.endImpersonation(active.id);
+              }
+            } catch (err) {
+              logger.warn?.("AuthProvider: orphan impersonation cleanup failed", err);
+            }
+          }
+        } else {
+          logger.info("AuthProvider: not authenticated; skipping user fetch");
+        }
+      } catch (error) {
+        console.error("Failed to initialize auth:", error);
+        logger.error("AuthProvider: initialization failed", error);
+        // Clear invalid auth data
+        await authService.logout();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Listen for logout events from API client (401 errors, auth failures, etc.)
+    const handleAuthLogout = () => {
+      console.log(
+        "Auth Context: Auth logout event received, clearing user state",
+      );
+      setUser(null);
+    };
+
+    // Any EMAIL_NOT_VERIFIED error anywhere in the app flips the gate.
+    const handleEmailUnverified = () => {
+      setIsEmailVerified((prev) => (prev === false ? prev : false));
+    };
+
+    // Also check localStorage periodically to detect if auth data was cleared externally
+    const checkAuthConsistency = () => {
+      if (user && !authService.isAuthenticated()) {
+        console.log(
+          "Auth Context: Detected auth data cleared externally, clearing user state",
+        );
+        setUser(null);
+      }
+    };
+
+    window.addEventListener("auth-logout", handleAuthLogout);
+    window.addEventListener("auth-email-unverified", handleEmailUnverified);
+
+    // Check auth consistency every 1 second
+    const authCheckInterval = setInterval(checkAuthConsistency, 1000);
+
+    // Only initialize if no initial user is provided (for testing)
+    if (initialUser === undefined) {
+      initializeAuth();
+    } else {
+      setIsLoading(false);
+    }
+
+    return () => {
+      window.removeEventListener("auth-logout", handleAuthLogout);
+      window.removeEventListener("auth-email-unverified", handleEmailUnverified);
+      clearInterval(authCheckInterval);
+    };
+  }, [initialUser]);
+
+  const login = async (
+    email: string,
+    password: string,
+    rememberMe = false,
+    cfTurnstileToken?: string,
+  ): Promise<true | TwoFactorChallengeUI | EmailVerificationChallengeUI> => {
+    // NOTE: do NOT toggle the global `isLoading` here. That flag means "auth
+    // bootstrap not yet settled" and is owned solely by the mount effect.
+    // Flipping it for an in-flight login flips `useShouldRenderAppChrome` /
+    // `useApiReady`, which remounts AppShell's subtree (and any route guard
+    // rendering <PageLoader/>) mid-request — destroying LoginForm's local 2FA
+    // state so the step-up code screen never appears. The caller (LoginForm)
+    // owns its own per-action loading state.
+    console.log("AuthContext.login: Starting login process");
+    {
+
+      // Errors propagate so the caller can show the actual server reason
+      // (TURNSTILE_FAIL, RATE_LIMIT, ACCOUNT_LOCKED, invalid credentials)
+      // via lib/services/auth-errors.ts instead of a generic "login failed".
+      const result = await authService.login({ email, password, rememberMe, cfTurnstileToken });
+      console.log("AuthContext.login: AuthService.login completed", result);
+
+      // If email verification is required, surface that to the UI
+      if (
+        typeof result === "object" &&
+        (result as any).requiresEmailVerification
+      ) {
+        const r = result as { requiresEmailVerification: true; email?: string };
+        const ui: EmailVerificationChallengeUI = {
+          requiresEmailVerification: true,
+          email: r.email ?? email,
+        };
+        console.log("AuthContext.login: Email verification required", ui);
+        setIsEmailVerified(false);
+        await maybeResendVerificationEmail();
+        return ui;
+      }
+
+      // If two-factor is required, return the minimal UI challenge info
+      if (typeof result === "object" && (result as ServiceTwoFactorChallenge).requiresTwoFactor) {
+        const challenge = result as ServiceTwoFactorChallenge;
+        const uiChallenge: TwoFactorChallengeUI = {
+          requiresTwoFactor: true,
+          email: challenge.email,
+          expiresAt: challenge.expiresAt,
+        };
+        console.log("AuthContext.login: Two-factor challenge returned", uiChallenge);
+        return uiChallenge;
+      }
+
+      // Otherwise normal login success; set user from stored profile if available
+      const profile = authService.getStoredUser();
+      console.log("AuthContext.login: Retrieved stored user profile", profile);
+
+      if (profile) {
+        const user = userProfileToUser(profile);
+        console.log("AuthContext.login: Converted profile to user", user);
+        setUser(user);
+        // Post-login bootstrap (gap #1367) — same single round-trip the
+        // refresh path uses. Seeds verification + flags + tokenBudget +
+        // unread-count before the dashboard mounts.
+        try {
+          const bootstrap = await fetchBootstrap();
+          if (bootstrap?.verification) {
+            setIsEmailVerified(bootstrap.verification.emailConfirmed);
+            if (!bootstrap.verification.emailConfirmed) {
+              await maybeResendVerificationEmail();
+            }
+          } else {
+            const status = await authService.getVerificationStatus();
+            setIsEmailVerified(status.emailConfirmed);
+            if (!status.emailConfirmed) {
+              await maybeResendVerificationEmail(status.sentAt);
+            }
+          }
+        } catch {
+          setIsEmailVerified(undefined);
+        }
+      }
+
+      console.log("AuthContext.login: Login successful, returning true");
+      return true;
+    }
+  };
+
+  const signup = async (
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string,
+    role: UserRole = USER_ROLES.JOB_SEEKER,
+    referralCode?: string,
+    enableAffiliate?: boolean,
+    cfTurnstileToken?: string,
+    language?: string,
+  ): Promise<void> => {
+    // See login(): never flip the global bootstrap `isLoading` for a transient
+    // action — SignupForm owns its own submit-loading state. Flipping the
+    // bootstrap flag remounts the chrome/route subtree mid-request.
+    {
+      // Filter out SuperAdmin from registration - it's internal only.
+      // Employee is invite-only (#1349); if someone tries to signup as
+      // one, coerce to job_seeker — they'll get a normal user account
+      // and have to be properly invited by an employer to gain workforce
+      // membership.
+      const registrationRole =
+        role === USER_ROLES.SUPER_ADMIN ? USER_ROLES.ADMIN :
+        role === USER_ROLES.EMPLOYEE ? USER_ROLES.JOB_SEEKER :
+        role;
+
+      // Inbound attribution — read once at submit time from the shared
+      // first-touch store (cookie, 30-day TTL; populated by
+      // useAttributionCapture on every route). An explicit referralCode
+      // arg (e.g. user typed one in the form) wins over the captured
+      // value; UTMs always flow from the store since the form has no
+      // input for them.
+      const captured = attributionPayload();
+
+      // Register returns a verification challenge; do not set any auth
+      // state here. Errors propagate so the caller can show the actual
+      // server reason (TURNSTILE_FAIL, BREACHED_PASSWORD, etc.) instead
+      // of a generic "signup failed" — see lib/services/auth-errors.ts.
+      await authService.register({
+        email,
+        password,
+        confirmPassword: password,
+        firstName,
+        lastName,
+        role: registrationRole,
+        referralCode: referralCode ?? captured.referralCode,
+        utmSource: captured.utmSource,
+        utmMedium: captured.utmMedium,
+        utmCampaign: captured.utmCampaign,
+        utmTerm: captured.utmTerm,
+        utmContent: captured.utmContent,
+        landingReferrer: captured.landingReferrer,
+        enableAffiliate,
+        cfTurnstileToken,
+        language,
+      });
+      trackJobSeekerStage("signed_up", { method: "password" });
+    }
+  };
+
+  const loginWithToken = async (token: string): Promise<void> => {
+    localStorage.setItem("auth_token", token);
+    try {
+      const profile = await authService.getCurrentUser();
+      if (profile) {
+        setUser(userProfileToUser(profile));
+      }
+    } catch (err) {
+      console.error("loginWithToken: failed to load user", err);
+    }
+  };
+
+  // One in-flight guest mint shared by every concurrent caller.
+  const guestSessionRef = useRef<Promise<boolean> | null>(null);
+  const ensureGuestSession = (): Promise<boolean> => {
+    if (user) return Promise.resolve(true);
+    if (!guestSessionRef.current) {
+      guestSessionRef.current = authService
+        .startGuestSession()
+        .then((profile) => {
+          setIsEmailVerified(true);
+          setUser(userProfileToUser(profile));
+          return true;
+        })
+        .catch((err) => {
+          logger.warn?.("AuthProvider: guest session failed", err);
+          return false;
+        })
+        .finally(() => {
+          guestSessionRef.current = null;
+        });
+    }
+    return guestSessionRef.current;
+  };
+
+  const isGuest = !!user && isGuestEmail(user.email);
+
+  // A REAL sign-in (any path: password, 2FA, magic link, OAuth, email
+  // verify) in a browser that holds a guest token claims the guest's work
+  // onto the real account, then refreshes every cached query.
+  useEffect(() => {
+    if (!user || isGuest || !authService.getGuestToken()) return;
+    let cancelled = false;
+    void authService.adoptGuest().then((done) => {
+      // A guest's work landing on a real account is the guest → member signup.
+      if (done) trackJobSeekerStage("signed_up", { method: "guest_adopt" });
+      if (done && !cancelled) void queryClient.invalidateQueries();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, isGuest, queryClient]);
+
+  const logout = async (): Promise<void> => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      // Drop the cached inbox seed so the next signed-in user doesn't
+      // briefly see the previous user's hub before /api/bootstrap fires
+      // (gap #1368).
+      clearInboxSeed();
+      setUser(null);
+    }
+  };
+
+  const updateUserRole = async (role: UserRole): Promise<void> => {
+    if (user) {
+      try {
+        const updatedProfile = await authService.updateProfile({ role });
+        setUser(userProfileToUser(updatedProfile));
+      } catch (error) {
+        console.error("Failed to update user role:", error);
+        throw error;
+      }
+    }
+  };
+
+  const updateProfile = async (
+    updates: ProfileUpdate,
+  ): Promise<void> => {
+    if (user) {
+      try {
+        const updatedProfile = await authService.updateProfile(updates);
+        setUser(userProfileToUser(updatedProfile));
+      } catch (error) {
+        console.error("Failed to update profile:", error);
+        throw error;
+      }
+    }
+  };
+
+  const refreshUser = async (): Promise<void> => {
+    if (authService.isAuthenticated()) {
+      try {
+        const profile = await authService.getCurrentUser();
+        setUser(userProfileToUser(profile));
+      } catch (error) {
+        console.error("Failed to refresh user:", error);
+        throw error;
+      }
+    }
+  };
+
+  const completeOnboarding = () => {
+    if (user) {
+      const updatedUser = { ...user, onboardingComplete: true };
+      setUser(updatedUser);
+    }
+  };
+
+  const apiCall = async (
+    url: string,
+    options: RequestInit = {},
+  ): Promise<any> => {
+    try {
+      // Use the configured apiClient which handles the correct base URL
+      const method = (options.method as any) || "GET";
+      const config = {
+        method: method as "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+        headers: options.headers as Record<string, string>,
+        body: options.body,
+      };
+
+      const response = await apiClient.request(url, config);
+      return response;
+    } catch (error: any) {
+      // Handle password change required error
+      if (error.message === "PASSWORD_CHANGE_REQUIRED") {
+        throw error;
+      }
+
+      // Handle authentication errors
+      if (error.message?.includes("Authentication") || error.message?.includes("401")) {
+        await logout();
+        throw new Error("Authentication required");
+      }
+
+      throw error;
+    }
+  };
+
+  const verifyTwoFactor = async (code: string, trustDevice = false): Promise<boolean> => {
+    // See login(): never flip the global bootstrap `isLoading` for a transient
+    // action — it remounts the chrome/route subtree (and this very 2FA form)
+    // mid-verify. LoginForm owns `isVerifying` for the button state.
+    try {
+      await authService.verifyTwoFactor(code, trustDevice);
+      const profile = authService.getStoredUser();
+      if (profile) setUser(userProfileToUser(profile));
+
+      // After successful 2FA, prime verification status so route guards behave correctly
+      try {
+        const status = await authService.getVerificationStatus();
+        setIsEmailVerified(status.emailConfirmed);
+      } catch (err) {
+        // Leave as undefined on failure; guards will avoid false redirects when loading
+        setIsEmailVerified(undefined);
+      }
+
+      return true;
+    } catch (error) {
+      console.error("AuthContext.verifyTwoFactor: failed", error);
+      return false;
+    }
+  };
+
+  const resendTwoFactorCode = async (): Promise<boolean> => {
+    try {
+      return await authService.resendTwoFactorCode();
+    } catch (error) {
+      console.error("AuthContext.resendTwoFactorCode: failed", error);
+      return false;
+    }
+  };
+
+  const resendEmailVerification = async (): Promise<boolean> => {
+    try {
+      return await authService.resendEmailVerification();
+    } catch (error) {
+      console.error("AuthContext.resendEmailVerification: failed", error);
+      return false;
+    }
+  };
+
+  const getVerificationStatus = async (): Promise<{ email?: string; emailConfirmed: boolean; sentAt?: string; sendCount?: number }> => {
+    try {
+      const status = await authService.getVerificationStatus();
+      // Keep context state in sync so GlobalVerificationGate doesn't bounce
+      // the user back to /verify-email after they confirm on another device
+      // and click "I already verified".
+      setIsEmailVerified(status.emailConfirmed);
+      return status;
+    } catch (error) {
+      console.error("AuthContext.getVerificationStatus: failed", error);
+      throw error;
+    }
+  };
+
+  // ── Impersonation ─────────────────────────────────────────────────────────
+
+  const isSuperAdmin = user?.role === USER_ROLES.SUPER_ADMIN;
+
+  const startImpersonation = async (targetUserId: string, reason: string, enableDebugger = false): Promise<ImpersonationSession> => {
+    const data = await impersonationService.startImpersonation(targetUserId, reason, enableDebugger);
+    const session: ImpersonationSession = {
+      sessionId: data.sessionId,
+      token: data.token,
+      targetUser: data.user,
+      role: data.role,
+      startedAt: data.startedAt,
+      expiresAt: data.expiresAt,
+      debuggerEnabled: enableDebugger,
+    };
+    setImpersonationSession(session);
+    impersonationTokenRef.current = session.token;
+    // Drop any cached admin-identity data so subsequent renders refetch as the
+    // emulated user.
+    queryClient.invalidateQueries();
+    return session;
+  };
+
+  const endImpersonation = async (): Promise<void> => {
+    if (!impersonationSession) return;
+    try {
+      await impersonationService.endImpersonation(impersonationSession.sessionId);
+    } catch (err) {
+      console.error("endImpersonation: failed to notify server", err);
+    } finally {
+      setImpersonationSession(null);
+      impersonationTokenRef.current = null;
+      queryClient.invalidateQueries();
+    }
+  };
+
+  const switchImpersonationRole = async (role: string): Promise<void> => {
+    if (!impersonationSession) return;
+    const data = await impersonationService.switchImpersonationRole(impersonationSession.sessionId, role);
+    setImpersonationSession((prev) =>
+      prev ? { ...prev, token: data.token, role: data.role } : null,
+    );
+    impersonationTokenRef.current = data.token;
+    queryClient.invalidateQueries();
+  };
+
+  const value: AuthContextType = {
+    user,
+    isSuperAdmin,
+    impersonationSession,
+    isImpersonating: impersonationSession !== null,
+    startImpersonation,
+    endImpersonation,
+    switchImpersonationRole,
+    login,
+    verifyTwoFactor,
+    resendTwoFactorCode,
+    resendEmailVerification,
+    loginWithToken,
+    getVerificationStatus,
+    signup,
+    logout,
+    updateUserRole,
+    updateProfile,
+    completeOnboarding,
+    // A guest session is NOT "authenticated": the app chrome, route guards and
+    // user-data hooks all treat a guest as signed out. Guest-aware surfaces
+    // (studio, the kit workspace) read `user` / `isGuest` instead.
+    isAuthenticated: authService.isAuthenticated() && !isGuest,
+    isGuest,
+    ensureGuestSession,
+    isLoading,
+    isEmailVerified: isEmailVerified ?? (undefined as unknown as boolean),
+    refreshUser,
+    apiCall,
+  };
+
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+/**
+ * Single predicate for "this user is in verification limbo": logged in but
+ * email not yet confirmed. Drives both the `GlobalVerificationGate` route
+ * redirect and the chrome's render decision in `<AppShell>` / `<GlobalChrome>`.
+ *
+ * Anonymous users → false (they're allowed on public pages).
+ * Authenticated + unverified → true (block API-fetching chrome to avoid
+ *   flooding the rate limiter with calls the server can't service).
+ * Authenticated + verified → false.
+ */
+export function useVerificationBlocked(): boolean {
+  const { isAuthenticated, isEmailVerified } = useAuth();
+  return isAuthenticated && isEmailVerified === false;
+}
+
+/**
+ * Single predicate for "can call user-scoped APIs right now".
+ *
+ * Pessimistic: returns false while auth is still bootstrapping (isLoading)
+ * so hooks that consume this never fire optimistically against an unknown
+ * auth state. The render layer (`<AppShell>`, `<GlobalChrome>`) consumes
+ * the same primitive so chrome that depends on api-ready data doesn't
+ * flash in and out as auth resolves.
+ *
+ * Used by every user-data hook (`useSubscription`, `useTokenBudget`,
+ * `useCommHub`, ...) via the shared `useGatedResource` base. The hook is
+ * the trigger for an API call, so the gate lives at the trigger — not at
+ * every render site that happens to mount one.
+ *
+ * Anonymous + bootstrapped → false (correctly: no user, no user data).
+ * Authenticated + unverified → false (verification limbo).
+ * Authenticated + verified → true.
+ * Any state + isLoading → false (don't fire until we know).
+ */
+export function useApiReady(): boolean {
+  const { isAuthenticated, isLoading } = useAuth();
+  const blocked = useVerificationBlocked();
+  if (isLoading) return false;
+  return isAuthenticated && !blocked;
+}
+
+export function useAuth(): AuthContextType & { realUser: User | null } {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  // Non-throwing context read — useAuth can be called from components mounted
+  // outside PersonaPreviewProvider (e.g. during initial auth bootstrap).
+  const preview = useContext(PersonaPreviewContext);
+
+  const realUser = context.user;
+  const impersonationSession = context.impersonationSession;
+  const personaPreview = preview?.personaPreview ?? null;
+
+  // Memoize so consumers with `[user]` effect deps don't re-fire every render.
+  // Build an effective user whose role (and impersonation target fields) reflect
+  // the active impersonation or previewed role. isSuperAdmin stays on the REAL
+  // role — SA-only UI (EmulationBar, Admin Panel guards) keeps working while
+  // previewing as a non-SA role.
+  return React.useMemo<AuthContextType & { realUser: User | null }>(() => {
+    if (!realUser) return { ...context, realUser: null };
+
+    if (impersonationSession) {
+      return {
+        ...context,
+        user: {
+          ...realUser,
+          id: impersonationSession.targetUser.id,
+          email: impersonationSession.targetUser.email,
+          name: impersonationSession.targetUser.name,
+          role: impersonationSession.role as UserRole,
+        },
+        realUser,
+      };
+    }
+
+    // Tier preview is consumed directly by useSubscription / useTokenBudget,
+    // so only the role needs to be reshaped here.
+    if (personaPreview) {
+      const effectiveRole = personaPreview as UserRole;
+      if (effectiveRole === realUser.role) {
+        return { ...context, realUser };
+      }
+      return {
+        ...context,
+        user: { ...realUser, role: effectiveRole },
+        realUser,
+      };
+    }
+
+    return { ...context, realUser };
+  }, [context, realUser, impersonationSession, personaPreview]);
+}

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid slice">
+
+  <ellipse cx="200" cy="120" rx="46" ry="50" fill="#1c1917"/>
+  <path d="M 150,180 L 250,180 L 270,360 L 130,360 Z" fill="#2563eb"/>
+  <path d="M 160,200 L 240,200 L 230,260 L 170,260 Z" fill="#facc15"/>
+  <rect x="130" y="180" width="40" height="120" fill="#1c1917"/>
+  <rect x="230" y="180" width="40" height="120" fill="#1c1917"/>
+  <rect x="150" y="360" width="40" height="180" fill="#1c1917"/>
+  <rect x="210" y="360" width="40" height="180" fill="#1c1917"/>
+
+</svg>

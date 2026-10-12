@@ -1,0 +1,128 @@
+/**
+ * use-entity-details-permission.ts — single seam for "can this viewer see
+ * the [🌐 Details] drawer for entity X?" Every <EntityDetailsSheet>
+ * adapter calls this hook with `{ kind, entity }`. The hook delegates
+ * to the appropriate per-entity permission rule and exposes a uniform
+ * `canViewStats` field so the drawer chrome stays kind-agnostic.
+ *
+ * Per the DRY rule, callers do NOT inline `isOwner || isRecruiter`
+ * derivations — that scatter is the symptom this hook closes.
+ *
+ * Owner-only rule: the [🌐 Details] drawer is gated to the artifact
+ * owner (super-admin preserved for support, same pattern as every
+ * other permission hook). Recruiters and employers do NOT see the
+ * drawer on someone else's resume/company/etc. — the per-entity hooks
+ * expose a wider `canViewStats` for inline surfaces (e.g. ResumeCard
+ * score chips), but the globe drawer is the strict surface and this
+ * aggregator enforces the tighter rule. Jobs are the exception: the
+ * "owner" of a job posting is the whole company team (backend-stamped
+ * `viewerCanManage`), so we delegate to `canEdit`.
+ *
+ * Owner-STRICT kinds: `profile` and `post` drop even the super-admin
+ * escape hatch — the drawer surfaces who-viewed / engagement signal
+ * that belongs solely to that person, so the button never renders for
+ * a non-owner (product decision 2026-06-24 for profile). Every other
+ * kind keeps the super-admin support hatch below.
+ *
+ * Super-admin only (NOT plain admin): the stats endpoint that backs
+ * this drawer (`GET /api/analytics/artifacts/:kind/:id`) is gated to
+ * owner-or-super-admin server-side, so granting the button to a plain
+ * admin just surfaces a button that 403s. The two gates must stay in
+ * lockstep.
+ *
+ * Adding a new artifact kind: extend EntityDetailsPermissionArgs with
+ * the new kind + its row shape, then add a `case` here that returns
+ * `{ canViewStats: <hook>.isOwner || canViewAsAdmin }`. No drawer site
+ * changes.
+ */
+
+import { useResumePermissions } from "@/hooks/use-resume-permissions";
+import { useJobPermissions } from "@/hooks/use-job-permissions";
+import { useCompanyPermissions } from "@/hooks/use-company-permissions";
+import { useProfilePermissions } from "@/hooks/use-profile-permissions";
+import { useArticlePermissions } from "@/hooks/use-article-permissions";
+import { useStudioTemplatePermissions } from "@/hooks/use-studio-template-permissions";
+import { useServicePermissions } from "@/hooks/use-service-permissions";
+import { usePermissions } from "@/hooks/use-permissions";
+import { useAuth } from "@/lib/auth";
+import type { Resume } from "@/types/resume";
+
+export interface EntityDetailsPermission {
+  canViewStats: boolean;
+}
+
+export interface ResumeArg { kind: "resume"; entity: Resume | null | undefined; }
+export interface JobArg { kind: "job"; entity: { id: string; userId?: string; viewerCanManage?: boolean } | null | undefined; }
+export interface CompanyArg { kind: "company"; entity: { id: string; ownerUserId?: string | null } | null | undefined; }
+export interface ProfileArg { kind: "profile"; entity: { id: string } | null | undefined; }
+export interface ArticleArg { kind: "article"; entity: { id: string; authorId?: string } | null | undefined; }
+export interface StudioTemplateArg { kind: "studio_template"; entity: { id: string; creatorUserId?: string | null } | null | undefined; }
+export interface ServiceArg { kind: "service"; entity: { id: string; providerUserId?: string | null } | null | undefined; }
+export interface VideoArg { kind: "video"; entity: { id: string; userId?: string | null } | null | undefined; }
+export interface PostArg { kind: "post"; entity: { id: string; userId?: string | null } | null | undefined; }
+
+export type EntityDetailsPermissionArgs =
+  | ResumeArg
+  | JobArg
+  | CompanyArg
+  | ProfileArg
+  | ArticleArg
+  | StudioTemplateArg
+  | ServiceArg
+  | VideoArg
+  | PostArg;
+
+export function useEntityDetailsPermission(
+  args: EntityDetailsPermissionArgs,
+): EntityDetailsPermission {
+  // All branch hooks must be called unconditionally to satisfy React's
+  // rules-of-hooks contract. Each per-entity hook accepts a null entity
+  // and returns an all-false permissions object in that case, so feeding
+  // a non-matching entity is safe.
+  // Super-admin only — must match the owner-or-super-admin gate on the
+  // backing stats endpoint (see the header comment). Plain admins are
+  // intentionally excluded so we never render a button that 403s.
+  const { isSuperAdmin: canViewAsAdmin } = usePermissions();
+  // Posts have no dedicated permission hook — ownership is simply "I am the
+  // author", resolved against the authed viewer here.
+  const { user } = useAuth();
+
+  const resume = useResumePermissions(args.kind === "resume" ? args.entity : null);
+  const job = useJobPermissions(args.kind === "job" ? args.entity ?? null : null);
+  const company = useCompanyPermissions(args.kind === "company" ? args.entity ?? null : null);
+  const profile = useProfilePermissions(args.kind === "profile" ? args.entity ?? null : null);
+  const article = useArticlePermissions(args.kind === "article" ? args.entity ?? null : null);
+  const template = useStudioTemplatePermissions(args.kind === "studio_template" ? args.entity ?? null : null);
+  const service = useServicePermissions(args.kind === "service" ? args.entity ?? null : null);
+  const video = useStudioTemplatePermissions(args.kind === "video" ? (args.entity as any) : null);
+
+  switch (args.kind) {
+    case "resume": return { canViewStats: resume.isOwner || canViewAsAdmin };
+    case "job": return { canViewStats: job.canEdit || canViewAsAdmin };
+    case "company": return { canViewStats: company.isOwner || canViewAsAdmin };
+    case "profile":
+      // Profiles are OWNER-STRICT for the [🌐 Details] drawer — the
+      // drawer surfaces who-viewed / engagement signal that is the
+      // profile owner's private surface, so NOT even a super-admin gets
+      // the button on someone else's profile (product decision
+      // 2026-06-24). The backing stats endpoint still allows super-admin
+      // for support tooling; the UI button is the strict surface (same
+      // shape as the "post" case below).
+      return { canViewStats: profile.isOwner };
+    case "article": return { canViewStats: article.isOwner || canViewAsAdmin };
+    case "studio_template": return { canViewStats: template.isOwner || canViewAsAdmin };
+    case "service": return { canViewStats: service.isOwner || canViewAsAdmin };
+    case "video": return { canViewStats: video.isOwner || canViewAsAdmin };
+    case "post": {
+      // Posts are OWNER-ONLY for the [🌐 Details] insights drawer — unlike
+      // other artifacts, even a super-admin doesn't get the button on
+      // someone else's post (product decision: post insights are the
+      // author's private surface). The backing endpoint still allows
+      // super-admin for support tooling, but the UI button is owner-strict.
+      const isOwner = Boolean(
+        args.entity?.userId && user?.id && args.entity.userId === user.id,
+      );
+      return { canViewStats: isOwner };
+    }
+  }
+}

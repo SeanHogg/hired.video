@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice">
+
+  <path d="M 60,20 Q 80,40 70,80 Q 50,120 70,160" stroke="#fafafa" stroke-width="4" fill="none" opacity="0.6"/>
+  <path d="M 100,40 Q 130,80 110,140 Q 80,180 110,200" stroke="#fafafa" stroke-width="4" fill="none" opacity="0.6"/>
+  <rect x="80" y="160" width="80" height="14" fill="#0a0a0a" stroke="#fafafa" stroke-width="3"/>
+  <rect x="148" y="160" width="14" height="14" fill="#fbbf24"/>
+
+</svg>

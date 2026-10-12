@@ -1,0 +1,58 @@
+-- Migration 0122 — reclaim dropped column slots on `job_items` (gap #1220).
+--
+-- Why this migration exists
+-- -------------------------
+-- PostgreSQL caps each table at 1600 entries in `pg_attribute`. Crucially
+-- that limit counts BOTH live columns AND dropped-but-not-vacuumed columns
+-- (where `attisdropped = true`). The only way to reclaim a dropped slot is
+-- a full table rewrite (`VACUUM FULL`, `CLUSTER`, or `pg_repack`).
+--
+-- `job_items` accumulated > 1600 slots over its lifetime — partly because
+-- migration 0046 originally added four sourcing columns that 0052 then
+-- dropped, partly from earlier out-of-tree `drizzle-kit push` churn.
+-- 0046 was partially defused (the offending ADD COLUMNs were removed) but
+-- the slots were never reclaimed, leaving the table one column-add away
+-- from breaking the deploy. That column add arrived as 0121's
+-- `archived_at` and broke the build with
+--   "tables can have at most 1600 columns".
+--
+-- Why this only runs once
+-- -----------------------
+-- The runner now tracks applied migrations in `_sql_migrations` (gap
+-- #1220 follow-on, same PR). Every migration file runs at most once per
+-- database — `VACUUM FULL` rewrites the entire heap and takes an
+-- AccessExclusiveLock, so we deliberately want it to run exactly once.
+-- Subsequent deploys see this filename in `_sql_migrations` and skip it.
+--
+-- Why VACUUM FULL and not CLUSTER / ALTER TYPE
+-- --------------------------------------------
+-- * `CLUSTER` would also work (it triggers the same rewrite) but it
+--   requires a usable index argument and silently no-ops when the table
+--   was never previously CLUSTERed — `VACUUM FULL` is the unambiguous
+--   choice for "reclaim and compact this table".
+-- * `ALTER TABLE … ALTER COLUMN … TYPE …` with a no-op cast may or may not
+--   trigger a rewrite depending on the version; `VACUUM FULL` always does.
+-- * `pg_repack` would avoid the AccessExclusiveLock but requires a
+--   server-installed extension; Neon does not ship it on shared compute.
+--
+-- Why we can call VACUUM here at all
+-- ----------------------------------
+-- `VACUUM` cannot run inside an explicit transaction. The runner sends
+-- each statement to Neon's HTTP endpoint as an autocommitted single
+-- query (no `BEGIN`/`COMMIT` wrapping), so a standalone `VACUUM FULL` at
+-- the top level is legal in this execution model.
+--
+-- Lock implications for the brief downtime
+-- ----------------------------------------
+-- During the rewrite, every read/write against `job_items` blocks. The
+-- table is small relative to the row counts our app ships with (each
+-- row is a single posting; we're nowhere near the millions-of-rows zone
+-- where `VACUUM FULL` becomes unsafe). On the production scale today
+-- this is a sub-second to low-seconds window. Re-running is gated by
+-- the once-marker so the cost is paid exactly once.
+--
+-- After this migration runs successfully, 0123 (`archived_at` add) will
+-- have an open slot and succeed; every future `job_items` column-add
+-- has headroom until the table is rewritten again.
+
+VACUUM FULL "job_items";

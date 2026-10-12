@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice">
+
+  <path d="M 100,80 Q 60,80 60,140 L 140,140 Q 140,80 100,80 Z" fill="#84cc16" stroke="#1f2937" stroke-width="4"/>
+  <path d="M 100,80 Q 60,40 90,20" stroke="#84cc16" stroke-width="6" fill="none"/>
+  <path d="M 100,80 Q 140,40 110,20" stroke="#84cc16" stroke-width="6" fill="none"/>
+  <path d="M 100,80 Q 80,30 100,10" stroke="#84cc16" stroke-width="6" fill="none"/>
+  <rect x="55" y="140" width="90" height="40" fill="#06b6d4" stroke="#1f2937" stroke-width="4"/>
+
+</svg>

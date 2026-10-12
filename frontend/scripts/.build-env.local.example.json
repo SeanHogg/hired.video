@@ -1,0 +1,6 @@
+{
+  "_comment": "Copy this file to .build-env.local.json and fill in the values. The .local.json variant is gitignored (matches **/*.local in .gitignore). The pre-build hook (frontend/scripts/inject-build-env.mjs) reads it as a fallback when the matching var is not set in process.env — useful for local 'npm run deploy' so devs don't have to export shell vars every session.",
+  "_priority": "process.env wins over this file. CI sets shell env; local devs use this file.",
+  "_source_of_truth": "Cloudflare Pages dashboard → hired → Settings → Environment variables → 'production' tab. Public site keys are safe to share within the team.",
+  "VITE_TURNSTILE_SITE_KEY": ""
+}

@@ -1,0 +1,281 @@
+name = "hired-api"
+# account_id intentionally NOT pinned here: it is account-scoped, so a hard-coded
+# value silently redirects every deploy to the old account after a migration.
+# wrangler reads CLOUDFLARE_ACCOUNT_ID from the environment (set in CI secrets).
+main = "src/worker.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env", "enable_request_signal"]
+
+# Worker startup CPU is capped (deploy fails with code 10021 "Script startup
+# exceeded CPU time limit"). Both settings below are inherited by
+# [env.production] and keep top-level evaluation under the cap:
+# - minify: the unminified bundle was 13 MB, and V8 parse/compile of it was
+#   the single largest startup cost. Names are preserved (keep_names defaults
+#   to true), so error/class names and stack traces are unchanged.
+# - alias zod: shared/*.ts resolved `zod` from shared/node_modules, so two
+#   identical zod copies were bundled and BOTH initialised at startup (zod
+#   init was ~385 ms of the startup profile). Pin every import to one copy.
+minify = true
+alias = { "zod" = "./node_modules/zod" }
+
+# Routes (API + CDN for R2 assets)
+routes = [
+  "api.hired.video/*",
+  "cdn.hired.video/*",
+]
+
+# Cron triggers — the scheduled() handler in worker.ts dispatches every
+# registered cron tick into runScheduled(), which in turn fans out to the
+# follow-up drip processor, the job queue, the registered-worker dispatcher,
+# the monthly usage close, and the email-integration sweep. Each downstream
+# gates itself by date/time so a single /5 tick is enough.
+[triggers]
+crons = ["*/5 * * * *"]
+
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1
+
+[[r2_buckets]]
+binding = "VIDEO_BUCKET"
+bucket_name = "hired-videos-temp"
+
+# Edge cache shared by BillingService.getSubscription and the generic
+# utils/edge-cache.ts `getOrSetCached` helper. Without this binding the
+# in-memory Map is the only cache layer, and it dies with each isolate —
+# meaning the 60s plan cache effectively never hit cross-request in prod.
+#
+# Create the namespace once with:
+#   wrangler kv:namespace create KV_CACHE
+#   wrangler kv:namespace create KV_CACHE --preview
+# then paste the returned ids into `id` / `preview_id` below.
+[[kv_namespaces]]
+binding = "KV_CACHE"
+id = "4ad142d51f6d4bdf97d8d969b5d7288f"
+preview_id = "97ca95af656b4639924e9f06dc31bdfa"
+
+[ai]
+binding = "AI"
+
+# Deployed version id/tag/timestamp (utils/release.ts) — stamped on every
+# request_logs row, log line and config snapshot.
+[version_metadata]
+binding = "CF_VERSION_METADATA"
+
+# Cloudflare Images binding — the explicit-content scan downscales large /
+# unsupported images (SVG, HEIC, 4K drawings) server-side to a ≤1600 px JPEG
+# before the vision check (services/moderation/explicit/imageDownscaler.ts).
+# Missing binding → those images stay unscreened (fail closed for public reach).
+[images]
+binding = "IMAGES"
+
+# Real-time chat backbone (gap #1230). One Durable Object per
+# conversationId holds open WebSocket pairs for every connected client
+# and broadcasts message / typing / presence events. Hibernation keeps
+# the DO cheap when idle. Created lazily on first connect via
+# `env.CHAT_ROOM.idFromName(conversationId)`.
+[[durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+
+# 3D world multiplayer (gap #1636). One DO per studio_projects.id —
+# holds WebRTC signaling sockets + authoritative challenge claims.
+# Per-frame gameplay (positions, animations) flows peer-to-peer over
+# data channels and never touches this DO; the room only sees join /
+# leave, SDP/ICE forwarding, and score claims. Hibernation keeps the
+# DO ~free between play sessions. See api/src/durable/GameSignalingRoom.ts.
+[[durable_objects.bindings]]
+name = "GAME_ROOM"
+class_name = "GameSignalingRoom"
+
+# Real-time collaborative studio editing (gap #2243). One DO per
+# studio_projects.id — the authoritative hub for presence, live edit
+# relay (debounced document snapshots), host election, and the latest
+# collaborative snapshot. Hibernation keeps idle rooms ~free. See
+# api/src/durable/StudioRoom.ts + api/src/routes/studio-socket.ts.
+[[durable_objects.bindings]]
+name = "STUDIO_ROOM"
+class_name = "StudioRoom"
+
+[[migrations]]
+tag = "v1"
+# SQLite-backed Durable Object — required on the Workers free plan (the
+# classic `new_classes` storage backend is paid-only as of 2024-08).
+# SQLite-backed DOs are the recommended default going forward and gain
+# the same hibernation / WebSocket APIs we use in ChatRoom.
+new_sqlite_classes = ["ChatRoom"]
+
+[[migrations]]
+tag = "v2"
+# GameSignalingRoom — added in the same `new_sqlite_classes` family
+# (SQLite-backed, hibernation-enabled) as ChatRoom. Separate migration
+# tag so the original `v1` migration stays content-stable.
+new_sqlite_classes = ["GameSignalingRoom"]
+
+[[migrations]]
+tag = "v3"
+# StudioRoom (gap #2243) — SQLite-backed, hibernation-enabled, same family
+# as ChatRoom / GameSignalingRoom. Separate tag keeps prior migrations
+# content-stable.
+new_sqlite_classes = ["StudioRoom"]
+
+[vars]
+# Authoritative environment signal for utils/runtime-env.ts. Cloudflare
+# never sets NODE_ENV, so without this the worker could not tell prod from
+# dev; the resolver fails closed to "production", and this makes it explicit.
+APP_ENV = "production"
+# Kill switch for the AI posting agent (#2300). Default on.
+POSTING_AGENT_ENABLED = "true"
+# Public SPA origin — OAuth redirect_uris (utils/public-urls.ts) and email
+# links are built from it, so it must be an absolute URL, never empty.
+FRONTEND_URL = "https://hired.video"
+VITE_API_URL = "https://api.hired.video"
+BASE_URL = "https://api.hired.video"
+CDN_BASE_URL = "https://cdn.hired.video"
+# Reserved house user id (#986) — owns the platform's paid-media ad
+# connections for internal growth. Pin the id printed by
+# `node api/scripts/seedHouseWorkspace.mjs`; /superadmin/ads reads it.
+# HOUSE_USER_ID = ""
+EMAIL_FROM = "info@hired.video"
+PAYMENT_PROVIDER = "helcim"
+# Secrets (do NOT set values here — use `wrangler secret put <NAME> [--env production]`)
+# wrangler secret put DATABASE_URL
+# wrangler secret put JWT_SECRET
+# -- Stripe (default payment provider) --
+# wrangler secret put STRIPE_PUBLISHABLE_KEY
+# wrangler secret put STRIPE_SECRET_KEY
+# wrangler secret put STRIPE_WEBHOOK_SIGNING_KEY
+# -- Helcim (active payment provider — PAYMENT_PROVIDER=helcim set above) --
+# wrangler secret put HELCIM_API_TOKEN       ← REQUIRED — Helcim dashboard → All Tools → Integrations → API Access
+# HELCIM_COLLECTION_FLOW = "modal"           ← modal | inline. Set as a plain [vars] entry, not a secret. Defaults to modal.
+# wrangler secret put HELCIM_JS_TOKEN        ← REQUIRED when HELCIM_COLLECTION_FLOW=inline — Helcim.js Configuration token
+# wrangler secret put HELCIM_JS_SECRET       ← reserved — Helcim.js amount hashing secret (not yet consumed)
+# wrangler secret put HELCIM_WEBHOOK_TOKEN   ← optional — webhook signing secret
+# wrangler secret put OPENROUTER_API_KEY
+# wrangler secret put OPENROUTER_MODELS
+# wrangler secret put GOOGLE_GEMINI_KEY
+# wrangler secret put EMAIL_CLIENTID
+# wrangler secret put EMAIL_SECRET
+# -- OAuth social login --
+# wrangler secret put GOOGLE_CLIENT_ID        # Google Cloud Console → Credentials
+# wrangler secret put GOOGLE_CLIENT_SECRET    # Callback: https://api.hired.video/api/auth/oauth/google/callback
+#                                            # Also YouTube connect: https://hired.video/studio/youtube/callback
+# wrangler secret put LINKEDIN_CLIENT_ID      # LinkedIn Developer Portal
+# wrangler secret put LINKEDIN_CLIENT_SECRET  # Callback: https://api.hired.video/api/auth/oauth/linkedin/callback
+#                                            # Also LinkedIn posting (social connect): https://api.hired.video/api/social/oauth/callback
+# wrangler secret put GITHUB_CLIENT_ID        # GitHub → Settings → Developer settings → OAuth Apps
+# wrangler secret put GITHUB_CLIENT_SECRET    # Callback: https://api.hired.video/api/auth/oauth/github/callback
+# wrangler secret put MICROSOFT_CLIENT_ID     # Azure Portal → App registrations
+# wrangler secret put MICROSOFT_CLIENT_SECRET # Callback: https://api.hired.video/api/auth/oauth/microsoft/callback
+# wrangler secret put API_URL                 # https://api.hired.video (used to build OAuth callback URLs)
+# -- Social publishing connection layer (PRD §5.0) --
+# Layer-1 developer-app creds. Self-lane callback:    https://api.hired.video/api/social/oauth/callback
+#                              Managed-lane callback:  https://api.hired.video/api/admin/social/oauth/callback
+# YouTube reuses GOOGLE_CLIENT_ID/SECRET; Instagram + Facebook reuse META_APP_ID/SECRET;
+# LinkedIn reuses LINKEDIN_CLIENT_ID/SECRET (enable BOTH w_member_social and the
+# Community Management API product so Lane A can post to the Company Page).
+# wrangler secret put TIKTOK_CONTENT_CLIENT_KEY     # TikTok for Developers → Content Posting API app (NOT the ads app)
+# wrangler secret put TIKTOK_CONTENT_CLIENT_SECRET  # open.tiktokapis.com — distinct from TIKTOK_APP_ID (ads)
+# wrangler secret put X_CLIENT_ID                   # X developer portal (OAuth 2.0, paid tier) — PKCE
+# wrangler secret put X_CLIENT_SECRET
+# wrangler secret put SOCIAL_KMS_KEY                # token-column envelope key (falls back to PAID_MEDIA_KMS_KEY)
+# wrangler secret put TURNSTILE_SECRET_KEY    # Cloudflare dashboard → Turnstile → site → Secret key.
+                                              # Paired with the frontend's VITE_TURNSTILE_SITE_KEY (managed via
+                                              # frontend/scripts/inject-build-env.mjs). Gates every unauthenticated
+                                              # entry endpoint (register / login / forgot-password / magic-link)
+                                              # via the shared captchaSoftCheck — miss is a soft signal per #1122.
+
+[env.production]
+name = "hired-api"
+# The DB connection string is stored as a Wrangler secret, not in source control.
+# Set it via:
+#   wrangler secret put NEON_DATABASE_URL --env production
+#   wrangler secret put NEON_DB_URL --env production
+#
+# NOTE: In some Cloudflare accounts, DATABASE_URL may conflict with an existing
+# binding name; in that case use NEON_DB_URL (the name checked by the app).
+
+[env.production.vars]
+# Authoritative environment signal for utils/runtime-env.ts. Cloudflare
+# never sets NODE_ENV, so without this the worker could not tell prod from
+# dev; the resolver fails closed to "production", and this makes it explicit.
+APP_ENV = "production"
+# Public SPA origin — OAuth redirect_uris (utils/public-urls.ts) and email
+# links are built from it, so it must be an absolute URL, never empty.
+FRONTEND_URL = "https://hired.video"
+VITE_API_URL = "https://api.hired.video"
+BASE_URL = "https://api.hired.video"
+CDN_BASE_URL = "https://cdn.hired.video"
+# Reserved house user id (#986) — owns the platform's paid-media ad
+# connections for internal growth. Pin the id printed by
+# `node api/scripts/seedHouseWorkspace.mjs`; /superadmin/ads reads it.
+# HOUSE_USER_ID = ""
+EMAIL_FROM = "info@hired.video"
+PAYMENT_PROVIDER = "helcim"
+
+[[env.production.r2_buckets]]
+binding = "VIDEO_BUCKET"
+bucket_name = "hired-videos-temp"
+
+[[env.production.kv_namespaces]]
+binding = "KV_CACHE"
+id = "4ad142d51f6d4bdf97d8d969b5d7288f"
+
+[env.production.ai]
+binding = "AI"
+
+# Deployed version id/tag/timestamp (utils/release.ts) — stamped on every
+# request_logs row, log line and config snapshot. Named envs don't inherit it.
+[env.production.version_metadata]
+binding = "CF_VERSION_METADATA"
+
+[env.production.images]
+binding = "IMAGES"
+
+[[env.production.durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+
+# Real-time collaborative studio editing (gap #2243). Named-env blocks do
+# NOT inherit the top-level durable_objects/migrations, so STUDIO_ROOM must
+# be declared here too or `wrangler deploy --env production` ships without
+# it (the same reason GAME_ROOM is absent in prod — logged separately).
+[[env.production.durable_objects.bindings]]
+name = "STUDIO_ROOM"
+class_name = "StudioRoom"
+
+[[env.production.migrations]]
+tag = "v1"
+# SQLite-backed DO — see comment on the top-level [[migrations]] block.
+new_sqlite_classes = ["ChatRoom"]
+
+[[env.production.migrations]]
+tag = "v2"
+# StudioRoom (gap #2243) — SQLite-backed, hibernation-enabled. Production's
+# migration chain is independent of the top-level one; this is prod's v2.
+new_sqlite_classes = ["StudioRoom"]
+
+# Hostname routing for production. Named environments do NOT inherit the
+# top-level `routes`, so without these blocks `wrangler deploy --env production`
+# ships a worker bound to nothing and every hostname resolves to NXDOMAIN.
+#
+# Addressed by `zone_name`, never `zone_id`: a zone id is account-scoped and dies
+# with any account move, which is exactly how these hostnames were lost.
+[[env.production.routes]]
+pattern = "api.hired.video/*"
+zone_name = "hired.video"
+
+[[env.production.routes]]
+pattern = "cdn.hired.video/*"
+zone_name = "hired.video"

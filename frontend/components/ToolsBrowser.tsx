@@ -1,0 +1,382 @@
+import { useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
+import { useEffectiveRole } from "@/hooks/use-effective-role";
+import { useRoleAccess } from "@/hooks/use-role-access";
+import { useSearchQueryParam } from "@/hooks/use-search-query-param";
+import { ToolCard } from "@/components/ToolCard";
+import { toolCategoryLabelKey } from "@/components/ToolCategoryBadge";
+import { ToolsTable } from "@/components/tools/ToolsTable";
+import CourseMarketplaceCard, {
+  type CourseMarketplaceItem,
+} from "@/components/CourseMarketplaceCard";
+import { CategoryFilterBar } from "@/components/CategoryFilterBar";
+import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
+import { useViewMode } from "@/lib/hooks/useViewMode";
+import { HorizontalScroller } from "@/components/HorizontalScroller";
+import { courseService } from "@/lib/services/course-service";
+import {
+  TOOLS_CATALOG,
+  TOOL_AUDIENCE_SPLIT_ENABLED,
+  audienceForRole,
+  isToolInAudience,
+  type ToolAudience,
+  type ToolCategory,
+  type ToolTier,
+} from "@/data/tools-catalog";
+import { localizeTool } from "@/lib/tools/localize-tool";
+import { weaveToolsAndCourses, type WovenItem } from "@/lib/tools/weave-courses";
+
+type TierFilter = "all" | ToolTier;
+type AudienceFilter = "for_me" | "all" | ToolAudience;
+type CategoryFilter = "all" | ToolCategory;
+
+// Order categories in the chip row by how broadly applicable they are
+// — Resume tops the list because most users start there, Extension
+// tails because the extension is a launcher more than a tool.
+const CATEGORY_ORDER: ToolCategory[] = [
+  "Resume",
+  "Job",
+  "Profile",
+  "Career",
+  "Interview",
+  "Salary",
+  "Application",
+  "Extension",
+];
+
+function parseCategoryFilter(raw: string | null): CategoryFilter {
+  if (!raw) return "all";
+  if (raw === "all") return "all";
+  if ((CATEGORY_ORDER as string[]).includes(raw)) return raw as ToolCategory;
+  return "all";
+}
+
+const TIER_OPTIONS = [
+  { value: "free", labelKey: "labels.free" },
+  { value: "pro", labelKey: "labels.paid" },
+];
+
+const AUDIENCE_OPTIONS = [
+  { value: "for_me", labelKey: "labels.tools.audienceForMe" },
+  { value: "job_seeker", labelKey: "labels.tools.audienceJobSeekers" },
+  { value: "recruiter_employer", labelKey: "labels.tools.audienceRecruitersEmployers" },
+  { value: "all", labelKey: "labels.tools.audienceShowAll" },
+];
+
+function parseAudienceFilter(raw: string | null): AudienceFilter {
+  // Audience split off (job-seeker-only product) → every tool is for
+  // everyone; ignore any stale ?audience= param.
+  if (!TOOL_AUDIENCE_SPLIT_ENABLED) return "for_me";
+  if (
+    raw === "for_me" ||
+    raw === "all" ||
+    raw === "job_seeker" ||
+    raw === "recruiter_employer"
+  ) {
+    return raw;
+  }
+  return "for_me";
+}
+
+/**
+ * The full AI-tools browse experience — audience / tier / category chip
+ * filters, a Scroll / Grid / Table view switcher, and the localized,
+ * filtered tool list. Extracted from Tools.tsx so the SAME experience
+ * renders for both the authenticated tools tab and the signed-out
+ * marketing page (#consistency) instead of two divergent layouts. All
+ * filter state lives in URL params (?audience / ?tier / ?category / ?q)
+ * and the view choice persists per-surface via useViewMode, so the
+ * component is fully self-contained — no props required.
+ *
+ * Role-access gating (`canSeeTool`) hides tools the SuperAdmin manifest
+ * disables for the viewer's role. Set `roleGated={false}` on surfaces
+ * that should showcase the whole catalog regardless of role — e.g. the
+ * signed-out marketing page, where the role query is disabled and would
+ * otherwise collapse the grid to the JOB_SEEKER defaults.
+ *
+ * Set `weaveCourses` to intermix the published learning-library courses
+ * through the (filtered) tool list — used on the signed-out marketing
+ * page so visitors discover both content kinds in one grid. The
+ * authenticated tools tab leaves it off because courses live in their own
+ * Learning tab there. Tool filters narrow only the tools; courses are a
+ * constant offering and stay woven in regardless of the active filter.
+ */
+export function ToolsBrowser({
+  roleGated = true,
+  weaveCourses = false,
+  courseLimit = 12,
+}: {
+  roleGated?: boolean;
+  weaveCourses?: boolean;
+  courseLimit?: number;
+} = {}) {
+  const { t } = useTranslation();
+  const effectiveRole = useEffectiveRole();
+  const { canSeeTool } = useRoleAccess();
+
+  // Published learning-library courses to weave in. Cached via react-query
+  // (in-memory, shared across consumers) so the list isn't refetched on every
+  // filter/view toggle. Only fetched on surfaces that opt into the weave.
+  const { data: courses = [] } = useQuery({
+    queryKey: ["published-courses", courseLimit],
+    queryFn: () => courseService.listPublished(courseLimit),
+    staleTime: 5 * 60 * 1000,
+    enabled: weaveCourses,
+  });
+
+  // Layout switcher for the AI-tools catalog list (Scroll / Grid / Table),
+  // matching the Studio landing pattern. Persisted per-surface so the
+  // choice survives reloads.
+  const [viewMode, setViewMode] = useViewMode(
+    "tools.browse",
+    "grid",
+    BROWSE_VIEW_MODES,
+  );
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Gate at 2 chars via the shared hook so single-keystroke ?q=A
+  // doesn't narrow the tools grid to noise.
+  const { effective: toolQuery } = useSearchQueryParam();
+  const tierParam = searchParams.get("tier") ?? "";
+  const tierFilter: TierFilter =
+    tierParam === "free" || tierParam === "pro" ? tierParam : "all";
+  const audienceFilter = parseAudienceFilter(searchParams.get("audience"));
+  const categoryFilter = parseCategoryFilter(searchParams.get("category"));
+
+  const setCategoryFilter = (next: CategoryFilter) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === "all") params.delete("category");
+    else params.set("category", next);
+    setSearchParams(params, { replace: true });
+  };
+
+  // #472 — audience + tier filters used to live in the PageHeader as
+  // select dropdowns via `useHeaderFilters`; category was already a
+  // chip row in-page. Filters now agree on chip-row UX (chips scan
+  // faster than nested dropdowns), so all three filters live in the
+  // same column.
+  const setAudienceFilter = (next: AudienceFilter | "all") => {
+    const params = new URLSearchParams(searchParams);
+    // The "for_me" default is implicit — drop the param when the user
+    // hits the For-me chip so URLs stay clean.
+    if (next === "for_me") params.delete("audience");
+    else params.set("audience", next);
+    setSearchParams(params, { replace: true });
+  };
+  const setTierFilter = (next: TierFilter | "all") => {
+    const params = new URLSearchParams(searchParams);
+    if (next === "all") params.delete("tier");
+    else params.set("tier", next);
+    setSearchParams(params, { replace: true });
+  };
+
+  // Resolve the active audience bucket. "for_me" maps the viewer's
+  // effective role onto the bucket (job_seeker / recruiter_employer);
+  // when the role doesn't bucket cleanly (admin, anonymous), fall back
+  // to "all" so the page stays useful instead of going empty.
+  const resolvedAudience: ToolAudience | "all" = useMemo(() => {
+    if (audienceFilter === "all") return "all";
+    if (audienceFilter === "for_me") {
+      return audienceForRole(effectiveRole) ?? "all";
+    }
+    return audienceFilter;
+  }, [audienceFilter, effectiveRole]);
+
+  // Tools that pass every filter EXCEPT category. Used both for the
+  // visible grid (further narrowed by the active category chip) AND for
+  // the per-chip count, so the chips reflect what the user would see if
+  // they switched chips — not a stale total.
+  const toolsByCategory = useMemo(() => {
+    const q = toolQuery.trim().toLowerCase();
+    return TOOLS_CATALOG.filter((tool) => {
+      // Role-access hard gate (SuperAdmin per-role override) applies first,
+      // before the user-driven audience/tier browse filters (#2038).
+      // Skipped on ungated surfaces (e.g. the signed-out marketing page).
+      if (roleGated && !canSeeTool(tool.id)) return false;
+      if (!isToolInAudience(tool, resolvedAudience)) return false;
+      if (tierFilter !== "all" && tool.tier !== tierFilter) return false;
+      if (q === "") return true;
+      // Search the LOCALIZED copy so a user typing in their language
+      // matches what the cards actually show (not the English source).
+      const lt = localizeTool(tool, t);
+      const haystack =
+        `${lt.title} ${lt.description} ${lt.features?.join(" ") ?? ""} ${lt.statusBadge?.label ?? ""}`.toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [toolQuery, tierFilter, resolvedAudience, t, canSeeTool, roleGated]);
+
+  const categoryCounts = useMemo(() => {
+    const map = new Map<ToolCategory, number>();
+    for (const tool of toolsByCategory) {
+      map.set(tool.category, (map.get(tool.category) ?? 0) + 1);
+    }
+    return map;
+  }, [toolsByCategory]);
+
+  const filteredTools = useMemo(() => {
+    if (categoryFilter === "all") return toolsByCategory;
+    return toolsByCategory.filter((tool) => tool.category === categoryFilter);
+  }, [toolsByCategory, categoryFilter]);
+
+  const isFiltering =
+    toolQuery.trim() !== "" ||
+    tierFilter !== "all" ||
+    audienceFilter !== "for_me" ||
+    categoryFilter !== "all";
+
+  // The list the layouts render: the filtered tools with the published
+  // courses woven in (when this surface opts into the weave). Courses are
+  // not subject to the tool filters — they're a constant learning offering
+  // — so the weave runs against the already-filtered tool list. When the
+  // weave is off (authenticated tools tab) this is just the tools.
+  const wovenItems = useMemo<WovenItem[]>(
+    () => weaveToolsAndCourses(filteredTools, weaveCourses ? courses : []),
+    [filteredTools, courses, weaveCourses],
+  );
+
+  // Single card renderer shared by the Grid and Scroll layouts so the
+  // tool/course branch lives in exactly one place. The scroll track wraps
+  // each in a fixed-width snap cell at the call site.
+  const renderWovenCard = (item: WovenItem) =>
+    item.kind === "tool" ? (
+      <ToolCard key={item.key} tool={item.value} />
+    ) : (
+      <CourseMarketplaceCard
+        key={item.key}
+        item={item.value as CourseMarketplaceItem}
+      />
+    );
+
+  return (
+    <>
+      {/* Flattened filter row (#472) — tier · category chip groups on ONE
+          horizontally-scrolling row, divided by thin rules, with the
+          Scroll/Grid/Table view switcher pinned at the end. The category
+          group keeps live counts and drops zero-match chips. */}
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto pb-1">
+          {TOOL_AUDIENCE_SPLIT_ENABLED && (
+            <>
+              <CategoryFilterBar
+                inline
+                value={audienceFilter}
+                onChange={setAudienceFilter}
+                allLabel={t("labels.tools.audienceShowAll")}
+                allCount={0}
+                hideZeroCounts={false}
+                options={AUDIENCE_OPTIONS.filter((o) => o.value !== "all").map(
+                  (o) => ({ value: o.value, label: t(o.labelKey), count: 0 }),
+                )}
+              />
+              <span className="h-6 w-px shrink-0 bg-border" aria-hidden />
+            </>
+          )}
+          <CategoryFilterBar
+            inline
+            value={tierFilter}
+            onChange={setTierFilter}
+            allLabel={t("labels.tools.anyTier")}
+            allCount={0}
+            hideZeroCounts={false}
+            options={TIER_OPTIONS.map((o) => ({
+              value: o.value,
+              label: t(o.labelKey),
+              count: 0,
+            }))}
+          />
+          <span className="h-6 w-px shrink-0 bg-border" aria-hidden />
+          <CategoryFilterBar
+            inline
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+            allCount={toolsByCategory.length}
+            options={CATEGORY_ORDER.map((cat) => ({
+              value: cat,
+              label: t(toolCategoryLabelKey(cat)),
+              count: categoryCounts.get(cat) ?? 0,
+            }))}
+          />
+        </div>
+        <ViewModeToggle
+          className="shrink-0"
+          value={viewMode}
+          onChange={setViewMode}
+          modes={BROWSE_VIEW_MODES}
+        />
+      </div>
+
+      {isFiltering && (
+        <div className="mb-4">
+          <p className="font-mono text-xs uppercase text-muted-foreground" aria-live="polite">
+            {toolQuery.trim() !== ""
+              ? t("messages.tools.countMatch", { count: filteredTools.length })
+              : t("messages.tools.count", { count: filteredTools.length })}
+            {toolQuery.trim() !== "" && (
+              <>
+                {" "}
+                <span className="font-medium text-foreground">
+                  &quot;{toolQuery}&quot;
+                </span>
+              </>
+            )}
+            {tierFilter !== "all" && (
+              <>
+                {" "}{t("messages.tools.filterIn")}{" "}
+                <span className="font-medium text-foreground">
+                  {tierFilter === "free" ? t("labels.free") : t("labels.paid")}
+                </span>
+              </>
+            )}
+            {audienceFilter !== "for_me" && (
+              <>
+                {" "}{t("messages.tools.filterFor")}{" "}
+                <span className="font-medium text-foreground">
+                  {t(
+                    AUDIENCE_OPTIONS.find((o) => o.value === audienceFilter)?.labelKey ??
+                      "labels.tools.audienceEveryone",
+                  )}
+                </span>
+              </>
+            )}
+            {categoryFilter !== "all" && (
+              <>
+                {" "}{t("messages.tools.filterIn")}{" "}
+                <span className="font-medium text-foreground">
+                  {t(toolCategoryLabelKey(categoryFilter))}
+                </span>
+              </>
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* Unified Tools list — Scroll / Grid / Table. The layout switcher
+          now lives at the end of the flattened filter row above (one row,
+          consistent with the Studio landing + Resumes browse pages) and is
+          scoped to this AI-tools catalog. */}
+      <div className="mb-8 sm:mb-12">
+        {filteredTools.length === 0 ? (
+          <div className="rounded-[20px] border border-dashed border-border bg-card px-6 py-14 text-center text-muted-foreground">
+            <p>{t("messages.tools.noMatch")}</p>
+          </div>
+        ) : viewMode === "table" ? (
+          <ToolsTable items={wovenItems} />
+        ) : viewMode === "scroll" ? (
+          <HorizontalScroller itemCount={wovenItems.length}>
+            {wovenItems.map((item) => renderWovenCard(item))}
+          </HorizontalScroller>
+        ) : (
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(280px,100%),1fr))] gap-5">
+            {wovenItems.map((item) => (
+              <li key={item.key} className="flex">
+                <div className="w-full">{renderWovenCard(item)}</div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
+  );
+}

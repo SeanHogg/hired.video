@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" preserveAspectRatio="xMidYMid slice">
+
+  <rect width="800" height="450" fill="#fef3c7"/>
+  <path d="M 60,360 Q 200,300 300,340 T 500,240 T 700,180" stroke="#1c1917" stroke-width="3" fill="none" stroke-dasharray="10 6"/>
+  <g fill="#b45309">
+    <circle cx="60"  cy="360" r="8"/>
+    <circle cx="300" cy="340" r="8"/>
+    <circle cx="500" cy="240" r="8"/>
+    <circle cx="700" cy="180" r="8"/>
+  </g>
+  <polygon points="700,180 720,160 730,180 750,160 760,180 730,200" fill="#166534"/>
+
+</svg>

@@ -1,0 +1,1428 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  hreflang annotations cover EVERY <url> entry below — top-of-funnel
+  marketing URLs (gap #1467) plus the full long-tail of /tools/*,
+  /companies/*, /salaries/*, /resume-guide/*, audience landing pages,
+  per-template landing pages, sector pages, learning library, etc.
+  Closed in gap #1471 via scripts/regenerate-sitemap-hreflang.mjs —
+  re-run after adding new URLs to extend hreflang coverage automatically.
+  Each URL emits xhtml:link rel="alternate" hreflang="X" for
+  en / es / fr-CA + x-default. Locale variants use the ?lang=X query
+  string convention also honoured by the SPA i18n bootstrap.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+
+  <!-- ===== Homepage ===== -->
+  <url>
+    <loc>https://hired.video/</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/?lang=fr-CA" />
+  </url>
+
+  <!-- ===== Core Products ===== -->
+  <url>
+    <loc>https://hired.video/studio</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/studio" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/studio" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/studio?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/studio?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/resumes</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/resumes" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/resumes" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/resumes?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/resumes?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/jobs</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/jobs" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/jobs" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/jobs?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/jobs?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/companies</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/companies" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/companies" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/companies?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/companies?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/people</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/people" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/people" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/people?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/people?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/tasks</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tasks" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tasks" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tasks?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tasks?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/vs-competitors</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/vs-competitors" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/vs-competitors" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/vs-competitors?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/vs-competitors?lang=fr-CA" />
+  </url>
+
+  <!-- ===== Lead-Gen & Engagement ===== -->
+
+  <url>
+    <loc>https://hired.video/tools/xyz-resume-review</loc>
+    <lastmod>2026-10-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tools/xyz-resume-review" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tools/xyz-resume-review" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tools/xyz-resume-review?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tools/xyz-resume-review?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/tools/resume-roast</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tools/resume-roast" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tools/resume-roast" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tools/resume-roast?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tools/resume-roast?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/interview</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/interview" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/interview" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/interview?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/interview?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/chrome-extension</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/chrome-extension" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/chrome-extension" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/chrome-extension?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/chrome-extension?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/affiliate-program</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/affiliate-program" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/affiliate-program" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/affiliate-program?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/affiliate-program?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/signup</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/signup" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/signup" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/signup?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/signup?lang=fr-CA" />
+  </url>
+
+  <!-- ===== AI Tools + Learning (high-value SEO pages) ===== -->
+  <url>
+    <loc>https://hired.video/tools</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tools" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tools" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tools?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tools?lang=fr-CA" />
+  </url>
+
+  <!-- Learning Content Library hub (alias redirects to /tools?tab=learning).
+       Distinct sitemap entry so SEO crawlers index the L&D positioning
+       page without depending on a JS-rendered tab toggle. -->
+  <url>
+    <loc>https://hired.video/learning</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/learning" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/learning" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/learning?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/learning?lang=fr-CA" />
+  </url>
+
+  <!-- Seeded Learning Content Library — five platform-authored SCORM 1.2
+       courses (AI, RAG, prompt eng, must-have skills, Claude API).
+       Permanent public URLs; index for SEO so the LinkedIn-Learning
+       competitor copy has crawlable course pages to point at. -->
+  <url>
+    <loc>https://hired.video/courses/hired-video-learning/ai-fundamentals-for-job-seekers</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/courses/hired-video-learning/ai-fundamentals-for-job-seekers" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/courses/hired-video-learning/ai-fundamentals-for-job-seekers" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/courses/hired-video-learning/ai-fundamentals-for-job-seekers?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/courses/hired-video-learning/ai-fundamentals-for-job-seekers?lang=fr-CA" />
+  </url>
+  <url>
+    <loc>https://hired.video/courses/hired-video-learning/retrieval-augmented-generation-rag</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/courses/hired-video-learning/retrieval-augmented-generation-rag" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/courses/hired-video-learning/retrieval-augmented-generation-rag" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/courses/hired-video-learning/retrieval-augmented-generation-rag?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/courses/hired-video-learning/retrieval-augmented-generation-rag?lang=fr-CA" />
+  </url>
+  <url>
+    <loc>https://hired.video/courses/hired-video-learning/prompt-engineering-essentials</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/courses/hired-video-learning/prompt-engineering-essentials" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/courses/hired-video-learning/prompt-engineering-essentials" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/courses/hired-video-learning/prompt-engineering-essentials?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/courses/hired-video-learning/prompt-engineering-essentials?lang=fr-CA" />
+  </url>
+  <url>
+    <loc>https://hired.video/courses/hired-video-learning/ai-era-must-have-skills</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/courses/hired-video-learning/ai-era-must-have-skills" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/courses/hired-video-learning/ai-era-must-have-skills" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/courses/hired-video-learning/ai-era-must-have-skills?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/courses/hired-video-learning/ai-era-must-have-skills?lang=fr-CA" />
+  </url>
+  <url>
+    <loc>https://hired.video/courses/hired-video-learning/building-with-the-claude-api</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/courses/hired-video-learning/building-with-the-claude-api" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/courses/hired-video-learning/building-with-the-claude-api" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/courses/hired-video-learning/building-with-the-claude-api?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/courses/hired-video-learning/building-with-the-claude-api?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/tools/ai-resume-scorer</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tools/ai-resume-scorer" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tools/ai-resume-scorer" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tools/ai-resume-scorer?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tools/ai-resume-scorer?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/tools/resume-optimizer</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tools/resume-optimizer" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tools/resume-optimizer" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tools/resume-optimizer?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tools/resume-optimizer?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/tools/salary-calculator</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tools/salary-calculator" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tools/salary-calculator" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tools/salary-calculator?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tools/salary-calculator?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/tools/job-resume-match</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tools/job-resume-match" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tools/job-resume-match" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tools/job-resume-match?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tools/job-resume-match?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/tools/summarize-resume</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tools/summarize-resume" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tools/summarize-resume" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tools/summarize-resume?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tools/summarize-resume?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/tools/sentiment-analysis</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tools/sentiment-analysis" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tools/sentiment-analysis" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tools/sentiment-analysis?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tools/sentiment-analysis?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/tools/value-proposition</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tools/value-proposition" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tools/value-proposition" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tools/value-proposition?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tools/value-proposition?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/tools/vendor-sync</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tools/vendor-sync" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tools/vendor-sync" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tools/vendor-sync?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tools/vendor-sync?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/tools/pdf-to-json</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tools/pdf-to-json" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tools/pdf-to-json" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tools/pdf-to-json?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tools/pdf-to-json?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/tools/resume-consolidator</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tools/resume-consolidator" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tools/resume-consolidator" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tools/resume-consolidator?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tools/resume-consolidator?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/tools/resume-tailor</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tools/resume-tailor" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tools/resume-tailor" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tools/resume-tailor?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tools/resume-tailor?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/tools/auto-fill</loc>
+    <lastmod>2026-04-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/tools/auto-fill" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/tools/auto-fill" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/tools/auto-fill?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/tools/auto-fill?lang=fr-CA" />
+  </url>
+
+  <!-- ===== Marketing Pages ===== -->
+  <url>
+    <loc>https://hired.video/pricing</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/pricing" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/pricing" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/pricing?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/pricing?lang=fr-CA" />
+  </url>
+  <url>
+    <loc>https://hired.video/rewards</loc>
+    <lastmod>2026-06-27</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/rewards" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/rewards" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/rewards?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/rewards?lang=fr-CA" />
+  </url>
+  <url>
+    <loc>https://hired.video/templates</loc>
+    <lastmod>2026-06-27</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates?lang=fr-CA" />
+  </url>
+  <url>
+    <loc>https://hired.video/studio/new</loc>
+    <lastmod>2026-10-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/studio/new" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/studio/new" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/studio/new?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/studio/new?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/about</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/about" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/about" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/about?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/about?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/careers</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/careers" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/careers" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/careers?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/careers?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/contact</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/contact" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/contact" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/contact?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/contact?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/help</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/help" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/help" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/help?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/help?lang=fr-CA" />
+  </url>
+
+  <!-- ===== Blog & Guides ===== -->
+  <url>
+    <loc>https://hired.video/blog</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/blog" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/blog" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/blog?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/blog?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/blog/how-to-score-your-resume-for-ats</loc>
+    <lastmod>2026-04-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/blog/how-to-score-your-resume-for-ats" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/blog/how-to-score-your-resume-for-ats" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/blog/how-to-score-your-resume-for-ats?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/blog/how-to-score-your-resume-for-ats?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/blog/optimize-your-resume-for-any-job</loc>
+    <lastmod>2026-03-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/blog/optimize-your-resume-for-any-job" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/blog/optimize-your-resume-for-any-job" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/blog/optimize-your-resume-for-any-job?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/blog/optimize-your-resume-for-any-job?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/blog/how-to-research-your-market-salary</loc>
+    <lastmod>2026-04-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/blog/how-to-research-your-market-salary" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/blog/how-to-research-your-market-salary" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/blog/how-to-research-your-market-salary?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/blog/how-to-research-your-market-salary?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/blog/how-to-match-your-resume-to-any-job</loc>
+    <lastmod>2026-04-12</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/blog/how-to-match-your-resume-to-any-job" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/blog/how-to-match-your-resume-to-any-job" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/blog/how-to-match-your-resume-to-any-job?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/blog/how-to-match-your-resume-to-any-job?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/blog/complete-guide-to-video-resumes</loc>
+    <lastmod>2026-04-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/blog/complete-guide-to-video-resumes" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/blog/complete-guide-to-video-resumes" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/blog/complete-guide-to-video-resumes?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/blog/complete-guide-to-video-resumes?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/blog/tailor-your-resume-for-every-application</loc>
+    <lastmod>2026-04-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/blog/tailor-your-resume-for-every-application" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/blog/tailor-your-resume-for-every-application" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/blog/tailor-your-resume-for-every-application?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/blog/tailor-your-resume-for-every-application?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/blog/write-a-confident-resume-tone-guide</loc>
+    <lastmod>2026-04-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/blog/write-a-confident-resume-tone-guide" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/blog/write-a-confident-resume-tone-guide" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/blog/write-a-confident-resume-tone-guide?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/blog/write-a-confident-resume-tone-guide?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/blog/how-to-write-your-personal-value-proposition</loc>
+    <lastmod>2026-04-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/blog/how-to-write-your-personal-value-proposition" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/blog/how-to-write-your-personal-value-proposition" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/blog/how-to-write-your-personal-value-proposition?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/blog/how-to-write-your-personal-value-proposition?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/blog/merge-multiple-resumes-into-one</loc>
+    <lastmod>2026-04-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/blog/merge-multiple-resumes-into-one" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/blog/merge-multiple-resumes-into-one" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/blog/merge-multiple-resumes-into-one?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/blog/merge-multiple-resumes-into-one?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/blog/write-a-professional-summary-that-gets-noticed</loc>
+    <lastmod>2026-04-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/blog/write-a-professional-summary-that-gets-noticed" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/blog/write-a-professional-summary-that-gets-noticed" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/blog/write-a-professional-summary-that-gets-noticed?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/blog/write-a-professional-summary-that-gets-noticed?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/blog/parse-resume-pdf-to-structured-json</loc>
+    <lastmod>2026-04-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/blog/parse-resume-pdf-to-structured-json" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/blog/parse-resume-pdf-to-structured-json" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/blog/parse-resume-pdf-to-structured-json?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/blog/parse-resume-pdf-to-structured-json?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/blog/how-to-prepare-for-any-job-interview</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/blog/how-to-prepare-for-any-job-interview" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/blog/how-to-prepare-for-any-job-interview" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/blog/how-to-prepare-for-any-job-interview?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/blog/how-to-prepare-for-any-job-interview?lang=fr-CA" />
+  </url>
+
+  <!-- BEGIN GENERATED: /for/:audience + /templates/:slug from AUDIENCES, the life-stage registry and TEMPLATE_CATALOG (scripts/generate-sitemap.mjs, #920). Do not hand-edit. -->
+  <url><loc>https://hired.video/for/athlete</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/athlete" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/athlete" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/athlete?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/athlete?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/actor</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/actor" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/actor" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/actor?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/actor?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/director</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/director" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/director" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/director?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/director?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/musician</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/musician" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/musician" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/musician?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/musician?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/creator</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/creator" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/creator" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/creator?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/creator?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/job_seeker</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/job_seeker" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/job_seeker" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/job_seeker?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/job_seeker?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/founder</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/founder" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/founder" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/founder?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/founder?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/developer</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/developer" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/developer" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/developer?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/developer?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/designer</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/designer" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/designer" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/designer?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/designer?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/data_analyst</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/data_analyst" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/data_analyst" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/data_analyst?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/data_analyst?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/podcaster</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/podcaster" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/podcaster" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/podcaster?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/podcaster?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/educator</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/educator" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/educator" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/educator?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/educator?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/voice_actor</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/voice_actor" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/voice_actor" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/voice_actor?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/voice_actor?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/game_dev</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/game_dev" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/game_dev" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/game_dev?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/game_dev?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/illustrator</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/illustrator" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/illustrator" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/illustrator?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/illustrator?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/animator</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/animator" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/animator" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/animator?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/animator?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/cad_user</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/cad_user" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/cad_user" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/cad_user?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/cad_user?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/job-seekers</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/job-seekers" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/job-seekers" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/job-seekers?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/job-seekers?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/recent-graduates</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/recent-graduates" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/recent-graduates" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/recent-graduates?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/recent-graduates?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/students</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/students" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/students" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/students?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/students?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/unemployed</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/unemployed" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/unemployed" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/unemployed?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/unemployed?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/layoff-recovery</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/layoff-recovery" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/layoff-recovery" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/layoff-recovery?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/layoff-recovery?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/career-changers</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/career-changers" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/career-changers" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/career-changers?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/career-changers?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/returning-to-workforce</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/returning-to-workforce" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/returning-to-workforce" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/returning-to-workforce?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/returning-to-workforce?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/veterans</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/veterans" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/veterans" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/veterans?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/veterans?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/gig-economy</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/gig-economy" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/gig-economy" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/gig-economy?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/gig-economy?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/international-job-seekers</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/international-job-seekers" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/international-job-seekers" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/international-job-seekers?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/international-job-seekers?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/early-career</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/early-career" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/early-career" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/early-career?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/early-career?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/for/senior-executives</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for/senior-executives" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for/senior-executives" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for/senior-executives?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for/senior-executives?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/basic</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/basic" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/basic" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/basic?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/basic?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/resume_doc</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/resume_doc" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/resume_doc" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/resume_doc?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/resume_doc?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/profile</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/profile" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/profile" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/profile?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/profile?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/resume</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/resume" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/resume" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/resume?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/resume?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/personal_brand</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/personal_brand" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/personal_brand" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/personal_brand?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/personal_brand?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/skills_demo</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/skills_demo" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/skills_demo" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/skills_demo?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/skills_demo?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/code_walkthrough</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/code_walkthrough" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/code_walkthrough" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/code_walkthrough?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/code_walkthrough?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/design_portfolio</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/design_portfolio" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/design_portfolio" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/design_portfolio?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/design_portfolio?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/data_analysis</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/data_analysis" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/data_analysis" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/data_analysis?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/data_analysis?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/job_ad</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/job_ad" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/job_ad" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/job_ad?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/job_ad?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/job_doc</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/job_doc" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/job_doc" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/job_doc?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/job_doc?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/company_doc</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/company_doc" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/company_doc" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/company_doc?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/company_doc?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/article_doc</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/article_doc" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/article_doc" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/article_doc?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/article_doc?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/blog_doc</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/blog_doc" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/blog_doc" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/blog_doc?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/blog_doc?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/company_promo</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/company_promo" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/company_promo" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/company_promo?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/company_promo?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/sizzle_reel</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/sizzle_reel" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/sizzle_reel" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/sizzle_reel?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/sizzle_reel?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/tool_promo</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/tool_promo" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/tool_promo" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/tool_promo?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/tool_promo?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/course_lesson_explainer</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/course_lesson_explainer" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/course_lesson_explainer" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/course_lesson_explainer?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/course_lesson_explainer?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/course_lesson_demo</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/course_lesson_demo" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/course_lesson_demo" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/course_lesson_demo?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/course_lesson_demo?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/course_lesson_walkthrough</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/course_lesson_walkthrough" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/course_lesson_walkthrough" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/course_lesson_walkthrough?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/course_lesson_walkthrough?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/self_tape</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/self_tape" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/self_tape" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/self_tape?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/self_tape?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/monologue</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/monologue" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/monologue" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/monologue?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/monologue?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/showreel</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/showreel" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/showreel" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/showreel?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/showreel?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/director_pitch</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/director_pitch" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/director_pitch" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/director_pitch?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/director_pitch?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/casting_call</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/casting_call" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/casting_call" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/casting_call?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/casting_call?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/podcast_trailer</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/podcast_trailer" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/podcast_trailer" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/podcast_trailer?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/podcast_trailer?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/podcast_episode</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/podcast_episode" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/podcast_episode" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/podcast_episode?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/podcast_episode?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/podcast_interview</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/podcast_interview" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/podcast_interview" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/podcast_interview?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/podcast_interview?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/voice_audition_reel</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/voice_audition_reel" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/voice_audition_reel" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/voice_audition_reel?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/voice_audition_reel?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/voice_ivr_prompt</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/voice_ivr_prompt" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/voice_ivr_prompt" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/voice_ivr_prompt?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/voice_ivr_prompt?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/voice_audiobook_chapter</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/voice_audiobook_chapter" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/voice_audiobook_chapter" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/voice_audiobook_chapter?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/voice_audiobook_chapter?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/product_promo</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/product_promo" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/product_promo" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/product_promo?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/product_promo?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/game_3d_world</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/game_3d_world" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/game_3d_world" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/game_3d_world?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/game_3d_world?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/endless_runner</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/endless_runner" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/endless_runner" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/endless_runner?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/endless_runner?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/quiz_game</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/quiz_game" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/quiz_game" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/quiz_game?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/quiz_game?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/memory_match</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/memory_match" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/memory_match" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/memory_match?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/memory_match?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/drawing_blank</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/drawing_blank" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/drawing_blank" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/drawing_blank?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/drawing_blank?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/drawing_social_square</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/drawing_social_square" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/drawing_social_square" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/drawing_social_square?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/drawing_social_square?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/drawing_og_card</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/drawing_og_card" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/drawing_og_card" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/drawing_og_card?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/drawing_og_card?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/animation-logo-loop</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/animation-logo-loop" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/animation-logo-loop" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/animation-logo-loop?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/animation-logo-loop?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/animation-spinner</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/animation-spinner" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/animation-spinner" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/animation-spinner?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/animation-spinner?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/animation-reaction</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/animation-reaction" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/animation-reaction" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/animation-reaction?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/animation-reaction?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/animation-explainer</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/animation-explainer" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/animation-explainer" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/animation-explainer?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/animation-explainer?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/cad-floor-plan</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/cad-floor-plan" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/cad-floor-plan" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/cad-floor-plan?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/cad-floor-plan?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/cad-part-drawing</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/cad-part-drawing" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/cad-part-drawing" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/cad-part-drawing?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/cad-part-drawing?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/cad-electrical-schematic</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/cad-electrical-schematic" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/cad-electrical-schematic" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/cad-electrical-schematic?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/cad-electrical-schematic?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/cad-blueprint</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/cad-blueprint" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/cad-blueprint" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/cad-blueprint?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/cad-blueprint?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/cad3d_part</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/cad3d_part" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/cad3d_part" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/cad3d_part?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/cad3d_part?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/cad3d_massing</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/cad3d_massing" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/cad3d_massing" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/cad3d_massing?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/cad3d_massing?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/cad3d_product</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/cad3d_product" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/cad3d_product" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/cad3d_product?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/cad3d_product?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/ad_iab_mpu_300x250</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/ad_iab_mpu_300x250" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/ad_iab_mpu_300x250" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/ad_iab_mpu_300x250?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/ad_iab_mpu_300x250?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/ad_iab_large_rect_336x280</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/ad_iab_large_rect_336x280" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/ad_iab_large_rect_336x280" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/ad_iab_large_rect_336x280?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/ad_iab_large_rect_336x280?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/ad_iab_leaderboard_728x90</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/ad_iab_leaderboard_728x90" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/ad_iab_leaderboard_728x90" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/ad_iab_leaderboard_728x90?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/ad_iab_leaderboard_728x90?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/ad_iab_half_page_300x600</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/ad_iab_half_page_300x600" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/ad_iab_half_page_300x600" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/ad_iab_half_page_300x600?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/ad_iab_half_page_300x600?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/ad_iab_skyscraper_160x600</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/ad_iab_skyscraper_160x600" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/ad_iab_skyscraper_160x600" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/ad_iab_skyscraper_160x600?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/ad_iab_skyscraper_160x600?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/ad_iab_billboard_970x250</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/ad_iab_billboard_970x250" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/ad_iab_billboard_970x250" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/ad_iab_billboard_970x250?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/ad_iab_billboard_970x250?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/ad_iab_mobile_banner_320x50</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/ad_iab_mobile_banner_320x50" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/ad_iab_mobile_banner_320x50" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/ad_iab_mobile_banner_320x50?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/ad_iab_mobile_banner_320x50?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/ad_iab_large_mobile_320x100</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/ad_iab_large_mobile_320x100" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/ad_iab_large_mobile_320x100" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/ad_iab_large_mobile_320x100?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/ad_iab_large_mobile_320x100?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/ad_og_link_card_1200x630</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/ad_og_link_card_1200x630" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/ad_og_link_card_1200x630" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/ad_og_link_card_1200x630?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/ad_og_link_card_1200x630?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/ad_social_reel_9x16</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/ad_social_reel_9x16" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/ad_social_reel_9x16" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/ad_social_reel_9x16?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/ad_social_reel_9x16?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/ad_meta_in_feed_4x5</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/ad_meta_in_feed_4x5" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/ad_meta_in_feed_4x5" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/ad_meta_in_feed_4x5?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/ad_meta_in_feed_4x5?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/ad_pinterest_pin_2x3</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/ad_pinterest_pin_2x3" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/ad_pinterest_pin_2x3" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/ad_pinterest_pin_2x3?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/ad_pinterest_pin_2x3?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/ad_youtube_bumper_6s</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/ad_youtube_bumper_6s" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/ad_youtube_bumper_6s" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/ad_youtube_bumper_6s?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/ad_youtube_bumper_6s?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/ad_outdoor_billboard_4x1</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/ad_outdoor_billboard_4x1" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/ad_outdoor_billboard_4x1" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/ad_outdoor_billboard_4x1?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/ad_outdoor_billboard_4x1?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/comic_hero</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/comic_hero" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/comic_hero" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/comic_hero?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/comic_hero?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/comic_noir</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/comic_noir" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/comic_noir" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/comic_noir?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/comic_noir?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/comic_scifi</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/comic_scifi" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/comic_scifi" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/comic_scifi?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/comic_scifi?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/comic_fantasy</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/comic_fantasy" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/comic_fantasy" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/comic_fantasy?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/comic_fantasy?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/comic_romance</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/comic_romance" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/comic_romance" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/comic_romance?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/comic_romance?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/comic_slice</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/comic_slice" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/comic_slice" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/comic_slice?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/comic_slice?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/comic_manga</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/comic_manga" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/comic_manga" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/comic_manga?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/comic_manga?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/comic_horror</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/comic_horror" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/comic_horror" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/comic_horror?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/comic_horror?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/comic_comedy</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/comic_comedy" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/comic_comedy" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/comic_comedy?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/comic_comedy?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/comic_retro80s</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/comic_retro80s" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/comic_retro80s" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/comic_retro80s?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/comic_retro80s?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/comic_webtoon</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/comic_webtoon" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/comic_webtoon" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/comic_webtoon?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/comic_webtoon?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/comic_adventure</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/comic_adventure" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/comic_adventure" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/comic_adventure?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/comic_adventure?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/icomic_branching_pitch</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/icomic_branching_pitch" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/icomic_branching_pitch" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/icomic_branching_pitch?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/icomic_branching_pitch?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/icomic_choose_path</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/icomic_choose_path" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/icomic_choose_path" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/icomic_choose_path?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/icomic_choose_path?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/icomic_case_study</loc><lastmod>2026-10-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/icomic_case_study" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/icomic_case_study" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/icomic_case_study?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/icomic_case_study?lang=fr-CA" />
+  </url>
+  <!-- END GENERATED -->
+
+  <!-- ===== Legal ===== -->
+  <url>
+    <loc>https://hired.video/privacy-policy</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/privacy-policy" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/privacy-policy" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/privacy-policy?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/privacy-policy?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/terms-of-service</loc>
+    <lastmod>2026-04-17</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/terms-of-service" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/terms-of-service" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/terms-of-service?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/terms-of-service?lang=fr-CA" />
+  </url>
+
+  <!-- AI-resilient sector surfaces (gap #1165). Slugs MUST stay in sync
+       with shared/sectors.ts SECTORS. Tracked as a consolidate-marketing-
+       route-SSoT follow-up gap. -->
+  <url><loc>https://hired.video/sectors</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/sectors" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/sectors" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/sectors?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/sectors?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/sectors/healthcare</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/sectors/healthcare" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/sectors/healthcare" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/sectors/healthcare?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/sectors/healthcare?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/sectors/legal</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/sectors/legal" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/sectors/legal" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/sectors/legal?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/sectors/legal?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/sectors/government</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/sectors/government" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/sectors/government" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/sectors/government?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/sectors/government?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/sectors/law_enforcement</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/sectors/law_enforcement" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/sectors/law_enforcement" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/sectors/law_enforcement?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/sectors/law_enforcement?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/sectors/security</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/sectors/security" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/sectors/security" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/sectors/security?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/sectors/security?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/sectors/skilled_trades</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/sectors/skilled_trades" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/sectors/skilled_trades" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/sectors/skilled_trades?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/sectors/skilled_trades?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/sectors/beauty_personal_care</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/sectors/beauty_personal_care" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/sectors/beauty_personal_care" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/sectors/beauty_personal_care?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/sectors/beauty_personal_care?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/sectors/gig_work</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/sectors/gig_work" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/sectors/gig_work" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/sectors/gig_work?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/sectors/gig_work?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/sectors/politics_campaigns</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/sectors/politics_campaigns" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/sectors/politics_campaigns" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/sectors/politics_campaigns?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/sectors/politics_campaigns?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/sectors/politics_civic</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/sectors/politics_civic" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/sectors/politics_civic" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/sectors/politics_civic?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/sectors/politics_civic?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/sectors/tech</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.5</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/sectors/tech" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/sectors/tech" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/sectors/tech?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/sectors/tech?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/pivot-explorer</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/pivot-explorer" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/pivot-explorer" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/pivot-explorer?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/pivot-explorer?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/resume-templates</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/resume-templates" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/resume-templates" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/resume-templates?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/resume-templates?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/articles</loc><lastmod>2026-05-25</lastmod><changefreq>daily</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/articles" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/articles" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/articles?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/articles?lang=fr-CA" />
+  </url>
+
+  <!-- Life-stage Resource Maps (#1629): the /for index. Every /for/<audience>
+       page (life-stage + profession) is in the GENERATED section above. -->
+  <url><loc>https://hired.video/for</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for?lang=fr-CA" />
+  </url>
+
+  <!-- Geographic landing pages (#1628). Country-level + sitemap entry
+       point. State + city pages auto-generate on demand; the canonical
+       /sitemap/locations index is the crawler's entry to every region. -->
+  <!-- Launch markets only (shared/launch-markets.ts): US live, CA + MX
+       building. AU / UK / EU are NOT promoted yet — /in/au + /in/gb
+       resolve-gate to 404, so they MUST stay out of the sitemap. -->
+  <url><loc>https://hired.video/sitemap/locations</loc><lastmod>2026-05-27</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/sitemap/locations" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/sitemap/locations" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/sitemap/locations?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/sitemap/locations?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/in/us</loc><lastmod>2026-05-27</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/in/us" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/in/us" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/in/us?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/in/us?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/in/ca</loc><lastmod>2026-05-27</lastmod><changefreq>weekly</changefreq><priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/in/ca" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/in/ca" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/in/ca?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/in/ca?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/in/mx</loc><lastmod>2026-05-27</lastmod><changefreq>weekly</changefreq><priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/in/mx" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/in/mx" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/in/mx?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/in/mx?lang=fr-CA" />
+  </url>
+
+</urlset>

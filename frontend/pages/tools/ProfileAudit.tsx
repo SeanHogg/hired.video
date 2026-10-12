@@ -1,0 +1,568 @@
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import {
+  CheckCircle2,
+  Loader2,
+  Sparkles,
+  XCircle,
+  AlertCircle,
+  Crown,
+} from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToolShell } from "@/components/tools/ToolShell";
+import PeopleCard from "@/components/PeopleCard";
+import ProfilePagePreview, {
+  type ProfilePagePreviewData,
+} from "@/components/profile-audit/ProfilePagePreview";
+import OpenToWorkButton from "@/components/profile/OpenToWorkButton";
+import { useAuth } from "@/lib/auth";
+import type { ProfileUpdate } from "@/lib/services/auth-service";
+import { useSubscription } from "@/lib/hooks/useSubscription";
+import { appendDiagnosticReference } from "@/lib/llm-diagnostic";
+import {
+  profileAuditService,
+  type ProfileAuditCheck,
+  type ProfileAuditResult,
+  type ProfileAuditSnapshot,
+} from "@/lib/services/profile-audit-service";
+import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { toast } from "sonner";
+import type { UserMetadata } from "@/types/people";
+
+const TOOL_ID = "profile-audit";
+
+export default function ProfileAudit() {
+  const { t } = useTranslation();
+  const { isAuthenticated, user, updateProfile, refreshUser } = useAuth();
+  const { isPro, loading: subLoading } = useSubscription();
+
+  const [isRunning, setIsRunning] = useState(false);
+  const [result, setResult] = useState<ProfileAuditResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [accepted, setAccepted] = useState<{
+    headline?: boolean;
+    summary?: boolean;
+    currentRole?: boolean;
+  }>({});
+  const [isApplying, setIsApplying] = useState(false);
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+  const { recordRun } = useToolRunRecorder(TOOL_ID);
+
+  const handleRun = async () => {
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
+      return;
+    }
+    setError(null);
+    setResult(null);
+    setAccepted({});
+    setIsRunning(true);
+    try {
+      const data = await profileAuditService.run();
+      setResult(data);
+      const passes = data.checks.filter((c) => c.status === "pass");
+      const issues = data.checks.filter((c) => c.status !== "pass");
+      void recordRun({
+        score: data.score,
+        result: {
+          overallScore: data.score,
+          summary: data.rationales.topFix,
+          strengths: passes.map((c) => `${c.label}: ${c.detail}`),
+          weaknesses: issues.map((c) => `${c.label}: ${c.detail}`),
+          recommendations: [
+            { title: t("tools.profileAudit.recHeadline"), description: `${data.rationales.headline}\n\n${t("tools.profileAudit.proposedLabel", { value: data.proposed.headline })}` },
+            { title: t("tools.profileAudit.recSummary"), description: `${data.rationales.summary}\n\n${t("tools.profileAudit.proposedLabel", { value: data.proposed.summary })}` },
+            ...(data.proposed.currentRole && data.proposed.currentRole !== data.current.currentRole
+              ? [{ title: t("tools.profileAudit.recCurrentRole"), description: t("tools.profileAudit.proposedLabel", { value: data.proposed.currentRole }) }]
+              : []),
+          ],
+          raw: data,
+        },
+        summary: t("tools.profileAudit.runSummary", { score: data.score, topFix: data.rationales.topFix }),
+      });
+    } catch (err: any) {
+      const code = err?.context?.serverCode ?? err?.code;
+      const msg = err?.context?.serverMessage ?? err?.message;
+      let base: string;
+      if (code === "PRO_REQUIRED") {
+        base = msg ?? t("tools.profileAudit.errProRequired");
+      } else if (code === "AI_UNAVAILABLE" || code === "AI_RATE_LIMITED" || code === "AI_INVALID_RESPONSE" || code === "AI_AUTH_FAILED") {
+        base = msg ?? t("tools.profileAudit.errAiUnavailable");
+      } else if (code === "NOT_FOUND") {
+        base = msg ?? t("tools.profileAudit.errNotFound");
+      } else {
+        base = t("tools.profileAudit.errFailed");
+      }
+      setError(appendDiagnosticReference(base, err));
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const acceptedCount =
+    (accepted.headline ? 1 : 0) +
+    (accepted.summary ? 1 : 0) +
+    (accepted.currentRole ? 1 : 0);
+
+  const handleApply = async () => {
+    if (!result || acceptedCount === 0) return;
+    setIsApplying(true);
+    try {
+      const updates: ProfileUpdate = {};
+      if (accepted.headline) updates.headline = result.proposed.headline;
+      if (accepted.summary) updates.summary = result.proposed.summary;
+      if (accepted.currentRole && result.proposed.currentRole) {
+        updates.currentRole = result.proposed.currentRole;
+      }
+      await updateProfile(updates);
+      await refreshUser();
+      toast.success(t("tools.profileAudit.toastApplied", { count: acceptedCount }));
+      setAccepted({});
+    } catch (err) {
+      console.error("[ProfileAudit] apply failed", err);
+      toast.error(t("tools.profileAudit.toastApplyError"));
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  // Build the two preview-data shapes from the audit result. One
+  // function, two call sites — guarantees the diff between current and
+  // proposed comes only from the fields we accepted, not from a
+  // divergent renderer.
+  const currentPreview = useMemo<ProfilePagePreviewData | null>(
+    () => (result ? snapshotToPreview(result.current) : null),
+    [result],
+  );
+  const proposedPreview = useMemo<ProfilePagePreviewData | null>(
+    () =>
+      result
+        ? {
+            ...snapshotToPreview(result.current),
+            headline: result.proposed.headline,
+            summary: result.proposed.summary,
+            currentRole: result.proposed.currentRole ?? result.current.currentRole,
+          }
+        : null,
+    [result],
+  );
+
+  const currentCardPerson = useMemo<UserMetadata | null>(
+    () => (result ? snapshotToPeopleCard(result.current, user?.id) : null),
+    [result, user?.id],
+  );
+  const proposedCardPerson = useMemo<UserMetadata | null>(
+    () =>
+      result && currentCardPerson
+        ? {
+            ...currentCardPerson,
+            headline: result.proposed.headline,
+            currentPosition: result.proposed.currentRole ?? currentCardPerson.currentPosition,
+          }
+        : null,
+    [result, currentCardPerson],
+  );
+
+  // Authenticated-but-not-Pro: render an upsell. Anonymous users see the
+  // run bar like everyone else; the overlay only fires when they click Run.
+  // Self-gating (per the codebase rule) — the page decides what to show
+  // based on its own dependencies, no `canAudit` prop drilling required.
+  const showProUpsell = isAuthenticated && !subLoading && !isPro;
+
+  return (
+    <ToolShell
+      toolId={TOOL_ID}
+      header={{
+        icon: <Sparkles className="h-6 w-6" />,
+        title: t("tools.card.profile-audit.title"),
+        description: t("tools.profileAudit.description"),
+        tier: "pro",
+      }}
+      authOverlay={{
+        show: showAuthOverlay,
+        message: t("tools.profileAudit.authMessage"),
+      }}
+    >
+            {showProUpsell ? (
+              <ProUpsell />
+            ) : (
+              <RunBar
+                isRunning={isRunning}
+                hasResult={!!result}
+                onRun={handleRun}
+                error={error}
+              />
+            )}
+
+            {result && currentPreview && proposedPreview && currentCardPerson && proposedCardPerson && (
+              <>
+                <ScoreAndChecks
+                  score={result.score}
+                  checks={result.checks}
+                  topFix={result.rationales.topFix}
+                  onOpenToWorkChanged={handleRun}
+                />
+
+                <Tabs defaultValue="card" className="space-y-4">
+                  <TabsList>
+                    <TabsTrigger value="card">{t("tools.profileAudit.tabCard")}</TabsTrigger>
+                    <TabsTrigger value="page">{t("tools.profileAudit.tabPage")}</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="card">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <LabeledColumn label={t("tools.profileAudit.labelCurrent")} tone="neutral">
+                        <PeopleCard person={currentCardPerson} />
+                      </LabeledColumn>
+                      <LabeledColumn label={t("tools.profileAudit.labelProposed")} tone="positive">
+                        <PeopleCard person={proposedCardPerson} />
+                      </LabeledColumn>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="page">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <ProfilePagePreview
+                        data={currentPreview}
+                        variantLabel={t("tools.profileAudit.labelCurrent")}
+                        variantRingClassName="ring-muted"
+                      />
+                      <ProfilePagePreview
+                        data={proposedPreview}
+                        variantLabel={t("tools.profileAudit.labelProposed")}
+                        variantRingClassName="ring-primary/30"
+                      />
+                    </div>
+                  </TabsContent>
+                </Tabs>
+
+                <RewritePanel
+                  current={result.current}
+                  proposed={result.proposed}
+                  rationales={result.rationales}
+                  accepted={accepted}
+                  onToggle={(field) => setAccepted((s) => ({ ...s, [field]: !s[field] }))}
+                />
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <span className="text-sm text-muted-foreground">
+                    {acceptedCount === 0
+                      ? t("tools.profileAudit.applyHintEmpty")
+                      : t("tools.profileAudit.applyHintReady", { count: acceptedCount })}
+                  </span>
+                  <Button
+                    onClick={handleApply}
+                    disabled={acceptedCount === 0 || isApplying}
+                    className="min-w-[160px]"
+                  >
+                    {isApplying ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        {t("tools.profileAudit.saving")}
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        {t("tools.profileAudit.applyBtn")}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
+    </ToolShell>
+  );
+}
+
+// ── Small subcomponents ─────────────────────────────────────────────────────
+
+function ProUpsell() {
+  const { t } = useTranslation();
+  return (
+    <Card className="border-amber-300/60 bg-amber-50/30">
+      <CardContent className="p-8 flex items-start gap-4">
+        <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+          <Crown className="h-6 w-6 text-amber-700" />
+        </div>
+        <div className="flex-1">
+          <h2 className="text-xl font-semibold mb-1">{t("tools.profileAudit.proTitle")}</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            {t("tools.profileAudit.proBody")}
+          </p>
+          <Link to="/pricing">
+            <Button>
+              <Crown className="h-4 w-4 mr-2" />
+              {t("tools.profileAudit.proCta")}
+            </Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface RunBarProps {
+  isRunning: boolean;
+  hasResult: boolean;
+  onRun: () => void;
+  error: string | null;
+}
+
+function RunBar({ isRunning, hasResult, onRun, error }: RunBarProps) {
+  const { t } = useTranslation();
+  return (
+    <Card>
+      <CardContent className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <p className="font-medium">
+            {hasResult
+              ? t("tools.profileAudit.runReRunTitle")
+              : t("tools.profileAudit.runNowTitle")}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {t("tools.profileAudit.runSubtitle")}
+          </p>
+        </div>
+        <Button onClick={onRun} disabled={isRunning} className="min-w-[180px]">
+          {isRunning ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              {t("tools.profileAudit.auditing")}
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4 mr-2" />
+              {hasResult
+                ? t("tools.profileAudit.reRunBtn")
+                : t("tools.profileAudit.runBtn")}
+            </>
+          )}
+        </Button>
+        {error && (
+          <Alert variant="destructive" className="w-full mt-2 sm:mt-0">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface ScoreAndChecksProps {
+  score: number;
+  checks: ProfileAuditCheck[];
+  topFix: string;
+  onOpenToWorkChanged?: () => void;
+}
+
+function scoreColor(score: number): string {
+  if (score >= 80) return "text-brand-green-text";
+  if (score >= 60) return "text-amber-600";
+  return "text-destructive";
+}
+
+function checkIcon(status: ProfileAuditCheck["status"]) {
+  if (status === "pass") return <CheckCircle2 className="h-4 w-4 text-brand-green-text" />;
+  if (status === "warn") return <AlertCircle className="h-4 w-4 text-amber-600" />;
+  return <XCircle className="h-4 w-4 text-destructive" />;
+}
+
+function ScoreAndChecks({ score, checks, topFix, onOpenToWorkChanged }: ScoreAndChecksProps) {
+  const { t } = useTranslation();
+  return (
+    <Card>
+      <CardContent className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+        <div className="text-center md:text-left">
+          <p className="text-sm text-muted-foreground">{t("tools.profileAudit.profileScore")}</p>
+          <p className={`text-5xl font-bold ${scoreColor(score)}`}>{score}<span className="text-xl text-muted-foreground">/100</span></p>
+          <p className="text-xs text-muted-foreground mt-2">{t("tools.profileAudit.checksCaption")}</p>
+        </div>
+        <ul className="md:col-span-2 space-y-2">
+          {checks.map((c) => (
+            <li key={c.id} className="flex items-start gap-2 text-sm">
+              <span className="flex-shrink-0 mt-0.5">{checkIcon(c.status)}</span>
+              <div className="flex-1 min-w-0">
+                <span className="font-medium">{c.label}: </span>
+                <span className="text-muted-foreground">{c.detail}</span>
+                {c.id === "openToWork" && (
+                  <div className="mt-2">
+                    <OpenToWorkButton onAfterChange={onOpenToWorkChanged} />
+                  </div>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+        <div className="md:col-span-3 mt-2 p-3 rounded-md bg-primary/5 border border-primary/20">
+          <p className="text-xs uppercase tracking-wide text-primary font-semibold mb-1">{t("tools.profileAudit.topFix")}</p>
+          <p className="text-sm">{topFix}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface LabeledColumnProps {
+  label: string;
+  tone: "neutral" | "positive";
+  children: React.ReactNode;
+}
+
+function LabeledColumn({ label, tone, children }: LabeledColumnProps) {
+  return (
+    <div className={`rounded-lg ring-2 ${tone === "positive" ? "ring-primary/30" : "ring-muted"} p-3 space-y-3`}>
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+interface RewritePanelProps {
+  current: ProfileAuditSnapshot;
+  proposed: ProfileAuditResult["proposed"];
+  rationales: ProfileAuditResult["rationales"];
+  accepted: { headline?: boolean; summary?: boolean; currentRole?: boolean };
+  onToggle: (field: "headline" | "summary" | "currentRole") => void;
+}
+
+function RewritePanel({ current, proposed, rationales, accepted, onToggle }: RewritePanelProps) {
+  const { t } = useTranslation();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("tools.profileAudit.proposedRewrites")}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <RewriteRow
+          field="headline"
+          label={t("tools.profileAudit.fieldHeadline")}
+          before={current.headline ?? ""}
+          after={proposed.headline}
+          rationale={rationales.headline}
+          accepted={!!accepted.headline}
+          onToggle={() => onToggle("headline")}
+        />
+        <RewriteRow
+          field="summary"
+          label={t("tools.profileAudit.fieldSummary")}
+          before={current.summary ?? ""}
+          after={proposed.summary}
+          rationale={rationales.summary}
+          accepted={!!accepted.summary}
+          onToggle={() => onToggle("summary")}
+        />
+        {proposed.currentRole && proposed.currentRole !== current.currentRole && (
+          <RewriteRow
+            field="currentRole"
+            label={t("tools.profileAudit.fieldCurrentRole")}
+            before={current.currentRole ?? ""}
+            after={proposed.currentRole}
+            rationale={t("tools.profileAudit.currentRoleRationale")}
+            accepted={!!accepted.currentRole}
+            onToggle={() => onToggle("currentRole")}
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface RewriteRowProps {
+  field: string;
+  label: string;
+  before: string;
+  after: string;
+  rationale: string;
+  accepted: boolean;
+  onToggle: () => void;
+}
+
+function RewriteRow({ label, before, after, rationale, accepted, onToggle }: RewriteRowProps) {
+  const { t } = useTranslation();
+  return (
+    <div className={`border rounded-md p-3 transition-colors ${accepted ? "border-brand-green/60 bg-brand-green/5" : ""}`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
+          {label}
+        </span>
+        <Button
+          size="sm"
+          variant={accepted ? "default" : "outline"}
+          onClick={onToggle}
+        >
+          {accepted ? (
+            <>
+              <CheckCircle2 className="h-4 w-4 mr-1.5" />
+              {t("tools.profileAudit.accepted")}
+            </>
+          ) : (
+            t("tools.profileAudit.acceptRewrite")
+          )}
+        </Button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+        <div className="bg-destructive/5 border border-destructive/20 p-2 rounded text-sm">
+          <div className="text-xs font-semibold text-destructive mb-1">{t("tools.profileAudit.before")}</div>
+          <div className="whitespace-pre-wrap break-words">{before || <em className="text-muted-foreground">{t("tools.profileAudit.empty")}</em>}</div>
+        </div>
+        <div className="bg-brand-green/5 border border-brand-green/20 p-2 rounded text-sm">
+          <div className="text-xs font-semibold text-brand-green-text mb-1">{t("tools.profileAudit.after")}</div>
+          <div className="whitespace-pre-wrap break-words">{after}</div>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        <span className="font-semibold">{t("tools.profileAudit.why")}</span> {rationale}
+      </p>
+    </div>
+  );
+}
+
+// ── Adapters ────────────────────────────────────────────────────────────────
+
+function snapshotToPreview(s: ProfileAuditSnapshot): ProfilePagePreviewData {
+  return {
+    fullName: s.fullName,
+    avatarUrl: s.avatarUrl,
+    headline: s.headline,
+    summary: s.summary,
+    currentRole: s.currentRole,
+    currentCompany: s.currentCompany,
+    location: s.location,
+    openToWork: s.openToWork,
+  };
+}
+
+function snapshotToPeopleCard(s: ProfileAuditSnapshot, ownId: string | undefined): UserMetadata {
+  const [first, ...rest] = (s.fullName || "").split(/\s+/);
+  return {
+    id: ownId ?? "preview",
+    slug: ownId ?? "preview",
+    firstName: first ?? "",
+    lastName: rest.join(" "),
+    fullName: s.fullName || "You",
+    avatar: s.avatarUrl ?? undefined,
+    headline: s.headline ?? "",
+    location: s.location ?? "",
+    role: s.role ?? "",
+    visibility: "public" as any,
+    status: (s.openToWork ? "looking" : "active") as any,
+    createdAt: s.createdAt ?? new Date().toISOString(),
+    updatedAt: s.lastActiveAt ?? new Date().toISOString(),
+    lastActiveAt: s.lastActiveAt ?? new Date().toISOString(),
+    profileViews: 0,
+    connectionCount: 0,
+    followerCount: 0,
+    emailConfirmed: true,
+    isPro: true,
+    openToWork: s.openToWork,
+    currentPosition: s.currentRole ?? undefined,
+    currentCompany: s.currentCompany ?? undefined,
+  };
+}

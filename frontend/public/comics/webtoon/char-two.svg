@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid slice">
+
+  <ellipse cx="130" cy="220" rx="80" ry="90" fill="#6366f1" opacity="0.85"/>
+  <ellipse cx="130" cy="210" rx="68" ry="78" fill="#ffffff"/>
+  <ellipse cx="270" cy="220" rx="80" ry="90" fill="#14b8a6" opacity="0.85"/>
+  <ellipse cx="270" cy="210" rx="68" ry="78" fill="#ffffff"/>
+  <path d="M 30,360 Q 130,320 230,360 Q 330,320 380,360 L 380,600 L 30,600 Z" fill="#6366f1" opacity="0.8"/>
+
+</svg>

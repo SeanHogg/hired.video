@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice">
+
+  <path d="M 100,40 Q 60,10 60,60 Q 60,100 100,140 Q 140,100 140,60 Q 140,10 100,40" fill="#f43f5e" stroke="#831843" stroke-width="5"/>
+  <g stroke="#fbcfe8" stroke-width="3">
+    <line x1="100" y1="160" x2="100" y2="180"/>
+    <line x1="60"  y1="150" x2="50"  y2="170"/>
+    <line x1="140" y1="150" x2="150" y2="170"/>
+  </g>
+
+</svg>

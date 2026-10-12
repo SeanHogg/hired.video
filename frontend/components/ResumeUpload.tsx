@@ -1,0 +1,631 @@
+import { Upload, Loader2, X, AlertTriangle } from "lucide-react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { parseJsonResumeFile, isResumeImageFile } from "@/lib/extract-text";
+import { useIsFirstResumeUpload } from "@/hooks/useIsFirstResumeUpload";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { resumeService, type Resume } from "@/lib/services/resume-service";
+import { useAnonGate } from "@/lib/studio/anon-gate-context";
+import { confirmDialog } from "@/lib/dialogs";
+import type {
+  ResumePrivacy,
+  ResumeUploadResponse,
+  ResumeData,
+} from "@/types/resume";
+
+interface ResumeUploadProps {
+  onUploadSuccess: (response: ResumeUploadResponse) => void;
+  /** Optional — when omitted (e.g. the upload form is embedded inline rather
+   *  than in a sheet/modal), the "Cancel" button is hidden since there's
+   *  nothing to dismiss. */
+  onCancel?: () => void;
+  /** When true, renders without the Card wrapper (for use inside sheets/modals) */
+  compact?: boolean;
+  /** Pre-fill the dropzone with a file the caller already collected (e.g. from
+   *  a drag-drop on a parent empty state). Used when the user dragged a file
+   *  directly onto a list-empty state and we open the sheet pre-loaded. */
+  initialFile?: File | null;
+  /** When true, hides the new-resume metadata fields (name / privacy / master)
+   *  and shows just the dropzone + a convert button. Use when the upload is
+   *  embedded into an existing editor where the user has already selected the
+   *  resume — surfacing those fields makes it look like they're creating a new
+   *  one. The title is auto-derived from the file; privacy defaults to private
+   *  and the first upload is still auto-promoted to master server-side. */
+  minimal?: boolean;
+  /** Override the primary button label (default "Upload Resume"). */
+  submitLabel?: string;
+  /** When set, the upload OVERWRITES this existing resume's content in place
+   *  (parse → PUT) instead of minting a new resume row. Use when the user has
+   *  already opened a resume and is importing a file into it. When omitted the
+   *  component creates a brand-new resume (the /resumes + empty-state flow). */
+  targetResumeId?: string;
+}
+
+// Helper function to create empty resume data
+const getEmptyResumeData = (): ResumeData => ({
+  basics: {
+    name: "",
+    label: "",
+    image: "",
+    email: "",
+    phone: "",
+    url: "",
+    summary: "",
+    location: null,
+  },
+  work: [],
+  volunteer: [],
+  education: [],
+  awards: [],
+  certificates: [],
+  publications: [],
+  skills: [],
+  languages: [],
+  interests: [],
+  references: [],
+  projects: [],
+});
+
+export default function ResumeUpload({
+  onUploadSuccess,
+  onCancel,
+  compact = false,
+  initialFile = null,
+  minimal = false,
+  submitLabel,
+  targetResumeId,
+}: ResumeUploadProps) {
+  const { t } = useTranslation();
+  // Self-gate the server-touching import behind auth. Default is a NO-OP that
+  // proceeds (authenticated surfaces + anywhere without the Studio gate
+  // provider); inside the anon Studio editor it opens the in-place sign-up
+  // panel instead of firing a 401 at /api/resumes/parse (#2214).
+  const { requireAuth } = useAnonGate();
+  const [isDragging, setIsDragging] = useState(false);
+  const [file, setFile] = useState<File | null>(initialFile);
+  const [name, setName] = useState("");
+  const [privacy, setPrivacy] = useState<ResumePrivacy>("private");
+  const [isMaster, setIsMaster] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  // Default `isMaster` based on whether this is the user's first upload.
+  // Backend auto-promotes the first resume to master regardless, but reflecting
+  // it in the checkbox tells the user what's about to happen and lets them
+  // override (in practice they can't un-master the only resume, but the default
+  // matters for second+ uploads which should stay unchecked).
+  const isFirstUpload = useIsFirstResumeUpload();
+  useEffect(() => {
+    if (isFirstUpload === undefined) return;
+    setIsMaster(isFirstUpload);
+  }, [isFirstUpload]);
+
+  const allowedTypes = useMemo(
+    () => [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain",
+      "text/markdown",
+      "text/x-markdown",
+      "application/json",
+      "application/ld+json",
+    ],
+    [],
+  );
+
+  const allowedExtensions = [".pdf", ".doc", ".docx", ".txt", ".md", ".markdown", ".json"];
+
+  function isFileAllowed(file: File): boolean {
+    if (allowedTypes.includes(file.type)) return true;
+    // Images (phone photos / scans) — parsed server-side via vision OCR.
+    if (isResumeImageFile(file)) return true;
+    const ext = "." + file.name.split(".").pop()?.toLowerCase();
+    return allowedExtensions.includes(ext);
+  }
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  // Pre-fill the name field. JSON Resume uploads peek at the parsed
+  // top-level `title` first (legacy hired.video exports stored the
+  // resume's display title there as `Name`); fall back to the filename
+  // when the file isn't a JSON Resume or has no embedded title.
+  const populateNameFromFile = useCallback(async (selected: File) => {
+    if (name) return;
+    const fallback = selected.name.replace(/\.[^/.]+$/, "");
+    const parsed = await parseJsonResumeFile(selected);
+    const embedded = typeof parsed?.title === "string" ? parsed.title.trim() : "";
+    setName(embedded || fallback);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name]);
+
+  // Mirror the drag-drop name-population path for `initialFile` — when the
+  // sheet is opened with a file already attached (parent empty-state drop),
+  // the name field would otherwise stay blank.
+  useEffect(() => {
+    if (initialFile) void populateNameFromFile(initialFile);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFile]);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      setError(null);
+
+      const droppedFile = e.dataTransfer.files[0];
+      if (droppedFile && isFileAllowed(droppedFile)) {
+        setFile(droppedFile);
+        void populateNameFromFile(droppedFile);
+      } else {
+        setError("Please upload a PDF, Word document, photo (JPG/PNG), Markdown, JSON, or text file.");
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [populateNameFromFile],
+  );
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    setError(null);
+
+    if (selectedFile && isFileAllowed(selectedFile)) {
+      setFile(selectedFile);
+      void populateNameFromFile(selectedFile);
+    } else {
+      setError("Please upload a PDF, Word document, Markdown, JSON, or text file.");
+    }
+  };
+
+  // Map canonical `Resume["content"]` → UI `ResumeData`. The shapes are
+  // the same (both JSON-Resume camelCase), so this is mostly pass-through
+  // with field-level "?? default" fallbacks for missing values. Renamed
+  // from the legacy `mapMetaResumeToResumeData(meta: Resume["metaResume"])`
+  // when the legacy shape was deleted on 2026-04-20.
+  const mapMetaResumeToResumeData = (
+    meta: NonNullable<Resume["content"]>,
+  ): ResumeData => {
+    const basics = meta?.basics ?? ({} as NonNullable<NonNullable<Resume["content"]>["basics"]>);
+    const location = basics?.location ?? null;
+    return {
+  basics: {
+        name: basics.name || "",
+        label: basics.label || "",
+        image: basics.image || "",
+        email: basics.email || "",
+        phone: basics.phone || "",
+        url: basics.url || "",
+        summary: basics.summary || "",
+        location: location
+          ? {
+              address: location.address || "",
+              postalCode: location.postalCode || "",
+              city: location.city || "",
+              countryCode: location.countryCode || "",
+              region: location.region || "",
+            }
+          : null,
+      },
+      work: (meta?.work || []).map((w) => ({
+        name: w.name || "",
+        position: w.position || "",
+        summary: w.summary || "",
+        startDate: w.startDate || "",
+        endDate: w.endDate || "",
+        highlights: Array.isArray(w.highlights) ? w.highlights : [],
+        url: w.url || "",
+      })),
+      volunteer: (meta?.volunteer || []).map((v) => ({
+        organization: v.organization || "",
+        position: v.position || "",
+        summary: v.summary || "",
+        startDate: v.startDate || "",
+        endDate: v.endDate || "",
+        highlights: Array.isArray(v.highlights) ? v.highlights : null,
+        url: v.url || "",
+      })),
+      education: (meta?.education || []).map((e) => ({
+        institution: e.institution || "",
+        area: e.area || "",
+        studyType: e.studyType || "",
+        startDate: e.startDate || "",
+        endDate: e.endDate || "",
+        score: e.score || "",
+        courses: Array.isArray(e.courses) ? e.courses : null,
+        url: e.url || "",
+      })),
+      awards: (meta?.awards || []).map((a) => ({
+        title: a.title || "",
+        date: a.date || "",
+        awarder: a.awarder || "",
+        summary: a.summary || "",
+      })),
+      certificates: (meta?.certificates || []).map((c) => ({
+        name: c.name || "",
+        date: c.date || "",
+        issuer: c.issuer || "",
+        url: c.url || "",
+      })),
+      publications: (meta?.publications || []).map((p) => ({
+        name: p.name || "",
+        publisher: p.publisher || "",
+        releaseDate: p.releaseDate || "",
+        url: p.url || "",
+        summary: p.summary || "",
+      })),
+      skills: (meta?.skills || []).map((s) => ({
+        name: s.name || "",
+        level: s.level || "",
+        keywords: Array.isArray(s.keywords) ? s.keywords : [],
+      })),
+      languages: (meta?.languages || []).map((l) => ({
+        language: l.language || "",
+        fluency: l.fluency || "",
+      })),
+      interests: (meta?.interests || []).map((i) => ({
+        name: i.name || "",
+        keywords: Array.isArray(i.keywords) ? i.keywords : [],
+      })),
+      references: (meta?.references || []).map((r) => ({
+        name: r.name || "",
+        reference: r.reference || "",
+      })),
+      projects: (meta?.projects || []).map((p) => ({
+        name: p.name || "",
+        description: p.description || "",
+        highlights: Array.isArray(p.highlights) ? p.highlights : [],
+        keywords: Array.isArray(p.keywords) ? p.keywords : [],
+        startDate: p.startDate || "",
+        endDate: p.endDate || "",
+        url: p.url || "",
+        roles: Array.isArray(p.roles) ? p.roles : [],
+        entity: p.entity || "",
+        type: p.type || "",
+      })),
+
+      meta: undefined,
+    };
+  };
+
+  const handleUpload = async () => {
+    // In overwrite mode the title is irrelevant (we keep the existing one), so
+    // only the create flow requires a name.
+    if (!file || (!targetResumeId && !name.trim())) return;
+
+    // Parsing the file runs a server-side LLM pass and writes a résumé row —
+    // both need an account. For a signed-out Studio visitor this opens the
+    // in-place sign-up panel and re-runs the import once they authenticate
+    // (their attached file + canvas are preserved); on authenticated surfaces
+    // (or anywhere outside the gate provider) it's a no-op that returns true.
+    if (
+      !requireAuth({
+        reason: "resume-import",
+        displayReason: t("studio.anon.gateResumeImport"),
+        onAuthed: () => {
+          void handleUpload();
+        },
+      })
+    ) {
+      return;
+    }
+
+    // Overwrite-in-place REPLACES the open résumé's content and the editor's
+    // Undo does NOT cover entity content — so confirm first, and reassure the
+    // user the current version is snapshotted (restorable from Version History)
+    // before we proceed.
+    if (targetResumeId) {
+      const proceed = await confirmDialog({
+        title: t("dialogs.resumeUpload.replaceTitle"),
+        description: t("dialogs.resumeUpload.replaceDescription"),
+        confirmText: t("dialogs.resumeUpload.replaceConfirm"),
+        destructive: true,
+      });
+      if (!proceed) return;
+    }
+
+    setIsUploading(true);
+    setError(null);
+    setUploadProgress(0);
+
+    try {
+      // Overwrite-in-place: the user already opened this resume, so parse the
+      // file to structured content and PUT it onto the SAME row — no new
+      // resume is minted. `parseResumeFromFile` handles JSON-Resume (structure
+      // preserved) and PDF/DOCX/text (server AI parse) uniformly.
+      if (targetResumeId) {
+        // Snapshot the current content BEFORE overwriting so the user can
+        // revert (the PUT does not auto-version). Best-effort — a snapshot
+        // failure shouldn't block the import the user explicitly confirmed.
+        try {
+          await resumeService.createVersion(targetResumeId, {
+            label: "Before résumé import",
+          });
+        } catch (snapshotErr) {
+          console.warn("Pre-import résumé snapshot failed:", snapshotErr);
+        }
+        const { data } = await resumeService.parseResumeFromFile(file);
+        await resumeService.updateResumeData(targetResumeId, { data });
+        onUploadSuccess({
+          id: targetResumeId,
+          content: data,
+          message: name.trim() || file.name,
+          confidence: 0.8,
+        });
+        return;
+      }
+
+      // Robust file → resume path (handles JSON exports verbatim, PDF/DOCX/text
+      // via client-or-server extraction, and phone photos/scans via server-side
+      // vision OCR). Never sends binary garbage — a failed extraction surfaces
+      // as a thrown error rather than a silently-empty resume.
+      const savedResume = await resumeService.createResumeFromFile(file, {
+        title: name.trim(),
+        privacy,
+        isMaster,
+      });
+
+      // Canonical Resume shape post-2026-04-20 refactor: `content` IS the
+      // JSON-Resume document directly (no `metaResume` envelope). Map the
+      // content if present, else fall back to empty. `mapMetaResumeToResumeData`
+      // tolerantly handles either legacy `metaResume` OR canonical `content`.
+      const payload =
+        (savedResume as any).content ??
+        (savedResume as any).metaResume ??
+        null;
+      const uploadedData: ResumeData = payload
+        ? mapMetaResumeToResumeData(payload)
+        : getEmptyResumeData();
+
+      const response: ResumeUploadResponse = {
+        id: savedResume.id ?? "",
+        content: uploadedData,
+        message: name.trim(),
+        confidence: 0.8,
+      };
+
+      onUploadSuccess(response);
+    } catch (err) {
+      console.error("Resume upload failed:", err);
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Failed to upload resume. Please try again.";
+      setError(errorMessage);
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const removeFile = () => {
+    setFile(null);
+    setError(null);
+  };
+
+  const getFileIcon = (file: File) => {
+    if (file.type.includes("pdf")) return "📄";
+    if (file.type.includes("word")) return "📝";
+    if (isResumeImageFile(file)) return "🖼️";
+    return "📄";
+  };
+
+  const content = (
+    <div className="space-y-6">
+        {/* File Upload Area */}
+        <div className="space-y-4">
+          <Label>Resume File</Label>
+          {!file ? (
+            <div
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                isDragging
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/50"
+              }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-lg font-medium mb-2">
+                Drop your resume here, or click to browse
+              </p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Supports PDF, Word (.doc, .docx), photos (JPG/PNG), markdown, JSON, and text files
+              </p>
+              <Input
+                type="file"
+                accept="image/*,.pdf,.doc,.docx,.txt,.md,.json"
+                onChange={handleFileSelect}
+                className="hidden"
+                id="file-upload"
+              />
+              <Button variant="outline" asChild>
+                <label htmlFor="file-upload" className="cursor-pointer">
+                  Choose File
+                </label>
+              </Button>
+            </div>
+          ) : (
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{getFileIcon(file)}</span>
+                  <div>
+                    <p className="font-medium">{file.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {(file.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={removeFile}
+                  disabled={isUploading}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Resume Settings — hidden in `minimal` mode (inline editor import),
+            where the user has already picked the resume and these new-resume
+            fields would imply a fresh one. Title auto-derives from the file. */}
+        {!minimal && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="resume-name">Resume Name</Label>
+            <Input
+              id="resume-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g., Software Engineer Resume"
+              disabled={isUploading}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Privacy Setting</Label>
+            <Select
+              value={privacy}
+              onValueChange={(value: ResumePrivacy) => setPrivacy(value)}
+              disabled={isUploading}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="private">
+                  Private - Only visible to you
+                </SelectItem>
+                <SelectItem value="recruiter_only">
+                  Recruiter Only - Visible to verified recruiters
+                </SelectItem>
+                <SelectItem value="public">
+                  Public - Searchable by anyone
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="master-resume"
+              checked={isMaster}
+              onCheckedChange={(checked) => setIsMaster(checked === true)}
+              disabled={isUploading}
+            />
+            <Label htmlFor="master-resume" className="text-sm">
+              Mark as Master Resume
+            </Label>
+          </div>
+          {isMaster && (
+            <p className="text-xs text-muted-foreground ml-6">
+              Master resumes can be used as templates to create targeted
+              variations.
+            </p>
+          )}
+        </div>
+        )}
+
+        {/* Overwrite warning — only when importing INTO an already-open résumé
+            (targetResumeId). Persistent so the user sees it before acting; the
+            confirm dialog repeats it on submit. */}
+        {targetResumeId && file && (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              This replaces the current résumé's content. The current version is
+              saved to Version History first (restorable any time); the editor's
+              Undo won't revert it.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Upload Progress */}
+        {isUploading && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Processing resume...</span>
+              <span className="text-sm text-muted-foreground">
+                {uploadProgress}%
+              </span>
+            </div>
+            <Progress value={uploadProgress} className="w-full" />
+          </div>
+        )}
+
+        {/* Error Display */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          <Button
+            onClick={handleUpload}
+            disabled={!file || isUploading || (!targetResumeId && !name.trim())}
+            className="flex-1"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Upload className="mr-2 h-4 w-4" />
+                {submitLabel ?? "Upload Resume"}
+              </>
+            )}
+          </Button>
+          {onCancel && (
+            <Button variant="outline" onClick={onCancel} disabled={isUploading}>
+              Cancel
+            </Button>
+          )}
+        </div>
+    </div>
+  );
+
+  if (compact) return content;
+
+  return (
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Upload className="h-5 w-5" />
+          Upload Resume
+        </CardTitle>
+      </CardHeader>
+      <CardContent>{content}</CardContent>
+    </Card>
+  );
+}

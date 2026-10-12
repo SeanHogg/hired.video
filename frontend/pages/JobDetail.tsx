@@ -1,0 +1,585 @@
+import { usePageChrome } from "@/lib/seo";
+import { publicJobPath } from "@shared/public-paths";
+import {
+  Edit,
+  Share,
+  Bookmark,
+  BookmarkCheck,
+  Users,
+  Eye,
+  Calendar,
+  ExternalLink,
+  ArrowLeft,
+  MoreVertical,
+  ClipboardCheck,
+  Building2,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import AddToListMenu from "@/components/lists/AddToListMenu";
+import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
+import { useState, useEffect } from "react";
+import { useParams, Link, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { useUserTimezone } from "@/hooks/use-user-timezone";
+import AuthOverlay from "@/components/AuthOverlay";
+import DeclarativeJobRenderer from "@/components/job-renderer/DeclarativeJobRenderer";
+import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
+import EntityDocumentCanvas from "@/components/studio/EntityDocumentCanvas";
+import JobScoreBadges from "@/components/tools/JobScoreBadges";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { ArchiveRestore } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import { jobService } from "@/lib/services/job-service";
+import { isUuid } from "@shared/value-types";
+import { useAuth } from "@/lib/auth";
+import { useJobPermissions } from "@/hooks/use-job-permissions";
+import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
+import ArtifactDetailsSheet from "@/components/shared/ArtifactDetailsSheet";
+import JobPipelineKanban from "@/components/recruit/JobPipelineKanban";
+import JobPipelineReports from "@/components/recruit/JobPipelineReports";
+import SourcingFeePanel from "@/components/recruit/SourcingFeePanel";
+import { TimeToHireCard } from "@/components/jobs/TimeToHireCard";
+import { AppShell } from "@/components/AppShell";
+import { APP_PAGE_COLUMN } from "@/lib/ui/page-layout";
+import { AppEmptyState } from "@/components/app/AppEmptyState";
+import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import EntityHubTabStrip from "@/components/EntityHubTabStrip";
+import { Briefcase } from "lucide-react";
+import { jobPipelineService } from "@/lib/services/job-pipeline-service";
+import { useUgcSeo } from "@/lib/seo-ugc";
+import { SAMPLE_JOB } from "@/lib/sample-job";
+import { DEFAULT_JOB_DESCRIPTOR, getJobTemplateById } from "@/types/job-template";
+import { mapApiJobToUI, type UIJob } from "@/lib/jobs/api-job-mapper";
+import { workSettingLabel } from "@/lib/jobs/work-setting-label";
+import TextNarrator from "@/components/audio/TextNarrator";
+import { textFromJobDescription } from "@/lib/audio/narrator-text";
+import { studioEditHref } from "@/lib/studio/studio-authoring";
+
+export default function JobDetail() {
+  usePageChrome();
+  const { t } = useTranslation();
+  const { id: slug } = useParams<{ id: string }>();
+  const { user, isAuthenticated } = useAuth();
+  const { format: formatTz } = useUserTimezone();
+  const dateOnly: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric" };
+  const [searchParams] = useSearchParams();
+
+  const [job, setJob] = useState<UIJob | null>(null);
+  const [archivedAt, setArchivedAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isTracked, setIsTracked] = useState<boolean>(false);
+  const [pipelineCount, setPipelineCount] = useState<number>(0);
+
+  const isSample = slug === "sample";
+
+  useEffect(() => {
+    let isMounted = true;
+    const run = async () => {
+      if (!slug) return;
+
+      // Sample mode — /jobs/sample renders the showcase job with whichever
+      // preset is requested via ?template=<id>. Skips API calls so anonymous
+      // users can browse templates from the marketing gallery.
+      if (isSample) {
+        setJob(SAMPLE_JOB as unknown as UIJob);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        let apiJob: any;
+        if (isUuid(slug)) {
+          // Load by ID for UUIDs
+          apiJob = await jobService.getJobById(slug);
+        } else {
+          // Try slug first, then fallback to ID just in case
+          try {
+            apiJob = await jobService.getJobBySlug(slug);
+          } catch (slugErr) {
+            apiJob = await jobService.getJobById(slug);
+          }
+        }
+
+        if (!isMounted) return;
+        setJob(mapApiJobToUI(apiJob));
+        // #1493 — archived jobs are still reachable by URL for the owner so
+        // they can restore. UIJob drops `archivedAt`, so capture it raw.
+        setArchivedAt(apiJob?.archivedAt ?? null);
+      } catch (e) {
+        if (!isMounted) return;
+        setError(t("errors.loadJobFailed"));
+        setJob(null);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      isMounted = false;
+    };
+  }, [slug, isSample]);
+
+  // Template override from ?template=<id>. Falls back to the job's saved
+  // templateId, then to the hired.video default descriptor.
+  const templateQueryId = searchParams.get("template");
+
+  // SEO — single adapter call. Builder lives in lib/seo-ugc.ts ("job"
+  // kind) and emits title/description, company-logo og:image, keywords
+  // from skills_required, and the JobPosting JSON-LD.
+  useUgcSeo("job", job);
+
+  const isOwner = user && job && job.userId === user.id;
+  const permissions = useJobPermissions(job);
+  useArtifactViewTracking({
+    artifactKind: "job",
+    artifactId: job?.id,
+    ownerUserId: (job as any)?.userId ?? null,
+  });
+
+  // Pipeline tabs (Candidates + Reports) gate on the same single source
+  // of truth as Edit / Delete (`useJobPermissions`), which mirrors the
+  // backend's `requireJobOwner` rule via the DTO's `viewerCanManage`
+  // flag. The panels self-gate on the same fact so the tab strip and
+  // the body can't disagree.
+  const canManagePipeline = permissions.canManagePipeline;
+
+  const sectionParam = searchParams.get("section");
+  const section: "overview" | "candidates" | "reports" =
+    canManagePipeline && (sectionParam === "candidates" || sectionParam === "reports")
+      ? sectionParam
+      : "overview";
+
+  // Pre-fetch the pipeline count so the Candidates tab badge is accurate
+  // before the user clicks into it. Fails silently for non-managers.
+  useEffect(() => {
+    if (!job?.id || !canManagePipeline) return;
+    let cancelled = false;
+    jobPipelineService
+      .list(job.id)
+      .then((snap) => {
+        if (!cancelled) setPipelineCount(snap.total);
+      })
+      .catch(() => {
+        // Permission denied or job not yet wired — leave count at 0.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [job?.id, canManagePipeline]);
+
+  const handleTrackJob = () => {
+    if (!isAuthenticated) return;
+    setIsTracked((prev) => !prev);
+  };
+
+  if (loading) {
+    return (
+      <AppShell bgClassName="bg-background">
+<div className={APP_PAGE_COLUMN}>
+            <div>
+              <Card>
+                <CardHeader>
+                  <h1 className="font-display text-2xl font-bold tracking-[-0.02em]">{t("status.loadingJob")}</h1>
+                  <CardDescription>{t("messages.pleaseWait")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-40 bg-muted animate-pulse rounded" />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+</AppShell>
+  );
+  }
+
+  if (!job) {
+    return (
+      <AppShell bgClassName="bg-background">
+<div className={APP_PAGE_COLUMN}>
+          <AppEmptyState
+            icon={Briefcase}
+            as="h1"
+            title={t("headings.jobNotFound")}
+            description={t("messages.jobNotFoundDesc")}
+            action={
+              <Button asChild>
+                <Link to="/jobs">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  {t("actions.backToJobs")}
+                </Link>
+              </Button>
+            }
+          />
+        </div>
+</AppShell>
+  );
+  }
+
+  // External application URL, if the posting links out (e.g. LinkedIn /
+  // company ATS). Drives whether Apply now renders as a link or a stub.
+  const applyUrl = (job.data as any).applyUrl as string | undefined;
+
+  // Narration text for the "Listen to this job" pill — title, company,
+  // description, and every bullet list the posting carries.
+  const narratorText = textFromJobDescription({
+    title: job.data.title,
+    company: job.data.company?.name,
+    description: job.data.description,
+    responsibilities: job.data.responsibilities,
+    requirements: job.data.requirements?.map((r) =>
+      [r.skill, r.level, r.required ? "(required)" : null]
+        .filter(Boolean)
+        .join(" "),
+    ),
+    qualifications: job.data.qualifications,
+    benefits: job.data.benefits?.map((b) =>
+      [b.type, b.description].filter(Boolean).join(": "),
+    ),
+  });
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active":
+        return "bg-brand-green/15 text-brand-green-text";
+      case "paused":
+        return "bg-amber-500/15 text-amber-700 dark:text-amber-400";
+      case "closed":
+        return "bg-muted text-foreground";
+      case "draft":
+        return "bg-amber-500/15 text-amber-700 dark:text-amber-400";
+      default:
+        return "bg-muted text-foreground";
+    }
+  };
+
+  // Breadcrumb + leaf section tabs. Overview is the canonical leaf; the
+  // recruiter-only Candidates / Reports panels become extra siblings on
+  // the same strip. Falls back to "/jobs" parent for the breadcrumb.
+  const jobTabs: PageHeaderTab[] = [
+    { key: "jobs", label: "Jobs", icon: Briefcase, to: "/jobs" },
+    { key: "overview", label: t("tabs.overview"), to: publicJobPath(job.id) },
+    ...(canManagePipeline
+      ? [
+          {
+            key: "candidates",
+            label: t("tabs.candidates"),
+            to: `${publicJobPath(job.id)}?section=candidates`,
+            badge: pipelineCount,
+          } satisfies PageHeaderTab,
+          {
+            key: "reports",
+            label: t("tabs.reports"),
+            to: `${publicJobPath(job.id)}?section=reports`,
+          } satisfies PageHeaderTab,
+        ]
+      : []),
+  ];
+  const activeJobTab = section === "candidates"
+    ? "candidates"
+    : section === "reports"
+      ? "reports"
+      : "overview";
+
+  return (
+    <AppShell bgClassName="bg-background">
+      <div className={!isAuthenticated ? "relative" : undefined}>
+          {!isAuthenticated && (
+            <AuthOverlay contentType="job" title={job?.data.title} />
+          )}
+          <div className={APP_PAGE_COLUMN}>
+            {/* Sticky action band — the hub-level tab strip (Jobs / Saved /
+                Applications / …), the leaf section tabs (Overview / Candidates
+                / Reports), and the job action toolbar pin together as ONE band
+                just below the top nav (h-16) so the "where am I" context +
+                every action stay reachable while the posting scrolls. Mirrors
+                the shared action-bar tone + the ResumeDetail pattern. The
+                negative x/top-margins break out of the page's `p-4 md:p-6`
+                padding so the band reaches the content edges and sits flush
+                under the nav; the inner rows restore their own padding. */}
+            <div className="sticky top-16 z-30 -mx-4 md:-mx-6 -mt-4 md:-mt-6 mb-4 border-b border-border bg-actionbar/95 backdrop-blur-md">
+              {isAuthenticated && (
+                <div className="px-4 md:px-6 pt-3">
+                  <EntityHubTabStrip entity="job" className="mb-0" />
+                </div>
+              )}
+              <div className="px-4 md:px-6 pt-3">
+                <PageHeader tabs={jobTabs} activeTabKey={activeJobTab} className="mb-0" />
+              </div>
+              {/* #1493 — owner-only restore banner. Archived jobs are hidden
+                  from listings but still reachable by URL so the owner can
+                  bring them back. */}
+              {isOwner && archivedAt && (
+                <div className="mx-4 md:mx-6 mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                  <span>{t("messages.jobs.archivedBanner")}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      if (!job?.id) return;
+                      try {
+                        await jobService.unarchiveJob(job.id);
+                        setArchivedAt(null);
+                        toast.success(t("messages.jobs.restored"));
+                      } catch {
+                        toast.error(t("messages.jobs.restoreFailed"));
+                      }
+                    }}
+                  >
+                    <ArchiveRestore className="h-4 w-4 mr-1" />
+                    {t("actions.jobs.restore")}
+                  </Button>
+                </div>
+              )}
+              {/* Owner / viewer action toolbar — only on the Overview leaf; the
+                  Candidates / Reports panels carry their own controls. The job
+                  content sections are produced by DeclarativeJobRenderer below,
+                  themed via a JobTemplateDescriptor. */}
+              {section === "overview" && (
+            <div className="px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
+                <JobScoreBadges job={job} />
+                <ArtifactDetailsSheet
+                  permission={{
+                    kind: "job",
+                    entity: { id: job.id, userId: job.userId, viewerCanManage: job.viewerCanManage },
+                  }}
+                  title={job.data?.title ?? "Job details"}
+                  chips={
+                    <Badge variant="secondary">{job.status}</Badge>
+                  }
+                  activity={{
+                    viewCount: job.views,
+                    createdAt: job.createdAt,
+                    updatedAt: job.updatedAt,
+                    extra: [
+                      { label: "Applications", value: <span className="tabular-nums">{job.applications ?? 0}</span> },
+                    ],
+                  }}
+                />
+                {isOwner && (
+                  <>
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <Eye className="h-3.5 w-3.5" />
+                      {job.views} views
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <Users className="h-3.5 w-3.5" />
+                      {job.applications} applications
+                    </span>
+                  </>
+                )}
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <Calendar className="h-3.5 w-3.5" />
+                  Posted{" "}
+                  {job.createdAt && !isNaN(new Date(job.createdAt).getTime())
+                    ? formatTz(job.createdAt, dateOnly)
+                    : "Unknown date"}
+                </span>
+                {/* #2092 — work setting + hybrid day-split (e.g. "Hybrid (2
+                    on-site / 3 remote)"), localized via the shared formatter. */}
+                {workSettingLabel(t, job.data.workSetting, job.data.onsiteDaysPerWeek, job.data.remoteDaysPerWeek) && (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <Building2 className="h-3.5 w-3.5" />
+                    {workSettingLabel(t, job.data.workSetting, job.data.onsiteDaysPerWeek, job.data.remoteDaysPerWeek)}
+                  </span>
+                )}
+                {job.expiresAt && (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <Calendar className="h-3.5 w-3.5" />
+                    Expires{" "}
+                    {!isNaN(new Date(job.expiresAt).getTime())
+                      ? formatTz(job.expiresAt, dateOnly)
+                      : "Unknown date"}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Listen-to-this-job pill — narrates the full posting.
+                    Lives in the action bar alongside Apply / Edit / Share. */}
+                <TextNarrator
+                  text={narratorText}
+                  preferenceKey={`job.${job.id}`}
+                  label="Listen to this job"
+                />
+                {permissions.canEdit ? (
+                  <>
+                    <Button variant="outline" asChild>
+                      <Link to={`${publicJobPath(job.id)}/screening`}>
+                        <ClipboardCheck className="h-4 w-4 mr-2" />
+                        Screening
+                      </Link>
+                    </Button>
+                    <Button asChild>
+                      <Link to={studioEditHref("job", job.id)}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Job
+                      </Link>
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {/* Apply now — primary action for candidates. Links out
+                        to the external ATS when the posting carries an
+                        applyUrl, otherwise renders disabled until auth. */}
+                    <Button
+                      disabled={!isAuthenticated}
+                      asChild={Boolean(applyUrl)}
+                    >
+                      {applyUrl ? (
+                        <a href={applyUrl} target="_blank" rel="noopener noreferrer">
+                          Apply now
+                          <ExternalLink className="h-4 w-4 ml-2" />
+                        </a>
+                      ) : (
+                        <>
+                          Apply now
+                          <ExternalLink className="h-4 w-4 ml-2" />
+                        </>
+                      )}
+                    </Button>
+                    <Button variant="outline" onClick={handleTrackJob}>
+                      {isTracked ? (
+                        <>
+                          <BookmarkCheck className="h-4 w-4 mr-2" />
+                          Tracked
+                        </>
+                      ) : (
+                        <>
+                          <Bookmark className="h-4 w-4 mr-2" />
+                          Track
+                        </>
+                      )}
+                    </Button>
+                  </>
+                )}
+                <Button variant="outline" size="icon">
+                  <Share className="h-4 w-4" />
+                </Button>
+                {/* Report this listing — self-gates (hidden for the
+                    poster, bounces anon to /login). */}
+                <ReportAbuseButton
+                  entityType="job"
+                  entityId={job.id}
+                  entityOwnerId={job.userId}
+                  entityLabel="job listing"
+                />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" aria-label="More actions">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <AddToListMenu
+                      entityType="job"
+                      entityId={job.id}
+                      entityLabel={job.data.title}
+                    />
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+              )}
+            </div>
+
+            {section === "candidates" ? (
+              <JobPipelineKanban
+                jobId={job.id}
+                jobOwner={{ userId: job.userId, viewerCanManage: job.viewerCanManage }}
+                onCountChange={setPipelineCount}
+              />
+            ) : section === "reports" ? (
+              <JobPipelineReports
+                jobId={job.id}
+                jobOwner={{ userId: job.userId, viewerCanManage: job.viewerCanManage }}
+              />
+            ) : (
+              <>
+            {isOwner && (
+              <div className="mb-4">
+                <SourcingFeePanel jobId={job.id} />
+              </div>
+            )}
+
+            {/* Time-to-hire metric. The card self-gates on the backend's
+                403 as a backstop, but we also gate the mount on the same
+                manager-only SSoT (`canManagePipeline`) that drives the
+                Candidates / Reports tabs — otherwise every job-seeker
+                viewer fires a guaranteed-403 request and sees a card whose
+                "your pipeline history" copy doesn't apply to them. */}
+            {canManagePipeline && (
+              <div className="mb-4">
+                <TimeToHireCard jobId={job.id} />
+              </div>
+            )}
+
+            {/* #275 — the posting's canvas design (owner: edit / show it;
+                visitors: the public design) replaces the standard render;
+                without one the declarative posting shows. */}
+            <EntityDocumentCanvas subject={{ kind: "job", id: job.id }} ownerUserId={job.userId}>
+            <DeclarativeJobRenderer
+              job={{
+                id: job.id,
+                data: {
+                  title: job.data.title,
+                  description: job.data.description,
+                  company: job.data.company,
+                  location: job.data.location,
+                  contactEmail: job.data.contactEmail,
+                  applicationDeadline: job.data.applicationDeadline,
+                  applyUrl: (job.data as any).applyUrl,
+                  responsibilities: job.data.responsibilities,
+                  requirements: job.data.requirements,
+                  qualifications: job.data.qualifications,
+                  skills: (job.data as any).skills || (job.data as any).skillsRequired,
+                  benefits: job.data.benefits,
+                  employmentType: job.data.employmentType,
+                  experienceLevel: job.data.experienceLevel,
+                  salaryMin: job.data.salaryMin,
+                  salaryMax: job.data.salaryMax,
+                  salaryCurrency: (job.data as any).salaryCurrency,
+                },
+              }}
+              descriptor={
+                getJobTemplateById(templateQueryId) ??
+                getJobTemplateById((job as any).templateId) ??
+                DEFAULT_JOB_DESCRIPTOR
+              }
+              embedded
+              heroActionSlot={
+                // Apply now + Edit Job both live in the action bar up top
+                // now, so suppress the hero's default Apply Now button for
+                // every viewer with an empty fragment.
+                <></>
+              }
+            />
+            </EntityDocumentCanvas>
+
+            {/* #743 — Attached Studio video (recruiter pitch / job-ad /
+                company-promo). Mounts the shared StudioVideoSurface
+                directly; the component self-gates on existence + plays
+                inline. */}
+            {(job as any).videoProjectId && (
+              <div className="mt-6">
+                <StudioVideoSurface mode="lazy" videoId={(job as any).videoProjectId} />
+              </div>
+            )}
+              </>
+            )}
+          </div>
+</div>
+</AppShell>
+  );
+}

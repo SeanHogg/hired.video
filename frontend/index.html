@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <!-- Google Consent Mode v2 — declare denied defaults BEFORE GTM loads so
+       any tag GTM ships obeys the user's consent state. The cookie banner +
+       useCookiePreferences hook later call gtag('consent','update',...) once
+       the user picks. Honors Sec-GPC by leaving everything denied until the
+       user explicitly opts in. -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){ dataLayer.push(arguments); }
+    window.gtag = window.gtag || gtag;
+    gtag("consent", "default", {
+      ad_storage: "denied",
+      ad_user_data: "denied",
+      ad_personalization: "denied",
+      analytics_storage: "denied",
+      personalization_storage: "denied",
+      functionality_storage: "granted",
+      security_storage: "granted",
+      wait_for_update: 500
+    });
+  </script>
+  <!-- End Google Consent Mode v2 -->
+
+  <!-- Google Tag Manager -->
+  <script>
+    (function (w, d, s, l, i) {
+      w[l] = w[l] || [];
+      w[l].push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
+      var f = d.getElementsByTagName(s)[0],
+        j = d.createElement(s),
+        dl = l != "dataLayer" ? "&l=" + l : "";
+      j.async = true;
+      j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+      f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-NBKFH43W");
+  </script>
+  <!-- End Google Tag Manager -->
+
+  <!-- Google AdSense -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6403133228609948"
+    crossorigin="anonymous"></script>
+  <!-- End Google AdSense -->
+
+  <!-- Theme no-FOUC: apply the persisted (or system) color scheme to <html>
+       BEFORE the app bundle loads, so a dark-mode user never sees a flash of
+       the light theme. Mirrors next-themes' storageKey ("theme") + class
+       strategy; the React <ThemeProvider> takes over once mounted. -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("theme");
+        var dark = t === "dark" ||
+          ((!t || t === "system") &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) document.documentElement.classList.add("dark");
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Video Resumes, Resume Builder & AI Job Search Platform — hired.video</title>
+  <meta name="description"
+    content="hired.video turns your resume into an AI-generated video resume in 60 seconds. Build, score, and tailor resumes for every job — and connect with recruiters through AI-powered matching." />
+  <meta name="keywords" content="AI video resume, video resume maker, resume builder, AI resume scorer, AI job matching, ATS resume, recruitment platform, job search, career tools, interview practice" />
+  <meta name="author" content="hired.video" />
+  <meta property="og:title" content="AI Video Resumes & AI Job Search — hired.video" />
+  <meta property="og:description"
+    content="Create an AI video resume in 60 seconds, tailor your resume for every job, and get matched with recruiters who are actively hiring." />
+  <meta property="og:image" content="https://hired.video/og-image.svg" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://hired.video/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@hired_video" />
+  <meta name="twitter:creator" content="@hired_video" />
+  <meta name="twitter:title" content="AI Video Resumes & AI Job Search — hired.video" />
+  <meta name="twitter:description" content="Create an AI video resume in 60 seconds, tailor your resume for every job, and get matched with recruiters who are actively hiring." />
+  <meta name="twitter:image" content="https://hired.video/og-image.svg" />
+  <!-- Self-referential canonical for non-JS crawlers; resolves to current URL -->
+  <link rel="canonical" href="https://hired.video/" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <!-- PWA -->
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="hired.video" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+  <link rel="mask-icon" href="/favicon.svg" color="#2563eb" />
+  <!-- Runtime configuration - loaded before app starts -->
+  <script src="/config.js?id=20250921"></script>
+
+</head>
+
+<body>
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NBKFH43W" height="0" width="0"
+      style="display: none; visibility: hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+
+  <div id="root"></div>
+
+  <script type="module" src="./App.tsx"></script>
+</body>
+
+</html>

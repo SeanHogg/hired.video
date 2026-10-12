@@ -1,0 +1,10 @@
+{
+  "name": "@hired/shared",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "license": "SEE LICENSE IN ../LICENSE",
+  "dependencies": {
+    "zod": "^4.0.0"
+  }
+}

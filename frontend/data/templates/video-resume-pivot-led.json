@@ -1,0 +1,106 @@
+{
+  "video": {
+    "duration": 60,
+    "fps": 30,
+    "resolution": "720p",
+    "aspect": "16:9",
+    "theme": {
+      "colorPalette": ["#064e3b", "#022c22", "#ecfdf5", "#34d399"],
+      "fontFamily": "Inter, sans-serif",
+      "motion": "moderate",
+      "transition": "fade",
+      "background": "gradient"
+    }
+  },
+  "scenes": [
+    {
+      "id": "open",
+      "start": 0,
+      "duration": 5,
+      "type": "intro",
+      "title": "Eight years in classroom teaching. Now I build software for teachers.",
+      "subtitle": "Your Name, Career Switcher to Product Management",
+      "animation": {
+        "titleEnter":    { "type": "slideUp", "start": 0.1, "duration": 0.5, "easing": "easeOut" },
+        "subtitleEnter": { "type": "fadeIn",  "start": 1.2, "duration": 0.5, "easing": "easeOut" }
+      }
+    },
+    {
+      "id": "background",
+      "start": 5,
+      "duration": 12,
+      "type": "achievement",
+      "title": "Where I'm Coming From",
+      "items": [
+        "Taught middle-school math, 280 students/year",
+        "Ran a district-wide curriculum redesign",
+        "Trained 40 teachers on the new tooling"
+      ],
+      "animation": {
+        "titleEnter": { "type": "fadeIn", "start": 0.2, "duration": 0.4, "easing": "easeOut" },
+        "textEnter":  { "type": "slideIn", "start": 0.6, "duration": 0.6, "easing": "easeOut" }
+      }
+    },
+    {
+      "id": "trigger",
+      "start": 17,
+      "duration": 12,
+      "type": "achievement",
+      "title": "Why I Switched",
+      "items": [
+        "Built a Notion dashboard tracking IEP goals for 80 students",
+        "Shared it with 6 schools across the district",
+        "Realised the bottleneck was the tool, not the teaching"
+      ],
+      "animation": {
+        "titleEnter": { "type": "fadeIn", "start": 0.2, "duration": 0.4, "easing": "easeOut" },
+        "textEnter":  { "type": "slideIn", "start": 0.6, "duration": 0.6, "easing": "easeOut" }
+      }
+    },
+    {
+      "id": "bridge",
+      "start": 29,
+      "duration": 12,
+      "type": "achievement",
+      "title": "What I've Done Since",
+      "items": [
+        "Reforge PM bootcamp + Lenny's PM accelerator",
+        "Shipped 3 features as a contract PM at EduCo",
+        "Drove a 22% bump in trial-to-paid conversion"
+      ],
+      "animation": {
+        "titleEnter": { "type": "fadeIn", "start": 0.2, "duration": 0.4, "easing": "easeOut" },
+        "textEnter":  { "type": "slideIn", "start": 0.6, "duration": 0.6, "easing": "easeOut" }
+      }
+    },
+    {
+      "id": "value",
+      "start": 41,
+      "duration": 10,
+      "type": "skills",
+      "title": "What I Bring That a Pure-PM Background Doesn't",
+      "skills": [
+        "Lived inside the user problem for 8 years",
+        "Comfortable presenting to 30 sceptical adults",
+        "Know how to teach a tool, not just ship it",
+        "Built for end-users I still talk to weekly"
+      ],
+      "animation": {
+        "titleEnter": { "type": "fadeIn", "start": 0.2, "duration": 0.4, "easing": "easeOut" },
+        "textEnter":  { "type": "scaleIn", "start": 0.5, "duration": 0.6, "easing": "spring" }
+      }
+    },
+    {
+      "id": "ask",
+      "start": 51,
+      "duration": 9,
+      "type": "closing",
+      "title": "Looking for a junior-to-mid PM role at an EdTech company.",
+      "subtitle": "linkedin.com/in/yourprofile · let's talk.",
+      "animation": {
+        "titleEnter":    { "type": "slideUp", "start": 0.2, "duration": 0.5, "easing": "easeOut" },
+        "subtitleEnter": { "type": "fadeIn",  "start": 0.9, "duration": 0.4, "easing": "easeOut" }
+      }
+    }
+  ]
+}

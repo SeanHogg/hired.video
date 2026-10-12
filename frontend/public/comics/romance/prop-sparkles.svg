@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice">
+
+  <g fill="#fbcfe8">
+    <path d="M 50,30 L 56,50 L 76,56 L 56,62 L 50,82 L 44,62 L 24,56 L 44,50 Z"/>
+    <path d="M 140,90 L 148,110 L 168,118 L 148,126 L 140,146 L 132,126 L 112,118 L 132,110 Z"/>
+    <path d="M 90,140 L 94,156 L 110,160 L 94,164 L 90,180 L 86,164 L 70,160 L 86,156 Z"/>
+  </g>
+
+</svg>

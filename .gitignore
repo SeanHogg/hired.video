@@ -1,0 +1,50 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+html
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment files (local only)
+.env
+**/.env
+
+# Wrangler dev temp files
+.wrangler/
+**/.wrangler/
+
+# General temporary build/cache folders
+**/tmp/
+
+.config/
+
+# Ignore legacy/alternative API implementation sources
+myvideoresume-api/
+
+# Playwright visual suite output (frontend: npm run test:visual)
+frontend/test-results/
+frontend/playwright-report/
+
+# Local-only docs
+/Vision.md
+/ROADMAP.md
+/DONE.md

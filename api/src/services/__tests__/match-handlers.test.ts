@@ -1,0 +1,756 @@
+/**
+ * Integration tests for the match handlers — score/tailor/bycontent.
+ *
+ * Runs fully locally:
+ *   - Fake DB (buildFakeDb) so we can seed jobs + resumes and assert DB
+ *     writes (saveMatchScore cache) without a network.
+ *   - Fake LLMClient that records each invocation and returns scripted
+ *     responses. Tests can assert on the prompt shape, on the fallback
+ *     path when the LLM throws, and on token-usage reporting.
+ *
+ * Covers the failure modes that have historically bitten this code:
+ *   • job HTML vs persisted job (both input shapes)
+ *   • missing/empty resume — 404
+ *   • missing/empty job — 404
+ *   • LLM returns empty response → fallback to keyword overlap
+ *   • LLM returns invalid schema → fallback
+ *   • `resumeContent` in tailor is not empty AND differs from parent
+ *   • tailored markdown preserves parent signal (name, key bullets)
+ *   • anonymous access → 401
+ *
+ * Run:
+ *   node --import tsx --test src/routes/__tests__/match-handlers.test.ts
+ */
+
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+
+import {
+  handleAnalyze,
+  handleByContent,
+  handleByid,
+  handleInsights,
+  keywordScore,
+  htmlToPlainText,
+  jobRowToLLMText,
+  resumeContentToText,
+  TEXT_CAP,
+  type MatchDeps,
+} from "../job/match-handlers.js";
+import type { LLMClient } from "../../services/adapters/llm-client.js";
+import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
+
+// ---------------------------------------------------------------------------
+// Fake LLM
+// ---------------------------------------------------------------------------
+
+interface FakeCall {
+  featureKey: string;
+  systemPrompt: string;
+  userMessage: string;
+  useCase: string;
+}
+
+interface ImplArg {
+  systemPrompt: string;
+  userMessage: string;
+  useCase: string;
+}
+
+function makeFakeLLM(
+  impl: (call: ImplArg) => unknown,
+  opts: { failFirst?: number } = {},
+): { client: LLMClient; calls: FakeCall[] } {
+  const calls: FakeCall[] = [];
+  let remainingFails = opts.failFirst ?? 0;
+  const client: LLMClient = {
+    async callJson(featureKey, options, schema) {
+      calls.push({
+        featureKey,
+        systemPrompt: options.systemPrompt,
+        userMessage: options.userMessage,
+        useCase: options.useCase,
+      });
+      if (remainingFails > 0) {
+        remainingFails--;
+        throw new Error("Simulated LLM failure");
+      }
+      const data = impl({ systemPrompt: options.systemPrompt, userMessage: options.userMessage, useCase: options.useCase });
+      const parsed = schema.safeParse(data);
+      if (!parsed.success) throw new Error(`Fake LLM returned schema-invalid data: ${parsed.error.message}`);
+      return {
+        data: parsed.data,
+        usage: {
+          promptTokens: Math.ceil(options.userMessage.length / 4),
+          completionTokens: 100,
+          totalTokens: Math.ceil(options.userMessage.length / 4) + 100,
+          model: "fake/test-model",
+        },
+      };
+    },
+    async callText(_featureKey, options) {
+      return {
+        content: JSON.stringify(impl({ systemPrompt: options.systemPrompt, userMessage: options.userMessage, useCase: options.useCase })),
+        usage: {
+          promptTokens: 1,
+          completionTokens: 1,
+          totalTokens: 2,
+          model: "fake/test-model",
+        },
+      };
+    },
+    async callMessages(_featureKey, options) {
+      return {
+        content: JSON.stringify(impl({ systemPrompt: "", userMessage: "", useCase: options.useCase })),
+        toolCalls: [],
+        finishReason: "stop",
+        usage: {
+          promptTokens: 1,
+          completionTokens: 1,
+          totalTokens: 2,
+          model: "fake/test-model",
+        },
+      };
+    },
+    async callJsonLenient(featureKey, options, spec) {
+      // Mirror callJson semantics so call-counter assertions and
+      // failFirst injection work the same regardless of which method
+      // the production code uses (some handlers were migrated to
+      // callJsonLenient as part of the lenient-ingest rollout).
+      calls.push({
+        featureKey,
+        systemPrompt: options.systemPrompt,
+        userMessage: options.userMessage,
+        useCase: options.useCase,
+      });
+      if (remainingFails > 0) {
+        remainingFails--;
+        throw new Error("Simulated LLM failure");
+      }
+      const data = impl({ systemPrompt: options.systemPrompt, userMessage: options.userMessage, useCase: options.useCase });
+      const parsed = spec.ingest.safeParse(data);
+      if (!parsed.success) throw new Error(`Fake LLM returned schema-invalid data: ${parsed.error.message}`);
+      return {
+        data: spec.coerce(parsed.data),
+        usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2, model: "fake/test-model" },
+      };
+    },
+  };
+  return { client, calls };
+}
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
+
+// zod v4's .uuid() validates the version byte (3rd group starts with 1-5
+// for v1-v5, or with 8-B for RFC 4122 variant bits). Fixed IDs of all the
+// same digit fail validation, so generate real v4 UUIDs at module load.
+const USER_ID = randomUUID();
+const JOB_ID = randomUUID();
+const RESUME_ID = randomUUID();
+
+function buildDeps(opts: {
+  llm?: LLMClient | null;
+  resumes?: any[];
+  jobs?: any[];
+} = {}): MatchDeps & { _state: any; _calls: any[]; _settle: () => Promise<unknown[]> } {
+  const fake = buildFakeDb({
+    resume_information: opts.resumes ?? [],
+    job_items: opts.jobs ?? [],
+    resume_match_scores: [],
+  });
+  // Capture the handler's detached cache-write (saveMatchScore) so tests can
+  // await the REAL onConflict insert instead of guessing its async depth with
+  // a setImmediate tick — that guess raced the write under CI load (the
+  // #pass-N/#fail-1 flake). Mirrors the people-ops sink's runDetached capture.
+  const detached: Promise<unknown>[] = [];
+  return {
+    db: fake.db,
+    now: () => new Date("2026-04-21T00:00:00Z"),
+    llm: opts.llm === undefined ? null : opts.llm,
+    runDetached: (task) => {
+      detached.push(Promise.resolve().then(task));
+    },
+    _state: fake.state,
+    _calls: fake.calls,
+    _settle: () => Promise.all(detached),
+  } as any;
+}
+
+function seedResume(overrides: Partial<Record<string, unknown>> = {}): any {
+  // Shape matches JSON Resume, which the `resumeContentToText` helper
+  // reads. `personalInfo`/`experience[].title` from an earlier draft
+  // of this fixture silently produced empty text — the resume parser
+  // only serializes `basics` + `work[].position` + `work[].name`.
+  return {
+    id: RESUME_ID,
+    userId: USER_ID,
+    content: {
+      basics: {
+        name: "Jane Doe",
+        email: "jane@example.com",
+        label: "Senior Frontend Engineer",
+        summary: "Senior frontend engineer with 8 years building React apps.",
+      },
+      work: [
+        {
+          name: "Acme",
+          position: "Senior Engineer",
+          startDate: "2022-01",
+          endDate: "Present",
+          highlights: [
+            "Shipped a Next.js redesign that cut LCP from 4.2s to 1.8s.",
+            "Led migration from Redux to Zustand, dropping bundle by 18%.",
+          ],
+        },
+      ],
+      skills: ["React", "TypeScript", "Next.js", "GraphQL"],
+    },
+    isActive: true,
+    isMaster: true,
+    ...overrides,
+  };
+}
+
+function seedJob(overrides: Partial<Record<string, unknown>> = {}): any {
+  return {
+    id: JOB_ID,
+    title: "Senior Frontend Engineer",
+    company: "GlobalCo",
+    location: "Remote, USA",
+    description: "Build beautiful React apps. TypeScript required. 5+ years experience.",
+    jobType: "full_time",
+    experienceLevel: "senior",
+    skillsRequired: ["React", "TypeScript", "Next.js"],
+    details: {
+      responsibilities: ["Ship features", "Mentor juniors"],
+      requirements: ["5+ years React", "TS"],
+    },
+    sourceUrl: "https://example.com/jobs/42",
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Pure helpers
+// ---------------------------------------------------------------------------
+
+describe("match-handlers pure helpers", () => {
+  it("htmlToPlainText strips script/style/tags and collapses whitespace", () => {
+    const html = `<html><head><style>.x{}</style><script>alert(1)</script></head>
+      <body><h1>Hello</h1>  \n <p>World</p></body></html>`;
+    assert.equal(htmlToPlainText(html), "Hello World");
+  });
+
+  it("jobRowToLLMText includes every structured field it has", () => {
+    const text = jobRowToLLMText(seedJob() as any);
+    assert.match(text, /Title: Senior Frontend Engineer/);
+    assert.match(text, /Company: GlobalCo/);
+    assert.match(text, /Location: Remote, USA/);
+    assert.match(text, /Responsibilities:\n- Ship features\n- Mentor juniors/);
+    assert.match(text, /Skills: React, TypeScript, Next.js/);
+  });
+
+  it("jobRowToLLMText caps output at TEXT_CAP", () => {
+    const row = { title: "X", description: "a".repeat(TEXT_CAP * 2) };
+    assert.ok(jobRowToLLMText(row as any).length <= TEXT_CAP);
+  });
+
+  it("keywordScore returns a deterministic score between 0 and 100", () => {
+    const { score, message } = keywordScore(
+      "We need a react engineer with typescript experience",
+      "I am a react typescript developer",
+    );
+    assert.ok(score >= 0 && score <= 100);
+    assert.match(message, /AI analysis unavailable/);
+  });
+
+  it("keywordScore is 0 when there's zero overlap", () => {
+    const { score } = keywordScore("python django postgres", "truck driver with years");
+    assert.equal(score, 0);
+  });
+
+  it("resumeContentToText produces non-empty text for a realistic resume", () => {
+    const text = resumeContentToText(seedResume().content);
+    assert.ok(text.length > 50);
+    assert.match(text, /Jane/);
+    assert.match(text, /React/);
+  });
+
+  it("resumeContentToText returns empty string for null/undefined content", () => {
+    // resumeContentToText hits the JSON-fallback when content is an
+    // empty object — it returns "{}" in that case. Null / undefined
+    // get the explicit empty-string short-circuit.
+    assert.equal(resumeContentToText(null), "");
+    assert.equal(resumeContentToText(undefined), "");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleAnalyze — auth, validation, 404s
+// ---------------------------------------------------------------------------
+
+describe("handleAnalyze — auth + validation", () => {
+  it("rejects anonymous requests with 401", async () => {
+    const res = await handleAnalyze(buildDeps(), null, { jobHtml: "<p>x</p>" });
+    assert.equal(res.status, 401);
+  });
+
+  it("rejects body without jobHtml / jobId / resume fields — 400", async () => {
+    const res = await handleAnalyze(buildDeps({ resumes: [seedResume()] }), USER_ID, {});
+    assert.equal(res.status, 400);
+  });
+
+  it("404s when the user has no resume", async () => {
+    const res = await handleAnalyze(buildDeps(), USER_ID, { jobHtml: "<p>x</p>" });
+    assert.equal(res.status, 404);
+    assert.match(JSON.stringify(res.body), /resume/i);
+  });
+
+  it("404s when jobId doesn't match any row", async () => {
+    const res = await handleAnalyze(
+      buildDeps({ resumes: [seedResume()] }),
+      USER_ID,
+      { jobId: randomUUID(), resumeId: RESUME_ID },
+    );
+    assert.equal(res.status, 404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleAnalyze — LLM happy path
+// ---------------------------------------------------------------------------
+
+describe("handleAnalyze — LLM happy path", () => {
+  it("returns the score + recommendations from the LLM", async () => {
+    const { client, calls } = makeFakeLLM(() => ({
+      score: 82,
+      summaryRecommendations:
+        "- Highlight TypeScript depth more prominently.\n- Call out your Next.js migration metrics up top.",
+    }));
+    const deps = buildDeps({
+      llm: client,
+      resumes: [seedResume()],
+      jobs: [seedJob()],
+    });
+    const res = await handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
+
+    assert.equal(res.status, 200);
+    const body = res.body as any;
+    assert.equal(body.success, true);
+    assert.equal(body.data.score, 82);
+    assert.match(body.data.summaryRecommendations, /TypeScript/);
+    assert.equal(body.data.resumeId, RESUME_ID);
+    assert.equal(body.data.sourceUrl, "https://example.com/jobs/42");
+    // Exactly one LLM call
+    assert.equal(calls.length, 1);
+    // Prompt includes both job + resume content
+    assert.match(calls[0].userMessage, /Job Description/);
+    assert.match(calls[0].userMessage, /Jane/);
+  });
+
+  it("persists the analyze result into resume_match_scores (cache for tailor)", async () => {
+    const { client } = makeFakeLLM(() => ({ score: 71, summaryRecommendations: "- Tighten bullets" }));
+    const deps = buildDeps({
+      llm: client,
+      resumes: [seedResume()],
+      jobs: [seedJob()],
+    });
+    await handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
+    await deps._settle();
+    const wrote = deps._calls.filter((c: any) => c.kind === "insert" && c.table === "resume_match_scores");
+    assert.equal(wrote.length, 1);
+    assert.equal(wrote[0].values[0].score, 71);
+  });
+
+  it("hands the LLM client the correct featureKey for billing", async () => {
+    // Token charge happens inside LLMClient (gate + debit). The handler's
+    // contract is: pass the right featureKey so the ledger row attributes
+    // tokens to the right product surface. The fake client records the
+    // featureKey it was called with, which is what we assert on.
+    const { client, calls } = makeFakeLLM(() => ({ score: 50, summaryRecommendations: "- x" }));
+    const deps = buildDeps({
+      llm: client,
+      resumes: [seedResume()],
+      jobs: [seedJob()],
+    });
+    await handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].featureKey, "match_analyze");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleAnalyze — LLM failure & fallbacks
+// ---------------------------------------------------------------------------
+
+describe("handleAnalyze — fallback path", () => {
+  it("falls back to keyword overlap when the LLM throws", async () => {
+    const { client } = makeFakeLLM(() => ({ score: 99, summaryRecommendations: "n/a" }), { failFirst: 1 });
+    const deps = buildDeps({
+      llm: client,
+      resumes: [seedResume()],
+      jobs: [seedJob()],
+    });
+    const res = await handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
+    assert.equal(res.status, 200);
+    const body = res.body as any;
+    // Keyword overlap path includes an "LLM error" footer so the user
+    // has something to report.
+    assert.match(body.data.summaryRecommendations, /LLM error/);
+  });
+
+  it("falls back when the LLM returns schema-invalid data", async () => {
+    const { client } = makeFakeLLM(() => ({
+      score: "not a number",
+      summaryRecommendations: null,
+    }));
+    const deps = buildDeps({
+      llm: client,
+      resumes: [seedResume()],
+      jobs: [seedJob()],
+    });
+    const res = await handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
+    assert.equal(res.status, 200);
+    // Keyword overlap path
+    assert.match((res.body as any).data.summaryRecommendations, /keyword overlap/i);
+  });
+
+  it("uses keyword overlap when no LLM client is configured", async () => {
+    const deps = buildDeps({
+      resumes: [seedResume()],
+      jobs: [seedJob()],
+    });
+    const res = await handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
+    assert.equal(res.status, 200);
+    const body = res.body as any;
+    assert.ok(body.data.score >= 0 && body.data.score <= 100);
+    assert.match(body.data.summaryRecommendations, /keyword overlap/i);
+  });
+
+  it("accepts recommendations supplied by the LLM as string[] (coerced)", async () => {
+    const { client } = makeFakeLLM(() => ({
+      score: 65,
+      summaryRecommendations: ["Fix A", "Fix B", "Fix C"],
+    }));
+    const deps = buildDeps({
+      llm: client,
+      resumes: [seedResume()],
+      jobs: [seedJob()],
+    });
+    const res = await handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
+    assert.equal(res.status, 200);
+    const body = res.body as any;
+    assert.match(body.data.summaryRecommendations, /- Fix A/);
+    assert.match(body.data.summaryRecommendations, /- Fix B/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleAnalyze — jobHtml path (no persisted job)
+// ---------------------------------------------------------------------------
+
+describe("handleAnalyze — jobHtml path", () => {
+  it("accepts raw HTML as the job input and strips tags for the LLM", async () => {
+    const { client, calls } = makeFakeLLM(() => ({
+      score: 55,
+      summaryRecommendations: "- Tighten skills section",
+    }));
+    const deps = buildDeps({
+      llm: client,
+      resumes: [seedResume()],
+    });
+    const html = `
+      <html><body>
+        <h1>Backend Engineer</h1>
+        <script>alert('x')</script>
+        <p>Go + Postgres required.</p>
+      </body></html>
+    `;
+    const res = await handleAnalyze(deps, USER_ID, { jobHtml: html });
+    assert.equal(res.status, 200);
+    // Tags + script are gone by the time the prompt is built
+    assert.doesNotMatch(calls[0].userMessage, /<script>|alert/);
+    assert.match(calls[0].userMessage, /Backend Engineer/);
+  });
+
+  it("does not persist a score when jobId is absent (HTML-only flow)", async () => {
+    const { client } = makeFakeLLM(() => ({ score: 40, summaryRecommendations: "- x" }));
+    const deps = buildDeps({ llm: client, resumes: [seedResume()] });
+    await handleAnalyze(deps, USER_ID, { jobHtml: "<p>Backend</p>" });
+    await deps._settle();
+    const wrote = deps._calls.filter((c: any) => c.kind === "insert" && c.table === "resume_match_scores");
+    assert.equal(wrote.length, 0);
+  });
+});
+
+// handleTailor is covered by match-handlers-tailor.test.ts — it owns
+// the JSON-preserving pipeline, variation persistence, retry/validation,
+// and the consolidated response shape.
+
+// ---------------------------------------------------------------------------
+// handleByContent — raw-string endpoint
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Concurrent analyze — the score cache is a per-(user, job, resume)
+// upsert, so two simultaneous /analyze calls for the same triple must
+// collapse to ONE row via Postgres' `ON CONFLICT DO UPDATE`. Schema has
+// a uniqueIndex on (userId, jobId, resumeId) guaranteeing this.
+// ---------------------------------------------------------------------------
+
+describe("handleAnalyze — concurrent writes for the same (user, job, resume)", () => {
+  it("two concurrent calls both succeed and the cache contains ONE row", async () => {
+    let callCount = 0;
+    const makeClient = (): LLMClient => ({
+      async callJson(_featureKey, _options, schema) {
+        callCount++;
+        const score = callCount === 1 ? 50 : 75;
+        const parsed = schema.safeParse({
+          score,
+          summaryRecommendations: `- call ${callCount}`,
+        });
+        return {
+          data: (parsed as any).data,
+          usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2, model: "fake" },
+        };
+      },
+      async callJsonLenient() {
+        throw new Error("not used");
+      },
+      async callText() {
+        throw new Error("not used");
+      },
+      async callMessages() {
+        throw new Error("not used");
+      },
+    });
+    const deps = buildDeps({
+      llm: makeClient(),
+      resumes: [seedResume()],
+      jobs: [seedJob()],
+    });
+
+    // Fire two concurrent calls. saveMatchScore is detached inside the
+    // handler (runs after the scored response), so we await the captured
+    // task promises — the REAL onConflict insert — before asserting,
+    // instead of guessing its async depth with a setImmediate tick.
+    const [resA, resB] = await Promise.all([
+      handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID }),
+      handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID }),
+    ]);
+    await deps._settle();
+
+    // Both handlers return 200.
+    assert.equal(resA.status, 200);
+    assert.equal(resB.status, 200);
+
+    // The cache table must end up with EXACTLY one row — the uniqueIndex
+    // on (userId, jobId, resumeId) collapses the two inserts via
+    // onConflictDoUpdate. The fake DB mirrors this behaviour so tests
+    // don't silently pass while prod races produce duplicates.
+    const cacheRows = deps._state.resume_match_scores;
+    assert.equal(cacheRows.length, 1, "cache must collapse concurrent inserts to one row");
+
+    // The surviving row reflects ONE of the two scores — whichever
+    // committed last. We don't care which, only that the schema
+    // invariant holds and the API didn't throw.
+    assert.ok([50, 75].includes(cacheRows[0].score));
+  });
+
+  it("LLM throw in ONE of two concurrent calls still returns 200 on both (independent fallbacks)", async () => {
+    let callCount = 0;
+    const client: LLMClient = {
+      async callJson(_featureKey, _options, schema) {
+        callCount++;
+        if (callCount === 1) throw new Error("upstream timeout");
+        const parsed = schema.safeParse({
+          score: 60,
+          summaryRecommendations: "- ok",
+        });
+        return {
+          data: (parsed as any).data,
+          usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2, model: "fake" },
+        };
+      },
+      async callJsonLenient() {
+        throw new Error("not used");
+      },
+      async callText() {
+        throw new Error("not used");
+      },
+      async callMessages() {
+        throw new Error("not used");
+      },
+    };
+    const deps = buildDeps({
+      llm: client,
+      resumes: [seedResume()],
+      jobs: [seedJob()],
+    });
+    const [resA, resB] = await Promise.all([
+      handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID }),
+      handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID }),
+    ]);
+    // Both 200 — one via LLM, one via keyword-overlap fallback.
+    assert.equal(resA.status, 200);
+    assert.equal(resB.status, 200);
+    // One of the two responses has the LLM error footer appended.
+    const bodies = [resA.body, resB.body] as any[];
+    const errors = bodies.filter((b) => /LLM error/.test(b.data.summaryRecommendations));
+    assert.equal(errors.length, 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleByid — persisted job + resume
+// ---------------------------------------------------------------------------
+
+describe("handleByid — persisted ids", () => {
+  it("401 for anonymous", async () => {
+    const res = await handleByid(buildDeps(), null, { jobId: JOB_ID, resumeId: RESUME_ID });
+    assert.equal(res.status, 401);
+  });
+
+  it("400 for missing/invalid jobId", async () => {
+    const res = await handleByid(buildDeps(), USER_ID, { resumeId: RESUME_ID });
+    assert.equal(res.status, 400);
+  });
+
+  it("404 when the job doesn't exist", async () => {
+    const res = await handleByid(
+      buildDeps({ resumes: [seedResume()] }),
+      USER_ID,
+      { jobId: randomUUID(), resumeId: RESUME_ID },
+    );
+    assert.equal(res.status, 404);
+  });
+
+  it("404 when the resume doesn't exist", async () => {
+    const res = await handleByid(
+      buildDeps({ jobs: [seedJob()] }),
+      USER_ID,
+      { jobId: JOB_ID, resumeId: randomUUID() },
+    );
+    assert.equal(res.status, 404);
+  });
+
+  it("runs the LLM path when configured and persists score cache", async () => {
+    const { client } = makeFakeLLM(() => ({ score: 81, summaryRecommendations: "- Keep it up" }));
+    const deps = buildDeps({
+      llm: client,
+      resumes: [seedResume()],
+      jobs: [seedJob()],
+    });
+    const res = await handleByid(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
+    assert.equal(res.status, 200);
+    const body = res.body as any;
+    assert.equal(body.data.score, 81);
+    assert.equal(body.data.jobId, JOB_ID);
+    assert.equal(body.data.resumeId, RESUME_ID);
+    await deps._settle();
+    const cache = deps._calls.filter((c: any) => c.kind === "insert" && c.table === "resume_match_scores");
+    assert.equal(cache.length, 1);
+  });
+
+  it("falls back to keyword overlap when LLM throws", async () => {
+    const { client } = makeFakeLLM(() => ({ score: 99, summaryRecommendations: "x" }), { failFirst: 1 });
+    const deps = buildDeps({
+      llm: client,
+      resumes: [seedResume()],
+      jobs: [seedJob()],
+    });
+    const res = await handleByid(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
+    assert.equal(res.status, 200);
+    assert.match((res.body as any).data.summaryRecommendations, /keyword overlap/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleInsights — Pro deep-dive
+// ---------------------------------------------------------------------------
+
+describe("handleInsights — deep career analysis", () => {
+  it("401 for anonymous", async () => {
+    const res = await handleInsights(buildDeps(), null, { jobHtml: "<p>x</p>" });
+    assert.equal(res.status, 401);
+  });
+
+  it("400 for missing jobHtml", async () => {
+    const res = await handleInsights(buildDeps({ resumes: [seedResume()] }), USER_ID, {});
+    assert.equal(res.status, 400);
+  });
+
+  it("404 when the caller has no resume", async () => {
+    const { client } = makeFakeLLM(() => ({}));
+    const res = await handleInsights(buildDeps({ llm: client }), USER_ID, { jobHtml: "<p>x</p>" });
+    assert.equal(res.status, 404);
+  });
+
+  it("503 when no LLM is configured — insights is AI-only, no heuristic fallback", async () => {
+    const res = await handleInsights(
+      buildDeps({ resumes: [seedResume()] }),
+      USER_ID,
+      { jobHtml: "<p>Senior React role</p>" },
+    );
+    assert.equal(res.status, 503);
+  });
+
+  it("happy path — returns the full insights shape", async () => {
+    const { client, calls } = makeFakeLLM(() => ({
+      overallFit: "strong",
+      seniorityFit: "Senior level matches.",
+      missingSkills: [
+        { skill: "Next.js App Router", category: "technical", importance: "important" },
+      ],
+      careerTrajectory: "Consistent upward trend in React-adjacent roles.",
+      interviewTips: ["Do a deep-dive on RSC", "Rehearse migration metrics"],
+      suggestedCertifications: [{ name: "React Advanced Patterns", reason: "tight fit" }],
+      estimatedRampTime: "2-3 weeks",
+    }));
+    const deps = buildDeps({ llm: client, resumes: [seedResume()] });
+    const res = await handleInsights(deps, USER_ID, { jobHtml: "<p>Senior React role</p>" });
+    assert.equal(res.status, 200);
+    const body = res.body as any;
+    assert.equal(body.data.overallFit, "strong");
+    assert.ok(Array.isArray(body.data.missingSkills));
+    assert.ok(Array.isArray(body.data.interviewTips));
+    assert.equal(calls.length, 1);
+  });
+
+  it("returns 500 when the LLM throws — does NOT fall back to heuristics", async () => {
+    const { client } = makeFakeLLM(() => ({}), { failFirst: 1 });
+    const deps = buildDeps({ llm: client, resumes: [seedResume()] });
+    const res = await handleInsights(deps, USER_ID, { jobHtml: "<p>x</p>" });
+    assert.equal(res.status, 500);
+  });
+});
+
+describe("handleByContent — raw-string scoring", () => {
+  it("rejects empty jobContent / resumeContent", async () => {
+    const res = await handleByContent(buildDeps(), USER_ID, {});
+    assert.equal(res.status, 400);
+  });
+
+  it("runs the LLM path when configured", async () => {
+    const { client } = makeFakeLLM(() => ({ score: 77, summaryRecommendations: "- ok" }));
+    const deps = buildDeps({ llm: client });
+    const res = await handleByContent(deps, USER_ID, {
+      jobContent: "React TypeScript job",
+      resumeContent: "I am a React TypeScript developer",
+    });
+    assert.equal(res.status, 200);
+    assert.equal((res.body as any).data.score, 77);
+  });
+
+  it("falls back to keyword overlap when no client is configured", async () => {
+    const res = await handleByContent(buildDeps(), USER_ID, {
+      jobContent: "React TypeScript Next.js",
+      resumeContent: "React TypeScript developer for 5 years",
+    });
+    assert.equal(res.status, 200);
+    assert.ok((res.body as any).data.score > 0);
+  });
+});

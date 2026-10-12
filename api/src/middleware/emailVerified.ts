@@ -1,0 +1,19 @@
+import type { MiddlewareHandler } from "hono";
+import type { Variables, AppEnv } from "../types/index.js";
+
+export const emailVerifiedMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const user = c.var.user;
+  // Guest accounts have no email to verify; they are scoped by being a
+  // guest (download / multi-destination need a real account).
+  if (!user?.emailVerified && !user?.guest) {
+    return c.json(
+      {
+        success: false,
+        error: { code: "EMAIL_NOT_VERIFIED", message: "Email address must be verified before accessing this resource." },
+        timestamp: new Date().toISOString(),
+      },
+      403,
+    );
+  }
+  return next();
+};

@@ -1,0 +1,370 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* Hide global chrome (mobile nav, AI brain, install prompt, chat panels…)
+ * both when the browser is actually printing AND when the page is loaded
+ * in print-preview mode (?print=1). The body attribute is set by the
+ * <PrintModeBodyAttribute /> mounted in App.tsx; the @media print rule
+ * is the belt-and-suspenders for the actual print render. Components opt
+ * in by tagging their root with `data-print-hide`. */
+@media print {
+  [data-print-hide] {
+    display: none !important;
+  }
+}
+
+body[data-print-mode] [data-print-hide] {
+  display: none !important;
+}
+
+/* ─── Studio layout ──────────────────────────────────────────────────────── */
+@layer components {
+  .studio-layout {
+    @apply flex h-screen overflow-hidden bg-background;
+  }
+  .studio-sidebar {
+    @apply w-[260px] flex-shrink-0 border-r bg-card overflow-y-auto flex flex-col;
+  }
+  .studio-editor {
+    @apply flex-1 min-w-0 overflow-hidden flex flex-col;
+  }
+  .studio-right-panel {
+    @apply w-[320px] flex-shrink-0 border-l flex flex-col overflow-y-auto;
+  }
+}
+
+.studio-page.min-h-screen {
+  min-height: auto !important;
+}
+
+/* Rail usage band — the AI-token + points pills style themselves for a light
+ * surface; on the coloured usage band we re-skin their chip + text to
+ * translucent-white so they stay legible in both themes (matching the design's
+ * uniform translucent chips). Scoped + unlayered, so it wins over the pills'
+ * Tailwind utility classes by layer order — no !important needed. */
+.rail-usage-chips a {
+  border-color: rgb(255 255 255 / 0.2);
+  background-color: rgb(255 255 255 / 0.1);
+  color: #fff;
+}
+.rail-usage-chips a:hover {
+  background-color: rgb(255 255 255 / 0.2);
+}
+.rail-usage-chips .text-muted-foreground {
+  color: rgb(255 255 255 / 0.72);
+}
+.rail-usage-chips .text-primary {
+  color: #fff;
+}
+
+/* Design system typography: app/marketing headings use the display face
+   (Bricolage Grotesque) with tight tracking. Zero-specificity (:where) so any
+   font-* / tracking-* utility still wins. Rendered documents (resume/job
+   papers, studio canvas) carry their own template fonts and are excluded via
+   [data-doc-surface] / .force-light-scope. */
+@layer base {
+  :where(h1, h2, h3):not(:where([data-doc-surface], .force-light-scope) *) {
+    font-family: "Bricolage Grotesque Variable", "Avenir Next", ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+  :where(h1):not(:where([data-doc-surface], .force-light-scope) *) {
+    letter-spacing: -0.03em;
+  }
+}
+
+@layer base {
+  /**
+   * Tailwind CSS theme
+   * tailwind.config.ts expects the following color variables to be expressed as HSL values.
+   * A different format will require also updating the theme in tailwind.config.ts.
+  */
+  /* Light theme — "Clear Blue". Palette chosen from YouGov's US favorite-color
+   * survey: blue is the favorite in every demographic (34%), green third (12%);
+   * brown/orange are the most disliked, so they are not brand colors. Cool
+   * slate neutrals; cards stay white on a faint blue-grey canvas. */
+  :root {
+    --background: 216 33% 97%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 214 32% 91%;
+    --secondary-foreground: 222 47% 18%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 19% 35%;
+
+    --accent: 214 95% 93%;
+    --accent-foreground: 224 64% 33%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    /* Chart series (categorical slots 1-2, validated light: CVD dE 24.7 / contrast >= 3:1 on card). Marks only; text stays on text tokens. */
+    --chart-1: 213 68% 50%;
+    --chart-2: 17 82% 56%;
+    --input: 213 27% 84%;
+    --ring: 221 83% 53%;
+
+    --radius: 0.75rem;
+
+    /* Top Navigation / BrandHeader chrome. */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 18%;
+    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 214 32% 93%;
+    --sidebar-accent-foreground: 222 47% 14%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 221 83% 53%;
+
+    /* ── App rail: light blue-grey menu zone over the navy usage band (the
+     * usage band matches the footer navy in both themes). ─────────────────── */
+    --rail-background: 214 60% 97%;
+    --rail-foreground: 222 30% 28%;
+    --rail-muted: 215 16% 47%;
+    --rail-hover: 214 70% 92%;
+    --rail-active: 221 83% 53%;
+    --rail-active-foreground: 0 0% 100%;
+    --rail-border: 214 32% 91%;
+    --rail-usage-background: 222 47% 11%;
+    --rail-usage-foreground: 214 32% 91%;
+    --rail-usage-muted: 215 20% 65%;
+    --rail-usage-border: 217 33% 22%;
+
+    /* ── Footer (two navy bands) — same in light + dark. ────── */
+    --footer-background: 217 33% 17%;
+    --footer-foreground: 214 32% 91%;
+    --footer-muted: 215 20% 65%;
+    --footer-brand: 213 94% 78%;
+    --footer-strong-background: 222 47% 11%;
+    --footer-strong-foreground: 215 20% 65%;
+
+    /* Action bar (sticky search/filter/tab toolbars). */
+    --action-bar: 210 40% 98%;
+
+    /* Brand colors. `brand-primary` is the blue identity (was purple). */
+    --brand-primary: 221 83% 53%;
+    --brand-primary-light: 214 95% 93%;
+    --brand-primary-dark: 224 64% 33%;
+    --brand-blue: 217 91% 60%;
+    --brand-blue-light: 214 95% 93%;
+    --brand-green: 142 71% 45%;
+    /* Readable green for point values / success copy on light surfaces. */
+    --brand-green-text: 142 72% 29%;
+    /* "Ink" = the deep-navy feature surface (balance card, video player, CTA
+       band). Stays dark in BOTH themes; in dark mode it lifts slightly so it
+       still reads as a raised panel against the page. */
+    --ink: 222 47% 11%;
+    --ink-foreground: 0 0% 100%;
+    --ink-muted: 215 20% 65%;
+    --ink-raised: 217 33% 17%;
+    --ink-accent: 213 94% 68%;
+    --ink-positive: 142 69% 58%;
+    --brand-orange: 25 95% 53%;
+    --brand-gradient-start: 221 83% 53%;
+    --brand-gradient-end: 217 91% 60%;
+    /* Review layer (the kit merge · tailor · create-from-a-job): text the
+       change adds, text it removes, and things that need the person. */
+    --diff-added: 141 79% 85%;
+    --diff-added-foreground: 144 61% 20%;
+    --diff-removed: 0 93% 94%;
+    --diff-removed-foreground: 0 70% 35%;
+    --review: 48 96% 89%;
+    --review-foreground: 32 81% 29%;
+    --review-border: 38 92% 50%;
+  }
+
+  /* Dark theme — "Midnight Navy". Deep slate canvas, cards a step lighter,
+   * a brighter blue primary so it stays legible on dark surfaces. */
+  .dark {
+    --background: 222 47% 9%;
+    --foreground: 214 32% 91%;
+
+    --card: 222 40% 13%;
+    --card-foreground: 214 32% 95%;
+
+    --popover: 222 40% 13%;
+    --popover-foreground: 214 32% 95%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 217 33% 19%;
+    --secondary-foreground: 214 32% 90%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 217 50% 22%;
+    --accent-foreground: 214 95% 88%;
+
+    --destructive: 0 63% 40%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 217 33% 22%;
+    /* Chart series, stepped for the dark card surface (validated dark: CVD dE 26.8 / contrast >= 3:1). */
+    --chart-1: 213 77% 56%;
+    --chart-2: 17 70% 50%;
+    --input: 217 33% 25%;
+    --ring: 217 91% 60%;
+
+    --sidebar-background: 222 47% 7%;
+    --sidebar-foreground: 214 20% 78%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 214 32% 92%;
+    --sidebar-border: 217 33% 18%;
+    --sidebar-ring: 217 91% 60%;
+
+    /* ── App rail — DARK: neutral navy menu zone; the selected row is the one
+     * brand-blue accent. Usage band matches the footer navy. ─────────────── */
+    --rail-background: 222 40% 12%;
+    --rail-foreground: 214 32% 90%;
+    --rail-muted: 215 20% 62%;
+    --rail-hover: 217 33% 18%;
+    --rail-active: 221 83% 53%;
+    --rail-active-foreground: 0 0% 100%;
+    --rail-border: 217 33% 20%;
+    --rail-usage-background: 222 47% 7%;
+    --rail-usage-foreground: 214 32% 91%;
+    --rail-usage-muted: 215 20% 65%;
+    --rail-usage-border: 217 33% 18%;
+
+    --footer-background: 217 33% 14%;
+    --footer-foreground: 214 32% 91%;
+    --footer-muted: 215 20% 65%;
+    --footer-brand: 213 94% 78%;
+    --footer-strong-background: 222 47% 7%;
+    --footer-strong-foreground: 215 20% 65%;
+
+    --action-bar: 217 33% 17%;
+
+    --brand-primary: 217 91% 60%;
+    --brand-primary-light: 217 50% 20%;
+    --brand-primary-dark: 214 95% 88%;
+    --brand-blue: 213 94% 68%;
+    --brand-blue-light: 217 50% 20%;
+    --brand-green: 142 69% 58%;
+    --brand-green-text: 142 69% 58%;
+    --ink: 222 40% 15%;
+    --ink-foreground: 0 0% 100%;
+    --ink-muted: 215 20% 65%;
+    --ink-raised: 217 33% 22%;
+    --ink-accent: 213 94% 68%;
+    --ink-positive: 142 69% 58%;
+    --brand-orange: 25 95% 53%;
+    --brand-gradient-start: 221 83% 53%;
+    --brand-gradient-end: 217 91% 60%;
+    --diff-added: 144 50% 18%;
+    --diff-added-foreground: 141 79% 85%;
+    --diff-removed: 0 50% 20%;
+    --diff-removed-foreground: 0 93% 90%;
+    --review: 32 60% 18%;
+    --review-foreground: 48 96% 89%;
+    --review-border: 38 92% 50%;
+  }
+}
+
+/* ─── Narrower sidebar, wider content ────────────────────────────────── */
+@media (min-width: 1024px) {
+  .lg\:w-80 {
+    width: 12rem !important;
+  }
+  .lg\:ml-80 {
+    margin-left: 12rem !important;
+  }
+}
+
+/* Nav bar & footer: remove horizontal padding */
+@media (min-width: 1024px) {
+  #nav-bar-wrapper,
+  #footer-wrapper {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  /* html too: short pages and overscroll otherwise show the UA canvas
+     (pure black in dark mode) below the body. */
+  html,
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Forced-light scope for rendered documents (resume templates, etc.).
+ * A resume is a fixed paper artifact — its on-screen preview must match the
+ * exported PDF, which is always light. The themes target a light surface
+ * (dark text on white paper), so under the app's dark theme the fixed-palette
+ * headings would otherwise land on a dark canvas and disappear. Re-declaring
+ * the core design tokens here pins every semantic utility (bg-card,
+ * text-muted-foreground, border, …) used inside the document to its light
+ * value, regardless of the ancestor `.dark`. Custom-property inheritance
+ * resolves to the nearest definition, so this wins over `.dark` on <html>.
+ * Kept unlayered so it also beats the @layer base `.dark` declarations. */
+.force-light-scope {
+  color-scheme: light;
+  --background: 216 33% 97%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 214 32% 91%;
+  --secondary-foreground: 222 47% 18%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 19% 35%;
+  --accent: 214 95% 93%;
+  --accent-foreground: 224 64% 33%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 213 27% 84%;
+  --ring: 221 83% 53%;
+  --diff-added: 141 79% 85%;
+  --diff-added-foreground: 144 61% 20%;
+  --diff-removed: 0 93% 94%;
+  --diff-removed-foreground: 0 70% 35%;
+  --review: 48 96% 89%;
+  --review-foreground: 32 81% 29%;
+  --review-border: 38 92% 50%;
+}
+
+
+/* ─── Workspace owns the viewport (use-workspace-viewport-lock.ts) ───── */
+/* From lg the kit columns scroll on their own; the document must not —
+   nothing outside the shell may make the page taller than the screen. */
+@media (min-width: 1024px) {
+  html.workspace-viewport-lock,
+  html.workspace-viewport-lock body {
+    height: 100%;
+    overflow: hidden;
+  }
+}

@@ -1,0 +1,49 @@
+name: Install workspace dependencies
+description: >
+  Sets up Node and installs the npm dependencies for the requested packages.
+  Shared by every CI job so the retry loop lives in one place.
+
+inputs:
+  node-version:
+    description: Node.js version to install.
+    required: true
+  packages:
+    description: >
+      Space-separated packages to install, in order. Any of: root, shared,
+      frontend, api. `shared` installs with --omit=dev (it only carries the
+      zod runtime dep that api/ and frontend/ import through it).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: "npm"
+
+    - name: Install dependencies
+      shell: bash
+      # #524 — retry each install so a single npm registry ECONNRESET doesn't
+      # fail the job. `npm install` (not `npm ci`) so lockfile drift reconciles
+      # against package.json instead of failing inside the loop and leaving
+      # node_modules empty. --prefer-offline + --no-audit drop the audit RTT.
+      run: |
+        set -euo pipefail
+        install() {
+          local dir="$1"; shift
+          for i in 1 2 3; do
+            (cd "$dir" && npm install --prefer-offline --no-audit "$@") && return 0
+            echo "npm install in $dir failed (attempt $i), retrying…"; sleep 5
+          done
+          echo "npm install in $dir failed after 3 attempts"; return 1
+        }
+        for pkg in ${{ inputs.packages }}; do
+          case "$pkg" in
+            root)   install . ;;
+            shared) install shared --omit=dev ;;
+            frontend|api) install "$pkg" ;;
+            *) echo "unknown package: $pkg"; exit 1 ;;
+          esac
+        done

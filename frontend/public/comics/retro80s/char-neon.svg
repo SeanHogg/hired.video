@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid slice">
+
+  <g stroke="#f472b6" stroke-width="6" fill="none" opacity="0.95">
+    <circle cx="200" cy="120" r="44"/>
+    <line x1="200" y1="164" x2="200" y2="360"/>
+    <line x1="200" y1="200" x2="120" y2="280"/>
+    <line x1="200" y1="200" x2="280" y2="280"/>
+    <line x1="200" y1="360" x2="150" y2="560"/>
+    <line x1="200" y1="360" x2="250" y2="560"/>
+  </g>
+  <g stroke="#fbbf24" stroke-width="2" fill="none" opacity="0.65">
+    <circle cx="200" cy="120" r="44"/>
+    <line x1="200" y1="164" x2="200" y2="360"/>
+    <line x1="200" y1="200" x2="120" y2="280"/>
+    <line x1="200" y1="200" x2="280" y2="280"/>
+    <line x1="200" y1="360" x2="150" y2="560"/>
+    <line x1="200" y1="360" x2="250" y2="560"/>
+  </g>
+
+</svg>

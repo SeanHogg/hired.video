@@ -1,0 +1,1197 @@
+/**
+ * ScorecardsService — application-layer orchestration for the
+ * structured-hiring bounded context.
+ *
+ * Coordinates the repository, the company-scope service, and the pure
+ * scoring rules in `./scoring.ts`. Use cases (templates CRUD, kit CRUD,
+ * submission lifecycle, debrief, decision) live here so route handlers
+ * stay thin HTTP adapters and tests can drive logic without Hono.
+ *
+ * Errors are thrown as `ServiceError` with a stable `code` so the route
+ * layer can map them to HTTP status codes one place.
+ */
+
+import {
+  IScorecardsRepository,
+  ScorecardsRepository,
+  type ScorecardTemplateRow,
+  type ScorecardAttributeRow,
+  type InterviewKitRow,
+  type InterviewKitStageRow,
+  type ScorecardSubmissionRow,
+  type ScorecardSubmissionRatingRow,
+  type HiringDecisionRow,
+  type CompetencyRow,
+  type CompetencyLevelRow,
+  type InterviewerReliability,
+  type TakeHomeAssignmentRow,
+  type TakeHomeSubmissionRow,
+  type UpdateAttributePatch,
+  type UpdateStagePatch,
+} from "../../repositories/scorecardsRepository.js";
+
+/** 32-byte hex magic-link token. Mirrors the async-interview invite shape. */
+function randomInviteToken(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+import { eq } from "drizzle-orm";
+import { getDb, schema } from "../../db/index.js";
+import {
+  resolveCompanyScope,
+  userCanAccessCompany,
+} from "../../services/company/scope.js";
+import {
+  buildAggregateSnapshot,
+  buildAttributeAverages,
+  computeOverallScore,
+  type AggregateSnapshot,
+  type AttributeAverage,
+} from "./scoring.js";
+import {
+  filterSubmissionsForRequester,
+  maskCandidateIdentity,
+} from "./blindReview.js";
+import {
+  filterSubmissionsForHm,
+  resolveHmVisibility,
+  type ScorecardHmVisibility,
+} from "./hmVisibility.js";
+import type {
+  CreateDecisionInput,
+  CreateKitInput,
+  CreateSubmissionInput,
+  CreateTemplateInput,
+  AttributeInput,
+  StageInput,
+  RatingInput,
+  UpdateKitInput,
+  UpdateSubmissionInput,
+  UpdateTemplateInput,
+  CreateCompetencyInput,
+  UpdateCompetencyInput,
+} from "./schemas.js";
+
+// ─── Errors ────────────────────────────────────────────────────────────────
+
+export type ServiceErrorCode =
+  | "NOT_FOUND"
+  | "FORBIDDEN"
+  | "CONFLICT"
+  | "VALIDATION_ERROR";
+
+export class ServiceError extends Error {
+  constructor(
+    public readonly code: ServiceErrorCode,
+    message: string,
+    public readonly details?: unknown,
+  ) {
+    super(message);
+  }
+}
+
+// ─── Result types ──────────────────────────────────────────────────────────
+
+export interface TemplateWithAttributes extends ScorecardTemplateRow {
+  attributes: ScorecardAttributeRow[];
+}
+
+export interface KitWithStages extends InterviewKitRow {
+  stages: InterviewKitStageRow[];
+}
+
+export interface SubmissionWithRatings extends ScorecardSubmissionRow {
+  ratings: ScorecardSubmissionRatingRow[];
+}
+
+export interface Debrief {
+  submissions: ScorecardSubmissionRow[];
+  avgScore: AggregateSnapshot["avgScore"];
+  recommendations: AggregateSnapshot["recommendations"];
+  attributes: AttributeAverage[];
+}
+
+export interface CompetencyWithLevels extends CompetencyRow {
+  levels: CompetencyLevelRow[];
+}
+
+// ─── Service ───────────────────────────────────────────────────────────────
+
+/** Lightweight DI surface — keeps tests off real DB / scope helpers. */
+export interface ScorecardsServiceDeps {
+  repo: IScorecardsRepository;
+  canAccessCompany: (userId: string, companyId: string) => Promise<boolean>;
+  getCompanyIdsForUser: (userId: string) => Promise<string[]>;
+  /** #241 — effective HM scorecard-visibility for a (company, job). Injected
+   *  so tests stay off the DB; the default impl reads + caches the config. */
+  resolveJobHmVisibility?: (companyId: string, jobId: string | null) => Promise<ScorecardHmVisibility>;
+  now?: () => Date;
+}
+
+// NOT cached: the config is two PK-indexed lookups read at most once per
+// panel view (listSubmissions), and a read-through cache here would need
+// cross-job invalidation whenever a company changes its default — not worth
+// it for a rarely-read, tiny value. Direct reads keep correctness simple.
+async function defaultResolveJobHmVisibility(
+  companyId: string,
+  jobId: string | null,
+): Promise<ScorecardHmVisibility> {
+  const db = getDb();
+  const [company] = await db
+    .select({ d: schema.companyProfiles.scorecardHmVisibilityDefault })
+    .from(schema.companyProfiles)
+    .where(eq(schema.companyProfiles.id, companyId))
+    .limit(1);
+  let jobOverride: string | null = null;
+  if (jobId) {
+    const [job] = await db
+      .select({ v: schema.jobItems.scorecardHmVisibility })
+      .from(schema.jobItems)
+      .where(eq(schema.jobItems.id, jobId))
+      .limit(1);
+    jobOverride = (job?.v as string | null) ?? null;
+  }
+  return resolveHmVisibility(jobOverride, company?.d ?? null);
+}
+
+export function defaultScorecardsServiceDeps(): ScorecardsServiceDeps {
+  return {
+    repo: new ScorecardsRepository(getDb()),
+    canAccessCompany: userCanAccessCompany,
+    getCompanyIdsForUser: async (userId: string) =>
+      (await resolveCompanyScope(userId)).companyIds,
+    resolveJobHmVisibility: defaultResolveJobHmVisibility,
+    now: () => new Date(),
+  };
+}
+
+export class ScorecardsService {
+  private readonly now: () => Date;
+
+  constructor(private readonly deps: ScorecardsServiceDeps) {
+    this.now = deps.now ?? (() => new Date());
+  }
+
+  // ─── Auth helpers ─────────────────────────────────────────────────────────
+
+  private async assertCompanyAccess(userId: string, companyId: string): Promise<void> {
+    if (!(await this.deps.canAccessCompany(userId, companyId))) {
+      throw new ServiceError("FORBIDDEN", "No access to this company");
+    }
+  }
+
+  /** Load a template + check the caller can access its company. */
+  private async loadTemplate(
+    userId: string,
+    templateId: string,
+  ): Promise<ScorecardTemplateRow> {
+    const tpl = await this.deps.repo.findTemplateById(templateId);
+    if (!tpl) throw new ServiceError("NOT_FOUND", "Template not found");
+    await this.assertCompanyAccess(userId, tpl.companyId);
+    return tpl;
+  }
+
+  /** Load a kit + check the caller can access its company. */
+  private async loadKit(userId: string, kitId: string): Promise<InterviewKitRow> {
+    const kit = await this.deps.repo.findKitById(kitId);
+    if (!kit) throw new ServiceError("NOT_FOUND", "Kit not found");
+    await this.assertCompanyAccess(userId, kit.companyId);
+    return kit;
+  }
+
+  /**
+   * Resolve the kit that governs a submission's review policy. Submissions
+   * link to a kit indirectly via `kitStageId` (optional) — submissions
+   * created outside a kit return null and behave as "no blind-review
+   * policy" (legacy ad-hoc scorecards keep working unchanged).
+   */
+  private async resolveKitForSubmission(
+    sub: Pick<ScorecardSubmissionRow, "kitStageId">,
+  ): Promise<InterviewKitRow | null> {
+    if (!sub.kitStageId) return null;
+    const stage = await this.deps.repo.findStageById(sub.kitStageId);
+    if (!stage) return null;
+    return this.deps.repo.findKitById(stage.kitId);
+  }
+
+  /** Batch form of `resolveKitForSubmission`: two inArray reads (stages,
+   *  then kits) for any number of submissions. Keyed by submission id. */
+  private async resolveKitsForSubmissions(
+    subs: ReadonlyArray<Pick<ScorecardSubmissionRow, "id" | "kitStageId">>,
+  ): Promise<Map<string, InterviewKitRow | null>> {
+    const stageIds = Array.from(
+      new Set(subs.map((s) => s.kitStageId).filter((id): id is string => Boolean(id))),
+    );
+    const stages = await this.deps.repo.findStagesByIds(stageIds);
+    const stageById = new Map(stages.map((st) => [st.id, st]));
+    const kits = await this.deps.repo.findKitsByIds(Array.from(new Set(stages.map((st) => st.kitId))));
+    const kitById = new Map(kits.map((k) => [k.id, k]));
+    const out = new Map<string, InterviewKitRow | null>();
+    for (const sub of subs) {
+      const stage = sub.kitStageId ? stageById.get(sub.kitStageId) : undefined;
+      out.set(sub.id, stage ? kitById.get(stage.kitId) ?? null : null);
+    }
+    return out;
+  }
+
+  /** Templates (by id) whose company the caller can access. One batched
+   *  template read + ONE accessible-company lookup, instead of a template
+   *  read and a `canAccessCompany` check per template. Same rule as
+   *  `canAccessCompany` (owner or active member) via `getCompanyIdsForUser`. */
+  private async findAccessibleTemplates(
+    userId: string,
+    templateIds: readonly string[],
+  ): Promise<ScorecardTemplateRow[]> {
+    if (templateIds.length === 0) return [];
+    const [templates, companyIds] = await Promise.all([
+      this.deps.repo.findTemplatesByIds(templateIds),
+      this.deps.getCompanyIdsForUser(userId),
+    ]);
+    const allowed = new Set(companyIds);
+    return templates.filter((t) => allowed.has(t.companyId));
+  }
+
+  // ─── Templates ────────────────────────────────────────────────────────────
+
+  async listTemplates(
+    userId: string,
+    onlyCompanyId?: string,
+  ): Promise<ScorecardTemplateRow[]> {
+    const companyIds = await this.deps.getCompanyIdsForUser(userId);
+    if (companyIds.length === 0) return [];
+    if (onlyCompanyId && !companyIds.includes(onlyCompanyId)) return [];
+    const target = onlyCompanyId ? [onlyCompanyId] : companyIds;
+    return this.deps.repo.findActiveTemplatesForCompanies(target);
+  }
+
+  async getTemplate(userId: string, id: string): Promise<TemplateWithAttributes> {
+    const tpl = await this.loadTemplate(userId, id);
+    const attributes = await this.deps.repo.findAttributesForTemplate(tpl.id);
+    return { ...tpl, attributes };
+  }
+
+  async createTemplate(
+    userId: string,
+    input: CreateTemplateInput,
+  ): Promise<TemplateWithAttributes> {
+    await this.assertCompanyAccess(userId, input.companyId);
+    const tpl = await this.deps.repo.insertTemplate({
+      companyId: input.companyId,
+      createdByUserId: userId,
+      name: input.name,
+      description: input.description,
+      ratingScale: input.ratingScale,
+      roleFamily: input.roleFamily,
+      requiredCertificationCourseId: input.requiredCertificationCourseId ?? null,
+    });
+    const attributes = await this.deps.repo.insertAttributes(
+      input.attributes.map((a, i) => ({
+        templateId: tpl.id,
+        name: a.name,
+        description: a.description,
+        displayOrder: a.displayOrder ?? i,
+        weight: a.weight ?? 1,
+        anchors: a.anchors as Record<string, string> | undefined,
+        competencyId: a.competencyId ?? null,
+      })),
+    );
+    return { ...tpl, attributes };
+  }
+
+  async updateTemplate(
+    userId: string,
+    id: string,
+    patch: UpdateTemplateInput,
+  ): Promise<ScorecardTemplateRow> {
+    await this.loadTemplate(userId, id);
+    return this.deps.repo.updateTemplate(id, patch);
+  }
+
+  async addAttribute(
+    userId: string,
+    templateId: string,
+    input: AttributeInput,
+  ): Promise<ScorecardAttributeRow> {
+    await this.loadTemplate(userId, templateId);
+    return this.deps.repo.insertAttribute({
+      templateId,
+      name: input.name,
+      description: input.description,
+      displayOrder: input.displayOrder ?? 0,
+      weight: input.weight ?? 1,
+      anchors: input.anchors as Record<string, string> | undefined,
+      competencyId: input.competencyId ?? null,
+    });
+  }
+
+  async updateAttribute(
+    userId: string,
+    id: string,
+    patch: Partial<AttributeInput>,
+  ): Promise<ScorecardAttributeRow> {
+    const attr = await this.deps.repo.findAttributeById(id);
+    if (!attr) throw new ServiceError("NOT_FOUND", "Attribute not found");
+    await this.loadTemplate(userId, attr.templateId);
+    const repoPatch: UpdateAttributePatch = {
+      name: patch.name,
+      description: patch.description,
+      displayOrder: patch.displayOrder,
+      weight: patch.weight,
+      anchors: patch.anchors,
+      competencyId: patch.competencyId,
+    };
+    return this.deps.repo.updateAttribute(id, repoPatch);
+  }
+
+  async deleteAttribute(userId: string, id: string): Promise<void> {
+    const attr = await this.deps.repo.findAttributeById(id);
+    if (!attr) throw new ServiceError("NOT_FOUND", "Attribute not found");
+    await this.loadTemplate(userId, attr.templateId);
+    await this.deps.repo.deleteAttribute(id);
+  }
+
+  // ─── Kits + stages ────────────────────────────────────────────────────────
+
+  async listKits(
+    userId: string,
+    filter: { onlyCompanyId?: string; jobId?: string },
+  ): Promise<InterviewKitRow[]> {
+    const companyIds = await this.deps.getCompanyIdsForUser(userId);
+    if (companyIds.length === 0) return [];
+    if (filter.onlyCompanyId && !companyIds.includes(filter.onlyCompanyId)) return [];
+    return this.deps.repo.findActiveKits({
+      companyIds,
+      jobId: filter.jobId,
+      onlyCompanyId: filter.onlyCompanyId,
+    });
+  }
+
+  async getKit(userId: string, id: string): Promise<KitWithStages> {
+    const kit = await this.loadKit(userId, id);
+    const stages = await this.deps.repo.findStagesForKit(kit.id);
+    return { ...kit, stages };
+  }
+
+  async createKit(userId: string, input: CreateKitInput): Promise<KitWithStages> {
+    await this.assertCompanyAccess(userId, input.companyId);
+    const kit = await this.deps.repo.insertKit({
+      companyId: input.companyId,
+      jobId: input.jobId,
+      createdByUserId: userId,
+      name: input.name,
+      description: input.description,
+      blindReviewMode: input.blindReviewMode ?? "off",
+      escalateToUserId: input.escalateToUserId ?? null,
+    });
+    const stages = await this.deps.repo.insertStages(
+      input.stages.map((s, i) => ({
+        kitId: kit.id,
+        name: s.name,
+        description: s.description,
+        displayOrder: s.displayOrder ?? i,
+        durationMinutes: s.durationMinutes ?? 60,
+        suggestedQuestions: s.suggestedQuestions,
+        scorecardTemplateId: s.scorecardTemplateId,
+        stageKind: s.stageKind ?? "interview",
+      })),
+    );
+    return { ...kit, stages };
+  }
+
+  async updateKit(
+    userId: string,
+    id: string,
+    patch: UpdateKitInput,
+  ): Promise<InterviewKitRow> {
+    await this.loadKit(userId, id);
+    return this.deps.repo.updateKit(id, patch);
+  }
+
+  async addStage(
+    userId: string,
+    kitId: string,
+    input: StageInput,
+  ): Promise<InterviewKitStageRow> {
+    await this.loadKit(userId, kitId);
+    return this.deps.repo.insertStage({
+      kitId,
+      name: input.name,
+      description: input.description,
+      displayOrder: input.displayOrder ?? 0,
+      durationMinutes: input.durationMinutes ?? 60,
+      suggestedQuestions: input.suggestedQuestions,
+      scorecardTemplateId: input.scorecardTemplateId,
+      stageKind: input.stageKind ?? "interview",
+    });
+  }
+
+  async updateStage(
+    userId: string,
+    id: string,
+    patch: Partial<StageInput>,
+  ): Promise<InterviewKitStageRow> {
+    const stage = await this.deps.repo.findStageById(id);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    await this.loadKit(userId, stage.kitId);
+    const repoPatch: UpdateStagePatch = {
+      name: patch.name,
+      description: patch.description,
+      displayOrder: patch.displayOrder,
+      durationMinutes: patch.durationMinutes,
+      suggestedQuestions: patch.suggestedQuestions,
+      scorecardTemplateId: patch.scorecardTemplateId,
+      stageKind: patch.stageKind,
+    };
+    return this.deps.repo.updateStage(id, repoPatch);
+  }
+
+  async deleteStage(userId: string, id: string): Promise<void> {
+    const stage = await this.deps.repo.findStageById(id);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    await this.loadKit(userId, stage.kitId);
+    await this.deps.repo.deleteStage(id);
+  }
+
+  // ─── Submissions ──────────────────────────────────────────────────────────
+
+  /**
+   * List submissions for an application or interview, filtered to those
+   * whose template the caller can access. We resolve via templates because
+   * submissions are polymorphic in `applicationId`, but every submission
+   * carries a template that's owned by a known company.
+   */
+  async listSubmissions(
+    userId: string,
+    filter: { applicationId?: string; interviewId?: string },
+  ): Promise<ScorecardSubmissionRow[]> {
+    if (!filter.applicationId && !filter.interviewId) {
+      throw new ServiceError(
+        "VALIDATION_ERROR",
+        "applicationId or interviewId required",
+      );
+    }
+    const subs = filter.applicationId
+      ? await this.deps.repo.findSubmissionsForApplication(filter.applicationId)
+      : await this.deps.repo.findSubmissionsForInterview(filter.interviewId!);
+    if (subs.length === 0) return [];
+
+    // Resolve which templates the caller can read; keep submissions whose
+    // template is in that set. We deliberately compute by template-id, not
+    // company-id — the variable name now matches the values it holds.
+    const templateIds = Array.from(new Set(subs.map((s) => s.templateId)));
+    const visibleTemplateIds = new Set(
+      (await this.findAccessibleTemplates(userId, templateIds)).map((t) => t.id),
+    );
+    const visible = subs.filter((s) => visibleTemplateIds.has(s.templateId));
+
+    // Blind-review peer-hiding (#1380). Group by governing kit because
+    // each kit defines its own policy; ungoverned submissions are
+    // unaffected. Kits are resolved for every submission in two batched
+    // reads (stages → kits), not per submission.
+    const grouped = new Map<string | "_none", ScorecardSubmissionRow[]>();
+    const kitCache = new Map<string, InterviewKitRow | null>();
+    const kitBySubmission = await this.resolveKitsForSubmissions(visible);
+    for (const sub of visible) {
+      const kit = kitBySubmission.get(sub.id) ?? null;
+      const key = kit?.id ?? "_none";
+      if (kit && !kitCache.has(kit.id)) kitCache.set(kit.id, kit);
+      const bucket = grouped.get(key) ?? [];
+      bucket.push(sub);
+      grouped.set(key, bucket);
+    }
+    const out: ScorecardSubmissionRow[] = [];
+    for (const [key, bucket] of grouped) {
+      const kit = key === "_none" ? null : kitCache.get(key) ?? null;
+      const isEvaluator = bucket.some((s) => s.evaluatorUserId === userId);
+      if (isEvaluator) {
+        // Evaluator viewer — blind-review peer-hiding + candidate masking.
+        const filtered = filterSubmissionsForRequester(bucket, kit, userId);
+        out.push(
+          ...filtered.map((s) => maskCandidateIdentity(s, kit, s.evaluatorUserId === userId)),
+        );
+      } else {
+        // #241 — hiring-manager / non-evaluator viewer: the job's HM-visibility
+        // mode governs whether they see the panel's scorecards.
+        const mode = await this.resolveHmVisibilityForKit(kit);
+        out.push(...filterSubmissionsForHm(bucket, mode, false));
+      }
+    }
+    return out;
+  }
+
+  /** #241 — resolve the effective HM scorecard-visibility for a kit's job.
+   *  Ungoverned (no kit) submissions are always visible. */
+  private async resolveHmVisibilityForKit(
+    kit: InterviewKitRow | null,
+  ): Promise<ScorecardHmVisibility> {
+    if (!kit || !this.deps.resolveJobHmVisibility) return "always_show_hm";
+    return this.deps.resolveJobHmVisibility(kit.companyId, kit.jobId ?? null);
+  }
+
+  async getSubmission(userId: string, id: string): Promise<SubmissionWithRatings> {
+    const sub = await this.deps.repo.findSubmissionById(id);
+    if (!sub) throw new ServiceError("NOT_FOUND", "Submission not found");
+    await this.loadTemplate(userId, sub.templateId);
+    const kit = await this.resolveKitForSubmission(sub);
+
+    // #241 — a non-evaluator (HM) viewer must clear the job's visibility gate
+    // before reading a single scorecard, so the detail route can't bypass the
+    // list-level gating.
+    if (sub.evaluatorUserId !== userId) {
+      const mode = await this.resolveHmVisibilityForKit(kit);
+      if (mode === "always_hide_hm") {
+        throw new ServiceError("FORBIDDEN", "Scorecards are hidden for hiring managers on this job");
+      }
+      if (mode === "hide_hm_until_submit") {
+        const panel = await this.deps.repo.findSubmissionsForApplication(sub.applicationId);
+        if (filterSubmissionsForHm(panel, mode, false).length === 0) {
+          throw new ServiceError("FORBIDDEN", "Scorecards unlock once the panel completes");
+        }
+      }
+    }
+
+    const ratings = await this.deps.repo.findRatingsForSubmission(sub.id);
+    const view = maskCandidateIdentity(sub, kit, sub.evaluatorUserId === userId);
+    return { ...view, ratings };
+  }
+
+  async createSubmission(
+    userId: string,
+    input: CreateSubmissionInput,
+  ): Promise<ScorecardSubmissionRow> {
+    await this.loadTemplate(userId, input.templateId);
+    const sub = await this.deps.repo.insertSubmission({
+      templateId: input.templateId,
+      interviewId: input.interviewId,
+      kitStageId: input.kitStageId,
+      applicationId: input.applicationId,
+      candidateUserId: input.candidateUserId,
+      evaluatorUserId: userId,
+      overallRecommendation: input.overallRecommendation,
+      summary: input.summary,
+      strengths: input.strengths,
+      concerns: input.concerns,
+      status: "draft",
+      dueAt: input.dueAt ?? null,
+    });
+    if (input.ratings && input.ratings.length > 0) {
+      await this.deps.repo.insertRatings(
+        input.ratings.map((rt) => ({
+          submissionId: sub.id,
+          attributeId: rt.attributeId,
+          rating: rt.rating ?? null,
+          notes: rt.notes,
+        })),
+      );
+    }
+    return sub;
+  }
+
+  async updateSubmission(
+    userId: string,
+    id: string,
+    patch: UpdateSubmissionInput,
+  ): Promise<ScorecardSubmissionRow> {
+    const sub = await this.deps.repo.findSubmissionById(id);
+    if (!sub) throw new ServiceError("NOT_FOUND", "Submission not found");
+    if (sub.evaluatorUserId !== userId) {
+      throw new ServiceError(
+        "FORBIDDEN",
+        "Only the evaluator can edit this submission",
+      );
+    }
+    if (sub.status === "submitted") {
+      throw new ServiceError(
+        "CONFLICT",
+        "Submitted scorecards cannot be edited",
+      );
+    }
+    const updated = await this.deps.repo.updateSubmission(id, {
+      overallRecommendation: patch.overallRecommendation,
+      summary: patch.summary ?? null,
+      strengths: patch.strengths ?? null,
+      concerns: patch.concerns ?? null,
+    });
+    if (patch.ratings && patch.ratings.length > 0) {
+      // One multi-row upsert (was select + insert/update per rating).
+      await this.deps.repo.upsertRatings(
+        patch.ratings.map((rt) => ({
+          submissionId: id,
+          attributeId: rt.attributeId,
+          rating: rt.rating ?? null,
+          notes: rt.notes ?? null,
+        })),
+      );
+    }
+    return updated;
+  }
+
+  /**
+   * Finalise a draft submission. Computes the weighted overall score
+   * from current ratings and locks the row by setting status=submitted.
+   * #1384 cert gate: if the template requires a certification course,
+   * the evaluator must hold an active, non-expired, non-revoked cert.
+   */
+  async submitSubmission(
+    userId: string,
+    id: string,
+  ): Promise<ScorecardSubmissionRow> {
+    const sub = await this.deps.repo.findSubmissionById(id);
+    if (!sub) throw new ServiceError("NOT_FOUND", "Submission not found");
+    if (sub.evaluatorUserId !== userId) {
+      throw new ServiceError("FORBIDDEN", "Only the evaluator can submit");
+    }
+    if (sub.status === "submitted") {
+      throw new ServiceError("CONFLICT", "Already submitted");
+    }
+    const tpl = await this.deps.repo.findTemplateById(sub.templateId);
+    if (tpl?.requiredCertificationCourseId) {
+      const ok = await this.deps.repo.hasActiveCertification(
+        userId,
+        tpl.requiredCertificationCourseId,
+        this.now(),
+      );
+      if (!ok) {
+        throw new ServiceError(
+          "FORBIDDEN",
+          "Complete the required training certification before submitting",
+        );
+      }
+    }
+    const attrs = await this.deps.repo.findAttributesForTemplate(sub.templateId);
+    const ratings = await this.deps.repo.findRatingsForSubmission(sub.id);
+    const overallScore = computeOverallScore(
+      attrs.map((a) => ({ id: a.id, weight: a.weight })),
+      ratings.map((r) => ({ attributeId: r.attributeId, rating: r.rating })),
+      tpl?.ratingScale ?? "1-4",
+    );
+    return this.deps.repo.updateSubmission(id, {
+      status: "submitted",
+      overallScore,
+      submittedAt: this.now(),
+    });
+  }
+
+  // ─── Debrief ──────────────────────────────────────────────────────────────
+
+  async getDebrief(userId: string, applicationId: string): Promise<Debrief> {
+    const subs = await this.deps.repo.findSubmittedForApplication(applicationId);
+    if (subs.length === 0) {
+      return {
+        submissions: [],
+        avgScore: null,
+        recommendations: {},
+        attributes: [],
+      };
+    }
+    const templateIds = Array.from(new Set(subs.map((s) => s.templateId)));
+    const authorised = (await this.findAccessibleTemplates(userId, templateIds)).length > 0;
+    if (!authorised) {
+      throw new ServiceError("FORBIDDEN", "No access to this debrief");
+    }
+
+    const subIds = subs.map((s) => s.id);
+    const ratings = await this.deps.repo.findRatingsForSubmissions(subIds);
+    const attrs = await this.deps.repo.findAttributesForTemplates(templateIds);
+    const snapshot = buildAggregateSnapshot(subs);
+    const attrAvgs = buildAttributeAverages(
+      attrs.map((a) => ({ id: a.id, name: a.name })),
+      ratings.map((r) => ({ attributeId: r.attributeId, rating: r.rating })),
+    );
+    return {
+      submissions: subs,
+      avgScore: snapshot.avgScore,
+      recommendations: snapshot.recommendations,
+      attributes: attrAvgs,
+    };
+  }
+
+  // ─── Decisions ────────────────────────────────────────────────────────────
+
+  async listDecisions(
+    userId: string,
+    applicationId: string,
+  ): Promise<HiringDecisionRow[]> {
+    const companyIds = await this.deps.getCompanyIdsForUser(userId);
+    return this.deps.repo.findDecisionsForApplication(applicationId, companyIds);
+  }
+
+  async createDecision(
+    userId: string,
+    input: CreateDecisionInput,
+  ): Promise<HiringDecisionRow> {
+    await this.assertCompanyAccess(userId, input.companyId);
+    const submitted = await this.deps.repo.findSubmittedForApplication(
+      input.applicationId,
+    );
+    const aggregateSnapshot = buildAggregateSnapshot(submitted);
+    return this.deps.repo.insertDecision({
+      companyId: input.companyId,
+      jobId: input.jobId,
+      applicationId: input.applicationId,
+      candidateUserId: input.candidateUserId,
+      decidedByUserId: userId,
+      decision: input.decision,
+      reason: input.reason,
+      aggregateSnapshot,
+    });
+  }
+
+  // ─── Competencies (#1382) ─────────────────────────────────────────────────
+
+  async listCompetencies(
+    userId: string,
+    onlyCompanyId?: string,
+  ): Promise<CompetencyWithLevels[]> {
+    const companyIds = await this.deps.getCompanyIdsForUser(userId);
+    if (companyIds.length === 0) return [];
+    if (onlyCompanyId && !companyIds.includes(onlyCompanyId)) return [];
+    const target = onlyCompanyId ? [onlyCompanyId] : companyIds;
+    const comps = await this.deps.repo.findActiveCompetenciesForCompanies(target);
+    if (comps.length === 0) return [];
+    const levels = await this.deps.repo.findLevelsForCompetencies(
+      comps.map((c) => c.id),
+    );
+    const byCompetency = new Map<string, CompetencyLevelRow[]>();
+    for (const lv of levels) {
+      const bucket = byCompetency.get(lv.competencyId) ?? [];
+      bucket.push(lv);
+      byCompetency.set(lv.competencyId, bucket);
+    }
+    return comps.map((c) => ({ ...c, levels: byCompetency.get(c.id) ?? [] }));
+  }
+
+  async getCompetency(userId: string, id: string): Promise<CompetencyWithLevels> {
+    const comp = await this.deps.repo.findCompetencyById(id);
+    if (!comp) throw new ServiceError("NOT_FOUND", "Competency not found");
+    await this.assertCompanyAccess(userId, comp.companyId);
+    const levels = await this.deps.repo.findLevelsForCompetencies([comp.id]);
+    return { ...comp, levels };
+  }
+
+  async createCompetency(
+    userId: string,
+    input: CreateCompetencyInput,
+  ): Promise<CompetencyWithLevels> {
+    await this.assertCompanyAccess(userId, input.companyId);
+    const comp = await this.deps.repo.insertCompetency({
+      companyId: input.companyId,
+      createdByUserId: userId,
+      name: input.name,
+      description: input.description,
+      taxonomy: input.taxonomy,
+    });
+    const levels =
+      input.levels && input.levels.length > 0
+        ? await this.deps.repo.insertCompetencyLevels(
+            input.levels.map((lv) => ({
+              competencyId: comp.id,
+              level: lv.level,
+              label: lv.label,
+              anchor: lv.anchor,
+            })),
+          )
+        : [];
+    return { ...comp, levels };
+  }
+
+  // ─── Stage questions + coverage (#1390) ───────────────────────────────────
+
+  async listStageQuestions(userId: string, kitStageId: string) {
+    const stage = await this.deps.repo.findStageById(kitStageId);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    await this.loadKit(userId, stage.kitId);
+    return this.deps.repo.findQuestionsForStage(kitStageId);
+  }
+
+  async addStageQuestion(
+    userId: string,
+    kitStageId: string,
+    input: {
+      prompt: string;
+      competencyId?: string | null;
+      difficulty?: string | null;
+      expectedAnswer?: string;
+    },
+  ) {
+    const stage = await this.deps.repo.findStageById(kitStageId);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    await this.loadKit(userId, stage.kitId);
+    return this.deps.repo.insertStageQuestion({
+      kitStageId,
+      prompt: input.prompt,
+      competencyId: input.competencyId ?? null,
+      difficulty: input.difficulty ?? null,
+      expectedAnswer: input.expectedAnswer ?? "open",
+    });
+  }
+
+  async deleteStageQuestion(userId: string, id: string) {
+    const q = await this.deps.repo.findStageQuestionById(id);
+    if (!q) throw new ServiceError("NOT_FOUND", "Question not found");
+    const stage = await this.deps.repo.findStageById(q.kitStageId);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    await this.loadKit(userId, stage.kitId);
+    await this.deps.repo.deleteStageQuestion(id);
+  }
+
+  /**
+   * Coverage warning for a kit — surface attributes (or competencies)
+   * the rubric assesses that have NO questions tagged against them.
+   * Used by the kit editor to nudge recruiters into closing gaps before
+   * sending the loop.
+   */
+  async getKitCoverage(
+    userId: string,
+    kitId: string,
+  ): Promise<{
+    competencyId: string;
+    competencyName: string;
+    hasQuestions: boolean;
+  }[]> {
+    const kit = await this.loadKit(userId, kitId);
+    const stages = await this.deps.repo.findStagesForKit(kit.id);
+    const templateIds = Array.from(
+      new Set(
+        stages
+          .map((s) => s.scorecardTemplateId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+    if (templateIds.length === 0) return [];
+    const attrs = await this.deps.repo.findAttributesForTemplates(templateIds);
+    const competencyIds = Array.from(
+      new Set(
+        attrs.map((a) => a.competencyId).filter((id): id is string => Boolean(id)),
+      ),
+    );
+    if (competencyIds.length === 0) return [];
+    const [allQuestions, competencyList] = await Promise.all([
+      this.deps.repo.findQuestionsForStages(stages.map((s) => s.id)),
+      this.deps.repo.findCompetenciesByIds(competencyIds),
+    ]);
+    const competenciesWithQuestions = new Set(
+      allQuestions.map((q) => q.competencyId).filter(Boolean) as string[],
+    );
+    // Preserve the attribute-derived competency order.
+    const competencyById = new Map(competencyList.map((c) => [c.id, c]));
+    return competencyIds
+      .map((id) => competencyById.get(id))
+      .filter((c): c is NonNullable<typeof c> => Boolean(c))
+      .map((c) => ({
+        competencyId: c.id,
+        competencyName: c.name,
+        hasQuestions: competenciesWithQuestions.has(c.id),
+      }));
+  }
+
+  // ─── Take-home assignments (#1386) ────────────────────────────────────────
+
+  async getTakeHomeForStage(userId: string, kitStageId: string) {
+    const stage = await this.deps.repo.findStageById(kitStageId);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    await this.loadKit(userId, stage.kitId);
+    return this.deps.repo.findTakeHomeForStage(kitStageId);
+  }
+
+  async upsertTakeHome(
+    userId: string,
+    kitStageId: string,
+    input: {
+      prompt: string;
+      deliveryFormat?: string;
+      dueInHours?: number;
+    },
+  ) {
+    const stage = await this.deps.repo.findStageById(kitStageId);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    await this.loadKit(userId, stage.kitId);
+    return this.deps.repo.upsertTakeHomeAssignment({
+      kitStageId,
+      prompt: input.prompt,
+      deliveryFormat: input.deliveryFormat,
+      dueInHours: input.dueInHours,
+    });
+  }
+
+  // ─── Take-home invite + candidate flow (#1438) ────────────────────────────
+
+  /**
+   * Recruiter mints a candidate invite for a take-home assignment. The
+   * candidate gets a magic-link URL `/take-home/:token` that resolves to
+   * the prompt + a delivery form. Idempotent over
+   * (assignmentId, applicationId) — re-inviting the same candidate
+   * returns the existing row rather than creating duplicates.
+   */
+  async createTakeHomeInvite(
+    userId: string,
+    kitStageId: string,
+    input: {
+      applicationId: string;
+      candidateUserId?: string;
+    },
+  ) {
+    const stage = await this.deps.repo.findStageById(kitStageId);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    await this.loadKit(userId, stage.kitId);
+    const assignment = await this.deps.repo.findTakeHomeForStage(kitStageId);
+    if (!assignment) {
+      throw new ServiceError(
+        "VALIDATION_ERROR",
+        "Configure the take-home prompt before inviting candidates",
+      );
+    }
+    // Idempotency over (assignment, application) — re-invite is cheap.
+    const existing = await this.deps.repo.findTakeHomeSubmissionsForAssignment(
+      assignment.id,
+    );
+    const match = existing.find((s) => s.applicationId === input.applicationId);
+    if (match) return match;
+
+    const token = randomInviteToken();
+    const expiresAt = new Date(
+      this.now().getTime() + assignment.dueInHours * 60 * 60 * 1000,
+    );
+    return this.deps.repo.insertTakeHomeSubmission({
+      assignmentId: assignment.id,
+      applicationId: input.applicationId,
+      candidateUserId: input.candidateUserId ?? null,
+      inviteToken: token,
+      tokenExpiresAt: expiresAt,
+    });
+  }
+
+  /** Public-by-token preview the candidate sees on /take-home/:token. */
+  async getTakeHomeByToken(token: string): Promise<{
+    submission: TakeHomeSubmissionRow;
+    assignment: TakeHomeAssignmentRow;
+    stage: { id: string; name: string };
+    /** True iff the token has expired AND no delivery is recorded yet. */
+    expired: boolean;
+    /** True iff the candidate has already submitted. */
+    alreadySubmitted: boolean;
+  }> {
+    const submission = await this.deps.repo.findTakeHomeSubmissionByToken(token);
+    if (!submission) {
+      throw new ServiceError("NOT_FOUND", "Invite not found");
+    }
+    const assignment = await this.deps.repo.findTakeHomeById(submission.assignmentId);
+    if (!assignment) throw new ServiceError("NOT_FOUND", "Assignment not found");
+    const stage = await this.deps.repo.findStageById(assignment.kitStageId);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    const now = this.now();
+    const expired =
+      submission.tokenExpiresAt != null &&
+      submission.tokenExpiresAt < now &&
+      submission.submittedAt == null;
+    return {
+      submission,
+      assignment,
+      stage: { id: stage.id, name: stage.name },
+      expired,
+      alreadySubmitted: submission.submittedAt != null,
+    };
+  }
+
+  /** Candidate submits their delivery via the magic-link surface. */
+  async submitTakeHomeByToken(
+    token: string,
+    input: {
+      deliveryUrl?: string;
+      textResponse?: string;
+      fileRefs?: string[];
+    },
+  ): Promise<TakeHomeSubmissionRow> {
+    const submission = await this.deps.repo.findTakeHomeSubmissionByToken(token);
+    if (!submission) {
+      throw new ServiceError("NOT_FOUND", "Invite not found");
+    }
+    if (submission.submittedAt) {
+      throw new ServiceError("CONFLICT", "Already submitted");
+    }
+    if (
+      submission.tokenExpiresAt != null &&
+      submission.tokenExpiresAt < this.now()
+    ) {
+      throw new ServiceError("CONFLICT", "Invite has expired");
+    }
+    if (!input.deliveryUrl && !input.textResponse && (input.fileRefs?.length ?? 0) === 0) {
+      throw new ServiceError("VALIDATION_ERROR", "Provide a delivery");
+    }
+    return this.deps.repo.updateTakeHomeSubmission(submission.id, {
+      deliveryUrl: input.deliveryUrl ?? null,
+      textResponse: input.textResponse ?? null,
+      fileRefs: input.fileRefs ?? [],
+      submittedAt: this.now(),
+    });
+  }
+
+  /** Recruiter lists submissions for a take-home assignment. */
+  async listTakeHomeSubmissions(
+    userId: string,
+    kitStageId: string,
+  ): Promise<TakeHomeSubmissionRow[]> {
+    const stage = await this.deps.repo.findStageById(kitStageId);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    await this.loadKit(userId, stage.kitId);
+    const assignment = await this.deps.repo.findTakeHomeForStage(kitStageId);
+    if (!assignment) return [];
+    return this.deps.repo.findTakeHomeSubmissionsForAssignment(assignment.id);
+  }
+
+  /**
+   * Bind a scorecard submission to a take-home submission for review.
+   * Lazy-creates a draft scorecard submission keyed to the same
+   * applicationId so the reviewer can immediately fill it without
+   * losing context. Idempotent — re-binding returns the existing link.
+   */
+  async startTakeHomeReview(
+    userId: string,
+    takeHomeSubmissionId: string,
+    templateId: string,
+  ): Promise<{
+    takeHomeSubmissionId: string;
+    scorecardSubmissionId: string;
+  }> {
+    const th = await this.deps.repo.findTakeHomeSubmissionById(takeHomeSubmissionId);
+    if (!th) throw new ServiceError("NOT_FOUND", "Take-home submission not found");
+    const assignment = await this.deps.repo.findTakeHomeById(th.assignmentId);
+    if (!assignment) throw new ServiceError("NOT_FOUND", "Assignment not found");
+    const stage = await this.deps.repo.findStageById(assignment.kitStageId);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    await this.loadKit(userId, stage.kitId);
+
+    if (th.evaluatorScorecardSubmissionId) {
+      return {
+        takeHomeSubmissionId: th.id,
+        scorecardSubmissionId: th.evaluatorScorecardSubmissionId,
+      };
+    }
+    await this.loadTemplate(userId, templateId);
+    const scorecard = await this.deps.repo.insertSubmission({
+      templateId,
+      applicationId: th.applicationId,
+      evaluatorUserId: userId,
+      kitStageId: stage.id,
+      candidateUserId: th.candidateUserId ?? undefined,
+      status: "draft",
+    });
+    await this.deps.repo.updateTakeHomeSubmission(th.id, {
+      evaluatorScorecardSubmissionId: scorecard.id,
+    });
+    return {
+      takeHomeSubmissionId: th.id,
+      scorecardSubmissionId: scorecard.id,
+    };
+  }
+
+  // ─── Reliability (#1434) ──────────────────────────────────────────────────
+
+  /**
+   * Caller may read their OWN reliability without extra checks (every
+   * interviewer can see their own stats). To read someone else's stats,
+   * the caller must share at least one company scope with the target —
+   * we already trust company-scope as the visibility boundary for the
+   * rest of the scorecards aggregate.
+   */
+  async getReliability(
+    userId: string,
+    targetUserId: string,
+    now: Date = this.now(),
+  ): Promise<InterviewerReliability> {
+    if (userId !== targetUserId) {
+      const callerScopes = await this.deps.getCompanyIdsForUser(userId);
+      const targetScopes = await this.deps.getCompanyIdsForUser(targetUserId);
+      const shared = callerScopes.some((c) => targetScopes.includes(c));
+      if (!shared) {
+        throw new ServiceError(
+          "FORBIDDEN",
+          "No shared workspace with this user",
+        );
+      }
+    }
+    return this.deps.repo.findReliabilityForUser(targetUserId, now);
+  }
+
+  // ─── Scorecard assignments (#1435) ────────────────────────────────────────
+
+  /**
+   * Recruiter-initiated assignment: pre-creates a draft submission keyed
+   * to (templateId, applicationId, evaluatorUserId) with the SLA `dueAt`.
+   * The evaluator's later `ScorecardSubmissionForm.ensureSubmission` then
+   * matches this draft by querying `listSubmissions({ applicationId })`
+   * and resuming it instead of creating a new row.
+   *
+   * Idempotent against (applicationId, evaluatorUserId, templateId): if a
+   * draft already exists, the dueAt is updated and the existing row is
+   * returned (no duplicate drafts).
+   */
+  async assignSubmission(
+    userId: string,
+    input: {
+      templateId: string;
+      applicationId: string;
+      evaluatorUserId: string;
+      kitStageId?: string;
+      candidateUserId?: string;
+      dueAt: Date;
+    },
+  ): Promise<ScorecardSubmissionRow> {
+    const tpl = await this.loadTemplate(userId, input.templateId);
+    const existing = await this.deps.repo.findSubmissionsForApplication(
+      input.applicationId,
+    );
+    const match = existing.find(
+      (s) =>
+        s.templateId === input.templateId &&
+        s.evaluatorUserId === input.evaluatorUserId &&
+        s.status === "draft",
+    );
+    if (match) {
+      return this.deps.repo.updateSubmission(match.id, { dueAt: input.dueAt });
+    }
+    return this.deps.repo.insertSubmission({
+      templateId: input.templateId,
+      applicationId: input.applicationId,
+      evaluatorUserId: input.evaluatorUserId,
+      kitStageId: input.kitStageId,
+      candidateUserId: input.candidateUserId,
+      status: "draft",
+      dueAt: input.dueAt,
+    });
+  }
+
+  async updateCompetency(
+    userId: string,
+    id: string,
+    patch: UpdateCompetencyInput & { levels?: CreateCompetencyInput["levels"] },
+  ): Promise<CompetencyWithLevels> {
+    const existing = await this.deps.repo.findCompetencyById(id);
+    if (!existing) throw new ServiceError("NOT_FOUND", "Competency not found");
+    await this.assertCompanyAccess(userId, existing.companyId);
+    const { levels, ...metaPatch } = patch;
+    const updated = await this.deps.repo.updateCompetency(id, metaPatch);
+    // Replace-all semantics on levels when provided — keeps the editor
+    // simple (the UI sends the full leveled rubric every save).
+    if (levels) {
+      await this.deps.repo.deleteLevelsForCompetency(id);
+      const inserted =
+        levels.length > 0
+          ? await this.deps.repo.insertCompetencyLevels(
+              levels.map((lv) => ({
+                competencyId: id,
+                level: lv.level,
+                label: lv.label,
+                anchor: lv.anchor,
+              })),
+            )
+          : [];
+      return { ...updated, levels: inserted };
+    }
+    const existingLevels = await this.deps.repo.findLevelsForCompetencies([id]);
+    return { ...updated, levels: existingLevels };
+  }
+}

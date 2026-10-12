@@ -1,0 +1,404 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+# One run per branch/PR at a time. PR runs supersede each other (cancel the
+# stale one); main/develop runs queue instead, so a deploy + migration step is
+# never killed halfway through. A newer push replaces any run still waiting.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: "22.x"
+
+jobs:
+  # Every check below runs as its own job so typecheck, tests, lint and the
+  # SPA build execute in parallel instead of one long serial chain. Deploys
+  # wait on all the gating jobs.
+
+  typecheck-frontend:
+    name: Typecheck (frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/install
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          packages: root shared frontend
+      - name: Run type checking (frontend)
+        run: cd frontend && npm run typecheck
+        env:
+          # `tsc` checks the whole project (frontend + server + shared via
+          # the root tsconfig) and peaks past Node's ~2 GB default old-space
+          # limit — OOM'd at ~2015 MB during type-relation checking.
+          # ubuntu-latest has 16 GB, lift the ceiling to 6 GB. Program-size
+          # bloat is tracked in the gap register.
+          NODE_OPTIONS: --max-old-space-size=6144
+
+  typecheck-api:
+    name: Typecheck (api) + migration lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/install
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          packages: root shared api
+      - name: Run type checking (api)
+        # Gates schema drift in the worker bundle (gap #1617).
+        run: cd api && npm run typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+      - name: Lint SQL migrations
+        # Gap #1643. Enforces the idempotent patterns in
+        # api/drizzle/TEMPLATE.md on every new migration (≥ 0156).
+        run: cd api && node scripts/lint-migrations.mjs
+
+  test-api:
+    name: Tests (api)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/install
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          packages: root shared api
+      - name: Run api tests
+        # node:test cases via scripts/run-tests.mjs (gap #1617) — the
+        # discoverer walks the tree so adding a `__tests__/` dir is a no-op.
+        run: cd api && npm test
+
+  test-frontend:
+    name: Tests (frontend, advisory)
+    runs-on: ubuntu-latest
+    # Advisory until #1595 closes — failures surface on every run but don't
+    # block the pipeline (gap #1618).
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/install
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          packages: root shared frontend
+      - name: Run frontend tests
+        run: cd frontend && npm test
+
+  visual-parity:
+    name: Visual parity (widgets)
+    # Pixel-diffs the DOM playback stage against the export compositor for
+    # every widget kind (#2312). Not in any deploy `needs`, so a red run
+    # flags drift without blocking a release.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/install
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          packages: root shared frontend
+      - name: Install Playwright Chromium
+        run: cd frontend && npx playwright install --with-deps chromium
+      - name: Pixel parity (DOM stage vs export compositor)
+        run: cd frontend && npm run test:visual
+        env:
+          CI: "true"
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 7
+
+  lint-api:
+    name: ESLint (api)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/install
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          packages: root shared api
+      - name: Run ESLint (api)
+        # Required gate — `eslint src` is clean (gap #1619 closed 2026-05-31).
+        run: cd api && npm run lint
+
+  build:
+    name: Build SPA
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/install
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          packages: root shared frontend
+
+      - name: Set build date
+        run: |
+          echo "BUILD_DATE=$(date -u +'%Y.%m.%d')" >> $GITHUB_ENV
+          echo "APP_VERSION=${GITHUB_SHA::8}" >> $GITHUB_ENV
+
+      - name: Build SPA
+        run: cd frontend && npm run build
+        env:
+          VITE_BUILD_DATE: ${{ env.BUILD_DATE }}
+          VITE_APP_VERSION: ${{ env.APP_VERSION }}
+          # Vite/Rollup peaks past Node's ~2 GB default old-space limit
+          # while minifying the bundle (OOM'd at ~2090 MB in "rendering
+          # chunks"). The bundle bloat itself is tracked in the gap register.
+          NODE_OPTIONS: --max-old-space-size=6144
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: build-artifacts
+          path: frontend/dist/
+          retention-days: 7
+
+  deploy-production:
+    name: Deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    # API first: API changes are additive, so the Worker must be live before
+    # the SPA that calls it. Deploying both in parallel let Pages win the race
+    # and the new frontend hit not-yet-deployed routes (404 /api/proof/stats,
+    # 2026-10-09).
+    needs: [build, typecheck-frontend, deploy-api]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: build-artifacts
+          path: dist
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name hired
+
+  deploy-api:
+    name: Deploy API to Cloudflare Workers
+    runs-on: ubuntu-latest
+    # Gate the Worker deploy on the API checks — it previously had no `needs`
+    # and shipped even when api typecheck/tests/lint were red.
+    needs: [typecheck-api, test-api, lint-api]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        # Install shared/ first so shared's zod runtime dep is available,
+        # then api/ for the deploy bundle. Wrangler's esbuild resolves
+        # shared/resume.ts's `import { z } from "zod"` via shared/node_modules,
+        # which only exists after `npm ci` here.
+        #
+        # The shared/ fallback uses parens to keep both `npm install`
+        # invocations running in the same already-cd'd directory —
+        # the previous `cd shared && X || cd shared && Y` form re-cd'd
+        # into shared/shared/ on the failure path and silently left
+        # api/node_modules unpopulated.
+        run: |
+          set -e
+          cd shared && npm install --omit=dev
+          cd ../api && npm install
+
+      - name: Validate DATABASE_URL secret
+        run: |
+          if [ -z "${{ secrets.DATABASE_URL }}" ]; then
+            echo "ERROR: DATABASE_URL secret is not set. Schema push will fail."
+            exit 1
+          fi
+
+      - name: Push DB schema
+        # `set -e` + explicit exit-code propagation so a drizzle-kit push
+        # failure is FATAL here (#1220) — it must not be silently swallowed,
+        # because the SQL-migrations step below runs `if: always()` and would
+        # otherwise apply onto a half-bootstrapped DB and fail downstream with
+        # cryptic FK errors that look like the migration's fault.
+        #
+        # drizzle-kit exits 0 even when it crashes (e.g. on an interactive
+        # rename prompt it cannot answer in CI — the help_mappings v1→v2 crash
+        # hid every schema change for weeks, #2341), so the output is scanned
+        # for `Error` too. A failure here is retried once by "Re-push DB
+        # schema" AFTER the SQL migrations, because some drift (a rename) can
+        # only be repaired by a migration; the re-push is fatal.
+        #
+        # Push runs WITHOUT --force and only over declared tables
+        # (drizzle.config.ts tablesFilter): a statement that would drop a table
+        # or column, or truncate one, stops the deploy with drizzle's
+        # "Found data-loss statements" list instead of running. Drops belong in
+        # numbered SQL migrations. Missing UNIQUE constraints are pre-created
+        # (scripts/ensure-unique-constraints.ts) without touching any row.
+        id: push
+        continue-on-error: true
+        run: |
+          set -eo pipefail
+          cd api
+          npm run db:push 2>&1 | tee "$RUNNER_TEMP/db-push.log"
+          if grep -qE '(^|[[:space:]])Error:' "$RUNNER_TEMP/db-push.log"; then
+            echo "::error::drizzle-kit push reported an error (see log above)"
+            exit 1
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Run SQL migrations (fallback)
+        # Belt-and-suspenders npm install — the upstream Install step
+        # normally populates api/node_modules, but `if: always()` means
+        # this step also runs when install partially failed. Re-running
+        # npm install is a ~5s no-op when the cache is warm and recovers
+        # the @neondatabase/serverless import that this script needs.
+        if: always()
+        run: |
+          set -e
+          cd api && npm install
+          node scripts/run-sql-migrations.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Comma-separated `-- @owner-gated` migration filenames the owner has approved.
+          SQL_MIGRATIONS_APPROVED: ${{ vars.SQL_MIGRATIONS_APPROVED }}
+
+      - name: Re-push DB schema
+        # Only when the first push failed: the migrations above may have
+        # repaired what push could not (#2341). This one is fatal.
+        if: steps.push.outcome == 'failure'
+        run: |
+          set -eo pipefail
+          cd api
+          npm run db:push 2>&1 | tee "$RUNNER_TEMP/db-push-2.log"
+          if grep -qE '(^|[[:space:]])Error:' "$RUNNER_TEMP/db-push-2.log"; then
+            echo "::error::drizzle-kit push still reports an error after migrations"
+            exit 1
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Seed first-party Studio templates
+        if: success()
+        run: cd api && node scripts/seed-first-party-templates.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Sync Worker secrets
+        # Worker secrets are write-only and scoped to ONE Cloudflare account:
+        # nothing can read a value back out, and nothing carries them across an
+        # account move. They had been set by hand exactly once, so moving the
+        # account left hired-api deployed but with zero secrets — it booted and
+        # answered every request with a neon() "no connection string" 500.
+        #
+        # Pushing them from CI on every deploy makes the GitHub secret the single
+        # source of truth, so the Worker is reproducible from an empty account.
+        # `wrangler secret put` reads the value from stdin, which keeps it out of
+        # the process table and out of the run log.
+        run: |
+          set -euo pipefail
+          cd api
+          put() {
+            if [ -z "${2:-}" ]; then echo "skip $1 (not set in GitHub secrets)"; return; fi
+            printf '%s' "$2" | npx wrangler secret put "$1" --env production
+            echo "set $1"
+          }
+          # The app checks DATABASE_URL, NEON_DATABASE_URL and NEON_DB_URL in that
+          # order; publish all three off the one GitHub secret so a rename upstream
+          # cannot silently drop the binding again.
+          put DATABASE_URL        "${{ secrets.DATABASE_URL }}"
+          put NEON_DATABASE_URL   "${{ secrets.DATABASE_URL }}"
+          put NEON_DB_URL         "${{ secrets.DATABASE_URL }}"
+          put JWT_SECRET          "${{ secrets.JWT_SECRET }}"
+          put BUILDERFORCE_API_KEY "${{ secrets.BUILDERFORCE_API_KEY }}"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy to Cloudflare Workers
+        run: cd api && npx wrangler deploy --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  sdk:
+    name: SDK (build + typecheck)
+    runs-on: ubuntu-latest
+    # Validates the partner SDK (@seanhogg/hired-video-sdk, packages/sdk)
+    # compiles on every push/PR — the same tsup build + tsc --noEmit the
+    # publish job relies on, so a broken SDK is caught before release.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install SDK dependencies
+        # Standalone package (no root workspace) — install its own deps.
+        # Same ECONNRESET retry loop + npm install (not ci) as the rest of
+        # this pipeline.
+        run: cd packages/sdk && (for i in 1 2 3; do npm install --prefer-offline --no-audit && break; sleep 5; done)
+
+      - name: Type check
+        run: cd packages/sdk && npm run typecheck
+
+      - name: Build
+        run: cd packages/sdk && npm run build
+
+  publish-sdk:
+    name: Publish SDK to npm (@seanhogg/hired-video-sdk)
+    runs-on: ubuntu-latest
+    needs: sdk
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          # Writes an .npmrc that authenticates with NODE_AUTH_TOKEN so
+          # `npm publish` can push to the public registry.
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install SDK dependencies
+        run: cd packages/sdk && (for i in 1 2 3; do npm install --prefer-offline --no-audit && break; sleep 5; done)
+
+      - name: Publish if version is new
+        # Version-gated release: publishes only when packages/sdk/package.json
+        # `version` is not already on npm. To cut a release, bump that version
+        # and merge to main; an unchanged version is a no-op (no failed build).
+        # `prepublishOnly` runs the tsup build, so dist/ is produced at publish.
+        # Scoped package → --access public. Requires the NPM_TOKEN secret to be
+        # an npm *Automation* token (bypasses 2FA/OTP in CI).
+        run: |
+          cd packages/sdk
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "$NAME@$VERSION already on npm — skipping publish."
+          else
+            echo "$NAME@$VERSION is new — publishing."
+            npm publish --access public
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

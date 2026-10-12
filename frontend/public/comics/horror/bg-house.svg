@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" preserveAspectRatio="xMidYMid slice">
+
+  <rect width="800" height="450" fill="#18181b"/>
+  <rect y="370" width="800" height="80" fill="#1e293b" opacity="0.45"/>
+  <g fill="#e7e5e4" opacity="0.95">
+    <polygon points="200,150 400,40 600,150 600,370 200,370"/>
+    <rect x="240" y="180" width="40" height="60" fill="#a3e635" opacity="0.8"/>
+    <rect x="520" y="180" width="40" height="60" fill="#a3e635" opacity="0.8"/>
+    <rect x="380" y="260" width="50" height="110" fill="#18181b"/>
+    <rect x="378" y="258" width="54" height="6"/>
+  </g>
+  <circle cx="640" cy="80" r="40" fill="#18181b" opacity="0.65"/>
+
+</svg>

@@ -1,0 +1,1118 @@
+import {
+  CheckSquare,
+  Calendar,
+  Clock,
+  CheckCircle2,
+  Zap,
+  List,
+  Filter,
+  Plus,
+  Edit,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+  Table as TableIcon,
+  AlertCircle,
+  Search,
+  Loader2,
+} from "lucide-react";
+import { Suspense, lazy, useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { AppShell } from "@/components/AppShell";
+import TasksMarketing from "@/components/tasks/TasksMarketing";
+import { APP_PAGE_COLUMN } from "@/lib/ui/page-layout";
+import HeaderSearch from "@/components/HeaderSearch";
+import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import { MyEventsAndCoffee } from "@/components/events/MyEventsAndCoffee";
+// Lazy-loaded so `leaflet` + `react-leaflet` (~250 KB minified) only land
+// in the bundle for users who hit the Discover tab on /tasks (gap #1366).
+// `EventDiscoveryPanel` is a named export — `.then` re-shapes to default.
+const EventDiscoveryPanel = lazy(() =>
+  import("@/components/events/EventDiscoveryPanel").then((m) => ({
+    default: m.EventDiscoveryPanel,
+  })),
+);
+import { TimesheetTab } from "@/components/timesheet/TimesheetTab";
+import MyActivities from "@/components/activities/MyActivities";
+import MarketingFAQ from "@/components/MarketingFAQ";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
+import { cn } from "@/lib/utils";
+import { useAuth, USER_ROLES } from "@/lib/auth";
+import TaskBoard from "@/components/tasks/TaskBoard";
+import TaskDetailSheet from "@/components/tasks/TaskDetailSheet";
+import { taskTypeColors, priorityColors } from "@/components/tasks/task-styles";
+import { taskService } from "@/lib/services/task-service";
+import {
+  TaskDTO,
+  TaskUIState,
+  taskDtoToUIState,
+  mapBackendTaskTypeToUI,
+  mapBackendStatusToUI,
+  mapUITaskTypeToBackend,
+  mapUIStatusToBackend,
+  TaskType,
+  ProductivityItemStatus,
+  CreateTaskRequest,
+  UpdateTaskRequest,
+  getAvailableTaskTypesForRole,
+  getTaskTypeDisplayName,
+  getStatusDisplayName,
+} from "@/types/task";
+
+// Use the TaskUIState interface from types/task.ts
+interface Task extends TaskUIState {}
+
+// taskTypeColors + priorityColors now live in components/tasks/task-styles.ts
+// (shared with the reusable <TaskBoard> + <TaskDetailSheet>).
+
+// Events FAQ lifted from the deleted /events page. Lives on the Discover
+// surface so the marketing copy stays public (events are public per the
+// consolidation decision — see [project_gap_register]). Built from a factory
+// so the copy localizes (t can't be called at module scope).
+const buildEventsFaq = (t: (key: string) => string) => [
+  { question: t("faq.events.host.q"), answer: t("faq.events.host.a") },
+  { question: t("faq.events.free.q"), answer: t("faq.events.free.a") },
+  { question: t("faq.events.kinds.q"), answer: t("faq.events.kinds.a") },
+  { question: t("faq.events.matchmaking.q"), answer: t("faq.events.matchmaking.a") },
+];
+
+export default function Tasks() {
+  const { t } = useTranslation();  const { isAuthenticated, user } = useAuth();
+
+  useSEO("/tasks");
+  useBreadcrumbs([{ name: t("messages.tasksEventsTimesheet"), url: "/tasks" }]);
+
+  const EVENTS_FAQ = buildEventsFaq(t);
+
+  // View axis lives in the URL so the page-level breadcrumb tabs are
+  // shareable + back-button friendly. `?tab=` controls the Tasks-view
+  // axis (kanban/calendar/table); `?view=` is reserved for the Discover
+  // sub-view (grid/map) so the two never collide.
+  type TaskView = "calendar" | "table" | "kanban";
+  // Top-level surface tab — Tasks / My events & coffee / Timesheet / Discover.
+  // Discover is the unauthenticated default so /tasks doubles as the
+  // public marketing landing for the (now-redirected) /events and /map.
+  // Timesheet is workforce-only (employee + employer, #1349).
+  type TaskSurface = "tasks" | "my-events" | "timesheet" | "discover";
+  const [searchParams, setSearchParams] = useSearchParams();
+  const surfaceParam = searchParams.get("surface");
+  const surfaceFromUrl: TaskSurface | null =
+    surfaceParam === "my-events" ? "my-events" :
+    surfaceParam === "timesheet" ? "timesheet" :
+    surfaceParam === "discover" ? "discover" :
+    surfaceParam === "tasks" ? "tasks" :
+    null;
+  const defaultSurface: TaskSurface = isAuthenticated ? "tasks" : "discover";
+  const currentSurface: TaskSurface = surfaceFromUrl ?? defaultSurface;
+  // Self-gate the Timesheet surface tab so the surface list is a single
+  // SSoT — no prop-drilled `canSeeTimesheet`; consumers inside Tasks.tsx
+  // read the same `availableSurfaces` array (DRY rule, #1349).
+  const role = (user?.role ?? "").toLowerCase();
+  const isWorkforceMember = role === USER_ROLES.EMPLOYEE
+    || role === USER_ROLES.EMPLOYER
+    || role === USER_ROLES.ADMIN
+    || role === USER_ROLES.SUPER_ADMIN;
+  const availableSurfaces: TaskSurface[] = isWorkforceMember
+    ? ["tasks", "my-events", "timesheet", "discover"]
+    : ["tasks", "my-events", "discover"];
+  const viewParam = currentSurface === "tasks" ? (searchParams.get("tab") ?? searchParams.get("view")) : null;
+  const currentView: TaskView =
+    viewParam === "calendar" ? "calendar" :
+    viewParam === "table" || viewParam === "list" ? "table" :
+    "kanban";
+  const switchSurface = (next: TaskSurface) => {
+    const sp = new URLSearchParams(searchParams);
+    if (next === defaultSurface) sp.delete("surface");
+    else sp.set("surface", next);
+    sp.delete("tab");
+    sp.delete("view");
+    setSearchParams(sp, { replace: false });
+  };
+
+  // Surface tabs — Tasks / My events & coffee / Timesheet / Discover. Routed
+  // through the shared PageHeader tab system (icons + active styling) so the
+  // strip matches every other top-level surface (People, Tools, …). Each tab
+  // switches the `?surface=` param via `onClick` (a plain Link can't clear the
+  // `tab`/`view` params on switch), so the tabs carry `onClick`, not `to`.
+  const surfaceTabs: PageHeaderTab[] = availableSurfaces.map((key) => ({
+    key,
+    label:
+      key === "tasks" ? t("labels.tasks") :
+      key === "my-events" ? t("labels.myEventsCoffee") :
+      key === "timesheet" ? t("labels.timesheet") :
+      t("labels.discover"),
+    icon:
+      key === "tasks" ? CheckSquare :
+      key === "my-events" ? Calendar :
+      key === "timesheet" ? Clock :
+      Search,
+    onClick: () => switchSurface(key),
+  }));
+
+  // Standalone tab strip for the surfaces that don't render their own action
+  // bar (Discover / My events / Timesheet / the unauth landing). The Tasks
+  // surface instead folds these same tabs INTO its action panel (the
+  // PageHeader below), so the menu, search, filters, view options and
+  // "Add task" button all read as one band.
+  const surfaceNav = (
+    <div className="px-4 md:px-6 pt-4 md:pt-6">
+      <PageHeader tabs={surfaceTabs} activeTabKey={currentSurface} sticky className="mb-0" />
+    </div>
+  );
+
+  const [calendarView, setCalendarView] = useState<"week" | "month">("week");
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedTaskType, setSelectedTaskType] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
+
+  const [taskPanelOpen, setTaskPanelOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  // Sheet opens in view mode by default; "Add task" / row-Edit start in edit.
+  const [sheetStartInEdit, setSheetStartInEdit] = useState(false);
+
+  // API state management
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+
+  const openTaskPanel = (task: Task | null) => {
+    setSheetStartInEdit(false);
+    setSelectedTask(task);
+    setTaskPanelOpen(true);
+  };
+
+  const handleDeleteTask = async (task: Task) => {
+    try {
+      if (isGuid(task.id)) {
+        await taskService.deleteTask(task.id);
+      }
+      setTasks((prev) => prev.filter((t) => t.id !== task.id));
+      setTaskPanelOpen(false);
+    } catch (e) {
+      console.error("Delete failed", e);
+      setError(e instanceof Error ? e.message : t("errors.failedDeleteTask"));
+    }
+  };
+
+  // Persist a created/edited task from the detail sheet. New (non-guid id)
+  // rows are prepended; existing rows merged — then flushed to the API.
+  const handleSaveTask = async (draft: Task) => {
+    setTasks((prev) => {
+      const exists = prev.some((tk) => tk.id === draft.id);
+      return exists
+        ? prev.map((tk) => (tk.id === draft.id ? { ...draft, updatedAt: new Date().toISOString() } : tk))
+        : [{ ...draft, updatedAt: new Date().toISOString() }, ...prev];
+    });
+    await saveTaskToApi({ ...draft });
+    setSelectedTask(draft);
+  };
+
+  // Kanban drag-drop status change — also stamps a start date the first time a
+  // task moves to In Progress. Reverts + surfaces an error on save failure.
+  const handleKanbanStatusChange = async (taskId: string, status: ProductivityItemStatus) => {
+    const now = new Date().toISOString().split("T")[0];
+    let originalTask: Task | null = null;
+    let updatedTask: Task | null = null;
+    setTasks((prev) => {
+      originalTask = prev.find((tk) => tk.id === taskId) || null;
+      const updated = prev.map((tk) =>
+        tk.id === taskId
+          ? {
+              ...tk,
+              status,
+              startDate:
+                status === ProductivityItemStatus.InProgress && !tk.startDate ? now : tk.startDate,
+              updatedAt: new Date().toISOString(),
+            }
+          : tk,
+      );
+      updatedTask = updated.find((tk) => tk.id === taskId) || null;
+      return updated;
+    });
+    if (updatedTask && originalTask) {
+      try {
+        await saveTaskToApi(updatedTask);
+      } catch (err) {
+        console.error("Failed to update task status:", err);
+        setTasks((prev) => prev.map((tk) => (tk.id === taskId ? originalTask! : tk)));
+        setError(t("errors.failedUpdateTaskStatus"));
+      }
+    }
+  };
+
+  // Load tasks from backend using the task service
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const loadTasks = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const [tasksData, usersData] = await Promise.all([
+          taskService.getTasks(),
+          taskService.getAssignableUsers().catch(() => []), // Don't fail if users can't be loaded
+        ]);
+
+        // Convert backend DTOs to UI format via the shared canonical mapper
+        // (also used by the Content Creator → Gigs board).
+        const uiTasks: Task[] = tasksData.map((dto: TaskDTO) => taskDtoToUIState(dto));
+
+        setTasks(uiTasks);
+        setAssignableUsers(usersData);
+      } catch (err) {
+        console.error("Failed to load tasks:", err);
+        setError(err instanceof Error ? err.message : t("errors.failedLoadTasks"));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadTasks();
+  }, [isAuthenticated, user]);
+
+  // Filter tasks based on selected filters
+  const filteredTasks = tasks
+    .filter((task) => {
+      const typeMatch =
+        selectedTaskType === "all" || task.type.toString() === selectedTaskType;
+      const statusMatch =
+        selectedStatus === "all" || task.status.toString() === selectedStatus;
+      return typeMatch && statusMatch;
+    })
+    .sort(
+      (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(),
+    );
+
+  // Local date helpers to avoid UTC offset issues in calendar rendering
+  const toLocalYmd = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+  const fromYmdLocal = (s?: string) => {
+    if (!s) return undefined;
+    const [y, m, d] = s.split("-").map((n) => parseInt(n, 10));
+    return new Date(y, (m || 1) - 1, d || 1);
+  };
+
+  // Get tasks for calendar view (week/month) using local day comparison
+  const getTasksForDate = (date: Date) => {
+    const cellKey = toLocalYmd(date);
+    return filteredTasks.filter((task) => {
+      const start = fromYmdLocal(task.startDate) || fromYmdLocal(task.dueDate);
+      const due = fromYmdLocal(task.dueDate);
+      const startKey = toLocalYmd(start);
+      const dueKey = toLocalYmd(due);
+      return cellKey >= startKey && cellKey <= dueKey;
+    });
+  };
+
+  // Calendar navigation
+  const navigateCalendar = (direction: "prev" | "next") => {
+    const newDate = new Date(currentDate);
+    if (calendarView === "week") {
+      newDate.setDate(newDate.getDate() + (direction === "next" ? 7 : -7));
+    } else {
+      newDate.setMonth(newDate.getMonth() + (direction === "next" ? 1 : -1));
+    }
+    setCurrentDate(newDate);
+  };
+
+  // Get week days for week view
+  const getWeekDays = () => {
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(startOfWeek);
+      day.setDate(startOfWeek.getDate() + i);
+      days.push(day);
+    }
+    return days;
+  };
+
+  // Get month grid (6 weeks x 7 days) for month view
+  const getMonthGrid = () => {
+    const firstOfMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1,
+    );
+    const start = new Date(firstOfMonth);
+    // move to Sunday on or before the 1st
+    start.setDate(firstOfMonth.getDate() - firstOfMonth.getDay());
+
+    const grid: Date[] = [];
+    for (let i = 0; i < 42; i++) {
+      const day = new Date(start);
+      day.setDate(start.getDate() + i);
+      grid.push(day);
+    }
+    return grid;
+  };
+
+  // Discover surface is fully public — render it before the auth gate
+  // so logged-out visitors land on the events grid + map + FAQ that
+  // /events and /map used to host. Placed AFTER all hooks (state,
+  // effects) above so React's hook-order invariant holds.
+  if (currentSurface === "discover") {
+    return (
+      <AppShell bgClassName="bg-background">
+        {surfaceNav}
+        <div className={APP_PAGE_COLUMN}>
+          <div className="space-y-12">
+            <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">{t("messages.loadingMap")}</div>}>
+              <EventDiscoveryPanel />
+            </Suspense>
+            <MarketingFAQ items={EVENTS_FAQ} schemaId="events" />
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // If user is not authenticated, show marketing page (with the surface
+  // tab strip so visitors can flip into the public Discover surface).
+  if (!isAuthenticated || !user) {
+    return (
+      <AppShell bgClassName="bg-background">
+        {surfaceNav}
+        <TasksMarketing />
+      </AppShell>
+    );
+  }
+
+  const isGuid = (value: string) =>
+    /^(\{)?[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}(\})?$/.test(
+      value,
+    );
+
+  const saveTaskToApi = async (task: Task) => {
+    try {
+      const request: CreateTaskRequest | UpdateTaskRequest = {
+        text: task.title,
+        description: task.description,
+        start: task.startDate
+          ? new Date(task.startDate).toISOString()
+          : new Date().toISOString(),
+        end: task.dueDate ? new Date(task.dueDate).toISOString() : undefined,
+        taskType: mapUITaskTypeToBackend(task.type),
+        status: mapUIStatusToBackend(task.status),
+        assignedToUserId: task.assignedTo?.id,
+      };
+
+      if (isGuid(task.id)) {
+        // Update existing task
+        const updateRequest: UpdateTaskRequest = {
+          ...request,
+          id: task.id,
+        };
+        const updatedTask = await taskService.updateTask(updateRequest);
+
+        // Update the task in state with the response from API
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === task.id ? {
+              ...t,
+              // Map the API response back to UI format
+              title: updatedTask.text || t.title,
+              description: updatedTask.description || t.description,
+              startDate: updatedTask.start ? new Date(updatedTask.start).toISOString().split('T')[0] : t.startDate,
+              dueDate: updatedTask.end ? new Date(updatedTask.end).toISOString().split('T')[0] : t.dueDate,
+              type: mapBackendTaskTypeToUI(updatedTask.taskType),
+              status: mapBackendStatusToUI(updatedTask.status),
+              updatedAt: updatedTask.updateDateTime || new Date().toISOString(),
+              createdAt: updatedTask.creationDateTime || t.createdAt,
+            } : t,
+          ),
+        );
+      } else {
+        // Create new task
+        const createdTask = await taskService.createTask(request);
+
+        // Update the task in state with the new ID and response data
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === task.id ? {
+              ...t,
+              id: createdTask.id || task.id,
+              // Map the API response back to UI format
+              title: createdTask.text || t.title,
+              description: createdTask.description || t.description,
+              startDate: createdTask.start ? new Date(createdTask.start).toISOString().split('T')[0] : t.startDate,
+              dueDate: createdTask.end ? new Date(createdTask.end).toISOString().split('T')[0] : t.dueDate,
+              type: mapBackendTaskTypeToUI(createdTask.taskType),
+              status: mapBackendStatusToUI(createdTask.status),
+              updatedAt: createdTask.updateDateTime || new Date().toISOString(),
+              createdAt: createdTask.creationDateTime || t.createdAt,
+            } : t,
+          ),
+        );
+      }
+    } catch (e) {
+      console.error("Failed to save task", e);
+      setError(e instanceof Error ? e.message : t("errors.failedSaveTask"));
+    }
+  };
+
+  const updateTaskStatus = async (taskId: string, newStatus: ProductivityItemStatus) => {
+    let originalTask: Task | null = null;
+    let updatedTask: Task | null = null;
+
+    // Store original task and update optimistically
+    setTasks((prev) => {
+      originalTask = prev.find((t) => t.id === taskId) || null;
+      const updated = prev.map((task) =>
+        task.id === taskId
+          ? { ...task, status: newStatus, updatedAt: new Date().toISOString() }
+          : task,
+      );
+      updatedTask = updated.find((t) => t.id === taskId) || null;
+      return updated;
+    });
+
+    // Save to API and handle potential errors
+    if (updatedTask && originalTask) {
+      try {
+        await saveTaskToApi(updatedTask);
+      } catch (error) {
+        // Revert to original state on error
+        console.error("Failed to update task status:", error);
+        setTasks((prev) =>
+          prev.map((t) => (t.id === taskId ? originalTask! : t))
+        );
+        setError(t("errors.failedUpdateTaskStatus"));
+      }
+    }
+  };
+
+  // Local-only remove (table-row trash); kanban drag-status lives in <TaskBoard>.
+  const deleteTask = (taskId: string) => {
+    setTasks(tasks.filter((task) => task.id !== taskId));
+  };
+
+  const taskTabs: PageHeaderTab[] = [
+    { key: "table",    label: t("fields.bulkListPick.label"), icon: TableIcon,    to: "/tasks?tab=table" },
+    { key: "calendar", label: t("labels.calendarView"),       icon: CalendarDays, to: "/tasks?tab=calendar" },
+    { key: "kanban",   label: t("labels.kanbanView"),         icon: List,         to: "/tasks" },
+  ];
+
+  // My events + coffee surface — short-circuits before the heavy
+  // tasks-tab JSX. (The Discover surface is handled earlier, above the
+  // auth gate, since events are public.)
+  if (currentSurface === "my-events") {
+    return (
+      <AppShell bgClassName="bg-background">
+        {surfaceNav}
+        <div className={APP_PAGE_COLUMN}>
+          <div className="space-y-6">
+            <MyEventsAndCoffee viewerUserId={user.id} />
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // Timesheet surface — workforce-only (employee + employer). The
+  // <TimesheetTab/> component self-gates; for non-workforce viewers it
+  // returns null and we fall through to the tasks surface below.
+  if (currentSurface === "timesheet" && isWorkforceMember) {
+    return (
+      <AppShell bgClassName="bg-background">
+        {surfaceNav}
+        <div className={APP_PAGE_COLUMN}>
+          <div className="space-y-6">
+            {/* Paid activities assigned by an employer — self-gates to null
+                when the worker has none, so it's safe to mount here too. */}
+            <MyActivities />
+            <TimesheetTab />
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell bgClassName="bg-background">
+      <div className={APP_PAGE_COLUMN}>
+          <div className="space-y-6">
+            {/* Paid activities an employer assigned to this worker (timer +
+                submit). Self-gating: renders nothing when there are none. */}
+            <MyActivities />
+            {/* One action panel: surface tabs + search + type/status filters
+                + view-axis toggle + Add task, all in the single sticky band. */}
+            <PageHeader
+              tabs={surfaceTabs}
+              activeTabKey={currentSurface}
+              search={<HeaderSearch />}
+              actions={
+                <>
+                  <Select
+                    value={selectedTaskType}
+                    onValueChange={setSelectedTaskType}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder={t("fields.filterByType.placeholder")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("labels.allTypes")}</SelectItem>
+                      {getAvailableTaskTypesForRole(user?.role || "").map((taskType) => (
+                        <SelectItem key={taskType} value={taskType.toString()}>
+                          {getTaskTypeDisplayName(taskType)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select
+                    value={selectedStatus}
+                    onValueChange={setSelectedStatus}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder={t("fields.filterByStatus.placeholder")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("fields.allStatus")}</SelectItem>
+                      <SelectItem value={ProductivityItemStatus.Planning.toString()}>
+                        {getStatusDisplayName(ProductivityItemStatus.Planning)}
+                      </SelectItem>
+                      <SelectItem value={ProductivityItemStatus.ToDo.toString()}>
+                        {getStatusDisplayName(ProductivityItemStatus.ToDo)}
+                      </SelectItem>
+                      <SelectItem value={ProductivityItemStatus.Open.toString()}>
+                        {getStatusDisplayName(ProductivityItemStatus.Open)}
+                      </SelectItem>
+                      <SelectItem value={ProductivityItemStatus.InProgress.toString()}>
+                        {getStatusDisplayName(ProductivityItemStatus.InProgress)}
+                      </SelectItem>
+                      <SelectItem value={ProductivityItemStatus.Completed.toString()}>
+                        {getStatusDisplayName(ProductivityItemStatus.Completed)}
+                      </SelectItem>
+                      <SelectItem value={ProductivityItemStatus.OnHold.toString()}>
+                        {getStatusDisplayName(ProductivityItemStatus.OnHold)}
+                      </SelectItem>
+                      <SelectItem value={ProductivityItemStatus.Cancelled.toString()}>
+                        {getStatusDisplayName(ProductivityItemStatus.Cancelled)}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* View-axis segmented control (List / Calendar / Kanban).
+                      Lives next to "Add task" instead of the PageHeader tab
+                      strip; each segment is a router Link so the view stays
+                      URL-driven (`?tab=`). */}
+                  <div className="flex items-center rounded-md border">
+                    {taskTabs.map((tab, i) => {
+                      const active = currentView === tab.key;
+                      const Icon = tab.icon;
+                      return (
+                        <Button
+                          key={tab.key}
+                          asChild
+                          variant={active ? "default" : "ghost"}
+                          size="sm"
+                          className={cn(
+                            i === 0 && "rounded-r-none",
+                            i === taskTabs.length - 1 && "rounded-l-none",
+                            i > 0 && i < taskTabs.length - 1 && "rounded-none",
+                          )}
+                          aria-pressed={active}
+                        >
+                          <Link to={tab.to ?? "/tasks"} aria-label={tab.label} title={tab.label}>
+                            {Icon && <Icon className="h-4 w-4" />}
+                          </Link>
+                        </Button>
+                      );
+                    })}
+                  </div>
+
+                  <Button
+                    className="gap-2"
+                    onClick={() => {
+                      const today = new Date();
+                      const y = today.getFullYear();
+                      const m = String(today.getMonth() + 1).padStart(2, "0");
+                      const d = String(today.getDate()).padStart(2, "0");
+                      const newTask: Task = {
+                        id: `temp-${Date.now()}`,
+                        title: "",
+                        description: "",
+                        type: TaskType.General,
+                        priority: "medium",
+                        status: ProductivityItemStatus.Planning,
+                        startDate: `${y}-${m}-${d}`,
+                        dueDate: `${y}-${m}-${d}`,
+                        createdAt: today.toISOString(),
+                      };
+                      setSelectedTask(newTask);
+                      setSheetStartInEdit(true);
+                      setTaskPanelOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                    {t("actions.addTask")}
+                  </Button>
+                </>
+              }
+            />
+
+            {/* Loading State */}
+            {isLoading && (
+              <div data-testid="loader" className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin mr-2" />
+                <span>{t("status.loadingTasks")}</span>
+              </div>
+            )}
+
+            {/* Error State */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+                  <span className="text-red-700">{error}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Quick Stats */}
+            {!isLoading && !error && (
+              <div className="grid grid-cols-2 md:grid-cols-8 gap-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      {t("labels.totalTasks")}
+                    </CardTitle>
+                    <CheckSquare className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{tasks.length}</div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      {getStatusDisplayName(ProductivityItemStatus.Planning)}
+                    </CardTitle>
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {tasks.filter((t) => t.status === ProductivityItemStatus.Planning).length}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      {getStatusDisplayName(ProductivityItemStatus.ToDo)}
+                    </CardTitle>
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {tasks.filter((t) => t.status === ProductivityItemStatus.ToDo).length}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      {getStatusDisplayName(ProductivityItemStatus.InProgress)}
+                    </CardTitle>
+                    <Zap className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {tasks.filter((t) => t.status === ProductivityItemStatus.InProgress).length}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      {getStatusDisplayName(ProductivityItemStatus.Completed)}
+                    </CardTitle>
+                    <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {tasks.filter((t) => t.status === ProductivityItemStatus.Completed).length}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Table View */}
+            {currentView === "table" && (
+              <Card data-testid="list-view">
+                <CardHeader>
+                  <CardTitle>{t("headings.tasksList")}</CardTitle>
+                  <CardDescription>
+                    {t("messages.tasksSortedByDueDate")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t("labels.taskTitleColumn")}</TableHead>
+                        <TableHead>{t("labels.transactionType")}</TableHead>
+                        <TableHead>{t("labels.priorityColumn")}</TableHead>
+                        <TableHead>{t("fields.startDateField.label")}</TableHead>
+                        <TableHead>{t("fields.dueDateField.label")}</TableHead>
+                        <TableHead>{t("labels.callStatus")}</TableHead>
+                        <TableHead>{t("labels.actionsColumn")}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredTasks.map((task) => (
+                        <TableRow
+                          key={task.id}
+                          className="cursor-pointer"
+                          onClick={() => openTaskPanel(task)}
+                        >
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{task.title}</div>
+                              {task.description && (
+                                <div className="text-sm text-muted-foreground mt-1">
+                                  {task.description.length > 50
+                                    ? `${task.description.substring(0, 50)}...`
+                                    : task.description}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={taskTypeColors[task.type]}>
+                              {getTaskTypeDisplayName(task.type)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={priorityColors[task.priority]}>
+                              {task.priority}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {task.startDate
+                              ? new Date(task.startDate).toLocaleDateString()
+                              : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {new Date(task.dueDate).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={task.status.toString()}
+                              onValueChange={(value) => {
+                                updateTaskStatus(
+                                  task.id,
+                                  parseInt(value) as ProductivityItemStatus,
+                                ).catch((error) => {
+                                  console.error("Failed to update task status:", error);
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={ProductivityItemStatus.Planning.toString()}>
+                                  {getStatusDisplayName(ProductivityItemStatus.Planning)}
+                                </SelectItem>
+                                <SelectItem value={ProductivityItemStatus.ToDo.toString()}>
+                                  {getStatusDisplayName(ProductivityItemStatus.ToDo)}
+                                </SelectItem>
+                                <SelectItem value={ProductivityItemStatus.Open.toString()}>
+                                  {getStatusDisplayName(ProductivityItemStatus.Open)}
+                                </SelectItem>
+                                <SelectItem value={ProductivityItemStatus.InProgress.toString()}>
+                                  {getStatusDisplayName(ProductivityItemStatus.InProgress)}
+                                </SelectItem>
+                                <SelectItem value={ProductivityItemStatus.Completed.toString()}>
+                                  {getStatusDisplayName(ProductivityItemStatus.Completed)}
+                                </SelectItem>
+                                <SelectItem value={ProductivityItemStatus.OnHold.toString()}>
+                                  {getStatusDisplayName(ProductivityItemStatus.OnHold)}
+                                </SelectItem>
+                                <SelectItem value={ProductivityItemStatus.Cancelled.toString()}>
+                                  {getStatusDisplayName(ProductivityItemStatus.Cancelled)}
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedTask(task);
+                                  setSheetStartInEdit(true);
+                                  setTaskPanelOpen(true);
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteTask(task.id);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Calendar View */}
+            {currentView === "calendar" && (
+              <Card data-testid="calendar-view">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>{t("headings.calendarView")}</CardTitle>
+                    <div className="flex items-center gap-3">
+                      <Select
+                        value={calendarView}
+                        onValueChange={(value) =>
+                          setCalendarView(value as "week" | "month")
+                        }
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="week">{t("labels.weekShort")}</SelectItem>
+                          <SelectItem value="month">{t("labels.monthShort")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => navigateCalendar("prev")}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => navigateCalendar("next")}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  <CardDescription>
+                    {calendarView === "week"
+                      ? t("labels.weekOf", { date: currentDate.toLocaleDateString() })
+                      : currentDate.toLocaleDateString(undefined, {
+                          month: "long",
+                          year: "numeric",
+                        })}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {calendarView === "week" ? (
+                    <div className="grid grid-cols-7 gap-2">
+                      {[
+                        { key: "sun", label: t("labels.weekday.sun") },
+                        { key: "mon", label: t("labels.weekday.mon") },
+                        { key: "tue", label: t("labels.weekday.tue") },
+                        { key: "wed", label: t("labels.weekday.wed") },
+                        { key: "thu", label: t("labels.weekday.thu") },
+                        { key: "fri", label: t("labels.weekday.fri") },
+                        { key: "sat", label: t("labels.weekday.sat") },
+                      ].map(
+                        (day) => (
+                          <div
+                            key={day.key}
+                            className="text-center font-medium text-muted-foreground py-2 border-b"
+                          >
+                            {day.label}
+                          </div>
+                        ),
+                      )}
+                      {getWeekDays().map((day, index) => {
+                        const dayTasks = getTasksForDate(day);
+                        const isToday =
+                          day.toDateString() === new Date().toDateString();
+
+                        return (
+                          <div
+                            key={index}
+                            className={`min-h-32 p-2 border rounded-lg ${isToday ? "bg-primary/5 border-primary/20" : "border-border"}`}
+                          >
+                            <div
+                              className={`text-sm font-medium mb-2 ${isToday ? "text-primary" : "text-foreground"}`}
+                            >
+                              {day.getDate()}
+                            </div>
+                            <div className="space-y-1">
+                              {dayTasks.map((task) => (
+                                <div
+                                  key={task.id}
+                                  onClick={() => openTaskPanel(task)}
+                                  className={`text-xs p-1 rounded text-foreground cursor-pointer ${
+                                    taskTypeColors[task.type] || "bg-muted-foreground"
+                                  }`}
+                                  title={task.description}
+                                >
+                                  {task.title.length > 15
+                                    ? `${task.title.substring(0, 15)}...`
+                                    : task.title}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-7 gap-2">
+                      {[
+                        { key: "sun", label: t("labels.weekday.sun") },
+                        { key: "mon", label: t("labels.weekday.mon") },
+                        { key: "tue", label: t("labels.weekday.tue") },
+                        { key: "wed", label: t("labels.weekday.wed") },
+                        { key: "thu", label: t("labels.weekday.thu") },
+                        { key: "fri", label: t("labels.weekday.fri") },
+                        { key: "sat", label: t("labels.weekday.sat") },
+                      ].map(
+                        (day) => (
+                          <div
+                            key={day.key}
+                            className="text-center font-medium text-muted-foreground py-2 border-b"
+                          >
+                            {day.label}
+                          </div>
+                        ),
+                      )}
+                      {getMonthGrid().map((day, index) => {
+                        const isCurrentMonth =
+                          day.getMonth() === currentDate.getMonth();
+                        const dayTasks = getTasksForDate(day);
+                        const isToday =
+                          day.toDateString() === new Date().toDateString();
+                        return (
+                          <div
+                            key={index}
+                            className={`min-h-28 p-2 border rounded-lg ${
+                              isToday
+                                ? "bg-primary/5 border-primary/20"
+                                : "border-border"
+                            } ${isCurrentMonth ? "" : "opacity-50"}`}
+                          >
+                            <div
+                              className={`text-sm font-medium mb-2 ${isToday ? "text-primary" : "text-foreground"}`}
+                            >
+                              {day.getDate()}
+                            </div>
+                            <div className="space-y-1">
+                              {dayTasks.map((task) => (
+                                <div
+                                  key={task.id}
+                                  onClick={() => openTaskPanel(task)}
+                                  className={`text-xs p-1 rounded text-foreground cursor-pointer ${
+                                    taskTypeColors[task.type] || "bg-muted-foreground"
+                                  }`}
+                                  title={task.description}
+                                >
+                                  {task.title.length > 12
+                                    ? `${task.title.substring(0, 12)}...`
+                                    : task.title}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Kanban View — reusable board, shared with Content Creator → Gigs */}
+            {currentView === "kanban" && (
+              <Card data-testid="kanban-view">
+                <CardHeader>
+                  <CardTitle>{t("headings.kanbanView")}</CardTitle>
+                  <CardDescription>{t("messages.dragToUpdateStatus")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TaskBoard
+                    tasks={tasks}
+                    onStatusChange={handleKanbanStatusChange}
+                    onTaskClick={openTaskPanel}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            <TaskDetailSheet
+              open={taskPanelOpen}
+              onOpenChange={setTaskPanelOpen}
+              task={selectedTask}
+              startInEdit={sheetStartInEdit}
+              onSave={handleSaveTask}
+              onDelete={handleDeleteTask}
+              availableTaskTypes={getAvailableTaskTypesForRole(user?.role || "")}
+              assignableUsers={
+                user?.role === USER_ROLES.EMPLOYER || user?.role === USER_ROLES.RECRUITER
+                  ? assignableUsers
+                  : []
+              }
+            />
+          </div>
+        </div>
+</AppShell>
+  );
+}

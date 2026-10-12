@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" preserveAspectRatio="xMidYMid slice">
+
+  <rect width="800" height="450" fill="#fefce8"/>
+  <rect x="200" y="80" width="400" height="280" fill="#84cc16" opacity="0.3" stroke="#1f2937" stroke-width="4"/>
+  <line x1="400" y1="80" x2="400" y2="360" stroke="#1f2937" stroke-width="4"/>
+  <line x1="200" y1="220" x2="600" y2="220" stroke="#1f2937" stroke-width="4"/>
+  <rect y="380" width="800" height="70" fill="#06b6d4" opacity="0.5"/>
+  <ellipse cx="640" cy="150" rx="40" ry="40" fill="#f59e0b" opacity="0.85"/>
+
+</svg>

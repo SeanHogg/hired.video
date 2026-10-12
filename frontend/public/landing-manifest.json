@@ -1,0 +1,205 @@
+[
+  {
+    "path": "/for/athlete",
+    "label": "Athletes",
+    "title": "Athletes: AI video maker + templates · hired.video",
+    "description": "Sports talent — recruit reels, season highlights, training breakdowns. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Athletes"
+  },
+  {
+    "path": "/for/actor",
+    "label": "Actors",
+    "title": "Actors: AI video maker + templates · hired.video",
+    "description": "Self-tapes, monologues, and showreels for casting submissions. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Actors"
+  },
+  {
+    "path": "/for/director",
+    "label": "Directors",
+    "title": "Directors: AI video maker + templates · hired.video",
+    "description": "Treatment pitches, casting calls, and DP / cinematographer reels. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Directors"
+  },
+  {
+    "path": "/for/musician",
+    "label": "Musicians",
+    "title": "Musicians: AI video maker + templates · hired.video",
+    "description": "Performance reels and beat-cut highlights from your best sets. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Musicians"
+  },
+  {
+    "path": "/for/creator",
+    "label": "Creators",
+    "title": "Creators: AI video maker + templates · hired.video",
+    "description": "Independent content creators promoting capabilities, projects, or an audience. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Creators"
+  },
+  {
+    "path": "/for/job_seeker",
+    "label": "Job seekers",
+    "title": "Job seekers: AI video maker + templates · hired.video",
+    "description": "Video resumes, skills demos, and personal-brand pitches that hiring managers actually watch. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Job seekers"
+  },
+  {
+    "path": "/for/founder",
+    "label": "Founders",
+    "title": "Founders: AI video maker + templates · hired.video",
+    "description": "Startup pitches, product launches, and tool demos — the founder telling the story. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Founders"
+  },
+  {
+    "path": "/for/developer",
+    "label": "Developers",
+    "title": "Developers: AI video maker + templates · hired.video",
+    "description": "Code walkthroughs, architecture explainers, and open-source project demos. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Developers"
+  },
+  {
+    "path": "/for/designer",
+    "label": "Designers",
+    "title": "Designers: AI video maker + templates · hired.video",
+    "description": "Portfolio walkthroughs, case studies, and process reels for product / brand / motion work. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Designers"
+  },
+  {
+    "path": "/for/data_analyst",
+    "label": "Data analysts",
+    "title": "Data analysts: AI video maker + templates · hired.video",
+    "description": "Insight presentations, chart walkthroughs, and methodology demos with the data front-and-centre. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Data analysts"
+  },
+  {
+    "path": "/for/podcaster",
+    "label": "Podcasters",
+    "title": "Podcasters: AI video maker + templates · hired.video",
+    "description": "Episode trailers, full-show recordings, and chapter-marked exports for every podcast platform. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Podcasters"
+  },
+  {
+    "path": "/for/educator",
+    "label": "Educators",
+    "title": "Educators: AI video maker + templates · hired.video",
+    "description": "Course trailers, lesson openers, and explainer episodes that meet learners on audio or video. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Educators"
+  },
+  {
+    "path": "/for/voice_actor",
+    "label": "Voice actors",
+    "title": "Voice actors: AI video maker + templates · hired.video",
+    "description": "Audition reels, character demos, narration samples, and ID spots — script-driven, voice-clone-friendly. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Voice actors"
+  },
+  {
+    "path": "/for/game_dev",
+    "label": "Game developers",
+    "title": "Game developers: AI video maker + templates · hired.video",
+    "description": "Browser-playable game prototypes — endless runners, quizzes, memory games — that publish to itch.io or your own page. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Game developers"
+  },
+  {
+    "path": "/for/illustrator",
+    "label": "Illustrators",
+    "title": "Illustrators: AI video maker + templates · hired.video",
+    "description": "Comics, drawing canvases, social posts, and OG cards — raster + vector tools with AI generation alongside. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Illustrators"
+  },
+  {
+    "path": "/for/animator",
+    "label": "Animators",
+    "title": "Animators: AI video maker + templates · hired.video",
+    "description": "Frame-by-frame raster animation with onion-skin overlay — logo loops, reaction GIFs, explainer micro-loops exported as GIF / APNG / WebP. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Animators"
+  },
+  {
+    "path": "/for/cad_user",
+    "label": "CAD users",
+    "title": "CAD users: AI video maker + templates · hired.video",
+    "description": "Architects, mechanical engineers, electrical hobbyists drafting 2D plans + part drawings + schematics in the studio — exports as SVG, DXF, and PDF. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For CAD users"
+  },
+  {
+    "path": "/for/job-seekers",
+    "label": "Job Seekers",
+    "title": "Job Seekers — hired.video resource map",
+    "description": "Already employed and ready to level up — sharpen your story, expand your network, and signal what's next.",
+    "eyebrow": "For Job Seekers"
+  },
+  {
+    "path": "/for/recent-graduates",
+    "label": "Recent Graduates",
+    "title": "Recent Graduates — hired.video resource map",
+    "description": "0-2 years out, no work history to lean on. Differentiate with a video resume, ship projects, and apply faster.",
+    "eyebrow": "For Recent Graduates"
+  },
+  {
+    "path": "/for/students",
+    "label": "College & University Students",
+    "title": "College & University Students — hired.video resource map",
+    "description": "Internships, class projects, and the network you'll lean on after graduation — build the portfolio now.",
+    "eyebrow": "For College & University Students"
+  },
+  {
+    "path": "/for/unemployed",
+    "label": "Between Jobs",
+    "title": "Between Jobs — hired.video resource map",
+    "description": "Out of work, momentum at risk. Apply velocity + outreach + small daily wins to keep the search moving.",
+    "eyebrow": "For Between Jobs"
+  },
+  {
+    "path": "/for/layoff-recovery",
+    "label": "After a Layoff",
+    "title": "After a Layoff — hired.video resource map",
+    "description": "Severance window + healthcare + insurance + apply velocity — the acute version of the search.",
+    "eyebrow": "For After a Layoff"
+  },
+  {
+    "path": "/for/career-changers",
+    "label": "Career Changers",
+    "title": "Career Changers — hired.video resource map",
+    "description": "Pivot industries by reframing transferable skills and telling a new story — resume, video, and certs in one place.",
+    "eyebrow": "For Career Changers"
+  },
+  {
+    "path": "/for/returning-to-workforce",
+    "label": "Returning to Work",
+    "title": "Returning to Work — hired.video resource map",
+    "description": "Re-entry after caregiving, sabbatical, or a long break. Reframe the gap, refresh skills, target flexible roles.",
+    "eyebrow": "For Returning to Work"
+  },
+  {
+    "path": "/for/veterans",
+    "label": "Veterans & Military Transition",
+    "title": "Veterans & Military Transition — hired.video resource map",
+    "description": "Translate military experience into civilian language, get cert credit where it counts, find veteran-friendly employers.",
+    "eyebrow": "For Veterans & Military Transition"
+  },
+  {
+    "path": "/for/gig-economy",
+    "label": "Gig Economy & Freelancers",
+    "title": "Gig Economy & Freelancers — hired.video resource map",
+    "description": "Portfolio-led work — contract, freelance, fractional. Bid on gigs, deliver against milestone escrow, and let your profile bring the next one in.",
+    "eyebrow": "For Gig Economy & Freelancers"
+  },
+  {
+    "path": "/for/international-job-seekers",
+    "label": "International Job Seekers",
+    "title": "International Job Seekers — hired.video resource map",
+    "description": "Visa sponsorship, foreign credential recognition, region-aware content — land work across borders.",
+    "eyebrow": "For International Job Seekers"
+  },
+  {
+    "path": "/for/early-career",
+    "label": "Early Career & Bootcamp",
+    "title": "Early Career & Bootcamp — hired.video resource map",
+    "description": "Pre-college, bootcamp, or self-taught path. Heavy on projects, certs, and visibility — let the work do the talking.",
+    "eyebrow": "For Early Career & Bootcamp"
+  },
+  {
+    "path": "/for/senior-executives",
+    "label": "Senior Executives",
+    "title": "Senior Executives — hired.video resource map",
+    "description": "Confidential search while you're still employed, exec brand, warm intros, and thought leadership. Board seats + fractional roles coming next.",
+    "eyebrow": "For Senior Executives"
+  }
+]

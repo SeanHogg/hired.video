@@ -1,0 +1,279 @@
+Sean Hogg
+seanhogg@gmail.com 2489907422
+linkedin.com/in/seanhogg
+Summary
+* Transformational Technology Leader with 20+ hands-on years of purpose driven results.
+* Passionate about culture, CX and delivery of value using lean processes.
+* Specialization in operational cost management & profitability, strategic planning, due-diligence exercises for the
+acquisition of new systems and/or companies, providing guidance on technical tool selection and usage, driving
+high-level technical direction for organizations, and establishing and continuously reviewing organization-wide
+technical governance strategies, policies and procedures.
+* Experience across multiple verticals and industries.
+Experience
+CIO/VP of Technology
+Alliance Inspection Management
+Sep 2021 - Present (1 year 3 months +)
+2022:
+- Improved IT-OPs by reducing operating costs by $1.79M ($400k AWS + renegotiated contracts,
+$1.39M in Telcom)
+- Proposed savings of $250K in operating expenses by transitioning to SAFe Agile-Accounting practices
+(no timesheets)
+- Revamped Product Development (Scrum and DevSecOps; Trunk-Based development, CI/CD, DORA
+metrics + kpi driven (velocity, cycle time, customer satisfaction)) From 57.45% to 84.8% of our story
+points and 68.6% to 92.2% of our # of issues. From 17.56% Scope Change (volatility) per sprint to
+0.3%.
+- Revamped Product & Project Management (immediate traceability of product requests, prioritization,
+reduced friction and accelerated handoff to engineering)
+- Revamped Quality Assurance (Full Test Management, Continuous Testing with API Automation;
+Katalon & Tricentis qTest)
+- Established a people first performance based culture (4 Pillars & Ideal Team Player; morale and
+retention improved)
+2021:
+- Restructured organizational chart to be service and value delivery oriented
+- Revamped IT Talent Management (vendor selection, interview process, talent selection, job
+descriptions, standardized onboarding/offboarding processes (checklists, sops, integrations,
+automation))
+- Revamped IT Support (level 1 & 2; launched "Help.AimInspections.com", improved customer
+satisfaction by 30%)
+- Revamped IT Leadership (structured meetings, action items, OKRs, Revenue Ops; over 128 Action
+items completed in under 90 days in 2021)
+- Established Center of Excellence (Architecture/Development, QA, Project Management/Agile)
+- Created IT Vendors Registry for Vendor Mgmt.
+- Improved: operational processes, sops, compliance/auditing, time management
+Sean Hogg - page 1
+
+- Increased team size from 60 to 75 (offshore & MSP resources; a 25-70% hourly billable reduction;
+improved velocity/throughput)
+- Organized Jira & Confluence (82% Decrease in spaces in Confluence from 94 to 17; 50% Decrease in
+Jira)
+VP/EVP, Product & Technology
+Career Now Brands
+Mar 2019 - Sep 2021 (2 years 7 months)
+- Reduced operating costs from 4 to 1.7 million in the 1st year.
+- Delivered 3 new products (6M+ in revenue) using 1 framework (the team had stopped innovating for
+the last 5 years)
+- Led department process transformation from ‘agile’ to Scrum to SAFe
+- Developed enterprise-level guidance on governance, policies, and procedures
+- Developed product technical and strategic roadmaps in respect to overall OKRs
+- Responsible for staffing, budgets and talent management
+- Grew, nurtured, and led multiple IT departments and engineering team members including new
+departments: MarTech (marketing automation) and Data Service teams.
+- Oversaw on/offshore engineering teams
+- Led the consolidation, re-platforming and migration of DigitalOcean to AWS Platform.
+- Defined Platform Architecture (Isomorphic Universal JavaScript, Web Components, Serverless/AWS
+Lambda, Microservices)
+- Created career progression, JDs, salary bands, and compensation/bonus structures
+- Provided recommendations on sales and marketing strategy for all products (target audience and
+segmentation, handraisers/leads/organic traffics, KPIs)
+- Defined IT OPs team (HelpDesk and DevSecOps) support model and SLA. Established real-time
+systems monitoring and metrics dashboard (NOC).
+- Created Quality Assurance standards and practices (test cases, severity/business impact, test plan,
+regression)
+- Analysed systems compliance and brought them up to Industry standards (CanSpam - DMARC/SPF/
+DKIM, Credit Card Processing - PCI DSS, TCPA)
+Solutions Architecture, Team Lead
+United Wholesale Mortgage
+Dec 2017 - Mar 2019 (1 year 4 months)
+- Led cross functional Solutions Architecture team
+- Directed the creation of Architecture Design (4+1 View, ilities, patterns) and Solution Design (Agile/
+Yagni) Documents.
+- Directed and created enterprise principles, guidelines, standards, reference architecture and patterns.
+- Defined microservices versioning and health checks patterns and standards.
+- Defined Data Governance strategy.
+- Led the creation of Roadmaps across Architecture Disciplines.
+- Led the adoption and roll-out of SonarQube (build pipeline, installation and training).
+- Created and conducted training on Integration Management (including API Gateway/Management &
+IPaaS [Mulesoft] Solutions).
+- Helped create the Brand, Vision and Purpose for the Architecture Team.
+- Mentored on standards, leadership principles, and team building.
+- Established benchmarks/scorecard.
+Sean Hogg - page 2
+
+- Led the creation of Cloud/On-Premise Data Center standards including deployment tooling, cloud
+providers, security, training and technology.
+- Created USFS.Templates (vsix package to rapidly build crud/cqrs .net core & .net standard apps),
+USFS.CodingStandards (NuGet package to enforce standards - stylecop rules and custom dictionary)
+and USFS.MERS, Lock Confirmation, Products & Pricing and Business Logic Services (all .Net Core
+microservices).
+- Chief Architect of modernization (re-architecting, re-platforming and re-factoring) initiatives (platform,
+business/domain and data microservices using DevOps principles and infrastructure).
+- Created RACI, dependency matrices, gap analysis, logical system model and migration patterns
+(strangler, proxy, anti-corruption-layer), performance baselines, build vs buy and portfolio road maps.
+- Created/conducting training/workshops on Integration Management (including API Gateway/
+Management & IPaaS [Mulesoft] Solutions), on n-layer, crud, cqrs, repository, client & server,
+microservices, esb, and spa patterns and asp.net core, angular, Azure machine learning, and uml as
+sketch kata.
+Principal Software Developer (Application Architect)
+Urban Science
+Oct 2014 - Dec 2017 (3 years 3 months)
+- Conducted Lunch and Learns on:
+> Cloud (Azure + Amazon Web Services (AWS) [Lambda, EC2, AWS CLI])
+> NodeJS using EdgeJS to call C#
+> Big Data (Hadoop Hive/Pig [Azure HDInsight])
+- Architected and Implemented a shared "File Service" microservice (leverages dependency injection for
+virus scanning and persistence layer [mongo, SQL server filestream, etc])
+- Introduced Monkey Testing (Gremlins.js)
+- Architected and lead dev for ContactManager (.net 4.5.2/4.6.1, webapi, json, angular + angularjs,
+mvc).
+- Architected and lead dev for TCA (.net core 2.0, webapi, json, angular, .net standard).
+- Setup TFS builds and Release Management for continuous Integration.
+- Restructured the S4 Ecosystem into discrete subsystems (enabling independent delivery of business
+value)
+- Enhanced Architecture and delivered a real-time KPI generator.
+- Proposed discrete monetization for new product development based upon tiered value propositions
+(basic, basic +, premium, premium +, enterprise).
+Software Development Manager
+3DEXCITE
+Oct 2013 - Oct 2014 (1 year 1 month)
+* Managed three product teams (20+ team members) with a combined budget of $3.5M.
+* Established RTT USA’s Application Development methodology and ALM Governance using SCRUM
+and TFS (Azure DevOps)
+* Helped in the design of the Unified Data Model, lead the architecture of ARK 3.0 and Picture
+Generator
+* Responsible for the strategy, tactical operation, goals, mission and vision for Application Development
+Software Development Manager
+Urban Science
+Sean Hogg - page 3
+
+Dec 2011 - Oct 2013 (1 year 11 months)
+* Led the Release Management Strategy for the Unified Data Model (UDM).
+* Led cross functional MMO & SMO development teams (BA, QA, Dev, etc. included the design, code,
+test, and deployment of those solutions into Production; Team sizes: 25+) using the Team Software
+Process (TSP).
+* Oversaw, liaised and guided a team of development leads, architects, developers, business analysts,
+and testers through the SDLC.
+* Architected and implemented the Dynamic Criteria JavaScript Framework (used the observer/
+subscriber pattern).
+* Authored documents to collect and measure developer productivity.
+* Created MS Project Plans for multiple projects (full integration with TFS Work Items).
+* Wrote business requirements as user stories & pbi's
+* SharePoint administration and restructuring to handle change requests, requirements and release
+schedules
+* Conducted Performance Reviews
+* Organized and conducted Lunch and Learn and technical trainings with 40+ attendees. Sessions on
+Unit Testing, ASP.net MVC, Silverlight, OLAP/SSAS Cube creation, NuGet, JavaScript, Knockout JS.
+* Authored Interview Tools (standardized questionnaire and technical Lab)
+* Authored team member onboarding processes.
+Sr. Software Engineer
+Urban Science
+Mar 2008 - Dec 2011 (3 years 10 months)
+• Designed and developed configurable message persistence [In-Memory vs. Recoverable messages]
+by leverage the extensibility of MSMQ.
+• Extended the “core workflow manager” to leverage the Competing Consumer design pattern to
+increase throughput by 100% (leveraging the Singleton Design Pattern).
+• Architected, documented and implemented the ADF to STAR (5.1.4 - ProcessSalesLead) conversion
+process including developing transformation XSLT’s and testing tools.
+• Reorganized existing source code to be based upon the Service Archetype by Microsoft Application
+Architecture Guidance (N-Tier Design).
+• Created Data Layer (SqlTools) that leverages delegates and generics.
+• Proposed using the Provider Model for Web Services infrastructure to allow swappable components.
+• Integration and implemented HTTP Digest Authentication with third party web services infrastructure.
+• Architected and developed reusable Dealer Search and Dealer Search Results Controls
+(Documentation, Database Design, AJAX).
+Software Engineer
+Compuware
+Apr 2006 - Jan 2008 (1 year 10 months)
+Management/Leadership
+• Reduced development costs (classic asp, Java) by leveraging VMWare.
+• Proposed value added features and functionality by identifying competitor services and products.
+• Launched SharePoint as team collaboration tool to minimize efforts in creating and sharing (support,
+hot fixes, release information, development cycle status, and documentation).
+Architecture/Design
+• Enhanced existing infrastructure to support multiple worker processes (web garden) under IIS 6.0.
+Sean Hogg - page 4
+
+• Moved VV from the Default Application Pool into a Custom Application Pool.
+• Removed dependency on IIS ASP Session Management and enabled ASP/ASP.net Session
+sharing with custom Session Manager and Utility modules. Noticeable improvements in performance,
+robustness and responsiveness.
+• Extended the Printing/Publishing functionality of VV to support RSS Feeds, PDF and MHT (Mime
+formatted HTML). Repurposed report output data (Cached HTML) for new distribution mechanisms.
+Development/Contributions
+• Converted VB6 to C#/VB.net, ASP to ASPX/ASHX (C#). Created reusable and distributable User
+Controls (ASCX).
+• Developed the Administration component of the VV (ASP.net) and DMI/VAS (JAVA) integration.
+Exposed VAS reports to the VV Report Infrastructure.
+Release Management
+• Migrated source from VSS to TFS.
+• Modified existing build processes (code/documentation) to support TFS.
+• Created a custom assembly for TFS Source Control Integration for the build tool (‘BUILD BUDDY’).
+Founder
+RelatedNews.ca
+Jan 1999 - Jan 2005 (6 years 1 month)
+RelatedNews.ca focused closely on the SMB market, specifically offering Custom Content Management
+(CMS) and Design Solutions.
+Business Development/Leadership:
+• Sole proprietor of RelatedNews.ca.
+• Developed products and services fundamentally rooted in CRM and Total Quality Management
+(TQM).
+• Collaborated with small business owners, board members and senior executives to identify new
+business opportunities.
+• Managed contract developers and university students to successfully deliver projects.
+• Architected Just-A-Click Content Management System.
+Sample Clients:
+# Windsor Symphony Orchestra – Online Purchasing System, Website, and Just-A-Click (Content
+Management System (CMS)). Technologies Used: VB, ASP, JavaScript, XHTML
+# Centre for Environmental Health of Ontario – Custom membership system, Automated E-Newsletter,
+Website, and Just-A-Click (CMS). Technologies Used: VB, ASP, MS Access, JavaScript, XHTML
+# Organization of Part-Time University Students – Online voting system, Website, Automated E-
+Newsletter, and Just-A-Click (CMS). Technologies Used: VB, ASP, MS Access, JavaScript, Flash,
+XHTML
+# Sandwich Community Health Center – base Just-A-Click package and website. Technologies Used:
+VB, ASP, MS Access, JavaScript, XHTML
+Education
+University of Windsor
+Bachelor of Science (BSc), Computer Science
+Sean Hogg - page 5
+
+1999 - 2004
+University of Windsor
+Bachelor of Arts (BA), Psychology
+1999 - 2004
+Licenses & Certifications
+AWS Administration Cookbook - StackSkills
+Agile with Atlassian Jira - Coursera
+Applied Scrum for Agile Project Management - edX
+Project Management Foundations: Risk - LinkedIn
+Strategic Thinking - LinkedIn
+Scrum: Advanced - LinkedIn
+Scrum: The Basics - LinkedIn
+Leadership Foundations: Leadership Styles and Models - LinkedIn
+Ken Blanchard on Servant Leadership - LinkedIn
+Strategies for Female Empowerment - LinkedIn
+Developing Executive Presence - LinkedIn
+Building High-Performance Teams - LinkedIn
+Managing a Cross-Functional Team - LinkedIn
+Creating a High Performance Culture - LinkedIn
+Coaching and Developing Employees - LinkedIn
+Sean Hogg - page 6
+
+Transformational Leadership - LinkedIn
+Managing Team Conflict - LinkedIn
+Enhancing Team Innovation - LinkedIn
+How to Have Fewer, Better Meetings - LinkedIn
+Boosting Your Team's Productivity - LinkedIn
+Manager as Coach - LinkedIn
+Managing Virtual Teams - LinkedIn
+Holding Your Team Accountable - LinkedIn
+Executive Leadership - LinkedIn
+Certified ScrumMaster® (CSM®) - Scrum Alliance
+Issued Sep 2022 - Expires Sep 2024
+1661777
+Implementing Your IT Strategy - LinkedIn
+Certified Scrum Product Owner® (CSPO®) - Scrum Alliance
+Issued Nov 2022 - Expires Nov 2024
+1686025
+Skills
+Amazon Web Services (AWS) • Strategic Planning • Strategy • Software Development • Scrum •
+Management • SDLC • Agile Methodologies • Web Services • Software Project Management
+Honors & Awards
+Innovation Award - Urban Science - Urban Science
+Mar 2015
+Created a "Status" page for SubSystem. All Apps (publisher) with the subsystem provide a status
+(system pulse page) that returns meta information to the primary hub (the subscriber - note: all
+subscribers are publishers and vice versa). The status page displays system information and installation
+Sean Hogg - page 7
+
+rules (for example: common errors can occur if the system wasn't installed correctly - installation rules
+help evaluate this).
+Sean Hogg - page 8

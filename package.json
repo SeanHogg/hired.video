@@ -1,0 +1,22 @@
+{
+  "name": "hired.video",
+  "version": "1.0.0",
+  "description": "A production-ready full-stack React application for video resume creation and talent management, featuring React Router 6 SPA mode, TypeScript, AI-powered features, and comprehensive business management tools.",
+  "main": "eslint.config.js",
+  "scripts": {
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:api": "node scripts/smoke.mjs --api-only",
+    "smoke:web": "node scripts/smoke.mjs --web-only",
+    "smoke:browser": "node scripts/smoke-browser.mjs",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "SEE LICENSE IN LICENSE",
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "playwright": "^1.60.0"
+  }
+}

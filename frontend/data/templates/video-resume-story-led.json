@@ -1,0 +1,124 @@
+{
+  "video": {
+    "duration": 75,
+    "fps": 30,
+    "resolution": "720p",
+    "aspect": "16:9",
+    "theme": {
+      "colorPalette": ["#0c0a09", "#292524", "#fafaf9", "#f59e0b"],
+      "fontFamily": "Inter, sans-serif",
+      "motion": "minimal",
+      "transition": "cut",
+      "background": "solid"
+    }
+  },
+  "scenes": [
+    {
+      "id": "open",
+      "start": 0,
+      "duration": 6,
+      "type": "intro",
+      "title": "Let me tell you about the time I shipped Stripe Tax in 6 weeks.",
+      "subtitle": "Your Name, Staff Engineer",
+      "animation": {
+        "titleEnter":    { "type": "fadeIn", "start": 0.1, "duration": 0.6, "easing": "easeOut" },
+        "subtitleEnter": { "type": "fadeIn", "start": 1.5, "duration": 0.5, "easing": "easeOut" }
+      }
+    },
+    {
+      "id": "stakes",
+      "start": 6,
+      "duration": 12,
+      "type": "achievement",
+      "title": "The Stakes",
+      "items": [
+        "Customer churn risk on every renewal call",
+        "Existing tax module wrong for 30% of EU sales",
+        "Q4 board commitment to ship before EOY"
+      ],
+      "animation": {
+        "titleEnter": { "type": "fadeIn", "start": 0.2, "duration": 0.4, "easing": "linear" },
+        "textEnter":  { "type": "fadeIn", "start": 0.6, "duration": 0.5, "easing": "linear" }
+      }
+    },
+    {
+      "id": "decision",
+      "start": 18,
+      "duration": 14,
+      "type": "achievement",
+      "title": "The Hard Decision",
+      "items": [
+        "Rejected the build-from-scratch proposal",
+        "Wrapped Stripe Tax behind our existing API",
+        "Cut scope: ship 3 jurisdictions, not 17",
+        "Bet the team that the wrapper would hold"
+      ],
+      "animation": {
+        "titleEnter": { "type": "fadeIn", "start": 0.2, "duration": 0.4, "easing": "linear" },
+        "textEnter":  { "type": "fadeIn", "start": 0.6, "duration": 0.5, "easing": "linear" }
+      }
+    },
+    {
+      "id": "execution",
+      "start": 32,
+      "duration": 14,
+      "type": "achievement",
+      "title": "How We Pulled It Off",
+      "items": [
+        "5 engineers, 2 designers, 1 PM, 6 weeks",
+        "Daily 15-min standup, no other meetings",
+        "Shipped a feature flag the morning of week 4",
+        "Onboarded the first 12 customers manually"
+      ],
+      "animation": {
+        "titleEnter": { "type": "fadeIn", "start": 0.2, "duration": 0.4, "easing": "linear" },
+        "textEnter":  { "type": "fadeIn", "start": 0.6, "duration": 0.5, "easing": "linear" }
+      }
+    },
+    {
+      "id": "outcome",
+      "start": 46,
+      "duration": 10,
+      "type": "achievement",
+      "title": "The Outcome",
+      "items": [
+        "Shipped on time, 17 jurisdictions by Q1",
+        "Recovered 4 at-risk renewals worth $2.8M",
+        "Won the company's first Q4 ship-it award"
+      ],
+      "animation": {
+        "titleEnter": { "type": "slideUp", "start": 0.2, "duration": 0.5, "easing": "easeOut" },
+        "textEnter":  { "type": "fadeIn",  "start": 0.6, "duration": 0.6, "easing": "linear" }
+      }
+    },
+    {
+      "id": "lesson",
+      "start": 56,
+      "duration": 12,
+      "type": "skills",
+      "title": "What This Says About How I Work",
+      "skills": [
+        "I'd rather wrap something boring than rebuild",
+        "Scope cuts are a feature, not a failure",
+        "Ship to 12 customers manually before automating",
+        "Bet on the team, then get out of their way"
+      ],
+      "animation": {
+        "titleEnter": { "type": "fadeIn", "start": 0.2, "duration": 0.4, "easing": "easeOut" },
+        "textEnter":  { "type": "fadeIn", "start": 0.5, "duration": 0.6, "easing": "linear" }
+      }
+    },
+    {
+      "id": "close",
+      "start": 68,
+      "duration": 7,
+      "type": "closing",
+      "title": "If that sounds like your team, let's talk.",
+      "subtitle": "linkedin.com/in/yourprofile",
+      "animation": {
+        "titleEnter":    { "type": "fadeIn", "start": 0.2, "duration": 0.5, "easing": "easeOut" },
+        "subtitleEnter": { "type": "fadeIn", "start": 0.8, "duration": 0.4, "easing": "easeOut" }
+      }
+    }
+  ]
+}

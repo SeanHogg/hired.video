@@ -1,0 +1,334 @@
+/**
+ * EntityMesh — renders a single `World3DEntity` as the right Three.js
+ * mesh + the right Rapier collider, picking both from the entity's
+ * `kind`. The mapping is the SSoT for "what does each kind look like"
+ * — adding a new kind is one entry in this file (the geometry +
+ * collider) and one entry in `ENTITY_KIND_DEFAULTS`
+ * (`world-3d-edit.ts`); no other file forks per kind.
+ *
+ * Selection chrome is handled here (a wireframe outline when
+ * `selected` is true) so the host scene doesn't need to overlay a
+ * separate gizmo per entity (DRY).
+ */
+
+import { useEffect, useMemo, useState } from "react";
+import { CuboidCollider, RigidBody, BallCollider } from "@react-three/rapier";
+import type { ThreeEvent } from "@react-three/fiber";
+import { TextureLoader, type Texture } from "three";
+import type {
+  World3DEntity,
+  World3DEntityKind,
+  World3DPhysicsKind,
+} from "@shared/game-state";
+import type { EntityTriggerEvent } from "@/lib/studio/game/challenge-runtime";
+
+interface EntityMeshProps {
+  entity: World3DEntity;
+  /** Edit mode shows selection chrome + makes the entity clickable.
+   *  Play mode drops both (the player is playing, not authoring). */
+  mode: "edit" | "play";
+  selected: boolean;
+  onSelect?: (id: string) => void;
+  /** Fired when a sensor entity (collectible / goal / hazard) detects
+   *  player overlap. Only emitted in play mode + when physics === "sensor".
+   *  Scene3D consumes this and forwards to the host's ChallengeTracker. */
+  onTrigger?: (event: EntityTriggerEvent) => void;
+}
+
+/** Map `World3DPhysicsKind` to Rapier's RigidBody type prop. `none` is
+ *  handled by the caller (renders without a RigidBody wrapper). `sensor`
+ *  maps to "fixed" — the sensor flag is set on the collider, not the
+ *  body. */
+function physicsToRapierType(p: World3DPhysicsKind): "fixed" | "dynamic" | "kinematicPosition" {
+  switch (p) {
+    case "static":
+      return "fixed";
+    case "dynamic":
+      return "dynamic";
+    case "kinematic":
+      return "kinematicPosition";
+    case "sensor":
+    case "none":
+      // Caller checks for "none" first; sensor bodies are "fixed" in
+      // Rapier terms with a sensor-flagged collider.
+      return "fixed";
+  }
+}
+
+export default function EntityMesh({
+  entity,
+  mode,
+  selected,
+  onSelect,
+  onTrigger,
+}: EntityMeshProps) {
+  // Texture loader — when the entity carries a textureUrl (sprite or
+  // user-uploaded asset dragged in from the left rail), we resolve
+  // the image with vanilla TextureLoader + hold it in state. Avoids
+  // drei's `useTexture` Suspense behavior (which would require a
+  // Suspense boundary around every EntityMesh).
+  const texture = useEntityTexture(entity.textureUrl);
+
+  const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    if (mode !== "edit" || !onSelect) return;
+    // Stop the click bubbling to the ground placement handler — clicking
+    // an entity selects it, it doesn't drop a new block underneath.
+    e.stopPropagation();
+    onSelect(entity.id);
+  };
+
+  // Decorative-only entities (light / no-collider) render the mesh
+  // without a RigidBody wrapper; they don't participate in physics.
+  if (entity.physics === "none") {
+    return (
+      <group
+        position={entity.position}
+        rotation={entity.rotation}
+        scale={entity.scale}
+        // userData carries the entity id so the play-mode hitscan
+        // (PlayerController) can identify which entity a left-click
+        // raycast hit. DRY: every entity branch sets this — the
+        // raycast walks `o.parent` to find the first ancestor with
+        // `userData.entityId`.
+        userData={{ entityId: entity.id }}
+      >
+        <KindMesh
+          kind={entity.kind}
+          color={entity.color}
+          texture={texture}
+          selected={selected}
+          onClick={handleClick}
+        />
+      </group>
+    );
+  }
+
+  const isSensor = entity.physics === "sensor";
+
+  return (
+    <RigidBody
+      type={physicsToRapierType(entity.physics)}
+      position={entity.position}
+      rotation={entity.rotation}
+      colliders={false}
+      sensor={isSensor}
+      // Only sensor bodies fire trigger events. The handler is wired
+      // unconditionally — non-sensor entities don't intersect-overlap
+      // anyone, so Rapier never calls it. The mode === "play" gate
+      // exists upstream (Scene3D drops onTrigger in edit mode).
+      onIntersectionEnter={
+        isSensor && onTrigger
+          ? () =>
+              onTrigger({
+                entityId: entity.id,
+                kind: entity.kind,
+                tag: entity.tag ?? null,
+              })
+          : undefined
+      }
+    >
+      <KindCollider kind={entity.kind} scale={entity.scale} sensor={isSensor} />
+      <group scale={entity.scale} userData={{ entityId: entity.id }}>
+        <KindMesh
+          kind={entity.kind}
+          color={entity.color}
+          texture={texture}
+          selected={selected}
+          onClick={handleClick}
+        />
+      </group>
+    </RigidBody>
+  );
+}
+
+// ─── Per-kind mesh ────────────────────────────────────────────────────────
+
+interface KindMeshProps {
+  kind: World3DEntityKind;
+  color: string;
+  /** Optional texture mapped onto the mesh — when present, the
+   *  `color` field tints the texture (white = unmodified). */
+  texture: Texture | null;
+  selected: boolean;
+  onClick: (e: ThreeEvent<MouseEvent>) => void;
+}
+
+function KindMesh({ kind, color, texture, selected, onClick }: KindMeshProps) {
+  const material = (
+    <meshStandardMaterial
+      color={color}
+      map={texture ?? undefined}
+      // Slight emissive on selection so the chrome reads even when the
+      // entity is in shadow; cleared when not selected so colors stay
+      // accurate during normal authoring.
+      emissive={selected ? "#3b82f6" : "#000000"}
+      emissiveIntensity={selected ? 0.4 : 0}
+    />
+  );
+
+  switch (kind) {
+    case "block":
+    case "platform":
+    case "hazard":
+      return (
+        <mesh onClick={onClick} castShadow receiveShadow>
+          <boxGeometry args={[1, 1, 1]} />
+          {material}
+        </mesh>
+      );
+    case "ramp":
+      // Right-triangular prism: a box geometry with one face slanted
+      // via vertex displacement isn't worth the cost — use a fallback
+      // "slope" approximation by rotating a half-thickness box. Good
+      // enough for the Phase-1 designer; a proper ramp mesh lands when
+      // the geometry library lands (gap #1639).
+      return (
+        <mesh onClick={onClick} castShadow receiveShadow rotation={[0, 0, -Math.PI / 6]}>
+          <boxGeometry args={[1, 0.2, 1]} />
+          {material}
+        </mesh>
+      );
+    case "sphere":
+    case "collectible":
+      return (
+        <mesh onClick={onClick} castShadow receiveShadow>
+          <sphereGeometry args={[0.5, 24, 18]} />
+          {material}
+        </mesh>
+      );
+    case "goal":
+      // Goal renders as a translucent box so the player can tell it's
+      // a trigger, not a wall. Physics is "none" so it never collides.
+      return (
+        <mesh onClick={onClick}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial
+            color={color}
+            transparent
+            opacity={0.4}
+            emissive={selected ? "#3b82f6" : color}
+            emissiveIntensity={selected ? 0.5 : 0.2}
+          />
+        </mesh>
+      );
+    case "light":
+      return (
+        <group>
+          <pointLight color={color} intensity={1.5} distance={20} castShadow />
+          {/* Visible marker so the author can see + click the light */}
+          <mesh onClick={onClick}>
+            <sphereGeometry args={[0.3, 12, 8]} />
+            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1} />
+          </mesh>
+        </group>
+      );
+    case "weapon":
+      // Roblox-style nerf-gun silhouette: a stubby grip + a barrel.
+      // Two box children inside one group; both pick up the parent
+      // entity's transform via the outer group in EntityMesh.
+      return (
+        <group onClick={onClick} castShadow>
+          {/* Grip — short vertical block */}
+          <mesh position={[0, -0.15, 0.2]} castShadow receiveShadow>
+            <boxGeometry args={[0.35, 0.6, 0.35]} />
+            {material}
+          </mesh>
+          {/* Barrel — long horizontal block */}
+          <mesh position={[0, 0.1, -0.15]} castShadow receiveShadow>
+            <boxGeometry args={[0.3, 0.3, 0.9]} />
+            {material}
+          </mesh>
+        </group>
+      );
+  }
+}
+
+// ─── Per-kind collider ────────────────────────────────────────────────────
+
+interface KindColliderProps {
+  kind: World3DEntityKind;
+  scale: [number, number, number];
+  /** Sensor flag — set on triggers so Rapier raises intersection
+   *  events instead of physical contacts. Forwarded to the underlying
+   *  collider; the parent RigidBody passes the same flag in parallel. */
+  sensor?: boolean;
+}
+
+/** Rapier collider sized to match the entity's authored scale. The
+ *  mesh inside the RigidBody is also scale-wrapped so the visuals + the
+ *  collider stay locked — change one place, both update. */
+function KindCollider({ kind, scale, sensor = false }: KindColliderProps) {
+  // Cuboid expects half-extents; mesh box geometry is unit-cube so the
+  // half-extent is half the scale on each axis.
+  const halfExtents = useMemo<[number, number, number]>(
+    () => [scale[0] / 2, scale[1] / 2, scale[2] / 2],
+    [scale],
+  );
+  const sphereRadius = useMemo(
+    () => Math.max(scale[0], scale[1], scale[2]) / 2,
+    [scale],
+  );
+
+  switch (kind) {
+    case "sphere":
+    case "collectible":
+      return <BallCollider args={[sphereRadius]} sensor={sensor} />;
+    case "block":
+    case "platform":
+    case "ramp":
+    case "hazard":
+    case "goal":
+    case "light":
+    // Weapon defaults to physics: "none" so this branch never fires
+    // for it at runtime — the case is here purely for switch
+    // exhaustiveness against `World3DEntityKind`. If a user overrides
+    // weapon physics to anything else, a Cuboid collider is a safe
+    // bounding-box default.
+    // falls through
+    case "weapon":
+      return <CuboidCollider args={halfExtents} sensor={sensor} />;
+  }
+}
+
+// ─── Texture loader hook ──────────────────────────────────────────────────
+
+/** Resolve a texture URL imperatively (no Suspense). Returns null
+ *  until the image is decoded; null also when the URL is absent.
+ *  Texture instances are kept in a small module-level cache so a
+ *  thousand collectible coins sharing one URL share one GPU upload. */
+const textureCache = new Map<string, Texture>();
+
+function useEntityTexture(url: string | undefined): Texture | null {
+  const [texture, setTexture] = useState<Texture | null>(() =>
+    url ? textureCache.get(url) ?? null : null,
+  );
+  useEffect(() => {
+    if (!url) {
+      setTexture(null);
+      return;
+    }
+    const cached = textureCache.get(url);
+    if (cached) {
+      setTexture(cached);
+      return;
+    }
+    let cancelled = false;
+    new TextureLoader().load(
+      url,
+      (tex) => {
+        if (cancelled) return;
+        textureCache.set(url, tex);
+        setTexture(tex);
+      },
+      undefined,
+      () => {
+        // Image failed to load — leave texture null so the entity
+        // falls back to its tint color.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+  return texture;
+}

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" preserveAspectRatio="xMidYMid slice">
+
+  <rect width="800" height="450" fill="#0f172a"/>
+  <path d="M 0,40 L 200,40 L 220,56 L 800,56" stroke="#22d3ee" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M 0,72 L 200,72 L 220,88 L 800,88" stroke="#22d3ee" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M 0,104 L 200,104 L 220,120 L 800,120" stroke="#22d3ee" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M 0,136 L 200,136 L 220,152 L 800,152" stroke="#22d3ee" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M 0,168 L 200,168 L 220,184 L 800,184" stroke="#22d3ee" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M 0,200 L 200,200 L 220,216 L 800,216" stroke="#22d3ee" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M 0,232 L 200,232 L 220,248 L 800,248" stroke="#22d3ee" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M 0,264 L 200,264 L 220,280 L 800,280" stroke="#22d3ee" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M 0,296 L 200,296 L 220,312 L 800,312" stroke="#22d3ee" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M 0,328 L 200,328 L 220,344 L 800,344" stroke="#22d3ee" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M 0,360 L 200,360 L 220,376 L 800,376" stroke="#22d3ee" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M 0,392 L 200,392 L 220,408 L 800,408" stroke="#22d3ee" stroke-width="2" fill="none" opacity="0.6"/>
+  <circle cx="30" cy="50" r="4" fill="#fde047"/>
+  <circle cx="130" cy="50" r="4" fill="#fde047"/>
+  <circle cx="230" cy="50" r="4" fill="#fde047"/>
+  <circle cx="330" cy="50" r="4" fill="#fde047"/>
+  <circle cx="430" cy="50" r="4" fill="#fde047"/>
+  <circle cx="530" cy="50" r="4" fill="#fde047"/>
+  <circle cx="630" cy="50" r="4" fill="#fde047"/>
+  <circle cx="730" cy="50" r="4" fill="#fde047"/>
+  <circle cx="30" cy="180" r="4" fill="#fde047"/>
+  <circle cx="130" cy="180" r="4" fill="#fde047"/>
+  <circle cx="230" cy="180" r="4" fill="#fde047"/>
+  <circle cx="330" cy="180" r="4" fill="#fde047"/>
+  <circle cx="430" cy="180" r="4" fill="#fde047"/>
+  <circle cx="530" cy="180" r="4" fill="#fde047"/>
+  <circle cx="630" cy="180" r="4" fill="#fde047"/>
+  <circle cx="730" cy="180" r="4" fill="#fde047"/>
+  <circle cx="30" cy="310" r="4" fill="#fde047"/>
+  <circle cx="130" cy="310" r="4" fill="#fde047"/>
+  <circle cx="230" cy="310" r="4" fill="#fde047"/>
+  <circle cx="330" cy="310" r="4" fill="#fde047"/>
+  <circle cx="430" cy="310" r="4" fill="#fde047"/>
+  <circle cx="530" cy="310" r="4" fill="#fde047"/>
+  <circle cx="630" cy="310" r="4" fill="#fde047"/>
+  <circle cx="730" cy="310" r="4" fill="#fde047"/>
+
+</svg>

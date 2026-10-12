@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice">
+
+  <path d="M 40,80 Q 30,50 60,50 Q 70,30 100,30 Q 130,30 140,50 Q 170,50 160,80 Q 180,90 170,110 Q 170,130 150,130 Q 140,150 110,140 Q 90,160 70,140 Q 40,140 40,120 Q 20,110 40,80 Z" fill="#ffffff" stroke="#27272a" stroke-width="4"/>
+  <circle cx="80"  cy="160" r="6" fill="#ffffff" stroke="#27272a" stroke-width="3"/>
+  <circle cx="65"  cy="180" r="4" fill="#ffffff" stroke="#27272a" stroke-width="2"/>
+
+</svg>

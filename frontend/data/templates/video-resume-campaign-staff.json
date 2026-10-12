@@ -1,0 +1,150 @@
+{
+  "video": {
+    "duration": 60,
+    "fps": 30,
+    "resolution": "720p",
+    "aspect": "16:9",
+    "theme": {
+      "colorPalette": [
+        "#7f1d1d",
+        "#fca5a5",
+        "#450a0a",
+        "#fee2e2"
+      ],
+      "fontFamily": "Inter, sans-serif",
+      "motion": "moderate",
+      "transition": "fade",
+      "background": "gradient"
+    }
+  },
+  "scenes": [
+    {
+      "id": "open",
+      "start": 0,
+      "duration": 5,
+      "type": "intro",
+      "title": "Field organizer. 3 cycles. Built turf from scratch in 2 states.",
+      "subtitle": "Your Name — Field, Comms, Digital",
+      "animation": {
+        "titleEnter": {
+          "type": "slideUp",
+          "start": 0.1,
+          "duration": 0.5,
+          "easing": "easeOut"
+        },
+        "subtitleEnter": {
+          "type": "fadeIn",
+          "start": 1.2,
+          "duration": 0.5,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "credentials",
+      "start": 5,
+      "duration": 13,
+      "type": "achievement",
+      "title": "Cycles worked",
+      "items": [
+        "[Race], [year] — Field organizer, [region]",
+        "[Race], [year] — Regional field director",
+        "[Race], [year] — Comms director, paid media buy",
+        "Win/loss: 2W–1L"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "slideIn",
+          "start": 0.6,
+          "duration": 0.6,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "recent",
+      "start": 18,
+      "duration": 13,
+      "type": "achievement",
+      "title": "What I built",
+      "items": [
+        "Volunteer pipeline: 0 → 350 weekly canvassers",
+        "VAN data ops + nightly modeling refresh",
+        "Door + phone + relational scaffolding"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "slideIn",
+          "start": 0.6,
+          "duration": 0.6,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "bring",
+      "start": 31,
+      "duration": 13,
+      "type": "skills",
+      "title": "What I bring",
+      "skills": [
+        "Long hours, no surprise — campaign tempo is the job",
+        "Speaks PDI + VAN + targeted email tools",
+        "Comfortable on TV / podcast hits when needed",
+        "Builds the operation, then makes it run without me"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "scaleIn",
+          "start": 0.5,
+          "duration": 0.6,
+          "easing": "spring"
+        }
+      }
+    },
+    {
+      "id": "ask",
+      "start": 44,
+      "duration": 16,
+      "type": "closing",
+      "title": "Open to state director / regional roles for the [next] cycle.",
+      "subtitle": "[encrypted contact] · let's talk.",
+      "animation": {
+        "titleEnter": {
+          "type": "slideUp",
+          "start": 0.2,
+          "duration": 0.5,
+          "easing": "easeOut"
+        },
+        "subtitleEnter": {
+          "type": "fadeIn",
+          "start": 0.9,
+          "duration": 0.4,
+          "easing": "easeOut"
+        }
+      }
+    }
+  ],
+  "_meta": {
+    "sector": "politics_campaigns",
+    "recommendation": "Cycles worked + role + win/loss record. Names of principals or committees are the credential."
+  }
+}

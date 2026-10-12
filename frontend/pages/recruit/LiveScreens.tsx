@@ -1,0 +1,444 @@
+/**
+ * Recruiter live-screening hub (#1239) at /recruit/live-screens.
+ *
+ * Creates back-to-back live-screen sessions (window + slot length + meeting
+ * URL), lists every session the recruiter owns, opens a session's slot
+ * roster, and lets the recruiter copy each invite link from the table.
+ *
+ * Scheduling (POST /sessions/:id/schedule) is intentionally NOT exposed
+ * yet — that flow needs a candidate picker that pulls from talent pools,
+ * which is its own surface (#1240 will track if needed). For now,
+ * recruiters seed candidates via the existing async-interview tooling and
+ * pivot here for the live-meeting slot UX.
+ */
+
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
+import {
+  CalendarClock,
+  Copy,
+  ExternalLink,
+  Loader2,
+  Plus,
+  Video,
+} from "lucide-react";
+import { AppShell } from "@/components/AppShell";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAuth } from "@/lib/auth";
+import { USER_ROLES } from "@shared/user-roles";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
+import { useLocation } from "react-router-dom";
+import {
+  autoMatchLiveScreenSession,
+  createLiveScreenSession,
+  getLiveScreenSession,
+  listLiveScreenSessions,
+  type LiveScreenInvite,
+  type LiveScreenSession,
+} from "@/lib/services/live-screen-service";
+import { Sparkles } from "lucide-react";
+import { toast } from "sonner";
+
+export default function LiveScreens() {
+  const { t } = useTranslation();
+  const location = useLocation();
+  useSEO(location.pathname);
+  useBreadcrumbs([
+    { name: t("labels.liveScreens.breadcrumbRecruit"), url: "/recruit" },
+    { name: t("headings.liveScreens.title"), url: "/recruit/live-screens" },
+  ]);
+
+  const { isAuthenticated, user } = useAuth();
+  const isRecruiter =
+    user?.role === USER_ROLES.RECRUITER ||
+    user?.role === USER_ROLES.EMPLOYER ||
+    user?.role === USER_ROLES.ADMIN ||
+    user?.role === USER_ROLES.SUPER_ADMIN;
+
+  const [sessions, setSessions] = useState<LiveScreenSession[] | null>(null);
+  const [openSessionId, setOpenSessionId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  async function refresh() {
+    try {
+      const rows = await listLiveScreenSessions();
+      setSessions(rows);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("messages.liveScreens.couldNotLoadSessions"));
+    }
+  }
+
+  useEffect(() => {
+    if (isAuthenticated && isRecruiter) void refresh();
+  }, [isAuthenticated, isRecruiter]);
+
+  if (!isAuthenticated || !isRecruiter) {
+    return (
+      <AppShell>
+        <div className="px-4 py-6">
+          <Alert>
+            <AlertDescription>
+              {t("messages.liveScreens.recruiterOnly")}
+            </AlertDescription>
+          </Alert>
+        </div>
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell>
+      <div className="px-4 py-6">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">{t("headings.liveScreens.title")}</h1>
+            <p className="text-sm text-muted-foreground">
+              {t("messages.liveScreens.subtitle")}
+            </p>
+          </div>
+          <Button onClick={() => setCreating(true)} className="gap-1">
+            <Plus className="h-4 w-4" />
+            {t("actions.liveScreens.newSession")}
+          </Button>
+        </div>
+
+        {sessions === null ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : sessions.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center space-y-2">
+              <Video className="h-10 w-10 text-muted-foreground/50 mx-auto" />
+              <p className="text-sm text-muted-foreground">
+                {t("messages.liveScreens.emptyState")}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {sessions.map((s) => (
+              <SessionRow key={s.id} session={s} onOpen={() => setOpenSessionId(s.id)} />
+            ))}
+          </div>
+        )}
+
+        {creating && (
+          <CreateSessionDialog
+            onClose={() => setCreating(false)}
+            onCreated={() => {
+              setCreating(false);
+              void refresh();
+            }}
+          />
+        )}
+        {openSessionId && (
+          <SessionDetailDialog
+            sessionId={openSessionId}
+            onClose={() => setOpenSessionId(null)}
+          />
+        )}
+      </div>
+    </AppShell>
+  );
+}
+
+function SessionRow({ session, onOpen }: { session: LiveScreenSession; onOpen: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <Card>
+      <CardContent className="pt-4 pb-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <span className="font-medium text-sm">{session.title}</span>
+              <Badge variant="outline" className="text-[10px]">{session.status}</Badge>
+            </div>
+            <div className="text-xs text-muted-foreground flex flex-wrap gap-3">
+              <span className="flex items-center gap-1">
+                <CalendarClock className="h-3 w-3" />
+                {formatSessionWindow(session.startTime, session.endTime)}
+              </span>
+              <span>{t("labels.liveScreens.minSlots", { minutes: session.slotMinutes })}</span>
+              {session.meetingUrl ? (
+                <a
+                  href={session.meetingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 hover:underline"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  {t("labels.liveScreens.meetingUrl")}
+                </a>
+              ) : (
+                <span className="text-amber-600">{t("labels.liveScreens.noMeetingUrl")}</span>
+              )}
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={onOpen}>
+            {t("actions.open")}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CreateSessionDialog({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const { t } = useTranslation();
+  const [title, setTitle] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [slotMinutes, setSlotMinutes] = useState(8);
+  const [meetingUrl, setMeetingUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const capacity = useMemo(() => {
+    if (!startTime || !endTime) return 0;
+    const s = new Date(startTime);
+    const e = new Date(endTime);
+    if (!(e > s)) return 0;
+    return Math.floor((e.getTime() - s.getTime()) / (slotMinutes * 60_000));
+  }, [startTime, endTime, slotMinutes]);
+
+  async function handleSave() {
+    if (!title.trim() || !startTime || !endTime) {
+      toast.error(t("messages.liveScreens.requiredFields"));
+      return;
+    }
+    setSaving(true);
+    try {
+      await createLiveScreenSession({
+        title: title.trim(),
+        startTime: new Date(startTime).toISOString(),
+        endTime: new Date(endTime).toISOString(),
+        slotMinutes,
+        meetingUrl: meetingUrl.trim() || null,
+      });
+      toast.success(t("messages.liveScreens.sessionCreated"));
+      onCreated();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("messages.liveScreens.couldNotCreate"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{t("headings.liveScreens.newSession")}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div className="space-y-1.5">
+            <Label>{t("labels.liveScreens.titleField")}</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("labels.liveScreens.titlePlaceholder")} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>{t("labels.liveScreens.start")}</Label>
+              <Input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("labels.liveScreens.end")}</Label>
+              <Input type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>{t("labels.liveScreens.slotLength")}</Label>
+              <Input
+                type="number"
+                min={3}
+                max={60}
+                value={slotMinutes}
+                onChange={(e) => setSlotMinutes(Math.max(3, Math.min(60, Number(e.target.value))))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("labels.liveScreens.capacity")}</Label>
+              <Input value={capacity ? t("labels.liveScreens.candidateCount", { count: capacity }) : "—"} readOnly />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t("labels.liveScreens.meetingUrlField")}</Label>
+            <Input value={meetingUrl} onChange={(e) => setMeetingUrl(e.target.value)} placeholder="https://meet.example.com/abc" />
+            <p className="text-[11px] text-muted-foreground">
+              {t("messages.liveScreens.meetingUrlHint")}
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>
+            {t("actions.cancel")}
+          </Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            {t("actions.create")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SessionDetailDialog({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
+  const { t } = useTranslation();
+  const [data, setData] = useState<{ session: LiveScreenSession; invites: LiveScreenInvite[] } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getLiveScreenSession(sessionId)
+      .then(setData)
+      .catch((err) => toast.error(err instanceof Error ? err.message : t("messages.liveScreens.couldNotLoad")))
+      .finally(() => setLoading(false));
+  }, [sessionId]);
+
+  function copyInviteLink(token: string) {
+    const url = `${window.location.origin}/live-screen/${token}`;
+    void navigator.clipboard.writeText(url).then(
+      () => toast.success(t("messages.liveScreens.inviteLinkCopied")),
+      () => toast.error(t("messages.liveScreens.couldNotCopy")),
+    );
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{data?.session.title ?? t("labels.liveScreens.sessionFallback")}</DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : !data ? (
+          <Alert variant="destructive">
+            <AlertDescription>{t("messages.liveScreens.couldNotLoadSession")}</AlertDescription>
+          </Alert>
+        ) : (
+          <div className="space-y-3">
+            <div className="text-xs text-muted-foreground">
+              {formatSessionWindow(data.session.startTime, data.session.endTime)} · {t("labels.liveScreens.minSlots", { minutes: data.session.slotMinutes })} · {t("labels.liveScreens.inviteCount", { count: data.invites.length })}
+            </div>
+            {data.invites.length === 0 ? (
+              <div className="space-y-3">
+                <Alert>
+                  <AlertDescription>
+                    {t("messages.liveScreens.noInvites")}
+                  </AlertDescription>
+                </Alert>
+                <AutoMatchButton sessionId={data.session.id} onMatched={async () => {
+                  setLoading(true);
+                  try {
+                    const fresh = await getLiveScreenSession(data.session.id);
+                    setData(fresh);
+                  } finally {
+                    setLoading(false);
+                  }
+                }} />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {data.invites.map((i) => (
+                  <div key={i.id} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium">{i.candidateName}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatTime(i.slotStart)}–{formatTime(i.slotEnd)} · {i.status}
+                      </div>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => copyInviteLink(i.inviteToken)}>
+                      <Copy className="h-3.5 w-3.5 mr-1.5" />
+                      {t("actions.liveScreens.copyLink")}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Link to="/interview-assignments" className="text-xs text-primary hover:underline">
+              {t("messages.liveScreens.asyncInterviewsLink")}
+            </Link>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Pure formatters (exported so the test suite can pin them) ──────────────
+
+export function formatSessionWindow(startIso: string, endIso: string): string {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  const day = start.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  return `${day} · ${formatTime(start)} – ${formatTime(end)}`;
+}
+
+export function formatTime(input: string | Date): string {
+  const d = typeof input === "string" ? new Date(input) : input;
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+/** Auto-match button — pulls top-scored candidates from the recruiter's
+ *  most recent AI Recruiter Agent run for this session's job and fills
+ *  the back-to-back slots. Self-gates on success/failure with toast
+ *  feedback; parent re-fetches to render the new invite rows. */
+function AutoMatchButton({
+  sessionId,
+  onMatched,
+}: {
+  sessionId: string;
+  onMatched: () => Promise<void> | void;
+}) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      onClick={async () => {
+        if (busy) return;
+        setBusy(true);
+        try {
+          const r = await autoMatchLiveScreenSession(sessionId);
+          if (r.scheduled === 0) {
+            toast.message(t("messages.liveScreens.noCandidatesTitle"), {
+              description: t("messages.liveScreens.noCandidatesDescription"),
+            });
+          } else {
+            toast.success(t("messages.liveScreens.autoMatched", { count: r.scheduled }));
+          }
+          await onMatched();
+        } catch (e: any) {
+          toast.error(e?.message ?? t("messages.liveScreens.autoMatchFailed"));
+        } finally {
+          setBusy(false);
+        }
+      }}
+      disabled={busy}
+      className="gap-1.5"
+    >
+      <Sparkles className="h-4 w-4" />
+      {busy ? t("messages.liveScreens.matching") : t("actions.liveScreens.autoMatch")}
+    </Button>
+  );
+}

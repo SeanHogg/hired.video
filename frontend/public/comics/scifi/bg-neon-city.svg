@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" preserveAspectRatio="xMidYMid slice">
+
+  <rect width="800" height="450" fill="#0f172a"/>
+  <g fill="#22d3ee" opacity="0.85">
+    <polygon points="40,450 40,180 120,150 120,450"/>
+    <polygon points="140,450 140,90 220,60 220,450"/>
+    <polygon points="240,450 240,200 320,180 320,450"/>
+    <polygon points="340,450 340,40 420,20 420,450"/>
+    <polygon points="450,450 450,140 530,120 530,450"/>
+    <polygon points="560,450 560,200 640,170 640,450"/>
+    <polygon points="660,450 660,90 740,60 740,450"/>
+  </g>
+  <g stroke="#a855f7" stroke-width="2" fill="none" opacity="0.7">
+    <path d="M 0,300 L 800,300"/>
+    <path d="M 0,330 L 800,330"/>
+    <path d="M 0,360 L 800,360"/>
+  </g>
+  <rect x="0" y="80" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="27" y="123" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="54" y="166" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="81" y="209" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="108" y="252" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="135" y="295" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="162" y="338" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="189" y="381" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="216" y="104" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="243" y="147" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="270" y="190" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="297" y="233" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="324" y="276" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="351" y="319" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="378" y="362" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="405" y="85" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="432" y="128" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="459" y="171" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="486" y="214" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="513" y="257" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="540" y="300" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="567" y="343" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="594" y="386" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="621" y="109" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="648" y="152" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="675" y="195" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="702" y="238" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="729" y="281" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="756" y="324" width="6" height="6" fill="#fde047" opacity="0.9"/>
+  <rect x="3" y="367" width="6" height="6" fill="#fde047" opacity="0.9"/>
+
+</svg>
