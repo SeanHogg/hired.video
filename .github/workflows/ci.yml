@@ -367,6 +367,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: sdk
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # id-token: write lets npm authenticate via trusted publishing (OIDC) —
+    # no long-lived token to expire (npm caps write tokens at 90 days; an
+    # expired NPM_TOKEN surfaces as a misleading `E404 PUT ... Not found`).
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -380,6 +386,9 @@ jobs:
           # `npm publish` can push to the public registry.
           registry-url: "https://registry.npmjs.org"
 
+      - name: Upgrade npm (trusted publishing needs npm >= 11.5.1)
+        run: npm install -g npm@11
+
       - name: Install SDK dependencies
         run: cd packages/sdk && (for i in 1 2 3; do npm install --prefer-offline --no-audit && break; sleep 5; done)
 
@@ -388,8 +397,10 @@ jobs:
         # `version` is not already on npm. To cut a release, bump that version
         # and merge to main; an unchanged version is a no-op (no failed build).
         # `prepublishOnly` runs the tsup build, so dist/ is produced at publish.
-        # Scoped package → --access public. Requires the NPM_TOKEN secret to be
-        # an npm *Automation* token (bypasses 2FA/OTP in CI).
+        # Scoped package → --access public. Auth: trusted publishing (OIDC,
+        # configured on npmjs.com → package Settings → Trusted Publisher:
+        # SeanHogg/hired.video, workflow ci.yml) is tried first; NPM_TOKEN
+        # (granular, write, bypass-2FA) is the fallback until that is set up.
         run: |
           cd packages/sdk
           NAME=$(node -p "require('./package.json').name")
