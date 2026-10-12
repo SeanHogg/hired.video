@@ -10,6 +10,7 @@ import { fontFamilyFor } from "@/lib/studio/font-catalog";
 import { stringOr } from "./frame";
 import type { RegisteredWidgetPlugin, RenderContext } from "./plugin";
 import { avatarPlugin } from "./plugins/avatar";
+import { brandKitPlugin } from "./plugins/brand-kit";
 import { captionBoxPlugin } from "./plugins/caption-box";
 import { chartPlugin } from "./plugins/chart";
 import { chipsPlugin } from "./plugins/chips";
@@ -42,6 +43,7 @@ export const WIDGET_PLUGINS: Record<WidgetKind, RegisteredWidgetPlugin> = {
   "caption-box": captionBoxPlugin,
   "sfx-burst": sfxBurstPlugin,
   avatar: avatarPlugin,
+  "brand-kit": brandKitPlugin,
 };
 
 export function pluginForWidgetKind(kind: WidgetKind): RegisteredWidgetPlugin {

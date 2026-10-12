@@ -314,6 +314,12 @@ function widgetToElementBody(widget: Widget): SceneElement | null {
       // AI presenter avatar (#1557) is V2-native — V1 has no equivalent.
       // The V2 timeline-emit path renders it via canvas-v2:avatar.
       return null;
+    case "brand-kit":
+      // Brand kit (#577) is V2-native (`canvas-v2:brand`) — V1 has no
+      // watermark SceneElement. The V2 timeline-emit path carries it.
+      return null;
+    case "engagement-asset":
+      return null;
     case "shape-rect":
     case "shape-circle":
     case "divider":

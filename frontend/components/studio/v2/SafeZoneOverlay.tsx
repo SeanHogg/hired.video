@@ -15,6 +15,7 @@
  */
 import { findFormatByDimensions, safeZonesForFormat } from "@/lib/studio/video-formats";
 import { useSafeZonePreference } from "@/lib/studio/editor-v2/use-safe-zone-pref";
+import { displayAdSafeZones } from "@/lib/ads/iab-safe-zones";
 
 interface SafeZoneOverlayProps {
   /** Unscaled canvas dimensions in pixels. The overlay positions zones as
@@ -48,7 +49,13 @@ export default function SafeZoneOverlay({
   const format = findFormatByDimensions(canvasWidth, canvasHeight);
   // #856 — derive zones by aspect when the format doesn't hand-declare
   // them, so 720p / 4K / square presets show guides too.
-  const zones = safeZonesForFormat(format);
+  // #1131 — IAB display-ad presets ship with empty `safeZones[]`; fall
+  // back to GDN / tap-target insets so banner authoring still gets guides.
+  const catalogZones = safeZonesForFormat(format);
+  const zones =
+    catalogZones.length > 0
+      ? catalogZones
+      : displayAdSafeZones(canvasWidth, canvasHeight);
   if (zones.length === 0) return null;
 
   return (

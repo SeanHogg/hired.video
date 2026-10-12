@@ -26,7 +26,15 @@ import {
   type WorkspaceParam,
 } from "@/lib/services/paid-media-service";
 import { advertisingService, type AdSet as InternalAdSet } from "@/lib/services/advertising-service";
+import { studioService } from "@/lib/services/studio-service";
 import AdSetEditor from "@/components/advertising/AdSetEditor";
+import {
+  CampaignSizeViewToggle,
+  CampaignSizeGroupedList,
+  collectCampaignAssets,
+  type CampaignViewMode,
+  type SizeAwareCampaign,
+} from "@/components/campaigns";
 import { useToast } from "@/hooks/use-toast";
 
 interface PaidMediaPageProps {
@@ -217,6 +225,20 @@ function CampaignsTab({ workspace }: { workspace: WorkspaceParam }) {
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingAdSet, setEditingAdSet] = useState<InternalAdSet | undefined>();
+  const [view, setView] = useState<CampaignViewMode>("list");
+
+  const creativesQ = useQuery({
+    queryKey: ["paid-media", "creatives", workspace],
+    queryFn: () => paidMediaService.listCreatives(workspace),
+  });
+  const studioCampaignsQ = useQuery({
+    queryKey: ["studio", "campaigns"],
+    queryFn: async () => (await studioService.getCampaigns()).data ?? [],
+  });
+  const studioProjectsQ = useQuery({
+    queryKey: ["studio", "projects"],
+    queryFn: async () => (await studioService.getProjects()).data ?? [],
+  });
 
   const internalIds = new Set((internalCampaignsQ.data ?? []).map((c) => c.id));
   const adSetsEnabled = !!selectedCampaignId && internalIds.has(selectedCampaignId);
@@ -278,9 +300,51 @@ function CampaignsTab({ workspace }: { workspace: WorkspaceParam }) {
       })),
   ];
 
+  const projectsById = new Map(
+    (studioProjectsQ.data ?? []).map((p) => [p.id, p] as const),
+  );
+  const studioCampaigns = studioCampaignsQ.data ?? [];
+  const studioById = new Map(studioCampaigns.map((c) => [c.id, c]));
+  const creatives = creativesQ.data ?? [];
+  const sizeAwareFromRows: SizeAwareCampaign[] = rows.map((row) => {
+    const paid = (campaignsQ.data ?? []).find((c) => c.id === row.id);
+    const studio = studioById.get(row.id);
+    const projectIdSet = new Set(studio?.projectIds ?? []);
+    const linkedCreatives = creatives.filter((cr) => {
+      const meta = cr.metadata ?? {};
+      if (meta.campaignId === row.id || meta.campaign_id === row.id) return true;
+      return !!(cr.studioProjectId && projectIdSet.has(cr.studioProjectId));
+    });
+    return {
+      id: row.id,
+      name: row.name,
+      status: row.status,
+      assets: collectCampaignAssets({
+        metadata: paid?.metadata ?? null,
+        projectIds: studio?.projectIds,
+        projectsById,
+        creatives: linkedCreatives,
+      }),
+    };
+  });
+  const rowIds = new Set(rows.map((r) => r.id));
+  const extraStudio: SizeAwareCampaign[] = studioCampaigns
+    .filter((c) => !rowIds.has(c.id))
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      status: c.status,
+      assets: collectCampaignAssets({
+        projectIds: c.projectIds,
+        projectsById,
+      }),
+    }));
+  const sizeAware = [...sizeAwareFromRows, ...extraStudio];
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <CampaignSizeViewToggle value={view} onChange={setView} />
         <button className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5" onClick={() => setShowNew((v) => !v)}>
           {showNew ? t("actions.cancel") : t("actions.paidMedia.newCampaign")}
         </button>
@@ -293,7 +357,15 @@ function CampaignsTab({ workspace }: { workspace: WorkspaceParam }) {
         />
       )}
 
-      {campaignsQ.isLoading && internalCampaignsQ.isLoading ? (
+      {view === "grouped" && (
+        <CampaignSizeGroupedList
+          campaigns={sizeAware}
+          selectedId={selectedCampaignId}
+          onSelect={setSelectedCampaignId}
+        />
+      )}
+
+      {view === "list" && (campaignsQ.isLoading && internalCampaignsQ.isLoading ? (
         <p className="text-sm text-muted-foreground">{t("status.loading")}</p>
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("messages.paidMedia.noCampaigns")}</p>
@@ -345,7 +417,7 @@ function CampaignsTab({ workspace }: { workspace: WorkspaceParam }) {
             ))}
           </tbody>
         </table>
-      )}
+      ))}
 
       <section className="space-y-3 pt-4 border-t">
         <div className="flex items-center justify-between gap-2">

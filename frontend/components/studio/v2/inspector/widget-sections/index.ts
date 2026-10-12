@@ -37,6 +37,7 @@ import {
   SFX_BURST_CONTENT_SECTION,
 } from "./comic";
 import { AVATAR_CONTENT_SECTION } from "./presenter";
+import { BRAND_CONTENT_SECTION } from "./brand";
 
 const SHARED_TAIL: WidgetInspectorSection[] = [
   CONTAINER_STYLE_SECTION,
@@ -79,6 +80,7 @@ export const WIDGET_INSPECTOR: Record<WidgetKind, WidgetInspectorSection[]> = {
   // is deferred to #1587; today the inspector exposes only layout +
   // the shared tail so the widget is still resizeable / animatable.
   "engagement-asset": [LAYOUT_SECTION, ...SHARED_TAIL],
+  "brand-kit": [LAYOUT_SECTION, BRAND_CONTENT_SECTION, ...SHARED_TAIL],
 };
 
 export function getWidgetSections(ctx: WidgetSectionCtx): WidgetInspectorSection[] {
@@ -105,4 +107,5 @@ export const WIDGET_TITLE_KEYS: Record<WidgetKind, string> = {
   "sfx-burst": "studio.effects.kind.sfxBurst",
   avatar: "studio.widget.kind.aiPresenter",
   "engagement-asset": "studio.effects.kind.engagementAsset",
+  "brand-kit": "studio.layout.brandKitsTitle",
 };

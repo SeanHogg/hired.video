@@ -5,6 +5,7 @@
  * surfaces that own each level of the hierarchy today). Video and Email
  * lists reuse the same search+view-toggle shell as Templates/Contacts.
  */
+import { useMemo, useState } from "react";
 import {
   BarChart3,
   ExternalLink,
@@ -14,7 +15,6 @@ import {
   Plus,
   Target,
   Trash2,
-  Video,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import Pagination from "@/components/Pagination";
@@ -32,9 +32,24 @@ import { OutreachTabToolbar } from "@/components/outreach/shared/OutreachTabTool
 import ViewModeToggle from "@/components/ViewModeToggle";
 import type { ViewMode } from "@/lib/hooks/useViewMode";
 import { ViewModeList, SCROLL_GRID_LIST_MODES } from "@/components/ViewModeList";
-import { CampaignList } from "@/components/campaigns";
+import {
+  CampaignList,
+  CampaignSizeGroupedList,
+  CampaignSizeViewToggle,
+  CreativeSizeMatrix,
+  collectCampaignAssets,
+  type CampaignViewMode,
+  type SizeAwareCampaign,
+} from "@/components/campaigns";
 import type { CampaignDTO } from "@shared/campaigns";
 import type { VideoCampaign } from "@/lib/services/studio-service";
+
+/** Minimal project shape for creative-size lookup (#1133). */
+export type CampaignsTabProject = {
+  id: string;
+  timelineSpec?: unknown;
+  imageState?: unknown;
+};
 
 export interface CampaignsTabProps {
   videoCampaigns: VideoCampaign[];
@@ -57,6 +72,9 @@ export interface CampaignsTabProps {
   onCreateVideoCampaign: () => void;
   onDeleteVideoCampaign: (id: string) => Promise<void>;
   onNavigateTo: (tab: "advertise" | "content" | "performance") => void;
+  /** Studio projects keyed by the campaign `projectIds` — drives the
+   *  creative-size matrix / grouped view (#1133). */
+  studioProjects?: CampaignsTabProject[];
 }
 
 export function CampaignsTab({
@@ -72,7 +90,32 @@ export function CampaignsTab({
   onCreateVideoCampaign,
   onDeleteVideoCampaign,
   onNavigateTo,
+  studioProjects = [],
 }: CampaignsTabProps) {
+  const [sizeView, setSizeView] = useState<CampaignViewMode>("list");
+  const projectsById = useMemo(() => {
+    const map = new Map<string, CampaignsTabProject>();
+    for (const project of studioProjects) map.set(project.id, project);
+    return map;
+  }, [studioProjects]);
+  const sizeAwareVideo: SizeAwareCampaign[] = useMemo(
+    () =>
+      filteredCampaigns.video.map((vc) => ({
+        id: vc.id,
+        name: vc.name,
+        status: vc.status,
+        assets: collectCampaignAssets({
+          projectIds: vc.projectIds,
+          projectsById,
+        }),
+      })),
+    [filteredCampaigns.video, projectsById],
+  );
+  const assetsByCampaignId = useMemo(() => {
+    const map = new Map<string, SizeAwareCampaign["assets"]>();
+    for (const campaign of sizeAwareVideo) map.set(campaign.id, campaign.assets);
+    return map;
+  }, [sizeAwareVideo]);
   const noCampaigns =
     emailCampaigns.length === 0 && videoCampaigns.length === 0;
 
@@ -89,7 +132,10 @@ export function CampaignsTab({
           },
         }}
       >
-        <ViewModeToggle value={viewMode} onChange={onViewModeChange} modes={SCROLL_GRID_LIST_MODES} />
+        <CampaignSizeViewToggle value={sizeView} onChange={setSizeView} />
+        {sizeView === "list" && (
+          <ViewModeToggle value={viewMode} onChange={onViewModeChange} modes={SCROLL_GRID_LIST_MODES} />
+        )}
         <Button onClick={onCreateVideoCampaign}>
           <Plus className="h-4 w-4 mr-2" />
           New Video Campaign
@@ -175,6 +221,9 @@ export function CampaignsTab({
               · videos, IAB banners, social-ad creatives
             </span>
           </h3>
+          {sizeView === "grouped" ? (
+            <CampaignSizeGroupedList campaigns={sizeAwareVideo} />
+          ) : (
           <ViewModeList viewMode={viewMode}>
             {filteredCampaigns.video.map((vc) => (
               <Card
@@ -189,6 +238,7 @@ export function CampaignsTab({
                         <p className="text-sm text-muted-foreground truncate">
                           {vc.description || "No description"}
                         </p>
+                        <CreativeSizeMatrix assets={assetsByCampaignId.get(vc.id) ?? []} />
                       </div>
                       <div className="hidden md:flex items-center gap-3 text-sm text-muted-foreground flex-shrink-0">
                         <span>{vc.projectIds.length} asset{vc.projectIds.length === 1 ? "" : "s"}</span>
@@ -256,6 +306,7 @@ export function CampaignsTab({
                           value={new Date(vc.createdAt).toLocaleDateString()}
                         />
                       </div>
+                      <CreativeSizeMatrix assets={assetsByCampaignId.get(vc.id) ?? []} />
                       <div className="mt-4 flex items-center justify-end">
                         <Link
                           to="/studio"
@@ -271,6 +322,7 @@ export function CampaignsTab({
               </Card>
             ))}
           </ViewModeList>
+          )}
         </>
       )}
 

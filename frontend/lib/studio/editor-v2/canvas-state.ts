@@ -64,7 +64,11 @@ export type WidgetKind =
   // not just a server-side row. Like `linked-content`, the kind sub-axis
   // lives in `engagement-assets.ts`'s registry — one row there per new
   // engagement kind.
-  | "engagement-asset";
+  | "engagement-asset"
+  // Brand kit — paints the selected kit's logo on preview + export
+  // (`canvas-v2:brand`). Distinct from the hired.video product
+  // watermark (`watermark.ts` / BrandWatermark).
+  | "brand-kit";
 
 /** The widget kinds a user (or the AI CHRO via `studio_insert_widget`)
  *  can drop onto a scene from scratch. Co-located with the `WidgetKind`
@@ -89,6 +93,7 @@ export const INSERTABLE_WIDGET_KINDS: readonly WidgetKind[] = [
   "speech-bubble",
   "caption-box",
   "sfx-burst",
+  "brand-kit",
 ] as const;
 
 export interface WidgetPosition {
@@ -477,6 +482,18 @@ export interface EngagementAssetWidgetParams {
   accentTextColor?: string;
 }
 
+/** Brand kit — kit id + snapshotted logo URL so export still paints
+ *  if the kit is later deleted. Opacity is independent of the shared
+ *  opacity effect. Position lives on `Widget.position`. */
+export interface BrandKitWidgetParams {
+  /** Studio brand kit id. Empty = none picked yet. */
+  brandKitId: string;
+  /** Snapshotted logo URL. Empty = editor-only hint, nothing in export. */
+  logoUrl: string;
+  /** 0..1 logo opacity. */
+  opacity: number;
+}
+
 export type WidgetParams =
   | { kind: "text" | "heading"; data: TextWidgetParams }
   | { kind: "image"; data: ImageWidgetParams }
@@ -492,7 +509,8 @@ export type WidgetParams =
   | { kind: "caption-box"; data: CaptionBoxWidgetParams }
   | { kind: "sfx-burst"; data: SfxBurstWidgetParams }
   | { kind: "avatar"; data: AvatarWidgetParams }
-  | { kind: "engagement-asset"; data: EngagementAssetWidgetParams };
+  | { kind: "engagement-asset"; data: EngagementAssetWidgetParams }
+  | { kind: "brand-kit"; data: BrandKitWidgetParams };
 
 /**
  * Per-widget container styling — background fill, border colour /
@@ -1286,6 +1304,19 @@ export function defaultWidget(kind: WidgetKind): Widget {
             voiceId: "",
             speed: 1,
           },
+        },
+        visibleFrom: null,
+        visibleTo: null,
+        motion: null,
+      };
+    case "brand-kit":
+      return {
+        id,
+        kind,
+        position: { ...position, x: 0.84, y: 0.84, width: 0.12, height: 0.12 },
+        params: {
+          kind: "brand-kit",
+          data: { brandKitId: "", logoUrl: "", opacity: 1 },
         },
         visibleFrom: null,
         visibleTo: null,

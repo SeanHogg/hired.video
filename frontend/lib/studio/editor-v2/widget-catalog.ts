@@ -22,6 +22,7 @@ import {
   Captions,
   Zap,
   UserCircle,
+  Stamp,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import type { WidgetKind } from "./canvas-state";
@@ -54,6 +55,7 @@ export const WIDGET_CATALOG: WidgetPaletteItem[] = [
   { kind: "divider", label: "Divider", icon: Minus, group: "layout" },
   { kind: "chart", label: "Chart", icon: BarChart3, group: "data" },
   { kind: "cta", label: "CTA card", icon: Megaphone, group: "layout" },
+  { kind: "brand-kit", label: "Brand kit", icon: Stamp, group: "layout" },
   // Comic-native primitives — only surface in the palette when the
   // active project is a comic. They're functional on any mediaKind (a
   // talking-head video can drop a speech bubble) but the picker stays

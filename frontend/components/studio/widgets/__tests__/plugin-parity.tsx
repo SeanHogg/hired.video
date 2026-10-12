@@ -268,6 +268,7 @@ const VARIANTS: Partial<Record<WidgetKind, Array<(p: WidgetParams) => WidgetPara
   "linked-content": [(p) => (p.kind === "linked-content" ? { ...p, data: { ...p.data, entityId: "res-1" } } : p)],
   "engagement-asset": [(p) => (p.kind === "engagement-asset" ? { ...p, data: { ...p.data, assetId: "form-1" } } : p)],
   avatar: [(p) => (p.kind === "avatar" ? { ...p, data: { ...p.data, script: "Hi, I build design systems." } } : p)],
+  "brand-kit": [(p) => (p.kind === "brand-kit" ? { ...p, data: { ...p.data, logoUrl: "https://cdn.example.com/logo.png" } } : p)],
 };
 
 /** One case per kind every plugin owns (+ variants), from the registry. */

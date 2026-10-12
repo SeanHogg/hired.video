@@ -74,6 +74,8 @@ function widgetToText(widget: Widget): string {
     case "divider":
     case "chart":
     case "webcam":
+    case "engagement-asset":
+    case "brand-kit":
       return "";
   }
 }

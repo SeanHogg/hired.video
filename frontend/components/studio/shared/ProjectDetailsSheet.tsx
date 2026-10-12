@@ -12,7 +12,9 @@
  */
 
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { BarChart3, Loader2, Megaphone, MessageSquare, Plus, Send, Tag } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import EntityDetailsSheet, {
   type EntityDetailsSection,
@@ -39,9 +41,10 @@ import { ArtifactAnalyticsDashboard } from "@/components/analytics";
 import { mediaKindToArtifactKind } from "@/lib/analytics/artifact-metrics";
 import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
 import { campaignShareUrlFor } from "@/lib/campaigns/bake-utm";
+import { studioCampaignsQueryKey } from "@/lib/campaigns/use-project-campaign";
 
-const EngagementResultsPanel = lazy(
-  () => import("@/components/studio/shared/EngagementResultsPanel"),
+const EngagementTab = lazy(
+  () => import("@/components/engagement/EngagementTab"),
 );
 
 interface Props {
@@ -98,6 +101,8 @@ export default function ProjectDetailsSheet({
   onRefreshPublications,
 }: Props) {
   const { toast } = useToast();
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const perms = useEntityDetailsPermission({
     kind: "video",
     entity: project ? { id: project.id, userId: (project as any).userId } : null,
@@ -183,8 +188,8 @@ export default function ProjectDetailsSheet({
       } catch (err) {
         setStatus("error");
         toast({
-          title: "Couldn't save details",
-          description: err instanceof Error ? err.message : "Unknown error",
+          title: t("studio.projectDetails.toast.saveFailed"),
+          description: err instanceof Error ? err.message : t("studio.projectDetails.unknownError"),
           variant: "destructive",
         });
       }
@@ -240,11 +245,12 @@ export default function ProjectDetailsSheet({
         setCampaigns((prev) =>
           prev ? prev.map((c) => (c.id === campaign.id ? res.data : c)) : prev,
         );
+        void queryClient.invalidateQueries({ queryKey: studioCampaignsQueryKey });
       }
     } catch (err) {
       toast({
-        title: "Couldn't update campaign",
-        description: err instanceof Error ? err.message : "Unknown error",
+        title: t("studio.projectDetails.toast.updateCampaignFailed"),
+        description: err instanceof Error ? err.message : t("studio.projectDetails.unknownError"),
         variant: "destructive",
       });
     } finally {
@@ -265,15 +271,16 @@ export default function ProjectDetailsSheet({
       if (res.data) {
         setCampaigns((prev) => (prev ? [res.data, ...prev] : [res.data]));
         setNewCampaignName("");
+        void queryClient.invalidateQueries({ queryKey: studioCampaignsQueryKey });
         toast({
-          title: "Campaign created",
-          description: `"${name}" now includes this project.`,
+          title: t("studio.projectDetails.toast.campaignCreated"),
+          description: t("studio.projectDetails.toast.campaignCreatedBody", { name }),
         });
       }
     } catch (err) {
       toast({
-        title: "Couldn't create campaign",
-        description: err instanceof Error ? err.message : "Unknown error",
+        title: t("studio.projectDetails.toast.createCampaignFailed"),
+        description: err instanceof Error ? err.message : t("studio.projectDetails.unknownError"),
         variant: "destructive",
       });
     } finally {
@@ -317,13 +324,12 @@ export default function ProjectDetailsSheet({
       ? ([
           {
             key: "published",
-            label: "Published",
+            label: t("studio.projectDetails.tab.published"),
             icon: Send,
             render: () => (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Where this {kindLabel} is live. Open any destination, or
-                  re-publish to push your latest edits.
+                  {t("studio.projectDetails.publishedBody", { kindLabel })}
                 </p>
                 <PublishedToList
                   publications={livePublications}
@@ -345,31 +351,30 @@ export default function ProjectDetailsSheet({
       : []),
     {
       key: "metrics",
-      label: "Metrics",
+      label: t("studio.projectDetails.tab.metrics"),
       icon: BarChart3,
       render: () =>
         playable ? (
           <ArtifactAnalyticsDashboard kind={mediaKindToArtifactKind(mediaKind)} artifactId={project.id} />
         ) : (
           <p className="rounded-md border border-dashed border-border bg-muted/20 py-10 text-center text-sm text-muted-foreground">
-            Make this {kindLabel} public to start collecting metrics — the
-            unified player serves it without a render step.
+            {t("studio.projectDetails.metricsPrivate", { kindLabel })}
           </p>
         ),
     },
     {
       key: "meta",
-      label: "Meta",
+      label: t("studio.projectDetails.tab.meta"),
       icon: Tag,
       render: () => (
         <div className="space-y-5">
           <div className="space-y-1.5">
-            <Label htmlFor="pds-meta">Meta description</Label>
+            <Label htmlFor="pds-meta">{t("studio.projectDetails.metaDescription")}</Label>
             <Textarea
               id="pds-meta"
               value={metaDescription}
               onChange={(e) => setMetaDescription(e.target.value.slice(0, 300))}
-              placeholder="One or two sentences shown in search results and social previews."
+              placeholder={t("studio.projectDetails.metaDescriptionPlaceholder")}
               rows={3}
             />
             <p className="text-xs text-muted-foreground">
@@ -377,7 +382,7 @@ export default function ProjectDetailsSheet({
             </p>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="pds-slug">Slug</Label>
+            <Label htmlFor="pds-slug">{t("studio.projectDetails.slug")}</Label>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">/v/</span>
               <Input
@@ -392,17 +397,16 @@ export default function ProjectDetailsSheet({
                       .slice(0, 80),
                   )
                 }
-                placeholder="sean-hogg-promo-video"
+                placeholder={t("studio.projectDetails.slugPlaceholder")}
                 className="h-9"
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Lowercase letters, numbers, and hyphens. Used in the public
-              share URL.
+              {t("studio.projectDetails.slugHelp")}
             </p>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="pds-keywords">Keywords</Label>
+            <Label htmlFor="pds-keywords">{t("studio.projectDetails.keywords")}</Label>
             <Input
               id="pds-keywords"
               value={keywordDraft}
@@ -416,7 +420,7 @@ export default function ProjectDetailsSheet({
                 }
               }}
               onBlur={commitKeywordDraft}
-              placeholder="Type a keyword and press Enter"
+              placeholder={t("studio.projectDetails.keywordPlaceholder")}
               className="h-9"
             />
             {keywords.length > 0 && (
@@ -428,7 +432,7 @@ export default function ProjectDetailsSheet({
                       type="button"
                       onClick={() => removeKeyword(k)}
                       className="rounded-full p-0.5 hover:bg-muted-foreground/20"
-                      aria-label={`Remove ${k}`}
+                      aria-label={t("studio.projectDetails.removeKeyword", { k })}
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -437,29 +441,27 @@ export default function ProjectDetailsSheet({
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              Up to 20 short tags. Help search and recommendation surface
-              this video.
+              {t("studio.projectDetails.keywordsHelp")}
             </p>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="pds-social">Social card image URL</Label>
+            <Label htmlFor="pds-social">{t("studio.projectDetails.socialCardImage")}</Label>
             <UrlPickerInput
               id="pds-social"
               value={socialCardImage}
               onChange={(v) => setSocialCardImage(v.slice(0, 500))}
-              placeholder="https://…/preview.png"
+              placeholder={t("studio.projectDetails.socialCardPlaceholder")}
               className="h-9"
               previewKind="image"
             >
               <MediaIconPicker
                 accept="image"
                 onPick={(url) => setSocialCardImage(url.slice(0, 500))}
-                label="Upload, pick stock, or AI-generate a social card image"
+                label={t("studio.projectDetails.socialCardPickerLabel")}
               />
             </UrlPickerInput>
             <p className="text-xs text-muted-foreground">
-              1200×630 PNG/JPG works best for LinkedIn, X, and Facebook
-              previews.
+              {t("studio.projectDetails.socialCardHelp")}
             </p>
           </div>
         </div>
@@ -467,7 +469,7 @@ export default function ProjectDetailsSheet({
     },
     {
       key: "campaign",
-      label: "Campaign",
+      label: t("studio.projectDetails.tab.campaign"),
       icon: Megaphone,
       render: () => (
         <CampaignSection
@@ -485,26 +487,19 @@ export default function ProjectDetailsSheet({
     },
     {
       key: "engagement",
-      label: "Engagement",
+      label: t("studio.projectDetails.tab.engagement"),
       icon: MessageSquare,
       render: () => (
-        <>
-          <Suspense
-            fallback={
-              <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading viewer engagement…
-              </div>
-            }
-          >
-            <EngagementResultsPanel projectId={project.id} />
-          </Suspense>
-          <p className="mt-4 text-xs text-muted-foreground">
-            What viewers did — form submissions, reviewer threads, plus the
-            chapters and thumbnails currently exposed to them. Author these
-            in the editor's Actions panel.
-          </p>
-        </>
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {t("studio.projectDetails.loadingEngagement")}
+            </div>
+          }
+        >
+          <EngagementTab project={project} />
+        </Suspense>
       ),
     },
   ];
@@ -514,7 +509,7 @@ export default function ProjectDetailsSheet({
   const headerAside = <SaveStatusBadge status={status} />;
 
   const sharedProps = {
-    title: project.title ?? "Project details",
+    title: project.title ?? t("studio.projectDetails.titleFallback"),
     chips,
     sections,
     layout: "tabs" as const,
@@ -566,11 +561,12 @@ function CampaignSection({
   onCreate: () => Promise<void>;
   creating: boolean;
 }) {
+  const { t } = useTranslation();
   if (campaignsLoading && !campaigns) {
     return (
       <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        Loading your campaigns…
+        {t("studio.projectDetails.loadingCampaigns")}
       </div>
     );
   }
@@ -580,17 +576,14 @@ function CampaignSection({
     <div className="space-y-5">
       <div>
         <p className="text-sm text-muted-foreground">
-          Group this project with other ads, banners, and videos so the
-          Outreach dashboard can roll up performance per launch, season,
-          or audience. Membership is editable from either side — this
-          panel or the Campaigns tab in Outreach.
+          {t("studio.projectDetails.campaignIntro")}
         </p>
       </div>
 
       {memberOf.length > 0 && (
         <div className="space-y-2">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-            In these campaigns
+            {t("studio.projectDetails.inTheseCampaigns")}
           </Label>
           <div className="space-y-1.5">
             {memberOf.map((c) => (
@@ -608,12 +601,11 @@ function CampaignSection({
 
       <div className="space-y-2">
         <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-          Add to existing campaign
+          {t("studio.projectDetails.addToExistingCampaign")}
         </Label>
         {list.length === 0 ? (
           <p className="rounded-md border border-dashed border-border bg-muted/20 py-4 px-3 text-xs text-muted-foreground">
-            No campaigns yet. Create one below — the Outreach tab will
-            roll up performance once metrics start arriving.
+            {t("studio.projectDetails.noCampaignsYet")}
           </p>
         ) : (
           <div className="space-y-1.5">
@@ -630,9 +622,10 @@ function CampaignSection({
                   <div className="min-w-0">
                     <p className="truncate font-medium">{c.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {c.projectIds.length} project
-                      {c.projectIds.length === 1 ? "" : "s"} ·{" "}
-                      {c.status}
+                      {t("studio.projectDetails.campaignProjectCount", {
+                        count: c.projectIds.length,
+                        status: c.status,
+                      })}
                     </p>
                   </div>
                   {campaignSaving === c.id ? (
@@ -644,8 +637,7 @@ function CampaignSection({
               ))}
             {list.every((c) => c.projectIds.includes(project.id)) && list.length > 0 && (
               <p className="rounded-md border border-dashed border-border bg-muted/20 py-3 px-3 text-xs text-muted-foreground">
-                This project is in every campaign you've created. Spin up
-                a new one below.
+                {t("studio.projectDetails.inEveryCampaign")}
               </p>
             )}
           </div>
@@ -654,7 +646,7 @@ function CampaignSection({
 
       <div className="space-y-2">
         <Label htmlFor="pds-new-campaign" className="text-xs uppercase tracking-wider text-muted-foreground">
-          New campaign
+          {t("studio.projectDetails.newCampaign")}
         </Label>
         <div className="flex items-center gap-2">
           <Input
@@ -667,7 +659,7 @@ function CampaignSection({
                 if (newCampaignName.trim()) void onCreate();
               }
             }}
-            placeholder="Spring product launch"
+            placeholder={t("studio.projectDetails.newCampaignPlaceholder")}
             className="h-9"
           />
           <Button
@@ -679,19 +671,18 @@ function CampaignSection({
             {creating ? (
               <>
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                Creating
+                {t("studio.projectDetails.creating")}
               </>
             ) : (
               <>
                 <Plus className="mr-1.5 h-3.5 w-3.5" />
-                Create
+                {t("studio.projectDetails.create")}
               </>
             )}
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Adds this project to the new campaign right away. Manage budget,
-          UTM params, and stats in the Outreach &gt; Campaigns tab.
+          {t("studio.projectDetails.createCampaignHelp")}
         </p>
       </div>
     </div>
@@ -714,6 +705,7 @@ function CampaignMembershipRow({
   saving: boolean;
   onRemove: () => void;
 }) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const hasAnyUtm = Boolean(
     campaign.utmSource || campaign.utmMedium || campaign.utmCampaign,
@@ -731,12 +723,12 @@ function CampaignMembershipRow({
     try {
       await navigator.clipboard.writeText(url);
       toast({
-        title: "Share URL copied",
-        description: hasAnyUtm ? utmHint : "No UTM tags — base URL only.",
+        title: t("studio.projectDetails.toast.shareUrlCopied"),
+        description: hasAnyUtm ? utmHint : t("studio.projectDetails.toast.noUtmTags"),
       });
     } catch {
       toast({
-        title: "Couldn't copy",
+        title: t("studio.projectDetails.toast.copyFailed"),
         description: url,
         variant: "destructive",
       });
@@ -760,11 +752,11 @@ function CampaignMembershipRow({
           className="h-7 text-xs"
           title={
             hasAnyUtm
-              ? "Copy share URL with UTM tags baked in"
-              : "Copy share URL (no UTM tags configured on this campaign)"
+              ? t("studio.projectDetails.copyShareUrlWithUtm")
+              : t("studio.projectDetails.copyShareUrlNoUtm")
           }
         >
-          Copy URL
+          {t("studio.projectDetails.copyUrl")}
         </Button>
         <Button
           type="button"
@@ -773,7 +765,9 @@ function CampaignMembershipRow({
           onClick={onRemove}
           disabled={saving}
           className="h-7 w-7 p-0"
-          aria-label={`Remove from ${campaign.name}`}
+          aria-label={t("studio.projectDetails.removeFromCampaign", {
+            campaignName: campaign.name,
+          })}
         >
           {saving ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -787,23 +781,24 @@ function CampaignMembershipRow({
 }
 
 function SaveStatusBadge({ status }: { status: SaveStatus }) {
+  const { t } = useTranslation();
   if (status === "idle") return null;
   if (status === "saving") {
     return (
       <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
         <Loader2 className="h-3 w-3 animate-spin" />
-        Saving…
+        {t("studio.projectDetails.saving")}
       </span>
     );
   }
   if (status === "saved") {
     return (
       <span className="text-xs font-normal text-emerald-600 dark:text-emerald-400">
-        Saved
+        {t("studio.projectDetails.saved")}
       </span>
     );
   }
   return (
-    <span className="text-xs font-normal text-destructive">Save failed</span>
+    <span className="text-xs font-normal text-destructive">{t("studio.projectDetails.saveFailed")}</span>
   );
 }
