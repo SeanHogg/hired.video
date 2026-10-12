@@ -48,7 +48,7 @@ import { refreshDiffPercentFor } from "../services/resume/view.js";
 import { runResumeParse } from "../services/resume/parsePipeline.js";
 import { createAiTextCaller, hasAiTextProvider } from "../services/adapters/ai-text-caller.js";
 import { PARTNER_RESUME_AI_PARSE, buildPartnerTextParser } from "../services/partner/resumeTextParser.js";
-import { extractResumeText } from "../services/resume/extractFile.js";
+import { decodeResumeFilePayload, extractResumeText } from "../services/resume/extractFile.js";
 import {
   PARTNER_EMBED_KINDS,
   PARTNER_EMBED_THEMES,
@@ -56,23 +56,20 @@ import {
   type PartnerScope,
 } from "../../../shared/partner.js";
 
-/** Decode a base64 (optionally data-URL) résumé `file` and extract its text.
- *  PDF/DOCX are extracted server-side; unsupported binaries return a typed code
- *  so the SDK can branch. Enforces the decoded-size ceiling. */
+/** Decode a résumé `file` (base64, data-URL, or raw PDF bytes) and extract
+ *  its text. PDF/DOCX are extracted server-side; unsupported binaries return
+ *  a typed code so the SDK can branch. Enforces the decoded-size ceiling. */
 async function decodePartnerResumeFile(
   file: string,
   contentType: string | undefined,
   filename: string | undefined,
 ): Promise<{ ok: true; rawText: string } | { ok: false; status: 413 | 415 | 422; code: string; message: string }> {
-  const b64 = file.includes(",") ? file.slice(file.indexOf(",") + 1) : file;
-  let bytes: Uint8Array;
-  try {
-    const bin = atob(b64);
-    bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  } catch {
-    return { ok: false, status: 422, code: "INVALID_RESUME", message: "`file` is not valid base64." };
+  const decodedFile = decodeResumeFilePayload(file);
+  // `in`-narrowing (non-strict tsconfig) — boolean discriminant doesn't narrow.
+  if ("message" in decodedFile) {
+    return { ok: false, status: 422, code: "INVALID_RESUME", message: decodedFile.message };
   }
+  const bytes = decodedFile.bytes;
   if (bytes.length > PARTNER_RESUME_UPLOAD_MAX_BYTES) {
     return {
       ok: false,
@@ -148,13 +145,13 @@ partnerRoutes.get("/v1/me", partnerAuth(null), async (c) => {
   return c.json(success({ partner, scopes }), 200);
 });
 
-// A résumé write payload — structured `content`, `rawText`, or a base64 `file`
-// (text/JSON only; binary PDF/DOCX rejected with UNSUPPORTED_MEDIA_TYPE).
+// A résumé write payload — structured `content`, `rawText`, or a `file`
+// (base64 / data-URL / raw PDF). Unsupported binaries → UNSUPPORTED_MEDIA_TYPE.
 const ResumeWriteBody = z.object({
   title: z.string().min(1).max(200).default("Resume"),
   content: z.record(z.string(), z.unknown()).optional(),
   rawText: z.string().max(60_000).optional(),
-  /** Base64 (optionally a data: URL). ~14M chars ≈ 10 MB decoded. */
+  /** Base64 (optionally a data: URL) or a raw PDF body. ~14M chars ≈ 10 MB decoded. */
   file: z.string().max(14_000_000).optional(),
   filename: z.string().max(255).optional(),
   contentType: z.string().max(120).optional(),
@@ -183,7 +180,7 @@ async function resolveResumeWrite(
     ok: false,
     status: 400,
     code: "VALIDATION_ERROR",
-    message: "Provide `content` (JSON Resume), `rawText`, or a base64 `file`.",
+    message: "Provide `content` (JSON Resume), `rawText`, or a `file` (base64 or raw PDF).",
   };
 }
 

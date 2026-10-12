@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { extractPdfText } from "../pdf-extract.js";
-import { extractResumeText } from "../../services/resume/extractFile.js";
+import { decodeResumeFilePayload, extractResumeText } from "../../services/resume/extractFile.js";
 
 /** Build a minimal, valid one-page PDF whose content stream is `content`
  *  (uncompressed), with correct xref offsets. */
@@ -64,5 +64,49 @@ describe("extractResumeText", () => {
     const bytes = new TextEncoder().encode("Jane Doe\nSenior Engineer at Acme, 2019 - Present");
     const result = await extractResumeText(bytes, { filename: "resume.txt", contentType: "text/plain" });
     assert.equal(result.ok, true);
+  });
+});
+
+describe("decodeResumeFilePayload (#2308 raw PDF, not only base64)", () => {
+  it("accepts a raw PDF latin1 string whose body contains commas", () => {
+    const pdf = buildPdf("BT /F1 12 Tf 72 720 Td (Hello, world) Tj ET");
+    const raw = new TextDecoder("latin1").decode(pdf);
+    assert.ok(raw.includes(","), "fixture must contain a comma so we don't regress data-URL slicing");
+    const decoded = decodeResumeFilePayload(raw);
+    assert.equal(decoded.ok, true);
+    assert.deepEqual(decoded.ok ? [...decoded.bytes] : [], [...pdf]);
+  });
+
+  it("accepts standard base64 of a PDF", () => {
+    const pdf = buildPdf("BT /F1 12 Tf 72 720 Td (Experience at Acme Corp) Tj ET");
+    const b64 = Buffer.from(pdf).toString("base64");
+    const decoded = decodeResumeFilePayload(b64);
+    assert.equal(decoded.ok, true);
+    assert.deepEqual(decoded.ok ? [...decoded.bytes] : [], [...pdf]);
+  });
+
+  it("accepts a data:application/pdf;base64 URL", () => {
+    const pdf = buildPdf("BT /F1 12 Tf 72 720 Td (Work History) Tj ET");
+    const b64 = Buffer.from(pdf).toString("base64");
+    const decoded = decodeResumeFilePayload(`data:application/pdf;base64,${b64}`);
+    assert.equal(decoded.ok, true);
+    assert.deepEqual(decoded.ok ? [...decoded.bytes] : [], [...pdf]);
+  });
+
+  it("rejects garbage that is neither base64 nor a PDF", () => {
+    const decoded = decodeResumeFilePayload("%%%not-base64%%%");
+    assert.equal(decoded.ok, false);
+    assert.match(decoded.ok ? "" : decoded.message, /base64 or a raw PDF/);
+  });
+
+  it("raw PDF payload extracts the same text as the original bytes", async () => {
+    const pdf = buildPdf(`BT /F1 12 Tf 72 720 Td <${hex("Work History")}> Tj ET`);
+    const decoded = decodeResumeFilePayload(new TextDecoder("latin1").decode(pdf));
+    assert.equal(decoded.ok, true);
+    const result = await extractResumeText(decoded.ok ? decoded.bytes : new Uint8Array(), {
+      filename: "resume.pdf",
+    });
+    assert.equal(result.ok, true);
+    assert.match(result.ok ? result.text : "", /Work History/);
   });
 });
