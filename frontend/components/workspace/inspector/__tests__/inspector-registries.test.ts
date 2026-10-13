@@ -108,12 +108,17 @@ describe("letter", () => {
 });
 
 describe("video Voice hint", () => {
-  const video = (source?: "ai" | "upload") =>
-    ({ plan: { voice: source === "upload" ? { source, url: "https://x.test/a.mp3", durationSeconds: 3 } : source ? { source } : undefined } }) as unknown as BuildVideo;
+  const video = (voice?: unknown) => ({ plan: { voice } }) as unknown as BuildVideo;
+  const clip = { voiceClip: { url: "https://x.test/t.webm", durationSeconds: 2 } } as never;
 
-  it("yours for a take, uploaded for a file, else AI", () => {
-    expect(sceneVoiceHint({ scene: { voiceClip: { url: "https://x.test/t.webm" } } as never, video: video() }, t)).toBe("build.sceneInspector.voiceHint.yours");
-    expect(sceneVoiceHint({ scene: {}, video: video("upload") }, t)).toBe("build.sceneInspector.voiceHint.uploaded");
-    expect(sceneVoiceHint({ scene: {}, video: video("ai") }, t)).toBe("build.sceneInspector.voiceHint.ai");
+  it("yours for a played take, uploaded for a file, AI for words, else none", () => {
+    expect(sceneVoiceHint({ scene: clip, video: video({ source: "recorded" }) }, t)).toBe("build.sceneInspector.voiceHint.yours");
+    expect(sceneVoiceHint({ scene: {}, video: video({ source: "upload", url: "https://x.test/a.mp3", durationSeconds: 3 }) }, t)).toBe("build.sceneInspector.voiceHint.uploaded");
+    expect(sceneVoiceHint({ scene: { voiceover: "Hi" }, video: video({ source: "ai" }) }, t)).toBe("build.sceneInspector.voiceHint.ai");
+    // No words, or the voice switched off: nobody speaks — never a false "AI".
+    expect(sceneVoiceHint({ scene: {}, video: video({ source: "ai" }) }, t)).toBe("build.sceneInspector.voiceHint.none");
+    expect(sceneVoiceHint({ scene: { voiceover: "Hi" }, video: video({ source: "none" }) }, t)).toBe("build.sceneInspector.voiceHint.none");
+    // A take that isn't played (the voice is AI) isn't "yours".
+    expect(sceneVoiceHint({ scene: clip, video: video({ source: "ai" }) }, t)).toBe("build.sceneInspector.voiceHint.none");
   });
 });

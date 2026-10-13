@@ -73,7 +73,7 @@ export function useSceneVoiceovers(
 ): { canvas: CanvasState | null; status: StatusMap } {
   const { user } = useAuth();
   const texts = useMemo(() => sceneVoiceoverTexts(plan), [plan]);
-  const voiceId = plan.voice?.source === "upload" ? undefined : plan.voice?.voiceId;
+  const voiceId = plan.voice?.source === "ai" || plan.voice?.source === "recorded" ? plan.voice.voiceId : undefined;
   const textsKey = JSON.stringify({ texts, voiceId });
   const [audio, setAudio] = useState<AudioMap>({});
   const [status, setStatus] = useState<StatusMap>({});

@@ -154,6 +154,15 @@ export async function synthesizePendingNarration(
   };
 }
 
+/** A short line in one narration voice, as audio to play right away —
+ *  nothing uploaded (the voice picker's ▶). Throws when no engine runs. */
+export async function renderNarrationSample(voiceId: string, text: string): Promise<Blob> {
+  const engine = pickEngine();
+  if (!engine) throw new Error("No in-browser TTS engine available (WebGPU required).");
+  const { pcm, sampleRate } = await renderToPcm(engine, text, voiceId);
+  return pcmToWav(pcm, sampleRate);
+}
+
 /** The voices narration can speak in, on this device (empty when no
  *  in-browser engine is available). */
 export async function listNarrationVoices(): Promise<TTSVoice[]> {

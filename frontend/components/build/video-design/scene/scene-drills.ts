@@ -8,6 +8,7 @@
  */
 import type { TFunction } from "i18next";
 import { defineDrills } from "@/components/workspace/inspector/inspector-drills";
+import { sceneSpeaker } from "@/lib/build/voice-state";
 import type { SceneDrillProps } from "./types";
 import WordsDrill from "./drills/WordsDrill";
 import VoiceDrill from "./drills/VoiceDrill";
@@ -36,10 +37,9 @@ export const SCENE_DRILL_IDS = [
 ] as const;
 export type SceneDrillId = (typeof SCENE_DRILL_IDS)[number];
 
-/** Who speaks this scene: the owner's take, their uploaded file, else the AI voice. Pure. */
+/** Who speaks this scene (voice-state.ts): yours, uploaded, AI, or nobody. Pure. */
 export function sceneVoiceHint({ scene, video }: Pick<SceneDrillProps, "scene" | "video">, t: TFunction): string {
-  if (scene.voiceClip) return t("build.sceneInspector.voiceHint.yours");
-  return video.plan.voice?.source === "upload" ? t("build.sceneInspector.voiceHint.uploaded") : t("build.sceneInspector.voiceHint.ai");
+  return t(`build.sceneInspector.voiceHint.${sceneSpeaker(video.plan, scene)}`);
 }
 
 const VIDEO = "build.sceneInspector.wholeVideo";

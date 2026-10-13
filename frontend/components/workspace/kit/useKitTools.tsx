@@ -33,6 +33,7 @@ import SectionsPanel from "@/components/build/SectionsPanel";
 import SectionEditPanel from "@/components/build/SectionEditPanel";
 import MediaPanel from "@/components/build/MediaPanel";
 import VoicePanel from "@/components/build/voice/VoicePanel";
+import SoundMix from "@/components/build/voice/SoundMix";
 import KitStoryPanel from "./KitStoryPanel";
 import KitSaveDesignTemplate from "./KitSaveDesignTemplate";
 import StagePlanCard from "@/components/build/StagePlanCard";
@@ -184,7 +185,12 @@ export function useKitTools({ kit, depth, showCanvas }: Args): WorkspaceTool[] {
     media: ready && nav.page !== "letter" ? (
       <div className={PAD}>
         <MediaPanel content={ready.content} music={ready.outline.music} onChange={history.commit} onMusicChange={video.setMusic} />
-        {onVideo && <VoicePanel video={video} />}
+        {onVideo && (
+          <div className="mt-6 flex flex-col gap-6">
+            <VoicePanel video={video} />
+            <SoundMix video={video} />
+          </div>
+        )}
       </div>
     ) : null,
     scenes:

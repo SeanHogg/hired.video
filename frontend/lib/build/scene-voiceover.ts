@@ -35,7 +35,7 @@ export const voiceoverLayerId = (sceneId: VideoSceneId): string => `build-${scen
  *  at all when one uploaded file carries the voice. */
 export function sceneVoiceoverTexts(plan: VideoPlan): Partial<Record<VideoSceneId, string>> {
   const out: Partial<Record<VideoSceneId, string>> = {};
-  if (plan.voice?.source === "upload") return out;
+  if (plan.voice?.source === "upload" || plan.voice?.source === "none") return out;
   const recorded = plan.voice?.source === "recorded";
   for (const id of VIDEO_SCENE_IDS) {
     const scene = plan.scenes?.[id];

@@ -31,9 +31,10 @@ interface SceneInspectorProps {
   onDrill: (id: SceneDrillId) => void;
   onContentChange: (next: ResumeContent, group?: string) => void;
   onEditSource: (sectionKey: string) => void;
+  onOpenSound: () => void;
 }
 
-export default function SceneInspector({ sceneId, content, video, advanced, drill, onDrill, onContentChange, onEditSource }: SceneInspectorProps) {
+export default function SceneInspector({ sceneId, content, video, advanced, drill, onDrill, onContentChange, onEditSource, onOpenSound }: SceneInspectorProps) {
   const { t } = useTranslation();
   const { plan, patchScene } = video;
 
@@ -67,6 +68,7 @@ export default function SceneInspector({ sceneId, content, video, advanced, dril
     content,
     onContentChange,
     onEditSource,
+    onOpenSound,
   };
 
   return (

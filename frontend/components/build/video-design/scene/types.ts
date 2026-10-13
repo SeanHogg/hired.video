@@ -27,4 +27,6 @@ export interface SceneDrillProps {
   content: ResumeContent;
   onContentChange: (next: ResumeContent, group?: string) => void;
   onEditSource: (sectionKey: string) => void;
+  /** Opens Media › Sound, where the whole video's voice is chosen. */
+  onOpenSound: () => void;
 }

@@ -287,9 +287,11 @@ export const VideoPlanSchema = z
     /** The shape; absent = 16:9. */
     aspect: z.enum(VIDEO_ASPECTS).optional(),
     /** Who speaks (Video board): an AI voice, the owner's recorded takes
-     *  (scenes without a take keep the AI voice), or one uploaded file. */
+     *  (scenes without a take keep the AI voice), one uploaded file, or
+     *  nobody ("none" keeps each scene's words but silences the video). */
     voice: z
       .discriminatedUnion("source", [
+        z.object({ source: z.literal("none") }).strict(),
         z.object({ source: z.literal("ai"), voiceId: z.string().max(80).optional() }).strict(),
         z.object({ source: z.literal("recorded"), voiceId: z.string().max(80).optional() }).strict(),
         z.object({ source: z.literal("upload"), url: z.string().url().max(2000), durationSeconds: z.number().min(0).max(600) }).strict(),

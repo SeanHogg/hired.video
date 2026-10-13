@@ -45,6 +45,7 @@ export function useSceneSlotPanel(kit: KitWorkspace, advanced: boolean): SlotPan
           onDrill={open}
           onContentChange={kit.history.commit}
           onEditSource={nav.editFromPage}
+          onOpenSound={() => kit.panel.show("media")}
         />
       </div>
     ),

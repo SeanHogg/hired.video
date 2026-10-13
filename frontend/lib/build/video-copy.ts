@@ -90,6 +90,20 @@ export function sceneCopy(scene: VideoOutlineScene, outline: VideoOutline, t: Tr
   }
 }
 
+/** What a narrator says over each scene when the owner wrote nothing: the
+ *  scene's heading, then its caption (else its lines), as sentences. */
+export function spokenLines(outline: VideoOutline, t: Translate): Partial<Record<VideoSceneId, string>> {
+  const out: Partial<Record<VideoSceneId, string>> = {};
+  for (const scene of outline.scenes) {
+    const copy = sceneCopy(scene, outline, t);
+    const parts = [copy.heading, copy.caption || copy.body.join(". ")]
+      .map((p) => p.replace(/\s+·\s+/g, ", ").trim())
+      .filter((p, i, all) => p && all.indexOf(p) === i);
+    if (parts.length) out[scene.id] = parts.map((p) => (/[.!?]$/.test(p) ? p : `${p}.`)).join(" ");
+  }
+  return out;
+}
+
 /** "Dana Okafor" → "DO"; one name → its first letter; empty → "". */
 export function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
