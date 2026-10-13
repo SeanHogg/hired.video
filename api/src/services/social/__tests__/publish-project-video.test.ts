@@ -42,7 +42,7 @@ function publisher(impl: SocialVideoPublisher["publish"]): Record<VideoPublishPl
 }
 
 const input = {
-  actor: { userId: OWNER, isGuest: false },
+  actor: { userId: OWNER },
   projectId: PROJECT,
   platform: "tiktok" as const,
   title: "Dana — video resume",

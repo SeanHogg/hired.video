@@ -1,8 +1,8 @@
 /**
  * runSelfPublishGate — the one Lane-B gate (#2044): entitlement (the plan's
- * channel cap, guest 1 → free 2 → Pro unlimited) → connection → fresh token.
- * The cap runs the REAL rule (canPostToDestination) with its plan and
- * publication lookups stubbed, so free / Pro / guest are each pinned.
+ * channel cap, free 2 — a guest session too — → Pro unlimited) → connection →
+ * fresh token. The cap runs the REAL rule (canPostToDestination) with its plan
+ * and publication lookups stubbed, so free and Pro are each pinned.
  *
  * Run: node --import tsx --test src/services/social/__tests__/self-publish-gate.test.ts
  */
@@ -41,8 +41,7 @@ function tokenSource(token: string | null) {
   };
 }
 
-const account = { userId: USER, isGuest: false };
-const guest = { userId: USER, isGuest: true };
+const account = { userId: USER };
 
 describe("runSelfPublishGate — free account (2 channels per video)", () => {
   it("lets a second channel through and hands back the fresh token", async () => {
@@ -101,26 +100,6 @@ describe("runSelfPublishGate — Pro (unlimited channels)", () => {
       { canPost: capFor({ isPro: true }, []), selfAccessToken: tokenSource(null).selfAccessToken },
     );
     assert.deepEqual(result, { ok: false, kind: "NOT_CONNECTED" });
-  });
-});
-
-describe("runSelfPublishGate — guest session (1 channel per video)", () => {
-  it("allows the one free destination", async () => {
-    const result = await runSelfPublishGate(
-      { actor: guest, projectId: PROJECT, platform: "tiktok" },
-      { canPost: capFor({ isPro: false }, []), selfAccessToken: tokenSource("tt").selfAccessToken },
-    );
-    assert.deepEqual(result, { ok: true, accessToken: "tt" });
-  });
-
-  it("stops a second destination at the cap", async () => {
-    const tokens = tokenSource("tt");
-    const result = await runSelfPublishGate(
-      { actor: guest, projectId: PROJECT, platform: "youtube" },
-      { canPost: capFor({ isPro: false }, published("profile")), selfAccessToken: tokens.selfAccessToken },
-    );
-    assert.deepEqual(result, { ok: false, kind: "CHANNEL_LIMIT" });
-    assert.deepEqual(tokens.asked, []);
   });
 });
 

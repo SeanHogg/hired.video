@@ -58,7 +58,7 @@ export class PublishProjectVideoError extends Error {
 }
 
 export interface PublishProjectVideoInput {
-  actor: { userId: string; isGuest: boolean };
+  actor: { userId: string };
   projectId: string;
   platform: VideoPublishPlatform;
   title: string;

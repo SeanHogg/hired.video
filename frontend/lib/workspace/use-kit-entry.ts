@@ -45,6 +45,7 @@ import {
 } from "@/lib/studio/resume-editor-link";
 import type { ReviewHandoff } from "@/lib/build/review/use-review-handoff";
 import { resumeService } from "@/lib/services/resume-service";
+import { readAfterGuestAdoption } from "@/lib/guest-adoption";
 import { uploadImage } from "@/lib/services/upload-service";
 import { useGuestRun } from "@/hooks/use-guest-run";
 import { kitStartForTemplate } from "@/lib/studio/career-starts";
@@ -157,8 +158,8 @@ export function useKitEntry({
     startedRef.current = true;
     const state = location.state as Partial<BuildEntryState> | null;
     if (resumeId) {
-      resumeService
-        .getResumeById(resumeId)
+      // Just signed in from a guest session: retried once its work is claimed.
+      readAfterGuestAdoption(() => resumeService.getResumeById(resumeId))
         .then((resume) => {
           adoptContent(resume.content, resume.title?.trim() || untitled, resumeId);
           const review = reviewFrom(searchParams, state, untitled);

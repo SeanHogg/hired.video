@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeFailure } from "@/lib/diagnostics/diagnostics-report";
+import { describeFailure, describeWaiting } from "@/lib/diagnostics/diagnostics-report";
 import { digestResume } from "@/lib/diagnostics/resume-digest";
 
 describe("describeFailure", () => {
@@ -30,6 +30,26 @@ describe("describeFailure", () => {
       timestamp: "2026-10-08T00:03:56.390Z",
     });
     expect(line).toBe("00:03:56 GET /api/resumes/abc?x=1 → network Failed to fetch");
+  });
+});
+
+describe("describeWaiting", () => {
+  it("names a publish still waiting, in minutes (real 2026-10-13 stuck YouTube post)", () => {
+    const line = describeWaiting({
+      id: 7,
+      method: "POST",
+      url: "https://api.hired.video/api/studio/projects/9ff4634c-a0af-41ba-90b5-1a152aa0c477/publish/social/youtube",
+      timestamp: "2026-10-13T03:44:47.100Z",
+      waitingMs: 251_400,
+    });
+    expect(line).toBe(
+      "03:44:47 POST /api/studio/projects/9ff4634c-a0af-41ba-90b5-1a152aa0c477/publish/social/youtube → still waiting (4m11s)",
+    );
+  });
+
+  it("uses seconds under a minute (boundary)", () => {
+    const line = describeWaiting({ id: 8, method: "PATCH", url: "/api/studio/projects/p/status", timestamp: "2026-10-13T03:44:47.100Z", waitingMs: 20_000 });
+    expect(line).toBe("03:44:47 PATCH /api/studio/projects/p/status → still waiting (20s)");
   });
 });
 

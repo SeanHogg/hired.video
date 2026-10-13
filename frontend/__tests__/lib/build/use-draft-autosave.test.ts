@@ -141,6 +141,24 @@ describe("useDraftAutosave", () => {
     expect(updateResumeData).toHaveBeenCalledTimes(1);
   });
 
+  it("never copies a résumé opened by id once it loads (the kit's /studio/:id open) — regression 2026-10-12", async () => {
+    // A kit opened at /studio/<projectId> mounts with no draft, then the
+    // résumé arrives as an adopted ("existing") source in ONE render.
+    const hook = renderHook(
+      (props: { content: ResumeContent | null; source: IntakeSource | null }) =>
+        useDraftAutosave({ ...props, design: null, autoPersist: true }),
+      { initialProps: { content: null as ResumeContent | null, source: null as IntakeSource | null } },
+    );
+    hook.rerender({ content: resume("v0"), source: existing });
+    // Same render: it already names the opened résumé's own row.
+    expect(hook.result.current.savedResumeId).toBe(RESUME_ID);
+    await act(async () => {
+      vi.advanceTimersByTime(SAVE_DEBOUNCE_MS * 2);
+    });
+    expect(createResume).not.toHaveBeenCalled();
+    expect(hook.result.current.savedResumeId).toBe(RESUME_ID);
+  });
+
   it("re-saves a restored draft of an existing résumé once", async () => {
     setup({ content: resume("edited before reload"), design: null }, false);
     await act(async () => {

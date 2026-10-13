@@ -87,8 +87,8 @@ interface AuthContextType {
   /** Signed in with a REAL account (false for a guest session). */
   isAuthenticated: boolean;
   /** Signed in as a silent guest account (no email yet). Guests can build,
-   *  save and post to ONE destination; download and multi-destination
-   *  posting need a real account. */
+   *  save and post like a free account; download needs a real account, and
+   *  saving the work to one is offered, never forced. */
   isGuest: boolean;
   /** Make sure there is a server identity: no-op when signed in (guest or
    *  real), otherwise mints a guest session. Resolves false on failure. */

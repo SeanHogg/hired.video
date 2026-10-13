@@ -19,6 +19,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigationType, useParams, useSearchParams } from "react-router-dom";
 import { kitResumeId } from "@shared/studio-subject";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
+import { readAfterGuestAdoption } from "@/lib/guest-adoption";
 import { resolveWorkspaceRoute } from "@/lib/workspace/workspace-route";
 import StudioLoadingShell from "./StudioLoadingShell";
 
@@ -29,14 +30,14 @@ type Loaded = { id: string; project: StudioProject | null };
 
 /** /studio/:id with no hand-off state: read the project once to tell a kit
  *  from a format. A failed read falls through to the editor, which shows
- *  its own "can't open this project" banner. */
+ *  its own "can't open this project" banner. Just signed in from a guest
+ *  session: retried once the guest's work is claimed. */
 function useLoadedProject(projectId: string | null): Loaded | null {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   useEffect(() => {
     if (!projectId) return;
     let cancelled = false;
-    studioService
-      .getProject(projectId)
+    readAfterGuestAdoption(() => studioService.getProject(projectId))
       .then((res) => !cancelled && setLoaded({ id: projectId, project: res.data ?? null }))
       .catch(() => !cancelled && setLoaded({ id: projectId, project: null }));
     return () => {

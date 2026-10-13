@@ -6,9 +6,10 @@
  * — the SAME handlers the Save menu uses — after ONE anon-gate check: a
  * signed-out visitor gets a silent guest session and the post continues with
  * no form. How many destinations one post may reach is `postChannelLimit`
- * (shared/pricing): a guest gets one — picking a second is the
- * "multi-destination" sign-up gate — a free account two, Pro unlimited. At
- * the free cap the remaining channels are locked (`isLocked`), not hidden.
+ * (shared/pricing): two without Pro — a guest the same as a free account,
+ * promoting is never behind a sign-up — Pro unlimited. At the free cap the
+ * remaining channels are locked (`isLocked`), not hidden. Saving the work to
+ * an account is the visitor's choice (`saveWork`, after posting).
  *
  * "Schedule" (#2047): with a send time picked (`when`), the same run
  * prepares the video and its fitted cuts, then queues one job per network
@@ -21,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useSubscription } from "@/lib/hooks/useSubscription";
 import { useAnonGate } from "@/lib/studio/anon-gate-context";
+import { SAVE_ACCOUNT_REASON } from "@/lib/studio/anon-conversion";
 import { writeCaption as writeCaptionFor } from "@/lib/studio/write-caption";
 import { startYouTubeConnect } from "@/lib/studio/youtube-connect";
 import type { PublishHandlers, PublishOutcome } from "@/lib/studio/use-publish-handlers";
@@ -73,13 +75,12 @@ export function useSharePanel({
 }: UseSharePanelArgs) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const { user, isGuest } = useAuth();
-  const hasAccount = !!user && !isGuest;
+  const { user } = useAuth();
   // Guest sessions connect + post too, so connection state loads for any
   // signed-in visitor (`isAuthenticated` is false for guests).
   const isAuthenticated = !!user;
   const { isPro } = useSubscription();
-  const limit = postChannelLimit({ isPro, hasAccount });
+  const limit = postChannelLimit({ isPro });
   const anonGate = useAnonGate();
   const social = useSocialChannelConnections(open);
   // Social networks only once the server offers them (developer app configured).
@@ -90,8 +91,7 @@ export function useSharePanel({
   );
 
   // The profile needs no connect, so it is pre-selected for everyone: the
-  // fastest path to a live, shareable post. A guest swaps it for another
-  // channel by unticking it (their one free destination).
+  // fastest path to a live, shareable post.
   const [selected, setSelected] = useState<Set<ShareChannelId>>(
     () => new Set(channels.includes("profile") ? ["profile"] : []),
   );
@@ -153,14 +153,12 @@ export function useSharePanel({
   const tiktokPicked = open && selected.has("tiktok") && isConnected("tiktok");
   const tiktok = useTikTokPostSettings(tiktokPicked, durationSec);
 
-  /** At a free account's cap: unpicked channels need Pro. */
-  const isLocked = (channel: ShareChannelId): boolean =>
-    hasAccount && !selected.has(channel) && selected.size >= limit;
+  /** At the free cap: unpicked channels need Pro. */
+  const isLocked = (channel: ShareChannelId): boolean => !selected.has(channel) && selected.size >= limit;
 
   const toggle = (channel: ShareChannelId) => {
     const adding = !selected.has(channel);
     if (adding && isLocked(channel)) return;
-    if (adding && selected.size >= limit && !gatedMulti(() => toggle(channel))) return;
     touchedRef.current.add(channel);
     setSelected((prev) => {
       const next = new Set(prev);
@@ -187,19 +185,15 @@ export function useSharePanel({
     return ok;
   };
 
-  /** A second destination needs a real account (guests get exactly one). */
-  const gatedMulti = (run: () => void): boolean => {
-    if (hasAccount) return true;
+  /** The visitor's OWN choice to keep their work on a free account (never a
+   *  gate): the panel steps aside for the sign-up sheet and comes back. */
+  const saveWork = () => {
     const ok = anonGate.requireAuth({
-      reason: "multi-destination",
-      displayReason: t("studio.share.gateMulti"),
-      onAuthed: () => {
-        onOpenChange(true);
-        run();
-      },
+      reason: SAVE_ACCOUNT_REASON,
+      displayReason: t("studio.share.saveWork.reason"),
+      onAuthed: () => onOpenChange(true),
     });
     if (!ok) onOpenChange(false);
-    return ok;
   };
 
   const connect = async (channel: ShareChannelId) => {
@@ -307,7 +301,6 @@ export function useSharePanel({
 
   const post = () => {
     const run = scheduling ? runSchedule : runPost;
-    if (postable.length > limit && !gatedMulti(() => void run())) return;
     if (!gated(() => void run())) return;
     void run();
   };
@@ -351,6 +344,8 @@ export function useSharePanel({
     showTikTokSettings: tiktokPicked,
     needsTikTokSettings,
     post,
+    /** Offer to save the work to a free account (shown to guests after posting). */
+    saveWork,
     status,
     results,
     /** Where the run is: render progress and each destination's state. */

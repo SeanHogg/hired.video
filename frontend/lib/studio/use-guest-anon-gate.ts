@@ -3,8 +3,8 @@
  * that host studio components (the post dock on the kit workspace). Same product rule
  * as the editor's gate (lib/studio/anon-conversion):
  *
- *   • account-only reasons (export / download / a second destination) open the
- *     in-place sign-up sheet and resume the action once they're signed in;
+ *   • account-only reasons (export / download / the visitor's own "save my
+ *     work") open the in-place sign-up sheet and resume once they're signed in;
  *   • everything else runs on a silent guest session — no form — and resumes
  *     as soon as the session exists (useGuestRun).
  *

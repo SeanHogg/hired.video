@@ -80,16 +80,15 @@ export const FREE_PUBLISHED_VIDEOS_LIMIT = 1;
 export const FREE_INTERVIEW_SESSIONS_PER_MONTH = 3;
 
 // ── Posting a video (Post dock) ─────────────────────────────────────────────
-/** Destinations one post may go to without any account (silent guest session). */
-export const GUEST_POST_CHANNEL_LIMIT = 1;
-/** Destinations one post may go to on a free account. Pro is unlimited. */
+/** Destinations one post may go to without Pro — the same for a silent guest
+ *  session and a free account: promoting is never behind a sign-up (an
+ *  account is offered to SAVE the work, not to post it). Pro is unlimited. */
 export const FREE_POST_CHANNEL_LIMIT = 2;
 
 /** How many destinations one post may go to — the single rule the Post dock
- *  enforces (guest 1 → free account 2 → Pro unlimited). */
-export function postChannelLimit({ isPro, hasAccount }: { isPro: boolean; hasAccount: boolean }): number {
-  if (isPro) return Number.POSITIVE_INFINITY;
-  return hasAccount ? FREE_POST_CHANNEL_LIMIT : GUEST_POST_CHANNEL_LIMIT;
+ *  and the server gate enforce (free / guest 2 → Pro unlimited). */
+export function postChannelLimit({ isPro }: { isPro: boolean }): number {
+  return isPro ? Number.POSITIVE_INFINITY : FREE_POST_CHANNEL_LIMIT;
 }
 
 // ── Inbox Sync (Gmail / Outlook connected mailboxes) ────────────────────────

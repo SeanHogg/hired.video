@@ -251,6 +251,9 @@ export class AuthService {
   /** Guest JWT (mig 0496), kept apart from `auth_token` so it survives a
    *  real sign-in and can be claimed (adoptGuest) onto the real account. */
   private guestTokenKey = "guest_token";
+  /** The ONE claim in flight — AuthProvider, Download and a page's first
+   *  reads share it instead of racing two POSTs. */
+  private adoption: Promise<boolean> | null = null;
   private userKey = "current_user";
 
 
@@ -697,7 +700,21 @@ export class AuthService {
    * videos, resumes and connections move over and the guest is deleted.
    * Returns true when there is nothing left to claim.
    */
-  async adoptGuest(): Promise<boolean> {
+  adoptGuest(): Promise<boolean> {
+    if (!this.getGuestToken()) return Promise.resolve(true);
+    this.adoption ??= this.claimGuest().finally(() => {
+      this.adoption = null;
+    });
+    return this.adoption;
+  }
+
+  /** The claim in flight, if any — a read that failed right after a real
+   *  sign-in may be reading guest-owned work that is still moving over. */
+  adoptionInFlight(): Promise<boolean> | null {
+    return this.adoption;
+  }
+
+  private async claimGuest(): Promise<boolean> {
     const guestToken = this.getGuestToken();
     if (!guestToken) return true;
     try {

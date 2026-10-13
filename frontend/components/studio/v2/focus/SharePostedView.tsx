@@ -1,8 +1,8 @@
 /**
  * SharePostedView — the Post dock's "posted" state: a POSTED eyebrow, the
  * channels that went out (each with its View link), the shareable profile
- * link with Copy, then (free users only) the single Pro offer, or a short
- * Pro confirmation.
+ * link with Copy, the optional save-your-work offer (guests only), then
+ * (free users only) the single Pro offer, or a short Pro confirmation.
  */
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { ShareChannelId } from "@/lib/studio/share-channels";
 import type { PublishOutcome } from "@/lib/studio/use-publish-handlers";
 import ProUpsellCard from "./ProUpsellCard";
+import GuestSaveWorkCard from "./GuestSaveWorkCard";
 import { useShareChannelLabel } from "./useShareChannelLabel";
 
 export interface SharePostedViewProps {
@@ -18,13 +19,15 @@ export interface SharePostedViewProps {
   isPro: boolean;
   onPostAgain: () => void;
   onNavigate: () => void;
+  /** Opens the optional save-to-account sheet (GuestSaveWorkCard). */
+  onSaveWork: () => void;
 }
 
 function absoluteUrl(url: string): string {
   return url.startsWith("http") ? url : `${window.location.origin}${url}`;
 }
 
-export default function SharePostedView({ channels, results, isPro, onPostAgain, onNavigate }: SharePostedViewProps) {
+export default function SharePostedView({ channels, results, isPro, onPostAgain, onNavigate, onSaveWork }: SharePostedViewProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -94,6 +97,7 @@ export default function SharePostedView({ channels, results, isPro, onPostAgain,
           </button>
         </div>
       )}
+      <GuestSaveWorkCard onSave={onSaveWork} />
       {isPro ? (
         <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[14px] bg-brand-green/10 p-3.5 ring-1 ring-inset ring-brand-green/30">
           <span className="flex-[1_1_220px] text-sm leading-normal text-brand-green-text">

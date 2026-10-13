@@ -2,7 +2,7 @@
  * Post-channel entitlement — the server half of the Post dock's channel cap.
  *
  * One video may go out to `postChannelLimit` destinations (shared/pricing:
- * guest 1 → free account 2 → Pro unlimited). The ledger is the project's
+ * free 2 — a guest session the same — → Pro unlimited). The ledger is the project's
  * publication records (publication-service — one row per destination), so
  * re-posting to a destination the video is already on never counts twice and
  * un-publishing frees the slot.
@@ -21,8 +21,6 @@ import { TIER_COPY, UPGRADE_URL } from "../../../../shared/tier-copy.js";
 
 export interface PostChannelCheck {
   userId: string;
-  /** Silent guest session (JWT `guest` claim). */
-  isGuest: boolean;
   projectId: string;
   destination: string;
 }
@@ -44,11 +42,11 @@ export interface PostChannelDeps {
 }
 
 export async function canPostToDestination(
-  { userId, isGuest, projectId, destination }: PostChannelCheck,
+  { userId, projectId, destination }: PostChannelCheck,
   deps: PostChannelDeps = {},
 ): Promise<boolean> {
   const isPro = deps.isPro ? await deps.isPro(userId) : (await getSubscription(userId)).isPro;
-  const limit = postChannelLimit({ isPro, hasAccount: !isGuest });
+  const limit = postChannelLimit({ isPro });
   if (!Number.isFinite(limit)) return true;
   const published = (await (deps.listPublications ?? listPublications)(projectId))
     .filter((p) => p.status === "published")
@@ -65,10 +63,8 @@ export async function postChannelGate(
   projectId: string,
   destination: string,
 ): Promise<Response | null> {
-  const user = c.var.user;
   const allowed = await canPostToDestination({
-    userId: user.sub,
-    isGuest: !!user.guest,
+    userId: c.var.user.sub,
     projectId,
     destination,
   });

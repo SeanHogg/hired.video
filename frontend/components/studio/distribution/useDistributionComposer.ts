@@ -54,7 +54,7 @@ export function useDistributionComposer() {
   const { user, isGuest } = useAuth();
   const hasAccount = !!user && !isGuest;
   const { isPro } = useSubscription();
-  const limit = postChannelLimit({ isPro, hasAccount });
+  const limit = postChannelLimit({ isPro });
 
   const projectsQuery = useQuery({
     queryKey: ["distribution", "projects"],

@@ -300,6 +300,10 @@ const MAX_BODY_BYTES_FOR_LOG = 2048;
 let _logIdCounter = 0;
 const _recentApiRequests: ApiRequestLogEntry[] = [];
 const _evictedApiFailures: ApiRequestLogEntry[] = [];
+/** Requests still waiting for an answer. Kept apart from the ring so a slow
+ *  one (a publish, an upload) is never pushed out by the polling that runs
+ *  while it waits — it is exactly what a diagnostics report needs to show. */
+const _pendingApiRequests = new Map<number, ApiRequestLogEntry>();
 
 function truncateBodyForLog(body: unknown): unknown {
   if (body == null) return body;
@@ -364,6 +368,7 @@ function pushApiLogEntry(entry: ApiRequestLogEntry): void {
     entry.requestBody = truncateBodyForLog(entry.requestBody);
   }
   _recentApiRequests.push(entry);
+  _pendingApiRequests.set(entry.id, entry);
   if (_recentApiRequests.length > MAX_LOG_ENTRIES) {
     const evicted = _recentApiRequests.shift();
     // A failure outlives the busy successes that follow it, so a report
@@ -380,7 +385,17 @@ export function isFailedLogEntry(entry: ApiRequestLogEntry): boolean {
 }
 
 function findLogEntry(id: number): ApiRequestLogEntry | undefined {
-  return _recentApiRequests.find((e) => e.id === id);
+  return _pendingApiRequests.get(id) ?? _recentApiRequests.find((e) => e.id === id);
+}
+
+/** The request failed without a response (transport error, timeout, a
+ *  rejected body). `firstOnly`: keep an answer already recorded. */
+function recordLogEntryError(id: number, message: string, startTime: number, firstOnly = true): void {
+  const entry = findLogEntry(id);
+  _pendingApiRequests.delete(id);
+  if (!entry || (firstOnly && entry.durationMs)) return;
+  entry.error = message;
+  entry.durationMs = Date.now() - startTime;
 }
 
 function recordLogEntryResponse(
@@ -390,6 +405,7 @@ function recordLogEntryResponse(
   startTime: number,
 ): void {
   const entry = findLogEntry(id);
+  _pendingApiRequests.delete(id);
   if (entry) {
     entry.status = status;
     entry.responseBody = truncateBodyForLog(body);
@@ -400,6 +416,13 @@ function recordLogEntryResponse(
 /** Returns a snapshot of the most recent API requests/responses for error diagnostics. */
 export function getRecentApiRequests(): ApiRequestLogEntry[] {
   return [..._recentApiRequests];
+}
+
+/** Requests sent but not answered yet, oldest first, with how long each has
+ *  been waiting — a post stuck on "Posting…" shows up here. */
+export function getPendingApiRequests(): Array<ApiRequestLogEntry & { waitingMs: number }> {
+  const now = Date.now();
+  return [..._pendingApiRequests.values()].map((e) => ({ ...e, waitingMs: now - Date.parse(e.timestamp) }));
 }
 
 /** The last failed requests (4xx/5xx or transport errors), oldest first —
@@ -1038,11 +1061,7 @@ export class ApiClient {
         const normalizedError = normalizeError(error);
 
         // Update the log entry with error details
-        const entry = findLogEntry(logId);
-        if (entry) {
-          entry.error = normalizedError.message;
-          entry.durationMs = Date.now() - startTime;
-        }
+        recordLogEntryError(logId, normalizedError.message, startTime, false);
 
         logApiCall(method, url, undefined, {
           attempt,
@@ -1167,11 +1186,7 @@ export class ApiClient {
       return { data: responseData as T };
     } catch (error) {
       const normalized = normalizeError(error);
-      const entry = findLogEntry(logId);
-      if (entry && !entry.durationMs) {
-        entry.error = normalized.message;
-        entry.durationMs = Date.now() - startTime;
-      }
+      recordLogEntryError(logId, normalized.message, startTime);
 
       if (!isExpectedSilentError(normalized)) {
         dispatchApiError({
@@ -1239,11 +1254,7 @@ export class ApiClient {
       return { data: responseData as T };
     } catch (error) {
       const normalized = normalizeError(error);
-      const entry = findLogEntry(logId);
-      if (entry && !entry.durationMs) {
-        entry.error = normalized.message;
-        entry.durationMs = Date.now() - startTime;
-      }
+      recordLogEntryError(logId, normalized.message, startTime);
 
       if (!config.suppressErrorEvent && !isExpectedSilentError(normalized)) {
         dispatchApiError({
@@ -1284,11 +1295,7 @@ export class ApiClient {
       return response;
     } catch (error) {
       const normalized = normalizeError(error);
-      const entry = findLogEntry(logId);
-      if (entry && !entry.durationMs) {
-        entry.error = normalized.message;
-        entry.durationMs = Date.now() - startTime;
-      }
+      recordLogEntryError(logId, normalized.message, startTime);
       if (!config.suppressErrorEvent && !isExpectedSilentError(normalized)) {
         dispatchApiError({ method, url, ...eventFieldsFromError(normalized), requestId: lastRequestId });
       }

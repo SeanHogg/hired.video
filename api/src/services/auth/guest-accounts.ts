@@ -8,7 +8,9 @@
  *   adoptGuestAccount  — after the visitor signs up or signs in (any path:
  *     password, 2FA, magic link, OAuth, email-verify), move everything the
  *     guest owns onto the real account and delete the guest
- *     (`adopt_guest_user()` SQL function, one transaction).
+ *     (`adopt_guest_user()` SQL function, one transaction; 0533: the guest's
+ *     fresh network connections replace the account's for the same network,
+ *     and a collision drops only that row).
  *
  * Stale guests age out in the retention sweep (RETENTION_POLICIES, 30 days).
  */

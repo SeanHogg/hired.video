@@ -3,7 +3,7 @@
  * every network's publish runs through, YouTube included:
  *
  *   1. entitlement   the plan's channel cap allows this destination
- *                    (guest 1 → free account 2 → Pro unlimited; re-posting to
+ *                    (free 2 — a guest session too — → Pro unlimited; re-posting to
  *                    a destination the video is already on never counts twice)
  *   2. connection    the user has a connection for the platform
  *   3. token refresh it yields a fresh access token (refresh on expiry)
@@ -17,7 +17,7 @@ import { canPostToDestination } from "../studio/post-channel-gate.js";
 import type { SelfTokenSource } from "./build-social-publisher.js";
 
 export interface SelfPublishGateInput {
-  actor: { userId: string; isGuest: boolean };
+  actor: { userId: string };
   projectId: string;
   platform: VideoPublishPlatform;
 }
@@ -37,7 +37,7 @@ export async function runSelfPublishGate(
 ): Promise<SelfPublishGateResult> {
   const canPost = deps.canPost ?? canPostToDestination;
   // Entitlement first: an over-cap post never touches the user's tokens.
-  if (!(await canPost({ userId: actor.userId, isGuest: actor.isGuest, projectId, destination: platform }))) {
+  if (!(await canPost({ userId: actor.userId, projectId, destination: platform }))) {
     return { ok: false, kind: "CHANNEL_LIMIT" };
   }
   const accessToken = await deps.selfAccessToken(actor.userId, platform);

@@ -81,7 +81,7 @@ export function useAnonAdoption({
   const runAsGuest = useGuestRun({ ready: !!persistedProjectId });
 
   /** Gate a server-touching action. Account-only actions (export / download /
-   *  a second destination — `requiresFullAccount`) open the in-place auth
+   *  the visitor's own "save my work" — `requiresFullAccount`) open the in-place auth
    *  panel for anyone without a real account, emit the `gate` funnel event and
    *  return false, re-running `run` (and emitting `convert`) once they sign
    *  in. Everything else proceeds for any signed-in visitor, guest included;

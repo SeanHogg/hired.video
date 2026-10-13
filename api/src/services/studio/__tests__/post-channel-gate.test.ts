@@ -10,26 +10,16 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { exceedsPostChannelLimit } from "../post-channel-gate.js";
-import {
-  FREE_POST_CHANNEL_LIMIT,
-  GUEST_POST_CHANNEL_LIMIT,
-  postChannelLimit,
-} from "../../../../../shared/pricing.js";
+import { FREE_POST_CHANNEL_LIMIT, postChannelLimit } from "../../../../../shared/pricing.js";
 
 describe("postChannelLimit", () => {
-  it("gives a guest one destination", () => {
-    assert.equal(postChannelLimit({ isPro: false, hasAccount: false }), GUEST_POST_CHANNEL_LIMIT);
-    assert.equal(GUEST_POST_CHANNEL_LIMIT, 1);
-  });
-
-  it("gives a free account two destinations", () => {
-    assert.equal(postChannelLimit({ isPro: false, hasAccount: true }), FREE_POST_CHANNEL_LIMIT);
+  it("gives every non-Pro poster two destinations — a guest session is not walled to one", () => {
+    assert.equal(postChannelLimit({ isPro: false }), FREE_POST_CHANNEL_LIMIT);
     assert.equal(FREE_POST_CHANNEL_LIMIT, 2);
   });
 
-  it("is unlimited on Pro, account or not", () => {
-    assert.equal(postChannelLimit({ isPro: true, hasAccount: true }), Number.POSITIVE_INFINITY);
-    assert.equal(postChannelLimit({ isPro: true, hasAccount: false }), Number.POSITIVE_INFINITY);
+  it("is unlimited on Pro", () => {
+    assert.equal(postChannelLimit({ isPro: true }), Number.POSITIVE_INFINITY);
   });
 });
 

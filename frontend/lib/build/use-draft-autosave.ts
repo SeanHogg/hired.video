@@ -80,7 +80,16 @@ export function useDraftAutosave({
 }: Args) {
   const { t } = useTranslation();
   const { user, isGuest } = useAuth();
-  const [savedResumeId, setSavedResumeId] = useState<string | null>(() => existingId(source) ?? restoredResumeId);
+  // The row a NEW draft was saved to, paired with that draft's source. The
+  // saved id is DERIVED in render, never set by an effect: an adopted résumé
+  // is its own row the moment it is on screen. (An effect-set id lagged one
+  // render, so the auto-create below saw "no row" for an opened résumé and
+  // minted a copy — the kit then followed the copy to a new project and its
+  // per-résumé stage / chat reset to step 1. 2026-10-12.)
+  const [created, setCreated] = useState<{ source: IntakeSource | null; id: string } | null>(() =>
+    restoredResumeId ? { source, id: restoredResumeId } : null,
+  );
+  const savedResumeId = existingId(source) ?? (created && created.source === source ? created.id : null);
   // The create step's status; row updates report through the autosave hook.
   const [createState, setCreateState] = useState<SaveStatus>(() =>
     (existingId(source) ?? restoredResumeId) ? "saved" : "idle",
@@ -141,8 +150,8 @@ export function useDraftAutosave({
     flushOnLeave: false,
   });
 
-  // A new source means a new draft: forget the saved id — or take the adopted
-  // résumé's own id, whose row already holds this content and design.
+  // A new source means a new draft (its saved id follows from `source`):
+  // rebaseline on what an adopted résumé's row already holds.
   const { rebaseline: rebaselineRow } = row;
   const { rebaseline: rebaselineVersions } = versions;
   useEffect(() => {
@@ -153,7 +162,6 @@ export function useDraftAutosave({
     rebaselineRow(saved);
     rebaselineVersions(saved);
     savingRef.current = null;
-    setSavedResumeId(adopted);
     setCreateState(adopted ? "saved" : "idle");
   }, [source, content, design, rebaselineRow, rebaselineVersions]);
 
@@ -191,7 +199,7 @@ export function useDraftAutosave({
         // The row now holds THIS content + design; later edits diff against it.
         rebaselineRow(basis);
         rebaselineVersions(basis);
-        setSavedResumeId(created.id);
+        setCreated({ source: from, id: created.id });
         setCreateState("saved");
         return created.id;
       })

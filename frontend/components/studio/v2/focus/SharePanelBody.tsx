@@ -95,6 +95,7 @@ export default function SharePanelBody({ share, Heading, onNavigate, headerClass
           isPro={isPro}
           onPostAgain={share.reset}
           onNavigate={onNavigate}
+          onSaveWork={share.saveWork}
         />
         <PublicScanNotice projectId={share.projectId} />
         {afterPosted}

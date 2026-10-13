@@ -24,8 +24,8 @@
  * `redirectTo` brings the visitor back to finish it.
  *
  * A silent GUEST session (useAuth().isGuest) does not pass this gate: the
- * gate guards actions that need a real account (download, posting to more
- * than one destination). The guest's work is claimed by the real account on
+ * gate guards actions that need a real account (download, and the visitor's
+ * own choice to save their work to an account) — never posting. The guest's work is claimed by the real account on
  * sign-in (AuthProvider → authService.adoptGuest).
  *
  * The non-UI core (requireAuth + the sheet's state) is `useAuthGateState`

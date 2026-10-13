@@ -173,7 +173,7 @@ export async function sendPublishJob(
   if (!isNetworkDestination(destination)) throw new PublishJobError("Unknown destination.", true);
   try {
     const publication = await (deps.publishSelf ?? publishProjectVideo)({
-      actor: { userId: job.createdBy, isGuest: false },
+      actor: { userId: job.createdBy },
       projectId: job.projectId,
       platform: destination,
       title,

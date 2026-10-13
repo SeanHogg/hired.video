@@ -82,7 +82,7 @@ studioSocialPublishRoutes.post("/projects/:projectId/publish/social/:platform", 
   const user = c.var.user;
   try {
     const publication = await publishProjectVideo({
-      actor: { userId: user.sub, isGuest: !!user.guest },
+      actor: { userId: user.sub },
       projectId: c.req.param("projectId"),
       platform,
       title: parsed.data.title,

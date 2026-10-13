@@ -4,7 +4,7 @@ import type { Variables, AppEnv } from "../types/index.js";
 export const emailVerifiedMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const user = c.var.user;
   // Guest accounts have no email to verify; they are scoped by being a
-  // guest (download / multi-destination need a real account).
+  // guest (download needs a real account).
   if (!user?.emailVerified && !user?.guest) {
     return c.json(
       {

@@ -30,13 +30,19 @@ import { STUDIO_FUNNEL_FEATURE_KEY } from "@shared/usage";
 
 const PENDING_CLAIM_KEY = "studio.anon.pendingClaim";
 
+/** The visitor chose to keep their work on a free account (never forced). */
+export const SAVE_ACCOUNT_REASON = "save-account";
+
 /**
- * Gate reasons that need a REAL account (2026-10-03 product rule). Every
- * other server-touching action — save, AI, upload, connect a network, post to
- * ONE destination — runs on a silent guest session (useAuth().ensureGuestSession)
- * with no form; the guest's work is claimed when they sign up / sign in.
+ * Gate reasons that need a REAL account (2026-10-03 product rule, widened
+ * 2026-10-12: promoting is never walled). Every other server-touching action —
+ * save, AI, upload, connect a network, post to any number of destinations
+ * within the plan — runs on a silent guest session
+ * (useAuth().ensureGuestSession) with no form; the guest's work is claimed
+ * when they sign up / sign in. `save-account` is the OPTIONAL "save your work
+ * so you can come back" offer (GuestSaveWorkCard) — the visitor asks for it.
  */
-const ACCOUNT_ONLY_REASONS: ReadonlySet<string> = new Set(["export", "download", "multi-destination"]);
+const ACCOUNT_ONLY_REASONS: ReadonlySet<string> = new Set(["export", "download", SAVE_ACCOUNT_REASON]);
 
 export function requiresFullAccount(reason: string): boolean {
   return ACCOUNT_ONLY_REASONS.has(reason);
