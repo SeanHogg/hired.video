@@ -13,7 +13,7 @@
  *   our Ad Set    → LinkedIn Campaign
  *   our Ad        → LinkedIn Creative
  *
- * Pinned API version: 202404 (Marketing Calls In Versioned Endpoints).
+ * API version: utils/linkedin-version (follows the calendar; never a pin).
  */
 
 import {
@@ -22,6 +22,7 @@ import {
   type AdapterConfig,
   type PaidMediaAdapter,
 } from "../../ports/adapter.js";
+import { linkedInApiVersion } from "../../../../utils/linkedin-version.js";
 import type {
   AdapterAdInput,
   AdapterAdSetInput,
@@ -39,7 +40,6 @@ import type {
   TargetingSpec,
 } from "../../ports/types.js";
 
-const LINKEDIN_API_VERSION = "202404";
 const LINKEDIN_API   = "https://api.linkedin.com/rest";
 const LINKEDIN_AUTH  = "https://www.linkedin.com/oauth/v2/authorization";
 const LINKEDIN_TOKEN = "https://www.linkedin.com/oauth/v2/accessToken";
@@ -73,7 +73,7 @@ const LI_OBJECTIVE: Record<string, string> = {
 function liHeaders(accessToken: string): HeadersInit {
   return {
     Authorization:            `Bearer ${accessToken}`,
-    "LinkedIn-Version":       LINKEDIN_API_VERSION,
+    "LinkedIn-Version":       linkedInApiVersion(),
     "X-Restli-Protocol-Version": "2.0.0",
     "Content-Type":           "application/json",
   };

@@ -21,6 +21,7 @@ import { and, eq } from "drizzle-orm";
 import type { getDb } from "../../../db/index.js";
 import { schema } from "../../../db/index.js";
 import { decryptSecret } from "../secrets.js";
+import { linkedInApiVersion } from "../../../utils/linkedin-version.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -164,7 +165,7 @@ async function sendLinkedIn(env: CapiEnv, pixel: typeof schema.paidMediaPixels.$
     headers: {
       Authorization:       `Bearer ${accessToken}`,
       "Content-Type":      "application/json",
-      "LinkedIn-Version":  "202404",
+      "LinkedIn-Version":  linkedInApiVersion(),
     },
     body: JSON.stringify(payload),
   });

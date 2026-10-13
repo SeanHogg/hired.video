@@ -20,19 +20,16 @@
  * reader exists to keep the adapter complete behind the port.
  */
 import { LINKEDIN_POST_TEXT_MAX } from "../../../../../shared/social-platforms.js";
-import { getEnv } from "../../../utils/env.js";
+import { linkedInApiVersion } from "../../../utils/linkedin-version.js";
 import { bearer, clip, readJson, type FetchLike } from "./http.js";
 import { SocialPublishError, type SocialVideoPublisher, type SocialViewReader } from "./types.js";
 
 const REST = "https://api.linkedin.com/rest";
 const USERINFO = "https://api.linkedin.com/v2/userinfo";
-/** Versioned LinkedIn REST API (YYYYMM). LinkedIn retires versions about a
- *  year after release, so this is env-overridable without a deploy. */
-const DEFAULT_LINKEDIN_VERSION = "202509";
 
 function restHeaders(accessToken: string): Record<string, string> {
   return bearer(accessToken, {
-    "LinkedIn-Version": getEnv("LINKEDIN_API_VERSION") || DEFAULT_LINKEDIN_VERSION,
+    "LinkedIn-Version": linkedInApiVersion(),
     "X-Restli-Protocol-Version": "2.0.0",
     "Content-Type": "application/json",
   });

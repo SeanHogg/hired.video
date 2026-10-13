@@ -12,10 +12,16 @@
 //     at most one in-session update is ever reported.
 // Together these made the prompt appear only on fresh loads of `/` (the PWA
 // start_url) and never on a long-lived tab on any other page.
+//
+// A waiting build is APPLIED automatically when nothing is unsaved: with
+// registerType "prompt" the old precached app otherwise kept loading on every
+// refresh until someone clicked the prompt (2026-10-13: a deployed fix stayed
+// invisible after "refresh"). With unsaved work the prompt still asks first.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useRegisterSW } from "virtual:pwa-register/react";
+import { hasUnsavedWork } from "@/hooks/use-unsaved-work";
 
 // How often an already-open tab polls the server for a freshly-deployed
 // service worker. A poll is a cheap conditional GET on the SW script; if the
@@ -131,6 +137,11 @@ export function useServiceWorkerUpdate(): ServiceWorkerUpdate {
     );
     worker.postMessage({ type: "SKIP_WAITING" });
   }, []);
+
+  // Nothing to lose: take the new build now instead of waiting on a click.
+  useEffect(() => {
+    if (waiting && !hasUnsavedWork()) applyUpdate();
+  }, [waiting, applyUpdate]);
 
   return { waiting, registration: registrationRef.current, applyUpdate };
 }
