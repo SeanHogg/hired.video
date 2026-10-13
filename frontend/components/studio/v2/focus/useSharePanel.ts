@@ -39,6 +39,7 @@ import { useSocialChannelConnections } from "./useSocialChannelConnections";
 import { useTikTokPostSettings } from "@/components/studio/share/useTikTokPostSettings";
 import { postChannelLimit } from "@shared/pricing";
 import { usePostRun } from "./usePostRun";
+import { usePublications } from "@/lib/studio/editor-v2/use-publications";
 import { useChannelFit, type VideoFrame } from "./useChannelFit";
 import { useFittedCuts } from "./useFittedCuts";
 import { useYouTubeConnection } from "./useYouTubeConnection";
@@ -105,6 +106,13 @@ export function useSharePanel({
   // Networks the master doesn't fit are posted their own cut (#2045).
   const cuts = useFittedCuts(publisher, fit.variantFor, fit.shapeKey);
   const { progress } = postRun;
+  // Where this video is already live — read while the panel is open,
+  // refreshed after each run, so a second visit says "Posted" up front.
+  const published = usePublications(open ? projectId : null);
+  const postedOn = (channel: ShareChannelId): { url: string | null } | null => {
+    const row = published.publications.find((p) => p.destination === channel && p.status === "published");
+    return row ? { url: row.externalUrl ?? null } : null;
+  };
   const results = useMemo(() => {
     const out: Partial<Record<ShareChannelId, PublishOutcome>> = {};
     for (const [channel, s] of Object.entries(progress.channels)) {
@@ -267,6 +275,7 @@ export function useSharePanel({
         else if (isSocialPostPlatform(channel)) social.reload();
       },
     });
+    void published.refresh();
   };
 
   /** Networks a scheduled post goes to — the profile isn't a timed post. */
@@ -336,6 +345,8 @@ export function useSharePanel({
     canWriteCaption: !!projectId,
     writeCaption,
     generatingCaption,
+    /** Where this video is already posted (null = not yet). */
+    postedOn,
     /** Selected AND connected channels, in display order. */
     postable,
     postableCount: postable.length,

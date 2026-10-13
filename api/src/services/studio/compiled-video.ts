@@ -4,7 +4,7 @@
  * included) and the brand-channel promotion queue.
  *
  *   requireCompiledVideo     the owned row with an R2 key (else NOT_FOUND / NOT_READY)
- *   fetchCompiledVideoBytes  its MP4 bytes from the CDN, for push-upload adapters
+ *   fetchCompiledVideoBytes  its MP4 bytes straight from R2, for push-upload adapters
  *   linkYouTubeUpload        a YouTube post also lands on the row (youtubeVideoId/Url),
  *                            which the public video pages and feed read
  *
@@ -14,6 +14,7 @@ import { and, eq } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import { schema } from "../../db/index.js";
 import { cdnUrl } from "../../utils/cdn.js";
+import { getVideoBucket } from "../storage/object-store.js";
 import { invalidatePublicVideoFeed } from "./public-video-feed.js";
 
 const { videos } = schema;
@@ -48,16 +49,36 @@ export async function requireCompiledVideo(
   return video;
 }
 
-/** Pull a compiled video's MP4 bytes from the CDN (MEDIA_FETCH_FAILED). */
+/** Reads one stored object's bytes by R2 key; null when it isn't there. */
+export type ReadMedia = (key: string) => Promise<Uint8Array | null>;
+
+/**
+ * The bucket binding — NEVER an HTTP fetch of cdn.hired.video: that host is
+ * a route on THIS Worker, and a Worker calling its own route answers 522
+ * (every LinkedIn / YouTube post failed that way, 2026-10-13). Without a
+ * binding (Node scripts, local dev) it falls back to the public CDN URL.
+ */
+export const readMediaFromBucket: ReadMedia = async (key) => {
+  const bucket = getVideoBucket();
+  if (bucket) {
+    const object = await bucket.get(key);
+    return object ? new Uint8Array(await object.arrayBuffer()) : null;
+  }
+  const res = await fetch(cdnUrl(key));
+  if (!res.ok) throw new PublishVideoError("MEDIA_FETCH_FAILED", `Failed to fetch compiled video: ${res.status}`);
+  return new Uint8Array(await res.arrayBuffer());
+};
+
+/** A compiled video's MP4 bytes (MEDIA_FETCH_FAILED when the object is missing). */
 export async function fetchCompiledVideoBytes(
   video: CompiledVideoRow,
-  fetchMedia: (url: string) => Promise<Response> = fetch,
+  readMedia: ReadMedia = readMediaFromBucket,
 ): Promise<Uint8Array> {
-  const mediaRes = await fetchMedia(cdnUrl(video.r2Key!));
-  if (!mediaRes.ok) {
-    throw new PublishVideoError("MEDIA_FETCH_FAILED", `Failed to fetch compiled video: ${mediaRes.status}`);
+  const bytes = await readMedia(video.r2Key!);
+  if (!bytes) {
+    throw new PublishVideoError("MEDIA_FETCH_FAILED", `Compiled video is missing from storage: ${video.r2Key}`);
   }
-  return new Uint8Array(await mediaRes.arrayBuffer());
+  return bytes;
 }
 
 /** Record a YouTube upload on the video row (the public pages link to it). */

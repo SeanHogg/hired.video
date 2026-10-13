@@ -49,21 +49,42 @@ describe("requireCompiledVideo", () => {
 });
 
 describe("fetchCompiledVideoBytes", () => {
-  it("reads the MP4 from the CDN", async () => {
+  it("reads the MP4 by its R2 key (never an HTTP call back into this Worker)", async () => {
     let asked = "";
-    const bytes = await fetchCompiledVideoBytes(videoRow() as never, async (url) => {
-      asked = url;
-      return new Response(new Uint8Array([0, 0, 0, 24]), { status: 200 });
+    const bytes = await fetchCompiledVideoBytes(videoRow() as never, async (key) => {
+      asked = key;
+      return new Uint8Array([0, 0, 0, 24]);
     });
-    assert.match(asked, /videos\/8f2c1a9e\/compiled\.mp4$/);
+    assert.match(asked, /^videos\/8f2c1a9e\/compiled\.mp4$/);
     assert.deepEqual([...bytes], [0, 0, 0, 24]);
   });
 
-  it("is MEDIA_FETCH_FAILED on a CDN miss", async () => {
+  it("is MEDIA_FETCH_FAILED when the object is missing from storage", async () => {
     await assert.rejects(
-      fetchCompiledVideoBytes(videoRow() as never, async () => new Response("", { status: 404 })),
+      fetchCompiledVideoBytes(videoRow() as never, async () => null),
       (e: unknown) => e instanceof PublishVideoError && e.kind === "MEDIA_FETCH_FAILED",
     );
+  });
+
+  it("reads through the bucket binding when one is bound", async () => {
+    const env = globalThis as { __ENV?: unknown };
+    const prev = env.__ENV;
+    const asked: string[] = [];
+    env.__ENV = {
+      VIDEO_BUCKET: {
+        get: async (key: string) => {
+          asked.push(key);
+          return { arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer };
+        },
+      },
+    };
+    try {
+      const bytes = await fetchCompiledVideoBytes(videoRow() as never);
+      assert.deepEqual([...bytes], [1, 2, 3]);
+      assert.equal(asked.length, 1);
+    } finally {
+      env.__ENV = prev;
+    }
   });
 });
 

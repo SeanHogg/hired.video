@@ -4,9 +4,10 @@
  * At the free plan's channel cap an unpicked card is locked and carries a
  * PRO badge instead of the box. The mono line under the name carries the
  * connect state — or, for the profile (nothing to connect), what it is.
- * Under the card: how the video fits the network's preset, or a failure.
+ * Under the card: where it is already posted (with its link, and what
+ * posting again does), how the video fits the network's preset, or a failure.
  */
-import { Check, Loader2 } from "lucide-react";
+import { Check, ExternalLink, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { ShareChannelId } from "@/lib/studio/share-channels";
@@ -24,6 +25,8 @@ export interface ShareChannelRowProps {
   result?: PublishOutcome;
   /** How the video fits this network (too long, reframed, posts as a Short). */
   fitNote?: string | null;
+  /** This video is already posted here (its live link, when known). */
+  posted?: { url: string | null } | null;
   onToggle: () => void;
   onConnect: () => void;
 }
@@ -39,6 +42,7 @@ export default function ShareChannelRow({
   disabled,
   result,
   fitNote,
+  posted,
   onToggle,
   onConnect,
 }: ShareChannelRowProps) {
@@ -106,6 +110,29 @@ export default function ShareChannelRow({
           </span>
           <span className="font-mono text-[11px] text-muted-foreground">{t("studio.share.notConnected")}</span>
         </div>
+      )}
+      {posted && !failure && (
+        <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+          <Check className="h-3 w-3 text-brand-green-text" strokeWidth={3} aria-hidden="true" />
+          <span>{t("studio.share.channel.alreadyPosted")}</span>
+          {posted.url && (
+            <a
+              href={posted.url}
+              target={posted.url.startsWith("http") ? "_blank" : undefined}
+              rel={posted.url.startsWith("http") ? "noopener noreferrer" : undefined}
+              className="inline-flex items-center gap-0.5 text-primary hover:underline"
+            >
+              {t("studio.share.viewPost")}
+              <ExternalLink className="h-3 w-3" aria-hidden="true" />
+            </a>
+          )}
+          {on && (
+            <span>
+              ·{" "}
+              {channel === "profile" ? t("studio.share.channel.updatesProfile") : t("studio.share.channel.postsAgain")}
+            </span>
+          )}
+        </p>
       )}
       {fitNote && !failure && <p className="text-xs text-muted-foreground">{fitNote}</p>}
       {failure && (

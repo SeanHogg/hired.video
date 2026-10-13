@@ -27,6 +27,7 @@ import { recordPublication, type PublicationRecord } from "../studio/publication
 import { canPostToDestination } from "../studio/post-channel-gate.js";
 import {
   fetchCompiledVideoBytes,
+  type ReadMedia,
   linkYouTubeUpload,
   PublishVideoError,
   requireCompiledVideo,
@@ -81,7 +82,7 @@ export interface PublishProjectVideoDeps {
   record?: typeof recordPublication;
   resolveVariant?: typeof resolvePostedVariant;
   linkYouTube?: typeof linkYouTubeUpload;
-  fetchMedia?: (url: string) => Promise<Response>;
+  readMedia?: ReadMedia;
 }
 
 export async function publishProjectVideo(
@@ -149,7 +150,7 @@ export async function publishProjectVideo(
       youtube: input.youtube,
       video: {
         url: cdnUrl(video.r2Key!),
-        bytes: () => fetchCompiledVideoBytes(video, deps.fetchMedia),
+        bytes: () => fetchCompiledVideoBytes(video, deps.readMedia),
       },
     });
   } catch (e) {

@@ -37,6 +37,7 @@ import {
   bumpPublicWatchCache,
   getPublicWatchCached,
 } from "../services/studio/public-watch-cache.js";
+import { carryBakedStamp } from "../services/studio/baked-stamp.js";
 import { STUDIO_PURPOSES } from "../../../shared/studio-purposes.js";
 import { publicVideoPath } from "../../../shared/public-paths.js";
 import { SCENE_TYPES, type SceneType } from "../../../shared/scene-types.js";
@@ -1806,12 +1807,36 @@ studioRoutes.post("/save-draft", async (c) => {
   // specific state columns for `mediaKind: 'game' | 'image'` projects
   // (#927 / #932); each lives on its own JSONB column per the canvas-
   // runtime extensibility model (PRD §1.2).
+  const db = getDb();
+  // SEO fields persist across non-SEO saves (e.g. v2 timeline autosaves)
+  // by merging with the existing storyboard meta. A timeline-only save
+  // shouldn't wipe a meta description the user just typed in the Details
+  // drawer. Each key is overwritten only when explicitly present in the
+  // request payload — otherwise we carry forward the prior value. The prior
+  // timeline's render stamp is carried the same way (baked-stamp.ts).
+  let priorMeta: Record<string, unknown> = {};
+  let priorSlug: string | null = null;
+  let priorTimelineSpec: unknown = null;
+  if (projectId) {
+    const [prior] = await db
+      .select({ storyboard: studioProjects.storyboard, slug: studioProjects.slug, timelineSpec: studioProjects.timelineSpec })
+      .from(studioProjects)
+      .where(eq(studioProjects.id, projectId))
+      .limit(1);
+    if (prior?.storyboard && typeof prior.storyboard === "object") {
+      priorMeta = prior.storyboard as Record<string, unknown>;
+    }
+    priorTimelineSpec = prior?.timelineSpec ?? null;
+    // Prefer the indexed column; fall back to the JSONB mirror for
+    // pre-migration-0141 rows that haven't been re-saved yet.
+    priorSlug = prior?.slug ?? ((priorMeta._slug as string | undefined) ?? null);
+  }
   const editorKindPatch =
     kind !== undefined || mediaKind !== undefined || timelineSpec !== undefined || gameState !== undefined || imageState !== undefined || animationState !== undefined || cadState !== undefined || cad3dState !== undefined || documentState !== undefined || interactiveComicState !== undefined
       ? {
           kind: kind ?? (timelineSpec !== undefined ? "nle" : undefined),
           ...(mediaKind !== undefined ? { mediaKind } : {}),
-          ...(timelineSpec !== undefined ? { timelineSpec } : {}),
+          ...(timelineSpec !== undefined ? { timelineSpec: carryBakedStamp(priorTimelineSpec, timelineSpec) } : {}),
           ...(gameState !== undefined ? { gameState } : {}),
           ...(imageState !== undefined ? { imageState } : {}),
           ...(animationState !== undefined ? { animationState } : {}),
@@ -1821,28 +1846,6 @@ studioRoutes.post("/save-draft", async (c) => {
           ...(interactiveComicState !== undefined ? { interactiveComicState } : {}),
         }
       : {};
-  const db = getDb();
-
-  // SEO fields persist across non-SEO saves (e.g. v2 timeline autosaves)
-  // by merging with the existing storyboard meta. A timeline-only save
-  // shouldn't wipe a meta description the user just typed in the Details
-  // drawer. Each key is overwritten only when explicitly present in the
-  // request payload — otherwise we carry forward the prior value.
-  let priorMeta: Record<string, unknown> = {};
-  let priorSlug: string | null = null;
-  if (projectId) {
-    const [prior] = await db
-      .select({ storyboard: studioProjects.storyboard, slug: studioProjects.slug })
-      .from(studioProjects)
-      .where(eq(studioProjects.id, projectId))
-      .limit(1);
-    if (prior?.storyboard && typeof prior.storyboard === "object") {
-      priorMeta = prior.storyboard as Record<string, unknown>;
-    }
-    // Prefer the indexed column; fall back to the JSONB mirror for
-    // pre-migration-0141 rows that haven't been re-saved yet.
-    priorSlug = prior?.slug ?? ((priorMeta._slug as string | undefined) ?? null);
-  }
   // Content revision (#2242) — lives with the other `_` meta keys in the
   // storyboard JSONB; every save-draft bumps it.
   const priorRevision = storyboardRevision(priorMeta);
@@ -2884,6 +2887,8 @@ studioRoutes.patch("/projects/:projectId/status", async (c) => {
     : null;
 
   const dto = toProjectDto(updated, linkedVideo);
+  // The /m/<slug> watch payload flips between "pending" and live with status.
+  bumpPublicWatchCache(updated.id, updated.slug, updated.videoId);
 
   // Record (or clear) the on-platform "profile" publication so the editor's
   // "Published to" list reflects where the project actually lives. The view
@@ -3669,6 +3674,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
     id: studioProjects.id,
     videoId: studioProjects.videoId,
     isPublic: studioProjects.isPublic,
+    status: studioProjects.status,
     kind: studioProjects.kind,
     // Output-axis discriminator (#894) — drives the public watch page's
     // surface dispatch (ProjectPlayer). Without this in the payload the
@@ -3704,6 +3710,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
     id: string;
     videoId: string | null;
     isPublic: boolean;
+    status: string | null;
     kind: string | null;
     mediaKind: string | null;
     storyboard: unknown;
@@ -3723,6 +3730,10 @@ studioRoutes.get("/public/:videoId", async (c) => {
     return {
       id: proj.id,
       isPublic: proj.isPublic,
+      // Published = live by link (the profile post). `isPublic` is the
+      // separate public / unlisted listing flag: an unlisted video still
+      // plays for anyone with the link.
+      published: proj.status === "published",
       title: (meta?._name as string | undefined) ?? null,
       storyboard: proj.storyboard ?? null,
       timelineSpec: proj.timelineSpec ?? null,
@@ -3819,7 +3830,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
   // canvas live, so a render isn't required. Fall back to
   // `videos.privacy_status` only when there's no project row (legacy
   // direct uploads with no storyboard).
-  const isViewable = projectInfo ? projectInfo.isPublic : v?.privacyStatus === "public";
+  const isViewable = projectInfo ? projectInfo.isPublic || projectInfo.published : v?.privacyStatus === "public";
   if (!isViewable) {
     const ownerName = projectInfo?.ownerName ?? v?.ownerName ?? null;
     const ownerAvatar = projectInfo?.ownerAvatar ?? v?.ownerAvatar ?? null;

@@ -20,10 +20,24 @@ import { useUgcSeo } from "@/lib/seo-ugc";
 import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
 import { SeoFinalCta } from "@/components/landing/SeoFinalCta";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const STATUS_TITLE =
   "font-display text-[clamp(32px,4vw,48px)] font-bold leading-none tracking-[-0.03em] text-foreground";
 const TEXT_LINK = "inline-flex min-h-[44px] items-center font-semibold text-primary hover:underline";
+
+/** The owner's photo — their initial when there is none or it fails to load
+ *  (a deleted or moved image 404s; never a broken-image icon). */
+function OwnerAvatar({ src, name }: { src: string | null | undefined; name: string | null | undefined }) {
+  return (
+    <Avatar className="h-14 w-14 flex-none border border-border">
+      {src && <AvatarImage src={src} alt={name ?? ""} className="object-cover" />}
+      <AvatarFallback className="bg-accent font-display text-xl font-bold text-primary" aria-hidden="true">
+        {(name?.trim() || "?")[0].toUpperCase()}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
 
 /** Centered status message (load error / pending) under the app chrome. */
 function StatusPanel({ children }: { children: ReactNode }) {
@@ -127,9 +141,7 @@ export default function PublicVideoResume() {
     return (
       <AppShell bgClassName="bg-background">
         <StatusPanel>
-          {video.ownerAvatar && (
-            <img src={video.ownerAvatar} alt={ownerLabel} className="h-14 w-14 rounded-full object-cover" />
-          )}
+          <OwnerAvatar src={video.ownerAvatar} name={ownerLabel} />
           <h1 className={STATUS_TITLE}>{video.title || t("seoLanding.publicVideo.inProgress")}</h1>
           <p className="text-lg text-muted-foreground">
             {t("seoLanding.publicVideo.pendingBody", { owner: ownerLabel })}
@@ -154,20 +166,7 @@ export default function PublicVideoResume() {
       <main className="mx-auto flex w-full max-w-[1000px] flex-col gap-8 px-6 pb-20 pt-10">
         {/* Owner info */}
         <header className="flex items-center gap-4">
-          {ready.ownerAvatar ? (
-            <img
-              src={ready.ownerAvatar}
-              alt={ready.ownerName ?? ""}
-              className="h-14 w-14 flex-none rounded-full border border-border object-cover"
-            />
-          ) : (
-            <div
-              className="flex h-14 w-14 flex-none items-center justify-center rounded-full bg-accent font-display text-xl font-bold text-primary"
-              aria-hidden="true"
-            >
-              {(ready.ownerName ?? "?")[0].toUpperCase()}
-            </div>
-          )}
+          <OwnerAvatar src={ready.ownerAvatar} name={ready.ownerName} />
           <div className="min-w-0">
             <h1 className="break-words font-display text-[clamp(28px,3.6vw,44px)] font-bold leading-[1.02] tracking-[-0.03em] text-foreground">
               {ready.title}

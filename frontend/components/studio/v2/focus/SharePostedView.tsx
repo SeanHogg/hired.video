@@ -33,7 +33,7 @@ export default function SharePostedView({ channels, results, isPro, onPostAgain,
   const { toast } = useToast();
   const labelOf = useShareChannelLabel();
   const posted = channels.filter((c) => results[c]?.ok);
-  const failed = channels.some((c) => results[c] && !results[c]?.ok);
+  const failed = channels.filter((c) => results[c] && !results[c]?.ok);
   const profile = results.profile;
   const shareLink = profile?.ok && profile.url ? absoluteUrl(profile.url) : null;
   const firstName = user?.firstName?.trim();
@@ -78,10 +78,24 @@ export default function SharePostedView({ channels, results, isPro, onPostAgain,
           );
         })}
       </ul>
-      {failed && (
-        <p className="text-sm text-destructive" role="alert">
-          {t("studio.share.someFailed")}
-        </p>
+      {failed.length > 0 && (
+        <div className="flex flex-col gap-1 text-sm text-destructive" role="alert">
+          <p>{t("studio.share.someFailed")}</p>
+          <ul className="flex flex-col gap-0.5">
+            {failed.map((channel) => {
+              const outcome = results[channel];
+              const why =
+                outcome?.reason === "not-connected"
+                  ? t("studio.share.reconnect")
+                  : outcome?.message || t("messages.publishFailedTitle");
+              return (
+                <li key={channel} className="break-words">
+                  <strong className="font-semibold">{labelOf(channel)}</strong> — {why}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
       {shareLink && (
         <div className="flex flex-wrap items-center gap-2">

@@ -682,7 +682,8 @@ export const studioService = {
     branded?: boolean,
   ): Promise<ApiSuccessResponse<StudioProject>> {
     const formData = new FormData();
-    formData.append("video", blob, "studio-video.webm");
+    // The name only sets the stored key's extension — match the real container.
+    formData.append("video", blob, blob.type.includes("mp4") ? "studio-video.mp4" : "studio-video.webm");
     formData.append("title", title);
     if (projectId) formData.append("projectId", projectId);
     if (resumeId) formData.append("resumeId", resumeId);

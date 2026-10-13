@@ -121,6 +121,7 @@ export default function SharePanelBody({ share, Heading, onNavigate, headerClass
             disabled={posting}
             result={share.results[channel]}
             fitNote={share.fitNoteFor(channel)}
+            posted={share.postedOn(channel)}
             onToggle={() => share.toggle(channel)}
             onConnect={() => void share.connect(channel)}
           />
