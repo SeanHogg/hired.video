@@ -17,6 +17,7 @@ export const TEMPLATE_STARTS: readonly TemplateStart[] = [
   { id: "getHired", labelKey: "studio.newMenu.tag.getHired", matches: (t) => isGetHiredTemplate(t.id) },
   { id: "promote", labelKey: "studio.landing.templateStart.promote", matches: (t) => t.category === "promote" },
   { id: "showcase", labelKey: "studio.landing.templateStart.showcase", matches: (t) => t.category === "showcase" },
+  { id: "film", labelKey: "studio.landing.templateStart.film", matches: (t) => t.category === "film" },
   { id: "quick", labelKey: "studio.landing.templateStart.quick", matches: (t) => t.category === "quick" },
 ];
 

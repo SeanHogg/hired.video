@@ -11,6 +11,8 @@
  *     start with one", and TemplateStartPanel (a few template picks).
  *   - YourWorkSection (+ MyContentDialogs) — ONE list of the viewer's kits
  *     and every other project.
+ *   - CategoryRail (film) — self-gating featured rail above the generic
+ *     catalog so directors see Film & Acting templates immediately.
  *   - TemplatesSection (`#templates`) — built-in + owned templates (the
  *     template picks' "See all").
  *
@@ -48,6 +50,7 @@ import KitStartBand from "@/components/workspace/home/KitStartBand";
 import TemplateStartPanel from "@/components/studio/landing/TemplateStartPanel";
 import YourWorkSection from "@/components/studio/landing/YourWorkSection";
 import MyContentDialogs from "@/components/studio/landing/MyContentDialogs";
+import CategoryRail from "@/components/studio/landing/CategoryRail";
 import TemplatesSection from "@/components/studio/landing/TemplatesSection";
 import CreateIntentChooser from "@/components/landing/CreateIntentChooser";
 import PostJobLeadDialog from "@/components/studio/landing/PostJobLeadDialog";
@@ -95,6 +98,8 @@ export default function StudioLanding() {
           "Browse every format" and the picks' "See all" land there). */}
       <KitStartBand aside={<TemplateStartPanel create={create} />} />
       <YourWorkSection content={content} />
+      {/* Self-gates inside the rail — do not wrap in a host length check. */}
+      <CategoryRail category="film" headingKey="studio.landing.categoryRail.film" create={create} />
       <TemplatesSection owned={owned} query={query} create={create} />
       <StudioLandingMarketingSections />
       <MyContentDialogs content={content} />
