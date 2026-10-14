@@ -4,16 +4,23 @@
  * widget painter — plugin or legacy applier — brackets its draw with these,
  * so frame behaviour is identical across kinds.
  */
-import { frameInputFromParams, resolveFrame, type Box, type EffectEntry, type ResolvedFrame } from "@/lib/studio/widgets/frame";
+import { frameInputFromParams, numberOr, resolveFrame, type Box, type EffectEntry, type ResolvedFrame } from "@/lib/studio/widgets/frame";
 import { getEffectDefinition, type EffectContext } from "./registry";
 
 export function resolveClipFrame(
   params: Record<string, unknown>,
   { canvas, clipFrame, clipDurationFrames, fps }: Pick<EffectContext, "canvas" | "clipFrame" | "clipDurationFrames" | "fps">,
 ): ResolvedFrame {
-  return resolveFrame(frameInputFromParams(params), canvas, {
-    clipTimeSec: fps > 0 ? clipFrame / fps : 0,
-    clipDurationSec: fps > 0 ? clipDurationFrames / fps : 0,
+  const clipTimeSec = fps > 0 ? clipFrame / fps : 0;
+  const clipDurationSec = fps > 0 ? clipDurationFrames / fps : 0;
+  // Transform keyframes are authored in scene seconds. Clip-local time
+  // plus the clip's scene origin (visibleFrom, persisted as
+  // keyframeOriginSec) recovers the playhead evaluateWidgetPositionAt
+  // expects. 0 when the widget spans the scene.
+  const scenePlayheadSec = clipTimeSec + numberOr(params.keyframeOriginSec, 0);
+  return resolveFrame(frameInputFromParams(params, scenePlayheadSec), canvas, {
+    clipTimeSec,
+    clipDurationSec,
   });
 }
 

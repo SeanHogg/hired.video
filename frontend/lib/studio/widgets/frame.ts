@@ -15,6 +15,7 @@
  */
 import type { ContainerStyle, Widget } from "@/lib/studio/editor-v2/canvas-state";
 import { isWidgetMotion, type WidgetMotion } from "@/lib/studio/editor-v2/widget-motion";
+import { evaluateWidgetPositionAt, parseWidgetKeyframes } from "@/lib/studio/widgets/evaluate-widget-position";
 import {
   ANIMATE_EFFECT_KINDS,
   computeAnimateOutput,
@@ -119,8 +120,11 @@ export function parseEffectStack(value: unknown): EffectEntry[] {
   return out;
 }
 
-export function frameInputFromWidget(widget: Widget): FrameInput {
-  const p = widget.position;
+/** Placement at `scenePlayheadSec` (seconds from scene start). Transform
+ *  keyframes lerp the pose; enter/exit `motion` still rides on the input
+ *  and is applied later by `computeAnimateOutput` inside `resolveFrame`. */
+export function frameInputFromWidget(widget: Widget, scenePlayheadSec = 0): FrameInput {
+  const p = evaluateWidgetPositionAt(widget, scenePlayheadSec);
   return {
     x: p.x,
     y: p.y,
@@ -134,15 +138,31 @@ export function frameInputFromWidget(widget: Widget): FrameInput {
   };
 }
 
-/** Frame fields as they ride on a `canvas-v2:*` clip effect's params. */
-export function frameInputFromParams(params: Record<string, unknown>): FrameInput {
+/** Frame fields as they ride on a `canvas-v2:*` clip effect's params.
+ *  `scenePlayheadSec` evaluates persisted transform keyframes so the
+ *  export painter sees the same pose as the DOM preview. */
+export function frameInputFromParams(params: Record<string, unknown>, scenePlayheadSec = 0): FrameInput {
+  const p = evaluateWidgetPositionAt(
+    {
+      position: {
+        x: numberOr(params.x, 0),
+        y: numberOr(params.y, 0),
+        width: numberOr(params.width, 1),
+        height: numberOr(params.height, 0.1),
+        z: numberOr(params.z, 1),
+        rotation: numberOr(params.rotation, 0),
+      },
+      keyframes: parseWidgetKeyframes(params.keyframes),
+    },
+    scenePlayheadSec,
+  );
   return {
-    x: numberOr(params.x, 0),
-    y: numberOr(params.y, 0),
-    width: numberOr(params.width, 1),
-    height: numberOr(params.height, 0.1),
-    z: numberOr(params.z, 1),
-    rotation: numberOr(params.rotation, 0),
+    x: p.x,
+    y: p.y,
+    width: p.width,
+    height: p.height,
+    z: p.z,
+    rotation: p.rotation,
     motion: isWidgetMotion(params.motion) ? params.motion : null,
     chrome: parseContainerStyle(params.containerStyle),
     effects: parseEffectStack(params.effects),

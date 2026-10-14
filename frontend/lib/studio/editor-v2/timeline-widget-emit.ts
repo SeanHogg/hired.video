@@ -7,6 +7,7 @@
 import type { Widget } from "./canvas-state";
 import { isWidgetMotion } from "./widget-motion";
 import { numberOr, parseContainerStyle, parseEffectStack } from "../widgets/frame";
+import { parseWidgetKeyframes } from "../widgets/evaluate-widget-position";
 import type { RenderContext } from "../widgets/plugin";
 import { PROJECT_FONT_PARAM, pluginForEffectKind, pluginForWidgetKind } from "../widgets/registry";
 import type { Clip, ClipEffect, Timeline } from "@shared/timeline";
@@ -55,6 +56,13 @@ function widgetToEffect(widget: Widget, render: Pick<RenderContext, "fontFamily"
     // Per-widget visual effect chain (drop shadow, glow, blur, etc) —
     // same `{kind, params}` registry shape v1 uses on SceneEffect.
     effects: widget.effects,
+    // Transform keyframes (#808). The static x/y/width/height/rotation
+    // above stay the base pose for clip layout; the export painter
+    // evaluates these at scene playhead via frameInputFromParams.
+    // `keyframeOriginSec` is visibleFrom so clip-local time + origin
+    // recovers scene seconds (atSec is authored from scene start).
+    keyframes: widget.keyframes,
+    keyframeOriginSec: widget.keyframes?.length ? (widget.visibleFrom ?? 0) : undefined,
   };
   const plugin = pluginForWidgetKind(widget.params.kind);
   return {
@@ -77,6 +85,7 @@ export function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widge
     | "motion"
     | "containerStyle"
     | "effects"
+    | "keyframes"
   > = {
     id: clip.id,
     position: {
@@ -92,6 +101,7 @@ export function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widge
     motion: isWidgetMotion(params.motion) ? params.motion : null,
     containerStyle: parseContainerStyle(params.containerStyle) ?? undefined,
     effects: Array.isArray(params.effects) ? parseEffectStack(params.effects) : undefined,
+    keyframes: parseWidgetKeyframes(params.keyframes),
   };
 
   const plugin = pluginForEffectKind(effect.kind);

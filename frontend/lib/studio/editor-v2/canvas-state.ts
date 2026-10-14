@@ -113,6 +113,15 @@ export interface WidgetPosition {
   rotation: number;
 }
 
+/** One sample on a widget's transform animation (#808 / #3160). `position`
+ *  is a partial overlay on the widget's static `position` (the base pose);
+ *  listed numeric fields lerp between surrounding samples. `atSec` is
+ *  seconds from the scene start. `z` is not interpolated. */
+export interface WidgetTransformKeyframe {
+  atSec: number;
+  position: Partial<WidgetPosition>;
+}
+
 export interface TextWidgetParams {
   text: string;
   fontPx: number;
@@ -551,6 +560,11 @@ export interface Widget {
    *  `SceneEffect`, so the editor and the renderer route through the
    *  shared effect registry — no parallel effect schema. */
   effects?: Array<{ kind: string; params: Record<string, unknown> }>;
+  /** Optional transform animation over scene time. `position` stays the
+   *  base pose; these samples lerp x/y/width/height/rotation. Evaluated
+   *  by `evaluateWidgetPositionAt` (preview + export). Persist with the
+   *  canvas-state JSON; omitted when the widget does not animate. */
+  keyframes?: WidgetTransformKeyframe[];
 }
 
 /** Enter animation specs preserved from v1's `scene.animation` so the

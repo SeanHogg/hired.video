@@ -73,8 +73,10 @@ export default function CanvasWidgetView({
 
   // One resolved frame drives this box AND the exported frame (#2312).
   // Enter / exit motion plays only on playback — the edit canvas shows
-  // every widget at rest.
-  const input = frameInputFromWidget(widget);
+  // every widget at rest. Transform keyframes still evaluate: clip-local
+  // time plus visibleFrom recovers the scene playhead (#808 / #3160).
+  const scenePlayheadSec = (widget.visibleFrom ?? 0) + animateInput.clipTimeSec;
+  const input = frameInputFromWidget(widget, scenePlayheadSec);
   const canvas = { width: canvasWidth, height: canvasHeight };
   const frame = resolveFrame(interactive ? { ...input, motion: null } : input, canvas, animateInput);
   // The export clips the body to the rounded inner box only when the
