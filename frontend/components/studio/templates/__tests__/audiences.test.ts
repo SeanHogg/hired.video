@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { AUDIENCES, AUDIENCE_BY_ID, enabledAudiences, getAudience, type Audience } from "@/lib/studio/templates/audiences";
+import { ALL_AUDIENCES, AUDIENCES, AUDIENCE_BY_ID, enabledAudiences, getAudience } from "@/lib/studio/templates/audiences";
+import { isCreateIntent } from "@/lib/studio/create-intent";
 
 describe("AUDIENCES registry", () => {
   it("contains a unique entry per Audience id", () => {
@@ -11,6 +12,16 @@ describe("AUDIENCES registry", () => {
     for (const a of AUDIENCES) {
       expect(a.label.length).toBeGreaterThan(0);
       expect(a.blurb.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("every registry entry declares landing-page fields (#2364)", () => {
+    const arts = new Set(["resume", "reel", "brand"]);
+    for (const a of ALL_AUDIENCES) {
+      expect(a.heroCopy.length, a.id).toBeGreaterThan(0);
+      expect(arts.has(a.heroArt), a.id).toBe(true);
+      expect(a.proof.length, a.id).toBeGreaterThan(0);
+      expect(isCreateIntent(a.createIntent), a.id).toBe(true);
     }
   });
 
@@ -29,9 +40,8 @@ describe("getAudience", () => {
   });
 
   it("covers every id reachable from the union", () => {
-    const ids: Audience[] = ["athlete", "actor", "director", "musician", "creator", "job_seeker", "recruiter", "employer", "founder", "developer", "designer", "data_analyst", "podcaster", "educator", "voice_actor", "game_dev", "illustrator"];
-    for (const id of ids) {
-      expect(getAudience(id).id).toBe(id);
+    for (const a of ALL_AUDIENCES) {
+      expect(getAudience(a.id).id).toBe(a.id);
     }
   });
 });
