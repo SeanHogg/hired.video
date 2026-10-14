@@ -94,6 +94,8 @@ export interface ProviderTransaction {
   currency: string;
   /** Provider customer id the charge was made against, when linked. */
   customerId?: string;
+  /** Provider invoice / order reference (HelcimPay `invoiceNumber`). */
+  invoiceNumber?: string;
 }
 
 /** A saved payment method returned after successful collection. */
@@ -142,6 +144,8 @@ export interface NormalizedWebhookPayload {
   invoiceStatus?: string;
   /** Billing reason (e.g. "subscription_create", "subscription_cycle"). */
   billingReason?: string;
+  /** HelcimPay invoiceNumber (token-pack:{packId}) when the provider sent one. */
+  invoiceNumber?: string;
   /** Invoice PDF URL, if available. */
   invoicePdfUrl?: string;
   /** Raw provider event object for advanced handlers. */
@@ -209,6 +213,8 @@ export interface PaymentProvider {
     amount?: number,
     currency?: string,
     paymentMethodType?: PaymentMethodType,
+    /** HelcimPay invoiceNumber — tags a one-off so the webhook can credit it. */
+    invoiceNumber?: string,
   ): Promise<CollectPaymentMethodResult>;
 
   /**

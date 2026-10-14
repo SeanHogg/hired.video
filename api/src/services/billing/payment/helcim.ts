@@ -164,6 +164,55 @@ const HELCIM_EVENT_MAP: Record<string, NormalizedEventType> = {
   "recurring.plan.cancelled": "subscription.deleted",
 };
 
+/** The fields we read from Helcim's card-transaction record. */
+export interface HelcimCardTransaction {
+  transactionId?: number | string;
+  status?: string;
+  type?: string;
+  amount?: number | string;
+  amountCharged?: number | string;
+  currency?: string;
+  currencyCode?: string;
+  customerCode?: string;
+  invoiceNumber?: string;
+  customer?: { customerCode?: string };
+}
+
+/** Helcim sometimes returns the record at the top level and sometimes under `data`. */
+export function unwrapHelcimRecord<T extends object>(raw: unknown): T | null {
+  if (!raw || typeof raw !== "object") return null;
+  const root = raw as Record<string, unknown>;
+  const inner =
+    root.data && typeof root.data === "object" && !Array.isArray(root.data)
+      ? (root.data as Record<string, unknown>)
+      : root;
+  return inner as T;
+}
+
+/**
+ * Map Helcim's GET /card-transactions/{id} JSON onto ProviderTransaction.
+ * Field names follow Helcim v2 docs; `data` wrapping matches other Helcim
+ * endpoints we already tolerate (customer create). Pure — unit-tested.
+ */
+export function mapHelcimCardTransaction(raw: unknown, fallbackId: string): ProviderTransaction | null {
+  const tx = unwrapHelcimRecord<HelcimCardTransaction>(raw);
+  if (!tx) return null;
+  const status = String(tx.status ?? "").toUpperCase();
+  const type = String(tx.type ?? "").toLowerCase();
+  const amount = tx.amount ?? tx.amountCharged;
+  const currency = tx.currency ?? tx.currencyCode;
+  const customerCode = tx.customerCode ?? tx.customer?.customerCode;
+  const invoiceNumber = tx.invoiceNumber;
+  return {
+    id: String(tx.transactionId ?? fallbackId),
+    approved: status === "APPROVED" && (type === "purchase" || type === "capture"),
+    amountCents: Math.round(Number(amount ?? 0) * 100),
+    currency: String(currency ?? "").toUpperCase(),
+    ...(customerCode ? { customerId: String(customerCode) } : {}),
+    ...(invoiceNumber ? { invoiceNumber: String(invoiceNumber) } : {}),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // HelcimPaymentProvider
 // ---------------------------------------------------------------------------
@@ -271,6 +320,7 @@ export class HelcimPaymentProvider implements PaymentProvider {
     amount?: number,
     currency?: string,
     paymentMethodType?: PaymentMethodType,
+    invoiceNumber?: string,
   ): Promise<CollectPaymentMethodResult> {
     const currencyValue = currency ?? "USD";
     // The inline path requires `jsToken`; gracefully degrade to modal so a
@@ -316,7 +366,14 @@ export class HelcimPaymentProvider implements PaymentProvider {
     };
     const initBody: Record<string, unknown> = isCardOnFile
       ? { paymentType: "verify", ...baseBody }
-      : { paymentType: "purchase", amount, ...baseBody };
+      : {
+          paymentType: "purchase",
+          amount,
+          ...baseBody,
+          // Tags the charge so a transaction.approved webhook can credit the
+          // pack if the tab closes before POST /confirm (gap #2352).
+          ...(invoiceNumber ? { invoiceNumber } : {}),
+        };
 
     const res = await helcimRequest<{ checkoutToken: string }>(
       this.config,
@@ -466,21 +523,28 @@ export class HelcimPaymentProvider implements PaymentProvider {
 
      
     const payload = JSON.parse(body) as Record<string, any>;
-    const eventType: NormalizedEventType = HELCIM_EVENT_MAP[payload.eventType] ?? "unknown";
+    const event = unwrapHelcimRecord<Record<string, any>>(payload) ?? payload;
+    const eventType: NormalizedEventType = HELCIM_EVENT_MAP[event.eventType ?? payload.eventType] ?? "unknown";
+    const transactionId = event.transactionId ?? payload.transactionId;
+    const invoiceNumber = event.invoiceNumber ?? payload.invoiceNumber;
+    const customerCode = event.customerCode ?? payload.customerCode ?? event.customerId ?? payload.customerId;
 
     return {
       // Idempotency key for billing_events. Prefer Helcim's own ids; fall back
       // to the body HMAC (deterministic per payload) rather than Date.now() —
       // a wall-clock fallback gave every redelivery a fresh id, so a retried
       // webhook for the same body slipped past the dedupe and reprocessed.
-      eventId: String(payload.eventId ?? payload.transactionId ?? `helcim:${expected}`),
+      eventId: String(payload.eventId ?? event.eventId ?? transactionId ?? `helcim:${expected}`),
       eventType,
-      customerId: payload.cardToken ?? payload.customerId,
-      providerSubscriptionId: payload.recurringPlanId,
-      providerInvoiceId: payload.transactionId,
-      amount: payload.amount ? Number(payload.amount) : undefined,
-      currency: payload.currency?.toUpperCase(),
-      billingReason: payload.eventType,
+      // cardToken is a card, not a customer — looking it up on users.stripeCustomerId
+      // never matches. Prefer Helcim's customerCode (CST…).
+      customerId: customerCode ? String(customerCode) : undefined,
+      providerSubscriptionId: event.recurringPlanId ?? payload.recurringPlanId,
+      providerInvoiceId: transactionId != null ? String(transactionId) : undefined,
+      amount: (event.amount ?? payload.amount) != null ? Number(event.amount ?? payload.amount) : undefined,
+      currency: (event.currency ?? payload.currency)?.toUpperCase(),
+      billingReason: event.eventType ?? payload.eventType,
+      ...(invoiceNumber ? { invoiceNumber: String(invoiceNumber) } : {}),
       raw: payload,
     };
   }
@@ -525,9 +589,9 @@ export class HelcimPaymentProvider implements PaymentProvider {
    */
   async getTransaction(transactionId: string): Promise<ProviderTransaction | null> {
     if (!/^\d+$/.test(transactionId)) return null;
-    let tx: HelcimCardTransaction;
+    let raw: unknown;
     try {
-      tx = await helcimRequest<HelcimCardTransaction>(
+      raw = await helcimRequest<unknown>(
         this.config,
         "GET",
         `/card-transactions/${transactionId}`,
@@ -536,24 +600,6 @@ export class HelcimPaymentProvider implements PaymentProvider {
       if (err instanceof Error && /error 404/.test(err.message)) return null;
       throw err;
     }
-    const status = String(tx.status ?? "").toUpperCase();
-    const type = String(tx.type ?? "").toLowerCase();
-    return {
-      id: String(tx.transactionId ?? transactionId),
-      approved: status === "APPROVED" && (type === "purchase" || type === "capture"),
-      amountCents: Math.round(Number(tx.amount ?? 0) * 100),
-      currency: String(tx.currency ?? "").toUpperCase(),
-      ...(tx.customerCode ? { customerId: String(tx.customerCode) } : {}),
-    };
+    return mapHelcimCardTransaction(raw, transactionId);
   }
-}
-
-/** The fields we read from Helcim's card-transaction record. */
-interface HelcimCardTransaction {
-  transactionId?: number | string;
-  status?: string;
-  type?: string;
-  amount?: number | string;
-  currency?: string;
-  customerCode?: string;
 }

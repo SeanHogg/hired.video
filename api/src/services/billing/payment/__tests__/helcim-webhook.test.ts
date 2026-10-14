@@ -56,6 +56,24 @@ describe("HelcimPaymentProvider.verifyWebhook", () => {
     assert.equal(payload.amount, 25);
     assert.equal(payload.currency, "USD");
     assert.equal(payload.billingReason, "transaction.approved");
+    assert.equal(payload.customerId, "CST123");
+  });
+
+  it("prefers customerCode over cardToken and surfaces invoiceNumber", async () => {
+    const body = JSON.stringify({
+      eventId: "evt-pack",
+      eventType: "transaction.approved",
+      transactionId: 2211223,
+      amount: "14.99",
+      currency: "usd",
+      customerCode: "CST1001",
+      cardToken: "card_should_not_be_the_customer",
+      invoiceNumber: "token-pack:tokens_1m",
+    });
+    const payload = await provider().verifyWebhook(body, headers(sign(body)));
+    assert.equal(payload.customerId, "CST1001");
+    assert.equal(payload.invoiceNumber, "token-pack:tokens_1m");
+    assert.equal(payload.providerInvoiceId, "2211223");
   });
 
   it("maps recurring plan + declined events to the right normalized types", async () => {

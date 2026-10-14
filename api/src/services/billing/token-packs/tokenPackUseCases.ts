@@ -30,9 +30,11 @@ import {
   type TokenPack,
 } from "../../../../../shared/pricing.js";
 import type { TokenBudgetDTO } from "../../../../../shared/billing.js";
-import type {
-  ConfirmTokenPackResultDTO,
-  TokenPackErrorKind,
+import {
+  parseTokenPackInvoiceNumber,
+  tokenPackInvoiceNumber,
+  type ConfirmTokenPackResultDTO,
+  type TokenPackErrorKind,
 } from "../../../../../shared/token-packs.js";
 import type {
   CollectPaymentMethodResult,
@@ -106,6 +108,7 @@ export async function startTokenPackCheckout(
     currency: PACK_CURRENCY,
     successUrl: input.successUrl,
     cancelUrl: input.cancelUrl,
+    invoiceNumber: tokenPackInvoiceNumber(pack.id),
   });
   return { pack, collection };
 }
@@ -214,4 +217,84 @@ export async function creditPendingPurchase(
     console.warn("[token-packs] post-grant side effects failed", { userId: input.userId, err: String(err) });
   }
   return { granted: true };
+}
+
+export type TokenPackWebhookOutcome =
+  | "credited"
+  | "already_credited"
+  | "pending"
+  | "rejected"
+  | "unresolved"
+  | "ignored";
+
+/** Pack id + provider transaction id from a normalised webhook, or null. */
+export function tokenPackConfirmFromWebhook(payload: {
+  invoiceNumber?: string;
+  providerInvoiceId?: string | number;
+  raw?: unknown;
+}): { packId: string; transactionId: string } | null {
+  const raw = payload.raw && typeof payload.raw === "object"
+    ? (payload.raw as Record<string, unknown>)
+    : null;
+  const nested = raw?.data && typeof raw.data === "object"
+    ? (raw.data as Record<string, unknown>)
+    : null;
+  const invoiceNumber =
+    payload.invoiceNumber
+    ?? (typeof raw?.invoiceNumber === "string" ? raw.invoiceNumber : undefined)
+    ?? (typeof nested?.invoiceNumber === "string" ? nested.invoiceNumber : undefined);
+  const packId = parseTokenPackInvoiceNumber(invoiceNumber);
+  const transactionId = payload.providerInvoiceId != null ? String(payload.providerInvoiceId) : "";
+  if (!packId || !transactionId) return null;
+  return { packId, transactionId };
+}
+
+/**
+ * Credit a token pack from `invoice.paid` / Helcim `transaction.approved`
+ * when the checkout tagged HelcimPay with `token-pack:{packId}`. The tab
+ * can close before POST /confirm; this is the path that still records
+ * pending and settles (gap #2352). Returns `ignored` when the event is
+ * not a pack purchase so the Stripe invoice handler can run.
+ */
+export async function confirmTokenPackFromWebhook(
+  deps: TokenPackDeps,
+  payload: {
+    invoiceNumber?: string;
+    providerInvoiceId?: string | number;
+    customerId?: string;
+    raw?: unknown;
+  },
+  userIdForCustomer: (customerId: string) => Promise<string | null>,
+): Promise<TokenPackWebhookOutcome> {
+  const pack = tokenPackConfirmFromWebhook(payload);
+  if (!pack) return "ignored";
+
+  let userId = payload.customerId ? await userIdForCustomer(payload.customerId) : null;
+  if (!userId && deps.payments) {
+    try {
+      const tx = await deps.payments.getTransaction(pack.transactionId);
+      if (tx?.customerId) userId = await userIdForCustomer(tx.customerId);
+    } catch (err) {
+      console.warn("[token-packs] webhook customer lookup failed", { err: String(err) });
+    }
+  }
+  if (!userId) return "unresolved";
+
+  try {
+    const result = await confirmTokenPackPurchase(deps, {
+      userId,
+      packId: pack.packId,
+      transactionId: pack.transactionId,
+    });
+    if (result.granted) return "credited";
+    if (result.pending) return "pending";
+    return "already_credited";
+  } catch (err) {
+    if (err instanceof TokenPackError) {
+      if (err.kind === "PAYMENT_NOT_VERIFIED") return "rejected";
+      console.warn("[token-packs] webhook confirm failed", { kind: err.kind, err: err.message });
+      return "unresolved";
+    }
+    throw err;
+  }
 }

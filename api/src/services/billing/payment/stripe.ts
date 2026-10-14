@@ -185,6 +185,7 @@ export class StripePaymentProvider implements PaymentProvider {
     _amount?: number,
     _currency?: string,
     paymentMethodType?: PaymentMethodType,
+    _invoiceNumber?: string,
   ): Promise<CollectPaymentMethodResult> {
     // Map our normalised type to Stripe's payment_method_types list. "any"
     // exposes both card and ACH so the buyer chooses inside the PaymentElement.

@@ -32,6 +32,25 @@ export const ConfirmTokenPackSchema = z.object({
 });
 export type ConfirmTokenPackInput = z.infer<typeof ConfirmTokenPackSchema>;
 
+/**
+ * HelcimPay.js `invoiceNumber` for a pack checkout (gap #2352). The widget
+ * does not tell the webhook which pack was bought; tagging the initialize
+ * call lets `transaction.approved` credit the same SKU if the tab closes
+ * before POST /confirm. Format is ours, not Helcim's.
+ */
+export const TOKEN_PACK_INVOICE_PREFIX = "token-pack:";
+
+export function tokenPackInvoiceNumber(packId: string): string {
+  return `${TOKEN_PACK_INVOICE_PREFIX}${packId}`;
+}
+
+/** Pack id encoded in a Helcim invoiceNumber, or null when it isn't ours. */
+export function parseTokenPackInvoiceNumber(value: unknown): string | null {
+  if (typeof value !== "string" || !value.startsWith(TOKEN_PACK_INVOICE_PREFIX)) return null;
+  const packId = value.slice(TOKEN_PACK_INVOICE_PREFIX.length);
+  return packId.length > 0 && packId.length <= 50 ? packId : null;
+}
+
 export const TOKEN_PACK_ERROR_KINDS = [
   "UNKNOWN_PACK",
   "PRO_REQUIRED",

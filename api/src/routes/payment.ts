@@ -19,6 +19,8 @@ import { getUserIdByStripeCustomer } from "../services/billing/payment/stripe.js
 import * as billingService from "../services/billing/BillingService.js";
 import { tryGetPayoutProvider } from "../services/payout/index.js";
 import { applyPayoutWebhook } from "./payouts.js";
+import { buildTokenPackDeps } from "../services/billing/token-packs/tokenPackDeps.js";
+import { confirmTokenPackFromWebhook } from "../services/billing/token-packs/tokenPackUseCases.js";
 
 export const paymentRoutes = new Hono<AppEnv>();
 
@@ -275,7 +277,7 @@ async function handleWebhook(c: Context<AppEnv>) {
   });
 
   try {
-    await dispatchWebhookEvent(db, payload);
+    await dispatchWebhookEvent(db, payload, getEnv(c));
      
     await db.update(schema.billingEvents).set({ processedAt: new Date() } as any).where(eq(schema.billingEvents.stripeEventId, payload.eventId));
   } catch (err) {
@@ -294,6 +296,7 @@ paymentRoutes.post("/stripe/webhook", handleWebhook as any); // legacy Stripe da
 async function dispatchWebhookEvent(
   db: ReturnType<typeof getDb>,
   payload: Awaited<ReturnType<NonNullable<ReturnType<typeof tryGetPaymentProvider>>["verifyWebhook"]>>,
+  env: Record<string, string | undefined>,
 ): Promise<void> {
   // Resolve userId from provider customerId
   const resolveUserId = async (): Promise<string | null> => {
@@ -333,6 +336,17 @@ async function dispatchWebhookEvent(
     }
 
     case "invoice.paid": {
+      // Helcim `transaction.approved` for a pack tagged with
+      // invoiceNumber `token-pack:{packId}` — credit even if the tab
+      // closed before POST /confirm (gap #2352). Stripe invoices don't
+      // carry that prefix, so they fall through.
+      const packOutcome = await confirmTokenPackFromWebhook(
+        buildTokenPackDeps(env),
+        payload,
+        getUserIdByStripeCustomer,
+      );
+      if (packOutcome !== "ignored") break;
+
       const userId = await resolveUserId();
       if (!userId) break;
        

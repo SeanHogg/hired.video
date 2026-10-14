@@ -23,6 +23,8 @@ export interface OneOffPaymentsPort {
     currency: string;
     successUrl: string;
     cancelUrl: string;
+    /** HelcimPay invoiceNumber so a webhook can identify the SKU. */
+    invoiceNumber?: string;
   }): Promise<CollectPaymentMethodResult>;
   getTransaction(transactionId: string): Promise<ProviderTransaction | null>;
 }
@@ -35,10 +37,18 @@ export function buildOneOffPaymentsPort(provider: PaymentProvider): OneOffPaymen
       if (!ctx) throw new Error(`one-off payments: user ${userId} not found`);
       return provider.getOrCreateCustomer(userId, ctx.user.email, ctx.user.name, ctx.billingAddress);
     },
-    initPurchase({ customerId, amount, currency, successUrl, cancelUrl }) {
+    initPurchase({ customerId, amount, currency, successUrl, cancelUrl, invoiceNumber }) {
       // A positive amount makes the provider widget a one-off PURCHASE
       // (not a card-on-file verify) for exactly the server-chosen price.
-      return provider.initPaymentCollection(customerId, successUrl, cancelUrl, amount, currency, "card");
+      return provider.initPaymentCollection(
+        customerId,
+        successUrl,
+        cancelUrl,
+        amount,
+        currency,
+        "card",
+        invoiceNumber,
+      );
     },
     async getTransaction(transactionId) {
       return provider.getTransaction ? provider.getTransaction(transactionId) : null;

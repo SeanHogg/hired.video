@@ -12,14 +12,17 @@ import { TOKEN_PACKS, tokenPackPriceCents } from "../../../../../../shared/prici
 import type { TokenBudgetDTO } from "../../../../../../shared/billing.js";
 import type { ProviderTransaction } from "../../payment/types.js";
 import {
+  confirmTokenPackFromWebhook,
   confirmTokenPackPurchase,
   creditPendingPurchase,
   isPaymentForPack,
   startTokenPackCheckout,
+  tokenPackConfirmFromWebhook,
   TokenPackError,
   TOKEN_PACK_MAX_CHECKS,
   type TokenPackDeps,
 } from "../tokenPackUseCases.js";
+import { tokenPackInvoiceNumber } from "../../../../../../shared/token-packs.js";
 import { reconcilePendingTokenPacks, TOKEN_PACK_RECONCILE_BATCH } from "../tokenPackReconcile.js";
 
 const PACK = TOKEN_PACKS[1];
@@ -69,14 +72,14 @@ function makeDeps(
   // reference, and the pending -> paid flip (with its credit) happens once.
   const rows: FakeRow[] = [];
   const balance = new Map<string, number>();
-  const inits: Array<{ amount: number; currency: string }> = [];
+  const inits: Array<{ amount: number; currency: string; invoiceNumber?: string }> = [];
   const granted: string[] = [];
   const deps: TokenPackDeps = {
     payments: opts.payments === false ? null : {
       supportsOneOffPurchases: true,
       customerIdFor: async () => CUSTOMER,
-      initPurchase: async ({ amount, currency }) => {
-        inits.push({ amount, currency });
+      initPurchase: async ({ amount, currency, invoiceNumber }) => {
+        inits.push({ amount, currency, invoiceNumber });
         return { flowType: "embedded", checkoutToken: "tok", providerName: "helcim" };
       },
       getTransaction: async (id) => {
@@ -144,7 +147,11 @@ describe("startTokenPackCheckout", () => {
     const { deps, inits } = makeDeps();
     const res = await startTokenPackCheckout(deps, input);
     assert.equal(res.pack.id, PACK.id);
-    assert.deepEqual(inits, [{ amount: PACK.price, currency: "USD" }]);
+    assert.deepEqual(inits, [{
+      amount: PACK.price,
+      currency: "USD",
+      invoiceNumber: tokenPackInvoiceNumber(PACK.id),
+    }]);
   });
 
   it("rejects unknown packs, free accounts, and missing payments", async () => {
@@ -298,5 +305,92 @@ describe("reconcilePendingTokenPacks", () => {
     const summary = await reconcilePendingTokenPacks({ ...fx.deps, pending: fx.pending }, { now: NOW });
     assert.equal(summary.scanned, 0);
     assert.equal(fx.listCalls.length, 0);
+  });
+});
+
+describe("tokenPackConfirmFromWebhook", () => {
+  it("parses a tagged Helcim invoiceNumber", () => {
+    assert.deepEqual(
+      tokenPackConfirmFromWebhook({
+        invoiceNumber: tokenPackInvoiceNumber(PACK.id),
+        providerInvoiceId: "9001",
+      }),
+      { packId: PACK.id, transactionId: "9001" },
+    );
+  });
+
+  it("reads invoiceNumber from the raw Helcim body when the normalised field is missing", () => {
+    assert.deepEqual(
+      tokenPackConfirmFromWebhook({
+        providerInvoiceId: 9001,
+        raw: { invoiceNumber: tokenPackInvoiceNumber(PACK.id) },
+      }),
+      { packId: PACK.id, transactionId: "9001" },
+    );
+  });
+
+  it("ignores Stripe invoices and incomplete payloads", () => {
+    assert.equal(tokenPackConfirmFromWebhook({ providerInvoiceId: "in_1" }), null);
+    assert.equal(tokenPackConfirmFromWebhook({ invoiceNumber: "token-pack:", providerInvoiceId: "1" }), null);
+    assert.equal(tokenPackConfirmFromWebhook({ invoiceNumber: tokenPackInvoiceNumber(PACK.id) }), null);
+  });
+});
+
+describe("confirmTokenPackFromWebhook", () => {
+  const userFor = (id: string) => async (customerId: string) => customerId === CUSTOMER ? id : null;
+
+  it("credits when the webhook names the pack and the customer", async () => {
+    const { deps, balance } = makeDeps({ transactions: { "9001": tx() } });
+    const outcome = await confirmTokenPackFromWebhook(
+      deps,
+      { invoiceNumber: tokenPackInvoiceNumber(PACK.id), providerInvoiceId: "9001", customerId: CUSTOMER },
+      userFor("u1"),
+    );
+    assert.equal(outcome, "credited");
+    assert.equal(balance.get("u1"), PACK.tokens);
+  });
+
+  it("looks up the customer from getTransaction when the webhook omits it", async () => {
+    const { deps, balance } = makeDeps({ transactions: { "9001": tx() } });
+    const outcome = await confirmTokenPackFromWebhook(
+      deps,
+      { invoiceNumber: tokenPackInvoiceNumber(PACK.id), providerInvoiceId: "9001" },
+      userFor("u1"),
+    );
+    assert.equal(outcome, "credited");
+    assert.equal(balance.get("u1"), PACK.tokens);
+  });
+
+  it("returns ignored for a non-pack invoice.paid so Stripe invoicing still runs", async () => {
+    const { deps, balance } = makeDeps({ transactions: { "9001": tx() } });
+    const outcome = await confirmTokenPackFromWebhook(
+      deps,
+      { providerInvoiceId: "in_stripe", billingReason: "subscription_create" } as never,
+      async () => "u1",
+    );
+    assert.equal(outcome, "ignored");
+    assert.equal(balance.get("u1"), undefined);
+  });
+
+  it("returns unresolved when no user can be found", async () => {
+    const { deps } = makeDeps({ transactions: { "9001": tx({ customerId: undefined }) } });
+    const outcome = await confirmTokenPackFromWebhook(
+      deps,
+      { invoiceNumber: tokenPackInvoiceNumber(PACK.id), providerInvoiceId: "9001" },
+      async () => null,
+    );
+    assert.equal(outcome, "unresolved");
+  });
+
+  it("a replayed webhook after confirm never credits twice", async () => {
+    const { deps, balance } = makeDeps({ transactions: { "9001": tx() } });
+    await confirmTokenPackPurchase(deps, { userId: "u1", packId: PACK.id, transactionId: "9001" });
+    const outcome = await confirmTokenPackFromWebhook(
+      deps,
+      { invoiceNumber: tokenPackInvoiceNumber(PACK.id), providerInvoiceId: "9001", customerId: CUSTOMER },
+      userFor("u1"),
+    );
+    assert.equal(outcome, "already_credited");
+    assert.equal(balance.get("u1"), PACK.tokens);
   });
 });
