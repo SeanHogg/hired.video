@@ -149,6 +149,12 @@ export function useServerAutosave({
   const armedRef = useRef(initialBaseline !== undefined);
   const inFlightRef = useRef(false);
   const conflictRef = useRef<AutosaveConflict | null>(null);
+  // First successful save of a new document stamps identity (entityId) on the
+  // next render. Adopting that snapshot as baseline — instead of treating it
+  // as an edit — stops a redundant write (#2242). Subsequent saves must not
+  // swallow a real follow-up edit, so this is one-shot.
+  const savedOnceRef = useRef(false);
+  const settleRef = useRef(false);
   // From an edit until the server accepts it, a reload would lose work — the
   // PWA auto-update and the unload prompt wait on this (hooks/use-unsaved-work.ts).
   const unsavedOwner = useUnsavedWorkOwner();
@@ -222,11 +228,23 @@ export function useServerAutosave({
         announceAutosave(key);
         void offlineSaveQueue.remove(key);
       }
-      // Re-baseline from the post-save state so the settle-down render doesn't
-      // look like a fresh change.
-      baselineRef.current = computeRef.current();
-      // An edit made while this write was in flight is still unsaved.
-      if (baselineRef.current !== snapshot) {
+      // Re-baseline from the post-save state (may already include a stamped
+      // entityId if the save flushed before this continuation).
+      const post = computeRef.current();
+      baselineRef.current = post;
+      const firstSave = !savedOnceRef.current;
+      savedOnceRef.current = true;
+      if (firstSave) {
+        // The next deps pass is the settle-down render (entityId / project id),
+        // not a user edit — adopt it as baseline instead of writing again.
+        settleRef.current = true;
+        // If that pass never comes (save didn't change deps), drop the flag
+        // on the next macrotask so a later real edit is not swallowed.
+        window.setTimeout(() => {
+          settleRef.current = false;
+        }, 0);
+      } else if (post !== snapshot) {
+        // An edit made while this write was in flight is still unsaved.
         schedule(debounceMs);
         return;
       }
@@ -258,6 +276,12 @@ export function useServerAutosave({
     if (!armedRef.current) {
       armedRef.current = true;
       baselineRef.current = computeRef.current();
+      return;
+    }
+    if (settleRef.current) {
+      settleRef.current = false;
+      baselineRef.current = computeRef.current();
+      markUnsaved(false);
       return;
     }
     markUnsaved(true);

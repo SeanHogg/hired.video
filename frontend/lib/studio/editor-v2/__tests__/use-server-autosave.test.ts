@@ -16,6 +16,8 @@
  *      are retried the moment the browser is back online.
  *   9. maxWaitMs writes during non-stop edits; initialBaseline null saves a
  *      restored draft; unmount flushes; rebaseline adopts a saved state.
+ *  10. First document-kind save that stamps entityId does not write again on
+ *      the next tick when nothing else changed (#2242).
  */
 
 import { renderHook, act } from "@testing-library/react";
@@ -368,5 +370,49 @@ describe("useServerAutosave — cadence and baselines", () => {
       vi.advanceTimersByTime(DEBOUNCE);
     });
     expect(save).not.toHaveBeenCalled();
+  });
+
+  it("still writes a later edit after a successful save with no identity stamp", async () => {
+    const { view, save } = setup({ snapshot: "v0" });
+    view.rerender({ enabled: true, ready: true, snapshot: "v1", isSaving: false, save });
+    await act(async () => {
+      vi.advanceTimersByTime(DEBOUNCE);
+    });
+    expect(save).toHaveBeenCalledTimes(1);
+    // First-save settle expires on the next macrotask when nothing stamped.
+    await act(async () => {
+      vi.advanceTimersByTime(0);
+    });
+    view.rerender({ enabled: true, ready: true, snapshot: "v2", isSaving: false, save });
+    await act(async () => {
+      vi.advanceTimersByTime(DEBOUNCE);
+    });
+    expect(save).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not write again after first document-kind save stamps entityId (#2242)", async () => {
+    const save = vi.fn(async () => ({ id: "p1" }));
+    // Props-based snapshot: the save's setState (entityId stamp) is not visible
+    // until the parent re-renders — the real document-kind first-save path.
+    const view = setupKeyed({ snapshot: JSON.stringify({ body: "draft", entityId: null }), save });
+    view.rerender({ snapshot: JSON.stringify({ body: "edited", entityId: null }), save });
+    await act(async () => {
+      vi.advanceTimersByTime(DEBOUNCE);
+    });
+    expect(save).toHaveBeenCalledTimes(1);
+
+    // Settle-down render: entity row id stamped, nothing else changed.
+    view.rerender({ snapshot: JSON.stringify({ body: "edited", entityId: "ent-1" }), save });
+    await act(async () => {
+      vi.advanceTimersByTime(DEBOUNCE * 2);
+    });
+    expect(save).toHaveBeenCalledTimes(1);
+
+    // A later real edit still persists.
+    view.rerender({ snapshot: JSON.stringify({ body: "edited-again", entityId: "ent-1" }), save });
+    await act(async () => {
+      vi.advanceTimersByTime(DEBOUNCE);
+    });
+    expect(save).toHaveBeenCalledTimes(2);
   });
 });
