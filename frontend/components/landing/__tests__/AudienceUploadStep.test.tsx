@@ -57,7 +57,7 @@ function renderStep(ui: ReactElement) {
 
 describe("AudienceUploadStep (#2364)", () => {
   it("a résumé closer is a KitDropZone that opens /studio/new with the drop", () => {
-    renderStep(<AudienceUploadStep intent="resume" />);
+    renderStep(<AudienceUploadStep id="resume-upload" intent="resume" />);
     expect(screen.getByText("Start with the résumé you already have")).toBeInTheDocument();
     const zone = screen.getByTestId("kit-drop-zone");
     expect(zone).toHaveAttribute("data-lead", "resume");
@@ -68,7 +68,7 @@ describe("AudienceUploadStep (#2364)", () => {
   });
 
   it("a video closer links to the studio on the named template", () => {
-    renderStep(<AudienceUploadStep intent="video" videoTemplate="self_tape" />);
+    renderStep(<AudienceUploadStep id="video-upload" intent="video" videoTemplate="self_tape" />);
     expect(screen.getByText("Bring the footage you already have")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Upload my footage" })).toHaveAttribute(
       "href",
@@ -78,7 +78,7 @@ describe("AudienceUploadStep (#2364)", () => {
   });
 
   it("a job closer links to a new job document", () => {
-    renderStep(<AudienceUploadStep intent="job" />);
+    renderStep(<AudienceUploadStep id="job-upload" intent="job" />);
     expect(screen.getByRole("link", { name: "Upload a job description" })).toHaveAttribute(
       "href",
       "/studio?contentTemplate=job_doc",
@@ -86,7 +86,7 @@ describe("AudienceUploadStep (#2364)", () => {
   });
 
   it("a company closer links to a new company document", () => {
-    renderStep(<AudienceUploadStep intent="company" />);
+    renderStep(<AudienceUploadStep id="company-upload" intent="company" />);
     expect(screen.getByRole("link", { name: "Create my company page" })).toHaveAttribute(
       "href",
       "/studio?contentTemplate=company_doc",
