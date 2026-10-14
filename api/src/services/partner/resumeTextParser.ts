@@ -2,25 +2,34 @@
  * Partner résumé text → JSON Resume content (#2270).
  *
  * A partner SDK upload (`rawText`, or text extracted from a `file`) arrives
- * with no signed-in user, so there is nobody to bill an AI parse to. Which
- * account pays is an owner decision (D12): the partner's owner account, or
- * the job seeker the résumé belongs to. Until D12 is made the AI parse stays
- * off and partner text takes the deterministic path (JSON Resume if it
- * parses, else the regex parser).
+ * with no signed-in user. The billed subject is D12: the partner's owner
+ * account, or the job seeker the résumé belongs to. Default is `job_seeker`
+ * — same billed subject as first-party `/api/resumes/parse` (JWT `sub` =
+ * résumé owner). Admin-provisioned partners have a null owner, so billing
+ * the seeker is the only subject that always exists.
  *
- * `PARTNER_RESUME_AI_PARSE` is the ONE switch. Flipping it to
- * "partner_owner" or "job_seeker" routes partner text through the same AI
- * parse pipeline as /api/resumes/parse, billed (ai_usage_records + token
- * budget) to that account. An AI failure still falls back to the
- * deterministic parse, so a partner write never fails on the model.
+ * `PARTNER_RESUME_AI_PARSE` is the code default. `resolvePartnerResumeAiParse`
+ * reads env `PARTNER_RESUME_AI_PARSE` (`off` | `partner_owner` | `job_seeker`)
+ * so D12 can still flip who pays without another code change. An AI failure
+ * still falls back to the deterministic parse, so a partner write never
+ * fails on the model.
  */
 import { parseResumeWithRegex, tryParseJsonResume } from "../resume/parse.js";
 
 /** Who pays for a partner upload's AI parse; "off" = deterministic only. */
 export type PartnerResumeAiParse = "off" | "partner_owner" | "job_seeker";
 
-/** THE switch — set by D12. Keep "off" until the owner decides who is billed. */
-export const PARTNER_RESUME_AI_PARSE: PartnerResumeAiParse = "off";
+/** Code default — billed to the résumé owner, matching first-party parse. */
+export const PARTNER_RESUME_AI_PARSE: PartnerResumeAiParse = "job_seeker";
+
+/** Resolve the switch from env (wrangler / secrets). Unknown / unset → default. */
+export function resolvePartnerResumeAiParse(
+  raw: string | undefined | null,
+): PartnerResumeAiParse {
+  const v = raw?.trim().toLowerCase();
+  if (v === "off" || v === "partner_owner" || v === "job_seeker") return v;
+  return PARTNER_RESUME_AI_PARSE;
+}
 
 export interface PartnerParseContext {
   /** The partner's owning account (null for admin-provisioned partners). */

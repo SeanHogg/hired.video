@@ -92,6 +92,10 @@ export interface Env {
   // api/scripts/seedHouseWorkspace.mjs. No new workspace kind is
   // introduced — the existing `delegated` kind + canActFor() SSoT is reused.
   HOUSE_USER_ID?: string;
+  // Partner SDK résumé AI-parse billing (#2270 / D12). "off" | "partner_owner"
+  // | "job_seeker". Unset → job_seeker (same billed subject as first-party
+  // /api/resumes/parse). Flip without a code change.
+  PARTNER_RESUME_AI_PARSE?: string;
   // ─── Social publishing connection layer (PRD §5.0) ──────────────────────
   // Layer-1 developer-app credentials, one pair per platform. YouTube +
   // LinkedIn + Meta reuse the keys declared above. TikTok's *organic*

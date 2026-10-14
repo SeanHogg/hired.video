@@ -3,6 +3,17 @@
 All notable changes to `@seanhogg/hired-video-sdk` are documented here. This
 project follows [Semantic Versioning](https://semver.org).
 
+## Unreleased
+
+### Changed
+
+- **Partner résumé `rawText` / `file` uploads now run the first-party AI parse
+  pipeline.** Structured `content` (JSON Resume) is still stored as-is. Plain
+  text and extracted PDF/DOCX text go through `runResumeParse`, billed to the
+  job seeker by default (`PARTNER_RESUME_AI_PARSE`; set to `partner_owner` or
+  `off` to change). An AI failure still falls back to the deterministic
+  parser, so a partner write never fails on the model. No SDK call change.
+
 ## 0.4.0
 
 ### Changed

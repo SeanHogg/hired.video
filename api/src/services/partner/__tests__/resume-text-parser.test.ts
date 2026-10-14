@@ -1,7 +1,7 @@
 /**
- * #2270 — partner résumé text goes through ONE switch: deterministic until
- * D12 picks who pays, then the AI parse billed to that account, with the
- * deterministic parse as the fallback.
+ * #2270 — partner résumé text goes through ONE switch: default job_seeker
+ * (first-party billed subject). Env can flip to partner_owner or off. AI
+ * parse billed to that account, deterministic parse as the fallback.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -9,6 +9,7 @@ import {
   PARTNER_RESUME_AI_PARSE,
   buildPartnerTextParser,
   partnerParseBillingSubject,
+  resolvePartnerResumeAiParse,
   type PartnerParseContext,
 } from "../resumeTextParser.js";
 
@@ -37,8 +38,18 @@ const JSON_RESUME = JSON.stringify({
 });
 
 describe("partner résumé parse switch", () => {
-  it("ships with the AI parse off until D12", () => {
-    assert.equal(PARTNER_RESUME_AI_PARSE, "off");
+  it("defaults to job_seeker so partner uploads share the first-party AI parse pipeline", () => {
+    assert.equal(PARTNER_RESUME_AI_PARSE, "job_seeker");
+  });
+
+  it("resolvePartnerResumeAiParse accepts env values and falls back to the default", () => {
+    assert.equal(resolvePartnerResumeAiParse(undefined), "job_seeker");
+    assert.equal(resolvePartnerResumeAiParse(null), "job_seeker");
+    assert.equal(resolvePartnerResumeAiParse(""), "job_seeker");
+    assert.equal(resolvePartnerResumeAiParse("nope"), "job_seeker");
+    assert.equal(resolvePartnerResumeAiParse("OFF"), "off");
+    assert.equal(resolvePartnerResumeAiParse(" partner_owner "), "partner_owner");
+    assert.equal(resolvePartnerResumeAiParse("job_seeker"), "job_seeker");
   });
 
   it("bills the account the switch names", () => {

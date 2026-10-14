@@ -61,7 +61,8 @@ A résumé can be supplied three ways, in priority order: structured `content`
 // (a) Structured JSON Resume — preferred, no parsing needed.
 await hired.jobSeekers.uploadResume(userId, { content: jsonResumeDoc });
 
-// (b) Plain text — parsed server-side (no AI) into JSON Resume.
+// (b) Plain text — parsed server-side into JSON Resume (same AI pipeline
+// as first-party /api/resumes/parse; billed to the job seeker).
 await hired.jobSeekers.uploadResume(userId, { rawText: extractedText });
 
 // (c) A file — pass a Blob/File/ArrayBuffer/Uint8Array or a base64 string.
@@ -75,7 +76,8 @@ await hired.jobSeekers.uploadResume(userId, {
 **Supported `file` formats:** **PDF**, **DOCX**, `text/plain`, and
 `application/json`. PDF and DOCX are extracted to text server-side (PDF via a
 text layer, DOCX via its document XML) and then structured (skills / work /
-education) with no AI cost. **Max decoded size: 10 MB.**
+education) through the same AI parse pipeline as first-party uploads. A JSON
+Resume file short-circuits with no model call. **Max decoded size: 10 MB.**
 
 > **Not supported:** legacy binary `.doc` (OLE), and image/scanned résumés with
 > no text layer. These return `HiredApiError.code === "UNSUPPORTED_MEDIA_TYPE"`

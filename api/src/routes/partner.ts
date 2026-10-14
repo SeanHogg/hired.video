@@ -47,7 +47,7 @@ import { buildRepos } from "../repositories/index.js";
 import { refreshDiffPercentFor } from "../services/resume/view.js";
 import { runResumeParse } from "../services/resume/parsePipeline.js";
 import { createAiTextCaller, hasAiTextProvider } from "../services/adapters/ai-text-caller.js";
-import { PARTNER_RESUME_AI_PARSE, buildPartnerTextParser } from "../services/partner/resumeTextParser.js";
+import { resolvePartnerResumeAiParse, buildPartnerTextParser } from "../services/partner/resumeTextParser.js";
 import { decodeResumeFilePayload, extractResumeText } from "../services/resume/extractFile.js";
 import { extractUploadedResumeFiles } from "../services/resume/uploadIntake.js";
 import { ocrResumeImage } from "./resume-parse.js";
@@ -111,16 +111,18 @@ function grantedScopes(keyScopes: string[]): PartnerScope[] {
 }
 
 /** Billing identity for a partner upload's AI parse (#2270). Partner calls
- *  carry no session, so the model call is billed to the account D12 names
- *  (see services/partner/resumeTextParser.ts) through this minimal claim set. */
+ *  carry no session, so the model call is billed to the account the switch
+ *  names (default: the job seeker; see resumeTextParser.ts) through this
+ *  minimal claim set. */
 function billingSubject(userId: string): JwtPayload {
   return { sub: userId, email: "", roles: [], emailVerified: true, mustChangePassword: false };
 }
 
-/** ResumeDeps for the partner write path. Partner text goes through the ONE
- *  switch in resumeTextParser.ts: deterministic (JSON Resume, else the regex
- *  parser) until D12 picks who pays, then the same AI parse pipeline as
- *  /api/resumes/parse, billed to that account. */
+/** ResumeDeps for the partner write path. Partner text goes through the
+ *  switch in resumeTextParser.ts (env `PARTNER_RESUME_AI_PARSE`, default
+ *  `job_seeker`): the same AI parse pipeline as /api/resumes/parse, billed
+ *  to that account. JSON Resume short-circuits; AI failure falls back to
+ *  the regex parser so a partner write never fails on the model. */
 function partnerResumeDeps(c: Context<AppEnv>, partnerId: string, jobSeekerUserId: string) {
   const now = () => new Date();
   const aiParse = hasAiTextProvider(c.env)
@@ -138,7 +140,7 @@ function partnerResumeDeps(c: Context<AppEnv>, partnerId: string, jobSeekerUserI
     repo: buildRepos(getDb(), now).resumes,
     parser: buildResumeParserPort(
       buildPartnerTextParser({
-        mode: PARTNER_RESUME_AI_PARSE,
+        mode: resolvePartnerResumeAiParse(c.env.PARTNER_RESUME_AI_PARSE),
         context: async () => ({
           partnerOwnerUserId: (await getPartner(partnerId))?.ownerUserId ?? null,
           jobSeekerUserId,
