@@ -199,6 +199,12 @@ describe("runResumeParse — boundaries", () => {
   });
 });
 
+function abortError(): Error {
+  const err = new Error("The operation was aborted");
+  err.name = "AbortError";
+  return err;
+}
+
 describe("runResumeParse — exceptions", () => {
   it("returns the regex pre-parse when every model call fails", async () => {
     const model = fakeModel({});
@@ -208,5 +214,58 @@ describe("runResumeParse — exceptions", () => {
     assert.equal(model.calls[0], "one-pass");
     assert.equal(model.calls.filter((c) => c.startsWith("section:")).length, 8, "every section was tried");
     assert.ok(Object.keys(result).length > 0, "regex content, not an empty résumé");
+  });
+
+  it("does not backfill sections when the one-pass call is aborted", async () => {
+    const model = fakeModel({
+      "one-pass": async () => {
+        throw abortError();
+      },
+    });
+
+    await assert.rejects(
+      () => runResumeParse(RESUME_TEXT, { callAI: model.callAI, extractSkills: null }),
+      (err: unknown) => err instanceof Error && err.name === "AbortError",
+    );
+    assert.deepEqual(model.calls, ["one-pass"], "closed tab must not spend tokens on 8 section prompts");
+  });
+
+  it("stops section backfill when a section call is aborted", async () => {
+    const model = fakeModel({
+      "one-pass": async () => {
+        throw new Error("gateway down");
+      },
+      "section:basics": async () => {
+        throw abortError();
+      },
+      "section:work": async () => {
+        throw abortError();
+      },
+      "section:education": async () => {
+        throw abortError();
+      },
+      "section:skills": async () => {
+        throw abortError();
+      },
+      "section:certificates": async () => {
+        throw abortError();
+      },
+      "section:awards": async () => {
+        throw abortError();
+      },
+      "section:volunteer": async () => {
+        throw abortError();
+      },
+      "section:projects": async () => {
+        throw abortError();
+      },
+    });
+
+    await assert.rejects(
+      () => runResumeParse(RESUME_TEXT, { callAI: model.callAI, extractSkills: null }),
+      (err: unknown) => err instanceof Error && err.name === "AbortError",
+    );
+    const sections = model.calls.filter((c) => c.startsWith("section:"));
+    assert.ok(sections.length < 8, `abort must not try every section (tried ${sections.length})`);
   });
 });

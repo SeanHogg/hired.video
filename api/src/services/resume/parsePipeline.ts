@@ -17,6 +17,7 @@
 import type { ResumeContent } from "../../../../shared/resume.js";
 import type { ResumeParseEvent } from "../../../../shared/resume-parse-stream.js";
 import type { AiTextCaller } from "../adapters/ai-text-caller.js";
+import { isAbortError } from "../../utils/abort.js";
 import { mapWithConcurrency, settleWithin } from "../../utils/async.js";
 import { hasRealSectionContent } from "./content.js";
 import { extractJson, isParseComplete, parseResumeWithRegex } from "./parse.js";
@@ -89,6 +90,8 @@ async function structureOnePass(callAI: AiTextCaller, resumeText: string): Promi
     if (!isParseComplete(result)) console.warn("[parse] Single-pass result incomplete, backfilling sections");
     return Object.keys(result).length > 0 ? result : null;
   } catch (err) {
+    // Disconnect is not a model failure — rethrow so we never backfill 8 more calls.
+    if (isAbortError(err)) throw err;
     console.error("[parse] Single-pass failed:", err instanceof Error ? err.message : err);
     return null;
   }
@@ -120,6 +123,7 @@ async function backfillSections(
       );
       return [section, extractJson(raw)[section]] as const;
     } catch (err) {
+      if (isAbortError(err)) throw err;
       console.warn(`[parse-sectional] ${section} failed:`, err instanceof Error ? err.message : err);
       return [section, undefined] as const;
     }

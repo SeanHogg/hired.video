@@ -33,6 +33,7 @@ import { normalizeJsonResume } from "../services/resume/parse.js";
 import { ocrBillingOpts } from "../services/resume/ocrBilling.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { tokenBudgetFor } from "../services/adapters/ai-stream-response.js";
+import { isAbortError } from "../utils/abort.js";
 import { eventStreamResponse } from "../utils/event-stream.js";
 import { fail, ok } from "../utils/response.js";
 
@@ -73,6 +74,9 @@ export async function resumeParseHandler(c: Ctx): Promise<Response> {
         }
         emit({ type: "result", content: outcome.content, tokenBudget: await tokenBudgetFor(c) });
       } catch (err) {
+        // Client gone — drop the stream quietly. Do not emit PARSE_FAILED
+        // (nothing is listening) and do not treat abort as a parse error.
+        if (isAbortError(err) || c.req.raw.signal.aborted) return;
         console.error("[parse] stream failed:", err instanceof Error ? err.message : err);
         emit({ type: "error", code: "PARSE_FAILED", message: NOTHING_TO_READ });
       }

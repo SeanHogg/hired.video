@@ -26,6 +26,7 @@ import {
   pdfEmbeddedImagesToFiles,
 } from "./extractFile.js";
 import { looksLikeBinaryText, stripResumeControlChars, tryParseJsonResume } from "./parse.js";
+import { isAbortError } from "../../utils/abort.js";
 import { mapWithConcurrency } from "../../utils/async.js";
 
 export type UploadIntakeResult =
@@ -144,6 +145,9 @@ async function readOneFile(file: File, deps: UploadIntakeDeps): Promise<FileRead
     const text = (await deps.ocrImage(file)).trim();
     return text ? { text, image: true } : { message: OCR_FAILED_MESSAGE, image: true };
   } catch (err) {
+    // A closed tab is not a vision failure — rethrow so remaining pages
+    // are not OCRed and the parse is not metered.
+    if (isAbortError(err)) throw err;
     console.warn("[resume upload] image OCR failed:", err instanceof Error ? err.message : err);
     return { message: OCR_FAILED_MESSAGE, image: true };
   }

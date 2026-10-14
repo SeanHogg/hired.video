@@ -118,6 +118,20 @@ describe("extractUploadedResumeFiles — exceptions", () => {
     assert.match((result as { kind: "error"; message: string }).message, /clearer, well-lit photo/);
   });
 
+  it("rethrows AbortError instead of turning a closed tab into an OCR failure", async () => {
+    const abort = new Error("The operation was aborted");
+    abort.name = "AbortError";
+    await assert.rejects(
+      () =>
+        extractUploadedResumeFiles([pngFile("resume-p1.png")], {
+          ocrImage: async () => {
+            throw abort;
+          },
+        }),
+      (err: unknown) => err instanceof Error && err.name === "AbortError",
+    );
+  });
+
   it("errors with the extractor's user-facing message on an unsupported type", async () => {
     const doc = new File([new Uint8Array([0xd0, 0xcf, 0x11, 0xe0])], "resume.doc", {
       type: "application/msword",
