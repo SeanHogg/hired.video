@@ -17,6 +17,7 @@ const EXPECTED: Record<LinkedContentKind, string> = {
   job: `/jobs/${ID}`,
   profile: `/people/${ID}`,
   resume: `/resumes/${ID}`,
+  template: `/marketplace/templates/${ID}`,
 };
 
 const KINDS = Object.keys(LINKED_CONTENT_REGISTRY) as LinkedContentKind[];

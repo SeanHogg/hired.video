@@ -31,6 +31,7 @@ export const LINKED_CONTENT_BODIES: Record<
   profile: lazy(() => import("./ProfileInlineBody")),
   company: lazy(() => import("./CompanyInlineBody")),
   video: lazy(() => import("./VideoInlineBody")),
+  template: lazy(() => import("./TemplateInlineBody")),
 };
 
 /** Renders a card preview of a bound engagement artifact (form fields

@@ -15,7 +15,8 @@ export type LinkedContentKind =
   | "article"
   | "profile"
   | "company"
-  | "video";
+  | "video"
+  | "template";
 
 /** Tile metadata for the palette section (one row per item the current
  *  user owns). Fetched from `LinkedContentMeta.listForUser` and rendered

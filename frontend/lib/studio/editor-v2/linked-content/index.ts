@@ -24,6 +24,7 @@ import { ARTICLE_LINKED_CONTENT } from "./article";
 import { PROFILE_LINKED_CONTENT } from "./profile";
 import { COMPANY_LINKED_CONTENT } from "./company";
 import { VIDEO_LINKED_CONTENT } from "./video";
+import { TEMPLATE_LINKED_CONTENT } from "./template";
 
 export type { LinkedContentKind, LinkedContentSummary } from "./types";
 
@@ -34,6 +35,7 @@ export const LINKED_CONTENT_REGISTRY: Record<LinkedContentKind, LinkedContentMet
   profile: PROFILE_LINKED_CONTENT,
   company: COMPANY_LINKED_CONTENT,
   video: VIDEO_LINKED_CONTENT,
+  template: TEMPLATE_LINKED_CONTENT,
 };
 
 const REF_SEPARATOR = ":";
