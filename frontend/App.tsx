@@ -31,6 +31,7 @@ import { AIProvider } from "@/lib/ai-context";
 import { AuthProvider, useAuth, useVerificationBlocked } from "@/lib/auth";
 import { useShouldRenderAppChrome } from "@/components/AppShell";
 import { LEGACY_REDIRECTS } from "@/lib/routing/legacy-redirects";
+import { isVerificationAllowedPath } from "@/lib/routing/verification-allowed-paths";
 import LegacyRedirect from "@/components/routing/LegacyRedirect";
 import { LocaleSync } from "@/lib/i18n/LocaleSync";
 import { ThemeSync } from "@/components/theme/ThemeSync";
@@ -432,41 +433,19 @@ function RequireVerified({ children }: { children: JSX.Element }) {
   return children;
 }
 
-// Paths a logged-in unverified user may still visit (auth flows, legal, landing).
-const VERIFICATION_ALLOWED_PREFIXES = [
-  // The landing page. Matched exactly (the check below is `path === p` or
-  // `p + "/"`, and no path starts with "//"), so it opens only `/` itself.
-  // It was missing, which sent an unverified signed-in user from `/` to
-  // /verify-email (#1658).
-  "/",
-  "/verify-email",
-  "/confirm-email",
-  "/login",
-  "/signup",
-  "/signup-success",
-  "/forgot-password",
-  "/reset-password",
-  "/auth/callback",
-  "/auth/magic-link",
-  "/accept-invitation",
-  "/logout",
-  "/privacy",
-  "/terms",
-  "/cookies",
-];
-
 // Any authenticated route is blocked until email is verified. Runs once for the
 // whole app so individual <Route> entries don't each need <RequireVerified>.
 // Shares the verification predicate with <AppShell> and <GlobalChrome> via
 // `useVerificationBlocked` — single source of truth for "user in limbo."
+// Allowed paths (including `/` itself — #1658) live in
+// `lib/routing/verification-allowed-paths.ts`.
 function GlobalVerificationGate({ children }: { children: ReactNode }) {
   const blocked = useVerificationBlocked();
   const location = useLocation();
 
   if (!blocked) return children as JSX.Element;
 
-  const path = location.pathname.toLowerCase();
-  const allowed = VERIFICATION_ALLOWED_PREFIXES.some((p) => path === p || path.startsWith(p + "/"));
+  const allowed = isVerificationAllowedPath(location.pathname);
   if (allowed) return children as JSX.Element;
 
   const intended = location.pathname + location.search;
