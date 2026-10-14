@@ -1,9 +1,13 @@
 /**
  * #2395 — ProjectDetailsSheet campaign first-load error + i18n retry.
+ * #3214 / #679 — EngagementTab host wire (lazy import on the engagement tab).
  *
  * Campaigns fetch is lazy; a silent empty list on first-load failure
  * looks like "no campaigns". The sheet must surface an error + Retry
  * that re-fetches, and the copy must live in the locale catalogues.
+ *
+ * The engagement tab must keep lazy-mounting EngagementTab even though
+ * the same file also owns #2395 i18n + campaign query invalidation.
  *
  * Run: vitest run components/studio/shared/__tests__/ProjectDetailsSheet.test.ts
  */
@@ -48,5 +52,15 @@ describe("ProjectDetailsSheet campaigns (#2395)", () => {
     expect(es["studio.projectDetails.retryLoad"]).toBe("Reintentar");
     expect(fr["studio.projectDetails.campaignsLoadFailed"]).toMatch(/campagne/i);
     expect(fr["studio.projectDetails.retryLoad"]).toBe("Réessayer");
+  });
+});
+
+describe("ProjectDetailsSheet EngagementTab host (#3214 / #679)", () => {
+  it("lazy-imports EngagementTab and mounts it on the engagement tab", () => {
+    expect(sheet).toMatch(
+      /lazy\(\s*\(\)\s*=>\s*import\(["']@\/components\/engagement\/EngagementTab["']\)/,
+    );
+    expect(sheet).toContain('key: "engagement"');
+    expect(sheet).toMatch(/<EngagementTab\s+project=\{project\}\s*\/>/);
   });
 });
