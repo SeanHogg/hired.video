@@ -33,6 +33,7 @@ import type { LLMClient, LLMUsage } from "../../services/adapters/llm-client.js"
 import { defineLenientIngest } from "../../services/adapters/llm-client.js";
 import { coerceEnum } from "../../services/adapters/lenient-coerce.js";
 import { coerceToString } from "./tailor-edits.js";
+import { ANALYZE_SKILLS_PROMPT_FRAGMENT, AnalyzeSkillsSchema, keywordSkillLists } from "./match-skills.js";
 import { resumeContentToText as resumeContentToTextShared } from "../../services/resume/parse.js";
 import type { ParsedJob } from "../../services/job/JobService.js";
 import {
@@ -98,6 +99,9 @@ export const AnalyzeResponseSchema = z.object({
   score: z.number().min(0).max(100),
   summaryRecommendations: coerceToString,
 });
+
+/** /analyze only: the same call also names matched / missing skills. */
+const AnalyzeWithSkillsResponseSchema = AnalyzeResponseSchema.extend(AnalyzeSkillsSchema.shape);
 
 export const InsightsResponseSchema = z.object({
   overallFit: z.enum(["strong", "good", "fair", "weak"]),
@@ -594,10 +598,10 @@ export async function handleAnalyze(
         {
           useCase: "match",
           systemPrompt: ANALYZE_SYSTEM_PROMPT,
-          userMessage: `Job Description:\n${job.text}\n\n---\n\nResume:\n${resumeText}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<2-4 bullet points of key gaps and suggestions>" }`,
+          userMessage: `Job Description:\n${job.text}\n\n---\n\nResume:\n${resumeText}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<2-4 bullet points of key gaps and suggestions>", ${ANALYZE_SKILLS_PROMPT_FRAGMENT} }`,
           responseFormat: "json_object",
         },
-        AnalyzeResponseSchema,
+        AnalyzeWithSkillsResponseSchema,
       );
       detach(deps, () => saveMatchScore(deps, {
         userId: auth.userId,
@@ -609,6 +613,8 @@ export async function handleAnalyze(
       return ok({
         score: result.score,
         summaryRecommendations: result.summaryRecommendations,
+        matchedSkills: result.matchedSkills,
+        missingSkills: result.missingSkills,
         resumeId,
         sourceUrl: job.sourceUrl,
       });
@@ -618,6 +624,7 @@ export async function handleAnalyze(
       return ok({
         score,
         summaryRecommendations: message + `\n\n_LLM error: ${msg.slice(0, 300)}_`,
+        ...keywordSkillLists(resume.content, job.text),
         resumeId,
         sourceUrl: job.sourceUrl,
       });
@@ -628,6 +635,7 @@ export async function handleAnalyze(
   return ok({
     score,
     summaryRecommendations: message,
+    ...keywordSkillLists(resume.content, job.text),
     resumeId,
     sourceUrl: job.sourceUrl,
   });

@@ -44,6 +44,7 @@ import {
 } from "@/components/sync/category-labels";
 import { useExtensionBridge } from "@/hooks/use-extension-bridge";
 import MergeResumeDialog from "@/components/MergeResumeDialog";
+import { CHROME_EXTENSION_STORE_URL } from "@/lib/chrome-extension";
 
 type CategoryFilter = VendorCategory | "all";
 
@@ -255,7 +256,7 @@ export default function VendorSync() {
                 {t("tools.vendorSync.extensionCard.body")}
                 {" "}
                 <a
-                  href="https://chromewebstore.google.com/search/hired.video"
+                  href={CHROME_EXTENSION_STORE_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline"

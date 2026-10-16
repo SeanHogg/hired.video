@@ -1,5 +1,5 @@
-// /chrome-extension feature-detail band: mono chip, section intro, then an
-// auto-fit grid of IconCards (one per extension capability).
+// /chrome-extension feature-detail band (one per lens, plus "every lens"):
+// mono chip, section intro, then an auto-fit grid of IconCards.
 
 import type { ComponentType } from "react";
 import { MarketingBand, MarketingSectionIntro } from "@/components/marketing/MarketingBand";
@@ -15,6 +15,8 @@ export interface ExtensionDetailItem {
 
 interface Props {
   tone: "page" | "card";
+  /** Section anchor (e.g. "recruiter") so lens cards and other pages can link here. */
+  anchorId?: string;
   id: string;
   chip: string;
   title: string;
@@ -22,9 +24,9 @@ interface Props {
   items: ExtensionDetailItem[];
 }
 
-export default function ExtensionDetailBand({ tone, id, chip, title, subtitle, items }: Props) {
+export default function ExtensionDetailBand({ tone, anchorId, id, chip, title, subtitle, items }: Props) {
   return (
-    <MarketingBand tone={tone} labelledBy={id} className="flex flex-col gap-8">
+    <MarketingBand tone={tone} id={anchorId} labelledBy={id} className="flex flex-col gap-8">
       <div className="flex flex-col gap-4">
         <MonoChip className="self-start">{chip}</MonoChip>
         <MarketingSectionIntro id={id} title={title} subtitle={subtitle} />

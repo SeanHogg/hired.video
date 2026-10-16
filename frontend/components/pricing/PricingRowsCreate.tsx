@@ -97,17 +97,9 @@ export default function PricingRowsCreate({ persona }: { persona: UserRole }) {
           <SectionRow label={t("marketing.pricing.section.browserExtensions")} />
           <FeatureRow
             icon={Chrome}
-            label={t("marketing.pricing.feature.jobSeekerExtension")}
+            label={t("marketing.pricing.feature.chromeExtensionAllLenses")}
             free
             pro
-          />
-          <PersonaGatedRow
-            icon={Chrome}
-            label={t("marketing.pricing.feature.recruiterExtension")}
-            free
-            pro
-            visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
-            currentPersona={persona}
           />
           <FeatureRow
             icon={Target}

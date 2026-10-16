@@ -166,7 +166,7 @@ export const FEATURE_ROWS: FeatureRow[] = [
     feature: "Chrome extension for sourcing/job capture",
     icon: Chrome,
     values: { hired: "yes", loxo: "yes", linkedin: "yes", greenhouse: "partial", bullhorn: "partial" },
-    note: "Hired.Video's recruiter extension captures profiles from any site, surfaces personal email + phone + LinkedIn/GitHub/X/website with click-to-call, click-to-email, and click-to-SMS, drops candidates directly onto an open job's pipeline, edits tags inline, and auto-logs every action to the candidate activity timeline — feature parity with Loxo Boost.",
+    note: "Hired.Video's one Chrome extension (recruiter lens) captures profiles from any site, surfaces personal email + phone + LinkedIn/GitHub/X/website with click-to-call, click-to-email, and click-to-SMS, drops candidates directly onto an open job's pipeline, edits tags inline, and auto-logs every action to the candidate activity timeline — feature parity with Loxo Boost.",
   },
   {
     feature: "Profile contact + social enrichment from capture (email, phone, LinkedIn, GitHub, X, website)",
@@ -505,7 +505,7 @@ export const COMPETITOR_DETAILS: CompetitorDetail[] = [
     ],
     whereHiredWins: [
       `${PRO_PRICE}/seat/mo Pro vs. $169/user/mo Basic — and AI is on the Free tier`,
-      "Recruiter Chrome extension matches Loxo Boost feature-for-feature — profile capture with personal email + phone + LinkedIn / GitHub / X / website auto-enrichment, bulk capture from search-result pages (up to 25 candidates per click), click-to-call (recorded VoIP via SignalWire) + click-to-SMS + click-to-email, one-click submit to a job / list / call queue / outreach sequence, inline tag editor, tracked-jobs tab, and an interactive 🪄 picker (job / profile / company modes) with learned-selector replay — all auto-logged to the activity timeline at 1/17th the per-seat price",
+      "One Chrome extension with a recruiter lens matches Loxo Boost feature-for-feature — profile capture with personal email + phone + LinkedIn / GitHub / X / website auto-enrichment, bulk capture from search-result pages (up to 25 candidates per click), click-to-call (recorded VoIP via SignalWire) + click-to-SMS + click-to-email, one-click submit to a job / list / call queue / outreach sequence, inline tag editor, tracked-jobs tab, and an interactive 🪄 picker (job / profile / company modes) with learned-selector replay — all auto-logged to the activity timeline at 1/17th the per-seat price",
       "Native AI video resumes, AI Studio editor, and voice cloning — LOXO has none of these",
       "Built-in consumer job board with Google-for-Jobs indexing, plus a candidate-facing app (interview practice, resume tailor, public profiles)",
       "Gamification with gift-card cashout, learning pathways with SCORM, and a map discovery surface — all absent from LOXO",

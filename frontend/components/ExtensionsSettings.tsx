@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Brain, Chrome, ExternalLink, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import {
   type ExtensionAISettings,
 } from "@/lib/services/settings-service";
 import { notifyExtension } from "@/hooks/use-extension-bridge";
+import { CHROME_EXTENSION_STORE_URL } from "@/lib/chrome-extension";
 
 export function ExtensionsSettings() {
   const { toast } = useToast();
@@ -115,125 +116,121 @@ export function ExtensionsSettings() {
 
   return (
     <div className="space-y-6">
+      {/* ONE extension, lens sections inside it. API shape stays {jobseeker, recruiter, ai}. */}
       <Card>
         <CardHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
               <CardTitle className="flex items-center gap-2">
-                <Chrome className="h-5 w-5" />
-                {t("headings.chromeExtensions")}
+                <Chrome className="h-5 w-5" aria-hidden="true" />
+                {t("settings.extensions.cardTitle")}
+                {saving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
               </CardTitle>
-              <CardDescription>
-                {t("messages.chromeExtensionsDesc")}
-              </CardDescription>
+              <CardDescription>{t("settings.extensions.cardDesc")}</CardDescription>
             </div>
-            {saving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            <Button variant="outline" size="sm" asChild>
+              <a href={CHROME_EXTENSION_STORE_URL} target="_blank" rel="noopener noreferrer">
+                <Chrome className="h-4 w-4 mr-2" aria-hidden="true" />
+                {t("settings.extensions.install")}
+                <ExternalLink className="h-3 w-3 ml-2" aria-hidden="true" />
+              </a>
+            </Button>
           </div>
         </CardHeader>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("headings.jobSeekerExtension")}</CardTitle>
-          <CardDescription>
-            {t("messages.jobSeekerExtensionDesc")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <ToggleRow
-            id="js-auto-detect"
-            label={t("settings.extensions.autoDetectLabel")}
-            description={t("settings.extensions.jsAutoDetectDesc")}
-            checked={js.autoDetect}
-            onChange={(v) => setJobseeker("autoDetect", v)}
-          />
-          <ToggleRow
-            id="js-auto-score"
-            label={t("settings.extensions.autoScoreLabel")}
-            description={t("settings.extensions.jsAutoScoreDesc")}
-            checked={js.autoScore}
-            onChange={(v) => setJobseeker("autoScore", v)}
-            pro
-          />
-          <ToggleRow
-            id="js-auto-tailor"
-            label={t("settings.extensions.autoTailorLabel")}
-            description={t("settings.extensions.autoTailorDesc")}
-            checked={js.autoTailor}
-            onChange={(v) => setJobseeker("autoTailor", v)}
-            pro
-          />
-          <ToggleRow
-            id="js-telemetry-opt-out"
-            label={t("settings.extensions.telemetryOptOutLabel")}
-            description={t("settings.extensions.telemetryOptOutDesc")}
-            checked={!!js.telemetryOptOut}
-            onChange={(v) => setJobseeker("telemetryOptOut", v)}
-          />
-          <div className="flex items-center justify-between gap-4">
-            <div className="space-y-0.5">
-              <Label htmlFor="js-download-format">{t("settings.extensions.downloadFormatLabel")}</Label>
-              <p className="text-sm text-muted-foreground">
-                {t("settings.extensions.downloadFormatDesc")}
-              </p>
+        <CardContent className="space-y-8">
+          <LensSection
+            title={t("settings.extensions.lensJobSeeker")}
+            description={t("settings.extensions.lensJobSeekerDesc")}
+          >
+            <ToggleRow
+              id="js-auto-detect"
+              label={t("settings.extensions.autoDetectLabel")}
+              description={t("settings.extensions.jsAutoDetectDesc")}
+              checked={js.autoDetect}
+              onChange={(v) => setJobseeker("autoDetect", v)}
+            />
+            <ToggleRow
+              id="js-auto-score"
+              label={t("settings.extensions.autoScoreLabel")}
+              description={t("settings.extensions.jsAutoScoreDesc")}
+              checked={js.autoScore}
+              onChange={(v) => setJobseeker("autoScore", v)}
+              pro
+            />
+            <ToggleRow
+              id="js-auto-tailor"
+              label={t("settings.extensions.autoTailorLabel")}
+              description={t("settings.extensions.autoTailorDesc")}
+              checked={js.autoTailor}
+              onChange={(v) => setJobseeker("autoTailor", v)}
+              pro
+            />
+            <ToggleRow
+              id="js-telemetry-opt-out"
+              label={t("settings.extensions.telemetryOptOutLabel")}
+              description={t("settings.extensions.telemetryOptOutDesc")}
+              checked={!!js.telemetryOptOut}
+              onChange={(v) => setJobseeker("telemetryOptOut", v)}
+            />
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="js-download-format">{t("settings.extensions.downloadFormatLabel")}</Label>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings.extensions.downloadFormatDesc")}
+                </p>
+              </div>
+              <Select
+                value={js.downloadFormat}
+                onValueChange={(v) => setJobseeker("downloadFormat", v)}
+              >
+                <SelectTrigger id="js-download-format" className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pdf">{t("labels.downloadFormat.pdf")}</SelectItem>
+                  <SelectItem value="docx">{t("labels.downloadFormat.docx")}</SelectItem>
+                  <SelectItem value="txt">{t("labels.downloadFormat.txt")}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select
-              value={js.downloadFormat}
-              onValueChange={(v) => setJobseeker("downloadFormat", v)}
-            >
-              <SelectTrigger id="js-download-format" className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pdf">{t("labels.downloadFormat.pdf")}</SelectItem>
-                <SelectItem value="docx">{t("labels.downloadFormat.docx")}</SelectItem>
-                <SelectItem value="txt">{t("labels.downloadFormat.txt")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("headings.recruiterExtension")}</CardTitle>
-          <CardDescription>
-            {t("messages.recruiterExtensionDesc")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <ToggleRow
-            id="rc-detect-jobs"
-            label={t("settings.extensions.autoDetectLabel")}
-            description={t("settings.extensions.detectJobsDesc")}
-            checked={rc.autoDetectJobs}
-            onChange={(v) => setRecruiter("autoDetectJobs", v)}
-            pro
-          />
-          <ToggleRow
-            id="rc-detect-profiles"
-            label={t("settings.extensions.detectProfilesLabel")}
-            description={t("settings.extensions.detectProfilesDesc")}
-            checked={rc.autoDetectProfiles}
-            onChange={(v) => setRecruiter("autoDetectProfiles", v)}
-            pro
-          />
-          <ToggleRow
-            id="rc-detect-companies"
-            label={t("settings.extensions.detectCompaniesLabel")}
-            description={t("settings.extensions.detectCompaniesDesc")}
-            checked={rc.autoDetectCompanies}
-            onChange={(v) => setRecruiter("autoDetectCompanies", v)}
-            pro
-          />
-          <ToggleRow
-            id="rc-auto-score"
-            label={t("settings.extensions.recruiterAutoScoreLabel")}
-            description={t("settings.extensions.recruiterAutoScoreDesc")}
-            checked={rc.autoScore}
-            onChange={(v) => setRecruiter("autoScore", v)}
-            pro
-          />
+          </LensSection>
+          <LensSection
+            title={t("settings.extensions.lensRecruiter")}
+            description={t("settings.extensions.lensRecruiterDesc")}
+          >
+            <ToggleRow
+              id="rc-detect-jobs"
+              label={t("settings.extensions.autoDetectLabel")}
+              description={t("settings.extensions.detectJobsDesc")}
+              checked={rc.autoDetectJobs}
+              onChange={(v) => setRecruiter("autoDetectJobs", v)}
+              pro
+            />
+            <ToggleRow
+              id="rc-detect-profiles"
+              label={t("settings.extensions.detectProfilesLabel")}
+              description={t("settings.extensions.detectProfilesDesc")}
+              checked={rc.autoDetectProfiles}
+              onChange={(v) => setRecruiter("autoDetectProfiles", v)}
+              pro
+            />
+            <ToggleRow
+              id="rc-detect-companies"
+              label={t("settings.extensions.detectCompaniesLabel")}
+              description={t("settings.extensions.detectCompaniesDesc")}
+              checked={rc.autoDetectCompanies}
+              onChange={(v) => setRecruiter("autoDetectCompanies", v)}
+              pro
+            />
+            <ToggleRow
+              id="rc-auto-score"
+              label={t("settings.extensions.recruiterAutoScoreLabel")}
+              description={t("settings.extensions.recruiterAutoScoreDesc")}
+              checked={rc.autoScore}
+              onChange={(v) => setRecruiter("autoScore", v)}
+              pro
+            />
+          </LensSection>
         </CardContent>
       </Card>
 
@@ -264,39 +261,19 @@ export function ExtensionsSettings() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("headings.installExtensions")}</CardTitle>
-          <CardDescription>
-            {t("messages.installExtensionsDesc")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <a
-              href="https://chromewebstore.google.com/search/hired.video%20job%20seeker"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Chrome className="h-4 w-4 mr-2" />
-              {t("labels.jobSeeker")}
-              <ExternalLink className="h-3 w-3 ml-2" />
-            </a>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <a
-              href="https://chromewebstore.google.com/search/hired.video%20recruiter"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Chrome className="h-4 w-4 mr-2" />
-              {t("labels.recruiterExt")}
-              <ExternalLink className="h-3 w-3 ml-2" />
-            </a>
-          </Button>
-        </CardContent>
-      </Card>
     </div>
+  );
+}
+
+function LensSection({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+  return (
+    <section className="space-y-5">
+      <div className="space-y-1 border-b border-border pb-3">
+        <h3 className="text-base font-semibold text-foreground">{title}</h3>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      {children}
+    </section>
   );
 }
 

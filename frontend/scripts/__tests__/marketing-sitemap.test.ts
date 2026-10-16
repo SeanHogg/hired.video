@@ -48,9 +48,9 @@ describe("marketingSitemapEntries — happy path (live registries)", () => {
     expect(paths).toContain("/templates/self_tape");
   });
 
-  it("leaves out the hiring audiences while their persona is off", () => {
-    expect(paths).not.toContain("/for/recruiter");
-    expect(paths).not.toContain("/for/employer");
+  it("includes the hiring audiences now that their persona is on", () => {
+    expect(paths).toContain("/for/recruiter");
+    expect(paths).toContain("/for/employer");
   });
 
   it("renders every block with x-default + en + es + fr-CA alternates", () => {

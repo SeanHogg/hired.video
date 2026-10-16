@@ -1,12 +1,12 @@
 /**
- * Persona switch (job-seeker-only product, 2026-10-03).
+ * Persona switch (hiring side restored 2026-10-16).
  *
- * `HIRING_PERSONAS_ENABLED` in user-roles.ts is the ONE switch that turns the
- * recruiter / employer side off. These tests pin:
- *   • the live posture (switch off → no hiring signup, no pipeline nav, no
- *     Post-Job CTA, no hiring audiences), and
+ * `HIRING_PERSONAS_ENABLED` in user-roles.ts is the ONE switch that governs
+ * the recruiter / employer side. These tests pin:
+ *   • the live posture (switch ON → hiring signup, pipeline nav, Post-Job CTA
+ *     and the hiring audiences are all available), and
  *   • both switch positions via the injectable pure helpers, so flipping the
- *     constant back restores the hiring side verbatim.
+ *     constant off again disables the hiring side verbatim.
  *   • staff / invite-only roles are NEVER public, in either position.
  *
  * Run: node --import tsx --test shared/__tests__/hiring-persona-switch.test.ts
@@ -46,30 +46,36 @@ import {
 const NEVER_PUBLIC = ["admin", "super_admin", "employee"] as const;
 
 describe("persona switch — live posture", () => {
-  it("hiring personas are switched off", () => {
-    assert.equal(HIRING_PERSONAS_ENABLED, false);
+  it("hiring personas are switched on", () => {
+    assert.equal(HIRING_PERSONAS_ENABLED, true);
   });
 
   it("HIRING_ROLES is exactly recruiter + employer", () => {
     assert.deepEqual([...HIRING_ROLES].sort(), ["employer", "recruiter"]);
   });
 
-  it("public signup = job_seeker, creator, affiliate", () => {
-    assert.deepEqual([...PUBLIC_SIGNUP_ROLES], ["job_seeker", "creator", "affiliate"]);
+  it("public signup = all five self-serve personas", () => {
+    assert.deepEqual(
+      [...PUBLIC_SIGNUP_ROLES],
+      ["job_seeker", "recruiter", "employer", "creator", "affiliate"],
+    );
   });
 
-  it("recruiter / employer are rejected at public signup", () => {
-    assert.equal(isPublicSignupRole("recruiter"), false);
-    assert.equal(isPublicSignupRole("employer"), false);
+  it("recruiter / employer can sign up publicly", () => {
+    assert.equal(isPublicSignupRole("recruiter"), true);
+    assert.equal(isPublicSignupRole("employer"), true);
   });
 
-  it("the signup picker collapses to job_seeker only (so no picker renders)", () => {
-    assert.deepEqual([...SIGNUP_PICKER_ROLES], ["job_seeker"]);
+  it("the signup picker offers job_seeker, recruiter and employer", () => {
+    assert.deepEqual([...SIGNUP_PICKER_ROLES], ["job_seeker", "recruiter", "employer"]);
   });
 
-  it("?role=recruiter|employer falls back to job_seeker", () => {
-    assert.equal(resolveSignupPickerRole("recruiter"), "job_seeker");
-    assert.equal(resolveSignupPickerRole("employer"), "job_seeker");
+  it("?role=recruiter|employer preselects that persona; junk falls back to job_seeker", () => {
+    assert.equal(resolveSignupPickerRole("recruiter"), "recruiter");
+    assert.equal(resolveSignupPickerRole("employer"), "employer");
+    assert.equal(resolveSignupPickerRole("creator"), "job_seeker");
+    assert.equal(resolveSignupPickerRole("admin"), "job_seeker");
+    assert.equal(resolveSignupPickerRole(null), "job_seeker");
   });
 });
 
@@ -82,13 +88,13 @@ describe("staff / invite-only roles are never public", () => {
   }
 
   it("isPublicSignupRole rejects staff roles, case variants, junk and empty input", () => {
-    for (const r of [...NEVER_PUBLIC, "Admin", "SUPER_ADMIN", "JobSeeker", "root", "", null, undefined]) {
+    for (const r of [...NEVER_PUBLIC, "Admin", "SUPER_ADMIN", "JobSeeker", "Recruiter", "root", "", null, undefined]) {
       assert.equal(isPublicSignupRole(r), false, String(r));
     }
   });
 
-  it("isPublicSignupRole accepts the retained public personas", () => {
-    for (const r of ["job_seeker", "creator", "affiliate"]) {
+  it("isPublicSignupRole accepts every public persona", () => {
+    for (const r of ["job_seeker", "recruiter", "employer", "creator", "affiliate"]) {
       assert.equal(isPublicSignupRole(r), true, r);
     }
   });
@@ -103,14 +109,14 @@ describe("isHiringRole / isPersonaEnabled", () => {
     }
   });
 
+  it("live switch enables every persona", () => {
+    for (const r of ALL_ROLES) assert.equal(isPersonaEnabled(r), true, r);
+  });
+
   it("switch off disables only hiring personas", () => {
     for (const r of ALL_ROLES) {
       assert.equal(isPersonaEnabled(r, false), !isHiringRole(r), r);
     }
-  });
-
-  it("switch on enables every persona", () => {
-    for (const r of ALL_ROLES) assert.equal(isPersonaEnabled(r, true), true, r);
   });
 
   it("empty role is never enabled", () => {
@@ -118,93 +124,100 @@ describe("isHiringRole / isPersonaEnabled", () => {
     assert.equal(isPersonaEnabled(""), false);
   });
 
-  it("switch on restores the original five-persona public set", () => {
-    assert.deepEqual(
-      [...publicSignupRolesFor(true)],
-      ["job_seeker", "recruiter", "employer", "creator", "affiliate"],
-    );
+  it("switch off narrows public signup to job_seeker, creator, affiliate", () => {
+    assert.deepEqual([...publicSignupRolesFor(false)], ["job_seeker", "creator", "affiliate"]);
   });
 });
 
 describe("nav:pipeline follows the switch (resolver, not components)", () => {
-  it("is hidden + disabled for every role while hiring is off", () => {
-    for (const role of ALL_ROLES) {
+  it("is visible for recruiter / employer / staff and hidden for job seekers (live)", () => {
+    for (const role of [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN, USER_ROLES.SUPER_ADMIN]) {
       const s = findSurface(resolveRoleAccess(role, []), "nav:pipeline");
+      assert.ok(s, `nav:pipeline missing for ${role}`);
+      assert.equal(s!.visible, true, role);
+    }
+    const js = findSurface(resolveRoleAccess(USER_ROLES.JOB_SEEKER, []), "nav:pipeline");
+    assert.equal(js!.visible, false);
+  });
+
+  it("a DB visible=false override still hides it for a hiring role", () => {
+    const rows: RoleFeatureAccessRow[] = [
+      { role: "recruiter", featureKey: "nav:pipeline", visible: false, enabled: false, rank: null },
+    ];
+    const s = findSurface(resolveRoleAccess(USER_ROLES.RECRUITER, rows), "nav:pipeline");
+    assert.equal(s!.visible, false);
+  });
+
+  it("switch off hides + disables it for every role, overrides included", () => {
+    const rows: RoleFeatureAccessRow[] = [
+      { role: "recruiter", featureKey: "nav:pipeline", visible: true, enabled: true, rank: null },
+    ];
+    for (const role of ALL_ROLES) {
+      const s = findSurface(
+        resolveRoleAccess(role, rows, undefined, { hiringPersonasEnabled: false }),
+        "nav:pipeline",
+      );
       assert.ok(s, `nav:pipeline missing for ${role}`);
       assert.equal(s!.visible, false, role);
       assert.equal(s!.enabled, false, role);
     }
   });
 
-  it("a DB visible=true override cannot resurrect it while hiring is off", () => {
-    const rows: RoleFeatureAccessRow[] = [
-      { role: "recruiter", featureKey: "nav:pipeline", visible: true, enabled: true, rank: null },
-    ];
-    const s = findSurface(resolveRoleAccess(USER_ROLES.RECRUITER, rows), "nav:pipeline");
-    assert.equal(s!.visible, false);
-  });
-
-  it("returns for recruiter / employer / staff when the switch is on", () => {
-    for (const role of [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN, USER_ROLES.SUPER_ADMIN]) {
-      const s = findSurface(
-        resolveRoleAccess(role, [], undefined, { hiringPersonasEnabled: true }),
-        "nav:pipeline",
-      );
-      assert.equal(s!.visible, true, role);
-    }
-    const js = findSurface(
-      resolveRoleAccess(USER_ROLES.JOB_SEEKER, [], undefined, { hiringPersonasEnabled: true }),
-      "nav:pipeline",
-    );
-    assert.equal(js!.visible, false);
-  });
-
-  it("existing recruiter / employer accounts resolve the job-seeker nav", () => {
+  it("recruiter / employer nav includes the pipeline; job-seeker nav does not", () => {
     const seekerNav = navSurfaces(resolveRoleAccess(USER_ROLES.JOB_SEEKER, [])).map((s) => s.key);
+    assert.equal(seekerNav.includes("nav:pipeline"), false);
     for (const role of HIRING_ROLES) {
       const nav = navSurfaces(resolveRoleAccess(role, [])).map((s) => s.key);
+      assert.ok(nav.includes("nav:pipeline"), role);
+    }
+  });
+
+  it("switch off collapses recruiter / employer to the job-seeker nav", () => {
+    const off = { hiringPersonasEnabled: false };
+    const seekerNav = navSurfaces(resolveRoleAccess(USER_ROLES.JOB_SEEKER, [], undefined, off)).map((s) => s.key);
+    for (const role of HIRING_ROLES) {
+      const nav = navSurfaces(resolveRoleAccess(role, [], undefined, off)).map((s) => s.key);
       assert.deepEqual(nav, seekerNav, role);
     }
   });
 });
 
 describe("mobile primary CTA", () => {
-  it("live map has no Post Job CTA for hiring roles; admin CTA kept", () => {
-    assert.equal(MOBILE_PRIMARY_CTA.recruiter, undefined);
-    assert.equal(MOBILE_PRIMARY_CTA.employer, undefined);
+  it("live map has Post Job for recruiter + employer; admin CTA kept", () => {
+    assert.equal(MOBILE_PRIMARY_CTA.recruiter?.href, STUDIO_NEW_JOB_PATH);
+    assert.equal(MOBILE_PRIMARY_CTA.employer?.href, STUDIO_NEW_JOB_PATH);
     assert.equal(MOBILE_PRIMARY_CTA.admin?.href, "/admin/dashboard");
     assert.equal(MOBILE_PRIMARY_CTA.super_admin?.href, "/admin/dashboard");
     assert.equal(MOBILE_PRIMARY_CTA.job_seeker, undefined);
   });
 
-  it("switch on restores Post Job for recruiter + employer", () => {
-    const on = buildMobilePrimaryCta(true);
-    assert.equal(on.recruiter?.href, STUDIO_NEW_JOB_PATH);
-    assert.equal(on.employer?.href, STUDIO_NEW_JOB_PATH);
+  it("switch off drops Post Job for recruiter + employer", () => {
+    const off = buildMobilePrimaryCta(false);
+    assert.equal(off.recruiter, undefined);
+    assert.equal(off.employer, undefined);
+    assert.equal(off.admin?.href, "/admin/dashboard");
   });
 });
 
 describe("life-stage audiences follow the switch", () => {
-  it("live registry drops employers + recruiters", () => {
+  it("live registry includes employers + recruiters, order preserved", () => {
     const keys = LIFE_STAGE_AUDIENCE_REGISTRY.map((a) => a.key) as string[];
-    assert.equal(keys.includes("employers"), false);
-    assert.equal(keys.includes("recruiters"), false);
-    assert.ok(keys.includes("job_seekers"));
+    assert.deepEqual(keys.slice(0, 3), ["job_seekers", "employers", "recruiters"]);
     assert.ok(keys.includes("senior_executives"));
-    for (const a of LIFE_STAGE_AUDIENCE_REGISTRY) {
-      assert.equal(isHiringRole(a.primaryRole), false, a.key);
-    }
   });
 
-  it("hiring audience lookups resolve null (landing page redirects to /for)", () => {
-    assert.equal(lifeStageAudienceMeta("employers"), null);
-    assert.equal(lifeStageAudienceMeta("recruiters"), null);
+  it("hiring audience lookups resolve to their hiring role", () => {
+    assert.equal(lifeStageAudienceMeta("employers")?.primaryRole, "employer");
+    assert.equal(lifeStageAudienceMeta("recruiters")?.primaryRole, "recruiter");
     assert.equal(lifeStageAudienceMeta("job_seekers")?.primaryRole, "job_seeker");
   });
 
-  it("switch on restores them, order preserved", () => {
-    const keys = enabledLifeStageAudiences(true).map((a) => a.key);
-    assert.deepEqual(keys.slice(0, 3), ["job_seekers", "employers", "recruiters"]);
-    assert.equal(keys.length, LIFE_STAGE_AUDIENCE_REGISTRY.length + 2);
+  it("switch off drops exactly the two hiring audiences", () => {
+    const off = enabledLifeStageAudiences(false);
+    const keys = off.map((a) => a.key) as string[];
+    assert.equal(keys.includes("employers"), false);
+    assert.equal(keys.includes("recruiters"), false);
+    assert.equal(off.length, LIFE_STAGE_AUDIENCE_REGISTRY.length - 2);
+    for (const a of off) assert.equal(isHiringRole(a.primaryRole), false, a.key);
   });
 });

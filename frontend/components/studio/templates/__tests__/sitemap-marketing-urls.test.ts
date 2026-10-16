@@ -91,8 +91,9 @@ describe("sitemap.xml marketing URLs", () => {
   });
 
   it("every live life-stage audience has a sitemap entry", () => {
-    // Only audiences whose persona is offered (hiring-side ones drop out
-    // while HIRING_PERSONAS_ENABLED is off and /for/employers redirects).
+    // Only audiences whose persona is offered. With HIRING_PERSONAS_ENABLED
+    // on, /for/employers + /for/recruiters are live and must be indexed; with
+    // it off they drop out of the registry (and the page redirects).
     const slugs = new Set(extractPaths("/for/"));
     for (const { key } of LIFE_STAGE_AUDIENCE_REGISTRY) {
       const slug = audienceSlug(key);

@@ -42,6 +42,20 @@
     "eyebrow": "For Job seekers"
   },
   {
+    "path": "/for/recruiter",
+    "label": "Recruiters",
+    "title": "Recruiters: AI video maker + templates · hired.video",
+    "description": "Job ads, talent-pool promos, and outreach video for candidate engagement. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Recruiters"
+  },
+  {
+    "path": "/for/employer",
+    "label": "Employers",
+    "title": "Employers: AI video maker + templates · hired.video",
+    "description": "Company promos, hiring spots, and employer-brand content for recruiting at scale. Build a standout video in your browser — free to start, no editing skills, AI-scaffolded in about a minute.",
+    "eyebrow": "For Employers"
+  },
+  {
     "path": "/for/founder",
     "label": "Founders",
     "title": "Founders: AI video maker + templates · hired.video",
@@ -124,6 +138,20 @@
     "title": "Job Seekers — hired.video resource map",
     "description": "Already employed and ready to level up — sharpen your story, expand your network, and signal what's next.",
     "eyebrow": "For Job Seekers"
+  },
+  {
+    "path": "/for/employers",
+    "label": "Employers",
+    "title": "Employers — hired.video resource map",
+    "description": "Hire faster, build employer brand, and run the back-office. One workspace for posts, candidates, and people-ops.",
+    "eyebrow": "For Employers"
+  },
+  {
+    "path": "/for/recruiters",
+    "label": "Recruiters",
+    "title": "Recruiters — hired.video resource map",
+    "description": "Source, bid, and place — placement-driven income on the same surface companies post sourcing requests.",
+    "eyebrow": "For Recruiters"
   },
   {
     "path": "/for/recent-graduates",

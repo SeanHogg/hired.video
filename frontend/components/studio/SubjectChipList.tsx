@@ -46,6 +46,7 @@ const KNOWN_KINDS: ReadonlySet<StudioSubjectKind> = new Set([
   "company",
   "skills_demo",
   "creator_credit",
+  "talent_pool_candidate",
 ]);
 
 export default function SubjectChipList({

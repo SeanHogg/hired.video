@@ -4,6 +4,7 @@ import type { AppEnv } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { schema } from "../db/index.js";
 import { getRelease } from "../utils/release.js";
+import { redactTokenPath } from "../utils/redact-token-path.js";
 
 // Requests that carry no analytics signal (CORS preflights, HEAD probes,
 // health checks) — skipping them saves a Neon INSERT per request.
@@ -21,8 +22,10 @@ export const requestLoggerMiddleware: MiddlewareHandler<AppEnv> = async (c, next
   const startTime = Date.now();
   await next();
   if (SKIPPED_METHODS.has(c.req.method)) return;
-  const path = new URL(c.req.url).pathname;
-  if (SKIPPED_PATHS.has(path)) return;
+  const rawPath = new URL(c.req.url).pathname;
+  if (SKIPPED_PATHS.has(rawPath)) return;
+  // Emailed-link tokens (consent, invites, shares) never reach the log.
+  const path = redactTokenPath(rawPath);
   const durationMs = Date.now() - startTime;
   // Lazily-mounted sub-apps report their own pattern; directly-registered
   // routes resolve from this context.

@@ -65,6 +65,7 @@ const STATUS: Record<Exclude<PublishProjectVideoErrorKind, "CHANNEL_LIMIT">, 403
   FORBIDDEN: 403,
   VIDEO_NOT_READY: 409,
   INVALID_VARIANT: 422,
+  CONSENT_REQUIRED: 403,
   NOT_CONNECTED: 409,
   ACCOUNT_UNSUPPORTED: 422,
   PUBLISH_FAILED: 502,
@@ -98,7 +99,7 @@ studioSocialPublishRoutes.post("/projects/:projectId/publish/social/:platform", 
     if (err.kind === "CHANNEL_LIMIT") return channelLimitResponse(c);
     // NOT_CONNECTED carries the platform-specific code the dock maps to "connect again".
     const code = err.kind === "NOT_CONNECTED" ? "SOCIAL_NOT_CONNECTED" : err.kind;
-    return c.json(error(code, err.message), STATUS[err.kind]);
+    return c.json(error(code, err.message, err.details), STATUS[err.kind]);
   }
 });
 

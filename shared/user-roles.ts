@@ -32,19 +32,17 @@ export const USER_ROLES = {
 export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES];
 
 /**
- * THE persona switch (2026-10-03). hired.video is job-seeker focused: the
- * product is "build a resume → turn it into a video → post it". Recruiter /
- * employer (the hiring side) surfaces are DISABLED — no public signup, no
- * hiring nav / mobile CTA, hiring routes redirect home, hiring audiences drop
- * off the /for landing pages. Existing recruiter / employer accounts and ALL
- * their data are RETAINED: they still sign in and simply see the job-seeker
- * surface set. Creator + affiliate personas stay on.
+ * THE persona switch. hired.video was job-seeker-only from 2026-10-03; the
+ * hiring side (recruiter / employer) was switched back ON 2026-10-16. When the
+ * switch is false, hiring surfaces are DISABLED — no public signup, no hiring
+ * nav / mobile CTA, hiring routes redirect home, hiring audiences drop off the
+ * /for landing pages — while existing recruiter / employer accounts and ALL
+ * their data are retained. Creator + affiliate personas are unaffected.
  *
- * Flip to `true` to restore the hiring side; every gate derives from this
- * one constant (no per-surface flags).
+ * Every gate derives from this one constant (no per-surface flags).
  */
-// `as boolean` (not the literal `false`) so TS doesn't narrow every gate to dead code.
-export const HIRING_PERSONAS_ENABLED = false as boolean;
+// `as boolean` (not a literal) so TS doesn't narrow every gate to dead code.
+export const HIRING_PERSONAS_ENABLED = true as boolean;
 
 /** The hiring-side personas the switch above governs. */
 export const HIRING_ROLES: readonly UserRole[] = [

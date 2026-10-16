@@ -14,6 +14,8 @@ import { publicProfilePath } from "../../../../shared/public-paths.js";
 import { getDb, schema } from "../../db/index.js";
 import type { PromotionPlatform, PromotionStatus } from "../../../../shared/promotions.js";
 import { assertCanWrite } from "../studio/workspace.js";
+import { CandidateConsentRequiredError } from "../../domains/candidate-consent/consent-gate.js";
+import { assertCandidateVideoConsent } from "../candidate-consent/candidate-consent-deps.js";
 import { requireCompiledVideo } from "../studio/compiled-video.js";
 import { currentCutVideoId, resolvePostedVariant } from "../studio/render-variants.js";
 import { socialConnectionServiceFor } from "../social/social-connection-factory.js";
@@ -33,13 +35,19 @@ export type PromotionErrorKind =
   | "VIDEO_NOT_READY"
   | "VIDEO_UNBRANDED"
   | "INVALID_VARIANT"
+  | "CONSENT_REQUIRED"
   | "LANE_NOT_READY"
   | "ALREADY_SUBMITTED"
   | "NOT_FOUND"
   | "NOT_REVIEWABLE";
 
 export class PromotionError extends Error {
-  constructor(public readonly kind: PromotionErrorKind, message: string) {
+  constructor(
+    public readonly kind: PromotionErrorKind,
+    message: string,
+    /** Envelope `details` (CONSENT_REQUIRED carries `{ reason }`). */
+    public readonly details?: unknown,
+  ) {
     super(message);
     this.name = "PromotionError";
   }
@@ -114,6 +122,13 @@ export async function submitForPromotion(args: {
 }): Promise<repo.PromotionSubmission> {
   const project = await loadProject(args.projectId);
   await assertCanWrite(args.actorUserId, project.userId, project.companyId ?? null);
+  // A candidate's video is promoted only after they approved it (now + scheduled).
+  try {
+    await assertCandidateVideoConsent(project.id);
+  } catch (e) {
+    if (e instanceof CandidateConsentRequiredError) throw new PromotionError("CONSENT_REQUIRED", e.message, e.details);
+    throw e;
+  }
   const cut = await requireOwnCut(project.id, args.variantVideoId);
   await requireBrandedVideo(project, cut?.videoId);
   if (!(await socialConnectionServiceFor(args.env).isManagedLaneReady(args.platform))) {

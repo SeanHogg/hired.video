@@ -15,6 +15,7 @@ import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { resumeSkillNames } from "../services/job/match-skills.js";
 
 export const bulkScoringRoutes = new Hono<AppEnv>();
 
@@ -64,20 +65,8 @@ function tokenize(s: string | null | undefined): string[] {
     .filter((t) => t.length > 1 && !STOP_WORDS.has(t));
 }
 
-function extractResumeSkills(content: any): string[] {
-  if (!content || typeof content !== "object") return [];
-  const skills: string[] = [];
-  // JSON Resume style
-  if (Array.isArray(content.skills)) {
-    for (const s of content.skills) {
-      if (typeof s === "string") skills.push(s);
-      else if (s && typeof s === "object") {
-        if (typeof s.name === "string") skills.push(s.name);
-        if (Array.isArray(s.keywords)) for (const k of s.keywords) if (typeof k === "string") skills.push(k);
-      }
-    }
-  }
-  return skills.map((s) => s.toLowerCase().trim()).filter(Boolean);
+function extractResumeSkills(content: unknown): string[] {
+  return resumeSkillNames(content).map((s) => s.toLowerCase());
 }
 
 function extractResumeTitles(content: any): string[] {

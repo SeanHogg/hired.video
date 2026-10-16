@@ -104,3 +104,4 @@ export * from "./themeCalendar.js";
 export * from "./videoPersonalization.js";
 export * from "./contentScans.js";
 export * from "./uploadedAssets.js";
+export * from "./candidate-video-consents.js";

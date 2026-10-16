@@ -29,7 +29,7 @@ const FAQS = [
   {
     question: "Is Hired.Video a real ATS, or just a video-resume tool?",
     answer:
-      "Both. Hired.Video ships an Applicant Tracking System with a Kanban hiring pipeline, a sourcing CRM, async video interviews, an AI candidate-to-job match score, and a Chrome recruiter extension with Loxo-Boost-parity capture (profiles from any site, personal email + phone + LinkedIn/GitHub/X/website auto-enrichment, click-to-call / email / SMS, one-click submit to a job, inline tag editor, and auto-logged activity) — alongside the AI Studio and video resume features competitors don't have.",
+      "Both. Hired.Video ships an Applicant Tracking System with a Kanban hiring pipeline, a sourcing CRM, async video interviews, an AI candidate-to-job match score, and one Chrome extension whose recruiter lens has Loxo-Boost-parity capture (profiles from any site, personal email + phone + LinkedIn/GitHub/X/website auto-enrichment, click-to-call / email / SMS, one-click submit to a job, inline tag editor, and auto-logged activity) — alongside the AI Studio and video resume features competitors don't have.",
   },
   {
     question:

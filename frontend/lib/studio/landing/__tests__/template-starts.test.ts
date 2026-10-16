@@ -17,10 +17,10 @@ describe("TEMPLATE_STARTS film tab (#3161 / #821)", () => {
 
   it("templatesForStart(\"film\") returns only category===\"film\" templates", () => {
     const catalog: TemplateDef[] = [
-      { id: "self_tape", category: "film" } as TemplateDef,
-      { id: "personal_brand", category: "promote" } as TemplateDef,
-      { id: "monologue", category: "film" } as TemplateDef,
-      { id: "sizzle", category: "showcase" } as TemplateDef,
+      { id: "self_tape", category: "film" } as unknown as TemplateDef,
+      { id: "personal_brand", category: "promote" } as unknown as TemplateDef,
+      { id: "monologue", category: "film" } as unknown as TemplateDef,
+      { id: "sizzle", category: "showcase" } as unknown as TemplateDef,
     ];
     const film = templatesForStart("film", catalog);
     expect(film.map((t) => t.id)).toEqual(["self_tape", "monologue"]);

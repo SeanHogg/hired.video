@@ -147,7 +147,7 @@ describe("timeline emit round-trips keyframes for export", () => {
     const params = clip!.effects[0]!.params;
     // Clip-local 2s + origin 2s = scene 4s → midpoint of 2..6.
     const frame = resolveClipFrame(params, {
-      canvas: CANVAS,
+      canvas: CANVAS as unknown as HTMLCanvasElement,
       clipFrame: 60,
       clipDurationFrames: 120,
       fps: 30,

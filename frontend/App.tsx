@@ -311,6 +311,7 @@ const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
 const ConnectAuthorize = lazy(() => import("./pages/ConnectAuthorize"));
 const EmbeddedStudioProject = lazy(() => import("./pages/EmbeddedStudioProject"));
 const SharedCandidateResume = lazy(() => import("./pages/SharedCandidateResume"));
+const CandidateVideoConsent = lazy(() => import("./pages/CandidateVideoConsent"));
 const SharedPitchDeck = lazy(() => import("./pages/SharedPitchDeck"));
 const CandidateDetail = lazy(() => import("./pages/services/CandidateDetail"));
 const PitchDecksList = lazy(() => import("./pages/services/PitchDecksList"));
@@ -1280,6 +1281,10 @@ const App = () => (
 
                       {/* Take-home assignment — candidate delivery surface (#1438) */}
                       <Route path="/take-home/:token" element={<TakeHomeDeliveryPage />} />
+
+                      {/* Candidate video consent — the candidate answers a recruiter's
+                          ask by the tokenized email link (unauthenticated). */}
+                      <Route path="/consent/video/:token" element={<CandidateVideoConsent />} />
 
                       {/* Agency recruiting — unauthenticated reviewer views */}
                       <Route

@@ -126,6 +126,7 @@ export function entityUrl(kind: StudioSubjectKind, id: string): string {
       return publicProfilePath(id);
     case "skills_demo":
     case "creator_credit":
+    case "talent_pool_candidate":
       // No standalone public page yet — surfaces that try to deep-link
       // to these kinds get the studio project URL as the best fallback.
       return `/studio/${id}`;

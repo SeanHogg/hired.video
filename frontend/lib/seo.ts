@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
 import { DEFAULT_LOCALE, PUBLIC_LOCALES, type Locale } from "@shared/i18n";
 import { resolvePageSeoKey } from "@/lib/config/page-meta-registry";
+import { CHROME_EXTENSION_STORE_URL } from "@/lib/chrome-extension";
 // schema.org JSON-LD builders live in the shared SSoT so the API worker's
 // crawler OG endpoints emit identical structured data. Imported here (used by
 // useBreadcrumbs below) and re-exported at the bottom for existing consumers.
@@ -54,7 +55,7 @@ export const ORGANIZATION_SCHEMA = {
     "hired.video is an AI-powered video resume platform that helps candidates create compelling video resumes and helps recruiters find top talent faster.",
   sameAs: [
     "https://www.linkedin.com/company/hired-video",
-    "https://chromewebstore.google.com/detail/hired.video-job-seeker/ohjmknhokdkgfmgbblflmliefoegciol",
+    CHROME_EXTENSION_STORE_URL,
     "https://x.com/hired_video",
     "https://www.youtube.com/@hired-video",
     "https://github.com/hired-video",
@@ -207,11 +208,11 @@ export const PAGE_SEO: Record<string, SEOData> = {
   },
   "/chrome-extension": {
     title:
-      "Chrome Extension for Job Seekers — hired.video",
+      "Chrome Extension for Job Seekers, Recruiters & Sellers — hired.video",
     description:
-      "Track jobs, score your resume against any posting, and tailor it with AI on LinkedIn, Indeed, Glassdoor, Workday and more — without leaving the page. Free to install.",
+      "One free Chrome extension: tailor your resume, cover letter and autofill on any job; pair a candidate with a job; pitch prospects and reply to posts with video. It fills the box, you press Send.",
     keywords:
-      "chrome extension, job tracker extension, resume scorer chrome, linkedin job tracker, resume tailoring extension, ATS resume match",
+      "chrome extension, job tracker extension, resume tailoring extension, autofill job applications, recruiter chrome extension, linkedin sourcing extension, video prospecting extension, video reply linkedin",
   },
   "/affiliate-program": {
     title: "Affiliate Program: Earn 25% — hired.video",

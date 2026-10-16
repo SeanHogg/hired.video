@@ -63,7 +63,7 @@ const ROUTES = [
   { path: '/tools/xyz-resume-review', title: 'Review Your Whole Résumé in XYZ Format — hired.video', description: 'Step through every bullet and summary on your résumé and rewrite each one as Accomplished X, measured by Y, by doing Z. Accept or skip each change, then apply them all as one undo step.' },
   { path: '/interview', title: 'Free AI Interview Practice — hired.video', description: 'Practice live interviews with an AI interviewer tuned to your role. Get instant feedback on your answers, tone, and pacing. Completely free.' },
   { path: '/affiliate-program', title: 'Affiliate Program: Earn 25% — hired.video', description: 'Earn 25% commission on every first-month subscription you refer. Promote AI video resumes and modern career tools to your audience.' },
-  { path: '/chrome-extension', title: 'Chrome Extensions for Job Seekers & Recruiters — hired.video', description: 'Track jobs, score resumes, and source candidates on LinkedIn, Indeed, Glassdoor and 16+ job boards — without leaving the page.' },
+  { path: '/chrome-extension', title: 'Chrome Extension for Job Seekers, Recruiters & Sellers — hired.video', description: 'One free Chrome extension: tailor your resume, cover letter and autofill on any job; pair a candidate with a job; pitch prospects and reply to posts with video. It fills the box, you press Send.' },
   { path: '/signup', title: 'Sign Up Free: AI Video Resumes & Career Tools — hired.video', description: 'Join hired.video today and create your professional video resume. Connect with top employers and advance your career.' },
 
   // --- AI Tools + Learning (high-value SEO pages) ---
@@ -152,7 +152,7 @@ function eyebrowFor(p) {
   if (p === '/interview') return 'Interview Practice';
   if (p === '/pivot-explorer') return 'Career Pivot';
   if (p === '/affiliate-program') return 'Affiliate Program';
-  if (p === '/chrome-extension') return 'Chrome Extensions';
+  if (p === '/chrome-extension') return 'Chrome Extension';
   if (['/resumes', '/studio'].includes(p)) return 'AI Studio';
   return 'hired.video';
 }

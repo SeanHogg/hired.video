@@ -67,6 +67,9 @@ import {
   removePublication,
 } from "../services/studio/publication-service.js";
 import { postChannelGate } from "../services/studio/post-channel-gate.js";
+import { candidateConsentGate } from "./candidate-consent-gate.js";
+import { enforceCandidateVideoConsent } from "../services/candidate-consent/candidate-consent-deps.js";
+import { applyProjectVisibility, forceProjectUnlisted, loadProjectSubjects } from "../services/studio/project-visibility.js";
 import { getPublicVideoFeed, invalidatePublicVideoFeed } from "../services/studio/public-video-feed.js";
 import { legacyScriptForPublic } from "../services/studio/public-video-state.js";
 import { storyboardScriptKeys } from "../services/studio/storyboard-meta.js";
@@ -1638,19 +1641,6 @@ async function replaceProjectSubjects(
   }
 }
 
-/** Read all subject links for a single project, in stable creation order. */
-async function loadProjectSubjects(
-  db: ReturnType<typeof getDb>,
-  projectId: string,
-): Promise<Array<{ kind: string; id: string }>> {
-  const rows = await db
-    .select({ kind: studioProjectSubjects.subjectKind, id: studioProjectSubjects.subjectId, createdAt: studioProjectSubjects.createdAt })
-    .from(studioProjectSubjects)
-    .where(eq(studioProjectSubjects.projectId, projectId))
-    .orderBy(studioProjectSubjects.createdAt);
-  return rows.map((r) => ({ kind: r.kind, id: r.id }));
-}
-
 /** Ensure a `creator_credit` row exists for the given contributor on the
  *  given project. Idempotent via the unique triple. Called automatically
  *  by mutation routes when the actor (editor) is different from the
@@ -1916,6 +1906,8 @@ studioRoutes.post("/save-draft", async (c) => {
   }
 
   let savedId: string;
+  // Public / on-profile before this save — an edit then re-checks consent.
+  let wasLive = false;
   if (projectId) {
     // Load + assert against the row's actual ownership (not just the
     // selection), so a malicious client can't update someone else's
@@ -1955,6 +1947,7 @@ studioRoutes.post("/save-draft", async (c) => {
     }
     if (!updated) return c.json(fail("NOT_FOUND", "Project not found"), 404);
     savedId = updated.id;
+    wasLive = updated.isPublic || updated.status === "published";
   } else {
     const [created] = await db
       .insert(studioProjects)
@@ -1980,6 +1973,14 @@ studioRoutes.post("/save-draft", async (c) => {
   if (subjects !== undefined) {
     await replaceProjectSubjects(db, savedId, subjects);
   }
+
+  // Candidate videos (shared/candidate-video-consent.ts): a newly linked
+  // talent_pool_candidate subject forces the project unlisted; an edit of a
+  // live candidate video re-checks the approval (content changed → unlisted).
+  const linksNewCandidate = (subjects ?? []).some((s) =>
+    s.kind === "talent_pool_candidate" && !subjectsBefore.some((b) => b.kind === s.kind && b.id === s.id));
+  if (linksNewCandidate) await forceProjectUnlisted(savedId, db);
+  else if (wasLive) await enforceCandidateVideoConsent(savedId);
 
   // Auto-credit: when the editor isn't the subject (delegated workspace —
   // a video editor / coach working on behalf of a job seeker), surface
@@ -2463,11 +2464,16 @@ studioRoutes.post("/upload", async (c) => {
   // Mark the project as Published so it shows up on the user's profile.
   // The user can still flip videos.privacyStatus via the Make Public toggle
   // to also expose it on the homepage public feed.
-  const [updatedProject] = await db
+  let [updatedProject] = await db
     .update(studioProjects)
     .set({ status: "published", videoId: video.id, resumeId: projectResumeId, updatedAt: new Date() } as any)
     .where(eq(studioProjects.id, project.id))
     .returning();
+  // A candidate video whose new render the candidate hasn't approved goes
+  // (back) to unlisted + off-profile — a re-render is new content.
+  if (await enforceCandidateVideoConsent(project.id)) {
+    [updatedProject] = await db.select().from(studioProjects).where(eq(studioProjects.id, project.id)).limit(1);
+  }
   // A page→video embed resolves the project's CURRENT video, so a
   // re-render must orphan the cached public resolve payloads.
   bumpPageEmbedsVersion();
@@ -2514,6 +2520,10 @@ studioRoutes.post("/publish", async (c) => {
     if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
     throw e;
   }
+  // Gated whatever the privacy: publish sets status "published", which the
+  // /m watch page serves and the profile lists.
+  const blocked = await candidateConsentGate(c, project.id);
+  if (blocked) return blocked;
 
   let linkedVideo: typeof videos.$inferSelect | null = null;
   if (project.videoId) {
@@ -2833,6 +2843,8 @@ studioRoutes.patch("/projects/:projectId/status", async (c) => {
   const isPublish = nextStatus === "published";
   const isUnpublish = nextStatus === "exported";
   if (isPublish) {
+    const blocked = await candidateConsentGate(c, projectId);
+    if (blocked) return blocked;
     const capped = await postChannelGate(c, projectId, "profile");
     if (capped) return capped;
   }
@@ -2991,46 +3003,23 @@ studioRoutes.patch("/projects/:projectId/visibility", async (c) => {
     if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
     throw e;
   }
-
-  const privacyStatus = parsed.data.isPublic ? "public" : "unlisted";
+  if (parsed.data.isPublic) {
+    const blocked = await candidateConsentGate(c, project.id);
+    if (blocked) return blocked;
+  }
 
   // Project-level visibility is the authoritative flag after #665 — the
   // watch page plays the saved canvas live (<CanvasStatePreview/>), so toggling
-  // Public on a draft makes it viewable in-platform without a render.
-  // Persist on the project row regardless of whether an MP4 exists.
-  const [updatedProject] = await db
-    .update(studioProjects)
-    .set({ isPublic: parsed.data.isPublic, updatedAt: new Date() })
-    .where(eq(studioProjects.id, project.id))
-    .returning();
-
-  // Mirror to the linked videos row when present so the CDN URL gate
-  // (off-platform embeds, YouTube/LinkedIn distribution) stays in sync.
-  // `videos.privacy_status` is the SSoT — the redundant `videos.is_public`
-  // boolean was dropped in migration 0086 (it drifted from privacy_status
-  // because the publish-insert at line ~1587 set only privacy_status,
-  // leaving is_public at its column default; the profile read filtered
-  // is_public while the homepage feed filtered privacy_status, so a
-  // freshly published video appeared on one surface but not the other).
-  if (project.videoId) {
-    await db
-      .update(videos)
-      .set({ privacyStatus, updatedAt: new Date() })
-      .where(eq(videos.id, project.videoId));
-    // Visibility flip adds/removes the video from the public `media` search
-    // and the home page's video wall (the wall after the explicit scan).
-    bumpSearchVersion();
-    invalidatePublicVideoFeed();
-    if (parsed.data.isPublic) scheduleVideoScan(c, project.videoId);
-  }
+  // Public on a draft makes it viewable in-platform without a render. The one
+  // writer (services/studio/project-visibility.ts) mirrors videos.privacy_status
+  // and orphans the search / feed / subject-list / watch caches.
+  const updatedProject = await applyProjectVisibility(db, project, parsed.data.isPublic);
+  // The home page's video wall shows a public render only after the explicit scan.
+  if (parsed.data.isPublic && project.videoId) scheduleVideoScan(c, project.videoId);
 
   const linkedVideo = project.videoId
     ? (await db.select().from(videos).where(eq(videos.id, project.videoId)).limit(1))[0] ?? null
     : null;
-
-  // In / out of every subject's public list (#274/#275).
-  invalidatePublicProjectsForSubjects(await loadProjectSubjects(db, project.id));
-  bumpPublicWatchCache(project.id, project.slug, project.videoId);
   return c.json(ok(toProjectDto(updatedProject ?? project, linkedVideo)));
 });
 
@@ -3176,10 +3165,17 @@ studioRoutes.post("/projects/:projectId/subjects", async (c) => {
     throw e;
   }
 
-  await db
+  const inserted = await db
     .insert(studioProjectSubjects)
     .values({ projectId, subjectKind: parsed.data.kind, subjectId: parsed.data.id } as any)
-    .onConflictDoNothing();
+    .onConflictDoNothing()
+    .returning({ id: studioProjectSubjects.projectId });
+
+  // A newly linked candidate makes this a candidate video: unlisted until
+  // the candidate approves it (POST /api/recruiter/candidate-video-consents).
+  if (parsed.data.kind === "talent_pool_candidate" && inserted.length > 0) {
+    await forceProjectUnlisted(projectId, db);
+  }
 
   // Keep the legacy `studio_projects.resume_id` denorm in sync for
   // resume-kind links so analytics joins that read it stay consistent.

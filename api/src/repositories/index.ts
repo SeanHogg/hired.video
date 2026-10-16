@@ -122,6 +122,7 @@ import {
 import { ContactsRepository, type IContactsRepository } from "./contactsRepository.js";
 import { PersonMergeRepository, type IPersonMergeRepository } from "./personMergeRepository.js";
 import { PitchRepository, type IPitchRepository } from "./pitchRepository.js";
+import { CandidateVideoConsentRepository, type ICandidateVideoConsentRepository } from "./candidateVideoConsentRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -203,6 +204,8 @@ export interface Repos {
   personMerge: IPersonMergeRepository;
   // current video pitch pointer on purpose:"pitch" studio projects (migration 0519)
   pitches: IPitchRepository;
+  // candidate approval of a recruiter's candidate-for-job video (migration 0534)
+  candidateVideoConsents: ICandidateVideoConsentRepository;
 }
 
 /** Wire every interface to its concrete implementation. */
@@ -254,6 +257,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     contacts: new ContactsRepository(db, now),
     personMerge: new PersonMergeRepository(db, now),
     pitches: new PitchRepository(db, now),
+    candidateVideoConsents: new CandidateVideoConsentRepository(db, now),
   };
 }
 
@@ -305,12 +309,14 @@ export type {
   IContactsRepository,
   IPersonMergeRepository,
   IPitchRepository,
+  ICandidateVideoConsentRepository,
 };
 
 // ── Re-export row / insert / patch types ───────────────────────────────────
 
 export type { PushSubscriptionRow, PushSubscriptionInput } from "./pushSubscriptionsRepository.js";
 export type { CurrentPitchRow, PitchProjectRow } from "./pitchRepository.js";
+export type { CandidateVideoConsentRow, ConsentProjectOwner, ConsentPublicContext, ConsentTalentPoolCandidate } from "./candidateVideoConsentRepository.js";
 export type { ContactRow, ContactInsert, ContactPatch, ContactJobLinkRow, ContactListFilters } from "./contactsRepository.js";
 export type { InboxProfileRow, InboxProfileInsert, InboxProfilePatch } from "./inboxProfilesRepository.js";
 export type { InboxActionRow, InboxActionInsert, InboxActionPatch, InboxActionRunRow, InboxActionRunInsert } from "./inboxActionsRepository.js";

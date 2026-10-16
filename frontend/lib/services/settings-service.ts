@@ -425,7 +425,7 @@ export class SettingsService {
 
   async getExtensionSettings(): Promise<ExtensionSettings> {
     const response = await apiClient.get<ExtensionSettings>(
-      "/api/Settings/extension-preferences",
+      "/api/settings/extension-preferences",
       ExtensionSettingsSchema,
     );
     return response.data;
@@ -440,7 +440,7 @@ export class SettingsService {
     patch: DeepPartial<ExtensionSettings>,
   ): Promise<ExtensionSettings> {
     const response = await apiClient.put<ExtensionSettings>(
-      "/api/Settings/extension-preferences",
+      "/api/settings/extension-preferences",
       patch,
       ExtensionSettingsSchema,
     );

@@ -18,6 +18,7 @@ import {
   FileText,
   Monitor,
   Newspaper,
+  UserCheck,
   UserCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -32,6 +33,7 @@ const SUBJECT_ICON: Record<StudioSubjectKind, LucideIcon> = {
   article:        Newspaper,
   creator_credit: Award,
   resume_video:   FileText,
+  talent_pool_candidate: UserCheck,
 };
 
 export function getStudioSubjectIcon(kind: StudioSubjectKind): LucideIcon {

@@ -22,14 +22,15 @@ function renderAt(path: string, enabled?: boolean) {
 }
 
 describe("HiringRouteGate", () => {
-  it("redirects hiring routes home while hiring personas are off (live switch)", () => {
+  it("renders hiring routes while hiring personas are on (live switch)", () => {
     renderAt("/post-a-job");
-    expect(screen.getByText("home-page")).toBeTruthy();
-    expect(screen.queryByText("post-a-job-page")).toBeNull();
+    expect(screen.getByText("post-a-job-page")).toBeTruthy();
+    expect(screen.queryByText("home-page")).toBeNull();
   });
 
-  it("renders the route when the switch is on", () => {
-    renderAt("/post-a-job", true);
-    expect(screen.getByText("post-a-job-page")).toBeTruthy();
+  it("redirects home when the switch is off", () => {
+    renderAt("/post-a-job", false);
+    expect(screen.getByText("home-page")).toBeTruthy();
+    expect(screen.queryByText("post-a-job-page")).toBeNull();
   });
 });

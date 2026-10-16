@@ -39,6 +39,8 @@ import type { SocialPublisherEnv } from "../social/build-social-publisher.js";
 import type { YouTubePostSettings } from "../social/publishers/index.js";
 import { PromotionError, submitForPromotion, type PromotionEnv } from "../promotions/promotionUseCases.js";
 import { crossPostToFeed } from "./feed-cross-post.js";
+import { CandidateConsentRequiredError } from "../../domains/candidate-consent/consent-gate.js";
+import { assertCandidateVideoConsent } from "../candidate-consent/candidate-consent-deps.js";
 import { PublishJobError } from "./drain-publish-jobs.js";
 
 export type DistributionEnv = SocialPublisherEnv & PromotionEnv;
@@ -96,6 +98,7 @@ const PERMANENT_SELF = new Set([
   "FORBIDDEN",
   "VIDEO_NOT_READY",
   "INVALID_VARIANT",
+  "CONSENT_REQUIRED",
   "CHANNEL_LIMIT",
   "NOT_CONNECTED",
   "ACCOUNT_UNSUPPORTED",
@@ -106,6 +109,7 @@ export interface SendDeps {
   publishSelf?: typeof publishProjectVideo;
   submitManaged?: typeof submitForPromotion;
   postToFeed?: typeof crossPostToFeed;
+  assertConsent?: (projectId: string) => Promise<void>;
 }
 
 export async function sendPublishJob(
@@ -132,6 +136,14 @@ export async function sendPublishJob(
 
   if (destination === FEED_DESTINATION) {
     if (!project.videoId) throw new PublishJobError("Render the video before posting it.", true);
+    // The network + managed lanes run this gate inside publishProjectVideo /
+    // submitForPromotion; the feed lane has no such service, so it runs here.
+    try {
+      await (deps.assertConsent ?? assertCandidateVideoConsent)(job.projectId);
+    } catch (e) {
+      if (e instanceof CandidateConsentRequiredError) throw new PublishJobError(e.message, true);
+      throw e;
+    }
     let video: Awaited<ReturnType<typeof requireCompiledVideo>>;
     try {
       video = await requireCompiledVideo(db, { videoId: variantVideoId ?? project.videoId, ownerUserId: project.userId });

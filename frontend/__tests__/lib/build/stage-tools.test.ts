@@ -21,7 +21,7 @@ describe("toolsForStage", () => {
 
   it("keeps tools outside the résumé → video → post flow off every stage", () => {
     const staged = new Set(BUILD_STAGES.flatMap(ids));
-    for (const id of ["comp-analyzer", "predictive-assessments", "inbox-sync", "interview-templates", "chrome-extension-recruiter"]) {
+    for (const id of ["comp-analyzer", "predictive-assessments", "inbox-sync", "interview-templates", "chrome-extension-jobseeker"]) {
       expect(staged.has(id)).toBe(false);
     }
     // Every staged id is a real catalog entry, listed once.

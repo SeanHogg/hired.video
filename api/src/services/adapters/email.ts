@@ -171,6 +171,76 @@ export async function sendScreeningInvitationEmail(
   });
 }
 
+// Candidate video consent (migration 0534) — English-only, like every email
+// in this module. The link carries the RAW token; only its hash is stored.
+const CANDIDATE_VIDEO_CONSENT_BODY = `
+    <h1 style="font-size:20px;margin:0 0 16px;color:#111827;">May we share your candidate video?</h1>
+    <p style="margin:0 0 16px;color:#374151;">Hi {{CandidateName}},</p>
+    <p style="margin:0 0 16px;color:#374151;">
+      {{RecruiterName}} made a short video introducing you{{ForJob}}. It stays private
+      until you approve it &mdash; nothing is made public or posted to social media without your yes.
+    </p>
+    {{MessageBlock}}
+    <p style="margin:24px 0;">
+      <a href="{{ConsentUrl}}" style="background:#2563eb;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">
+        Review the video
+      </a>
+    </p>
+    <p style="margin:0 0 8px;color:#6b7280;font-size:13px;">
+      This link expires on {{ExpiresOn}}. Or paste it into your browser:<br />
+      <a href="{{ConsentUrl}}" style="color:#2563eb;">{{ConsentUrl}}</a>
+    </p>`;
+
+export interface CandidateVideoConsentEmailInput {
+  to: string;
+  candidateName: string;
+  recruiterName: string;
+  jobTitle?: string | null;
+  companyName?: string | null;
+  message?: string | null;
+  /** The raw consent token (never stored). */
+  token: string;
+  expiresAt: Date;
+}
+
+/** `${FRONTEND_URL}/consent/video/<token>` — the candidate's public consent page. */
+export function buildCandidateVideoConsentUrl(token: string): string {
+  return `${getBaseUrl()}/consent/video/${encodeURIComponent(token)}`;
+}
+
+/** Pure builder: render the candidate-video consent email. Exported for tests. */
+export function buildCandidateVideoConsentEmail(
+  input: CandidateVideoConsentEmailInput,
+): { to: string; subject: string; html: string } {
+  const role = [input.jobTitle?.trim(), input.companyName?.trim()].filter(Boolean).join(" at ");
+  const message = input.message?.trim();
+  // MessageBlock is pre-escaped markup, so it is spliced in after render().
+  const html = render(CANDIDATE_VIDEO_CONSENT_BODY, {
+    CandidateName: input.candidateName,
+    RecruiterName: input.recruiterName,
+    ForJob: role ? ` for ${role}` : "",
+    ConsentUrl: buildCandidateVideoConsentUrl(input.token),
+    ExpiresOn: input.expiresAt.toUTCString().replace(/ \d\d:\d\d:\d\d GMT$/, ""),
+  }).replace(
+    "{{MessageBlock}}",
+    message ? `<p style="margin:0 0 16px;color:#374151;">${escapeHtml(message)}</p>` : "",
+  );
+  return {
+    to: input.to,
+    subject: `${input.recruiterName} asked to share your candidate video`,
+    html,
+  };
+}
+
+export async function sendCandidateVideoConsentEmail(input: CandidateVideoConsentEmailInput): Promise<void> {
+  const provider = getEmailProvider();
+  if (!provider) {
+    console.warn("[email] No provider configured — skipping candidate video consent email");
+    return;
+  }
+  await provider.send(buildCandidateVideoConsentEmail(input));
+}
+
 let _provider: EmailProvider | null = null;
 /** Test seam — when set, overrides provider resolution so a spy/fake can
  *  observe `.send()` without SendPulse credentials. Mirrors the

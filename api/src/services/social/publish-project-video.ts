@@ -9,9 +9,10 @@
  *   2. it has a rendered MP4                                  (VIDEO_NOT_READY)
  *      — or, when the dock baked a fitted cut for this network (#2045),
  *      that cut, which must be a cut of THIS project          (INVALID_VARIANT)
- *   3. runSelfPublishGate: channel cap → connection → fresh token
+ *   3. the candidate approved it, when it's a candidate video  (CONSENT_REQUIRED)
+ *   4. runSelfPublishGate: channel cap → connection → fresh token
  *                                                  (CHANNEL_LIMIT / NOT_CONNECTED)
- *   4. publish, then record ONE publication row under the platform id
+ *   5. publish, then record ONE publication row under the platform id
  *      (with the cut it posted, when one was)
  *      (a YouTube post also lands on the video row — linkYouTubeUpload)
  *
@@ -36,6 +37,8 @@ import { cdnUrl } from "../../utils/cdn.js";
 import { resolvePostedVariant } from "../studio/render-variants.js";
 import { buildSocialPublisher, type SelfTokenSource, type SocialPublisherEnv } from "./build-social-publisher.js";
 import { runSelfPublishGate } from "./self-publish-gate.js";
+import { CandidateConsentRequiredError, type AssertCandidateConsent } from "../../domains/candidate-consent/consent-gate.js";
+import { assertCandidateVideoConsent } from "../candidate-consent/candidate-consent-deps.js";
 import { SocialPublishError, type SocialVideoPublisher, type YouTubePostSettings } from "./publishers/index.js";
 
 export type PublishProjectVideoErrorKind =
@@ -43,6 +46,7 @@ export type PublishProjectVideoErrorKind =
   | "FORBIDDEN"
   | "VIDEO_NOT_READY"
   | "INVALID_VARIANT"
+  | "CONSENT_REQUIRED"
   | "CHANNEL_LIMIT"
   | "NOT_CONNECTED"
   | "ACCOUNT_UNSUPPORTED"
@@ -52,6 +56,8 @@ export class PublishProjectVideoError extends Error {
   constructor(
     public readonly kind: PublishProjectVideoErrorKind,
     message: string,
+    /** Envelope `details` (CONSENT_REQUIRED carries `{ reason }`). */
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = "PublishProjectVideoError";
@@ -83,6 +89,8 @@ export interface PublishProjectVideoDeps {
   resolveVariant?: typeof resolvePostedVariant;
   linkYouTube?: typeof linkYouTubeUpload;
   readMedia?: ReadMedia;
+  /** The candidate-video consent gate (tests stub it). */
+  assertConsent?: AssertCandidateConsent;
 }
 
 export async function publishProjectVideo(
@@ -124,6 +132,15 @@ export async function publishProjectVideo(
     video = await requireCompiledVideo(db, { videoId: variant?.videoId ?? project.videoId, ownerUserId: project.userId });
   } catch (e) {
     if (e instanceof PublishVideoError) throw new PublishProjectVideoError("VIDEO_NOT_READY", e.message);
+    throw e;
+  }
+
+  // A candidate's video goes out only after they approved it. Here (not in a
+  // route) so post-now and scheduled self posts share the one check.
+  try {
+    await (deps.assertConsent ?? assertCandidateVideoConsent)(projectId);
+  } catch (e) {
+    if (e instanceof CandidateConsentRequiredError) throw new PublishProjectVideoError("CONSENT_REQUIRED", e.message, e.details);
     throw e;
   }
 

@@ -24,6 +24,8 @@ import {
   TokenBudgetExceededError,
 } from "./domains/billing/token-ledger.js";
 import { logger } from "./lib/logger.js";
+import { redactTokenPath } from "./utils/redact-token-path.js";
+
 export function createApp() {
   const app = new Hono();
   // Route modules load on first request, not at isolate start — see
@@ -212,6 +214,8 @@ export function createApp() {
     "/api/whitelabel/demo-request",
     "/api/whitelabel/roi-calculator",
     "/api/public/candidate-resume",
+    // Candidate video consent link (tokenized email, no JWT) — migration 0534.
+    "/api/public/candidate-video-consent",
     "/api/public/pitch-deck",
     "/api/public/take-home",
     // /map discovery pins (events + open-to-coffee people) — anonymous
@@ -639,6 +643,7 @@ export function createApp() {
   mount("/api/reviews", () => import("./routes/reviews.js").then((m) => m.reviewRoutes));
   mount("/api/boosts", () => import("./routes/boosts.js").then((m) => m.boostRoutes));
   mount("/api/taxonomies", () => import("./routes/taxonomies.js").then((m) => m.taxonomyRoutes));
+  mount("/api/recruiter/candidate-video-consents", () => import("./routes/candidate-video-consents.js").then((m) => m.candidateVideoConsentRoutes));
   mount("/api/recruiter", () => import("./routes/recruiter.js").then((m) => m.recruiterRoutes));
   mount("/api/recruiter/live-screen", () => import("./routes/live-screen.js").then((m) => m.liveScreenRecruiterRoutes));
   mount("/api/live-screen", () => import("./routes/live-screen.js").then((m) => m.liveScreenPublicRoutes));
@@ -797,6 +802,7 @@ export function createApp() {
   mount("/api/recruit/pitch-decks", () => import("./routes/pitch-decks.js").then((m) => m.pitchDeckRoutes));
   mount("/api/recruit/screening", () => import("./routes/screening.js").then((m) => m.screeningRoutes));
   mount("/api/public/candidate-resume", () => import("./routes/candidates.js").then((m) => m.candidateResumePublicRoutes));
+  mount("/api/public/candidate-video-consent", () => import("./routes/candidate-video-consents.js").then((m) => m.candidateVideoConsentPublicRoutes));
   mount("/api/public/pitch-deck", () => import("./routes/pitch-decks.js").then((m) => m.pitchDeckPublicRoutes));
   mount("/api/public/screening", () => import("./routes/screening.js").then((m) => m.screeningPublicRoutes));
   mount("/api/assessments", () => import("./routes/assessments.js").then((m) => m.assessmentRoutes));
@@ -930,7 +936,7 @@ Keep responses concise (2–4 sentences). Answer questions about features, prici
     }
     logger.error("unhandled request error", {
       message: err.message,
-      path: c.req.path,
+      path: redactTokenPath(c.req.path),
       // The root app is untyped (`new Hono()`), so read the var through its declared shape.
       route: (c.var as Partial<Variables>).routePattern ?? null,
       method: c.req.method,

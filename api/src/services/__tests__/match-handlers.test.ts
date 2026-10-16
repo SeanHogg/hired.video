@@ -754,3 +754,40 @@ describe("handleByContent — raw-string scoring", () => {
     assert.ok((res.body as any).data.score > 0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// handleAnalyze — matchedSkills / missingSkills (extension fit panel)
+// ---------------------------------------------------------------------------
+
+describe("handleAnalyze — skill lists", () => {
+  it("returns the skill lists from the SAME LLM call, trimmed + de-duplicated", async () => {
+    const { client, calls } = makeFakeLLM(() => ({
+      score: 78,
+      summaryRecommendations: "- Add Kubernetes exposure.",
+      matchedSkills: [" React ", "TypeScript", "react", ""],
+      missingSkills: ["Kubernetes", 42, "GraphQL Federation"],
+    }));
+    const deps = buildDeps({ llm: client, resumes: [seedResume()], jobs: [seedJob()] });
+    const res = await handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
+    const body = res.body as any;
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].userMessage, /matchedSkills/);
+    assert.deepEqual(body.data.matchedSkills, ["React", "TypeScript"]);
+    assert.deepEqual(body.data.missingSkills, ["Kubernetes", "GraphQL Federation"]);
+  });
+
+  it("reads a model answer without skill lists as empty lists", async () => {
+    const { client } = makeFakeLLM(() => ({ score: 60, summaryRecommendations: "- ok" }));
+    const deps = buildDeps({ llm: client, resumes: [seedResume()], jobs: [seedJob()] });
+    const body = (await handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID })).body as any;
+    assert.deepEqual(body.data.matchedSkills, []);
+    assert.deepEqual(body.data.missingSkills, []);
+  });
+
+  it("keyword fallback lists the resume skills the job mentions, no missing list", async () => {
+    const deps = buildDeps({ resumes: [seedResume()], jobs: [seedJob()] });
+    const body = (await handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID })).body as any;
+    assert.deepEqual(body.data.matchedSkills, ["React", "TypeScript", "Next.js"]);
+    assert.deepEqual(body.data.missingSkills, []);
+  });
+});

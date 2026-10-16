@@ -9,6 +9,14 @@
 import { z } from "zod";
 import type { LLMClient } from "../adapters/llm-client.js";
 import { normalizeJsonResume } from "./parse.js";
+import type {
+  ArrayDiff,
+  BasicsConflict,
+  MergeAnalysis,
+  MergeDecision,
+  ScalarFieldDiffs,
+  SectionMatch,
+} from "../../../../shared/resume-merge-decisions.js";
 
 /**
  * Coerce a skills/keywords/etc entry into a canonical `{ name, keywords[] }`
@@ -57,101 +65,9 @@ export type MergeSectionType =
   | "references"
   | "projects";
 
-/** Counts of items that appear only in source, only in target, or in
- *  both — used for both highlight bullets and array-of-strings fields
- *  like `courses` or `keywords`. */
-export interface ArrayDiff {
-  onlyInSource: number;
-  onlyInTarget: number;
-  shared: number;
-}
-
-/** Fields that differ between two identity-matched entries. Each value
- *  is the pair of values found (source first, target second) so the UI
- *  can render a before/after view. Empty when the field matches. */
-export type ScalarFieldDiffs = Record<string, { source: string; target: string }>;
-
-export interface SectionMatch {
-  sectionType: MergeSectionType;
-  sourceIndex: number;
-  targetIndex: number | null;
-  confidence: number;
-  matchReason: string;
-  mergeAction: "auto" | "manual" | "skip";
-  /** True when source and target represent the same record (identity
-   *  matched) but any meaningful content differs — signals the UI that
-   *  the user should review which values to keep even though the match
-   *  itself is solid. Covers bullets AND scalar fields (dates, summary,
-   *  URL, description, institution name variants, etc.). */
-  hasContentDifferences?: boolean;
-  /** Bullet-level diff for fields like `highlights` (work/volunteer/
-   *  projects) and `courses` (education). Present only when the section
-   *  has such a field. */
-  highlightDiff?: ArrayDiff;
-  /** Keyword-level diff for projects/skills/interests. */
-  keywordDiff?: ArrayDiff;
-  /** Which scalar fields (dates, summary, url, etc.) differ between the
-   *  two entries. Key = field name, value = { source, target } text. */
-  scalarDiffs?: ScalarFieldDiffs;
-  /** Set when the SOURCE entry's identity also appears in a different
-   *  section type within the same source resume — e.g. a volunteer row
-   *  whose `organization` matches a `work[].name`. Almost always means
-   *  the parser misclassified the entry; the UI surfaces a warning and
-   *  defaults the action to skip so bad data doesn't ride along into
-   *  the merge. */
-  crossSectionConflict?: {
-    suggestedSection: string;
-    /** Human-readable reason ("Also appears in Work as 'VP at Acme'"). */
-    reason: string;
-  };
-}
-
-export interface BasicsConflict {
-  field: string;
-  sourceValue: string;
-  targetValue: string;
-}
-
-export interface MergeAnalysis {
-  basics: {
-    conflicts: BasicsConflict[];
-    autoMerge: boolean;
-  };
-  sectionMatches: SectionMatch[];
-  newSections: Array<{
-    sectionType: MergeSectionType;
-    sourceIndex: number;
-    item: Record<string, unknown>;
-    /** See SectionMatch.crossSectionConflict — same semantics for new
-     *  items that have no matching target. */
-    crossSectionConflict?: {
-      suggestedSection: string;
-      reason: string;
-    };
-  }>;
-  summary: {
-    totalSections: number;
-    autoMerge: number;
-    manualReview: number;
-    skip: number;
-    newItems: number;
-  };
-}
-
-export interface MergeDecision {
-  sectionType: string;
-  sourceIndex: number;
-  targetIndex: number | null;
-  action: "merge" | "replace" | "skip" | "add";
-  mergeHighlights?: "combine" | "source_only" | "target_only";
-  /** Exact list of highlight strings to use, overriding `mergeHighlights`.
-   *  Set by the UI when the user has ticked/unticked individual bullets.
-   *  When present, this wins. */
-  selectedHighlights?: string[];
-  /** Per-field picks for scalar values that differ between source and
-   *  target (e.g. startDate, summary, url). Value is which side to take. */
-  scalarChoices?: Record<string, "source" | "target">;
-}
+// The analysis + decision shapes live in shared/resume-merge-decisions.ts so
+// the web merge surfaces and the Chrome extension read the same types.
+export type { ArrayDiff, BasicsConflict, MergeAnalysis, MergeDecision, ScalarFieldDiffs, SectionMatch };
 
 export interface MergeRequest {
   sourceResumeId: string;

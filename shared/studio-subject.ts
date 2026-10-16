@@ -40,6 +40,11 @@ export const STUDIO_SUBJECT_KINDS = [
   // résumé's video without guessing. A studio-made video about the same
   // résumé is never overwritten.
   "resume_video",
+  // A recruiter's candidate-for-job video: the subject id is the
+  // talent_pool_candidates row. Such a video may go public / be posted
+  // socially only after the candidate approves it by a tokenized email
+  // link (shared/candidate-video-consent.ts, assertCandidateConsent).
+  "talent_pool_candidate",
 ] as const;
 
 export type StudioSubjectKind = (typeof STUDIO_SUBJECT_KINDS)[number];
@@ -93,6 +98,7 @@ export const STUDIO_SUBJECT_LABEL: Record<StudioSubjectKind, string> = {
   article:        "Article Promo",
   creator_credit: "Portfolio Credit",
   resume_video:   "Resume Video",
+  talent_pool_candidate: "Candidate Reel",
 };
 
 /** Plain-noun copy used when we want to say "this video is about a [X]"
@@ -106,6 +112,7 @@ export const STUDIO_SUBJECT_NOUN: Record<StudioSubjectKind, string> = {
   article:        "Article",
   creator_credit: "Portfolio",
   resume_video:   "Resume",
+  talent_pool_candidate: "Candidate",
 };
 
 /** Build the route for "open the entity this video is about". Used by
@@ -128,6 +135,8 @@ export function studioSubjectHref(subject: StudioSubject): string | null {
     case "creator_credit": return publicProfilePath(subject.id);
     // The résumé's kit (résumé + letter + video) opens in the workspace.
     case "resume_video":   return `/studio/resume/${encodeURIComponent(subject.id)}`;
+    // The recruiter's private candidate detail page (owner-only).
+    case "talent_pool_candidate": return `/services/candidates/${encodeURIComponent(subject.id)}`;
   }
 }
 

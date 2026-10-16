@@ -14,6 +14,7 @@ import {
   type PublishProjectVideoDeps,
 } from "../publish-project-video.js";
 import { SocialPublishError, type SocialVideoPublisher } from "../publishers/types.js";
+import { CandidateConsentRequiredError } from "../../../domains/candidate-consent/consent-gate.js";
 import { VIDEO_PUBLISH_PLATFORMS, type VideoPublishPlatform } from "../../../../../shared/social-platforms.js";
 
 const OWNER = "8f2c1a9e-4b7d-4e21-9c3a-1d5e6f7a8b9c";
@@ -50,6 +51,9 @@ const input = {
   env: undefined,
 };
 
+/** The candidate-consent gate passes (not a candidate video). */
+const consentOk = async (): Promise<void> => {};
+
 async function expectKind(promise: Promise<unknown>, kind: string) {
   await assert.rejects(promise, (e: unknown) => e instanceof PublishProjectVideoError && e.kind === kind);
 }
@@ -71,11 +75,28 @@ describe("publishProjectVideo", () => {
     );
   });
 
+  it("refuses a candidate video the candidate hasn't approved, before the channel cap or a token", async () => {
+    let touched = false;
+    await expectKind(
+      publishProjectVideo(input, {
+        db: dbReturning([project], [video]),
+        assertConsent: async () => {
+          throw new CandidateConsentRequiredError();
+        },
+        canPost: async () => ((touched = true), true),
+        getAccessToken: async () => ((touched = true), "tok"),
+      }),
+      "CONSENT_REQUIRED",
+    );
+    assert.equal(touched, false);
+  });
+
   it("checks the channel cap before asking for a token", async () => {
     let askedForToken = false;
     await expectKind(
       publishProjectVideo(input, {
         db: dbReturning([project], [video]),
+        assertConsent: consentOk,
         canPost: async () => false,
         getAccessToken: async () => ((askedForToken = true), "tok"),
       }),
@@ -88,6 +109,7 @@ describe("publishProjectVideo", () => {
     await expectKind(
       publishProjectVideo(input, {
         db: dbReturning([project], [video]),
+        assertConsent: consentOk,
         canPost: async () => true,
         getAccessToken: async () => null,
       }),
@@ -96,7 +118,7 @@ describe("publishProjectVideo", () => {
   });
 
   it("maps a rejected token to NOT_CONNECTED and an unsupported account through", async () => {
-    const base = { canPost: async () => true, getAccessToken: async () => "tok" };
+    const base = { assertConsent: consentOk, canPost: async () => true, getAccessToken: async () => "tok" };
     await expectKind(
       publishProjectVideo(input, {
         ...base,
@@ -124,6 +146,7 @@ describe("publishProjectVideo", () => {
     let sentUrl = "";
     const record = await publishProjectVideo(input, {
       db: dbReturning([project], [video]),
+      assertConsent: consentOk,
       canPost: async () => true,
       getAccessToken: async () => "tok",
       publishers: publisher(async (req) => {
@@ -164,6 +187,7 @@ describe("publishProjectVideo", () => {
       { ...input, platform: "linkedin" },
       {
         db: dbReturning([project], [video]),
+        assertConsent: consentOk,
         canPost: async ({ destination }) => ((seen.capDestination = destination), true),
         getAccessToken: async (_userId, platform) => ((seen.tokenPlatform = platform), "li-tok"),
         publishers: adapters,
@@ -194,6 +218,7 @@ describe("publishProjectVideo", () => {
         { ...input, platform: "linkedin" },
         {
           db: dbReturning([project], [video]),
+          assertConsent: consentOk,
           canPost: async () => false,
           getAccessToken: async () => "li-tok",
           publishers: publisher(async () => ((posted = true), { externalId: "x", externalUrl: null })),
@@ -220,6 +245,7 @@ describe("publishProjectVideo", () => {
       { ...input, platform: "youtube", youtube: { privacy: "unlisted", shorts: true } },
       {
         db: dbReturning([project], [video]),
+        assertConsent: consentOk,
         canPost: async () => true,
         getAccessToken: async (_userId, platform) => ((seen.tokenPlatform = platform), "yt-tok"),
         publishers: adapters,
@@ -253,6 +279,7 @@ describe("publishProjectVideo", () => {
     let linked = false;
     await publishProjectVideo(input, {
       db: dbReturning([project], [video]),
+      assertConsent: consentOk,
       canPost: async () => true,
       getAccessToken: async () => "tok",
       publishers: publisher(async () => ({ externalId: "777", externalUrl: null })),
@@ -289,6 +316,7 @@ describe("publishProjectVideo — fitted cuts (#2045)", () => {
         { ...input, platform: "instagram", variantVideoId: CUT },
         {
           db: dbReturning([project], []),
+          assertConsent: consentOk,
           canPost: async () => true,
           getAccessToken: async () => ((askedForToken = true), "tok"),
           publishers: publisher(async () => ((posted = true), { externalId: "x", externalUrl: null })),
@@ -322,6 +350,7 @@ describe("publishProjectVideo — fitted cuts (#2045)", () => {
       {
         db: dbReturning([project], [cutVideo]),
         resolveVariant: async () => cutRow,
+        assertConsent: consentOk,
         canPost: async () => true,
         getAccessToken: async () => "yt-tok",
         publishers: publisher(async (req) => {

@@ -6,6 +6,7 @@
  * Storage: `contacts` + `contact_job_links` (migration 0493). These enums are
  * the SSoT for the CHECK constraints, the API validators and the UI.
  */
+import { isPublicMailboxDomain } from "./public-email-providers.js";
 
 export const CONTACT_LIFECYCLES = ["contact", "lead"] as const;
 export type ContactLifecycle = (typeof CONTACT_LIFECYCLES)[number];
@@ -41,11 +42,6 @@ export interface ContactIdentity {
   linkedinUrl?: string | null;
 }
 
-const FREE_MAIL_DOMAINS = new Set([
-  "gmail.com", "googlemail.com", "yahoo.com", "outlook.com", "hotmail.com", "live.com",
-  "icloud.com", "me.com", "aol.com", "proton.me", "protonmail.com", "gmx.com",
-]);
-
 export function normalizeEmail(email: string | null | undefined): string | null {
   const v = email?.trim().toLowerCase();
   return v && v.includes("@") ? v : null;
@@ -68,7 +64,7 @@ function normLinkedIn(v: string | null | undefined): string | null {
 
 function corporateDomain(email: string | null | undefined): string | null {
   const domain = normalizeEmail(email)?.split("@")[1] ?? null;
-  return domain && !FREE_MAIL_DOMAINS.has(domain) ? domain : null;
+  return domain && !isPublicMailboxDomain(domain) ? domain : null;
 }
 
 /**

@@ -3352,6 +3352,76 @@ BLOG_POSTS.push({
   ],
 });
 
+BLOG_POSTS.push({
+  slug: "one-chrome-extension-for-job-seekers-recruiters-and-sellers",
+  title: "One Chrome Extension That Drafts Your Next Move on Any Page — Then Lets You Press Send",
+  description:
+    "Looking for a job, filling one, or selling? The hired.video Chrome extension reads the page you're on, pairs it with your résumé, your job or your offer, and drafts the tailored résumé, the intro note or the pitch video. You stay in control of every send.",
+  publishedAt: "2026-10-16",
+  updatedAt: "2026-10-16",
+  readingTime: 6,
+  author: "hired.video",
+  toolSlug: "chrome-extension-jobseeker",
+  toolName: "Chrome Extension",
+  toolUrl: "/chrome-extension",
+  keywords:
+    "chrome extension for job seekers, autofill job applications, tailor resume chrome extension, cover letter chrome extension, recruiter chrome extension, linkedin candidate video, video prospecting extension, video reply linkedin post",
+  heroAlt: "The hired.video side panel open beside a job posting, a candidate profile and a social post",
+  category: "Job Search Strategy",
+  sections: [
+    {
+      heading: "The Page You're On Is Where the Work Happens",
+      body: "You find the job on LinkedIn. The candidate is on GitHub. The prospect just posted something worth replying to. And then you leave: open another tab, copy and paste, rewrite the same paragraph again.\n\nThe [hired.video Chrome extension](/chrome-extension) stays on the page with you. It reads what's in front of you (a job, a profile, a company or a post), pairs it with something of yours (your résumé, your open job or your offer) and drafts the next move right there. One free extension, with three lenses that follow your account role. You can switch lenses any time.",
+    },
+    {
+      heading: "Job Seeker: From Posting to Application in One Sitting",
+      body: "Open a posting on any job site and the extension spots it. In a few clicks you can:\n\n**Track it**, so it lands in your job list with the full description saved.\n\n**Tailor your résumé to it.** You get a version of your master résumé aimed at this job's keywords and requirements, and you can download it as PDF or Word.\n\n**Write the cover letter**, from your résumé, for this posting.\n\n**Autofill the application.** The form fills in from your résumé. You read it over and press Submit.\n\n**Record a \"why I fit\" video**, a short video that tells this employer why you're the person for this job. It's the thing that gets your application remembered.",
+    },
+    {
+      heading: "Recruiter: Present a Candidate for a Job in Minutes",
+      body: "Open a candidate's profile on LinkedIn, GitHub or any other site and the extension reads it. Pick one of your open jobs to pair them with, and you get:\n\n**An intro email or LinkedIn note**, drafted in the message box and personal to this candidate and this role. You press Send.\n\n**A candidate-for-job video** that presents this person for this job, ready for your client or hiring manager.\n\nThat video stays private until the candidate approves it. We email them, they say yes, and only then does it go public. Nobody's face goes anywhere without their consent.",
+    },
+    {
+      heading: "Sales & Social: Start the Conversation With Video",
+      body: "A short video gets noticed where one more text message gets skipped. On a prospect's profile, the extension makes a **pitch video plus a message** about what they care about. On a post worth answering, it makes a **video reply** with a comment drafted in the box. You edit it and press Send.",
+    },
+    {
+      heading: "One Engine Under All Three: Pair + Verb",
+      body: "Every action works the same way. The extension pairs the thing on the page with something of yours, then applies one of four verbs:\n\n**Create** what's missing: a résumé from your profile, a cover letter, a video.\n\n**Strengthen** it with suggestions from the page. You confirm each one.\n\n**Target** it at this exact job, candidate or prospect.\n\n**Promote** it: the form, the message box or the reply is filled and waiting for you.\n\nLearn it once and you know every lens.",
+    },
+    {
+      heading: "It Also Fixes Your Own Profile",
+      body: "Visit your own LinkedIn or GitHub profile and the extension can **import your experience into your résumé**, so you're not retyping a decade of work. Visit someone else's profile, such as a person in the role you want, and it can **compare their profile to yours** and suggest improvements to your résumé. You confirm each suggestion, and nothing of theirs is copied.\n\nOn a site it doesn't recognize, the **manual picker** lets you point at the title, company and description once, and it remembers them. **Progress analytics** show what you've tracked, tailored and sent. Your **settings sync with the web**, so a change in the side panel shows up in your hired.video settings and the other way around.",
+    },
+    {
+      heading: "It Never Sends Anything for You",
+      body: "This is a rule, not a setting. The extension fills the box or the form, and you press Send or Submit. Every message that goes out under your name is one you read first.\n\n[Add the extension to Chrome](/chrome-extension). It's free, and it works on LinkedIn, Indeed, Glassdoor, ZipRecruiter, Workday, Greenhouse, Lever, GitHub and more.",
+    },
+  ],
+  faq: [
+    {
+      question: "Is it one extension or two?",
+      answer:
+        "One. The job seeker and recruiter extensions are now a single extension with three lenses: job seeker, recruiter, and sales & social. If you used the old Recruiter extension, install this one instead.",
+    },
+    {
+      question: "Does the extension send messages or submit applications for me?",
+      answer:
+        "No. It fills the message box or the application form, and you read it and press Send or Submit yourself.",
+    },
+    {
+      question: "Is the hired.video Chrome extension free?",
+      answer:
+        "Yes. It's free to install from the Chrome Web Store, and the core of every lens is free. AI features draw on your monthly tokens.",
+    },
+    {
+      question: "Can a recruiter publish a video about me without my permission?",
+      answer:
+        "No. A candidate-for-job video stays private until you approve it from the email we send you. If you don't approve it, it never goes public.",
+    },
+  ],
+});
+
 export function getBlogPost(slug: string): BlogPost | undefined {
   return BLOG_POSTS.find((p) => p.slug === slug);
 }
