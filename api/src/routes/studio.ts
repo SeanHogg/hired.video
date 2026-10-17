@@ -1,3 +1,4 @@
+import { STUDIO_PROJECT_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import { Hono, type Context } from "hono";
 import { and, asc, count, desc, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -3123,13 +3124,17 @@ studioRoutes.get("/projects", async (c) => {
     countPublishedChannelsByProject(projectIds, db),
   ]);
 
-  return c.json(ok(projects.map((p) => toProjectDto(
+  const dtos = projects.map((p) => toProjectDto(
     p,
     p.videoId ? videoById.get(p.videoId) ?? null : null,
     analyticsByProject.get(p.id),
     subjectsByProject.get(p.id) ?? [],
     channelsByProject.get(p.id) ?? 0,
-  ))));
+  ));
+  // `?fields=` trims each row for list views (the full DTO carries every
+  // editor state blob).
+  const fields = parseFields(c.req.query("fields"), STUDIO_PROJECT_LIST_FIELDS);
+  return c.json(ok(projectRows(dtos as Array<Record<string, unknown>>, fields)));
 });
 
 // ─── Per-link subject management ──────────────────────────────────────────────

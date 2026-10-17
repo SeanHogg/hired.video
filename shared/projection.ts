@@ -218,17 +218,35 @@ export const FEED_POST_LIST_FIELDS = [
   "tags",
 ] as const;
 
+/** Keys of GET /api/recruiter/talent-pool rows (rowToTalentPoolEntry). */
 export const TALENT_POOL_LIST_FIELDS = [
   "id",
   "candidateUserId",
   "candidateName",
-  "candidateAvatarUrl",
-  "candidateHeadline",
-  "stage",
-  "score",
+  "candidateEmail",
+  "candidateTitle",
+  "candidateProfilePicture",
+  "currentCompany",
+  "currentTitle",
+  "status",
   "tags",
-  "addedAt",
-  "lastInteractionAt",
+  "lastContactedAt",
+  "createdAt",
+  "updatedAt",
+] as const;
+
+/** Keys of GET /api/studio/projects rows (toProjectDto) a list needs. */
+export const STUDIO_PROJECT_LIST_FIELDS = [
+  "id",
+  "title",
+  "status",
+  "kind",
+  "mediaKind",
+  "thumbnailUrl",
+  "videoUrl",
+  "slug",
+  "isPublic",
+  "updateDateTime",
 ] as const;
 
 export const NOTIFICATION_LIST_FIELDS = [
@@ -253,6 +271,7 @@ const LIST_FIELDS_BY_KIND = {
   articles: ARTICLE_LIST_FIELDS,
   feedPosts: FEED_POST_LIST_FIELDS,
   talentPool: TALENT_POOL_LIST_FIELDS,
+  studioProjects: STUDIO_PROJECT_LIST_FIELDS,
   notifications: NOTIFICATION_LIST_FIELDS,
 } as const;
 
@@ -271,7 +290,8 @@ export const CARD_FIELDS_BY_KIND: Record<ListFieldsKind, readonly string[]> = {
   resumes: ["id", "title", "slug", "privacy", "isMaster", "viewCount", "updatedAt"],
   articles: ["id", "kind", "title", "slug", "summary", "coverImageUrl", "category", "tags", "sector", "audience", "author", "readMinutes", "viewCount", "publishedAt"],
   feedPosts: ["id", "authorName", "authorAvatarUrl", "kind", "title", "preview", "thumbnailUrl", "createdAt", "likeCount", "commentCount", "isLikedByMe"],
-  talentPool: ["id", "candidateName", "candidateAvatarUrl", "candidateHeadline", "stage", "tags", "addedAt"],
+  talentPool: ["id", "candidateName", "candidateTitle", "candidateProfilePicture", "currentCompany", "status", "tags", "createdAt"],
+  studioProjects: ["id", "title", "status", "mediaKind", "thumbnailUrl", "videoUrl", "slug", "isPublic", "updateDateTime"],
   notifications: ["id", "type", "title", "message", "isRead", "createdAt"],
 } as const;
 
