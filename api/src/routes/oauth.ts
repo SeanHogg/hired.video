@@ -9,7 +9,8 @@ import { sendMagicLinkEmail } from "../services/adapters/email.js";
 import { recordReferralAttribution } from "../services/auth/attribution.js";
 import { createAffiliateProfileForUser } from "../services/auth/affiliate.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
-import { markUserLogin } from "./auth.js";
+import { markUserLogin } from "../services/auth/loginStamp.js";
+import { hashPassword } from "../services/auth/password.js";
 import { isPublicSignupRole } from "../../../shared/user-roles.js";
 import {
   createSession,
@@ -18,8 +19,12 @@ import {
   revokeAllSessionsForUser,
 } from "../services/auth/sessions.js";
 import { getJwtSecret } from "../utils/jwt.js";
-import { frontendBaseUrl } from "../utils/public-urls.js";
+import { hexToBytes, hmacSha256Hex, hmacSha256Verify, randomHex } from "../utils/crypto.js";
+import { apiBaseUrl, frontendBaseUrl } from "../utils/public-urls.js";
 import { getEnv } from "../utils/env.js";
+import { logger } from "../lib/logger.js";
+import { sealCredential } from "../services/crypto/credential-columns.js";
+import { authMiddleware } from "../middleware/auth.js";
 
 const { users, oauthAccounts, magicLinkTokens, sessions, loginEvents } = schema;
 
@@ -70,14 +75,10 @@ async function recordOAuthEvent(
       failureReason: ev.failureReason ?? null,
     } as any);
   } catch (err) {
-    console.error("[oauth] login_event insert failed:", err);
+    logger.error("[oauth] login_event insert failed", err);
   }
 }
 
-
-function getApiBase(): string {
-  return getEnv("API_URL") || "https://api.hired.video";
-}
 
 function createJwt(sub: string, email: string, role: string, emailVerified: boolean, sid?: string): Promise<string> {
   return issueJwt({ sub, email, roles: [role], emailVerified, mustChangePassword: false, sid }, getJwtSecret());
@@ -138,18 +139,11 @@ function sanitizeIntent(i: SignupIntent | undefined): SignupIntent | undefined {
 
 async function createOAuthState(redirect: string, linkUserId?: string, attribution?: OAuthAttribution, intent?: SignupIntent): Promise<string> {
   const secret = getJwtSecret();
-  const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  const nonce = randomHex(16);
   const attr = sanitizeAttribution(attribution);
   const intentClean = sanitizeIntent(intent);
   const payload = JSON.stringify({ nonce, redirect: redirect || "/dashboard", ts: Date.now(), ...(linkUserId ? { linkUserId } : {}), ...(attr ? { attr } : {}), ...(intentClean ? { intent: intentClean } : {}) });
-  const key = await crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
-  const sigHex = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const sigHex = await hmacSha256Hex(secret, payload);
   return btoa(payload + "|" + sigHex);
 }
 
@@ -160,12 +154,7 @@ async function verifyOAuthState(state: string): Promise<{ redirect: string; link
     const sepIdx = decoded.lastIndexOf("|");
     const payload = decoded.slice(0, sepIdx);
     const sigHex = decoded.slice(sepIdx + 1);
-    const key = await crypto.subtle.importKey(
-      "raw", new TextEncoder().encode(secret),
-      { name: "HMAC", hash: "SHA-256" }, false, ["verify"],
-    );
-    const sigBytes = new Uint8Array(sigHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
-    const valid = await crypto.subtle.verify("HMAC", key, sigBytes, new TextEncoder().encode(payload));
+    const valid = await hmacSha256Verify(secret, payload, hexToBytes(sigHex));
     if (!valid) return null;
     const { redirect, ts, linkUserId, attr, intent } = JSON.parse(payload);
     if (Date.now() - ts > 10 * 60 * 1000) return null;
@@ -350,7 +339,7 @@ oauthRoutes.get("/:provider", async (c) => {
   };
 
   const state = await createOAuthState(redirect, linkUserId, attribution, intent);
-  const callbackUrl = `${getApiBase()}/api/auth/oauth/${name}/callback`;
+  const callbackUrl = `${apiBaseUrl()}/api/auth/oauth/${name}/callback`;
 
   const params = new URLSearchParams({
     client_id: cfg.clientId(),
@@ -381,7 +370,7 @@ oauthRoutes.get("/:provider/callback", async (c) => {
   const stateData = await verifyOAuthState(state);
   if (!stateData) return c.redirect(`${base}/login?error=invalid_state`);
 
-  const callbackUrl = `${getApiBase()}/api/auth/oauth/${name}/callback`;
+  const callbackUrl = `${apiBaseUrl()}/api/auth/oauth/${name}/callback`;
 
   let tokens: { access_token: string; refresh_token?: string; expires_in?: number };
   let providerUser: { id: string; email: string; name: string; avatar?: string };
@@ -394,13 +383,22 @@ oauthRoutes.get("/:provider/callback", async (c) => {
       providerUser.email = await getGitHubEmail(tokens.access_token);
     }
   } catch (err) {
-    console.error(`[oauth:${name}] Failed:`, err);
+    logger.error(`[oauth:${name}] Failed`, err);
     return c.redirect(`${base}/login?error=auth_failed`);
   }
 
   if (!providerUser.email && !stateData.linkUserId) return c.redirect(`${base}/login?error=no_email`);
 
   const db = getDb();
+  // Provider tokens are stored encrypted (services/crypto/credential-columns.ts).
+  const sealedAccess = await sealCredential(tokens.access_token);
+  const sealedRefresh = await sealCredential(tokens.refresh_token);
+  const tokenColumns = {
+    accessToken: sealedAccess.plain,
+    accessTokenEnc: sealedAccess.enc,
+    refreshToken: sealedRefresh.plain,
+    refreshTokenEnc: sealedRefresh.enc,
+  };
   const [existingOAuth] = await db
     .select()
     .from(oauthAccounts)
@@ -415,8 +413,7 @@ oauthRoutes.get("/:provider/callback", async (c) => {
     userId = stateData.linkUserId ?? existingOAuth.userId;
     await db.update(oauthAccounts).set({
       userId,
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token ?? null,
+      ...tokenColumns,
       tokenExpiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,
       displayName: providerUser.name,
       avatarUrl: providerUser.avatar ?? null,
@@ -432,8 +429,7 @@ oauthRoutes.get("/:provider/callback", async (c) => {
       email: providerUser.email?.toLowerCase() ?? null,
       displayName: providerUser.name,
       avatarUrl: providerUser.avatar ?? null,
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token ?? null,
+      ...tokenColumns,
       tokenExpiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,
     } as any);
   } else {
@@ -495,20 +491,17 @@ oauthRoutes.get("/:provider/callback", async (c) => {
           await createAffiliateProfileForUser(db, {
             userId,
             name: providerUser.name,
-            randomHex: (bytes) =>
-              Array.from(crypto.getRandomValues(new Uint8Array(bytes)))
-                .map((b) => b.toString(16).padStart(2, "0"))
-                .join(""),
+            randomHex,
           });
         } catch (err) {
-          console.error("[oauth] Failed to create affiliate profile:", err);
+          logger.error("[oauth] Failed to create affiliate profile", err);
         }
       }
       // Seed onboarding tasks for the new user with their actual role so a
       // creator / affiliate gets the right starter checklist (fire-and-forget).
       c.executionCtx.waitUntil(
         seedOnboardingTasks(userId, signupRole).catch((err) =>
-          console.error("[oauth] Failed to seed onboarding tasks:", err),
+          logger.error("[oauth] Failed to seed onboarding tasks", err),
         ),
       );
     }
@@ -520,8 +513,7 @@ oauthRoutes.get("/:provider/callback", async (c) => {
       email: providerUser.email!.toLowerCase(),
       displayName: providerUser.name,
       avatarUrl: providerUser.avatar ?? null,
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token ?? null,
+      ...tokenColumns,
       tokenExpiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,
     } as any);
   }
@@ -589,14 +581,14 @@ oauthRoutes.post("/magic-link", async (c) => {
     .from(users).where(eq(users.email, email)).limit(1);
 
   if (user && user.isActive) {
-    const token = Array.from(crypto.getRandomValues(new Uint8Array(32))).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const token = randomHex(32);
 
     await db.update(magicLinkTokens).set({ used: true } as any).where(and(eq(magicLinkTokens.email, email), eq(magicLinkTokens.used, false)));
     await db.insert(magicLinkTokens).values({ email, token, expiresAt: new Date(Date.now() + 15 * 60 * 1000), redirect } as any);
 
     c.executionCtx.waitUntil(
       sendMagicLinkEmail(email, user.name, token).catch((err) =>
-        console.error("[magic-link] Failed to send:", err),
+        logger.error("[magic-link] Failed to send", err),
       ),
     );
   }
@@ -647,6 +639,13 @@ oauthRoutes.get("/magic-link/verify", async (c) => {
 // ============================================================================
 // Linked accounts management (authenticated)
 // ============================================================================
+
+// `/api/auth/*` is a PUBLIC prefix in app.ts (login/sign-up flows), so the
+// global auth layer never attaches c.var.user here. These account-scoped
+// routes verify the bearer themselves — without this every call 401'd.
+for (const path of ["/linked-accounts", "/unlink/*", "/add-password", "/sessions", "/sessions/*"]) {
+  oauthRoutes.use(path, authMiddleware);
+}
 
 oauthRoutes.get("/linked-accounts", async (c) => {
   const uid = c.var.user?.sub as string | undefined;
@@ -702,14 +701,9 @@ oauthRoutes.post("/add-password", async (c) => {
   const [user] = await db.select({ passwordHash: users.passwordHash }).from(users).where(eq(users.id, uid)).limit(1);
   if (user?.passwordHash) return c.json(error("CONFLICT", "Account already has a password"), 409);
 
-  const encoder = new TextEncoder();
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const keyMaterial = await crypto.subtle.importKey("raw", encoder.encode(body.password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 100_000, hash: "SHA-256" }, keyMaterial, 256);
-  const saltHex = Array.from(salt).map((b) => b.toString(16).padStart(2, "0")).join("");
-  const hashHex = Array.from(new Uint8Array(bits)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const passwordHash = await hashPassword(String(body.password));
 
-  await db.update(users).set({ passwordHash: `${saltHex}:${hashHex}`, passwordChangedAt: new Date() } as any).where(eq(users.id, uid));
+  await db.update(users).set({ passwordHash, passwordChangedAt: new Date() } as any).where(eq(users.id, uid));
   return c.json(success(null, "Password set successfully"));
 });
 

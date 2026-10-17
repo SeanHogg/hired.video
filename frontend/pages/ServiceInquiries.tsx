@@ -11,6 +11,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { formatCentsPlain, initialsFromWords } from "@/lib/format";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AppShell } from "@/components/AppShell";
@@ -55,19 +56,6 @@ function StatusBadge({ status }: { status: string }) {
   const labelKey = STATUS_LABEL_KEYS[status];
   const label = labelKey ? t(labelKey) : status;
   return <Badge variant={variant}>{label}</Badge>;
-}
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
-
-function formatPrice(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
 }
 
 function useTimeAgo() {
@@ -200,7 +188,7 @@ export default function ServiceInquiries() {
                         <CardContent className="p-4">
                           <div className="flex items-start gap-4">
                             <Avatar className="h-10 w-10 shrink-0">
-                              <AvatarFallback>{initials(buyer.name)}</AvatarFallback>
+                              <AvatarFallback>{initialsFromWords(buyer.name)}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1 min-w-0">
                               <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -218,7 +206,7 @@ export default function ServiceInquiries() {
                                 {" · "}
                                 {inquiry.orderType === "purchase" && (
                                   <span className="text-sky-600 font-medium">
-                                    {formatPrice(inquiry.paidAmountCents)}
+                                    {formatCentsPlain(inquiry.paidAmountCents)}
                                   </span>
                                 )}
                               </p>
@@ -310,7 +298,7 @@ export default function ServiceInquiries() {
                         <CardContent className="p-4">
                           <div className="flex items-start gap-4">
                             <Avatar className="h-10 w-10 shrink-0">
-                              <AvatarFallback>{initials(provider.name)}</AvatarFallback>
+                              <AvatarFallback>{initialsFromWords(provider.name)}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1 min-w-0">
                               <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -322,7 +310,7 @@ export default function ServiceInquiries() {
                                 {" · "}
                                 {inquiry.orderType === "purchase" ? (
                                   <span className="text-sky-600 font-medium">
-                                    {formatPrice(inquiry.paidAmountCents)}
+                                    {formatCentsPlain(inquiry.paidAmountCents)}
                                   </span>
                                 ) : (
                                   <span className="text-muted-foreground">{t("labels.orderType.inquiry")}</span>

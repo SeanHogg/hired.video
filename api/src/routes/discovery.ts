@@ -9,7 +9,9 @@ import { getDb, schema } from "../db/index.js";
 import { getCachedSearch } from "../utils/search-cache.js";
 import { getOrSetCached } from "../utils/edge-cache.js";
 import { toJsonSafe } from "../utils/json-safe.js";
+import { clampLimit } from "../utils/pagination.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { tryExtractJson } from "../../../shared/extract-json.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { scoreJobsForRanking } from "../services/job/ranking.js";
 import {
@@ -35,7 +37,7 @@ function uid(c: any): string | null {
  */
 discoveryRoutes.get("/talent-feed", async (c) => {
   const db = getDb();
-  const limit = Math.min(50, Math.max(1, Number(c.req.query("limit") ?? 20)));
+  const limit = clampLimit(c.req.query("limit"), 20, 50);
   const offset = Math.max(0, Number(c.req.query("cursor") ?? 0));
   const skillFilter = c.req.query("skills")?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
   const location = c.req.query("location")?.trim() ?? "";
@@ -128,7 +130,7 @@ discoveryRoutes.get("/jobs", async (c) => {
   const q = c.req.query("q")?.trim() ?? "";
   const location = c.req.query("location")?.trim() ?? "";
   const remote = c.req.query("remote") === "true";
-  const limit = Math.min(50, Math.max(1, Number(c.req.query("limit") ?? 20)));
+  const limit = clampLimit(c.req.query("limit"), 20, 50);
 
   const userId = uid(c);
   const isPro = userId ? (await getSubscription(userId)).isPro : false;
@@ -244,8 +246,8 @@ discoveryRoutes.get("/seo/resume-guide/:jobSlug", async (c) => {
 Return ONLY valid JSON.`;
       const llm = createLLMClient(c.env as any, c.var.user);
       const { content: raw } = await llm.callText("discovery_career_guide", { useCase: "discovery", systemPrompt: "", userMessage: prompt });
-      const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
-      if (parsed.headline) content = { ...content, ...parsed, jobTitle: jobSlug, generatedAt: new Date().toISOString() };
+      const parsed = tryExtractJson<Partial<typeof content>>(raw);
+      if (parsed?.headline) content ={ ...content, ...parsed, jobTitle: jobSlug, generatedAt: new Date().toISOString() };
     } catch { /* use defaults */ }
   }
 
@@ -369,7 +371,7 @@ discoveryRoutes.get("/seo/salary/:jobSlug/:locationSlug", handleSalaryQuery);
  */
 discoveryRoutes.get("/companies/top-rated", async (c) => {
   const db = getDb();
-  const limit = Math.min(50, Math.max(1, Number(c.req.query("limit") ?? 12)));
+  const limit = clampLimit(c.req.query("limit"), 12, 50);
   const minReviews = Math.max(1, Number(c.req.query("minReviews") ?? 3));
 
   const rows = await db

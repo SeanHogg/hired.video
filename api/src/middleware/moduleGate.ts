@@ -1,26 +1,13 @@
 import type { Context, MiddlewareHandler } from "hono";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getModuleStatusMap, isModuleActive } from "../services/auth/moduleStatus.js";
-import { USER_ROLES } from "../../../shared/user-roles.js";
+import { isAdminRole } from "./superAdmin.js";
 import { resolveAccessRole } from "../../../shared/role-access.js";
 import { RoleAccessService } from "../services/admin/RoleAccessService.js";
 import { buildRepos } from "../repositories/index.js";
 import { getDb } from "../db/index.js";
 
 type AppCtx = Context<AppEnv>;
-
-// Role bypass — internal users always see every module, regardless of toggle.
-// Same convention used by tierEnforcement.requirePro.
-function isAdminRole(c: AppCtx): boolean {
-  const roles = c.var.user?.roles ?? [];
-  const role = (c.var.user as any)?.role ?? "";
-  return (
-    roles.includes(USER_ROLES.SUPER_ADMIN) ||
-    roles.includes(USER_ROLES.ADMIN) ||
-    role === USER_ROLES.SUPER_ADMIN ||
-    role === USER_ROLES.ADMIN
-  );
-}
 
 /** The slice of RoleAccessService the path gate actually calls (ISP). */
 type RoleAccessGate = Pick<RoleAccessService, "isFeatureEnabledForUser">;
@@ -71,7 +58,8 @@ function forbidden(c: AppCtx, slug: string): Response {
  */
 export function requireModuleActive(slug: string): MiddlewareHandler<AppEnv> {
   return async (c: AppCtx, next) => {
-    if (isAdminRole(c)) return next();
+    // Role bypass — internal users always see every module, regardless of toggle.
+    if (isAdminRole(c.var.user)) return next();
     if (await isModuleActive(slug)) return next();
     return forbidden(c, slug);
   };
@@ -93,7 +81,7 @@ export function moduleGateByPath(
     const path = c.req.path;
     const matched = sorted.find((p) => path === p || path.startsWith(p + "/"));
     if (!matched) return next();
-    if (isAdminRole(c)) return next();
+    if (isAdminRole(c.var.user)) return next();
     const slug = registry[matched];
 
     // Global kill-switch (modules table) — disabled for everyone.

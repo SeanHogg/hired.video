@@ -16,6 +16,7 @@
 
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
+import { bumpInboxFor } from "../services/messaging/inboxCacheVersion.js";
 
 const {
   conversations,
@@ -148,11 +149,13 @@ export class ConversationsRepository implements IConversationsRepository {
 
   async insertConversationParticipant(input: ConversationParticipantInsert): Promise<void> {
     await this.db.insert(conversationParticipants).values(input as any);
+    bumpInboxFor([input.userId]);
   }
 
   async insertConversationParticipants(inputs: ConversationParticipantInsert[]): Promise<void> {
     if (inputs.length === 0) return;
     await this.db.insert(conversationParticipants).values(inputs as any);
+    bumpInboxFor(inputs.map((i) => i.userId));
   }
 
   async findParticipantUserIds(conversationId: string): Promise<string[]> {
@@ -264,6 +267,7 @@ export class ConversationsRepository implements IConversationsRepository {
         .values(toInsert)
         .onConflictDoNothing()
         .catch(() => undefined);
+      bumpInboxFor([userId]);
     }
     return rows.length;
   }

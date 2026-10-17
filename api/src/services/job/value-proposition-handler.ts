@@ -16,7 +16,7 @@ import {
   type ValuePropositionResponse,
 } from "../../../../shared/tool-schemas.js";
 import { getPrompt } from "../../../../shared/ai-prompts/index.js";
-import { ok, fail, requireAuth, type HandlerResult } from "../../handlers/shared.js";
+import { DomainError, requireUserId } from "../../domains/errors.js";
 import type { LLMStreamSink } from "../adapters/llm-client.js";
 import {
   TEXT_CAP,
@@ -64,23 +64,22 @@ export async function handleValueProposition(
   body: unknown,
   /** Stream the pitch as it is written (#1342). */
   stream?: LLMStreamSink,
-): Promise<HandlerResult> {
-  const auth = requireAuth(viewerId);
-  if ("status" in auth) return auth;
+): Promise<ValuePropositionResponse> {
+  const userId = requireUserId(viewerId);
 
   const parsed = ValuePropositionRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "A job (jobId or jobContent) and a resume (resumeId or resumeContent) are required", parsed.error.flatten());
+    throw new DomainError(400, "VALIDATION_ERROR", "A job (jobId or jobContent) and a resume (resumeId or resumeContent) are required", parsed.error.flatten());
   }
   const req = parsed.data;
 
   const job = await resolveJob(deps, req.jobId ? { jobId: req.jobId } : { jobHtml: req.jobContent });
-  if (!job) return fail(404, "NOT_FOUND", "Job not found");
+  if (!job) throw new DomainError(404, "NOT_FOUND", "Job not found");
 
-  const resumeText = await resolveResumeText(deps, auth.userId, req);
-  if (!resumeText) return fail(404, "NOT_FOUND", "Resume not found");
+  const resumeText = await resolveResumeText(deps, userId, req);
+  if (!resumeText) throw new DomainError(404, "NOT_FOUND", "Resume not found");
 
-  if (!deps.llm) return fail(503, "AI_UNAVAILABLE", "AI is not configured");
+  if (!deps.llm) throw new DomainError(503, "AI_UNAVAILABLE", "AI is not configured");
 
   const { data } = await deps.llm.callJson<ValuePropositionResponse>(
     "value_proposition_generate",
@@ -93,5 +92,5 @@ export async function handleValueProposition(
     ValuePropositionResponseSchema,
     stream ? { stream } : undefined,
   );
-  return ok(data);
+  return data;
 }

@@ -134,7 +134,7 @@ export function emptyCompanyContent(): CompanyDocumentContent {
 
 const orNull = (v: string): string | null => (v.trim() === "" ? null : v.trim());
 
-/** The write payload `PUT /api/Companies/:id` (and the POST) accepts — the
+/** The write payload `PUT /api/companies/:id` (and the POST) accepts — the
  *  same shape the retired builder sent (`buildCreateRequest`). */
 export function contentToCompanyFields(c: CompanyDocumentContent): CompanyWritableFields {
   const benefitFlags: Record<string, unknown> = Object.fromEntries(

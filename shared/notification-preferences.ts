@@ -106,7 +106,13 @@ export function categoryForNotificationType(type: string): NotificationCategory 
   if (t.includes("connection")) return "connectionRequests";
   if (t.includes("message") || t === "service_inquiry" || t.includes("review") || t.includes("feedback"))
     return "messages";
-  if (t.includes("application") || t === "applied" || t === "interview" || t === "offer") {
+  if (
+    t.includes("application") ||
+    t === "applied" ||
+    t === "interview" ||
+    t === "interview_scheduled" ||
+    t === "offer"
+  ) {
     return "applicationUpdates";
   }
   if (t.includes("job_match") || t === "jobmatch" || t === "job_alert") return "jobMatches";

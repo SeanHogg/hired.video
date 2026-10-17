@@ -1,6 +1,6 @@
 import { FileText } from "lucide-react";
 import { SelectItem } from "@/components/ui/select";
-import ResumeScoreBadges, { type ResumeScores } from "./ResumeScoreBadges";
+import ResumeScoreBadges, { type ResumeScoreFields } from "./ResumeScoreBadges";
 
 /**
  * Minimum shape this component reads. Loose-typed because the upstream
@@ -8,7 +8,7 @@ import ResumeScoreBadges, { type ResumeScores } from "./ResumeScoreBadges";
  * extract just the fields we render and let TypeScript permissively
  * accept supersets.
  */
-export interface ResumeRow extends ResumeScores {
+export interface ResumeRow extends ResumeScoreFields {
   id: string;
   title?: string | null;
   slug?: string | null;

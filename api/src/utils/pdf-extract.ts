@@ -11,6 +11,8 @@
  * Returns "" when neither yields text (scanned image PDF); callers turn that
  * into an actionable error.
  */
+import { logger } from "../lib/logger.js";
+
 export async function extractPdfText(pdfBytes: Uint8Array): Promise<string> {
   const viaPdfJs = await extractWithPdfJs(pdfBytes);
   if (viaPdfJs.trim()) return viaPdfJs;
@@ -27,7 +29,7 @@ async function extractWithPdfJs(pdfBytes: Uint8Array): Promise<string> {
     const { text } = await extractText(pdf, { mergePages: true });
     return (Array.isArray(text) ? (text as string[]).join("\n") : text).trim();
   } catch (err) {
-    console.warn("[pdf-extract] pdf.js failed:", err instanceof Error ? err.message : err);
+    logger.warn("[pdf-extract] pdf.js failed", err);
     return "";
   }
 }

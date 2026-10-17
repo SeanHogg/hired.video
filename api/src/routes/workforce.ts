@@ -49,10 +49,7 @@ import {
   disconnectByEmployer,
   type IntegrationProvider,
 } from "../services/workforce/integrations.js";
-import {
-  getCompanyTokenPoolView,
-  setMemberTokenLimit,
-} from "../domains/billing/company-token-ledger.js";
+import { tokenLedger } from "../domains/billing/token-ledger.js";
 import { getVideoBucket, putObject } from "../services/storage/object-store.js";
 
 export const workforceRoutes = new Hono<AppEnv>();
@@ -359,7 +356,7 @@ workforceRoutes.get("/token-pool", async (c) => {
   // in the surface that raised the global api-error toast + "Report this
   // error" prompt for a normal empty state, generating support-ticket noise.
   // The <TokenPoolCard/> self-gates (renders null) when `pool` is null.
-  const view = await getCompanyTokenPoolView(userId);
+  const view = await tokenLedger.companyPoolView(userId);
   return c.json(success({ pool: view }), 200);
 });
 
@@ -378,6 +375,6 @@ workforceRoutes.patch("/members/:userId/token-limit", async (c) => {
   if (limit === undefined) {
     return c.json(error("BAD_REQUEST", "limit must be a non-negative number or null"), 400);
   }
-  await setMemberTokenLimit(userId, targetUserId, limit);
+  await tokenLedger.setCompanyMemberLimit(userId, targetUserId, limit);
   return c.json(success({ updated: true }), 200);
 });

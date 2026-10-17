@@ -50,6 +50,9 @@ import { useAuth } from "@/lib/auth";
 import type { CompanyWithOwnership } from "@/types/company";
 import { isValidCompanyName } from "@/lib/utils/company-validation";
 import { studioNewEntityHref } from "@/lib/studio/studio-authoring";
+import { useMyCompanies } from "@/hooks/queries/use-companies";
+
+const NO_COMPANIES: Company[] = [];
 
 export default function Companies() {
   const { t } = useTranslation();
@@ -161,7 +164,7 @@ export default function Companies() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [totalCompanies, setTotalCompanies] = useState<number>(0);
-  const [ownedCompanies, setOwnedCompanies] = useState<Company[]>([]);
+  const { data: ownedCompanies = NO_COMPANIES } = useMyCompanies();
 
   // Pagination logic
   const {
@@ -212,25 +215,6 @@ export default function Companies() {
   useEffect(() => {
     fetchCompanies();
   }, [fetchCompanies]);
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setOwnedCompanies([]);
-      return;
-    }
-    let cancelled = false;
-    companyService
-      .getMyCompanies()
-      .then((rows) => {
-        if (!cancelled) setOwnedCompanies(rows);
-      })
-      .catch(() => {
-        if (!cancelled) setOwnedCompanies([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated]);
 
   const handleFollowCompany = async (companyId: string) => {
     if (user) {

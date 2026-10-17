@@ -34,6 +34,7 @@ import { invalidateTaxYearReports } from "./TaxReportingService.js";
 import { PayoutBalancesRepository } from "../../repositories/payoutBalancesRepository.js";
 import { tryGetPayoutProvider } from "./index.js";
 import type { ActivePayoutProvider } from "../../../../shared/payout-profile.js";
+import { logger } from "../../lib/logger.js";
 
 const { payouts, payoutProfiles } = schema;
 
@@ -99,7 +100,7 @@ export class PayoutReleaseWorker {
         eligible.map((r) => r.userId),
       );
     } catch (err) {
-      console.warn("[release-worker] balance pre-filter failed; falling back to per-user reads", err);
+      logger.warn("[release-worker] balance pre-filter failed; falling back to per-user reads", err);
     }
 
     for (const row of eligible) {
@@ -116,7 +117,7 @@ export class PayoutReleaseWorker {
 
         if (opts.dryRun) {
           result.queued += 1;
-          console.info("[release-worker] DRY", {
+          logger.info("[release-worker] DRY", {
             userId: row.userId,
             provider: row.provider,
             availableCents: balance.availableCents,
@@ -199,7 +200,7 @@ export class PayoutReleaseWorker {
             })
             .where(eq(payouts.id, created.id));
           result.sent += 1;
-          console.info("[release-worker] sent", {
+          logger.info("[release-worker] sent", {
             userId: row.userId,
             payoutId: created.id,
             providerPayoutId: dispatched.providerPayoutId,
@@ -226,18 +227,18 @@ export class PayoutReleaseWorker {
           });
           result.failed += 1;
           result.errors.push({ userId: row.userId, reason });
-          console.warn("[release-worker] failed", { userId: row.userId, payoutId: created.id, reason });
+          logger.warn("[release-worker] failed", { userId: row.userId, payoutId: created.id, reason });
         }
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         result.errors.push({ userId: row.userId, reason });
-        console.warn("[release-worker] tick error", { userId: row.userId, reason });
+        logger.warn("[release-worker] tick error", { userId: row.userId, reason });
       }
     }
 
     // New / settled / failed payouts feed the annual tax report.
     if (!opts.dryRun && result.queued > 0) invalidateTaxYearReports();
-    console.info("[release-worker] tick complete", result);
+    logger.info("[release-worker] tick complete", result);
     return result;
   }
 }

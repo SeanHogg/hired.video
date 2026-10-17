@@ -153,17 +153,6 @@ export function deleteEntity(state: GameState, entityId: string): GameState {
   });
 }
 
-/** Move an entity's position. Convenience over `updateEntity` so the
- *  drag-to-move handler in `<GameStage3D>` doesn't need to construct
- *  a partial-patch object per pointermove frame. */
-export function moveEntity(
-  state: GameState,
-  entityId: string,
-  position: [number, number, number],
-): GameState {
-  return updateEntity(state, entityId, { position });
-}
-
 // ─── World-level mutations ────────────────────────────────────────────────
 
 export function updateSpawn(

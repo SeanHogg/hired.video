@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { buildApiUrl } from "@/lib/api/base-url";
 
 export interface ChatRoomMessage {
   /** Client-side id used for keyed rendering. */
@@ -50,14 +51,8 @@ export interface UseChatRoomState {
 }
 
 function buildSocketUrl(conversationId: string): string {
-  // The API host comes from the runtime config in prod; in dev we
-  // default to the same-origin upgrade path.
-  const apiBase = (import.meta as any).env?.VITE_API_URL || "";
-  const httpToWs = (u: string) => u.replace(/^http/, "ws");
-  if (apiBase) return `${httpToWs(apiBase)}/api/chat/socket/${conversationId}`;
-  const loc = typeof window !== "undefined" ? window.location : null;
-  const scheme = loc?.protocol === "https:" ? "wss:" : "ws:";
-  return `${scheme}//${loc?.host ?? ""}/api/chat/socket/${conversationId}`;
+  // Same API host as every HTTP call (base-URL SSoT), upgraded to ws(s).
+  return buildApiUrl(`/api/chat/socket/${conversationId}`).replace(/^http/, "ws");
 }
 
 export function useChatRoom(

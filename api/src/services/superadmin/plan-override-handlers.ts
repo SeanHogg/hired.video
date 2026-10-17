@@ -73,6 +73,7 @@ export interface PlanOverrideDeps {
 // use requireAuth because superadmin routes have their own Hono-level
 // role guard upstream of the handler.
 import { ok, fail, type HandlerResult } from "../../handlers/shared.js";
+import { logger } from "../../lib/logger.js";
 export { ok, fail };
 export type { HandlerResult };
 
@@ -243,7 +244,7 @@ export async function handleSetPlanOverride(
       monthlyTokenLimit: row.monthlyTokenLimit,
       expiresAt: row.expiresAt,
     }).catch((err) => {
-      console.error("[plan-override] Failed to send upgrade email:", err);
+      logger.error("[plan-override] Failed to send upgrade email", err);
     });
   }
 

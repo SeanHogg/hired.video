@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { initialsFromWords } from "@/lib/format";
 import { Separator } from "@/components/ui/separator";
 import type { User } from "@/lib/auth";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
@@ -38,12 +39,7 @@ const EMPLOYER_LINKS: QuickLink[] = [
 export default function FeedProfileCard({ user }: FeedProfileCardProps) {
   const effectiveRole = useEffectiveRole();
   const quickLinks = roleUtils.isEmployer(effectiveRole) ? EMPLOYER_LINKS : JOB_SEEKER_LINKS;
-  const initials = (user.name || user.email || "?")
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+  const initials = initialsFromWords(user.name || user.email || "?");
 
   const role = (user as any).role ?? "";
   const headline = (user as any).headline ?? role ?? "Professional";

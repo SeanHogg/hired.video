@@ -15,6 +15,7 @@
  * fails on the model.
  */
 import { parseResumeWithRegex, tryParseJsonResume } from "../resume/parse.js";
+import { logger } from "../../lib/logger.js";
 
 /** Who pays for a partner upload's AI parse; "off" = deterministic only. */
 export type PartnerResumeAiParse = "off" | "partner_owner" | "job_seeker";
@@ -66,7 +67,7 @@ export function buildPartnerTextParser(deps: PartnerTextParserDeps): (text: stri
     try {
       return await deps.aiParse(text, billedUserId);
     } catch (err) {
-      console.warn("[partner resume] AI parse failed, using the deterministic parse:", err instanceof Error ? err.message : err);
+      logger.warn("[partner resume] AI parse failed, using the deterministic parse", err);
       return parseResumeWithRegex(text);
     }
   };

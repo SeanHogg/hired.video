@@ -13,20 +13,21 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
+import type { PartnerConnectionStatus } from "@shared/partner";
 
 // ============================================================================
 // SCHEMAS
 // ============================================================================
 
 /** status of a partner connection/grant. */
-export const PartnerConnectionStatusSchema = z.enum([
+export type { PartnerConnectionStatus };
+/** Runtime validator for the shared `PartnerConnectionStatus` union
+ *  (@shared/partner) — annotated so the two can't drift. */
+export const PartnerConnectionStatusSchema: z.ZodType<PartnerConnectionStatus> = z.enum([
   "pending",
   "active",
   "revoked",
 ]);
-export type PartnerConnectionStatus = z.infer<
-  typeof PartnerConnectionStatusSchema
->;
 
 /** One row in the user's "connected platforms" list (GET /grants). */
 export const PartnerGrantSchema = z.object({

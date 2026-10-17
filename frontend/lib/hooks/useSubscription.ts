@@ -2,6 +2,7 @@ import { billingService, type SubscriptionSummary } from "@/lib/services/billing
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import { useAuth } from "@/lib/auth";
 import { useGatedResource } from "@/hooks/use-gated-resource";
+import { readBootstrapSeed } from "@/lib/bootstrap-seed";
 import { USER_ROLES } from "@shared/user-roles";
 
 /**
@@ -50,6 +51,8 @@ export function useSubscription(): SubscriptionState {
     fetcher: () => billingService.getSubscription(),
     defaults: RAW_DEFAULTS,
     cacheKey: SUBSCRIPTION_CACHE_KEY,
+    // Seeded by /api/bootstrap — no /api/billing/subscription on first load.
+    seedFn: () => readBootstrapSeed<SubscriptionSummary>("subscription"),
   });
 
   const state: SubscriptionState = {

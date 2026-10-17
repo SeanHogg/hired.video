@@ -6,20 +6,12 @@ import { and, count, desc, eq, inArray, sql, sum } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { adminMiddleware } from "../middleware/superAdmin.js";
 
 export const affiliateRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
-}
-
-/** Platform-admin gate for the /admin/* affiliate endpoints. */
-function isAdmin(c: any): boolean {
-  const u = c.var.user;
-  if (!u) return false;
-  if (u.isSuperAdmin === true) return true;
-  const roles: string[] = u.roles ?? [];
-  return roles.includes("admin") || roles.includes("super_admin");
 }
 
 function ok<T>(data: T) {
@@ -420,15 +412,11 @@ affiliateRoutes.post("/payout", async (c) => {
 // Gap #1684: these used to return `{success:true}` with no DB write. They now
 // require a platform admin and actually mutate the affiliate's status / payout
 // state. `:userId` is the affiliate's USER id; we resolve to their profile.
-
-function requireAdmin(c: any) {
-  return isAdmin(c) ? null : c.json(error("FORBIDDEN", "Admin access required"), 403);
-}
+// Every /admin/* endpoint requires a platform admin.
+affiliateRoutes.use("/admin/*", adminMiddleware);
 
 /** Set an affiliate profile's status by the owner's userId. */
 async function setAffiliateStatus(c: any, status: string) {
-  const guard = requireAdmin(c);
-  if (guard) return guard;
   const db = getDb();
   const [row] = await db.update(schema.affiliateProfiles)
     .set({ status, updatedAt: new Date() } as any)
@@ -444,8 +432,6 @@ affiliateRoutes.post("/admin/:userId/suspend", (c) => setAffiliateStatus(c, "sus
 affiliateRoutes.post("/admin/:userId/unsuspend", (c) => setAffiliateStatus(c, "active"));
 
 affiliateRoutes.get("/admin/:userId/referrals", async (c) => {
-  const guard = requireAdmin(c);
-  if (guard) return guard;
   const db = getDb();
   const [profile] = await db.select({ id: schema.affiliateProfiles.id })
     .from(schema.affiliateProfiles).where(eq(schema.affiliateProfiles.userId, c.req.param("userId"))).limit(1);
@@ -457,8 +443,6 @@ affiliateRoutes.get("/admin/:userId/referrals", async (c) => {
 });
 
 affiliateRoutes.get("/admin/:userId/conversions", async (c) => {
-  const guard = requireAdmin(c);
-  if (guard) return guard;
   const db = getDb();
   const [profile] = await db.select({ id: schema.affiliateProfiles.id })
     .from(schema.affiliateProfiles).where(eq(schema.affiliateProfiles.userId, c.req.param("userId"))).limit(1);
@@ -470,8 +454,6 @@ affiliateRoutes.get("/admin/:userId/conversions", async (c) => {
 });
 
 affiliateRoutes.get("/admin/pending-payouts", async (c) => {
-  const guard = requireAdmin(c);
-  if (guard) return guard;
   const db = getDb();
   const rows = await db.select().from(schema.affiliatePayouts)
     .where(eq(schema.affiliatePayouts.status, "pending"))
@@ -482,8 +464,6 @@ affiliateRoutes.get("/admin/pending-payouts", async (c) => {
 /** Move a payout through its lifecycle. `process` also credits the affiliate's
  *  totalPaid so the dashboard's paid total reflects processed payouts. */
 async function setPayoutStatus(c: any, status: string) {
-  const guard = requireAdmin(c);
-  if (guard) return guard;
   const db = getDb();
   const set: Record<string, unknown> = { status, updatedAt: new Date() };
   if (status === "processed") set.processedAt = new Date();
@@ -512,8 +492,6 @@ affiliateRoutes.post("/admin/payout/:payoutId/reject", (c) => setPayoutStatus(c,
 affiliateRoutes.post("/admin/payout/:payoutId/process", (c) => setPayoutStatus(c, "processed"));
 
 affiliateRoutes.get("/admin/payout/:payoutId/status", async (c) => {
-  const guard = requireAdmin(c);
-  if (guard) return guard;
   const db = getDb();
   const [payout] = await db.select({ status: schema.affiliatePayouts.status })
     .from(schema.affiliatePayouts).where(eq(schema.affiliatePayouts.id, c.req.param("payoutId"))).limit(1);

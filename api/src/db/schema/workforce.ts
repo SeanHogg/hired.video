@@ -74,6 +74,7 @@ export const taskTimeEntries = pgTable("task_time_entries", {
   // Find the open row for a user fast. WHERE-partial means the index
   // only stores rows that are actually punched-in (typically << 1% of total).
   index("idx_time_entries_active").on(t.userId).where(sql`ended_at IS NULL`),
+  index("idx_task_time_entries_task_id").on(t.taskId),
 ]);
 
 export type TaskTimeEntry = typeof taskTimeEntries.$inferSelect;
@@ -114,6 +115,7 @@ export const timesheets = pgTable("timesheets", {
   uniqueIndex("uniq_timesheet_user_company_period").on(t.userId, t.companyId, t.periodStart),
   index("idx_timesheets_company_status").on(t.companyId, t.status),
   index("idx_timesheets_user_status").on(t.userId, t.status),
+  index("idx_timesheets_approver_id").on(t.approverId),
 ]);
 
 export type Timesheet = typeof timesheets.$inferSelect;
@@ -137,6 +139,7 @@ export const timesheetTouchpoints = pgTable("timesheet_touchpoints", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_timesheet_touchpoints_ts_created").on(t.timesheetId, t.createdAt),
+  index("idx_timesheet_touchpoints_performed_by_user_id").on(t.performedByUserId),
 ]);
 
 export type TimesheetTouchpoint = typeof timesheetTouchpoints.$inferSelect;
@@ -178,6 +181,7 @@ export const placementDocuments = pgTable("placement_documents", {
   index("idx_placement_docs_placement").on(t.placementId),
   index("idx_placement_docs_company_user").on(t.companyId, t.userId),
   index("idx_placement_docs_expiry").on(t.expiresAt).where(sql`expires_at IS NOT NULL`),
+  index("idx_placement_documents_user_id").on(t.userId),
 ]);
 
 export type PlacementDocument = typeof placementDocuments.$inferSelect;

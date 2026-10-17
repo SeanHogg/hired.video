@@ -54,6 +54,7 @@ import type {
   NormalisedEmail,
 } from "@shared/email-providers/types.ts";
 import { apiClient } from "@/lib/api-client";
+import { emailIntegrationService } from "@/lib/services/email-integration-service";
 import type { InboxAccount } from "@/hooks/use-comm-hub";
 
 const PROVIDERS: Record<string, EmailProvider> = {
@@ -124,12 +125,7 @@ async function fetchAccessToken(accountId: string): Promise<AccessTokenResp> {
 }
 
 async function fetchUserRules(): Promise<UserRule[]> {
-  try {
-    const r = await apiClient.get<UserRule[]>("/api/integrations/email/rules");
-    return r.data ?? [];
-  } catch {
-    return [];
-  }
+  return emailIntegrationService.listRules().catch(() => []);
 }
 
 async function ingestChunk(

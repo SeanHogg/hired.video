@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { PointsHub } from "@/components/points/PointsHub";
 import { isPointsEligible } from "@/lib/services/points-service";
+import { oauthLinkUrl } from "@/lib/services/oauth-service";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
@@ -1117,7 +1118,6 @@ function SettingsContent() {
                         {(["google", "linkedin", "github", "microsoft"] as const).map((provider) => {
                           const linked = security?.linkedAccounts.find((a) => a.provider === provider);
                           const providerLabel = { google: "Google", linkedin: "LinkedIn", github: "GitHub", microsoft: "Microsoft" }[provider];
-                          const apiBase = (import.meta as any).env?.VITE_API_URL ?? "/api";
                           return (
                             <div key={provider} className="flex items-center justify-between p-3 border rounded-lg">
                               <div className="flex items-center gap-3">
@@ -1150,8 +1150,7 @@ function SettingsContent() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => {
-                                    const token = localStorage.getItem("auth_token") ?? "";
-                                    window.location.href = `${apiBase}/api/auth/oauth/${provider}?redirect=/settings&link_token=${encodeURIComponent(token)}`;
+                                    window.location.href = oauthLinkUrl(provider, "/settings");
                                   }}
                                 >
                                   {t("actions.connect")}

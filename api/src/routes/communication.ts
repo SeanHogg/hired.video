@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
+import { clampLimit } from "../utils/pagination.js";
 import { CampaignService } from "../services/campaigns/CampaignService.js";
 import {
   findOrCreateDirectConversation,
@@ -96,11 +97,11 @@ communicationRoutes.get("/messages", async (c) => {
   if (!uid) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
 
   const conversationId = c.req.query("conversationId") || undefined;
-  const limitRaw = Number.parseInt(c.req.query("limit") ?? "", 10);
   const repos = buildRepos(getDb());
   const rows = await repos.conversations.findMessagesForParticipant(uid, {
     conversationId,
-    limit: Number.isFinite(limitRaw) ? limitRaw : undefined,
+    // Same default/bounds the repository applies (100, 1..500).
+    limit: clampLimit(c.req.query("limit"), 100, 500),
   });
 
   return c.json(ok(rows), 200);

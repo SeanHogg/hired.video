@@ -15,7 +15,11 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
 import { resolveJobV2, resolveResumeV2, type MatchDeps } from "../job/match-handlers.js";
-import { handleTailor } from "../job/tailor-handler.js";
+import { handleTailor as tailorUseCase } from "../job/tailor-handler.js";
+import { asHandler } from "../../handlers/shared.js";
+
+// The use case returns data / throws DomainError; assert the routed envelope.
+const handleTailor = asHandler(tailorUseCase);
 import {
   validateTailorOutput,
   applyResumeEdits,

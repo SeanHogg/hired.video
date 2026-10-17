@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { resumeService } from "@/lib/services/resume-service";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 
 /**
  * Returns `true` when the authenticated user has no resumes yet, `false`
@@ -12,22 +11,9 @@ import { resumeService } from "@/lib/services/resume-service";
  * for the rule, so callers don't each re-implement the count check.
  */
 export function useIsFirstResumeUpload(): boolean | undefined {
-  const [isFirst, setIsFirst] = useState<boolean | undefined>(undefined);
-
-  useEffect(() => {
-    let cancelled = false;
-    resumeService
-      .getUserResumes()
-      .then((resumes) => {
-        if (!cancelled) setIsFirst(resumes.length === 0);
-      })
-      .catch(() => {
-        if (!cancelled) setIsFirst(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return isFirst;
+  const { data, isError, fetchStatus } = useUserResumes();
+  // A failed read, or no signed-in viewer to read for, is "not first".
+  if (isError) return false;
+  if (data) return data.length === 0;
+  return fetchStatus === "idle" ? false : undefined;
 }

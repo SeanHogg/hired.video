@@ -24,6 +24,7 @@ import type { Db } from "../../db/index.js";
 import { schema } from "../../db/index.js";
 import { transcribeAudio } from "../adapters/transcription.js";
 import type { Env } from "../../types/index.js";
+import { logger } from "../../lib/logger.js";
 
 const { studioAsyncResponses } = schema;
 
@@ -226,7 +227,7 @@ export function transcribeResponseInBackground(
     },
   };
   const p = transcribeResponse(db, deps, args).catch((err) => {
-    console.error("[transcribe-response] background job failed:", err);
+    logger.error("[transcribe-response] background job failed", err);
   });
   if (waitUntil) {
     waitUntil(p);

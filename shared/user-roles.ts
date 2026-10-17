@@ -31,6 +31,36 @@ export const USER_ROLES = {
 
 export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES];
 
+/** Every spelling of a role we accept on the way in (case-insensitive,
+ *  trimmed) → the canonical value. Includes the legacy PascalCase-derived
+ *  forms ("jobseeker"), human labels ("job seeker", "super admin") and the
+ *  retired "business" role (→ employer). */
+const ROLE_ALIASES: ReadonlyMap<string, UserRole> = new Map<string, UserRole>([
+  ["jobseeker", USER_ROLES.JOB_SEEKER],
+  ["job_seeker", USER_ROLES.JOB_SEEKER],
+  ["job seeker", USER_ROLES.JOB_SEEKER],
+  ["recruiter", USER_ROLES.RECRUITER],
+  ["employer", USER_ROLES.EMPLOYER],
+  ["business", USER_ROLES.EMPLOYER],
+  ["employee", USER_ROLES.EMPLOYEE],
+  ["creator", USER_ROLES.CREATOR],
+  ["affiliate", USER_ROLES.AFFILIATE],
+  ["admin", USER_ROLES.ADMIN],
+  ["administrator", USER_ROLES.ADMIN],
+  ["superadmin", USER_ROLES.SUPER_ADMIN],
+  ["super_admin", USER_ROLES.SUPER_ADMIN],
+  ["super admin", USER_ROLES.SUPER_ADMIN],
+]);
+
+/** Parse a free-form role string into the canonical `UserRole`, or null
+ *  when it isn't a role we know. Callers layer their own policy on top
+ *  (the frontend defaults to job_seeker; the API restricts which roles a
+ *  profile update may assign). */
+export function parseRoleAlias(value: string | null | undefined): UserRole | null {
+  if (!value) return null;
+  return ROLE_ALIASES.get(value.toLowerCase().trim()) ?? null;
+}
+
 /**
  * THE persona switch. hired.video was job-seeker-only from 2026-10-03; the
  * hiring side (recruiter / employer) was switched back ON 2026-10-16. When the
@@ -138,43 +168,17 @@ export function resolveSignupPickerRole(raw: string | null | undefined): UserRol
  *  ledger, not gamification points. */
 export type ScoringRole = "job_seeker" | "recruiter" | "employer" | "creator";
 
-/** Roles whose profiles surface to candidate-discovery feeds — `/people`
- *  search, recruiter talent pools, pitch decks, profile-section public
- *  defaults. Single SSoT for the "is this user discoverable as a hireable
- *  candidate" gate (#1407, DRY rule).
- *
- *  Deliberately excludes `employee` (workforce member of a specific
- *  employer — not on the market), `admin` / `super_admin` (platform
- *  staff — not candidates). `recruiter` + `employer` ARE included
- *  because they often participate in cross-platform networking and can
- *  be approached for connections / coffee chats; the actual "open to work"
- *  filter on People.tsx narrows further per intent.
- *
- *  `creator` + `affiliate` ARE included: a creator-only or affiliate-only
- *  account opted into a public-facing persona and expects to be discoverable
- *  under /people — but surfaced AS a Creator / Affiliate, never relabelled a
- *  Job Seeker. The per-role label resolver (not the visibility gate) draws
- *  that distinction. */
-export const CANDIDATE_VISIBLE_ROLES: readonly UserRole[] = [
-  "job_seeker",
-  "recruiter",
-  "employer",
-  "creator",
-  "affiliate",
-] as const;
-
-/** Negated form for `WHERE role NOT IN (...)` queries — convenient for
- *  filtering OUT non-candidate roles in Drizzle queries. */
+/** Roles whose profiles never surface to candidate-discovery feeds
+ *  (`/people` search, talent pools, pitch decks) — for `WHERE role NOT IN
+ *  (...)` queries (#1407). `employee` is a workforce member of a specific
+ *  employer (not on the market); `admin` / `super_admin` are platform staff.
+ *  Every other role (job_seeker, recruiter, employer, creator, affiliate)
+ *  is discoverable. */
 export const NON_CANDIDATE_ROLES: readonly UserRole[] = [
   "employee",
   "admin",
   "super_admin",
 ] as const;
-
-export function isCandidateVisibleRole(role: string | null | undefined): boolean {
-  if (!role) return false;
-  return (CANDIDATE_VISIBLE_ROLES as readonly string[]).includes(role.toLowerCase());
-}
 
 /** Resolve the user's primary scoring role from the JWT `roles` array
  *  (or any string array of role claims). Returns null when none of the

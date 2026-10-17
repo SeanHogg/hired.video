@@ -28,18 +28,19 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
-import {
-  handleRegister,
-  handleLogin,
-  handleForgotPassword,
-  handleResetPassword,
-  handleVerifyEmail,
-  type AuthDeps,
-  type EmailerPort,
-  type OnboardingPort,
-} from "../auth/AuthService.js";
-import { hashPassword } from "../../routes/auth.js";
+import * as authUseCases from "../auth/AuthService.js";
+import type { AuthDeps, EmailerPort, OnboardingPort } from "../auth/AuthService.js";
+import { hashPassword } from "../auth/password.js";
 import { PUBLIC_SIGNUP_ROLES } from "../../../../shared/user-roles.js";
+import { asHandler } from "../../handlers/shared.js";
+
+// The use cases return data / throw DomainError; assert the envelope the
+// route sends (register answers 201).
+const handleRegister = asHandler(authUseCases.handleRegister, 201);
+const handleLogin = asHandler(authUseCases.handleLogin);
+const handleForgotPassword = asHandler(authUseCases.handleForgotPassword);
+const handleResetPassword = asHandler(authUseCases.handleResetPassword);
+const handleVerifyEmail = asHandler(authUseCases.handleVerifyEmail);
 
 // ---------------------------------------------------------------------------
 // Fake DB — records every query, lets tests inspect writes

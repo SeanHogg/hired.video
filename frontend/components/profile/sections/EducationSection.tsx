@@ -4,6 +4,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useState } from "react";
+import { formatMonthYear } from "@/lib/format";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Education } from "@/types/resume";
@@ -33,12 +34,7 @@ function EducationTimelineItem({
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
-  const formatDate = (dateString: string) => {
-    if (!dateString || dateString === "Present") return dateString || t("labels.present");
-    const dateObj = new Date(dateString);
-    if (isNaN(dateObj.getTime())) return dateString;
-    return dateObj.toLocaleDateString("en-US", { year: "numeric", month: "short" });
-  };
+  const formatDate = (dateString: string) => formatMonthYear(dateString, t("labels.present"));
 
   const title = studyType && area
     ? t("labels.studyTypeIn", { studyType, area })

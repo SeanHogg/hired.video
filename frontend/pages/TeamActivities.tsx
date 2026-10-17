@@ -17,7 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import AssignActivityButton from "@/components/activities/AssignActivityButton";
 import { activitiesService, type ActivityDTO } from "@/lib/services/activities-service";
-import { formatMoney, formatDuration } from "@/lib/activities/format";
+import { formatMoneyCents, formatDurationHms } from "@/lib/format";
 
 export default function TeamActivities(): JSX.Element {
   useSEO("/team");
@@ -93,7 +93,7 @@ export default function TeamActivities(): JSX.Element {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <StatTile label={t("activities.team.statTotal")} value={String(stats.total)} icon={<ClipboardList className="h-4 w-4" />} />
           <StatTile label={t("activities.team.statPending")} value={String(stats.pending)} icon={<Clock className="h-4 w-4" />} />
-          <StatTile label={t("activities.team.statPaid")} value={formatMoney(stats.paidCents)} icon={<DollarSign className="h-4 w-4" />} />
+          <StatTile label={t("activities.team.statPaid")} value={formatMoneyCents(stats.paidCents)} icon={<DollarSign className="h-4 w-4" />} />
         </div>
 
         {/* Approval queue */}
@@ -128,7 +128,7 @@ export default function TeamActivities(): JSX.Element {
                     <div className="flex flex-wrap items-center gap-2">
                       <Button size="sm" disabled={busyId === a.id} onClick={() => approve(a.id)}>
                         {busyId === a.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                        {t("activities.team.approve", { amount: formatMoney(a.earnedCents, a.currency) })}
+                        {t("activities.team.approve", { amount: formatMoneyCents(a.earnedCents, a.currency) })}
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => { setRejectingId(a.id); setRejectReason(""); }}>
                         <X className="mr-2 h-4 w-4" />
@@ -183,11 +183,11 @@ function ActivityRow({ a, compact }: { a: ActivityDTO; compact?: boolean }): JSX
         <span className="inline-flex items-center gap-1">
           {a.payType === "hourly" ? <Clock className="h-3.5 w-3.5" /> : <DollarSign className="h-3.5 w-3.5" />}
           {a.payType === "hourly"
-            ? t("activities.mine.rate", { amount: formatMoney(a.rateCents ?? 0, a.currency) })
-            : t("activities.mine.fixed", { amount: formatMoney(a.amountCents ?? 0, a.currency) })}
+            ? t("activities.mine.rate", { amount: formatMoneyCents(a.rateCents ?? 0, a.currency) })
+            : t("activities.mine.fixed", { amount: formatMoneyCents(a.amountCents ?? 0, a.currency) })}
         </span>
-        {a.payType === "hourly" && <span className="font-mono tabular-nums">{formatDuration(a.trackedSec)}</span>}
-        {!compact && <span className="font-medium text-foreground">{t("activities.team.earned", { amount: formatMoney(earned, a.currency) })}</span>}
+        {a.payType === "hourly" && <span className="font-mono tabular-nums">{formatDurationHms(a.trackedSec)}</span>}
+        {!compact && <span className="font-medium text-foreground">{t("activities.team.earned", { amount: formatMoneyCents(earned, a.currency) })}</span>}
       </div>
     </div>
   );

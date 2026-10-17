@@ -1,6 +1,8 @@
 /**
  * Self-serve promotion writes that carry a content target (#176):
- * job boosts, company boosts and ad creatives.
+ * job boosts and ad creatives. (Company boosts are read-only here — the
+ * unpaid create/list endpoints were removed 2026-10-17; paid promotion of
+ * any subject goes through POST /api/checkout {kind:"boost"}.)
  *
  *   - Every write stamps the polymorphic pair through adSubjectColumns()
  *     (and therefore still writes job_id / company_id for those targets).
@@ -15,7 +17,6 @@ import { getDb } from "../../db/index.js";
 import {
   AdPromotionRepository,
   type AdRow,
-  type CompanyBoostRow,
   type JobBoostRow,
   type NewAdRow,
 } from "../../repositories/adPromotionRepository.js";
@@ -91,54 +92,6 @@ export async function listJobBoosts(userId: string, repo?: AdPromotionRepository
 }
 
 // ─── Company boosts ───────────────────────────────────────────────────────
-
-export interface CreateCompanyBoostInput {
-  companyId: string;
-  placementType: string;
-  pricingModel: Extract<BoostPricingModel, "flat" | "cpm">;
-  budgetCents: number;
-  durationDays: number;
-}
-
-export async function createCompanyBoost(
-  userId: string,
-  input: CreateCompanyBoostInput,
-  repo?: AdPromotionRepository,
-): Promise<PromotionResult<CompanyBoostRow>> {
-  const r = repoOf(repo);
-  if (!(await r.isCompanyOwnedBy(input.companyId, userId))) {
-    return { ok: false, code: "NOT_FOUND", message: "Company not found or not owned by you" };
-  }
-  const pricing = computeBoostPricing(input);
-  const target = adSubjectColumns({ subjectType: "company", subjectId: input.companyId });
-  const boost = await r.insertCompanyBoost({
-    companyId: input.companyId,
-    subjectType: target.subjectType,
-    subjectId: target.subjectId,
-    userId,
-    placementType: input.placementType,
-    pricingModel: input.pricingModel,
-    budgetCents: pricing.totalCents,
-    rateUnitCents: pricing.rateUnitCents,
-    startsAt: pricing.startsAt,
-    endsAt: pricing.endsAt,
-  });
-  await r.markCompanyFeatured(input.companyId, pricing.endsAt);
-  return { ok: true, value: boost };
-}
-
-export async function listCompanyBoosts(userId: string, repo?: AdPromotionRepository) {
-  const r = repoOf(repo);
-  const rows = await r.listCompanyBoostsForUser(userId);
-  const targets = rows.map((b) => resolveAdContentTarget(b));
-  const names = await r.companyNamesByIds([
-    ...new Set(targets.filter((t): t is AdContentTarget => t?.subjectType === "company").map((t) => t.subjectId)),
-  ]);
-  return rows.map((b, i) => {
-    const target = targets[i];
-    return { ...b, target, companyName: (target && names.get(target.subjectId)) ?? "Company" };
-  });
-}
 
 // ─── Ad creatives ─────────────────────────────────────────────────────────
 

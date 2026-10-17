@@ -103,7 +103,6 @@ export const payoutProfiles = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
-    index("idx_payout_profiles_user").on(t.userId),
     index("idx_payout_profiles_payout_provider").on(t.payoutProvider).where(sql`payout_provider IS NOT NULL`),
   ],
 );
@@ -141,6 +140,7 @@ export const payoutLedgerEntries = pgTable(
       .where(sql`${t.kind} = 'accrual' AND ${t.sourceId} IS NOT NULL`),
     check("payout_ledger_entries_source_kind_check", sql`${t.sourceKind} IS NULL OR ${t.sourceKind} IN ('service_order', 'voice_clone_license', 'gift_card', 'platform_fee', 'creator_payout', 'manual_adjustment', 'commission', 'partner_program')`),
     check("payout_ledger_entries_kind_check", sql`${t.kind} IN ('accrual', 'payout', 'reversal', 'adjustment')`),
+    index("idx_payout_ledger_entries_created_by_user_id").on(t.createdByUserId),
   ],
 );
 

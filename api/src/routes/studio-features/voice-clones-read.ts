@@ -9,6 +9,7 @@ import { getDb } from "../../db/index.js";
 import { filterVisibleCreators, isCreatorVisible } from "../../services/creators/visibility.js";
 import { ok, fail, studioVoiceClones, studioVoiceCloneLicenses } from "./shared.js";
 import { userHasVoiceLicense } from "./voice-clone-shared.js";
+import { parsePagination } from "../../utils/pagination.js";
 
 export const voiceCloneReadRoutes = new Hono<AppEnv>();
 
@@ -58,8 +59,7 @@ voiceCloneReadRoutes.get("/voice-clones/marketplace", async (c) => {
   const language = c.req.query("language") || undefined;
   const gender = c.req.query("gender") || undefined;
   const sort = c.req.query("sort") ?? "popular"; // popular | newest | price_asc | price_desc
-  const page = Math.max(1, Number(c.req.query("page") ?? 1));
-  const limit = Math.min(100, Math.max(1, Number(c.req.query("limit") ?? 24)));
+  const { page, limit } = parsePagination(c, { defaultLimit: 24, maxLimit: 100 });
 
   const conds: any[] = [eq(studioVoiceClones.visibility, "public")];
   if (search) {

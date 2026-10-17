@@ -41,24 +41,6 @@ export const ApiErrorResponseSchema = ApiResponseSchema.extend({
   }),
 });
 
-/**
- * Success Response Schema
- */
-export const ApiSuccessResponseSchema = <T extends z.ZodTypeAny>(
-  dataSchema: T,
-) =>
-  ApiResponseSchema.extend({
-    success: z.literal(true),
-    data: dataSchema,
-  });
-
-/**
- * Demo Response Schema
- */
-export const DemoResponseSchema = z.object({
-  message: z.string(),
-});
-
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
@@ -85,11 +67,6 @@ export interface ApiSuccessResponse<T> {
    *  the AI-tokens UI in sync without issuing a second /token-budget call. */
   tokenBudget?: import("./billing.js").TokenBudgetDTO;
 }
-
-/**
- * Demo Response Type
- */
-export type DemoResponse = z.infer<typeof DemoResponseSchema>;
 
 // ============================================================================
 // API ENDPOINT SCHEMAS
@@ -154,61 +131,8 @@ export type TwoFactorChallenge = z.infer<typeof TwoFactorChallengeSchema>;
 export type EmailVerificationChallenge = z.infer<typeof EmailVerificationChallengeSchema>;
 
 /**
- * User Profile Endpoints
- */
-export const UserProfileResponseSchema = z.object({
-  id: UuidLikeSchema,
-  slug: z.string(),
-  data: z.object({
-    firstName: z.string(),
-    lastName: z.string(),
-    avatar: z.string().url().optional(),
-    headline: z.string(),
-    summary: z.string(),
-    // Add more fields as needed
-  }),
-  role: z.enum([
-    USER_ROLES.JOB_SEEKER,
-    USER_ROLES.RECRUITER,
-    USER_ROLES.EMPLOYER,
-    USER_ROLES.ADMIN,
-  ]),
-  isVerified: z.boolean(),
-  isPro: z.boolean(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-});
-
-export const UpdateUserProfileRequestSchema = z.object({
-  firstName: z.string().optional(),
-  lastName: z.string().optional(),
-  headline: z.string().optional(),
-  summary: z.string().optional(),
-  // Add more fields as needed
-});
-
-/**
  * Resume Endpoints
  */
-export const ResumeListResponseSchema = z.object({
-  resumes: z.array(
-    z.object({
-      id: UuidLikeSchema,
-      slug: z.string(),
-      name: z.string(),
-      privacy: z.enum(["public", "private", "unlisted"]),
-      isMaster: z.boolean(),
-      isActive: z.boolean(),
-      createdAt: z.iso.datetime(),
-      updatedAt: z.iso.datetime(),
-      views: z.number(),
-    }),
-  ),
-  total: z.number(),
-  page: z.number(),
-  limit: z.number(),
-});
-
 export const CreateResumeRequestSchema = z.object({
   name: z.string().min(1),
   privacy: z.enum(["public", "private", "unlisted"]).default("private"),
@@ -218,46 +142,6 @@ export const CreateResumeRequestSchema = z.object({
 /**
  * Job Endpoints
  */
-export const JobListResponseSchema = z.object({
-  jobs: z.array(
-    z.object({
-      id: UuidLikeSchema,
-      slug: z.string(),
-      data: z.object({
-        title: z.string(),
-        description: z.string(),
-        company: z.string(),
-        location: z.object({
-          city: z.string(),
-          state: z.string(),
-          country: z.string(),
-          remote: z.boolean(),
-        }),
-        employmentType: EmploymentTypeSchema,
-        // Canonical seniority vocabulary — keep in sync with the SSoT in
-        // shared/seniority.ts (#2090). `junior` was missing here, so a job
-        // stored as canonical "junior" would fail response validation.
-        experienceLevel: z.enum([
-          "entry",
-          "junior",
-          "mid",
-          "senior",
-          "lead",
-          "executive",
-        ]),
-      }),
-      status: z.enum(["draft", "active", "paused", "closed"]),
-      createdAt: z.iso.datetime(),
-      updatedAt: z.iso.datetime(),
-      views: z.number(),
-      applications: z.number(),
-    }),
-  ),
-  total: z.number(),
-  page: z.number(),
-  limit: z.number(),
-});
-
 export const CreateJobRequestSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
@@ -289,13 +173,7 @@ export const CreateJobRequestSchema = z.object({
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 export type LoginResponse = z.infer<typeof LoginResponseSchema>;
 export type SignupRequest = z.infer<typeof SignupRequestSchema>;
-export type UserProfileResponse = z.infer<typeof UserProfileResponseSchema>;
-export type UpdateUserProfileRequest = z.infer<
-  typeof UpdateUserProfileRequestSchema
->;
-export type ResumeListResponse = z.infer<typeof ResumeListResponseSchema>;
 export type CreateResumeRequest = z.infer<typeof CreateResumeRequestSchema>;
-export type JobListResponse = z.infer<typeof JobListResponseSchema>;
 export type CreateJobRequest = z.infer<typeof CreateJobRequestSchema>;
 
 // ============================================================================
@@ -397,37 +275,3 @@ export function validateApiResponse<T>(
 
 // Export nullToUndefined so raw API calls can normalize backend nulls to undefined
 export { nullToUndefined };
-
-/**
- * Creates a typed API error response
- */
-export function createApiError(
-  code: string,
-  message: string,
-  details?: Record<string, unknown>,
-): ApiErrorResponse {
-  return {
-    success: false,
-    error: {
-      code,
-      message,
-      details,
-    },
-    timestamp: new Date().toISOString(),
-  };
-}
-
-/**
- * Creates a typed API success response
- */
-export function createApiSuccess<T>(
-  data: T,
-  message?: string,
-): ApiSuccessResponse<T> {
-  return {
-    success: true,
-    data,
-    message,
-    timestamp: new Date().toISOString(),
-  };
-}

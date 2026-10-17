@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Building2, ChevronDown, Check, Crown, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useApiReady } from "@/lib/auth";
+import { useAvailableAccounts } from "@/hooks/queries/use-available-accounts";
 import { accountService } from "@/lib/services/account-service";
 import { AccountOption } from "@/types/account";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
@@ -22,32 +22,12 @@ interface AccountSwitcherProps {
 }
 
 export function AccountSwitcher({ className }: AccountSwitcherProps) {
-  const apiReady = useApiReady();
-  const [accounts, setAccounts] = useState<AccountOption[]>([]);
-  const [currentAccountId, setCurrentAccountId] = useState<string | null>(null);
+  const { data: accounts = [] } = useAvailableAccounts();
+  const [currentAccountId, setCurrentAccountId] = useState<string | null>(() =>
+    typeof localStorage !== "undefined" ? localStorage.getItem("currentAccountId") : null,
+  );
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    // Endpoint requires auth + verified account. `useApiReady` handles
-    // anonymous (Login/Signup/Pricing/marketing) AND verification-limbo
-    // (post-signup pre-confirm) in one predicate.
-    if (!apiReady) return;
-    loadAvailableAccounts();
-    // Get current account from localStorage
-    const savedAccountId = localStorage.getItem("currentAccountId");
-    setCurrentAccountId(savedAccountId);
-  }, [apiReady]);
-
-  const loadAvailableAccounts = async () => {
-    try {
-      const availableAccounts = await accountService.getAvailableAccounts();
-      setAccounts(availableAccounts);
-    } catch (error) {
-      console.error("Failed to load available accounts:", error);
-      // Don't show error toast for this as it's not critical
-    }
-  };
 
   const handleAccountSwitch = async (accountId: string) => {
     if (accountId === currentAccountId) return;

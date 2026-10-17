@@ -38,6 +38,7 @@ export const liveScreeningSessions = pgTable("live_screening_sessions", {
   index("idx_live_screening_sessions_recruiter").on(t.recruiterId, t.startTime.desc().nullsFirst()),
   index("idx_live_screening_sessions_status_window").on(t.status, t.startTime),
   check("live_screening_sessions_slot_minutes_check", sql`${t.slotMinutes} BETWEEN 3 AND 60`),
+  index("idx_live_screening_sessions_job_id").on(t.jobId),
 ]);
 
 export type LiveScreeningSession = typeof liveScreeningSessions.$inferSelect;
@@ -64,6 +65,7 @@ export const liveScreeningInvites = pgTable("live_screening_invites", {
   uniqueIndex("uniq_live_screening_invites_session_candidate")
     .on(t.sessionId, t.candidateId)
     .where(sql`candidate_id IS NOT NULL`),
+  index("idx_live_screening_invites_candidate_id").on(t.candidateId),
 ]);
 
 export type LiveScreeningInvite = typeof liveScreeningInvites.$inferSelect;

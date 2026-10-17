@@ -17,6 +17,9 @@
 
 import { cdnUrl } from "../../utils/cdn.js";
 import type { UserActorRow } from "../../repositories/usersRepository.js";
+// users.name → first/last lives in shared/person-name.ts (one splitter for
+// actors, public cards, profile DTOs, People-Ops and enrichment).
+import { splitPersonName } from "../../../../shared/person-name.js";
 
 /** The DTO that gets serialised into notification.data, comment authors,
  *  connection.fromUser, etc. Frontends parse exactly this shape. */
@@ -31,21 +34,8 @@ export interface UserActor {
   slug: string;
 }
 
-/** Single source of truth for splitting `users.name` into first/last.
- *  Used by `toUserActor`, `toPublicUserCardDto`, and `toUserProfileDto`. */
-export function splitName(name: string | null | undefined): {
-  firstName: string;
-  lastName: string;
-} {
-  const parts = (name ?? "").split(" ");
-  return {
-    firstName: parts[0] ?? "",
-    lastName: parts.slice(1).join(" "),
-  };
-}
-
 export function toUserActor(row: UserActorRow): UserActor {
-  const { firstName, lastName } = splitName(row.name);
+  const { firstName, lastName } = splitPersonName(row.name);
   return {
     id: row.id,
     email: row.email ?? "",

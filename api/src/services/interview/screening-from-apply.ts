@@ -18,13 +18,9 @@
 import { and, eq } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import { schema } from "../../db/index.js";
+import { randomHex } from "../../utils/crypto.js";
 
 const { jobItems, interviewQuestionSets, studioAsyncInterviews } = schema;
-
-function randomToken(byteLength = 24): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 export interface ScreeningCreationResult {
   interviewId: string;
@@ -73,7 +69,7 @@ export async function createScreeningInterviewFromApply(
   const now = new Date();
   const tokenExpiresAt = new Date(now.getTime() + 14 * 24 * 3_600_000); // 14d
   const responseDeadline = new Date(now.getTime() + responseWindowHours * 3_600_000);
-  const inviteToken = randomToken(24);
+  const inviteToken = randomHex(24);
 
   const [created] = await db
     .insert(studioAsyncInterviews)

@@ -16,10 +16,11 @@
  * (useTikTokPostSettings) and the caption writer (writeCaption).
  */
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { useSubscription } from "@/lib/hooks/useSubscription";
-import { studioService, type StudioProject } from "@/lib/services/studio-service";
+import type { StudioProject } from "@/lib/services/studio-service";
+import { useStudioProjects } from "@/hooks/queries/use-studio-projects";
 import { distributionService, type ScheduleDestination, type ScheduleResult } from "@/lib/services/distribution-service";
 import { startYouTubeConnect } from "@/lib/studio/youtube-connect";
 import { writeCaption } from "@/lib/studio/write-caption";
@@ -56,11 +57,7 @@ export function useDistributionComposer() {
   const { isPro } = useSubscription();
   const limit = postChannelLimit({ isPro });
 
-  const projectsQuery = useQuery({
-    queryKey: ["distribution", "projects"],
-    queryFn: async () => (await studioService.getProjects()).data ?? [],
-    enabled: hasAccount,
-  });
+  const projectsQuery = useStudioProjects({ enabled: hasAccount });
   const projects = useMemo(() => (projectsQuery.data ?? []).filter(isPostableProject), [projectsQuery.data]);
   const [projectId, setProjectId] = useState<string | null>(null);
   const project = projects.find((p) => p.id === projectId) ?? null;

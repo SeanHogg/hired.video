@@ -18,7 +18,7 @@
  * — tracked in the gap register as a follow-up.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, Compass } from "lucide-react";
@@ -33,7 +33,7 @@ import { PivotDrilldown } from "@/components/pivot-explorer/PivotDrilldown";
 import { RESILIENCE_LABEL_KEYS, rankSectors } from "@/components/pivot-explorer/pivot-scoring";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { isValidSector, type Sector } from "@shared/sectors";
-import { resumeService } from "@/lib/services/resume-service";
+import { useResume } from "@/hooks/queries/use-resumes";
 
 export default function PivotExplorer() {
   const { t } = useTranslation();
@@ -47,8 +47,12 @@ export default function PivotExplorer() {
     toParam && isValidSector(toParam) ? toParam : null;
 
   const [skillsInput, setSkillsInput] = useState("");
-  const [hydratingFromResume, setHydratingFromResume] = useState(false);
-  const [resumeHydrationError, setResumeHydrationError] = useState<string | null>(null);
+  const sourceResume = useResume(fromResume);
+  const hydratingFromResume = sourceResume.isLoading;
+  const resumeHydrationError = sourceResume.isError ? t("pivotExplorer.skills.hydrationError") : null;
+  // Seed the input once per ?fromResume — a background re-read must not
+  // overwrite what the user has since typed.
+  const seededFrom = useRef<string | null>(null);
 
   // Hydrate from a resume when ?fromResume=<id> is set (#1170). Each
   // skill's `name` + its `keywords[]` join into the comma-separated
@@ -56,45 +60,28 @@ export default function PivotExplorer() {
   // hit. Best-effort: failure leaves the input untouched and surfaces a
   // non-blocking note.
   useEffect(() => {
-    if (!fromResume) return;
-    let alive = true;
-    setHydratingFromResume(true);
-    setResumeHydrationError(null);
-    void resumeService
-      .getResumeById(fromResume)
-      .then((resume) => {
-        if (!alive) return;
-        const tokens: string[] = [];
-        for (const skill of resume.content?.skills ?? []) {
-          if (skill.name) tokens.push(skill.name);
-          for (const kw of skill.keywords ?? []) {
-            if (kw) tokens.push(kw);
-          }
-        }
-        if (tokens.length > 0) {
-          // De-dupe case-insensitively so "Python" + "python" don't both
-          // show up after a sloppy resume parse.
-          const seen = new Set<string>();
-          const unique = tokens.filter((tok) => {
-            const k = tok.toLowerCase();
-            if (seen.has(k)) return false;
-            seen.add(k);
-            return true;
-          });
-          setSkillsInput(unique.join(", "));
-        }
-      })
-      .catch(() => {
-        if (alive) setResumeHydrationError(t("pivotExplorer.skills.hydrationError"));
-      })
-      .finally(() => {
-        if (alive) setHydratingFromResume(false);
-      });
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromResume]);
+    const resume = sourceResume.data;
+    if (!fromResume || !resume || seededFrom.current === fromResume) return;
+    seededFrom.current = fromResume;
+    const tokens: string[] = [];
+    for (const skill of resume.content?.skills ?? []) {
+      if (skill.name) tokens.push(skill.name);
+      for (const kw of skill.keywords ?? []) {
+        if (kw) tokens.push(kw);
+      }
+    }
+    if (tokens.length === 0) return;
+    // De-dupe case-insensitively so "Python" + "python" don't both
+    // show up after a sloppy resume parse.
+    const seen = new Set<string>();
+    const unique = tokens.filter((tok) => {
+      const k = tok.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    setSkillsInput(unique.join(", "));
+  }, [fromResume, sourceResume.data]);
 
   const skills = useMemo(
     () => skillsInput.split(",").map((s) => s.trim()).filter(Boolean),

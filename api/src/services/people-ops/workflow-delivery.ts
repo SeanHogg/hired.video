@@ -21,6 +21,7 @@ import { getDb, schema } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
 import { emitNotification, resolveActor } from "../notifications/notificationService.js";
 import { getEmailProvider } from "../adapters/email.js";
+import { escapeHtml } from "../../../../shared/html-escape.js";
 import {
   PeopleEmployeesRepository,
   type SegmentScope,
@@ -162,12 +163,4 @@ async function resolveSlackWebhook(companyId: string): Promise<string | null> {
   if (!row || row.status !== "connected") return null;
   const url = (row.metadata as any)?.webhookUrl;
   return typeof url === "string" && url.startsWith("https://") ? url : null;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

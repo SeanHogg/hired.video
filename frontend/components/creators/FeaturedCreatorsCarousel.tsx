@@ -47,11 +47,10 @@ export default function FeaturedCreatorsCarousel({
       ? `/api/featured-creators/by-category/${encodeURIComponent(category)}?limit=${limit}`
       : `/api/featured-creators?limit=${limit}`;
     apiClient
-      .get(url)
-      .then((res) => {
+      .fetchData<{ items?: FeaturedCreator[] }>(url)
+      .then((body) => {
         if (cancelled) return;
-        const body = (res as any).data?.data ?? (res as any).data ?? {};
-        setItems((body.items ?? []) as FeaturedCreator[]);
+        setItems(body?.items ?? []);
       })
       .catch(() => {
         if (!cancelled) setItems([]);

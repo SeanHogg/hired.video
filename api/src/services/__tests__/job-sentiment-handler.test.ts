@@ -23,9 +23,14 @@ import assert from "node:assert/strict";
 
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
 import { JobsRepository } from "../../repositories/jobsRepository.js";
-import { handleJobSentimentPrediction } from "../job/job-sentiment-handler.js";
+import { handleJobSentimentPrediction as jobSentimentUseCase } from "../job/job-sentiment-handler.js";
+import { asHandler } from "../../handlers/shared.js";
 import { jobRowToLLMText } from "../job/match-handlers.js";
 import { scoreSentiment } from "../../../../shared/sentiment.js";
+
+// The use case returns data / throws DomainError; assert the HTTP envelope
+// the route sends.
+const handleJobSentimentPrediction = asHandler(jobSentimentUseCase);
 
 const JOB_ID = "22222222-2222-2222-2222-222222222222";
 

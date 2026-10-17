@@ -91,7 +91,7 @@ export const submissionService = {
    * Submit a candidate to a job
    */
   async submitCandidate(request: SubmitCandidateRequest): Promise<SubmissionDTO> {
-    const response = await apiClient.post('/api/Recruiter/submissions', request);
+    const response = await apiClient.post('/api/recruiter/submissions', request);
     const parsed = SubmissionResponseSchema.parse(response);
     
     if (!parsed.success || !parsed.data) {
@@ -116,7 +116,7 @@ export const submissionService = {
     if (filters?.page) params.append('page', filters.page.toString());
     if (filters?.pageSize) params.append('pageSize', filters.pageSize.toString());
     
-    const url = `/api/Recruiter/submissions${params.toString() ? `?${params.toString()}` : ''}`;
+    const url = `/api/recruiter/submissions${params.toString() ? `?${params.toString()}` : ''}`;
     const response = await apiClient.get(url);
     const parsed = SubmissionListResponseSchema.parse(response);
     
@@ -131,7 +131,7 @@ export const submissionService = {
    * Get a specific submission by ID
    */
   async getSubmissionById(submissionId: string): Promise<SubmissionDTO> {
-    const response = await apiClient.get(`/api/Recruiter/submissions/${submissionId}`);
+    const response = await apiClient.get(`/api/recruiter/submissions/${submissionId}`);
     const parsed = SubmissionResponseSchema.parse(response);
     
     if (!parsed.success || !parsed.data) {
@@ -149,7 +149,7 @@ export const submissionService = {
     request: UpdateSubmissionStatusRequest
   ): Promise<SubmissionDTO> {
     const response = await apiClient.put(
-      `/api/Recruiter/submissions/${submissionId}/status`,
+      `/api/recruiter/submissions/${submissionId}/status`,
       request
     );
     const parsed = SubmissionResponseSchema.parse(response);
@@ -169,7 +169,7 @@ export const submissionService = {
     request: WithdrawSubmissionRequest
   ): Promise<SubmissionDTO> {
     const response = await apiClient.post(
-      `/api/Recruiter/submissions/${submissionId}/withdraw`,
+      `/api/recruiter/submissions/${submissionId}/withdraw`,
       request
     );
     const parsed = SubmissionResponseSchema.parse(response);
@@ -185,7 +185,7 @@ export const submissionService = {
    * Get all submissions for a specific job
    */
   async getJobSubmissions(jobId: string): Promise<SubmissionDTO[]> {
-    const response = await apiClient.get(`/api/Recruiter/submissions/job/${jobId}`);
+    const response = await apiClient.get(`/api/recruiter/submissions/job/${jobId}`);
     const parsed = SubmissionListResponseSchema.parse(response);
     
     if (!parsed.success) {

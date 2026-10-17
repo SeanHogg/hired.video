@@ -10,7 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { Loader2, MessageSquare, Inbox as InboxIcon, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { safeRelativeTime } from "@/lib/relative-time";
+import { safeRelativeTime } from "@/lib/format";
 import { useMyReviews, type ReviewInboxEntry } from "@/hooks/use-my-reviews";
 
 /** Row labels by what is reviewed (#2254). */

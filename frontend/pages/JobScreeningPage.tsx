@@ -8,11 +8,11 @@
 import { Briefcase } from "lucide-react";
 import { publicJobPath } from "@shared/public-paths";
 import { useParams } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import EntityEditShell from "@/components/EntityEditShell";
 import { JobScreeningCard } from "@/components/jobs/JobScreeningCard";
 import ScorecardVisibilityPanel from "@/components/scorecards/ScorecardVisibilityPanel";
-import { jobService } from "@/lib/services/job-service";
+import { useJob } from "@/hooks/queries/use-jobs";
 import { useJobPermissions } from "@/hooks/use-job-permissions";
 import { usePageChrome } from "@/lib/seo";
 import { toast } from "sonner";
@@ -22,26 +22,14 @@ export default function JobScreeningPage() {
   // SEO + breadcrumb JSON-LD (route-derived; owner-only page falls back to the
   // /jobs base entry). Satisfies the require-page-chrome contract.
   usePageChrome();
-  const [job, setJob] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const jobQuery = useJob(id);
+  const job = jobQuery.data ?? null;
+  const loading = jobQuery.isLoading;
   const permissions = useJobPermissions(job);
 
   useEffect(() => {
-    const loadJob = async () => {
-      if (!id) return;
-      setLoading(true);
-      try {
-        const jobData = await jobService.getJobById(id);
-        setJob(jobData);
-      } catch (error) {
-        console.error("Failed to load job:", error);
-        toast.error("Failed to load job details");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadJob();
-  }, [id]);
+    if (jobQuery.isError) toast.error("Failed to load job details");
+  }, [jobQuery.isError]);
 
   return (
     <EntityEditShell

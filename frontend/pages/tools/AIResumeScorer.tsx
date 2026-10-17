@@ -49,7 +49,7 @@ export default function AIResumeScorer() {
         loadingLabel: t("tools.aiResumeScorer.submitLoading"),
         icon: Brain,
       }}
-      endpoint="/api/ResumeScorer/score"
+      endpoint="/api/resumescorer/score"
       reportLabel={t("tools.aiResumeScorer.reportHeader")}
       emptyState={{
         title: t("tools.aiResumeScorer.emptyTitle"),

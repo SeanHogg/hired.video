@@ -11214,6 +11214,8 @@
   "courseCheckout.paySuccess": "Payment successful",
   "courseCheckout.paySuccessBody": "Enrolment unlocked.",
   "courseCheckout.payFailed": "Payment failed",
+  "courseCheckout.verifying": "Payment received — confirming",
+  "courseCheckout.verifyingBody": "Your payment is being confirmed with the provider. Refresh in a minute to start learning.",
   "certificate.seoTitle": "Certificate verification · hired.video",
   "certificate.seoTitleValid": "{{name}} · {{course}} · hired.video",
   "certificate.seoDescription": "Verify a hired.video learning certificate. Signed, tamper-evident and issued on passing the course.",

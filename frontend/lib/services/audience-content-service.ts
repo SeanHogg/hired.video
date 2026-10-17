@@ -9,7 +9,7 @@
  * content_locations). Learning paths surface under `learning_paths`
  * (#1667).
  */
-import { apiClient } from "@/lib/api-client";
+import { getPublicSearch } from "@/lib/services/search-service";
 
 export interface AudienceContentItem {
   id: string;
@@ -46,7 +46,7 @@ const KIND_TO_CATEGORY: Record<string, string> = {
   learning_path: "learning_paths",
 };
 
-function buildQuery(kind: string, filter: ResourceFilter, limit: number): string | null {
+function buildQuery(kind: string, filter: ResourceFilter, limit: number): URLSearchParams | null {
   const category = KIND_TO_CATEGORY[kind];
   if (!category) return null;
   const params = new URLSearchParams({ category, limit: String(limit) });
@@ -57,7 +57,7 @@ function buildQuery(kind: string, filter: ResourceFilter, limit: number): string
     if (filter.geo.stateId) params.set("stateId", filter.geo.stateId);
     if (filter.geo.cityId) params.set("cityId", filter.geo.cityId);
   }
-  return `/api/search/public?${params.toString()}`;
+  return params;
 }
 
 /** Fetch up to `limit` items of one ContentLocationKind matching the
@@ -68,11 +68,11 @@ export async function fetchResourceContent(
   filter: ResourceFilter,
   limit = 6,
 ): Promise<AudienceContentItem[]> {
-  const url = buildQuery(kind, filter, limit);
-  if (!url) return [];
+  const params = buildQuery(kind, filter, limit);
+  if (!params) return [];
   try {
-    const res = await apiClient.get<{ items?: AudienceContentItem[] }>(
-      url,
+    const res = await getPublicSearch<{ items?: AudienceContentItem[] }>(
+      params,
       undefined,
       { suppressErrorEvent: true },
     );

@@ -10,6 +10,7 @@
  */
 
 import { registerEffect } from "./registry";
+import { clamp01, clampByte, numberOr } from "./params";
 
 const SHAPE_OPTIONS = [
   { value: "rect", labelKey: "studio.effects.option.shape.rect" },
@@ -164,18 +165,6 @@ function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
-function clamp01(v: number): number {
-  return clamp(v, 0, 1);
-}
-
-function clampByte(v: number): number {
-  return v < 0 ? 0 : v > 255 ? 255 : v;
-}
-
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * (t < 0 ? 0 : t > 1 ? 1 : t);
-}
-
-function numberOr(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }

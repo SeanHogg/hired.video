@@ -34,6 +34,7 @@ export const serviceOfferings = pgTable("service_offerings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_service_offerings_platform").on(t.isPlatformService).where(sql`is_platform_service = TRUE`),
+  index("idx_service_offerings_user_id").on(t.userId),
 ]);
 
 export type ServiceOffering = typeof serviceOfferings.$inferSelect;
@@ -56,7 +57,11 @@ export const serviceInquiries = pgTable("service_inquiries", {
   paidAmountCents: integer("paid_amount_cents").default(0).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_service_inquiries_from_user_id").on(t.fromUserId),
+  index("idx_service_inquiries_provider_id").on(t.providerId),
+  index("idx_service_inquiries_service_id").on(t.serviceId),
+]);
 
 export type ServiceInquiry = typeof serviceInquiries.$inferSelect;
 export type NewServiceInquiry = typeof serviceInquiries.$inferInsert;
@@ -72,7 +77,9 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   p256dh: text("p256dh").notNull(),
   auth: text("auth").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_push_subscriptions_user_id").on(t.userId),
+]);
 
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type NewPushSubscription = typeof pushSubscriptions.$inferInsert;

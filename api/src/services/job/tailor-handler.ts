@@ -22,7 +22,7 @@ import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import { ResumeContentSchema, type ResumeContent } from "../../../../shared/resume.js";
 import { buildRepos } from "../../repositories/index.js";
-import { ok, fail, requireAuth, type HandlerResult } from "../../handlers/shared.js";
+import { DomainError, requireUserId } from "../../domains/errors.js";
 import { buildAIErrorEnvelope } from "../../services/adapters/llm-error.js";
 import type { ParsedJob } from "../../services/job/JobService.js";
 import { saveVersionOfMaster } from "../../services/resume/lineage.js";
@@ -44,6 +44,7 @@ import {
   type TailorValidationResult,
 } from "./tailor-edits.js";
 import { verifiedMatchedKeywords } from "./matched-keywords.js";
+import { logger } from "../../lib/logger.js";
 
 export const TailorInputSchema = z
   .object({
@@ -61,36 +62,35 @@ export async function handleTailor(
   deps: MatchDeps,
   viewerId: string | null,
   body: unknown,
-): Promise<HandlerResult> {
-  const auth = requireAuth(viewerId);
-  if ("status" in auth) return auth;
+) {
+  const userId = requireUserId(viewerId);
 
   const parsed = TailorInputSchema.safeParse(body);
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
+    throw new DomainError(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
   }
   const { preview = false } = parsed.data;
 
   const job = await resolveJobForFit(deps, parsed.data);
   if (!job) {
-    return parsed.data.jobId
-      ? fail(404, "NOT_FOUND", "Job not found. Track the job before scoring.")
-      : fail(400, "VALIDATION_ERROR", "Either jobHtml or jobId is required");
+    throw parsed.data.jobId
+      ? new DomainError(404, "NOT_FOUND", "Job not found. Track the job before scoring.")
+      : new DomainError(400, "VALIDATION_ERROR", "Either jobHtml or jobId is required");
   }
   const { parsedJob, sourceUrl, jobId: jobIdResolved } = job;
 
   const inline = preview ? parsed.data.resumeContent : undefined;
-  const stored = await resolveResumeV2(deps, auth.userId, parsed.data.resumeId);
-  if (!inline && !stored) return fail(404, "NOT_FOUND", "No resume found. Please create a resume first.");
+  const stored = await resolveResumeV2(deps, userId, parsed.data.resumeId);
+  if (!inline && !stored) throw new DomainError(404, "NOT_FOUND", "No resume found. Please create a resume first.");
   const sourceContent: ResumeContent = inline ?? stored!.content;
 
   if (!deps.llm) {
-    return fail(503, "AI_ERROR", "AI tailoring unavailable: no LLM configured");
+    throw new DomainError(503, "AI_ERROR", "AI tailoring unavailable: no LLM configured");
   }
 
   const prior =
     jobIdResolved && stored
-      ? await loadPriorRecommendations(deps, { userId: auth.userId, jobId: jobIdResolved, resumeId: stored.id })
+      ? await loadPriorRecommendations(deps, { userId, jobId: jobIdResolved, resumeId: stored.id })
       : undefined;
 
   let prompt = buildTailorPrompt({ job: parsedJob, resume: sourceContent, priorRecommendations: prior });
@@ -103,6 +103,9 @@ export async function handleTailor(
   // The raw thrown object keeps the dispatch trail (model chain, gateway
   // requestIds, classification) for the AI_* envelope below.
   let lastErrorObj: unknown;
+  // Set inside the attempt's try (a throw there would be read as an LLM
+  // failure) and thrown once the loop exits.
+  let saveFailure: DomainError | null = null;
 
   while (attempt < maxAttempts) {
     attempt++;
@@ -145,11 +148,11 @@ export async function handleTailor(
         variationTitle,
         preview,
       };
-      if (preview) return ok(payload);
+      if (preview) return payload;
 
       const saved = await saveVersionOfMaster(
         buildRepos(deps.db).resumes,
-        auth.userId,
+        userId,
         stored!.id,
         {
           content: tailoredResume,
@@ -160,35 +163,38 @@ export async function handleTailor(
       );
       if (!saved.ok) {
         // The tailor succeeded; persisting it did not.
-        return fail(
+        saveFailure = new DomainError(
           500,
           "VARIATION_SAVE_FAILED",
           saved.code === "NOT_FOUND" ? "Source resume no longer exists" : "Tailored resume failed validation on save",
           saved.code === "INVALID_CONTENT" ? { issues: saved.issues } : undefined,
         );
+        break;
       }
-      return ok({ ...payload, variationId: saved.row!.id });
+      return { ...payload, variationId: saved.row!.id };
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
       lastErrorObj = err;
-      console.warn("[match/tailor] LLM call failed:", lastError);
+      logger.warn("[match/tailor] LLM call failed", lastError);
       // A provider failure won't be fixed by a retry.
       break;
     }
   }
 
+  if (saveFailure) throw saveFailure;
+
   // The model ran but nothing applied — distinct from a transport failure.
   if (noApplicableChanges) {
-    return fail(
+    throw new DomainError(
       422,
       "NO_APPLICABLE_CHANGES",
       "The AI couldn't find changes to make for this job — your resume may already be a strong match. Try a different job or resume.",
     );
   }
 
-  return (
-    failFromAiError(lastErrorObj, lastError) ??
-    fail(400, "VALIDATION_ERROR", "Tailored resume failed validation after retries", {
+  throw (
+    aiDomainError(lastErrorObj, lastError) ??
+    new DomainError(400, "VALIDATION_ERROR", "Tailored resume failed validation after retries", {
       errors: lastValidation?.errors ?? [lastError ?? "unknown failure"],
       missingWorkEntries: lastValidation?.missingWorkEntries ?? [],
       missingEducationInstitutions: lastValidation?.missingEducationInstitutions ?? [],
@@ -197,15 +203,15 @@ export async function handleTailor(
 }
 
 /**
- * Map an LLM dispatch failure onto the structured AI_* envelope (shared
+ * Map an LLM dispatch failure onto the structured AI_* DomainError (shared
  * classifier first, then the legacy aggregate-string check). Null when the
  * failure is not an AI-availability problem. Shared by every fit flow.
  */
-export function failFromAiError(errObj: unknown, message: string | undefined): HandlerResult | null {
+export function aiDomainError(errObj: unknown, message: string | undefined): DomainError | null {
   const envelope = buildAIErrorEnvelope(errObj);
-  if (envelope) return fail(envelope.status, envelope.code, envelope.message, envelope.payload);
+  if (envelope) return new DomainError(envelope.status, envelope.code, envelope.message, envelope.payload);
   if (message && isAiUnavailableError(message)) {
-    return fail(
+    return new DomainError(
       503,
       "AI_UNAVAILABLE",
       "AI providers are temporarily overloaded or rate-limited. Please try again in a minute.",

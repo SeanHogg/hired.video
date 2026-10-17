@@ -20,6 +20,8 @@ import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
 import { classifyJobSector } from "../../../../shared/sectors.js";
 import type { JobInsert } from "../../repositories/jobsRepository.js";
 import { chunk } from "../../utils/chunk.js";
+import { sha256Hex } from "../../utils/crypto.js";
+import { logger } from "../../lib/logger.js";
 
 type Source = typeof schema.jobBoardSources.$inferSelect;
 
@@ -155,7 +157,7 @@ export async function scrapeJobSource(
         errorMessage,
       } as any)
       .where(eq(schema.jobBoardSyncLog.id, logId));
-    console.error(`[jobscraper] Source ${source.id} failed:`, errorMessage);
+    logger.error("[jobscraper] Source failed", { sourceId: source.id, errorMessage });
   }
 }
 
@@ -170,7 +172,7 @@ export async function scrapeAllActiveSources(deps?: Partial<JobScraperDeps>): Pr
     .where(eq(schema.jobBoardSources.isActive, true));
 
   await Promise.allSettled(sources.map((s) => scrapeJobSource(s, d)));
-  console.log(`[jobscraper] Processed ${sources.length} active source(s).`);
+  logger.info("[jobscraper] Processed active sources", { sourceCount: sources.length });
 }
 
 // ---------------------------------------------------------------------------
@@ -255,9 +257,7 @@ function parseJsonApi(data: unknown, config: Record<string, unknown>): JobItem[]
 // ---------------------------------------------------------------------------
 async function hashFingerprint(title: string, company = "", location = ""): Promise<string> {
   const raw = `${title.toLowerCase().trim()}|${company.toLowerCase().trim()}|${location.toLowerCase().trim()}`;
-  const enc = new TextEncoder().encode(raw);
-  const buf = await crypto.subtle.digest("SHA-256", enc);
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 64);
+  return sha256Hex(raw);
 }
 
 // ---------------------------------------------------------------------------

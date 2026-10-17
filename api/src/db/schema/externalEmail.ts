@@ -136,6 +136,7 @@ export const externalEmailAccounts = pgTable(
     externalEmailAccountsPushExpiryIdx: index("external_email_accounts_push_expiry_idx").on(t.pushExpiresAt).where(sql`status = 'active' AND push_expires_at IS NOT NULL`),
     // 0157 built this name dynamically; Postgres truncated it to 63 bytes.
     oauthRefreshTokenEncFormatCheck: check("external_email_accounts_oauth_refresh_token_enc_enc_format_chec", sql`${t.oauthRefreshTokenEnc} IS NULL OR ${t.oauthRefreshTokenEnc} LIKE 'v1.aes-gcm.hkdf:%' OR ${t.oauthRefreshTokenEnc} ~ '^[A-Za-z0-9+/=]+\\.[A-Za-z0-9+/=]+$' OR ${t.oauthRefreshTokenEnc} ~ '^[0-9a-fA-F]+:[0-9a-fA-F]+$'`),
+    activeProfileIdFkIdx: index("idx_external_email_accounts_active_profile_id").on(t.activeProfileId),
   }),
 );
 
@@ -261,6 +262,7 @@ export const emailUserRules = pgTable(
       t.isEnabled,
       t.priority,
     ),
+    profileIdFkIdx: index("idx_email_user_rules_profile_id").on(t.profileId),
   }),
 );
 

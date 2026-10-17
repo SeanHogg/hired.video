@@ -16,6 +16,7 @@ import { getDb, schema } from "../db/index.js";
 import { LEARNING_GOAL_STATUSES } from "../db/schema/learning.js";
 import { getOrSetCached, invalidateCachedKey } from "../utils/edge-cache.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { slugify } from "../../../shared/slugify.js";
 
 export const learningGoalsRoutes = new Hono<AppEnv>();
 
@@ -208,9 +209,7 @@ learningGoalsRoutes.post("/:id/generate-path", async (c) => {
   const title = (plan?.title?.trim() || `Path: ${goal.goalText}`).slice(0, 255);
   const summary = (plan?.summary?.trim() || `A learning path toward "${goal.goalText}".`).slice(0, 1000);
 
-  const baseSlug =
-    title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) ||
-    "learning-path";
+  const baseSlug = slugify(title, { fallback: "learning-path", maxLen: 60 });
   const slug = `${baseSlug}-${crypto.randomUUID().slice(0, 8)}`;
 
   const [path] = await db

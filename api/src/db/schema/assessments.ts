@@ -76,6 +76,7 @@ export const assessmentAttempts = pgTable("assessment_attempts", {
   // #2305 — legacy UNIQUE (migration 0155_residual_collate_and_attempt_number.sql); duplicates resolved by 0518_dedupe_unique_indexes.sql.
   uniqueIndex("uq_assessment_attempts_user_assessment_attempt").on(t.userId, t.assessmentId, t.attemptNumber),
   check("assessment_attempts_attempt_number_positive", sql`${t.attemptNumber} >= 1`),
+  index("idx_assessment_attempts_assessment_id").on(t.assessmentId),
 ]);
 
 export type AssessmentAttempt= typeof assessmentAttempts.$inferSelect;

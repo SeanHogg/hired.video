@@ -8,7 +8,8 @@
  * Run: vitest run lib/workspace/kit/__tests__/use-kit-document-layers.test.tsx
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useContentHistory } from "@/lib/build/use-content-history";
 import { useKitHistory } from "../use-kit-history";
@@ -24,6 +25,12 @@ vi.mock("@/lib/services/studio-service", () => ({
     saveDraft: vi.fn(async () => ({ data: null })),
   },
 }));
+
+/** use-studio-project-row reads through React Query — a fresh client per hook. */
+function queryWrapper() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+}
 
 const IMAGE_URL = "https://media.hired.video/u/5715588f/stripe-dashboard.png";
 const VIDEO_URL = "https://media.hired.video/u/5715588f/demo.webm";
@@ -41,6 +48,7 @@ function host(userId: string | null = OWNER_ID) {
 async function mountLayers(h: ReturnType<typeof host>) {
   const hook = renderHook(({ resume }) => useKitDocumentLayers({ projectId: "proj-1", resumeId: "res-1", title: "Kit", resume }), {
     initialProps: { resume: h.binding() },
+    wrapper: queryWrapper(),
   });
   await waitFor(() => expect(hook.result.current.ready).toBe(true));
   return hook;
@@ -139,7 +147,7 @@ describe("media binding is ONE undo step (kit journal)", () => {
   }
 
   it("one Undo reverts the element AND its metaData row; Redo brings both back", async () => {
-    const { result } = renderHook(useKit);
+    const { result } = renderHook(useKit, { wrapper: queryWrapper() });
     await waitFor(() => expect(result.current.layers.ready).toBe(true));
     const before = result.current.content.metaData;
     act(() => result.current.layers.insertMedia("resume", "image", IMAGE_URL, { x: 0.5, y: 0.3 }, { referenceId: WORK_STRIPE_ID }));
@@ -157,7 +165,7 @@ describe("media binding is ONE undo step (kit journal)", () => {
   });
 
   it("removing a bound element is one step too: one Undo restores both", async () => {
-    const { result } = renderHook(useKit);
+    const { result } = renderHook(useKit, { wrapper: queryWrapper() });
     await waitFor(() => expect(result.current.layers.ready).toBe(true));
     act(() => result.current.layers.insertMedia("resume", "image", IMAGE_URL, { x: 0.5, y: 0.3 }, { referenceId: WORK_STRIPE_ID }));
     const bound = result.current.content.metaData;

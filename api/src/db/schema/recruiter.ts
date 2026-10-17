@@ -16,23 +16,13 @@ import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 import { companyProfiles } from "./companies.js";
 
-export const recruiterTalentPools = pgTable("recruiter_talent_pools", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  recruiterId: uuid("recruiter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  companyId: uuid("company_id").references(() => companyProfiles.id, { onDelete: "set null" }),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
-  isActive: boolean("is_active").default(true).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
 
-export type RecruiterTalentPool = typeof recruiterTalentPools.$inferSelect;
-export type NewRecruiterTalentPool = typeof recruiterTalentPools.$inferInsert;
 
 export const talentPoolCandidates = pgTable("talent_pool_candidates", {
   id: uuid("id").primaryKey().defaultRandom(),
-  poolId: uuid("pool_id").references(() => recruiterTalentPools.id, { onDelete: "set null" }),
+  /** Legacy pool link. `recruiter_talent_pools` was archived in 0545 (no code
+   *  read or wrote it); the column is kept, unreferenced, so no row changes. */
+  poolId: uuid("pool_id"),
   recruiterId: uuid("recruiter_id").references(() => users.id, { onDelete: "cascade" }),
   candidateId: uuid("candidate_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   candidateName: varchar("candidate_name", { length: 255 }).default("").notNull(),
@@ -59,6 +49,7 @@ export const talentPoolCandidates = pgTable("talent_pool_candidates", {
 }, (t) => [
   index("idx_talent_pool_candidates_source_id").on(t.sourceId),
   index("idx_talent_pool_candidates_recruiter_added").on(t.recruiterId, t.addedAt.desc().nullsFirst()),
+  index("idx_talent_pool_candidates_candidate_id").on(t.candidateId),
 ]);
 
 export type TalentPoolCandidate = typeof talentPoolCandidates.$inferSelect;
@@ -79,7 +70,11 @@ export const candidateInteractions = pgTable("candidate_interactions", {
   followUpDate: timestamp("follow_up_date", { withTimezone: true }),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_candidate_interactions_candidate_id").on(t.candidateId),
+  index("idx_candidate_interactions_recruiter_id").on(t.recruiterId),
+  index("idx_candidate_interactions_talent_pool_id").on(t.talentPoolId),
+]);
 
 export type CandidateInteraction = typeof candidateInteractions.$inferSelect;
 export type NewCandidateInteraction = typeof candidateInteractions.$inferInsert;
@@ -111,6 +106,7 @@ export const candidateSubmissions = pgTable("candidate_submissions", {
 }, (t) => [
   index("idx_candidate_submissions_recruiter_submitted").on(t.recruiterId, t.submittedAt.desc().nullsFirst()),
   index("idx_candidate_submissions_job_status_submitted").on(t.jobId, t.status, t.submittedAt.desc().nullsFirst()).where(sql`job_id IS NOT NULL`),
+  index("idx_candidate_submissions_candidate_id").on(t.candidateId),
 ]);
 
 export type CandidateSubmission = typeof candidateSubmissions.$inferSelect;
@@ -180,6 +176,9 @@ export const placements = pgTable("placements", {
   index("idx_placements_kind_status").on(t.placementKind, t.status),
   index("idx_placements_recruiter_created").on(t.recruiterId, t.createdAt.desc().nullsFirst()),
   check("placements_fee_mode_chk", sql`${t.feeMode} IN ('flat', 'percent')`),
+  index("idx_placements_candidate_id").on(t.candidateId),
+  index("idx_placements_company_id").on(t.companyId),
+  index("idx_placements_submission_id").on(t.submissionId),
 ]);
 
 export type Placement = typeof placements.$inferSelect;
@@ -240,49 +239,30 @@ export const placementNotificationLog = pgTable(
 );
 export type PlacementNotificationLogRow = typeof placementNotificationLog.$inferSelect;
 
-export const jobBoards = pgTable("job_boards", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: varchar("name", { length: 255 }).notNull(),
-  url: text("url").notNull(),
-  apiKey: text("api_key"),
-  isActive: boolean("is_active").default(true).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
 
-export type JobBoard = typeof jobBoards.$inferSelect;
-export type NewJobBoard = typeof jobBoards.$inferInsert;
 
 export const jobBoardPostings = pgTable("job_board_postings", {
   id: uuid("id").primaryKey().defaultRandom(),
   jobId: uuid("job_id").notNull(),
-  boardId: uuid("board_id").notNull().references(() => jobBoards.id, { onDelete: "cascade" }),
+  /** Board the posting went to. Written by routes/exclusive-boards.ts with an
+   *  `exclusive_boards.id`; the old FK pointed at the never-used `job_boards`
+   *  table (archived in 0545) and rejected those inserts. */
+  boardId: uuid("board_id").notNull(),
   externalJobId: text("external_job_id"),
   status: varchar("status", { length: 50 }).default("pending").notNull(),
   postedAt: timestamp("posted_at", { withTimezone: true }),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  // jobsRepository lists a job's postings by job_id.
+  index("idx_job_board_postings_job_id").on(t.jobId),
+]);
 
 export type JobBoardPosting = typeof jobBoardPostings.$inferSelect;
 export type NewJobBoardPosting = typeof jobBoardPostings.$inferInsert;
 
-export const queueJobToResume = pgTable("queue_job_to_resume", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  jobId: uuid("job_id").notNull(),
-  resumeId: uuid("resume_id").notNull(),
-  status: varchar("status", { length: 50 }).default("pending").notNull(),
-  attempts: integer("attempts").default(0).notNull(),
-  lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
-  result: jsonb("result"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
 
-export type QueueJobToResume = typeof queueJobToResume.$inferSelect;
-export type NewQueueJobToResume = typeof queueJobToResume.$inferInsert;
 
 export const queueJobToProcess = pgTable("queue_job_to_process", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -314,7 +294,9 @@ export const savedSearches = pgTable("saved_searches", {
   searchType: varchar("search_type", { length: 50 }).default("recruiter").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_saved_searches_user_id").on(t.userId),
+]);
 
 export type SavedSearch = typeof savedSearches.$inferSelect;
 export type NewSavedSearch = typeof savedSearches.$inferInsert;
@@ -345,7 +327,9 @@ export const recruiterAgentRuns = pgTable("recruiter_agent_runs", {
   startedAt: timestamp("started_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_recruiter_agent_runs_recruiter_id").on(t.recruiterId),
+]);
 
 export type RecruiterAgentRun = typeof recruiterAgentRuns.$inferSelect;
 export type NewRecruiterAgentRun = typeof recruiterAgentRuns.$inferInsert;
@@ -371,6 +355,7 @@ export const recruiterAgentFollowups = pgTable("recruiter_agent_followups", {
   index("idx_recruiter_agent_followups_due").on(t.scheduledFor).where(sql`status = 'pending'`),
   index("idx_recruiter_agent_followups_recruiter").on(t.recruiterId, t.scheduledFor.desc().nullsFirst()),
   index("idx_recruiter_agent_followups_run").on(t.runId, t.sequenceIndex),
+  index("idx_recruiter_agent_followups_candidate_id").on(t.candidateId),
 ]);
 
 export type RecruiterAgentFollowup = typeof recruiterAgentFollowups.$inferSelect;
@@ -383,8 +368,11 @@ export const atsConnections = pgTable("ats_connections", {
   id: uuid("id").primaryKey().defaultRandom(),
   companyId: uuid("company_id").notNull().references(() => companyProfiles.id, { onDelete: "cascade" }),
   provider: varchar("provider", { length: 50 }).notNull(), // "greenhouse" | "lever" | "workday"
-  // API key or OAuth access token (encrypted at rest by the hosting platform)
+  // API key or OAuth access token. Written encrypted to api_key_enc
+  // (services/crypto/credential-columns.ts); api_key is the legacy plaintext
+  // column, read only for rows not yet backfilled (0548/0549).
   apiKey: text("api_key"),
+  apiKeyEnc: text("api_key_enc"),
   webhookSecret: text("webhook_secret"),
   // Provider-specific config (board token, subdomain, etc.)
   config: jsonb("config").default({}).$type<Record<string, unknown>>(),
@@ -392,7 +380,9 @@ export const atsConnections = pgTable("ats_connections", {
   lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_ats_connections_company_id").on(t.companyId),
+]);
 
 export type AtsConnection = typeof atsConnections.$inferSelect;
 export type NewAtsConnection = typeof atsConnections.$inferInsert;
@@ -429,7 +419,10 @@ export const extractedProfiles = pgTable("extracted_profiles", {
   extractionMethod: varchar("extraction_method", { length: 50 }).default("extension").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_extracted_profiles_recruiter_id").on(t.recruiterId),
+  index("idx_extracted_profiles_talent_pool_candidate_id").on(t.talentPoolCandidateId),
+]);
 
 export type ExtractedProfile = typeof extractedProfiles.$inferSelect;
 export type NewExtractedProfile = typeof extractedProfiles.$inferInsert;
@@ -467,7 +460,6 @@ export const recruiterListMembers = pgTable(
     // One row per candidate per list. Position can change but membership
     // uniqueness is at the (list, candidate) pair.
     uniqueIndex("uq_recruiter_list_members_pair").on(t.listId, t.talentPoolCandidateId),
-    index("recruiter_list_members_list_idx").on(t.listId),
     index("recruiter_list_members_candidate_idx").on(t.talentPoolCandidateId),
   ],
 );
@@ -519,6 +511,8 @@ export const recruiterOutreachEnrollments = pgTable("recruiter_outreach_enrollme
 }, (t) => [
   index("recruiter_outreach_enrollments_recruiter_idx").on(t.recruiterId),
   index("recruiter_outreach_enrollments_due_idx").on(t.status, t.nextSendAt).where(sql`status = 'active'`),
+  index("idx_recruiter_outreach_enrollments_sequence_id").on(t.sequenceId),
+  index("idx_recruiter_outreach_enrollments_talent_pool_candidate_id").on(t.talentPoolCandidateId),
 ]);
 
 export type RecruiterOutreachEnrollment = typeof recruiterOutreachEnrollments.$inferSelect;
@@ -540,7 +534,9 @@ export const recruiterMatchScores = pgTable("recruiter_match_scores", {
   resumeTextHash: varchar("resume_text_hash", { length: 64 }),
   scoredAt: timestamp("scored_at", { withTimezone: true }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_recruiter_match_scores_recruiter_id").on(t.recruiterId),
+]);
 
 export type RecruiterMatchScore = typeof recruiterMatchScores.$inferSelect;
 export type NewRecruiterMatchScore = typeof recruiterMatchScores.$inferInsert;

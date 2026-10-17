@@ -14,6 +14,7 @@
 import type { Db } from "../../db/index.js";
 import { schema } from "../../db/index.js";
 import { inArray } from "drizzle-orm";
+import { logger } from "../../lib/logger.js";
 
 /**
  * How a key is owned:
@@ -135,7 +136,7 @@ export async function loadDbLinkedKeys(db: Db): Promise<LoadDbLinkedKeysResult> 
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.warn(`[r2-keys] skipping ${label}: ${message}`);
+      logger.warn("[r2-keys] skipping column", { label, error: message });
       errors.push({ label, error: message });
     }
   }

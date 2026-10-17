@@ -17,7 +17,7 @@ import {
   getAvailableRolesForInvite,
 } from "../../../../shared/account.js";
 import { ConflictError, ForbiddenError, NotFoundError } from "../../middleware/errorHandler.js";
-import { splitName } from "./userActor.js";
+import { splitPersonName } from "../../../../shared/person-name.js";
 import { sendInvitationEmail } from "../adapters/email.js";
 import { revokeAllSessionsForUser } from "../auth/sessions.js";
 import { defaultRoleChangeCacheBusters, onUserRoleChanged } from "./roleChangeEffects.js";
@@ -26,6 +26,8 @@ import { invalidatePublicVideoFeed } from "../studio/public-video-feed.js";
 import { eraseVideoPersonalization } from "../video-personalization/videoPersonalization.js";
 
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
+import { logger } from "../../lib/logger.js";
+import { randomHex } from "../../utils/crypto.js";
 
 /** Narrow Deps slice. account.ts touches both `users` (via UsersRepository)
  *  and `accountInvitations` (via PlatformRepository) plus assorted
@@ -138,7 +140,7 @@ function normalizeUser(
   row: typeof users.$inferSelect,
   ctx: { currentUserId: string; currentUserRole: string },
 ): AccountUser {
-  const { firstName, lastName } = splitName(row.name);
+  const { firstName, lastName } = splitPersonName(row.name);
   const fullName = (row.name ?? "").trim();
   const roleLower = (row.role ?? "").toLowerCase();
   const viewerIsAdmin = ctx.currentUserRole?.toLowerCase() === "admin";
@@ -312,7 +314,7 @@ export async function inviteAccountUser(request: InviteUserRequest, invitedByUse
     }
   }
 
-  const token = Array.from(crypto.getRandomValues(new Uint8Array(24))).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const token = randomHex(24);
   const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000);
   const [row] = await db
     .insert(accountInvitations)
@@ -345,7 +347,7 @@ export async function inviteAccountUser(request: InviteUserRequest, invitedByUse
       expiryDays: INVITE_TTL_DAYS,
     });
   } catch (err) {
-    console.error("[invite] Failed to send invitation email:", err);
+    logger.error("[invite] Failed to send invitation email", err);
   }
 
   return {
@@ -818,7 +820,7 @@ export async function resendInvitation(userId: string, invitationId: string,
     throw new ConflictError("Only pending invitations can be resent");
   }
   // Rotate the token + extend the deadline so the resent link is fresh.
-  const token = Array.from(crypto.getRandomValues(new Uint8Array(24))).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const token = randomHex(24);
   const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000);
   await db
     .update(accountInvitations)
@@ -836,7 +838,7 @@ export async function resendInvitation(userId: string, invitationId: string,
       expiryDays: INVITE_TTL_DAYS,
     });
   } catch (err) {
-    console.error("[invite] Failed to resend invitation email:", err);
+    logger.error("[invite] Failed to resend invitation email", err);
   }
 }
 
@@ -947,9 +949,7 @@ export async function deleteAccount(userId: string,
       email: handles.email,
       isActive: false,
       emailVerified: false,
-      passwordHash: Array.from(crypto.getRandomValues(new Uint8Array(32)))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("") as any,
+      passwordHash: randomHex(32) as any,
       deletedAt: now,
       updatedAt: now,
     } as any)

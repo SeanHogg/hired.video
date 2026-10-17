@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, varchar, integer, boolean, timestamp, jsonb, text, date, uniqueIndex, check } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, integer, boolean, timestamp, jsonb, text, date, uniqueIndex, check, index } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 
 /**
@@ -41,6 +41,7 @@ export const themeCalendarEvents = pgTable(
     check("theme_calendar_events_auto_pick_check", sql`${t.autoPick} IN ('everyone','whenFits','never')`),
     check("theme_calendar_events_priority_check", sql`${t.priority} BETWEEN 0 AND 500`),
     check("theme_calendar_events_tone_check", sql`${t.tone} IN ('playful','warm','respectful')`),
+    index("idx_theme_calendar_events_updated_by").on(t.updatedBy),
   ],
 );
 

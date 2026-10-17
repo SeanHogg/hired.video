@@ -65,6 +65,7 @@ export const userPointsBalance = pgTable("user_points_balance", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("user_points_balance_suspended_idx").on(t.isSuspended).where(sql`"is_suspended" = true`),
+  index("idx_user_points_balance_suspended_by").on(t.suspendedBy),
 ]);
 
 export type UserPointsBalance = typeof userPointsBalance.$inferSelect;
@@ -224,6 +225,7 @@ export const pointsFraudFlags = pgTable(
   (t) => ({
     userStatusIdx: index("points_fraud_flags_user_status_idx").on(t.userId, t.status),
     statusCreatedIdx: index("points_fraud_flags_status_created_idx").on(t.status, t.createdAt),
+    reviewedByFkIdx: index("idx_points_fraud_flags_reviewed_by").on(t.reviewedBy),
   }),
 );
 
@@ -277,6 +279,7 @@ export const userBadges = pgTable(
   (t) => ({
     userAwardedIdx: index("user_badges_user_awarded_idx").on(t.userId, t.awardedAt),
     userBadgeIdx: index("user_badges_user_badge_idx").on(t.userId, t.badgeId),
+    badgeIdFkIdx: index("idx_user_badges_badge_id").on(t.badgeId),
   }),
 );
 
@@ -351,6 +354,7 @@ export const pointRedemptions = pgTable(
     vendorOrderUniq: uniqueIndex("uq_point_redemptions_vendor_order")
       .on(t.vendorOrderId)
       .where(sql`${t.vendorOrderId} IS NOT NULL`),
+    approvedByFkIdx: index("idx_point_redemptions_approved_by").on(t.approvedBy),
   }),
 );
 

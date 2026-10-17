@@ -131,6 +131,9 @@ export const articles = pgTable(
     index("idx_articles_sector_status_published").on(t.sector, t.status, t.publishedAt.desc().nullsLast()).where(sql`"sector" IS NOT NULL`),
     index("idx_articles_audience_sector").on(t.audience, t.sector).where(sql`"audience" IS NOT NULL`),
     check("articles_status_check", sql`${t.status} IN ('draft', 'submitted_for_review', 'published', 'rejected', 'unlisted', 'flagged')`),
+    index("idx_articles_approved_by").on(t.approvedBy),
+    index("idx_articles_moderation_scanned_by").on(t.moderationScannedBy),
+    index("idx_articles_rejected_by").on(t.rejectedBy),
   ],
 );
 
@@ -157,7 +160,10 @@ export const articleVersions = pgTable(
     isAutosave: boolean("is_autosave").default(false).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [index("idx_article_versions_article").on(t.articleId, t.versionNumber)],
+  (t) => [
+    index("idx_article_versions_article").on(t.articleId, t.versionNumber),
+    index("idx_article_versions_user_id").on(t.userId),
+  ],
 );
 
 export type ArticleVersion = typeof articleVersions.$inferSelect;
@@ -204,7 +210,10 @@ export const articleClaps = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [uniqueIndex("uq_article_claps_user_article").on(t.userId, t.articleId)],
+  (t) => [
+    uniqueIndex("uq_article_claps_user_article").on(t.userId, t.articleId),
+    index("idx_article_claps_article_id").on(t.articleId),
+  ],
 );
 
 export type ArticleClap = typeof articleClaps.$inferSelect;
@@ -222,7 +231,10 @@ export const articleShares = pgTable(
     userAgent: text("user_agent"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [index("idx_article_shares_article").on(t.articleId, t.createdAt)],
+  (t) => [
+    index("idx_article_shares_article").on(t.articleId, t.createdAt),
+    index("idx_article_shares_user_id").on(t.userId),
+  ],
 );
 
 export type ArticleShare = typeof articleShares.$inferSelect;
@@ -324,3 +336,51 @@ export const partnerProgramBalances = pgTable("partner_program_balances", {
 
 export type PartnerProgramBalance = typeof partnerProgramBalances.$inferSelect;
 export type NewPartnerProgramBalance = typeof partnerProgramBalances.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// #896 — article engagement payout periods + per-article entries
+// ---------------------------------------------------------------------------
+export const articlePayoutRuns = pgTable(
+  "article_payout_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
+    periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
+    centsPer1kReadMinutes: integer("cents_per_1k_read_minutes").notNull(),
+    status: varchar("status", { length: 16 }).notNull().default("pending"),
+    totalCreditedCents: integer("total_credited_cents").notNull().default(0),
+    articlesPaid: integer("articles_paid").notNull().default(0),
+    ranAt: timestamp("ran_at", { withTimezone: true }),
+    failedReason: text("failed_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_article_payout_runs_period").on(t.periodStart, t.periodEnd),
+    check("article_payout_runs_status_check", sql`${t.status} IN ('pending', 'running', 'completed', 'failed')`),
+  ],
+);
+
+export type ArticlePayoutRun = typeof articlePayoutRuns.$inferSelect;
+export type NewArticlePayoutRun = typeof articlePayoutRuns.$inferInsert;
+
+export const articlePayoutEntries = pgTable(
+  "article_payout_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    runId: uuid("run_id").notNull().references(() => articlePayoutRuns.id, { onDelete: "cascade" }),
+    articleId: uuid("article_id").notNull(),
+    creatorUserId: uuid("creator_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    qualifyingReadMinutes: integer("qualifying_read_minutes").notNull().default(0),
+    qualifyingViewCount: integer("qualifying_view_count").notNull().default(0),
+    centsCredited: integer("cents_credited").notNull().default(0),
+    ledgerEntryId: uuid("ledger_entry_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_article_payout_entries_run_article").on(t.runId, t.articleId),
+    index("idx_article_payout_entries_creator").on(t.creatorUserId),
+  ],
+);
+
+export type ArticlePayoutEntry = typeof articlePayoutEntries.$inferSelect;
+export type NewArticlePayoutEntry = typeof articlePayoutEntries.$inferInsert;

@@ -20,6 +20,8 @@
 import type { Repos } from "../../repositories/index.js";
 import type { ConversationRow, MessageRow } from "../../repositories/conversationsRepository.js";
 import { emitNotification, resolveActor } from "../notifications/notificationService.js";
+import { logger } from "../../lib/logger.js";
+import { bumpInboxFor } from "./inboxCacheVersion.js";
 
 export type MessagingServiceDeps = {
   repos: Pick<Repos, "users" | "notifications" | "conversations">;
@@ -112,13 +114,15 @@ export async function sendMessage(
   // participants. Both are best-effort — failures must not make the
   // message look like it failed to send.
   await deps.repos.conversations.touchConversation(input.conversationId).catch((err) => {
-    console.error("[messaging] touchConversation failed:", err);
+    logger.error("[messaging] touchConversation failed", err);
   });
 
   try {
     const participantIds = await deps.repos.conversations.findParticipantUserIds(
       input.conversationId,
     );
+    // New last-message preview + unread counts for everyone in the thread.
+    bumpInboxFor(participantIds);
     const recipients = participantIds.filter((id) => id !== input.senderId);
     if (recipients.length > 0) {
       const { actor, actorName } = await resolveActor(deps, input.senderId);
@@ -133,7 +137,7 @@ export async function sendMessage(
       });
     }
   } catch (err) {
-    console.error("[messaging] notification fanout failed:", err);
+    logger.error("[messaging] notification fanout failed", err);
   }
 
   return message;

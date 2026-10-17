@@ -1,145 +1,160 @@
 /**
- * Regression tests for the /5 cron tick rotation + date-window predicates
- * in `scheduled.ts` (gaps #1589, #1593, #1602, #1617).
+ * Regression tests for the cron plan (services/scheduling/cron-plan.ts) and
+ * the KV work-marker decisions (work-signals.ts) — gaps #1589, #1593,
+ * #1602, #1617 and the W1-B Neon remediation.
  *
- * Why this matters: in 2026-05-26 the cron tick was firing all nine
- * sweeps every /5 (#1589) — registered-workers + scrape + heavy sweeps —
- * which routinely tripped `Worker exceeded CPU time limit`. The fix was a
- * tick rotation (`isQuarterTick`, `isHalfTick`) plus daily windows
- * (`isSeedSuperAdminWindow`, etc.). These tests pin the cadence so a
- * future "let's run scrape every tick again" regression fails CI before
- * it ships.
+ * Why this matters: in 2026-05 the /5 tick fired every sweep on every tick
+ * and tripped the Worker CPU limit; later the same single /5 tick kept Neon
+ * compute awake 24/7 by querying ~12–16 times every 5 minutes. These tests
+ * pin (a) which cron does what, (b) that daily jobs run exactly once a day,
+ * and (c) that the marker logic only writes KV on a change of state.
  */
 
 import { describe, it } from "node:test";
 import { strict as assert } from "node:assert";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import {
-  isQuarterTick,
-  isHalfTick,
-  isSeedSuperAdminWindow,
-  isRetentionSweepWindow,
-  isFraudSweepWindow,
+  CRON,
+  CRON_SCHEDULES,
+  cronKind,
+  hourlyJobsFor,
+  isHalfHourInterval,
   isMonthlyCloseWindow,
   isPartnerPoolCloseWindow,
-} from "../scheduled.js";
+  isPayoutReleaseWindow,
+} from "../services/scheduling/cron-plan.js";
+import {
+  WORK_DUE_SLACK_MS,
+  dueQueues,
+  idleUntilMs,
+  nextMarkerAction,
+  type WorkMarkers,
+} from "../services/scheduling/work-signals.js";
+import { WORKER_DUE_GRACE_MS, isWorkerDueAt } from "../workers/runner.js";
+import type { WorkerDefinition } from "../workers/types.js";
 
-function utc(iso: string): Date {
-  return new Date(iso);
-}
+const utc = (iso: string) => new Date(iso);
+const HOUR = 60 * 60 * 1000;
 
-describe("isQuarterTick — /15 cadence registered-workers dispatcher", () => {
-  it("fires at :00, :15, :30, :45 (with /5 jitter window)", () => {
-    for (const min of [0, 1, 2, 3, 4, 15, 16, 30, 33, 45, 49]) {
-      const d = utc(`2026-05-26T12:${String(min).padStart(2, "0")}:00Z`);
-      assert.equal(isQuarterTick(d), true, `should fire at :${min}`);
+describe("cronKind — dispatch by event.cron", () => {
+  it("maps each registered schedule to its plan", () => {
+    assert.equal(cronKind(CRON.TICK), "tick");
+    assert.equal(cronKind(CRON.INTERVAL), "interval");
+    assert.equal(cronKind(CRON.HOURLY), "hourly");
+  });
+  it("falls back to the tick for unknown / missing crons", () => {
+    assert.equal(cronKind(undefined), "tick");
+    assert.equal(cronKind("* * * * *"), "tick");
+  });
+  it("wrangler.toml registers exactly CRON_SCHEDULES", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const toml = readFileSync(resolve(here, "../../wrangler.toml"), "utf8");
+    const line = toml.split("\n").find((l) => l.trim().startsWith("crons ="));
+    assert.ok(line, "no crons line in wrangler.toml");
+    const listed = [...line!.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    assert.deepEqual(listed, [...CRON_SCHEDULES]);
+  });
+});
+
+describe("isHalfHourInterval — job-board scrape on :00/:30 only", () => {
+  it("fires on the :00 and :30 interval runs", () => {
+    for (const min of [0, 30]) {
+      assert.equal(isHalfHourInterval(utc(`2026-05-26T12:${String(min).padStart(2, "0")}:00Z`)), true);
     }
   });
-
-  it("does NOT fire on off-quarter minutes", () => {
-    for (const min of [5, 10, 14, 20, 25, 29, 35, 40, 44, 50, 55]) {
-      const d = utc(`2026-05-26T12:${String(min).padStart(2, "0")}:00Z`);
-      assert.equal(isQuarterTick(d), false, `should NOT fire at :${min}`);
+  it("does NOT fire on :15 / :45", () => {
+    for (const min of [15, 45]) {
+      assert.equal(isHalfHourInterval(utc(`2026-05-26T12:${min}:00Z`)), false);
     }
   });
 });
 
-describe("isHalfTick — /30 cadence heavy scraper", () => {
-  it("fires at :00 and :30 (with /5 jitter window)", () => {
-    for (const min of [0, 2, 4, 30, 33]) {
-      const d = utc(`2026-05-26T12:${String(min).padStart(2, "0")}:00Z`);
-      assert.equal(isHalfTick(d), true, `should fire at :${min}`);
+describe("hourlyJobsFor — daily jobs run exactly once a day", () => {
+  const day = (h: number) => utc(`2026-05-26T${String(h).padStart(2, "0")}:02:00Z`);
+  const countOver24h = (job: string) =>
+    Array.from({ length: 24 }, (_, h) => hourlyJobsFor(day(h))).filter((jobs) => jobs.includes(job as never)).length;
+
+  it("every hour reconciles markers first", () => {
+    for (let h = 0; h < 24; h++) assert.equal(hourlyJobsFor(day(h))[0], "reconcile-markers");
+  });
+  it("seed, maintenance (retention → counters → fraud), drift, geocoder, placement: once per day", () => {
+    for (const job of ["seed-superadmin", "maintenance", "model-catalog-drift", "geocoder-refresh", "placement-stage-events"]) {
+      assert.equal(countOver24h(job), 1, `${job} should run once per day`);
     }
   });
-
-  it("does NOT fire on /15 boundaries that aren't /30", () => {
-    for (const min of [15, 18, 45, 49]) {
-      const d = utc(`2026-05-26T12:${String(min).padStart(2, "0")}:00Z`);
-      assert.equal(isHalfTick(d), false, `should NOT fire at :${min}`);
-    }
+  it("keeps the historical hours", () => {
+    assert.ok(hourlyJobsFor(day(3)).includes("seed-superadmin"));
+    assert.ok(hourlyJobsFor(day(4)).includes("maintenance"));
+    assert.ok(hourlyJobsFor(day(5)).includes("model-catalog-drift"));
+    assert.ok(hourlyJobsFor(day(6)).includes("placement-stage-events"));
   });
 });
 
-describe("isSeedSuperAdminWindow — daily 03:30 UTC reconciliation (gap #1593)", () => {
-  it("fires only in the 03:30–03:34 UTC window", () => {
-    for (const min of [30, 31, 32, 33, 34]) {
-      const d = utc(`2026-05-26T03:${min}:00Z`);
-      assert.equal(isSeedSuperAdminWindow(d), true, `should fire at 03:${min}`);
-    }
+describe("monthly / weekly windows (hour granularity)", () => {
+  it("month close: 1st of month, 00:xx–03:xx", () => {
+    assert.equal(isMonthlyCloseWindow(utc("2026-06-01T01:02:00Z")), true);
+    assert.equal(isMonthlyCloseWindow(utc("2026-05-01T03:02:00Z")), true);
+    assert.equal(isMonthlyCloseWindow(utc("2026-05-01T04:02:00Z")), false);
+    assert.equal(isMonthlyCloseWindow(utc("2026-05-02T01:02:00Z")), false);
   });
-
-  it("does NOT fire elsewhere in the day", () => {
-    const offTimes = [
-      "2026-05-26T03:00:00Z", // earlier in the hour
-      "2026-05-26T03:25:00Z",
-      "2026-05-26T03:29:59Z",
-      "2026-05-26T03:35:00Z", // window closed
-      "2026-05-26T03:45:00Z",
-      "2026-05-26T04:30:00Z", // wrong hour
-      "2026-05-26T15:30:00Z", // afternoon
-      "2026-05-26T00:00:00Z",
-    ];
-    for (const t of offTimes) {
-      assert.equal(isSeedSuperAdminWindow(utc(t)), false, `should NOT fire at ${t}`);
-    }
+  it("partner pool: 1st of month, 02:xx only", () => {
+    assert.equal(isPartnerPoolCloseWindow(utc("2026-05-01T02:02:00Z")), true);
+    assert.equal(isPartnerPoolCloseWindow(utc("2026-05-01T03:02:00Z")), false);
+    assert.equal(isPartnerPoolCloseWindow(utc("2026-05-02T02:02:00Z")), false);
+  });
+  it("payout release: Tuesday 09:xx only", () => {
+    assert.equal(isPayoutReleaseWindow(utc("2026-05-26T09:02:00Z")), true); // Tuesday
+    assert.equal(isPayoutReleaseWindow(utc("2026-05-27T09:02:00Z")), false);
+    assert.equal(isPayoutReleaseWindow(utc("2026-05-26T10:02:00Z")), false);
   });
 });
 
-describe("isRetentionSweepWindow — daily 04:15 UTC retention (gap #1602)", () => {
-  it("fires only at 04:15–04:19 UTC", () => {
-    for (const min of [15, 16, 17, 18, 19]) {
-      const d = utc(`2026-05-26T04:${min}:00Z`);
-      assert.equal(isRetentionSweepWindow(d), true);
-    }
+describe("work markers — KV writes only on a change of state", () => {
+  const now = Date.parse("2026-05-26T12:00:00Z");
+
+  it("nothing pending: delete an existing marker, otherwise no-op", () => {
+    assert.deepEqual(nextMarkerAction(now - 1000, null, now), { kind: "delete" });
+    assert.deepEqual(nextMarkerAction(null, null, now), { kind: "none" });
   });
-  it("does NOT collide with the 03:30 seed window or the 04:30 fraud window", () => {
-    assert.equal(isRetentionSweepWindow(utc("2026-05-26T03:30:00Z")), false);
-    assert.equal(isRetentionSweepWindow(utc("2026-05-26T04:30:00Z")), false);
-    assert.equal(isRetentionSweepWindow(utc("2026-05-26T04:14:59Z")), false);
-    assert.equal(isRetentionSweepWindow(utc("2026-05-26T04:20:00Z")), false);
+  it("due now (or within the slack): keep a due marker without writing", () => {
+    assert.deepEqual(nextMarkerAction(now - 60_000, now - 5, now), { kind: "none" });
+    assert.deepEqual(nextMarkerAction(now - 60_000, now + WORK_DUE_SLACK_MS, now), { kind: "none" });
+    assert.deepEqual(nextMarkerAction(null, now, now), { kind: "put", value: now });
+    assert.deepEqual(nextMarkerAction(now + HOUR, now, now), { kind: "put", value: now });
+  });
+  it("due later: write the time once, then no-op", () => {
+    assert.deepEqual(nextMarkerAction(null, now + HOUR, now), { kind: "put", value: now + HOUR });
+    assert.deepEqual(nextMarkerAction(now + HOUR, now + HOUR, now), { kind: "none" });
+  });
+  it("dueQueues: only markers at/before now; no KV → everything", () => {
+    const markers: WorkMarkers = new Map([
+      ["followups", now - 1],
+      ["campaigns", now + HOUR],
+      ["job-queue", null],
+    ]);
+    assert.deepEqual(dueQueues(markers, now, ["followups", "campaigns", "job-queue"]), ["followups"]);
+    assert.deepEqual(dueQueues(null, now, ["followups", "campaigns"]), ["followups", "campaigns"]);
+  });
+  it("idle back-off expires just before the next top of hour, ≥ 60s ahead", () => {
+    const at = Date.parse("2026-05-26T12:15:00Z");
+    assert.equal(idleUntilMs(at), Date.parse("2026-05-26T12:58:00Z"));
+    const late = Date.parse("2026-05-26T12:57:30Z");
+    assert.equal(idleUntilMs(late), Date.parse("2026-05-26T13:58:00Z"));
   });
 });
 
-describe("isFraudSweepWindow — daily 04:30–04:59 UTC (gamification)", () => {
-  it("fires for the full half-hour", () => {
-    for (const min of [30, 35, 45, 55, 59]) {
-      assert.equal(
-        isFraudSweepWindow(utc(`2026-05-26T04:${min}:00Z`)),
-        true,
-        `should fire at 04:${min}`,
-      );
-    }
+describe("isWorkerDueAt — cadence gate with tick grace", () => {
+  const hourly = { name: "w", cadenceMs: HOUR } as WorkerDefinition;
+  const now = Date.parse("2026-05-26T13:00:01Z");
+  it("never ran → due", () => {
+    assert.equal(isWorkerDueAt(hourly, undefined, now), true);
   });
-  it("does NOT fire at 04:29 or 05:00", () => {
-    assert.equal(isFraudSweepWindow(utc("2026-05-26T04:29:00Z")), false);
-    assert.equal(isFraudSweepWindow(utc("2026-05-26T05:00:00Z")), false);
+  it("a run that started a few seconds past the previous tick is still due", () => {
+    assert.equal(isWorkerDueAt(hourly, new Date(Date.parse("2026-05-26T12:00:04Z")), now), true);
   });
-});
-
-describe("isMonthlyCloseWindow — 1st of month, 00:00–03:59 UTC", () => {
-  it("fires only on the 1st", () => {
-    assert.equal(isMonthlyCloseWindow(utc("2026-06-01T01:00:00Z")), true);
-    assert.equal(isMonthlyCloseWindow(utc("2026-05-01T03:59:00Z")), true);
-  });
-  it("does NOT fire on other days even in the morning window", () => {
-    assert.equal(isMonthlyCloseWindow(utc("2026-05-26T02:00:00Z")), false);
-    assert.equal(isMonthlyCloseWindow(utc("2026-05-02T01:00:00Z")), false);
-    // 1st but past 04:00 UTC
-    assert.equal(isMonthlyCloseWindow(utc("2026-05-01T04:00:00Z")), false);
-  });
-});
-
-describe("isPartnerPoolCloseWindow — 1st of month, 02:00–02:04 UTC", () => {
-  it("fires inside the 5-minute window on the 1st", () => {
-    for (const min of [0, 1, 2, 3, 4]) {
-      assert.equal(
-        isPartnerPoolCloseWindow(utc(`2026-05-01T02:${String(min).padStart(2, "0")}:00Z`)),
-        true,
-      );
-    }
-  });
-  it("does NOT fire at 02:05 or after, nor on other days", () => {
-    assert.equal(isPartnerPoolCloseWindow(utc("2026-05-01T02:05:00Z")), false);
-    assert.equal(isPartnerPoolCloseWindow(utc("2026-05-02T02:00:00Z")), false);
-    assert.equal(isPartnerPoolCloseWindow(utc("2026-05-01T03:00:00Z")), false);
+  it("not due before cadence minus grace", () => {
+    assert.equal(isWorkerDueAt(hourly, new Date(now - HOUR + WORKER_DUE_GRACE_MS + 60_000), now), false);
   });
 });

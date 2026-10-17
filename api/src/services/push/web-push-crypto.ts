@@ -10,6 +10,8 @@
  * `__tests__/web-push-crypto.test.ts`, which decrypts with the receiver key).
  */
 
+import { base64UrlEncode, base64UrlToBytes } from "../../utils/crypto.js";
+
 export interface PushSubscriptionKeys {
   /** Receiver public key — base64url, uncompressed P-256 point (65 bytes). */
   p256dh: string;
@@ -70,8 +72,8 @@ export async function encryptPushPayload(
   plaintext: Uint8Array,
   keys: PushSubscriptionKeys,
 ): Promise<Uint8Array> {
-  const receiverPublicKey = base64UrlDecode(keys.p256dh);
-  const authSecret = base64UrlDecode(keys.auth);
+  const receiverPublicKey = base64UrlToBytes(keys.p256dh);
+  const authSecret = base64UrlToBytes(keys.auth);
   const receiverKey = await subtle().importKey(
     "raw",
     receiverPublicKey,
@@ -138,11 +140,11 @@ export async function buildVapidAuthorization(
 }
 
 async function importVapidPrivateKey(vapid: VapidKeys): Promise<CryptoKey> {
-  const raw = base64UrlDecode(vapid.privateKey);
+  const raw = base64UrlToBytes(vapid.privateKey);
   if (raw.length === 32) {
     // Raw scalar (the format `web-push generate-vapid-keys` prints) → JWK,
     // taking x/y from the uncompressed public point (0x04 ‖ x ‖ y).
-    const pub = base64UrlDecode(vapid.publicKey);
+    const pub = base64UrlToBytes(vapid.publicKey);
     return subtle().importKey(
       "jwk",
       {
@@ -169,16 +171,4 @@ export function concat(...arrays: Uint8Array[]): Uint8Array {
     offset += a.length;
   }
   return out;
-}
-
-export function base64UrlDecode(s: string): Uint8Array {
-  const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
-  const bin = atob(b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), "="));
-  return Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
-}
-
-export function base64UrlEncode(bytes: Uint8Array): string {
-  let bin = "";
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }

@@ -48,6 +48,7 @@ import {
   type UpdateGoalInput,
 } from "../../repositories/peopleGoalsRepository.js";
 import type { OneOnOneAgendaItem, KeyResult } from "../../../../shared/people-ops.js";
+import { splitPersonName } from "../../../../shared/person-name.js";
 import type { PeopleSegmentScope } from "../../services/people-ops/segment.js";
 import {
   createPeopleOpsEventSink,
@@ -90,14 +91,6 @@ function employeeName(row: { firstName?: string | null; lastName?: string | null
   return `${row.firstName ?? ""} ${row.lastName ?? ""}`.trim() || "Employee";
 }
 
-function splitName(name: string): { firstName: string; lastName: string } {
-  const trimmed = (name ?? "").trim();
-  if (!trimmed) return { firstName: "Unknown", lastName: "" };
-  const idx = trimmed.indexOf(" ");
-  if (idx === -1) return { firstName: trimmed, lastName: "" };
-  return { firstName: trimmed.slice(0, idx), lastName: trimmed.slice(idx + 1) };
-}
-
 /** Read the active members of a company (role employee/member) joined to
  *  users, for materialization + billability. */
 async function fetchActiveCompanyMembers(companyId: string): Promise<MemberIdentity[]> {
@@ -118,7 +111,7 @@ async function fetchActiveCompanyMembers(companyId: string): Promise<MemberIdent
       ),
     );
   return rows.map((r: { userId: string; name: string; email: string | null }) => {
-    const { firstName, lastName } = splitName(r.name);
+    const { firstName, lastName } = splitPersonName(r.name, { emptyFirstName: "Unknown" });
     return { userId: r.userId, firstName, lastName, email: r.email };
   });
 }

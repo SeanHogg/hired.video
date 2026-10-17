@@ -13,10 +13,11 @@
  *   • handleUnfollowCompany     — delete link
  *   • handleFollowingStatus     — false for anonymous, true when linked
  *   • handleListLocations       — ordered by displayOrder
- *   • handleCreateLocation      — 201 with row, 403 non-owner, 400 validation
+ *   • handleCreateLocation      — 201 with row, 400 validation
  *   • handleUpdateLocation      — 200 update, 404 not-found
  *   • handleDeleteLocation      — 200 delete
- *   • handleCreateTeamMember    — 201 with row, 403 non-owner
+ *   • handleCreateTeamMember    — 201 with row, 400 validation
+ *   (location / team writes are authorized by the route's requireCompanyOwner)
  *   • handleUpdateTeamMember    — partial update accepted
  *   • handleDeleteTeamMember    — 200 delete
  *   • slugifyCompanyName        — edge cases
@@ -28,24 +29,26 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
-import {
-  handleCreateCompany,
-  handleUpdateCompany,
-  handleDeleteCompany,
-  handleFollowCompany,
-  handleUnfollowCompany,
-  handleFollowingStatus,
-  handleListLocations,
-  handleCreateLocation,
-  handleUpdateLocation,
-  handleDeleteLocation,
-  handleListTeamMembers,
-  handleCreateTeamMember,
-  handleUpdateTeamMember,
-  handleDeleteTeamMember,
-  slugifyCompanyName,
-  type CompanyDeps,
-} from "../company/handlers.js";
+import * as companyUseCases from "../company/handlers.js";
+import { slugifyCompanyName, type CompanyDeps } from "../company/handlers.js";
+import { asHandler } from "../../handlers/shared.js";
+
+// The use cases return data / throw DomainError; assert the envelope the
+// route sends (creates answer 201).
+const handleCreateCompany = asHandler(companyUseCases.handleCreateCompany, 201);
+const handleUpdateCompany = asHandler(companyUseCases.handleUpdateCompany);
+const handleDeleteCompany = asHandler(companyUseCases.handleDeleteCompany);
+const handleFollowCompany = asHandler(companyUseCases.handleFollowCompany);
+const handleUnfollowCompany = asHandler(companyUseCases.handleUnfollowCompany);
+const handleFollowingStatus = asHandler(companyUseCases.handleFollowingStatus);
+const handleListLocations = asHandler(companyUseCases.handleListLocations);
+const handleCreateLocation = asHandler(companyUseCases.handleCreateLocation, 201);
+const handleUpdateLocation = asHandler(companyUseCases.handleUpdateLocation);
+const handleDeleteLocation = asHandler(companyUseCases.handleDeleteLocation);
+const handleListTeamMembers = asHandler(companyUseCases.handleListTeamMembers);
+const handleCreateTeamMember = asHandler(companyUseCases.handleCreateTeamMember, 201);
+const handleUpdateTeamMember = asHandler(companyUseCases.handleUpdateTeamMember);
+const handleDeleteTeamMember = asHandler(companyUseCases.handleDeleteTeamMember);
 
 // ---------------------------------------------------------------------------
 // Fake DB — supports the query shapes the handlers use
@@ -365,7 +368,7 @@ describe("handleListLocations", () => {
 describe("handleCreateLocation", () => {
   it("creates a location and returns 201", async () => {
     const deps = makeDeps({ companies: [makeCompany()] });
-    const res = await handleCreateLocation(deps, "owner-1", "company-1", {
+    const res = await handleCreateLocation(deps, "company-1", {
       city: "Detroit",
       region: "MI",
       countryCode: "US",
@@ -376,10 +379,10 @@ describe("handleCreateLocation", () => {
     assert.equal((deps._state.locations[0] as any).city, "Detroit");
   });
 
-  it("returns 403 for non-owners", async () => {
-    const deps = makeDeps({ companies: [makeCompany({ ownerId: "owner-1" })] });
-    const res = await handleCreateLocation(deps, "other", "company-1", { city: "X" });
-    assert.equal(res.status, 403);
+  it("returns 400 for an invalid location (nothing written)", async () => {
+    const deps = makeDeps({ companies: [makeCompany()] });
+    const res = await handleCreateLocation(deps, "company-1", { city: "x".repeat(101) });
+    assert.equal(res.status, 400);
     assert.equal(deps._state.locations.length, 0);
   });
 });
@@ -390,19 +393,28 @@ describe("handleUpdateLocation", () => {
       companies: [makeCompany()],
       locations: [{ id: "loc-1", companyId: "company-1", city: "Old", createdAt: new Date(), updatedAt: new Date() }],
     });
-    const res = await handleUpdateLocation(deps, "owner-1", "company-1", "loc-1", { city: "New" });
+    const res = await handleUpdateLocation(deps, "company-1", "loc-1", { city: "New" });
     assert.equal(res.status, 200);
     assert.equal((deps._state.locations[0] as any).city, "New");
+  });
+
+  it("returns 404 when the location doesn't belong to the company", async () => {
+    const deps = makeDeps({
+      companies: [makeCompany()],
+      locations: [{ id: "loc-1", companyId: "company-2", city: "Old", createdAt: new Date(), updatedAt: new Date() }],
+    });
+    const res = await handleUpdateLocation(deps, "company-1", "loc-1", { city: "New" });
+    assert.equal(res.status, 404);
   });
 });
 
 describe("handleDeleteLocation", () => {
-  it("deletes the location (owner-gated)", async () => {
+  it("deletes the location", async () => {
     const deps = makeDeps({
       companies: [makeCompany()],
       locations: [{ id: "loc-1", companyId: "company-1", city: "X", createdAt: new Date(), updatedAt: new Date() }],
     });
-    const res = await handleDeleteLocation(deps, "owner-1", "company-1", "loc-1");
+    const res = await handleDeleteLocation(deps, "company-1", "loc-1");
     assert.equal(res.status, 200);
     assert.equal(deps._state.locations.length, 0);
   });
@@ -415,7 +427,7 @@ describe("handleDeleteLocation", () => {
 describe("handleCreateTeamMember", () => {
   it("creates a team member and returns 201", async () => {
     const deps = makeDeps({ companies: [makeCompany()] });
-    const res = await handleCreateTeamMember(deps, "owner-1", "company-1", {
+    const res = await handleCreateTeamMember(deps, "company-1", {
       name: "Ada Lovelace",
       title: "CTO",
     });
@@ -426,14 +438,8 @@ describe("handleCreateTeamMember", () => {
 
   it("rejects missing name with 400", async () => {
     const deps = makeDeps({ companies: [makeCompany()] });
-    const res = await handleCreateTeamMember(deps, "owner-1", "company-1", { title: "CTO" });
+    const res = await handleCreateTeamMember(deps, "company-1", { title: "CTO" });
     assert.equal(res.status, 400);
-  });
-
-  it("returns 403 for non-owners", async () => {
-    const deps = makeDeps({ companies: [makeCompany({ ownerId: "owner-1" })] });
-    const res = await handleCreateTeamMember(deps, "other", "company-1", { name: "Ada" });
-    assert.equal(res.status, 403);
   });
 });
 
@@ -443,7 +449,7 @@ describe("handleUpdateTeamMember", () => {
       companies: [makeCompany()],
       teamMembers: [{ id: "tm-1", companyId: "company-1", name: "Ada", title: "Engineer", createdAt: new Date(), updatedAt: new Date() }],
     });
-    const res = await handleUpdateTeamMember(deps, "owner-1", "company-1", "tm-1", {
+    const res = await handleUpdateTeamMember(deps, "company-1", "tm-1", {
       title: "Senior Engineer",
     });
     assert.equal(res.status, 200);
@@ -452,12 +458,12 @@ describe("handleUpdateTeamMember", () => {
 });
 
 describe("handleDeleteTeamMember", () => {
-  it("deletes (owner-gated)", async () => {
+  it("deletes the team member", async () => {
     const deps = makeDeps({
       companies: [makeCompany()],
       teamMembers: [{ id: "tm-1", companyId: "company-1", name: "X", createdAt: new Date(), updatedAt: new Date() }],
     });
-    const res = await handleDeleteTeamMember(deps, "owner-1", "company-1", "tm-1");
+    const res = await handleDeleteTeamMember(deps, "company-1", "tm-1");
     assert.equal(res.status, 200);
     assert.equal(deps._state.teamMembers.length, 0);
   });

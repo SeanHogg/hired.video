@@ -43,6 +43,7 @@ import { slugify } from "../../../shared/slugify.js";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import { LearningPathService } from "../services/learning/learning-path-service.js";
 import { resolveAuthorEligibility } from "../services/learning/author-eligibility.js";
+import { clampLimit } from "../utils/pagination.js";
 
 const {
   courses,
@@ -95,7 +96,7 @@ const UpdatePathCourseSchema = z.object({
 
 learningPathRoutes.get("/public", async (c) => {
   const db = getDb();
-  const limit = Math.min(parseInt(c.req.query("limit") ?? "20", 10) || 20, 100);
+  const limit = clampLimit(c.req.query("limit"), 20, 100);
   try {
     const rows = await db
       .select()

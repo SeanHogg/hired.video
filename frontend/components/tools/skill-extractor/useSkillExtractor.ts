@@ -32,6 +32,7 @@ import {
   type SkillResultSource,
 } from "./skill-extractor-shared";
 import { useSkillSaveBack } from "./useSkillSaveBack";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 
 // The server accepts ONE of: `content` (paste/upload paths), `resumeId`
 // (saved-resume path), or `jobId` (saved-job path). For the saved-entity
@@ -136,11 +137,7 @@ export function useSkillExtractor() {
 
   // Saved items — fetched lazily per source type so we only hit the endpoint
   // the user actually needs.
-  const { data: resumes = [] } = useQuery({
-    queryKey: ["resumes"],
-    queryFn: () => resumeService.getUserResumes(),
-    enabled: isAuthenticated && sourceType === "resume",
-  });
+  const { data: resumes = [] } = useUserResumes({ enabled: sourceType === "resume" });
   const { data: userJobs = [] } = useQuery({
     queryKey: ["user-jobs"],
     queryFn: () => jobService.getUserJobs(),

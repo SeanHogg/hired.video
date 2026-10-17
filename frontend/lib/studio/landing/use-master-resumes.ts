@@ -4,9 +4,8 @@
  * the viewer is signed in; a signed-out visitor or a failed read has none, so
  * the step offers "new master" only.
  */
-import { useEffect, useState } from "react";
-import { useAuth } from "@/lib/auth";
-import { resumeService } from "@/lib/services/resume-service";
+import { useMemo } from "react";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 
 export interface MasterResume {
   id: string;
@@ -14,38 +13,15 @@ export interface MasterResume {
 }
 
 export function useMasterResumes(enabled: boolean): { masters: MasterResume[]; loading: boolean } {
-  const { user } = useAuth();
-  const signedIn = !!user;
-  const [masters, setMasters] = useState<MasterResume[]>([]);
-  const [loading, setLoading] = useState(false);
+  const query = useUserResumes({ enabled });
+  const list = enabled ? query.data : undefined;
+  const masters = useMemo<MasterResume[]>(
+    () =>
+      (list ?? [])
+        .filter((r) => r.isMaster === true && typeof r.id === "string" && r.id !== "")
+        .map((r) => ({ id: r.id as string, title: r.title?.trim() || "" })),
+    [list],
+  );
 
-  useEffect(() => {
-    if (!enabled || !signedIn) {
-      setMasters([]);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    resumeService
-      .getUserResumes()
-      .then((list) => {
-        if (cancelled) return;
-        setMasters(
-          list
-            .filter((r) => r.isMaster === true && typeof r.id === "string" && r.id !== "")
-            .map((r) => ({ id: r.id as string, title: r.title?.trim() || "" })),
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setMasters([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled, signedIn]);
-
-  return { masters, loading };
+  return { masters, loading: enabled && query.isLoading };
 }

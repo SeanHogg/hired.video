@@ -44,6 +44,7 @@ export const contentScans = pgTable("content_scans", {
   check("content_scans_subject_type_check", sql`${t.subjectType} IN ('video', 'video_frames', 'image', 'profile', 'video_personalization')`),
   check("content_scans_verdict_check", sql`${t.verdict} IN ('pass', 'block', 'unscreened')`),
   check("content_scans_override_check", sql`${t.overrideVerdict} IS NULL OR ${t.overrideVerdict} IN ('pass', 'block')`),
+  index("idx_content_scans_reviewed_by").on(t.reviewedBy),
 ]);
 
 export type ContentScanRow = typeof contentScans.$inferSelect;

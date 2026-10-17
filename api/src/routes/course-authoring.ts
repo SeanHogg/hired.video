@@ -23,6 +23,8 @@ import type { AppEnv } from "../types/index.js";
 import { generateCourse, CourseGenInputSchema } from "../services/courses/course-generator.js";
 import { createLLMClient, toClientUsage } from "../services/adapters/llm-client.js";
 import { connectorFor } from "../services/lms/index.js";
+import { lmsConnectorPublicColumns } from "../services/lms/connector-columns.js";
+import { openCredential } from "../services/crypto/credential-columns.js";
 import { LMS_PROVIDERS } from "../db/schema/courses.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
 
@@ -86,7 +88,7 @@ courseAuthoringRoutes.post("/lms/connectors/:id/revoke", async (c) => {
   const [updated] = await db.update(lmsConnectors)
     .set({ status: "revoked", updatedAt: new Date() })
     .where(and(eq(lmsConnectors.id, c.req.param("id")), eq(lmsConnectors.userId, userId)))
-    .returning();
+    .returning(lmsConnectorPublicColumns);
   if (!updated) return c.json(error("NOT_FOUND", "Connector not found"), 404);
   return c.json(success(updated), 200);
 });
@@ -137,7 +139,7 @@ courseAuthoringRoutes.post("/:id/publish-to-lms", async (c) => {
         category: course.category ?? undefined,
       },
       {
-        accessToken: conn.accessToken ?? "",
+        accessToken: (await openCredential(conn.accessTokenEnc, conn.accessToken)) ?? "",
         baseUrl: conn.baseUrl ?? "",
         metadata: (conn.metadata as Record<string, unknown>) ?? {},
       },

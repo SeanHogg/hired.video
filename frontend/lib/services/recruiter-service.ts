@@ -111,7 +111,7 @@ class RecruiterService {
     request: AddToTalentPoolRequest
   ): Promise<TalentPoolEntry> {
     const response = await apiClient.post<TalentPoolEntry>(
-      "/api/Recruiter/talent-pool",
+      "/api/recruiter/talent-pool",
       request,
       TalentPoolEntrySchema
     );
@@ -138,8 +138,8 @@ class RecruiterService {
 
     const queryString = params.toString();
     const endpoint = queryString
-      ? `/api/Recruiter/talent-pool?${queryString}`
-      : "/api/Recruiter/talent-pool";
+      ? `/api/recruiter/talent-pool?${queryString}`
+      : "/api/recruiter/talent-pool";
 
     const response = await apiClient.get<TalentPoolEntry[]>(
       endpoint,
@@ -153,7 +153,7 @@ class RecruiterService {
    */
   async getTalentPoolEntry(id: string): Promise<TalentPoolEntry> {
     const response = await apiClient.get<TalentPoolEntry>(
-      `/api/Recruiter/talent-pool/${id}`,
+      `/api/recruiter/talent-pool/${id}`,
       TalentPoolEntrySchema
     );
     return response.data;
@@ -167,7 +167,7 @@ class RecruiterService {
     request: UpdateTalentPoolRequest
   ): Promise<TalentPoolEntry> {
     const response = await apiClient.put<TalentPoolEntry>(
-      `/api/Recruiter/talent-pool/${id}`,
+      `/api/recruiter/talent-pool/${id}`,
       request,
       TalentPoolEntrySchema
     );
@@ -178,7 +178,7 @@ class RecruiterService {
    * Remove a candidate from the talent pool
    */
   async removeFromTalentPool(id: string): Promise<void> {
-    await apiClient.delete(`/api/Recruiter/talent-pool/${id}`);
+    await apiClient.delete(`/api/recruiter/talent-pool/${id}`);
   }
 
   /**
@@ -186,7 +186,7 @@ class RecruiterService {
    */
   async addInteraction(request: AddInteractionRequest): Promise<Interaction> {
     const response = await apiClient.post<Interaction>(
-      "/api/Recruiter/interactions",
+      "/api/recruiter/interactions",
       request,
       InteractionSchema
     );
@@ -198,7 +198,7 @@ class RecruiterService {
    */
   async getInteractions(talentPoolId: string): Promise<Interaction[]> {
     const response = await apiClient.get<Interaction[]>(
-      `/api/Recruiter/interactions/${talentPoolId}`,
+      `/api/recruiter/interactions/${talentPoolId}`,
       z.array(InteractionSchema)
     );
     return response.data;
@@ -210,7 +210,7 @@ class RecruiterService {
   async checkInTalentPool(candidateUserId: string): Promise<boolean> {
     try {
       const response = await apiClient.get<boolean>(
-        `/api/Recruiter/talent-pool/check/${candidateUserId}`
+        `/api/recruiter/talent-pool/check/${candidateUserId}`
       );
       return response.data;
     } catch {

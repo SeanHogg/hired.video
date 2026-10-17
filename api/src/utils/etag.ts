@@ -1,4 +1,7 @@
 import type { MiddlewareHandler } from "hono";
+// SHA-1: collision resistance isn't a requirement here, only stability
+// across identical bodies, and it is the shortest broadly-supported digest.
+import { sha1Hex } from "./crypto.js";
 
 /**
  * Conditional-GET (ETag / 304) middleware.
@@ -45,18 +48,4 @@ export function etagMiddleware(): MiddlewareHandler {
       c.res = new Response(null, { status: 304, headers: newHeaders });
     }
   };
-}
-
-async function sha1Hex(buf: ArrayBuffer): Promise<string> {
-  // Workers + modern browsers expose SubtleCrypto with SHA-1; collision-
-  // resistance isn't a security requirement here, only stability across
-  // identical bodies, so SHA-1 is fine and is the shortest digest with
-  // broad support.
-  const digest = await crypto.subtle.digest("SHA-1", buf);
-  const bytes = new Uint8Array(digest);
-  let out = "";
-  for (let i = 0; i < bytes.length; i++) {
-    out += bytes[i].toString(16).padStart(2, "0");
-  }
-  return out;
 }

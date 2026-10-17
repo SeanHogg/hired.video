@@ -7,6 +7,7 @@
 import type { Context } from "hono";
 import { createExplicitScanDeps, type ExplicitScanEnv } from "./deps.js";
 import { evaluateVideoForPublic } from "./videoScan.js";
+import { logger } from "../../../lib/logger.js";
 
 function runInBackground(c: Context, task: Promise<unknown>): void {
   try {
@@ -23,7 +24,7 @@ export function scheduleVideoScan(c: Context, videoId: string | null | undefined
   runInBackground(
     c,
     evaluateVideoForPublic(videoId, deps).catch((err) => {
-      console.error(`[explicit-scan] video ${videoId} scan failed:`, err instanceof Error ? err.message : err);
+      logger.error("[explicit-scan] video scan failed", { videoId, error: err });
     }),
   );
 }

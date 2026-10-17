@@ -25,9 +25,9 @@ import {
   computeViewerExtrasBatch,
   recordResumeView,
   persistSentimentScore,
-  hashClientIp,
   EMPTY_VIEWER_EXTRAS,
 } from "../resumes.js";
+import { hashClientIp } from "../../utils/crypto.js";
 import { ResumeRepository } from "../../repositories/resumeRepository.js";
 
 /** The view service now takes a `ResumeRepository`, not a raw Drizzle

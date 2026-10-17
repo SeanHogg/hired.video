@@ -35,6 +35,11 @@ export interface SlugifyOptions {
    *  the fallback substitution. Defaults to 80, which is the validator
    *  width used by every public-URL slug column in the schema. */
   maxLen?: number;
+  /** Step 3 (NFKD normalize + drop combining marks). Defaults to true.
+   *  Pass false ONLY where the slug must byte-match a legacy derivation
+   *  that never normalized (historical URLs / existing DB rows): accented
+   *  letters then collapse into hyphens ("café" → "caf"). */
+  stripDiacritics?: boolean;
 }
 
 // U+0300–U+036F = combining diacritical marks. After NFKD splits
@@ -64,10 +69,12 @@ export function slugify(
   options: SlugifyOptions,
 ): string {
   const maxLen = options.maxLen ?? 80;
-  const out = (input ?? "")
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(COMBINING_MARKS, "")
+  const lowered = (input ?? "").toLowerCase();
+  const folded =
+    options.stripDiacritics === false
+      ? lowered
+      : lowered.normalize("NFKD").replace(COMBINING_MARKS, "");
+  const out = folded
     .replace(NON_ALNUM, "-")
     .replace(EDGE_HYPHENS, "")
     .slice(0, maxLen);

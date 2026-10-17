@@ -10,7 +10,8 @@
 import type { ResumeContent } from "@shared/resume";
 import { coverLetterSender, coverLetterToText, type CoverLetter } from "@shared/cover-letter";
 import { slugify } from "@shared/slugify";
-import { escapeHtml as esc, triggerDownload } from "@/lib/resume-exporters";
+import { triggerDownload } from "@/lib/resume-exporters";
+import { escapeHtml as esc } from "@shared/html-escape";
 import { letterPrintPageSize, letterStyleVars } from "@/lib/build/cover-letter/letter-style";
 import {
   LETTER_MARGIN_IN,

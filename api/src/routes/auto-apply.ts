@@ -12,7 +12,9 @@ import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
 import { insertAutoApplications } from "../repositories/autoApplyRepository.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { tryExtractJson } from "../../../shared/extract-json.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
+import { clampLimit } from "../utils/pagination.js";
 
 export const autoApplyRoutes = new Hono<AppEnv>();
 
@@ -108,9 +110,9 @@ ${customInstructions ? `Custom instructions: ${customInstructions}` : ""}
 Respond with JSON: { "coverLetter": "...", "summary": "..." }`;
 
         const { content } = await llm.callText("auto_apply_tailor", { useCase: "auto_apply", systemPrompt: "", userMessage: prompt });
-        const p = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
-        if (p.coverLetter) tailoredCoverLetter = p.coverLetter;
-        if (p.summary) tailoredSummary = p.summary;
+        const p = tryExtractJson<{ coverLetter?: string; summary?: string }>(content);
+        if (p?.coverLetter) tailoredCoverLetter = p.coverLetter;
+        if (p?.summary) tailoredSummary = p.summary;
       } catch { /* keep defaults */ }
     }
 
@@ -164,7 +166,7 @@ autoApplyRoutes.get("/matches", requirePro("Auto-Apply Agent"), async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
-  const limit = Math.min(50, Math.max(1, Number(c.req.query("limit") ?? 10)));
+  const limit = clampLimit(c.req.query("limit"), 10, 50);
   const db = getDb();
 
   // Fetch user's resume skills — through the repo per layering rule.

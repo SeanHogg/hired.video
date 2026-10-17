@@ -1,18 +1,19 @@
 /**
  * Polymorphic Boost Service
  *
- * Wraps /api/boosts. Any user-generated subject (review, feed_post,
- * video, resume, voice_clone, …) can be promoted by its owner via
- * `boostService.create({ subjectType, subjectId, ... })`.
- *
- * Creation runs the paid checkout server-side: the boost comes back
+ * Any user-generated subject (review, feed_post, video, resume,
+ * voice_clone, …) can be promoted by its owner via
+ * `boostService.create({ subjectType, subjectId, ... })`, which starts the
+ * paid checkout (POST /api/checkout {kind:"boost"}): the boost comes back
  * 'active' only when Campaign $ covered it; otherwise it is
- * 'pending_payment' until the USD payment is confirmed.
+ * 'pending_payment' until the USD payment is confirmed (useBoostPayment).
+ * Listing / cancelling boosts is /api/boosts.
  */
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
-import type { InitCollectionResult } from "@/lib/payment";
+import { checkoutService } from "@/lib/services/checkout-service";
+import { checkoutIdFor, type BoostableSubject } from "@shared/checkout";
 
 export const BoostSchema = z.object({
   id: z.string(),
@@ -36,7 +37,7 @@ export const BoostSchema = z.object({
 export type Boost = z.infer<typeof BoostSchema>;
 
 export interface CreateBoostInput {
-  subjectType: string;
+  subjectType: BoostableSubject;
   subjectId: string;
   budgetCents: number;
   durationDays: number;
@@ -44,15 +45,15 @@ export interface CreateBoostInput {
   pricingModel?: "flat" | "cpm" | "cpc";
 }
 
+/** The checkout id of a boost (the boost id is its key) — for useCheckoutPayment. */
+export function boostCheckoutId(boostId: string): string {
+  return checkoutIdFor("boost", boostId);
+}
+
 export class BoostService {
   async create(input: CreateBoostInput): Promise<Boost> {
-    const responseSchema = z.object({ boost: BoostSchema });
-    const res = await apiClient.post<z.infer<typeof responseSchema>>(
-      "/api/boosts",
-      input,
-      responseSchema,
-    );
-    return res.data.boost;
+    const checkout = await checkoutService.start<"boost">({ kind: "boost", ...input });
+    return BoostSchema.parse(checkout.details.boost);
   }
 
   async listMine(): Promise<Boost[]> {
@@ -71,26 +72,6 @@ export class BoostService {
       responseSchema,
     );
     return res.data.items;
-  }
-
-  /** Opens the payment widget for exactly the USD still owed on a boost
-   *  (server-chosen amount). */
-  async startPayment(boostId: string): Promise<InitCollectionResult> {
-    const returnUrl = window.location.href;
-    const res = await apiClient.request<{ collection: InitCollectionResult }>(
-      `/api/boost-checkout/boosts/${encodeURIComponent(boostId)}/pay`,
-      { method: "POST", body: { successUrl: returnUrl, cancelUrl: returnUrl }, suppressErrorEvent: true },
-    );
-    return res.data.collection;
-  }
-
-  /** Server re-reads the transaction from the provider before activating. */
-  async confirmPayment(boostId: string, transactionId: string): Promise<{ activated: boolean; pending: boolean }> {
-    const res = await apiClient.request<{ activated: boolean; pending: boolean }>(
-      `/api/boost-checkout/boosts/${encodeURIComponent(boostId)}/confirm-payment`,
-      { method: "POST", body: { transactionId }, suppressErrorEvent: true },
-    );
-    return res.data;
   }
 
   async cancel(boostId: string): Promise<void> {

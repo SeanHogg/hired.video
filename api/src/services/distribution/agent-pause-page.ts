@@ -3,6 +3,8 @@
  * GET renders confirm (no state change); the form POSTs the pause.
  */
 
+import { escapeHtml } from "../../../../shared/html-escape.js";
+
 export type PausePageLocale = "en" | "es" | "fr-CA";
 
 const COPY: Record<
@@ -57,14 +59,6 @@ export function localeFromAcceptLanguage(header: string | undefined | null): Pau
   if (raw.includes("fr")) return "fr-CA";
   if (raw.includes("es")) return "es";
   return "en";
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 const PAGE_STYLES = `body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f4f4f5;margin:0;padding:0}

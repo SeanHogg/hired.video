@@ -57,7 +57,7 @@ export interface AttributeInput {
   competencyId?: string | null;
 }
 
-export interface CreateTemplateInput {
+export interface CreateScorecardTemplateInput {
   companyId: string;
   name: string;
   description?: string;
@@ -333,7 +333,7 @@ export const scorecardsService = {
   async getTemplate(id: string): Promise<ScorecardTemplate | null> {
     return (await apiClient.get<ScorecardTemplate>(`/api/scorecards/templates/${id}`)).data ?? null;
   },
-  async createTemplate(input: CreateTemplateInput): Promise<ScorecardTemplate> {
+  async createTemplate(input: CreateScorecardTemplateInput): Promise<ScorecardTemplate> {
     return (await apiClient.post<ScorecardTemplate>("/api/scorecards/templates", input)).data!;
   },
   async updateTemplate(

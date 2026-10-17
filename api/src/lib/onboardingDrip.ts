@@ -15,7 +15,9 @@
  */
 
 import { and, eq } from "drizzle-orm";
+import { frontendBaseUrl } from "../utils/public-urls.js";
 import { getDb, schema } from "../db/index.js";
+import { signalWork } from "../services/scheduling/work-signals.js";
 import { TIER_NAME } from "../../../shared/tier-copy.js";
 
 const SYSTEM_SEQUENCE_NAME = "__onboarding__";
@@ -135,7 +137,7 @@ export async function triggerOnboardingDrip(
 
   if (existing) return; // already enrolled
 
-  const baseUrl = (globalThis as any).__ENV?.FRONTEND_URL || process.env.FRONTEND_URL || "https://hired.video";
+  const baseUrl = frontendBaseUrl();
 
   await db.insert(schema.followUpEnrollments).values({
     sequenceId,
@@ -153,4 +155,5 @@ export async function triggerOnboardingDrip(
       upgradeUrl: `${baseUrl}/settings/billing`,
     } as any,
   } as any);
+  await signalWork("followups");
 }

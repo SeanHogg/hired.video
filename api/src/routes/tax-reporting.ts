@@ -14,20 +14,11 @@ import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
 import { error } from "../types/index.js";
 import { taxReportingService } from "../services/payout/TaxReportingService.js";
-import { isAdminRole } from "../domains/billing/audience.js";
+import { adminMiddleware } from "../middleware/superAdmin.js";
 
 export const taxReportingRoutes = new Hono<AppEnv>();
 
-function requireAdmin(c: any): true | Response {
-  const user = c.var.user;
-  if (!user) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  if (!isAdminRole(user)) return c.json(error("FORBIDDEN", "Admin role required"), 403);
-  return true;
-}
-
-taxReportingRoutes.get("/tax-year/:year", async (c) => {
-  const guard = requireAdmin(c);
-  if (guard !== true) return guard;
+taxReportingRoutes.get("/tax-year/:year", adminMiddleware, async (c) => {
   const year = Number.parseInt(c.req.param("year"), 10);
   if (!Number.isInteger(year)) {
     return c.json(error("VALIDATION_ERROR", "year must be a 4-digit integer"), 400);
@@ -41,9 +32,7 @@ taxReportingRoutes.get("/tax-year/:year", async (c) => {
   }
 });
 
-taxReportingRoutes.get("/tax-year/:year.csv", async (c) => {
-  const guard = requireAdmin(c);
-  if (guard !== true) return guard;
+taxReportingRoutes.get("/tax-year/:year.csv", adminMiddleware, async (c) => {
   const year = Number.parseInt(c.req.param("year"), 10);
   if (!Number.isInteger(year)) {
     return c.text("year must be a 4-digit integer", 400);

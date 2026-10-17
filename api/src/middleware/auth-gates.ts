@@ -15,7 +15,7 @@
 import type { Context, MiddlewareHandler } from "hono";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
-import { USER_ROLES } from "../../../shared/user-roles.js";
+import { isAdminRole } from "./superAdmin.js";
 import { TIER_COPY, UPGRADE_URL } from "../../../shared/tier-copy.js";
 
 type AppCtx = Context<AppEnv>;
@@ -32,14 +32,7 @@ export function requirePro(featureName: string): MiddlewareHandler<AppEnv> {
       return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
     }
 
-    const roles = c.var.user?.roles ?? [];
-    const role = (c.var.user as any)?.role ?? "";
-    if (
-      roles.includes(USER_ROLES.SUPER_ADMIN) ||
-      roles.includes(USER_ROLES.ADMIN) ||
-      role === USER_ROLES.SUPER_ADMIN ||
-      role === USER_ROLES.ADMIN
-    ) {
+    if (isAdminRole(c.var.user)) {
       return next();
     }
 

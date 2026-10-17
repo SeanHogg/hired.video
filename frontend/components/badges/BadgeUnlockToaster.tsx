@@ -1,6 +1,9 @@
 /**
  * Mount once globally (in App.tsx next to other root-level providers).
- * Polls the points summary and fires a full-screen CELEBRATION for each
+ * Refreshes the points summary on signals — never on a timer: the
+ * BADGE_REFRESH_EVENT (award-firing responses echo `badgesUnlocked`, and
+ * completion flows signal it), a badge/points notification pushed over
+ * the SSE notifications hub, and window focus — then fires a full-screen CELEBRATION for each
  * newly-earned badge — both first-time earns and repeatable re-earns
  * (e.g. rebuilt 7-day streak → another "On Fire", now with its ×N
  * multiplier). Detection lives here; the party lives in
@@ -8,7 +11,7 @@
  * [celebration bus](../../lib/points/celebration.ts) so this stays the
  * single "what's newly earned?" diff.
  *
- * Self-gates on eligibility so the poll is a no-op for non-scoring
+ * Self-gates on eligibility so the refresh is a no-op for non-scoring
  * roles. Stores the last-seen earn-count map in `localStorage` keyed by
  * user id so the first load after sign-in doesn't spam the user with
  * historical earns.
@@ -22,10 +25,12 @@ import {
   type PointsBadge,
 } from "@/lib/services/points-service";
 import { BADGE_REFRESH_EVENT } from "@/lib/badges/refresh";
+import { signalRService } from "@/lib/services/signalr-service";
 import { celebrate } from "@/lib/points/celebration";
 
 const STORAGE_KEY_PREFIX = "hv.badge-earn-snapshot:";
-const POLL_MS = 60_000;
+/** Notification types the gamification engine emits on an award. */
+const AWARD_NOTIFICATION_TYPES = new Set(["badge", "points"]);
 
 type EarnSnapshot = Record<string, number>;
 
@@ -61,18 +66,32 @@ export function BadgeUnlockToaster() {
   const seenRef = useRef<EarnSnapshot | null>(null);
 
   const { data, refetch } = usePointsSummary(eligible && !!userId, {
-    refetchInterval: POLL_MS,
     refetchOnWindowFocus: true,
   });
 
   // #1568 — listen for the cross-surface "I just earned something"
   // event so badge toasts surface within the same render cycle as the
-  // completion dialog instead of lagging up to 60s on the poll tick.
+  // completion dialog.
   useEffect(() => {
     if (!eligible || !userId) return;
     const handler = () => { void refetch(); };
     window.addEventListener(BADGE_REFRESH_EVENT, handler);
     return () => window.removeEventListener(BADGE_REFRESH_EVENT, handler);
+  }, [eligible, userId, refetch]);
+
+  // Awards made server-side (workers, other tabs) arrive as badge/points
+  // notifications on the SSE hub. The hub re-sends every UNREAD row on each
+  // reconnect, so only rows created after mount (and not yet seen) refetch.
+  useEffect(() => {
+    if (!eligible || !userId) return;
+    // Small skew allowance — the server clock stamps createdAt.
+    const mountedAt = Date.now() - 2 * 60 * 1000;
+    const seen = new Set<string>();
+    return signalRService.onNotification((n) => {
+      if (!AWARD_NOTIFICATION_TYPES.has(String(n.type)) || seen.has(n.id)) return;
+      seen.add(n.id);
+      if (Date.parse(n.timestamp) >= mountedAt) void refetch();
+    });
   }, [eligible, userId, refetch]);
 
   useEffect(() => {

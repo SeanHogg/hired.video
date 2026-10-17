@@ -10,6 +10,8 @@
  * "preview the schedule" UI call.
  */
 
+import { randomBase64Url } from "../../utils/crypto.js";
+
 export interface ScheduleCandidate {
   candidateId: string | null;
   candidateName: string;
@@ -81,23 +83,5 @@ export function windowCapacity(
 /** URL-safe random token used as the public accept-invite identifier.
  *  Defaults to 32 bytes of entropy (≈43 chars base64url). */
 export function generateInviteToken(bytes = 32): string {
-  // Use the WebCrypto API — available in Workers, Node 18+, and Bun.
-  // Falls back to a Math.random-based generator only when crypto is
-  // missing (should never happen on a supported runtime).
-  const buf = new Uint8Array(bytes);
-  const cryptoObj: Crypto | undefined =
-    (globalThis as any).crypto ?? undefined;
-  if (cryptoObj?.getRandomValues) {
-    cryptoObj.getRandomValues(buf);
-  } else {
-    for (let i = 0; i < buf.length; i++) buf[i] = Math.floor(Math.random() * 256);
-  }
-  // base64url, no padding.
-  let bin = "";
-  for (const b of buf) bin += String.fromCharCode(b);
-  // btoa is available in Workers + Node 16+.
-  const b64 = typeof btoa === "function"
-    ? btoa(bin)
-    : Buffer.from(bin, "binary").toString("base64");
-  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return randomBase64Url(bytes);
 }

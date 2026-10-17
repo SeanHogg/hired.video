@@ -2,7 +2,7 @@
  * Job import — the retired JobCreatePage's upload paths, brought into the
  * studio's job create step (#1915): a PDF / DOCX description, or a CSV / XLSX
  * file, is parsed by the SAME endpoint the form used
- * (`jobService.createJobFromFile` → `POST /api/Job/CreateFromFile`), and the
+ * (`jobService.createJobFromFile` → `POST /api/jobs/createfromfile`), and the
  * parsed posting becomes a DRAFT job the studio opens on the canvas. The CSV
  * template download is the form's, unchanged.
  *

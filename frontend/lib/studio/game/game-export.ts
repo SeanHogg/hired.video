@@ -26,6 +26,7 @@
 
 import JSZip from "jszip";
 import type { GameState } from "@shared/game-state";
+import { escapeHtml } from "@shared/html-escape";
 // Vite's `?raw` returns the file source as a string. Both files are plain JS
 // (no TS-only syntax) precisely so this raw text is browser-runnable.
 import runtimeCoreSource from "./runtime-core.js?raw";
@@ -124,11 +125,3 @@ function indexHtml(title: string, w: number, h: number): string {
 </html>`;
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}

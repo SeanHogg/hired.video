@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { billingService, type TokenBudget } from "@/lib/services/billing-service";
 import { FREE_AI_MONTHLY_TOKENS, PRO_AI_MONTHLY_TOKENS, hasTokensForAiCall } from "@shared/pricing";
 import { useGatedResource } from "@/hooks/use-gated-resource";
+import { readBootstrapSeed } from "@/lib/bootstrap-seed";
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 
 /**
@@ -125,6 +126,10 @@ export function useTokenBudget() {
     cacheKey: TOKEN_BUDGET_CACHE_KEY,
     fetcher: () => billingService.getTokenBudget(),
     defaults: RAW_DEFAULTS,
+    // /api/bootstrap already carried the budget — adopt it and skip the
+    // first round-trip (the update listener below attaches too late to
+    // catch bootstrap's broadcast).
+    seedFn: () => readBootstrapSeed<TokenBudget>("tokenBudget"),
   });
 
   useEffect(() => {

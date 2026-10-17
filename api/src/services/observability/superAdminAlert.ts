@@ -19,6 +19,8 @@
  */
 import { sendGenericEmail } from "../adapters/email.js";
 import { getKvNamespace } from "../../utils/edge-cache.js";
+import { logger } from "../../lib/logger.js";
+import { escapeHtml } from "../../../../shared/html-escape.js";
 
 /** Where ops alerts and approval requests go. Overridable via env. */
 export function superAdminEmail(): string {
@@ -51,10 +53,6 @@ export interface AlertMarkerStore {
   put(key: string, value: string, options: { expirationTtl: number }): Promise<void>;
 }
 
-function escapeHtml(s: string): string {
-  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
-}
-
 export function alertCacheKey(key: string): string {
   return `opsalert:${key}`;
 }
@@ -84,7 +82,7 @@ function defaultStore(): AlertMarkerStore {
   if (kv) return kv as unknown as AlertMarkerStore;
   if (!_warnedNoKv) {
     _warnedNoKv = true;
-    console.warn("[ops-alert] KV_CACHE binding absent — alert dedupe is per-isolate only");
+    logger.warn("[ops-alert] KV_CACHE binding absent — alert dedupe is per-isolate only");
   }
   return memoStore;
 }
@@ -112,13 +110,13 @@ async function attempt(alert: SuperAdminAlert, send: AlertSender, store: AlertMa
   } catch (err) {
     // Can't dedupe → don't send: an unguarded alert on a hot failure path is
     // exactly the spam this module exists to stop.
-    console.error("[ops-alert] dedupe failed:", alert.key, err);
+    logger.error("[ops-alert] dedupe failed", { key: alert.key, error: err });
     return false;
   }
 
   const ok = await send(superAdminEmail(), `[hired.video] ${alert.subject}`, renderHtml(alert), "hired.video ops monitor")
     .catch((err) => {
-      console.error("[ops-alert] send failed:", alert.key, err);
+      logger.error("[ops-alert] send failed", { key: alert.key, error: err });
       return false;
     });
   if (ok) return true;
@@ -127,7 +125,7 @@ async function attempt(alert: SuperAdminAlert, send: AlertSender, store: AlertMa
   // every SEND_FAILURE_RETRY_SECONDS, not on every hit — nor never.
   await store
     .put(markerKey, "send-failed", { expirationTtl: Math.min(SEND_FAILURE_RETRY_SECONDS, Math.max(60, alert.windowSeconds)) })
-    .catch((err) => console.error("[ops-alert] marker shorten failed:", alert.key, err));
+    .catch((err) => logger.error("[ops-alert] marker shorten failed", { key: alert.key, error: err }));
   return false;
 }
 

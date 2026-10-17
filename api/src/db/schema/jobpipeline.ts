@@ -65,6 +65,8 @@ export const jobPipelineEntries = pgTable(
     index("idx_pipeline_job_stage").on(t.jobId, t.stage),
     index("idx_pipeline_job_owner").on(t.jobId, t.ownerId),
     index("idx_pipeline_candidate_user").on(t.candidateUserId),
+    index("idx_job_pipeline_entries_job_application_id").on(t.jobApplicationId),
+    index("idx_job_pipeline_entries_owner_id").on(t.ownerId),
   ],
 );
 
@@ -81,7 +83,10 @@ export const pipelineTouchpoints = pgTable(
     performedByUserId: uuid("performed_by_user_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [index("idx_touchpoints_entry_created").on(t.entryId, t.createdAt)],
+  (t) => [
+    index("idx_touchpoints_entry_created").on(t.entryId, t.createdAt),
+    index("idx_pipeline_touchpoints_performed_by_user_id").on(t.performedByUserId),
+  ],
 );
 
 export type PipelineTouchpoint = typeof pipelineTouchpoints.$inferSelect;
@@ -102,7 +107,10 @@ export const pipelineShareLinks = pgTable(
     createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [index("idx_pipeline_share_links_job").on(t.jobId)],
+  (t) => [
+    index("idx_pipeline_share_links_job").on(t.jobId),
+    index("idx_pipeline_share_links_created_by_user_id").on(t.createdByUserId),
+  ],
 );
 
 export type PipelineShareLink = typeof pipelineShareLinks.$inferSelect;

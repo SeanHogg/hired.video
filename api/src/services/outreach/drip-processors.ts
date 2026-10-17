@@ -28,6 +28,7 @@ import {
   DripQueuesRepository,
   type CandidateInteractionInsert,
 } from "../../repositories/dripQueuesRepository.js";
+import { logger } from "../../lib/logger.js";
 
 const DUE_LIMIT = 100;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -47,14 +48,15 @@ async function mailableEmailSet(
 // Follow-up drip processor (#15)
 // ---------------------------------------------------------------------------
 
-export async function processFollowUps(): Promise<void> {
+/** Returns how many due enrollments were handled (0 = nothing was due). */
+export async function processFollowUps(): Promise<number> {
   const db = getDb();
   const repo = new DripQueuesRepository(db);
   const now = new Date();
 
   // Load all active enrollments that are due, plus their sequence steps
   const due = await repo.listDueFollowUps(now, DUE_LIMIT);
-  if (due.length === 0) return;
+  if (due.length === 0) return 0;
 
   const provider = getEmailProvider();
   // Nurture drips are marketing — honor the same opt-out gate campaigns use.
@@ -126,7 +128,7 @@ export async function processFollowUps(): Promise<void> {
               errorMessage = String(err?.message ?? err);
             }
           } else {
-            console.warn(`[scheduled] No email provider — skipping follow-up to ${enrollment.recipientEmail}`);
+            logger.warn("[scheduled] No email provider — skipping follow-up", { enrollmentId: enrollment.id });
             sendStatus = "failed";
             errorMessage = "No email provider configured";
           }
@@ -155,17 +157,18 @@ export async function processFollowUps(): Promise<void> {
           );
         }
       } catch (err) {
-        console.error(`[scheduled] Error processing enrollment ${enrollment.id}:`, err);
+        logger.error("[scheduled] Error processing enrollment", { enrollmentId: enrollment.id, error: err });
       }
     }
   } finally {
     await Promise.all([
       repo.setFollowUpEnrollmentsStatus(toComplete, "completed", now),
       repo.setFollowUpEnrollmentsStatus(toUnsubscribe, "unsubscribed", now),
-    ]).catch((err) => console.error("[scheduled] follow-up status flush failed:", err));
+    ]).catch((err) => logger.error("[scheduled] follow-up status flush failed", err));
   }
 
-  console.log(`[scheduled] Processed ${due.length} follow-up enrollment(s).`);
+  logger.info("[scheduled] Processed follow-up enrollments", { count: due.length });
+  return due.length;
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +186,8 @@ type OutreachStep = {
   aiPersonalize?: boolean;
 };
 
-export async function processRecruiterOutreach(): Promise<void> {
+/** Returns how many due enrollments were handled (0 = nothing was due). */
+export async function processRecruiterOutreach(): Promise<number> {
   const db = getDb();
   const repo = new DripQueuesRepository(db);
   const now = new Date();
@@ -191,7 +195,7 @@ export async function processRecruiterOutreach(): Promise<void> {
   // Join the candidate in the same query so the per-row loop never N+1s for
   // recipient email/name/company.
   const due = await repo.listDueOutreach(now, DUE_LIMIT);
-  if (due.length === 0) return;
+  if (due.length === 0) return 0;
 
   const provider = getEmailProvider();
   const consent = new MarketingConsentService(buildRepos(db).emailConsent as any);
@@ -243,7 +247,7 @@ export async function processRecruiterOutreach(): Promise<void> {
                 html: `<p>${body.replace(/\n/g, "<br>")}</p>`,
               })
               .catch((err: any) =>
-                console.error(`[outreach] send failed for ${enrollment.id}:`, err?.message ?? err),
+                logger.error("[outreach] send failed", { enrollmentId: enrollment.id, error: err }),
               );
           }
         }
@@ -274,15 +278,16 @@ export async function processRecruiterOutreach(): Promise<void> {
           now,
         );
       } catch (err) {
-        console.error(`[scheduled] Error processing outreach enrollment ${enrollment.id}:`, err);
+        logger.error("[scheduled] Error processing outreach enrollment", { enrollmentId: enrollment.id, error: err });
       }
     }
   } finally {
     await Promise.all([
       repo.completeOutreachEnrollments(toComplete, now),
       repo.insertCandidateInteractions(interactions),
-    ]).catch((err) => console.error("[scheduled] outreach flush failed:", err));
+    ]).catch((err) => logger.error("[scheduled] outreach flush failed", err));
   }
 
-  console.log(`[scheduled] Processed ${due.length} recruiter outreach enrollment(s).`);
+  logger.info("[scheduled] Processed recruiter outreach enrollments", { count: due.length });
+  return due.length;
 }

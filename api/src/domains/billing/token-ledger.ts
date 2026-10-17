@@ -32,18 +32,30 @@ import {
   type TokenBudgetSummary,
 } from "../../services/billing/BillingService.js";
 import type { LLMUsage } from "../../services/adapters/llm-client.js";
-import { isAdminRole } from "./audience.js";
+import { isAdminRole } from "../../middleware/superAdmin.js";
 import { servicesProcessor } from "../services-processing/index.js";
 import { hasTokensForAiCall, PRO_AI_MONTHLY_TOKENS } from "../../../../shared/pricing.js";
 import { aiCallCostUsd } from "../../../../shared/ai-model-rates.js";
 import { emitNotification } from "../../services/notifications/notificationService.js";
 import { buildRepos } from "../../repositories/index.js";
+import { logger } from "../../lib/logger.js";
 import { tokenUsageAlertFor, tokenUsageAlertMessage } from "./token-usage-alerts.js";
 import {
   resolveEmployeeAiContext,
   checkCompanyBudget,
   recordCompanyTokenUsage,
+  getCompanyTokenBudget,
+  getCompanyTokenPoolView,
+  setMemberTokenLimit,
+  toSummary as companyBudgetSummary,
+  type CompanyPoolView,
 } from "./company-token-ledger.js";
+
+/** Who a token pool belongs to. The per-user and company pools still live in
+ *  separate tables (merge is Wave 3); this module is the one API over both. */
+export type TokenOwner =
+  | { ownerKind: "user"; ownerId: string }
+  | { ownerKind: "company"; ownerId: string };
 
 /**
  * Thrown by `ensureBudget()` when a user has zero tokens available across
@@ -86,6 +98,15 @@ export interface TokenLedger {
   /** Current budget summary. Thin wrapper so callers don't import
    *  `services/billing.ts` directly. */
   getBudget(userId: string): Promise<TokenBudgetSummary>;
+
+  /** Current budget of either pool, in the one TokenBudgetSummary shape. */
+  budgetFor(owner: TokenOwner): Promise<TokenBudgetSummary>;
+
+  /** Employer view of their company pool (null when they manage none). */
+  companyPoolView(employerUserId: string): Promise<CompanyPoolView | null>;
+
+  /** Employer sets / clears (null) a member's monthly sub-cap on the pool. */
+  setCompanyMemberLimit(employerUserId: string, memberUserId: string, limit: number | null): Promise<void>;
 }
 
 export const tokenLedger: TokenLedger = {
@@ -203,7 +224,7 @@ export const tokenLedger: TokenLedger = {
         },
       });
     } catch (err) {
-      console.warn(`[token-ledger] failed to mirror ai_tokens to usage_ledger:`, err);
+      logger.warn("[token-ledger] failed to mirror ai_tokens to usage_ledger", err);
     }
 
     if (toolRunId) {
@@ -218,7 +239,7 @@ export const tokenLedger: TokenLedger = {
           } as any)
           .where(eq(schema.toolRuns.id, toolRunId));
       } catch (err) {
-        console.warn(`[token-ledger] failed to update tool_runs.tokens_used for ${toolRunId}:`, err);
+        logger.warn("[token-ledger] failed to update tool_runs.tokens_used", { toolRunId, error: err });
       }
     }
 
@@ -230,12 +251,24 @@ export const tokenLedger: TokenLedger = {
     try {
       return await buildTokenBudgetDTO(userId);
     } catch (err) {
-      console.warn(`[token-ledger] buildTokenBudgetDTO failed for ${userId}:`, err);
+      logger.warn("[token-ledger] buildTokenBudgetDTO failed", { userId, error: err });
       return null;
     }
   },
 
   getBudget: getTokenBudgetSummary,
+
+  async budgetFor(owner) {
+    return owner.ownerKind === "company"
+      ? companyBudgetSummary(await getCompanyTokenBudget(owner.ownerId))
+      : getTokenBudgetSummary(owner.ownerId);
+  },
+
+  companyPoolView: (employerUserId) => getCompanyTokenPoolView(employerUserId),
+
+  async setCompanyMemberLimit(employerUserId, memberUserId, limit) {
+    await setMemberTokenLimit(employerUserId, memberUserId, limit);
+  },
 };
 
 /** Best-effort: an alert failure never fails the AI response. */
@@ -259,7 +292,7 @@ async function notifyTokenUsageAlert(
       },
     );
   } catch (err) {
-    console.warn(`[token-ledger] usage alert failed for ${userId}:`, err);
+    logger.warn("[token-ledger] usage alert failed", { userId, error: err });
   }
 }
 

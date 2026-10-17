@@ -2,7 +2,7 @@
  * EventsRepository — public-event aggregate.
  *
  * Owns reads/writes for scheduled_events rows where type IN ('event',
- * 'coffee') plus all auxiliary tables in schema/events.ts:
+ * 'coffee') plus all auxiliary tables in schema/eventAttendance.ts:
  *   • event_attendees       — relational RSVP
  *   • event_co_hosts        — delegated host permissions
  *   • event_waitlist        — capacity overflow
@@ -19,6 +19,7 @@
  */
 import { and, asc, count, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
+import { signalWork } from "../services/scheduling/work-signals.js";
 
 const {
   scheduledEvents,
@@ -182,6 +183,7 @@ export class EventsRepository implements IEventsRepository {
       .insert(scheduledEvents)
       .values({ ...input, updatedAt: this.now() } as any)
       .returning();
+    await signalReminderWork(row as EventRow | undefined);
     return row as EventRow;
   }
 
@@ -191,6 +193,10 @@ export class EventsRepository implements IEventsRepository {
       .set({ ...patch, updatedAt: this.now() } as any)
       .where(and(eq(scheduledEvents.id, id), this.eventTypeFilter()))
       .returning();
+    const p = patch as { startAt?: unknown; endAt?: unknown; cancelledAt?: unknown };
+    if (p.startAt !== undefined || p.endAt !== undefined || p.cancelledAt !== undefined) {
+      await signalReminderWork(row as EventRow | undefined);
+    }
     return (row as EventRow | undefined) ?? null;
   }
 
@@ -643,4 +649,12 @@ export class EventsRepository implements IEventsRepository {
 
     return and(...conditions);
   }
+}
+
+/** An event/coffee row with a reminder cadence was created or re-timed —
+ *  wake the cron's `event-reminders` queue so its KV marker is re-derived
+ *  (the tick computes the real next reminder window). */
+async function signalReminderWork(row: EventRow | undefined): Promise<void> {
+  const type = (row as { type?: string } | undefined)?.type;
+  if (type === "event" || type === "coffee") await signalWork("event-reminders");
 }

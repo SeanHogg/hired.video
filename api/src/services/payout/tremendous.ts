@@ -6,7 +6,8 @@
  *                flowType="email" so the frontend skips the hosted-widget
  *                step and POSTs straight to /complete.
  *
- * Push payment — POST /api/v2/orders with a single reward. Tremendous
+ * Push payment — POST /api/v2/orders with a single reward, through the one
+ *                Tremendous HTTP client (services/tremendous/client.ts). Tremendous
  *                emails a claim link the recipient redeems for their
  *                choice of Visa / Amazon / Venmo / PayPal / 1000+ options.
  *                Default reward catalog is "ACH" + major gift cards;
@@ -38,6 +39,11 @@ import type {
   NormalizedPayoutWebhookPayload,
   PayoutEventType,
 } from "./types.js";
+import {
+  TREMENDOUS_PRODUCTION_BASE_URL,
+  TREMENDOUS_SANDBOX_BASE_URL,
+  TremendousClient,
+} from "../tremendous/client.js";
 
 interface TremendousConfig {
   apiKey: string;
@@ -47,32 +53,8 @@ interface TremendousConfig {
   env: "production" | "sandbox";
 }
 
-function baseUrl(config: TremendousConfig): string {
-  return config.env === "production"
-    ? "https://api.tremendous.com/api/v2"
-    : "https://testflight.tremendous.com/api/v2";
-}
-
-async function tremendousRequest<T = unknown>(
-  config: TremendousConfig,
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<T> {
-  const res = await fetch(`${baseUrl(config)}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new Error(`Tremendous API error ${res.status}: ${text}`);
-  }
-  return res.json() as Promise<T>;
-}
+/** Visa Virtual digital — global default when no campaign is configured. */
+const DEFAULT_PRODUCT_ID = "OKMZ4D03U18F";
 
 // Tremendous webhook event names. Anything outside this set returns null
 // from verifyAndNormalizeWebhook so the dispatcher can drop the event.
@@ -83,18 +65,20 @@ const TREMENDOUS_EVENT_MAP: Record<string, PayoutEventType> = {
   "REWARDS.CANCELED": "payout.reversed",
 };
 
-interface TremendousOrderResponse {
-  order?: {
-    id: string;
-    status?: string;
-    rewards?: Array<{ id: string; status?: string }>;
-  };
-}
-
 export class TremendousPayoutProvider implements PayoutProvider {
   readonly name = "tremendous" as const;
 
-  constructor(private readonly config: TremendousConfig) {}
+  private readonly client: TremendousClient;
+
+  constructor(private readonly config: TremendousConfig) {
+    // The one Tremendous HTTP client (services/tremendous/client.ts).
+    this.client = new TremendousClient({
+      apiKey: config.apiKey,
+      baseUrl: config.env === "production" ? TREMENDOUS_PRODUCTION_BASE_URL : TREMENDOUS_SANDBOX_BASE_URL,
+      fundingSourceId: config.fundingId,
+      campaignId: config.campaignId,
+    });
+  }
 
   async startOnboardingSession(
     _userId: string,
@@ -107,42 +91,23 @@ export class TremendousPayoutProvider implements PayoutProvider {
   }
 
   async createPayout(input: CreatePayoutInput): Promise<CreatePayoutResult> {
-    // The minimal order shape works for both campaign-based and direct
-    // product orders. If a campaign id is configured the reward inherits
-    // its branding + product list; otherwise default to the digital
-    // catalog (Visa + major gift cards).
-    const body: Record<string, unknown> = {
-      external_id: input.payoutId,
-      payment: this.config.fundingId
-        ? { funding_source_id: this.config.fundingId }
-        : undefined,
-      reward: {
-        value: { denomination: input.amountCents / 100, currency_code: input.currency },
-        recipient: { email: input.providerAccountId },
-        delivery: { method: "EMAIL" },
-        ...(this.config.campaignId
-          ? { campaign_id: this.config.campaignId }
-          : { products: ["OKMZ4D03U18F"] }), // Visa Virtual digital — global default
-        ...(input.memo ? { custom_fields: [{ id: "memo", value: input.memo }] } : {}),
-      },
-    };
-
-    const res = await tremendousRequest<TremendousOrderResponse>(
-      this.config,
-      "POST",
-      "/orders",
-      body,
-    );
-
-    const orderId = res.order?.id;
-    if (!orderId) throw new Error("Tremendous order creation did not return an id");
+    // A configured campaign supplies branding + the product list;
+    // otherwise default to the digital catalog (Visa + major gift cards).
+    const order = await this.client.createOrder({
+      externalId: input.payoutId,
+      recipientEmail: input.providerAccountId,
+      amountDollars: input.amountCents / 100,
+      currency: input.currency,
+      ...(this.config.campaignId ? {} : { productIds: [DEFAULT_PRODUCT_ID] }),
+      ...(input.memo ? { customFields: [{ id: "memo", value: input.memo }] } : {}),
+    });
 
     // Tremendous emails the reward as part of order creation — we consider
     // it 'sent' on the synchronous response. Settlement (REDEEMED) lands
     // later via webhook when the recipient claims the card.
     return {
-      providerPayoutId: orderId,
-      providerStatus: res.order?.status ?? "EXECUTED",
+      providerPayoutId: order.orderId,
+      providerStatus: order.status === "unknown" ? "EXECUTED" : order.status,
       isSettled: false,
     };
   }

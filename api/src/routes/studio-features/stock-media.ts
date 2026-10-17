@@ -9,8 +9,10 @@ import type { AppEnv } from "../../types/index.js";
 import { getDb } from "../../db/index.js";
 import { searchStockMedia, fetchAssetForHashing, mediaTypeFromMime, type StockMediaType } from "../../services/media/stockmedia.js";
 import { cdnUrl } from "../../utils/cdn.js";
+import { clampLimit, parsePagination } from "../../utils/pagination.js";
 import { putObject } from "../../services/storage/object-store.js";
 import { ok, fail, stockMediaAssets, userStockMediaUsage } from "./shared.js";
+import { logger } from "../../lib/logger.js";
 
 export const stockMediaRoutes = new Hono<AppEnv>();
 
@@ -38,8 +40,7 @@ stockMediaRoutes.get("/stock/search", async (c) => {
   if (!q) return c.json(fail("VALIDATION_ERROR", "q query param is required"), 400);
   const typeParam = c.req.query("type") as StockMediaType | undefined;
   const mediaType: StockMediaType = (typeParam === "video" || typeParam === "audio") ? typeParam : "image";
-  const page = Math.max(1, parseInt(c.req.query("page") ?? "1", 10) || 1);
-  const perPage = Math.min(40, Math.max(1, parseInt(c.req.query("perPage") ?? "20", 10) || 20));
+  const { page, limit: perPage } = parsePagination(c, { defaultLimit: 20, maxLimit: 40, limitKey: "perPage" });
 
   const keys = providerKeys(c);
   if (!keys.unsplash && !keys.pexels && !keys.pixabay) {
@@ -50,7 +51,7 @@ stockMediaRoutes.get("/stock/search", async (c) => {
     const response = await searchStockMedia(keys, { query: q, mediaType, page, perPage });
     return c.json(ok(response));
   } catch (err) {
-    console.error("[stock/search] error:", err);
+    logger.error("[stock/search] error", err);
     return c.json(fail("STOCK_SEARCH_FAILED", `Stock media search failed: ${err}`), 500);
   }
 });
@@ -109,7 +110,7 @@ stockMediaRoutes.post("/stock/pick", async (c) => {
     try {
       fetched = await fetchAssetForHashing(p.downloadUrl);
     } catch (err) {
-      console.error("[stock/pick] download error:", err);
+      logger.error("[stock/pick] download error", err);
       return c.json(fail("STOCK_DOWNLOAD_FAILED", `Failed to download asset: ${err}`), 502);
     }
 
@@ -201,7 +202,7 @@ stockMediaRoutes.post("/stock/pick", async (c) => {
 // GET /api/studio/stock/recent — current user's recently used stock assets
 stockMediaRoutes.get("/stock/recent", async (c) => {
   const user = c.var.user;
-  const limit = Math.min(50, Math.max(1, parseInt(c.req.query("limit") ?? "20", 10) || 20));
+  const limit = clampLimit(c.req.query("limit"), 20, 50);
   const db = getDb();
 
   const rows = await db

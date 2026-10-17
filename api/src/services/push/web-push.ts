@@ -27,6 +27,7 @@ import {
   encryptPushPayload,
   type VapidKeys,
 } from "./web-push-crypto.js";
+import { logger } from "../../lib/logger.js";
 
 export interface WebPushPayload {
   title: string;
@@ -106,10 +107,10 @@ export async function sendPushToSubscriptions(
         if (GONE_STATUSES.has(res.status)) {
           await repo.deleteByEndpoint(sub.endpoint);
         } else if (!res.ok) {
-          console.warn("[web-push] delivery rejected", res.status, new URL(sub.endpoint).host);
+          logger.warn("[web-push] delivery rejected", { status: res.status, host: new URL(sub.endpoint).host });
         }
       } catch (err) {
-        console.warn("[web-push] delivery failed", err instanceof Error ? err.message : err);
+        logger.warn("[web-push] delivery failed", err);
       }
     }),
   );

@@ -36,7 +36,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { safeRelativeTime } from "@/lib/relative-time";
+import { safeRelativeTime } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { resumeFeedbackService } from "@/lib/services/resume-feedback-service";
 import type { ResumeReviewDTO, ReviewStatus } from "@shared/resume-feedback";

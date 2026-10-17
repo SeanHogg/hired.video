@@ -20,9 +20,12 @@ import { verifyTotp } from "../services/auth/totp.js";
 import { consumeBackupCode } from "../services/auth/backupCodes.js";
 import { mintTrustedDeviceCookie } from "../services/auth/trustedDevice.js";
 import { mintTwoFactorApproveToken, verifyTwoFactorApproveToken } from "../services/auth/twoFactorApprove.js";
+import { generateVerificationCode } from "../services/auth/password.js";
+import { markUserLogin } from "../services/auth/loginStamp.js";
+import { VerifyTwoFactorSchema, ResendTwoFactorSchema } from "../services/auth/schemas.js";
+import { toHandlerResult } from "../handlers/shared.js";
 import { and, eq, gt } from "drizzle-orm";
 import { z } from "zod";
-import { isPublicSignupRole } from "../../../shared/user-roles.js";
 import type { Variables, JwtPayload, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -37,7 +40,9 @@ import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { triggerOnboardingDrip } from "../lib/onboardingDrip.js";
 import { registerRateLimiterMiddleware, authWriteRateLimiterMiddleware } from "../middleware/rateLimiter.js";
 import { getJwtSecret } from "../utils/jwt.js";
+import { randomHex } from "../utils/crypto.js";
 import { isDevEnvironment } from "../utils/runtime-env.js";
+import { logger } from "../lib/logger.js";
 
 const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes, magicLinkTokens, affiliateProfiles } = schema;
 
@@ -48,57 +53,9 @@ const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes, mag
 // HELPERS
 // ============================================================================
 
-export async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: 100_000, hash: "SHA-256" },
-    keyMaterial,
-    256,
-  );
-  const saltHex = Array.from(salt).map((b) => b.toString(16).padStart(2, "0")).join("");
-  const hashHex = Array.from(new Uint8Array(bits))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  return `${saltHex}:${hashHex}`;
-}
-
-export async function verifyPassword(password: string, stored: string | null | undefined): Promise<boolean> {
-  if (!stored) return false;
-  const [saltHex, hashHex] = stored.split(":");
-  if (!saltHex || !hashHex) return false;
-
-  const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
-  const encoder = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: 100_000, hash: "SHA-256" },
-    keyMaterial,
-    256,
-  );
-  const candidateHex = Array.from(new Uint8Array(bits))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  return candidateHex === hashHex;
-}
-
-export function generateVerificationCode(): string {
-  const digits = Array.from(crypto.getRandomValues(new Uint8Array(6))).map((b) => (b % 10).toString());
-  return digits.join("");
-}
+// Password hashing / verification codes live in services/auth/password.ts,
+// the last-login stamp in services/auth/loginStamp.ts and the request
+// schemas in services/auth/schemas.ts (services never import from routes/).
 
 async function createTwoFactorEntry(userId: string) {
   const db = getDb();
@@ -113,22 +70,6 @@ async function createTwoFactorEntry(userId: string) {
     .returning();
 
   return entry;
-}
-
-/**
- * Stamp `lastLoginAt = now` on the user. Called from every successful login
- * path (password, 2FA, OAuth, magic link) so the admin UserManagement page
- * reflects real login activity. Exported for unit testing.
- */
-export async function markUserLogin(
-  db: { update: (table: any) => any },
-  userId: string,
-  now: Date = new Date(),
-): Promise<void> {
-  await db
-    .update(users)
-    .set({ lastLoginAt: now } as any)
-    .where(eq(users.id, userId));
 }
 
 async function consumeTwoFactorEntry(tempAuthToken: string) {
@@ -195,109 +136,6 @@ async function completeTwoFactorSession(
   };
 }
 
-// ============================================================================
-// SCHEMAS
-// ============================================================================
-
-export const LoginSchema = z.object({
-  email: z.string().email().transform((e) => e.toLowerCase()),
-  password: z.string().min(6),
-  // Cloudflare Turnstile token. Optional at the schema level so tests /
-  // dev don't have to set up Turnstile, but `handleLogin` enforces
-  // presence + validity when TURNSTILE_SECRET_KEY is set — same posture
-  // as register.
-  cfTurnstileToken: z.string().optional(),
-});
-
-export const RegisterSchema = z.object({
-  email: z.string().email().transform((e) => e.toLowerCase()),
-  password: z.string().min(8),
-  // Accept either a single `name` field or `firstName`+`lastName` from the frontend.
-  name: z.string().min(1).optional(),
-  firstName: z.string().optional(),
-  lastName: z.string().optional(),
-  // Canonical lower_snake values only — the schema no longer accepts
-  // PascalCase. Clients must send the exact enum value shared via
-  // shared/user-roles.ts. `creator` + `affiliate` are first-class roles
-  // (promoted 2026-06-13) so growth/SaaS reports can GROUP BY role and
-  // creator-only / affiliate-only accounts surface as themselves under
-  // /people. `employee` stays invite-only (coerced to job_seeker if sent).
-  // Validated against PUBLIC_SIGNUP_ROLES (the same SSoT the OAuth start
-  // route uses) so a public POST can never self-assign `admin` /
-  // `super_admin` / `employee` or a persona that is switched off.
-  role: z
-    .string()
-    .default("job_seeker")
-    .refine(isPublicSignupRole, { message: "Role is not available for public signup" }),
-  // When true, auto-creates an affiliate profile for the new user. Typically
-  // paired with `role: "affiliate"` from the affiliate-program page, but it
-  // remains independent — any role can layer affiliate status on top.
-  enableAffiliate: z.boolean().optional(),
-  // Inbound referral attribution. The frontend captures `?ref=CODE` into
-  // a first-touch cookie and ships it here; `handleRegister` resolves it
-  // to an affiliate_profile and inserts an affiliate_referrals row.
-  // 64-char cap mirrors `affiliate_profiles.referral_code`.
-  referralCode: z.string().trim().min(1).max(64).optional(),
-  // Inbound campaign attribution — captured from `utm_*` querystring on
-  // first hit by useAttributionCapture, persisted onto the new user row.
-  // 128-char cap mirrors `users.utm_*` columns from migration 0116.
-  utmSource: z.string().trim().max(128).optional(),
-  utmMedium: z.string().trim().max(128).optional(),
-  utmCampaign: z.string().trim().max(128).optional(),
-  utmTerm: z.string().trim().max(128).optional(),
-  utmContent: z.string().trim().max(128).optional(),
-  landingReferrer: z.string().trim().max(2048).optional(),
-  // Cloudflare Turnstile token from the signup widget. Optional at the
-  // schema level so tests / dev don't have to set up Turnstile, but the
-  // handler enforces presence + validity when TURNSTILE_SECRET_KEY is set.
-  cfTurnstileToken: z.string().optional(),
-  // Honeypot field — hidden in the form, only filled by naive bots.
-  // Any value (including empty string) is accepted at the schema layer;
-  // the signup composer rejects when length > 0.
-  website: z.string().optional(),
-  // Pre-auth UI locale the visitor selected before submitting. Seeded
-  // onto `account_preferences.language` so the first authed render in
-  // LocaleSync resolves to their pick instead of the DB default ("en").
-  // Validated downstream via `canPickLocale` so anything outside the
-  // PUBLIC_LOCALES whitelist is silently dropped (matches the existing
-  // settings sanitizer posture).
-  language: z.string().trim().max(16).optional(),
-}).refine(
-  (d) => d.name || (d.firstName || d.lastName),
-  { message: "name or firstName/lastName is required", path: ["name"] },
-);
-
-export const ForgotPasswordSchema = z.object({
-  email: z.string().email(),
-  // Cloudflare Turnstile token. Optional at the schema level so tests /
-  // dev don't have to set up Turnstile, but the handler treats a miss
-  // as a SOFT signal (records bot_block_event, proceeds with the
-  // always-200-no-enumeration response) per the visible-widget posture
-  // on every unauthenticated entry form.
-  cfTurnstileToken: z.string().optional(),
-});
-
-export const ResetPasswordSchema = z.object({
-  token: z.string().min(1),
-  password: z.string().min(8),
-});
-
-export const VerifyEmailSchema = z.object({
-  token: z.string().min(1),
-});
-
-export const VerifyTwoFactorSchema = z.object({
-  tempAuthToken: z.string().min(1),
-  verificationCode: z.string().min(1),
-  // When true, mint the HMAC-signed trusted-device cookie so future
-  // logins from this device skip MFA for 30 days.
-  trustDevice: z.boolean().optional(),
-});
-
-export const ResendTwoFactorSchema = z.object({
-  tempAuthToken: z.string().min(1),
-});
-
 /**
  * Decide whether a /resend-2fa request may proceed, given the challenge row the
  * supplied tempAuthToken resolved to (or undefined if the id matched nothing).
@@ -330,14 +168,14 @@ export const authRoutes = new Hono<AppEnv>();
  *  it's pounding from one source. The captcha is the inner gate. */
 authRoutes.post("/register", registerRateLimiterMiddleware, async (c) => {
   const body = await c.req.json().catch(() => null);
-  const result = await handleRegister(buildAuthDeps(c), body);
+  const result = await toHandlerResult(handleRegister(buildAuthDeps(c), body), 201);
   return c.json(result.body as any, result.status as any);
 });
 
 /** POST /api/auth/login — thin Hono adapter over handleLogin. */
 authRoutes.post("/login", authWriteRateLimiterMiddleware, async (c) => {
   const body = await c.req.json().catch(() => null);
-  const result = await handleLogin(buildAuthDeps(c), body);
+  const result = await toHandlerResult(handleLogin(buildAuthDeps(c), body));
   return c.json(result.body as any, result.status as any);
 });
 
@@ -395,14 +233,14 @@ authRoutes.post("/logout", (c) => {
 /** POST /api/auth/forgot-password — thin Hono adapter over handleForgotPassword. */
 authRoutes.post("/forgot-password", authWriteRateLimiterMiddleware, async (c) => {
   const body = await c.req.json().catch(() => null);
-  const result = await handleForgotPassword(buildAuthDeps(c), body);
+  const result = await toHandlerResult(handleForgotPassword(buildAuthDeps(c), body));
   return c.json(result.body as any, result.status as any);
 });
 
 /** POST /api/auth/reset-password — thin Hono adapter over handleResetPassword. */
 authRoutes.post("/reset-password", authWriteRateLimiterMiddleware, async (c) => {
   const body = await c.req.json().catch(() => null);
-  const result = await handleResetPassword(buildAuthDeps(c), body);
+  const result = await toHandlerResult(handleResetPassword(buildAuthDeps(c), body));
   return c.json(result.body as any, result.status as any);
 });
 
@@ -414,7 +252,7 @@ authRoutes.post("/reset-password", authWriteRateLimiterMiddleware, async (c) => 
  *  row is correct. */
 authRoutes.post("/verify-email", async (c) => {
   const body = await c.req.json().catch(() => null);
-  const result = await handleVerifyEmail(buildAuthDeps(c), body);
+  const result = await toHandlerResult(handleVerifyEmail(buildAuthDeps(c), body));
   if (result.status !== 200) {
     return c.json(result.body as any, result.status as any);
   }
@@ -448,7 +286,7 @@ authRoutes.post("/verify-email", async (c) => {
       }),
     );
   } catch (e) {
-    console.warn("[verify-email] failed to issue fresh JWT", e);
+    logger.warn("[verify-email] failed to issue fresh JWT", e);
     return c.json(result.body as any, 200);
   }
 });
@@ -596,7 +434,7 @@ authRoutes.post("/resend-2fa", async (c) => {
     const approveToken = (await mintTwoFactorApproveToken(entry.id).catch(() => null)) ?? undefined;
     c.executionCtx.waitUntil(
       sendTwoFactorEmail(userForEmail.email, userForEmail.name, entry.code, 10, approveToken).catch((err) =>
-        console.error("[resend-2fa] Failed to send 2FA email:", err),
+        logger.error("[resend-2fa] Failed to send 2FA email", err),
       ),
     );
   }
@@ -671,9 +509,7 @@ authRoutes.post("/resend-email-verification", async (c) => {
 
     // Invalidate old tokens and issue a new one
     await db.update(emailVerificationTokens).set({ used: true } as any).where(eq(emailVerificationTokens.userId, user.id));
-    const newToken = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
+    const newToken = randomHex(32);
     await db.insert(emailVerificationTokens).values({
       userId: user.id,
       token: newToken,
@@ -681,7 +517,7 @@ authRoutes.post("/resend-email-verification", async (c) => {
     });
     c.executionCtx.waitUntil(
       sendResendVerificationEmail(user.email, user.name, newToken).catch((err) =>
-        console.error("[resend-email-verification] Failed to send email:", err),
+        logger.error("[resend-email-verification] Failed to send email", err),
       ),
     );
     const isDev = isDevEnvironment();
@@ -735,8 +571,7 @@ authRoutes.post("/magic-link", authWriteRateLimiterMiddleware, async (c) => {
     .where(and(eq(magicLinkTokens.email, email), eq(magicLinkTokens.used, false)));
 
   // Generate a secure token
-  const rawBytes = crypto.getRandomValues(new Uint8Array(32));
-  const token = Array.from(rawBytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const token = randomHex(32);
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
   await db.insert(magicLinkTokens).values({ email, token, expiresAt, redirect, used: false } as any);

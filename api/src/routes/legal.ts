@@ -24,22 +24,14 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { LegalRepository } from "../repositories/legalRepository.js";
+import { superAdminMiddleware } from "../middleware/superAdmin.js";
 
-const { legalDocuments, legalDocumentAcceptances, users } = schema;
+const { legalDocuments, legalDocumentAcceptances } = schema;
 
 export const legalRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
-}
-
-async function isSuperAdmin(db: ReturnType<typeof getDb>, userId: string): Promise<boolean> {
-  const [row] = await db
-    .select({ isSuperAdmin: users.isSuperAdmin })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  return !!row?.isSuperAdmin;
 }
 
 // ---------------------------------------------------------------------------
@@ -162,19 +154,10 @@ legalRoutes.get("/me/status", async (c) => {
 // Superadmin CRUD
 // ---------------------------------------------------------------------------
 
-async function requireSuperAdmin(c: any): Promise<string | Response> {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-  const ok = await isSuperAdmin(db, userId);
-  if (!ok) return c.json(error("FORBIDDEN", "Superadmin only"), 403);
-  return userId;
-}
+legalRoutes.use("/admin/*", superAdminMiddleware);
 
 // GET /admin/documents — list all (every version of every kind)
 legalRoutes.get("/admin/documents", async (c) => {
-  const auth = await requireSuperAdmin(c);
-  if (typeof auth !== "string") return auth;
   const db = getDb();
   const rows = await db
     .select()
@@ -185,8 +168,6 @@ legalRoutes.get("/admin/documents", async (c) => {
 
 // POST /admin/documents — create draft
 legalRoutes.post("/admin/documents", async (c) => {
-  const auth = await requireSuperAdmin(c);
-  if (typeof auth !== "string") return auth;
   const body = await c.req.json().catch(() => ({})) as {
     kind?: string;
     version?: string;
@@ -216,8 +197,6 @@ legalRoutes.post("/admin/documents", async (c) => {
 
 // PATCH /admin/documents/:id — edit a draft (cannot edit a published doc)
 legalRoutes.patch("/admin/documents/:id", async (c) => {
-  const auth = await requireSuperAdmin(c);
-  if (typeof auth !== "string") return auth;
   const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
   const db = getDb();
   const [existing] = await db
@@ -243,8 +222,7 @@ legalRoutes.patch("/admin/documents/:id", async (c) => {
 
 // POST /admin/documents/:id/publish — publish + un-current the previous current doc
 legalRoutes.post("/admin/documents/:id/publish", async (c) => {
-  const auth = await requireSuperAdmin(c);
-  if (typeof auth !== "string") return auth;
+  const publisherId = c.var.user!.sub;
   const db = getDb();
   const [doc] = await db
     .select()
@@ -269,7 +247,7 @@ legalRoutes.post("/admin/documents/:id/publish", async (c) => {
     .set({
       isCurrent: true,
       publishedAt: doc.publishedAt ?? new Date(),
-      publishedBy: auth,
+      publishedBy: publisherId,
       updatedAt: new Date(),
     } as any)
     .where(eq(legalDocuments.id, doc.id))
@@ -280,8 +258,6 @@ legalRoutes.post("/admin/documents/:id/publish", async (c) => {
 
 // DELETE /admin/documents/:id — drafts only
 legalRoutes.delete("/admin/documents/:id", async (c) => {
-  const auth = await requireSuperAdmin(c);
-  if (typeof auth !== "string") return auth;
   const db = getDb();
   const [doc] = await db
     .select({ id: legalDocuments.id, publishedAt: legalDocuments.publishedAt })

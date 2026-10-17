@@ -45,8 +45,8 @@ export const resumeMatchScores = pgTable("resume_match_scores", {
   // The composite covers point lookups but not "all matches for user X"
   // / "all matches for job Y" rollups — those table-scanned without
   // these plain indexes.
-  index("idx_resume_match_scores_user").on(t.userId),
   index("idx_resume_match_scores_job").on(t.jobId),
+  index("idx_resume_match_scores_resume_id").on(t.resumeId),
 ]);
 
 export type ResumeMatchScore = typeof resumeMatchScores.$inferSelect;

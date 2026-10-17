@@ -7,6 +7,7 @@
  */
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { schema } from "../db/index.js";
+import { logger } from "../lib/logger.js";
 
 const { legalDocuments, legalDocumentAcceptances } = schema;
 
@@ -79,7 +80,7 @@ export class LegalRepository {
       return;
     } catch (batchErr) {
       if (rows.length === 1) {
-        console.warn(`[${logTag}] legal-doc acceptance failed:`, batchErr);
+        logger.warn(`[${logTag}] legal-doc acceptance failed`, batchErr);
         return;
       }
     }
@@ -87,7 +88,7 @@ export class LegalRepository {
       try {
         await this.db.insert(legalDocumentAcceptances).values(row);
       } catch (e) {
-        console.warn(`[${logTag}] legal-doc acceptance failed:`, e);
+        logger.warn(`[${logTag}] legal-doc acceptance failed`, e);
       }
     }
   }

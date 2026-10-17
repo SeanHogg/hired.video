@@ -64,6 +64,7 @@ export const workspaceGrants = pgTable(
     uniqueIndex("uq_workspace_grants_active")
       .on(t.subjectUserId, t.contributorUserId, t.scope)
       .where(sql`is_active = true`),
+    index("idx_workspace_grants_granted_by_user_id").on(t.grantedByUserId),
   ],
 );
 

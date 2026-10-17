@@ -59,6 +59,8 @@ export const scorecardTemplates = pgTable(
   },
   (t) => ({
     companyIdx: index("scorecard_templates_company_idx").on(t.companyId),
+    createdByUserIdFkIdx: index("idx_scorecard_templates_created_by_user_id").on(t.createdByUserId),
+    requiredCertificationCourseIdFkIdx: index("idx_scorecard_templates_required_certification_course_id").on(t.requiredCertificationCourseId),
   }),
 );
 
@@ -96,6 +98,7 @@ export const competencies = pgTable(
     companyNameUnique: uniqueIndex("competencies_company_name_unique")
       .on(t.companyId, sql`lower(${t.name})`)
       .where(sql`is_archived = FALSE`),
+    createdByUserIdFkIdx: index("idx_competencies_created_by_user_id").on(t.createdByUserId),
   }),
 );
 
@@ -115,7 +118,6 @@ export const competencyLevels = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
-    competencyIdx: index("competency_levels_competency_idx").on(t.competencyId),
     levelUnique: uniqueIndex("competency_levels_unique").on(t.competencyId, t.level),
   }),
 );
@@ -190,6 +192,8 @@ export const interviewKits = pgTable(
   (t) => ({
     companyIdx: index("interview_kits_company_idx").on(t.companyId),
     jobIdx: index("interview_kits_job_idx").on(t.jobId),
+    createdByUserIdFkIdx: index("idx_interview_kits_created_by_user_id").on(t.createdByUserId),
+    escalateToUserIdFkIdx: index("idx_interview_kits_escalate_to_user_id").on(t.escalateToUserId),
   }),
 );
 
@@ -224,6 +228,7 @@ export const interviewKitStages = pgTable(
   },
   (t) => ({
     kitIdx: index("interview_kit_stages_kit_idx").on(t.kitId),
+    scorecardTemplateIdFkIdx: index("idx_interview_kit_stages_scorecard_template_id").on(t.scorecardTemplateId),
   }),
 );
 
@@ -283,12 +288,14 @@ export const scorecardSubmissions = pgTable(
   (t) => ({
     applicationIdx: index("scorecard_submissions_application_idx").on(t.applicationId),
     evaluatorIdx: index("scorecard_submissions_evaluator_idx").on(t.evaluatorUserId),
-    interviewIdx: index("scorecard_submissions_interview_idx").on(t.interviewId),
     slaIdx: index("scorecard_submissions_sla_idx").on(t.dueAt),
     // One submission per (interview, evaluator) — rerunning replaces the row.
     interviewEvaluatorUnique: uniqueIndex(
       "scorecard_submissions_interview_evaluator_unique",
     ).on(t.interviewId, t.evaluatorUserId),
+    candidateUserIdFkIdx: index("idx_scorecard_submissions_candidate_user_id").on(t.candidateUserId),
+    kitStageIdFkIdx: index("idx_scorecard_submissions_kit_stage_id").on(t.kitStageId),
+    templateIdFkIdx: index("idx_scorecard_submissions_template_id").on(t.templateId),
   }),
 );
 
@@ -352,6 +359,9 @@ export const hiringDecisions = pgTable(
   (t) => ({
     applicationIdx: index("hiring_decisions_application_idx").on(t.applicationId),
     companyIdx: index("hiring_decisions_company_idx").on(t.companyId),
+    candidateUserIdFkIdx: index("idx_hiring_decisions_candidate_user_id").on(t.candidateUserId),
+    decidedByUserIdFkIdx: index("idx_hiring_decisions_decided_by_user_id").on(t.decidedByUserId),
+    jobIdFkIdx: index("idx_hiring_decisions_job_id").on(t.jobId),
   }),
 );
 

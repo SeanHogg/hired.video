@@ -22,6 +22,7 @@ import { getDb, schema } from "../db/index.js";
 import { eq } from "drizzle-orm";
 import { requireJobOwner } from "../services/jobs/jobOwnership.js";
 import * as listings from "../services/recruiter-marketplace/SourcingListingService.js";
+import { logger } from "../lib/logger.js";
 
 export const sourcingBrowseRoutes = new Hono<AppEnv>();
 export const sourcingBidsByJobRoutes = new Hono<AppEnv>();
@@ -187,7 +188,7 @@ sourcingBidActionRoutes.patch("/:bidId/accept", async (c) => {
       refType: "sourcing_bid",
     });
   } catch (e) {
-    console.warn("[gamification] bid-won failed", {
+    logger.warn("[gamification] bid-won failed", {
       bidId: bid.id,
       error: e instanceof Error ? e.message : String(e),
     });

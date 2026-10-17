@@ -28,6 +28,7 @@ import {
 import { looksLikeBinaryText, stripResumeControlChars, tryParseJsonResume } from "./parse.js";
 import { isAbortError } from "../../utils/abort.js";
 import { mapWithConcurrency } from "../../utils/async.js";
+import { logger } from "../../lib/logger.js";
 
 export type UploadIntakeResult =
   | { kind: "structured"; content: Record<string, unknown> }
@@ -127,7 +128,7 @@ async function extractDocumentText(
     filename: file.name,
   });
   if ("code" in result) {
-    console.warn("[resume upload] extraction failed:", result.code, result.message);
+    logger.warn("[resume upload] extraction failed", { code: result.code, reason: result.message });
     return { message: UPLOAD_EXTRACT_MESSAGES[result.code] };
   }
   return { text: result.text };
@@ -148,7 +149,7 @@ async function readOneFile(file: File, deps: UploadIntakeDeps): Promise<FileRead
     // A closed tab is not a vision failure — rethrow so remaining pages
     // are not OCRed and the parse is not metered.
     if (isAbortError(err)) throw err;
-    console.warn("[resume upload] image OCR failed:", err instanceof Error ? err.message : err);
+    logger.warn("[resume upload] image OCR failed", err);
     return { message: OCR_FAILED_MESSAGE, image: true };
   }
 }

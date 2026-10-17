@@ -12,10 +12,9 @@
  * callers can drop it in unconditionally.
  */
 
-import { useQuery } from "@tanstack/react-query";
 import { publicProfilePath } from "@shared/public-paths";
 import { Link } from "react-router-dom";
-import { userService } from "@/lib/services/user-service";
+import { useUser } from "@/hooks/queries/use-users";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 interface Props {
@@ -26,12 +25,7 @@ interface Props {
 }
 
 export default function CreatorAttribution({ creatorId, label = "By", className }: Props) {
-  const { data: user } = useQuery({
-    queryKey: ["public-user", creatorId],
-    queryFn: () => userService.getUserById(creatorId as string),
-    enabled: Boolean(creatorId),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: user } = useUser(creatorId, { staleTime: 5 * 60 * 1000 });
 
   if (!creatorId || !user) return null;
 

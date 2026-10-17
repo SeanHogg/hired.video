@@ -74,6 +74,7 @@ export const coffeeRequests = pgTable(
     uniqueIndex("uq_coffee_requests_pending_pair")
       .on(t.requesterUserId, t.recipientUserId)
       .where(sql`${t.status} = 'pending'`),
+    index("idx_coffee_requests_accepted_event_id").on(t.acceptedEventId),
   ],
 );
 

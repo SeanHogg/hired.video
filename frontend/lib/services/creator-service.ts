@@ -10,6 +10,9 @@ import {
   Video,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { getAuthToken, getEmulationToken } from "@/lib/api/auth-token";
+import { queryClient } from "@/lib/query-client";
+import { queryKeys } from "@/lib/query-keys";
 import {
   CREATOR_PROGRAMS,
   PROGRAM_TERMS_KIND,
@@ -168,13 +171,23 @@ export interface UpdateProfileInput {
 // round-trips per page load. An in-flight promise collapses concurrent mounts
 // onto ONE request, and a short TTL serves remounts from memory. Every mutation
 // below primes or clears the cache so callers never read stale enrollment.
-let _mineCache: { value: CreatorProfile | null; at: number } | null = null;
+// Keyed by the acting identity (bearer + impersonation token) so a SuperAdmin
+// impersonation or account switch never reads the previous identity's row.
+let _mineCache: { value: CreatorProfile | null; at: number; who: string } | null = null;
+
+function actingIdentity(): string {
+  return `${getAuthToken() ?? ""}|${getEmulationToken() ?? ""}`;
+}
 let _mineInFlight: Promise<CreatorProfile | null> | null = null;
+let _mineInFlightWho = "";
 const MINE_TTL_MS = 30_000;
 
-function primeMine(value: CreatorProfile | null): void {
-  _mineCache = { value, at: Date.now() };
+/** Prime the memo after a write and tell `useCreatorMine` consumers to
+ *  re-read (served from the freshly primed memo — no extra round-trip). */
+function primeMine(value: CreatorProfile | null, fromWrite = false): void {
+  _mineCache = { value, at: Date.now(), who: actingIdentity() };
   _mineInFlight = null;
+  if (fromWrite) void queryClient.invalidateQueries({ queryKey: queryKeys.creatorMine.all });
 }
 
 /** Drop the cached `getMine()` result. Call after any out-of-band change to the
@@ -182,13 +195,16 @@ function primeMine(value: CreatorProfile | null): void {
 export function invalidateMyCreatorProfile(): void {
   _mineCache = null;
   _mineInFlight = null;
+  void queryClient.invalidateQueries({ queryKey: queryKeys.creatorMine.all });
 }
 
 export const creatorService = {
   async getMine(opts?: { force?: boolean }): Promise<CreatorProfile | null> {
     if (!opts?.force) {
-      if (_mineCache && Date.now() - _mineCache.at < MINE_TTL_MS) return _mineCache.value;
-      if (_mineInFlight) return _mineInFlight;
+      const fresh =
+        _mineCache && _mineCache.who === actingIdentity() && Date.now() - _mineCache.at < MINE_TTL_MS;
+      if (fresh && _mineCache) return _mineCache.value;
+      if (_mineInFlight && _mineInFlightWho === actingIdentity()) return _mineInFlight;
     }
     const p = apiClient
       .get<CreatorProfile | null>("/api/creators/me")
@@ -202,36 +218,37 @@ export const creatorService = {
         throw e;
       });
     _mineInFlight = p;
+    _mineInFlightWho = actingIdentity();
     return p;
   },
 
   async optIn(input: OptInInput): Promise<CreatorProfile> {
     const res = await apiClient.post<CreatorProfile>("/api/creators/opt-in", input);
-    primeMine(res.data);
+    primeMine(res.data, true);
     return res.data;
   },
 
   async updateProfile(input: UpdateProfileInput): Promise<CreatorProfile> {
     const res = await apiClient.patch<CreatorProfile>("/api/creators/me", input);
-    primeMine(res.data);
+    primeMine(res.data, true);
     return res.data;
   },
 
   async enableProgram(program: CreatorProgram): Promise<CreatorProfile> {
     const res = await apiClient.post<CreatorProfile>(`/api/creators/me/programs/${program}`, {});
-    primeMine(res.data);
+    primeMine(res.data, true);
     return res.data;
   },
 
   async disableProgram(program: CreatorProgram): Promise<CreatorProfile> {
     const res = await apiClient.delete<CreatorProfile>(`/api/creators/me/programs/${program}`);
-    primeMine(res.data);
+    primeMine(res.data, true);
     return res.data;
   },
 
   async cancel(): Promise<CreatorProfile> {
     const res = await apiClient.post<CreatorProfile>("/api/creators/me/cancel", {});
-    primeMine(res.data);
+    primeMine(res.data, true);
     return res.data;
   },
 

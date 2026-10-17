@@ -27,6 +27,7 @@ import type {
   HelpIndexItem,
   HelpMappingListItem,
 } from "../../../../shared/help.js";
+import { logger } from "../../lib/logger.js";
 
 type Db = ReturnType<typeof getDb>;
 
@@ -51,7 +52,7 @@ export class HelpMappingService {
     try {
       return await fn();
     } catch (err) {
-      console.error(`[HelpMappingService] ${label} degraded (returning fallback):`, err);
+      logger.error("[HelpMappingService] degraded (returning fallback)", { label, error: err });
       return fallback;
     }
   }

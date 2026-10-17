@@ -7,6 +7,7 @@ import {
   jsonb,
   integer,
   unique,
+  index,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 import { jobItems, savedJobs } from "./jobs.js";
@@ -47,7 +48,12 @@ export const applicationFormAnswers = pgTable("application_form_answers", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-});
+}, (t) => [
+  index("idx_application_form_answers_job_id").on(t.jobId),
+  index("idx_application_form_answers_resume_id").on(t.resumeId),
+  index("idx_application_form_answers_saved_job_id").on(t.savedJobId),
+  index("idx_application_form_answers_user_id").on(t.userId),
+]);
 
 export type ApplicationFormAnswer =
   typeof applicationFormAnswers.$inferSelect;

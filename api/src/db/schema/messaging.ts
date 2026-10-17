@@ -71,6 +71,7 @@ export const messageReadReceipts = pgTable("message_read_receipts", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_message_read_receipts_user_message").on(t.userId, t.messageId),
+  index("idx_message_read_receipts_message_id").on(t.messageId),
 ]);
 
 export type MessageReadReceipt = typeof messageReadReceipts.$inferSelect;
@@ -117,6 +118,8 @@ export const emailCampaigns = pgTable("email_campaigns", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_email_campaigns_status_scheduled").on(t.status, t.scheduledAt),
+  index("idx_email_campaigns_created_by_user_id").on(t.createdByUserId),
+  index("idx_email_campaigns_template_id").on(t.templateId),
 ]);
 
 export type EmailCampaign = typeof emailCampaigns.$inferSelect;
@@ -142,6 +145,7 @@ export const emailCampaignRecipients = pgTable("email_campaign_recipients", {
   index("idx_campaign_recipients_campaign_status").on(t.campaignId, t.status),
   // #2305 — legacy UNIQUE (migration 0204_campaign_engine.sql); duplicates resolved by 0518_dedupe_unique_indexes.sql.
   uniqueIndex("uq_campaign_recipients_campaign_email").on(t.campaignId, t.email),
+  index("idx_email_campaign_recipients_user_id").on(t.userId),
 ]);
 
 export type EmailCampaignRecipient = typeof emailCampaignRecipients.$inferSelect;
@@ -161,7 +165,9 @@ export const emailSuppressions = pgTable("email_suppressions", {
   // The campaign whose footer triggered the opt-out, when known — analytics only.
   campaignId: uuid("campaign_id").references(() => emailCampaigns.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_email_suppressions_campaign_id").on(t.campaignId),
+]);
 
 export type EmailSuppression = typeof emailSuppressions.$inferSelect;
 export type NewEmailSuppression = typeof emailSuppressions.$inferInsert;
@@ -193,7 +199,9 @@ export const emailMarketingPreferences = pgTable("email_marketing_preferences", 
   source: varchar("source", { length: 64 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_email_marketing_preferences_user_id").on(t.userId),
+]);
 
 export type EmailMarketingPreference = typeof emailMarketingPreferences.$inferSelect;
 export type NewEmailMarketingPreference = typeof emailMarketingPreferences.$inferInsert;
@@ -208,23 +216,14 @@ export const communicationTracking = pgTable("communication_tracking", {
   status: varchar("status", { length: 50 }).default("sent").notNull(),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_communication_tracking_user_id").on(t.userId),
+]);
 
 export type CommunicationTracking = typeof communicationTracking.$inferSelect;
 export type NewCommunicationTracking = typeof communicationTracking.$inferInsert;
 
-export const applicationNotes = pgTable("application_notes", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  applicationId: uuid("application_id").notNull(),
-  authorId: uuid("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  content: text("content").notNull(),
-  isPrivate: boolean("is_private").default(false).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
 
-export type ApplicationNote = typeof applicationNotes.$inferSelect;
-export type NewApplicationNote = typeof applicationNotes.$inferInsert;
 
 export const interviews = pgTable("interviews", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -241,7 +240,9 @@ export const interviews = pgTable("interviews", {
   rating: integer("rating"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_interviews_scheduled_by").on(t.scheduledBy),
+]);
 
 export type Interview = typeof interviews.$inferSelect;
 export type NewInterview = typeof interviews.$inferInsert;

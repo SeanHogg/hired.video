@@ -18,8 +18,8 @@
  *
  *   • API-key / Basic-auth (TalentLMS default, Cornerstone /
  *     Workday-Learning via SAML bearer assertion are too heavy for the
- *     MVP) — `POST /api/lms-oauth/:provider/configure` writes the
- *     plaintext API key into `lmsConnectors.accessToken`. The token is
+ *     MVP) — `POST /api/lms-oauth/:provider/configure` stores the
+ *     API key (encrypted) as the connector's access token. The token is
  *     scoped to the user's tenant subdomain and never touches a
  *     credential store outside the per-tenant connector row.
  *
@@ -43,8 +43,11 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { LMS_PROVIDERS, type LmsProvider } from "../db/schema/courses.js";
 import { getJwtSecret } from "../utils/jwt.js";
-import { frontendBaseUrl } from "../utils/public-urls.js";
+import { apiBaseUrl, frontendBaseUrl } from "../utils/public-urls.js";
 import { getEnv } from "../utils/env.js";
+import { logger } from "../lib/logger.js";
+import { sealCredential } from "../services/crypto/credential-columns.js";
+import { lmsConnectorPublicColumns } from "../services/lms/connector-columns.js";
 
 const { lmsConnectors } = schema;
 
@@ -59,10 +62,6 @@ function uid(c: any): string | null {
 // local copy fell back to the literal "dev-secret-not-for-prod", which in a
 // deployed worker (where NODE_ENV is never "production") signed real LMS
 // tokens with a constant published in this repo.
-
-function getApiBase(): string {
-  return getEnv("API_URL") || "https://api.hired.video";
-}
 
 /** OAuth 2.0 authorization-code config per provider. Adding a new
  *  provider = add an entry here; the start/callback handlers are
@@ -186,7 +185,7 @@ lmsOauthRoutes.post("/:provider/start", async (c) => {
       503,
     );
   }
-  const redirectUri = `${getApiBase()}/api/lms-oauth/${provider}/callback`;
+  const redirectUri = `${apiBaseUrl()}/api/lms-oauth/${provider}/callback`;
   const state = await signState({
     userId,
     provider,
@@ -237,13 +236,13 @@ lmsOauthRoutes.get("/:provider/callback", async (c) => {
   if (!clientId || !clientSecret) {
     return c.redirect(`${frontendBaseUrl()}/services/creator/courses?lms_error=not_configured`);
   }
-  const redirectUri = `${getApiBase()}/api/lms-oauth/${provider}/callback`;
+  const redirectUri = `${apiBaseUrl()}/api/lms-oauth/${provider}/callback`;
 
   let tokens: Awaited<ReturnType<typeof cfg.exchangeToken>>;
   try {
     tokens = await cfg.exchangeToken({ baseUrl, redirectUri, clientId, clientSecret, code });
   } catch (e) {
-    console.error(`[lms-oauth:${provider}] token exchange failed:`, e);
+    logger.error(`[lms-oauth:${provider}] token exchange failed`, e);
     return c.redirect(`${frontendBaseUrl()}/services/creator/courses?lms_error=token_exchange_failed`);
   }
 
@@ -253,12 +252,16 @@ lmsOauthRoutes.get("/:provider/callback", async (c) => {
     .from(lmsConnectors)
     .where(and(eq(lmsConnectors.userId, userId), eq(lmsConnectors.provider, provider)))
     .limit(1);
+  const access = await sealCredential(tokens.accessToken);
+  const refresh = await sealCredential(tokens.refreshToken);
 
   if (existing) {
     await db.update(lmsConnectors).set({
       baseUrl,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken ?? null,
+      accessToken: access.plain,
+      accessTokenEnc: access.enc,
+      refreshToken: refresh.plain,
+      refreshTokenEnc: refresh.enc,
       scope: tokens.scope ?? null,
       expiresAt,
       status: "connected",
@@ -272,8 +275,10 @@ lmsOauthRoutes.get("/:provider/callback", async (c) => {
       provider,
       displayName,
       baseUrl,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken ?? null,
+      accessToken: access.plain,
+      accessTokenEnc: access.enc,
+      refreshToken: refresh.plain,
+      refreshTokenEnc: refresh.enc,
       scope: tokens.scope ?? null,
       expiresAt,
       status: "connected",
@@ -294,9 +299,9 @@ const ConfigureSchema = z.object({
 /** Manual / API-key path — covers TalentLMS, Cornerstone, Workday Learning,
  *  SuccessFactors. These either use Basic-auth API keys (TalentLMS) or
  *  SAML bearer assertions whose XML envelopes don't fit a generic OAuth
- *  flow. We write the credential straight into `lmsConnectors.accessToken`
- *  so the existing adapter chain (publishCourse / checkStatus / revoke)
- *  picks it up unchanged. */
+ *  flow. We store the credential as the connector's access token (encrypted,
+ *  services/crypto/credential-columns.ts) so the existing adapter chain
+ *  (publishCourse / checkStatus / revoke) picks it up unchanged. */
 lmsOauthRoutes.post("/:provider/configure", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
@@ -312,27 +317,30 @@ lmsOauthRoutes.post("/:provider/configure", async (c) => {
     .from(lmsConnectors)
     .where(and(eq(lmsConnectors.userId, userId), eq(lmsConnectors.provider, provider)))
     .limit(1);
+  const key = await sealCredential(parsed.data.apiKey);
 
   if (existing) {
     const [updated] = await db.update(lmsConnectors).set({
       baseUrl: parsed.data.baseUrl,
-      accessToken: parsed.data.apiKey,
+      accessToken: key.plain,
+      accessTokenEnc: key.enc,
       displayName: parsed.data.displayName ?? null,
       metadata: parsed.data.metadata ?? null,
       status: "connected",
       lastError: null,
       updatedAt: new Date(),
-    } as any).where(eq(lmsConnectors.id, existing.id)).returning();
+    } as any).where(eq(lmsConnectors.id, existing.id)).returning(lmsConnectorPublicColumns);
     return c.json(success(updated), 200);
   }
   const [created] = await db.insert(lmsConnectors).values({
     userId,
     provider,
     baseUrl: parsed.data.baseUrl,
-    accessToken: parsed.data.apiKey,
+    accessToken: key.plain,
+    accessTokenEnc: key.enc,
     displayName: parsed.data.displayName ?? null,
     metadata: parsed.data.metadata ?? null,
     status: "connected",
-  } as any).returning();
+  } as any).returning(lmsConnectorPublicColumns);
   return c.json(success(created), 201);
 });

@@ -14,6 +14,9 @@ import { aiFailure } from "../services/adapters/llm-error.js";
 import { cacheMiddleware } from "../utils/cache-headers.js";
 import { etagMiddleware } from "../utils/etag.js";
 import { DashboardRepository } from "../repositories/dashboardRepository.js";
+import { getOrSetIsolateCached } from "../utils/isolate-cache.js";
+import { NotificationsRepository } from "../repositories/notificationsRepository.js";
+import { getCachedUnreadCount } from "../services/messaging/inboxCache.js";
 
 export const dashboardRoutes = new Hono<AppEnv>();
 
@@ -27,6 +30,21 @@ dashboardRoutes.use("/*", cacheMiddleware({ scope: "private", maxAge: 60 }));
 dashboardRoutes.use("/*", etagMiddleware());
 
 const now = () => new Date().toISOString();
+
+// Each role dashboard is 6–12 aggregate queries per load. The payload is
+// cached per (user, role) for 120s in the isolate (utils/isolate-cache.ts —
+// no KV writes on Workers Free), the same staleness the private max-age
+// above already tolerates, so repeat loads and the ETag revalidation don't
+// re-run the counts.
+const DASHBOARD_CACHE_TTL_SECONDS = 120;
+
+function cachedDashboard<T>(kind: string, userId: string, role: string, loader: () => Promise<T>): Promise<T> {
+  return getOrSetIsolateCached({
+    key: `dash:v1:${kind}:${role}:${userId}`,
+    ttlSeconds: DASHBOARD_CACHE_TTL_SECONDS,
+    loader,
+  });
+}
 const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 
 async function buildBase(userId: string, role: string) {
@@ -46,7 +64,9 @@ async function buildBase(userId: string, role: string) {
 // GET /api/dashboard/
 // ---------------------------------------------------------------------------
 dashboardRoutes.get("/", async (c) => {
-  const base = await buildBase(c.var.user.sub, c.var.user.roles?.[0] ?? "job_seeker");
+  const userId = c.var.user.sub;
+  const role = c.var.user.roles?.[0] ?? "job_seeker";
+  const base = await cachedDashboard("base", userId, role, () => buildBase(userId, role));
   return c.json(success(base), 200);
 });
 
@@ -55,11 +75,17 @@ dashboardRoutes.get("/", async (c) => {
 // ---------------------------------------------------------------------------
 dashboardRoutes.get("/jobseeker", async (c) => {
   const userId = c.var.user.sub;
+  const role = c.var.user.roles?.[0] ?? "job_seeker";
+  const payload = await cachedDashboard("jobseeker", userId, role, () => buildJobseekerDashboard(userId, role));
+  return c.json(success(payload), 200);
+});
+
+async function buildJobseekerDashboard(userId: string, role: string) {
   const db = getDb();
 
   const [base, applications, profileStats, totalConversations, unreadCount, publishedResumes, videoResumes] =
     await Promise.all([
-      buildBase(userId, c.var.user.roles?.[0] ?? "job_seeker"),
+      buildBase(userId, role),
 
       // All applications grouped by status
       db
@@ -76,11 +102,8 @@ dashboardRoutes.get("/jobseeker", async (c) => {
       // Count of conversations this user participates in
       new DashboardRepository(db).countConversationsForUser(userId),
 
-      // Unread messages count via message read receipts
-      db
-        .select({ total: count() })
-        .from(schema.notifications)
-        .where(and(eq(schema.notifications.userId, userId), eq(schema.notifications.isRead, false))),
+      // Unread notifications — the same per-user cached count the bell uses.
+      getCachedUnreadCount(new NotificationsRepository(db), userId),
 
       // Published résumés — privacyLevel < 10 means visible to someone
       // (public / recruiter-only / connections), i.e. "posted" rather
@@ -106,52 +129,55 @@ dashboardRoutes.get("/jobseeker", async (c) => {
   const offersReceived = byStatus["offer"] ?? 0;
   const successRate = totalApplications > 0 ? Math.round((offersReceived / totalApplications) * 100) : 0;
 
-  return c.json(
-    success({
-      ...base,
-      profileStats: {
-        totalViews: profileStats.totalViews,
-        viewsThisWeek: profileStats.viewsThisWeek,
-        viewsThisMonth: profileStats.viewsThisMonth,
-        viewsChangePercentage: profileStats.viewsChangePercentage,
-        recentViewers: profileStats.recentViewers,
-      },
-      applicationStats: {
-        totalApplications,
-        pendingApplications: byStatus["applied"] ?? byStatus["pending"] ?? 0,
-        interviewRequests,
-        rejectedApplications,
-        offersReceived,
-        successRate,
-        recentApplications: [],
-      },
-      resumeStats: {
-        publishedResumes: publishedResumes[0]?.total ?? 0,
-        videoResumes: videoResumes[0]?.total ?? 0,
-      },
-      jobMatches: [],
-      upcomingInterviews: [],
-      messageStats: {
-        unreadCount: unreadCount[0]?.total ?? 0,
-        totalConversations,
-        recentMessages: [],
-      },
-    }),
-    200,
-  );
-});
+  return {
+    ...base,
+    profileStats: {
+      totalViews: profileStats.totalViews,
+      viewsThisWeek: profileStats.viewsThisWeek,
+      viewsThisMonth: profileStats.viewsThisMonth,
+      viewsChangePercentage: profileStats.viewsChangePercentage,
+      recentViewers: profileStats.recentViewers,
+    },
+    applicationStats: {
+      totalApplications,
+      pendingApplications: byStatus["applied"] ?? byStatus["pending"] ?? 0,
+      interviewRequests,
+      rejectedApplications,
+      offersReceived,
+      successRate,
+      recentApplications: [],
+    },
+    resumeStats: {
+      publishedResumes: publishedResumes[0]?.total ?? 0,
+      videoResumes: videoResumes[0]?.total ?? 0,
+    },
+    jobMatches: [],
+    upcomingInterviews: [],
+    messageStats: {
+      unreadCount,
+      totalConversations,
+      recentMessages: [],
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // GET /api/dashboard/recruiter
 // ---------------------------------------------------------------------------
 dashboardRoutes.get("/recruiter", async (c) => {
   const userId = c.var.user.sub;
+  const role = c.var.user.roles?.[0] ?? "recruiter";
+  const payload = await cachedDashboard("recruiter", userId, role, () => buildRecruiterDashboard(userId, role));
+  return c.json(success(payload), 200);
+});
+
+async function buildRecruiterDashboard(userId: string, role: string) {
   const db = getDb();
   const monthAgo = daysAgo(30);
 
   const dashRepo = new DashboardRepository(db);
   const [base, poolCandidates, submissions, placementAgg, placementsWithDates] = await Promise.all([
-    buildBase(userId, c.var.user.roles?.[0] ?? "recruiter"),
+    buildBase(userId, role),
 
     // Total candidates in talent pools
     db
@@ -182,55 +208,58 @@ dashboardRoutes.get("/recruiter", async (c) => {
   // Time-to-hire: avg days from placement createdAt to startDate (SQL AVG)
   const avgTimeToHireDays = placementAgg.avgDaysToHire == null ? 0 : Math.round(placementAgg.avgDaysToHire);
 
-  return c.json(
-    success({
-      ...base,
-      candidateStats: {
-        totalCandidates: poolCandidates[0]?.total ?? 0,
-        newCandidatesThisMonth: 0,
-        activeCandidates: poolCandidates[0]?.total ?? 0,
-      },
-      submissionStats: {
-        total: totalSubmissions,
-        submitted: submissionsByStatus["submitted"] ?? 0,
-        interviewing: submissionsByStatus["interviewing"] ?? 0,
-        offered: submissionsByStatus["offered"] ?? 0,
-        placed: submissionsByStatus["placed"] ?? 0,
-        withdrawn: submissionsByStatus["withdrawn"] ?? 0,
-      },
-      placementStats: {
-        totalPlacements,
-        placementRate,
-        totalCommissionEarned: Math.round(totalCommission * 100) / 100,
-      },
-      hiringSuccessMetrics: {
-        submissionToPlacementRate: placementRate,
-        averageTimeToHireDays: avgTimeToHireDays,
-        totalRevenue: Math.round(totalCommission * 100) / 100,
-      },
-      timeToHireAnalytics: {
-        averageDays: avgTimeToHireDays,
-        placements: placementsWithDates.map((p) => ({
-          id: p.id,
-          daysToHire: Math.round(
-            (new Date(p.startDate).getTime() - new Date(p.createdAt).getTime()) / (1000 * 60 * 60 * 24),
-          ),
-        })),
-      },
-    }),
-    200,
-  );
-});
+  return {
+    ...base,
+    candidateStats: {
+      totalCandidates: poolCandidates[0]?.total ?? 0,
+      newCandidatesThisMonth: 0,
+      activeCandidates: poolCandidates[0]?.total ?? 0,
+    },
+    submissionStats: {
+      total: totalSubmissions,
+      submitted: submissionsByStatus["submitted"] ?? 0,
+      interviewing: submissionsByStatus["interviewing"] ?? 0,
+      offered: submissionsByStatus["offered"] ?? 0,
+      placed: submissionsByStatus["placed"] ?? 0,
+      withdrawn: submissionsByStatus["withdrawn"] ?? 0,
+    },
+    placementStats: {
+      totalPlacements,
+      placementRate,
+      totalCommissionEarned: Math.round(totalCommission * 100) / 100,
+    },
+    hiringSuccessMetrics: {
+      submissionToPlacementRate: placementRate,
+      averageTimeToHireDays: avgTimeToHireDays,
+      totalRevenue: Math.round(totalCommission * 100) / 100,
+    },
+    timeToHireAnalytics: {
+      averageDays: avgTimeToHireDays,
+      placements: placementsWithDates.map((p) => ({
+        id: p.id,
+        daysToHire: Math.round(
+          (new Date(p.startDate).getTime() - new Date(p.createdAt).getTime()) / (1000 * 60 * 60 * 24),
+        ),
+      })),
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // GET /api/dashboard/employer
 // ---------------------------------------------------------------------------
 dashboardRoutes.get("/employer", async (c) => {
   const userId = c.var.user.sub;
+  const role = c.var.user.roles?.[0] ?? "employer";
+  const payload = await cachedDashboard("employer", userId, role, () => buildEmployerDashboard(userId, role));
+  return c.json(success(payload), 200);
+});
+
+async function buildEmployerDashboard(userId: string, role: string) {
   const db = getDb();
 
   const [base, jobAgg, teamMembers] = await Promise.all([
-    buildBase(userId, c.var.user.roles?.[0] ?? "employer"),
+    buildBase(userId, role),
 
     // Jobs posted by this user + their applications/placements, aggregated in SQL
     new DashboardRepository(db).aggregateEmployerJobs(userId),
@@ -254,54 +283,51 @@ dashboardRoutes.get("/employer", async (c) => {
   // Time-to-hire for employer (SQL AVG over placements with a start date)
   const avgTimeToFill = jobAgg.avgDaysToFill == null ? 0 : Math.round(jobAgg.avgDaysToFill);
 
-  return c.json(
-    success({
-      ...base,
-      teamMetrics: {
-        totalTeamMembers: (teamMembers[0]?.total ?? 0) + 1, // +1 for the owner
-        activeRecruiters: 0,
-        openPositions: activeJobs,
-        teamPerformanceScore: 0,
-      },
-      budgetStats: { totalBudget: 0, spentAmount: 0, remainingBudget: 0, costPerHire: 0 },
-      recruiterPerformance: [],
-      companyStats: { totalEmployees: (teamMembers[0]?.total ?? 0) + 1, newHires: filledPositions, hiringVelocity: 0, employeeRetentionRate: 0 },
-      candidateStats: {
-        totalCandidates: totalApplications,
-        newCandidates: 0,
-        qualifiedCandidates: interviewedCount,
-        interviewedCandidates: interviewedCount,
-      },
-      jobPostingStats: {
-        activeJobs,
-        totalJobs: jobAgg.totalJobs,
-        totalApplications,
-        filledPositions,
-        averageTimeToFill: avgTimeToFill,
-      },
-      recruitmentMetrics: {
-        placementsMade: filledPositions,
-        placementRate: totalApplications > 0 ? Math.round((filledPositions / totalApplications) * 100) : 0,
-        averageTimeToHire: avgTimeToFill,
-        costPerHire: 0,
-      },
-      hiringSuccessMetrics: {
-        offerAcceptanceRate: 0,
-        applicationToInterviewRate: totalApplications > 0 ? Math.round((interviewedCount / totalApplications) * 100) : 0,
-        timeToFillDays: avgTimeToFill,
-        totalHires: filledPositions,
-      },
-      timeToHireAnalytics: {
-        averageDays: avgTimeToFill,
-        trend: [],
-      },
-      newCandidates: [],
-      scheduledInterviews: [],
-      messageStats: { unreadCount: 0, totalConversations: 0, recentMessages: [] },
-    }),
-    200,
-  );
-});
+  return {
+    ...base,
+    teamMetrics: {
+      totalTeamMembers: (teamMembers[0]?.total ?? 0) + 1, // +1 for the owner
+      activeRecruiters: 0,
+      openPositions: activeJobs,
+      teamPerformanceScore: 0,
+    },
+    budgetStats: { totalBudget: 0, spentAmount: 0, remainingBudget: 0, costPerHire: 0 },
+    recruiterPerformance: [],
+    companyStats: { totalEmployees: (teamMembers[0]?.total ?? 0) + 1, newHires: filledPositions, hiringVelocity: 0, employeeRetentionRate: 0 },
+    candidateStats: {
+      totalCandidates: totalApplications,
+      newCandidates: 0,
+      qualifiedCandidates: interviewedCount,
+      interviewedCandidates: interviewedCount,
+    },
+    jobPostingStats: {
+      activeJobs,
+      totalJobs: jobAgg.totalJobs,
+      totalApplications,
+      filledPositions,
+      averageTimeToFill: avgTimeToFill,
+    },
+    recruitmentMetrics: {
+      placementsMade: filledPositions,
+      placementRate: totalApplications > 0 ? Math.round((filledPositions / totalApplications) * 100) : 0,
+      averageTimeToHire: avgTimeToFill,
+      costPerHire: 0,
+    },
+    hiringSuccessMetrics: {
+      offerAcceptanceRate: 0,
+      applicationToInterviewRate: totalApplications > 0 ? Math.round((interviewedCount / totalApplications) * 100) : 0,
+      timeToFillDays: avgTimeToFill,
+      totalHires: filledPositions,
+    },
+    timeToHireAnalytics: {
+      averageDays: avgTimeToFill,
+      trend: [],
+    },
+    newCandidates: [],
+    scheduledInterviews: [],
+    messageStats: { unreadCount: 0, totalConversations: 0, recentMessages: [] },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // GET /api/dashboard/career-progress  (Pro — Job Seeker only)

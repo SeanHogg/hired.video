@@ -13,13 +13,16 @@
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { apiClient } from "@/lib/api-client";
+import type { SignupEligibility } from "@shared/security/securityRegistry";
 
+// The verdict union is the server's SSoT (@shared/security/securityRegistry);
+// the annotation makes the runtime enum fail to compile if they drift.
 const EligibilitySchema = z.object({
   countryCode: z.string().nullable(),
-  eligibility: z.enum(["allowed", "waitlist", "sanctioned"]),
+  eligibility: z.enum(["allowed", "waitlist", "sanctioned"]) satisfies z.ZodType<SignupEligibility>,
 });
 
-export type SignupEligibility = z.infer<typeof EligibilitySchema>["eligibility"];
+export type { SignupEligibility };
 
 export type UseGeoEligibilityApi = {
   eligibility: SignupEligibility | null;

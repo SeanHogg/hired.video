@@ -32,6 +32,7 @@ import {
 import { frontendBaseUrl } from "../utils/public-urls.js";
 import { socialConnectionServiceFor } from "../services/social/social-connection-factory.js";
 import { socialOAuthCallbackHandler } from "./social-oauth-callback.js";
+import { logger } from "../lib/logger.js";
 
 const { adminAuditLog } = schema;
 
@@ -50,7 +51,7 @@ async function audit(actorId: string, action: string, platform: string) {
       metadata: { platform },
     } as any);
   } catch (err) {
-    console.error("[admin-social] audit insert failed:", err);
+    logger.error("[admin-social] audit insert failed", err);
   }
 }
 

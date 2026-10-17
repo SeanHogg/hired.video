@@ -14,6 +14,7 @@
  * drift — same pattern as the 2FA one-tap link.
  */
 import { hmacHex, getAuthSecret } from "../auth/signing.js";
+import { base64UrlDecode, base64UrlEncode, timingSafeEqual } from "../../utils/crypto.js";
 import {
   PARTNER_EMBED_TOKEN_TTL_SECONDS,
   type PartnerEmbedKind,
@@ -26,24 +27,6 @@ interface EmbedTokenPayload {
   exp: number; // unix seconds
 }
 
-function b64urlEncode(input: string): string {
-  // btoa is available in the Workers runtime.
-  return btoa(input).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function b64urlDecode(input: string): string {
-  const padded = input.replace(/-/g, "+").replace(/_/g, "/");
-  return atob(padded);
-}
-
-/** Constant-time-ish string compare (lengths already fixed hex). */
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
 export async function mintEmbedToken(
   partnerId: string,
   userId: string,
@@ -52,7 +35,9 @@ export async function mintEmbedToken(
 ): Promise<{ token: string; expiresAt: Date }> {
   const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
   const payload: EmbedTokenPayload = { p: partnerId, u: userId, k: kind, exp };
-  const body = b64urlEncode(JSON.stringify(payload));
+  // Payload is ASCII-only JSON (ids, enum kind, unix seconds), so UTF-8
+  // base64url is byte-identical to the former `btoa(json)` encoding.
+  const body = base64UrlEncode(JSON.stringify(payload));
   const sig = await hmacHex(body);
   return { token: `${body}.${sig}`, expiresAt: new Date(exp * 1000) };
 }
@@ -65,10 +50,10 @@ export async function verifyEmbedToken(token: string | null | undefined): Promis
   const [body, sig] = token.split(".");
   if (!body || !sig) throw new EmbedTokenError("Malformed embed token.");
   const expected = await hmacHex(body);
-  if (!safeEqual(sig, expected)) throw new EmbedTokenError("Invalid embed token signature.");
+  if (!timingSafeEqual(sig, expected)) throw new EmbedTokenError("Invalid embed token signature.");
   let payload: EmbedTokenPayload;
   try {
-    payload = JSON.parse(b64urlDecode(body));
+    payload = JSON.parse(base64UrlDecode(body));
   } catch {
     throw new EmbedTokenError("Corrupt embed token payload.");
   }

@@ -4,27 +4,37 @@
  */
 
 import { z } from "zod";
-
+
 import { UuidLikeSchema } from "./validation.js";
 // ============================================================================
-// REQUEST SCHEMAS — single source of truth for the autofill write endpoints.
+// REQUEST SCHEMAS — single source of truth for the autofill write endpoints
+// (POST /api/autofill/save, PUT /api/autofill/cache/:id).
 // ============================================================================
 
 export const SaveSubmissionSchema = z.object({
-  fields: z.array(z.record(z.string(), z.unknown())).min(1).max(100),
-  answers: z.record(z.string(), z.unknown()),
-  sourceUrl: z.string().url().optional().nullable(),
-  jobId: UuidLikeSchema.optional().nullable(),
-  savedJobId: UuidLikeSchema.optional().nullable(),
-  resumeId: UuidLikeSchema.optional().nullable(),
-  atsProvider: z.string().max(50).optional().nullable(),
-  jobDescription: z.string().max(50000).optional().nullable(),
+  fields: z.array(z.object({
+    id: z.string(),
+    label: z.string(),
+    type: z.string(),
+    name: z.string().optional(),
+    required: z.boolean(),
+    options: z.array(z.string()).optional(),
+    selector: z.string().optional(),
+    category: z.string().optional(),
+  })),
+  answers: z.record(z.string(), z.string()),
+  sourceUrl: z.string().max(2000).optional(),
+  jobId: UuidLikeSchema.optional(),
+  savedJobId: UuidLikeSchema.optional(),
+  resumeId: UuidLikeSchema.optional(),
+  atsProvider: z.string().max(50).optional(),
+  jobDescription: z.string().max(10000).optional(),
   status: z.enum(["draft", "submitted", "reviewed"]).optional(),
 });
 export type SaveSubmissionInput = z.infer<typeof SaveSubmissionSchema>;
 
 export const UpdateCacheEntrySchema = z.object({
-  answer: z.string().max(5000),
+  answer: z.string().min(1).max(5000),
 });
 export type UpdateCacheEntryInput = z.infer<typeof UpdateCacheEntrySchema>;
 

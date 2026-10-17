@@ -1,10 +1,11 @@
 import { SignJWT } from "jose";
+import { getEnv } from "./env.js";
 import { isProduction } from "./runtime-env.js";
 
 /** The ONLY place JWT_SECRET is read out of the environment. */
 function readJwtSecret(): string | null {
-  const secret = process.env.JWT_SECRET || (globalThis as any).__ENV?.JWT_SECRET;
-  return typeof secret === "string" && secret.length > 0 ? secret : null;
+  const secret = getEnv("JWT_SECRET");
+  return secret.length > 0 ? secret : null;
 }
 
 /**

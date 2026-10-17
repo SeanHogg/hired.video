@@ -9,13 +9,16 @@ import { getSubscription } from "../services/billing/BillingService.js";
 import { getDb, schema } from "../db/index.js";
 import { bumpSearchVersion } from "../utils/search-cache.js";
 import { getOrSetCached, invalidateCachedKey } from "../utils/edge-cache.js";
+import { clampLimit, parsePagination } from "../utils/pagination.js";
+import { MB, parseUpload, isUploadRejected } from "../utils/multipart.js";
 import { buildRepos } from "../repositories/index.js";
 import { gamificationFromContext } from "../domains/gamification/with-gamification.js";
 import { replaceOnboardingTasks } from "../lib/onboarding.js";
 import { cdnUrl, r2KeyFromCdnUrl } from "../utils/cdn.js";
 import { deleteUserObjects } from "../services/storage/delete-user-objects.js";
 import { sendConnectionRequestEmail } from "../services/adapters/email.js";
-import { USER_ROLES, NON_CANDIDATE_ROLES } from "../../../shared/user-roles.js";
+import { USER_ROLES, NON_CANDIDATE_ROLES, parseRoleAlias, type UserRole } from "../../../shared/user-roles.js";
+import { isSuperAdmin } from "../middleware/superAdmin.js";
 import {
   resolveProfileSections,
   sanitizeProfileSectionsInput,
@@ -23,7 +26,8 @@ import {
 } from "../../../shared/profile-sections.js";
 import { USER_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import type { UserActorRow } from "../repositories/usersRepository.js";
-import { splitName, toUserActor } from "../services/user/userActor.js";
+import { toUserActor } from "../services/user/userActor.js";
+import { splitPersonName } from "../../../shared/person-name.js";
 import { resolveUserRef } from "../services/user/resolveUserRef.js";
 import { emitNotification, resolveActor } from "../services/notifications/notificationService.js";
 import { projectUserResumes } from "../handlers/resume-serializer.js";
@@ -34,6 +38,8 @@ import { getVideoBucket, putObject } from "../services/storage/object-store.js";
 import { getProfilePitch } from "../services/pitch/pitchService.js";
 import { invalidatePartnerProfilesForUser } from "../services/partner/connections.js";
 import { onUserRoleChanged } from "../services/user/roleChangeEffects.js";
+import { logger } from "../lib/logger.js";
+import { bumpInboxFor } from "../services/messaging/inboxCacheVersion.js";
 
 const { users, userProfiles, userConnections, privacyPreferences, creatorProfiles } = schema;
 
@@ -56,21 +62,23 @@ const profileCols = {
   updatedAt: userProfiles.updatedAt,
 } as const;
 
-/** Map frontend PascalCase role to DB snake_case role */
-function normalizeRole(role: string): string | null {
-  const map: Record<string, string> = {
-    jobseeker: "job_seeker",
-    job_seeker: "job_seeker",
-    recruiter: "recruiter",
-    employer: "employer",
-    // creator + affiliate are first-class roles (2026-06-13) — they map to
-    // themselves so the /people role facet filters correctly and a role
-    // change to creator/affiliate persists instead of silently coercing.
-    creator: "creator",
-    affiliate: "affiliate",
-    admin: "admin",
-  };
-  return map[role.toLowerCase()] ?? null;
+/** Roles a profile update may assign (creator + affiliate are first-class
+ *  since 2026-06-13). employee (invite-only) and super_admin are never
+ *  assignable here. */
+const PROFILE_ASSIGNABLE_ROLES: ReadonlySet<UserRole> = new Set<UserRole>([
+  USER_ROLES.JOB_SEEKER,
+  USER_ROLES.RECRUITER,
+  USER_ROLES.EMPLOYER,
+  USER_ROLES.CREATOR,
+  USER_ROLES.AFFILIATE,
+  // ADMIN / SUPER_ADMIN / EMPLOYEE are never self-assignable: admin is granted
+  // only through the SuperAdmin user console, employee only by invite.
+]);
+
+/** Inbound role spelling → canonical DB role, or null when not assignable. */
+function normalizeRole(role: string): UserRole | null {
+  const parsed = parseRoleAlias(role);
+  return parsed && PROFILE_ASSIGNABLE_ROLES.has(parsed) ? parsed : null;
 }
 
 // ============================================================================
@@ -166,7 +174,7 @@ function toPublicUserCardDto(r: {
     trimmedName
     || (r.externalPublicHandle ?? "").trim()
     || `User ${r.id.slice(0, 4)}`;
-  const { firstName, lastName } = splitName(fullName);
+  const { firstName, lastName } = splitPersonName(fullName);
   return {
     id: r.id,
     type: "people" as const,
@@ -265,7 +273,7 @@ function toUserProfileDto(
     categories: string[] | null;
   } | null,
 ) {
-  const { firstName, lastName } = splitName(row.name);
+  const { firstName, lastName } = splitPersonName(row.name);
   const profileUpdatedAt = profile?.updatedAt ?? row.updatedAt ?? row.createdAt;
 
   // Privacy gating: redact contact fields for non-owners when toggled off.
@@ -465,8 +473,7 @@ async function queryUserCards(
  * (or NULL — the default public) are returned. */
 userRoutes.get("/public", async (c) => {
   const db = getDb();
-  const page = Number(c.req.query("page") ?? 1) || 1;
-  const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 100);
+  const { page, limit } = parsePagination(c, { defaultLimit: 20, maxLimit: 100 });
   const offset = (page - 1) * limit;
 
   const baseConds = [
@@ -616,7 +623,7 @@ async function upsertProfile(userId: string, profileUpdates: Record<string, unkn
   if (profileUpdates.profileSections !== undefined) {
     invalidatePublicReferences(userId);
     await invalidatePartnerProfilesForUser(userId).catch((err) =>
-      console.warn("[users] partner profile invalidation failed:", err instanceof Error ? err.message : err),
+      logger.warn("[users] partner profile invalidation failed", { error: err instanceof Error ? err.message : err }),
     );
   }
   return profile;
@@ -640,7 +647,16 @@ const handleUpdateProfile = async (c: any) => {
 
   const userUpdates: Partial<{ name: string; email: string; role: string; updatedAt: Date }> = { updatedAt: new Date() };
   if (fullName) userUpdates.name = fullName;
-  if (d.email) userUpdates.email = d.email;
+  // Email changes go through the two-inbox verified flow
+  // (POST /api/auth/email-change/request); this route only accepts the
+  // address the session already has, so a stolen session can't silently
+  // re-home the account.
+  if (d.email && d.email.trim().toLowerCase() !== String(user.email ?? "").trim().toLowerCase()) {
+    return c.json(
+      error("EMAIL_CHANGE_REQUIRES_VERIFICATION", "Change your email from Settings › Security; both inboxes must confirm."),
+      409,
+    );
+  }
 
   const newRole = d.role ? normalizeRole(d.role) : null;
   if (newRole) userUpdates.role = newRole;
@@ -676,7 +692,7 @@ const handleUpdateProfile = async (c: any) => {
         try {
           await replaceOnboardingTasks(user.sub, newRole);
         } catch (err) {
-          console.error("[users/me] Failed to re-seed onboarding tasks:", err);
+          logger.error("[users/me] Failed to re-seed onboarding tasks", err);
         }
       })(),
     );
@@ -744,7 +760,7 @@ userRoutes.post("/connections", async (c) => {
           message: message || `${actorName} sent you a connection request.`,
           target: { id: conn.id, type: "connection" },
         },
-      ).catch((err) => console.error("[connections] notification insert failed:", err));
+      ).catch((err) => logger.error("[connections] notification insert failed", err));
 
       if (recipient?.email) {
         await sendConnectionRequestEmail(
@@ -753,10 +769,10 @@ userRoutes.post("/connections", async (c) => {
           actorName,
           from,
           parsed.data.message ?? null,
-        ).catch((err) => console.error("[connections] email send failed:", err));
+        ).catch((err) => logger.error("[connections] email send failed", err));
       }
     } catch (err) {
-      console.error("[connections] post-send side effects failed:", err);
+      logger.error("[connections] post-send side effects failed", err);
     }
   })();
 
@@ -843,7 +859,7 @@ userRoutes.get("/me/connections/search", async (c) => {
   const me = c.var.user.sub;
   const db = getDb();
   const q = (c.req.query("q") ?? "").trim();
-  const limit = Math.min(Math.max(Number(c.req.query("limit")) || 20, 1), 50);
+  const limit = clampLimit(c.req.query("limit"), 20, 50);
 
   const otherIds = await loadConnectionIds(db, me);
   if (otherIds.length === 0) return c.json(success({ items: [] }), 200);
@@ -902,6 +918,8 @@ userRoutes.put("/connections/:id/accept", async (c) => {
   invalidateCachedKey(connCardsKey(updated.fromUserId));
   invalidateCachedKey(connIdsKey(me));
   invalidateCachedKey(connIdsKey(updated.fromUserId));
+  // The request leaves the accepter's inbox "pending" list.
+  bumpInboxFor([me]);
 
   // Notify the original sender that their request was accepted.
   (async () => {
@@ -918,7 +936,7 @@ userRoutes.put("/connections/:id/accept", async (c) => {
           message: `You and ${actorName} are now connected on hired.video.`,
           target: { id: updated.id, type: "connection" },
         },
-      ).catch((err) => console.error("[connections] accept notification failed:", err));
+      ).catch((err) => logger.error("[connections] accept notification failed", err));
 
       // #1258 — if both users attended the same event in the last 30 days,
       // reward the networking the event drove (both sides earn once).
@@ -942,7 +960,7 @@ userRoutes.put("/connections/:id/accept", async (c) => {
         ]);
       }
     } catch (err) {
-      console.error("[connections] accept side effects failed:", err);
+      logger.error("[connections] accept side effects failed", err);
     }
   })();
 
@@ -1173,9 +1191,7 @@ userRoutes.get("/:id", async (c) => {
 
   const visibility = profile?.profileVisibility ?? "public";
   const isOwner = caller?.sub === me.id;
-  const isSuperAdmin =
-    caller?.isSuperAdmin === true ||
-    caller?.roles?.includes(USER_ROLES.SUPER_ADMIN);
+  const callerIsSuperAdmin = isSuperAdmin(caller);
 
   // Fetched up-front (not in the enrich Promise.all below) because two of
   // these flags participate in the visibility gates that follow:
@@ -1200,7 +1216,7 @@ userRoutes.get("/:id", async (c) => {
   const profileVisibleToPublic = privacyRow?.profileVisibleToPublic ?? true;
 
   // Private profiles are only visible to the owner (SuperAdmins bypass)
-  if (visibility === "private" && !isOwner && !isSuperAdmin) {
+  if (visibility === "private" && !isOwner && !callerIsSuperAdmin) {
     return c.json(error("FORBIDDEN", "This profile is private"), 403);
   }
 
@@ -1208,7 +1224,7 @@ userRoutes.get("/:id", async (c) => {
   // SuperAdmins. Returning 404 (rather than a verification-specific error)
   // avoids leaking the existence of half-created accounts to anonymous
   // callers — same shape as if the user simply didn't exist.
-  if (!me.emailVerified && !isOwner && !isSuperAdmin) {
+  if (!me.emailVerified && !isOwner && !callerIsSuperAdmin) {
     return c.json(error("NOT_FOUND", "User not found"), 404);
   }
 
@@ -1222,7 +1238,7 @@ userRoutes.get("/:id", async (c) => {
   // AuthOverlay) and are not blocked here so a creator can keep their
   // profile open to anonymous promotion traffic while keeping it hidden
   // from random signed-in users — the two axes are independent.
-  if (!profileVisibleToPublic && caller && !isOwner && !isSuperAdmin) {
+  if (!profileVisibleToPublic && caller && !isOwner && !callerIsSuperAdmin) {
     return c.json(error("FORBIDDEN", "This profile is private"), 403);
   }
 
@@ -1271,28 +1287,27 @@ userRoutes.get("/:id", async (c) => {
   }), 200);
 });
 
-const AVATAR_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const AVATAR_MAX_BYTES = 5 * MB;
 const AVATAR_ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
 /** POST /api/users/me/avatar — upload a new avatar (5MB, jpg/png/gif/webp only) */
 userRoutes.post("/me/avatar", async (c) => {
   const user = c.var.user;
-  const form = await c.req.formData().catch(() => null);
-  const part = (form?.get("avatar") ?? form?.get("file")) as File | null;
-
-  if (!part || typeof part.arrayBuffer !== "function") {
-    return c.json(error("VALIDATION_ERROR", "Missing avatar file in form field 'avatar'"), 400);
+  const up = await parseUpload(c, {
+    fields: ["avatar", "file"],
+    mimes: AVATAR_ALLOWED_TYPES,
+    maxBytes: AVATAR_MAX_BYTES,
+    messages: {
+      missing: "Missing avatar file in form field 'avatar'",
+      type: (contentType) => `Only jpg, png, gif, and webp images are allowed. Got: ${contentType}`,
+      size: (fileBytes) => `Avatar must be under 5 MB. File is ${(fileBytes / MB).toFixed(1)} MB`,
+    },
+  });
+  if (isUploadRejected(up)) {
+    // 400 missing / 415 wrong type stay VALIDATION_ERROR; 413 is PAYLOAD_TOO_LARGE.
+    return c.json(error(up.code === "PAYLOAD_TOO_LARGE" ? up.code : "VALIDATION_ERROR", up.message), up.status);
   }
-
-  const contentType = part.type || "application/octet-stream";
-  if (!AVATAR_ALLOWED_TYPES.has(contentType)) {
-    return c.json(error("VALIDATION_ERROR", `Only jpg, png, gif, and webp images are allowed. Got: ${contentType}`), 415);
-  }
-
-  const bytes = await part.arrayBuffer();
-  if (bytes.byteLength > AVATAR_MAX_BYTES) {
-    return c.json(error("PAYLOAD_TOO_LARGE", `Avatar must be under 5 MB. File is ${(bytes.byteLength / 1024 / 1024).toFixed(1)} MB`), 413);
-  }
+  const { file: part, bytes, contentType } = up;
 
   const ext = part.name?.split(".").pop()?.toLowerCase() ?? "jpg";
   const key = `uploads/${user.sub}/avatars/${crypto.randomUUID()}.${ext}`;
@@ -1326,7 +1341,7 @@ userRoutes.post("/me/avatar", async (c) => {
   const previousKey = r2KeyFromCdnUrl(previous?.avatarUrl);
   if (previousKey && previousKey !== key && previousKey.startsWith(`uploads/${user.sub}/avatars/`)) {
     c.executionCtx.waitUntil(
-      deleteUserObjects(user.sub, [previousKey]).catch((err) => console.warn("[avatar] old avatar not reclaimed:", err)),
+      deleteUserObjects(user.sub, [previousKey]).catch((err) => logger.warn("[avatar] old avatar not reclaimed", err)),
     );
   }
 

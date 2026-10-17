@@ -7,7 +7,7 @@
  * Sections (in order):
  *   1. Hero — sector label + tagline + honest AI-resilience chip
  *   2. AI-resilience reality check + example roles + licensure notes
- *   3. Live jobs in this sector (top 8 from `/api/Job?sector=…`,
+ *   3. Live jobs in this sector (top 8 from `/api/jobs?sector=…`,
  *      omitted for content-only sectors like politics_civic)
  *   4. Top articles in this sector (top 4 from `/api/articles/public?sector=…`)
  *   5. Recommended resume template + link to gallery

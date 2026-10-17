@@ -35,9 +35,8 @@ export default function TemplatesReview() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get("/api/admin/templates-review");
-      const body = (res as any).data?.data ?? (res as any).data ?? {};
-      setItems((body.items ?? []) as PendingItem[]);
+      const body = await apiClient.fetchData<{ items?: PendingItem[] }>("/api/admin/templates-review");
+      setItems(body?.items ?? []);
     } catch (err) {
       toast.error("Failed to load review queue");
     } finally {

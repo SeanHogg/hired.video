@@ -18,7 +18,7 @@ import type { Db } from "../../db/index.js";
 import {
   creatorYoutubeIngests,
   type CreatorYoutubeIngest,
-} from "../../db/schema/creator.js";
+} from "../../db/schema/creators.js";
 
 // `drizzle-orm/postgres-js` + the `postgres` package don't bundle for
 // Cloudflare Workers — see profile-mode.ts for the full story. Use the

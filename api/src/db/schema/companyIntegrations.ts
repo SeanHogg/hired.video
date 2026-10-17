@@ -44,6 +44,7 @@ export const companyIntegrations = pgTable("company_integrations", {
   index("idx_company_integrations_status").on(t.status),
   check("company_integrations_access_token_enc_enc_format_check", sql`${t.accessTokenEnc} IS NULL OR ${t.accessTokenEnc} LIKE 'v1.aes-gcm.hkdf:%' OR ${t.accessTokenEnc} ~ '^[A-Za-z0-9+/=]+\\.[A-Za-z0-9+/=]+$' OR ${t.accessTokenEnc} ~ '^[0-9a-fA-F]+:[0-9a-fA-F]+$'`),
   check("company_integrations_refresh_token_enc_enc_format_check", sql`${t.refreshTokenEnc} IS NULL OR ${t.refreshTokenEnc} LIKE 'v1.aes-gcm.hkdf:%' OR ${t.refreshTokenEnc} ~ '^[A-Za-z0-9+/=]+\\.[A-Za-z0-9+/=]+$' OR ${t.refreshTokenEnc} ~ '^[0-9a-fA-F]+:[0-9a-fA-F]+$'`),
+  index("idx_company_integrations_connected_by_user_id").on(t.connectedByUserId),
 ]);
 
 export type CompanyIntegration = typeof companyIntegrations.$inferSelect;

@@ -86,7 +86,7 @@ class JobBoardService {
    * Get available job boards for distribution
    */
   async getAvailableJobBoards(): Promise<JobBoardDTO[]> {
-    const response = await apiClient.get("/api/Communication/job-boards");
+    const response = await apiClient.get("/api/communication/job-boards");
     return z.array(JobBoardDTOSchema).parse(response.data);
   }
 
@@ -97,7 +97,7 @@ class JobBoardService {
     request: PostJobToBoardsRequest
   ): Promise<JobBoardPostingDTO[]> {
     const response = await apiClient.post(
-      "/api/Communication/job-boards/post",
+      "/api/communication/job-boards/post",
       request
     );
     return z.array(JobBoardPostingDTOSchema).parse(response.data);
@@ -108,7 +108,7 @@ class JobBoardService {
    */
   async getPostingsForJob(jobId: string): Promise<JobBoardPostingDTO[]> {
     const response = await apiClient.get(
-      `/api/Communication/job-boards/jobs/${jobId}/postings`
+      `/api/communication/job-boards/jobs/${jobId}/postings`
     );
     return z.array(JobBoardPostingDTOSchema).parse(response.data);
   }
@@ -131,7 +131,7 @@ class JobBoardService {
     if (filters?.pageSize) params.append("pageSize", filters.pageSize.toString());
 
     const response = await apiClient.get(
-      `/api/Communication/job-boards/postings?${params.toString()}`
+      `/api/communication/job-boards/postings?${params.toString()}`
     );
     return z.array(JobBoardPostingDTOSchema).parse(response.data);
   }
@@ -148,7 +148,7 @@ class JobBoardService {
     if (filters?.endDate) params.append("endDate", filters.endDate);
 
     const response = await apiClient.get(
-      `/api/Communication/job-boards/stats?${params.toString()}`
+      `/api/communication/job-boards/stats?${params.toString()}`
     );
     return JobBoardStatsDTOSchema.parse(response.data);
   }
@@ -158,7 +158,7 @@ class JobBoardService {
    */
   async removeJobBoardPosting(postingId: string): Promise<boolean> {
     const response = await apiClient.delete(
-      `/api/Communication/job-boards/postings/${postingId}`
+      `/api/communication/job-boards/postings/${postingId}`
     );
     return response.data === true;
   }

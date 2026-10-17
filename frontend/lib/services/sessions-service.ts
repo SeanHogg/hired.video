@@ -1,5 +1,5 @@
 /**
- * Sessions service — wraps the /api/auth/sessions endpoints.
+ * Sessions service — wraps the /api/auth/oauth/sessions endpoints (routes/oauth.ts).
  *
  * Single source of truth for session ops on the FE. Both the user-facing
  * /security/sessions page AND the SuperAdmin "view this user's sessions"
@@ -35,18 +35,18 @@ export const SessionsListSchema = z.array(SessionSchema);
 export const sessionsService = {
   /** List the caller's active sessions, oldest-first. */
   async list(): Promise<SessionRow[]> {
-    const res = await apiClient.get<SessionRow[]>("/api/auth/sessions", SessionsListSchema);
+    const res = await apiClient.get<SessionRow[]>("/api/auth/oauth/sessions", SessionsListSchema);
     return res.data;
   },
 
   /** Revoke a specific device. Backend rejects with 404 if the id
    *  doesn't belong to the caller — caller doesn't need to scope. */
   async revoke(id: string): Promise<void> {
-    await apiClient.delete(`/api/auth/sessions/${encodeURIComponent(id)}`);
+    await apiClient.delete(`/api/auth/oauth/sessions/${encodeURIComponent(id)}`);
   },
 
   /** Revoke every session except the caller's current one. */
   async revokeAllOthers(): Promise<void> {
-    await apiClient.delete("/api/auth/sessions");
+    await apiClient.delete("/api/auth/oauth/sessions");
   },
 };

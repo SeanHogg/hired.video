@@ -29,6 +29,7 @@ export const couponCodes = pgTable(
     check("coupon_codes_duration_days_check", sql`${t.durationDays} BETWEEN 1 AND 365`),
     check("coupon_codes_max_redemptions_check", sql`${t.maxRedemptions} IS NULL OR ${t.maxRedemptions} > 0`),
     check("coupon_codes_redemption_count_check", sql`${t.redemptionCount} >= 0`),
+    index("idx_coupon_codes_created_by").on(t.createdBy),
   ],
 );
 

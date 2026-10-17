@@ -63,6 +63,7 @@ export const communityResources = pgTable(
     index("idx_community_resources_submitter").on(t.submittedBy, t.createdAt),
     index("idx_community_resources_geo_ids").on(t.countryGeoId, t.stateGeoId, t.status),
     check("community_resources_status_check", sql`${t.status} IN ('pending','approved','rejected')`),
+    index("idx_community_resources_reviewed_by").on(t.reviewedBy),
   ],
 );
 

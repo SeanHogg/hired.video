@@ -71,8 +71,12 @@ describe("0534_candidate_video_consents.sql", () => {
   it("every index it creates is declared in the schema under the same name", () => {
     const declared = new Map(getTableConfig(candidateVideoConsents).indexes.map((i) => [i.config.name, i.config]));
     const created = [...sql.matchAll(/CREATE (UNIQUE )?INDEX IF NOT EXISTS (\w+)/g)].map((m) => ({ unique: !!m[1], name: m[2] }));
-    assert.deepEqual(created.map((c) => c.name).sort(), [...declared.keys()].sort());
-    for (const c of created) assert.equal(!!declared.get(c.name)?.unique, c.unique, c.name);
+    // Later migrations may add more (0547 adds the FK indexes), so 0534's set
+    // must be a subset of what the schema declares — push --force drops the rest.
+    for (const c of created) {
+      assert.ok(declared.has(c.name), `${c.name} is declared`);
+      assert.equal(!!declared.get(c.name)?.unique, c.unique, c.name);
+    }
   });
 });
 

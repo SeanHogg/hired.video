@@ -2,6 +2,8 @@ import { apiClient } from "@/lib/api-client";
 import type { ApiSuccessResponse } from "@shared/api";
 import type { InitCollectionResult } from "@/lib/payment/types";
 import type { UsageInvoice, UsageStatement } from "@shared/usage-statement";
+import type { CourseCheckoutReceipt } from "@shared/checkout";
+import { checkoutService } from "@/lib/services/checkout-service";
 
 // Shared pricing constants
 import { FREE_AI_MONTHLY_LIMIT, FREE_AI_MONTHLY_TOKENS } from "@shared/pricing";
@@ -38,17 +40,8 @@ export interface PaymentMethod {
   isDefault: boolean;
 }
 
-export interface CoursePurchase {
-  id: string;
-  courseId: string;
-  courseTitle: string;
-  courseSlug: string;
-  totalCents: number;
-  status: string;
-  paidAt: string | null;
-  enrollmentId: string | null;
-  createdAt: string;
-}
+/** A paid course purchase (receipt) — GET /api/checkout/mine?kind=course. */
+export type CoursePurchase = CourseCheckoutReceipt;
 
 export interface Invoice {
   id: string;
@@ -75,7 +68,7 @@ export interface AIUsageMonth {
 }
 
 /**
- * Full token-budget summary returned by /api/Billing/token-budget. This is
+ * Full token-budget summary returned by /api/billing/token-budget. This is
  * the new shape used by the sidebar AITokenPill, AIUsageLimitBanner, and
  * the "buy more tokens" sheet. It surfaces both the monthly subscription
  * allowance and the purchased pack balance, plus the combined total.
@@ -118,7 +111,7 @@ export interface InboxSeatState {
 export const billingService = {
   async getSubscription(): Promise<SubscriptionSummary> {
     const res: ApiSuccessResponse<SubscriptionSummary> = await apiClient.get(
-      "/api/Billing/subscription",
+      "/api/billing/subscription",
     );
     return res.data;
   },
@@ -126,14 +119,14 @@ export const billingService = {
 
   async getPaymentMethods(): Promise<PaymentMethod[]> {
     const res: ApiSuccessResponse<PaymentMethod[]> = await apiClient.get(
-      "/api/Billing/payment-methods",
+      "/api/billing/payment-methods",
     );
     return res.data;
   },
 
   async getInvoices(): Promise<Invoice[]> {
     const res: ApiSuccessResponse<Invoice[]> = await apiClient.get(
-      "/api/Billing/invoices",
+      "/api/billing/invoices",
     );
     return res.data;
   },
@@ -141,10 +134,7 @@ export const billingService = {
   /** The caller's paid course purchases (separate ledger from subscription
    *  invoices). Powers the billing "My courses" receipts view. */
   async getCoursePurchases(): Promise<CoursePurchase[]> {
-    const res: ApiSuccessResponse<CoursePurchase[]> = await apiClient.get(
-      "/api/course-checkout/mine",
-    );
-    return res.data ?? [];
+    return checkoutService.listMine("course");
   },
 
   /**
@@ -156,7 +146,7 @@ export const billingService = {
   async getUsageStatement(month?: string): Promise<UsageStatement> {
     const qs = month ? `?month=${encodeURIComponent(month)}` : "";
     const res: ApiSuccessResponse<UsageStatement> = await apiClient.get(
-      `/api/Billing/usage-statement${qs}`,
+      `/api/billing/usage-statement${qs}`,
     );
     return res.data;
   },
@@ -165,14 +155,14 @@ export const billingService = {
    *  `$0 free_zero` Free Invoices alongside paid invoices. */
   async getUsageInvoices(): Promise<UsageInvoice[]> {
     const res: ApiSuccessResponse<UsageInvoice[]> = await apiClient.get(
-      "/api/Billing/usage-invoices",
+      "/api/billing/usage-invoices",
     );
     return res.data;
   },
 
   async getMonthlyAIUsage(): Promise<AIUsageMonth> {
     const res: ApiSuccessResponse<AIUsageMonth> = await apiClient.get(
-      "/api/Billing/ai-usage/month",
+      "/api/billing/ai-usage/month",
     );
     // Ensure remaining computed when backend didn't provide it.
     // Note: legacy `FREE_AI_MONTHLY_LIMIT` is the request-count value (10).
@@ -195,7 +185,7 @@ export const billingService = {
    */
   async getTokenBudget(): Promise<TokenBudget> {
     const res: ApiSuccessResponse<TokenBudget> = await apiClient.get(
-      "/api/Billing/token-budget",
+      "/api/billing/token-budget",
     );
     const t = res.data;
     // Defensive: ensure remaining/totalAvailable are computed if the backend
@@ -214,7 +204,7 @@ export const billingService = {
 
   async createSetupSession(successUrl: string, cancelUrl: string): Promise<string> {
     const res: ApiSuccessResponse<{ Url: string }> = await apiClient.post(
-      "/api/Payment/create-setup-session",
+      "/api/payment/create-setup-session",
       { successUrl, cancelUrl }
     );
     return res.data.Url;
@@ -237,7 +227,7 @@ export const billingService = {
   /** Current inbox-seat add-on state (extra mailboxes above the included base). */
   async getInboxSeats(): Promise<InboxSeatState> {
     const res: ApiSuccessResponse<InboxSeatState> = await apiClient.get(
-      "/api/Billing/inbox-seats",
+      "/api/billing/inbox-seats",
     );
     return res.data;
   },
@@ -250,7 +240,7 @@ export const billingService = {
    */
   async setInboxSeats(quantity: number): Promise<InboxSeatState> {
     const res: ApiSuccessResponse<InboxSeatState> = await apiClient.patch(
-      "/api/Billing/inbox-seats",
+      "/api/billing/inbox-seats",
       { quantity },
     );
     return res.data;
@@ -258,7 +248,7 @@ export const billingService = {
 
   async deletePaymentMethod(paymentMethodId: string): Promise<string> {
     const { data } = await apiClient.requestRaw<{ message: string }>(
-      `/api/Payment/payment-methods/${paymentMethodId}`,
+      `/api/payment/payment-methods/${paymentMethodId}`,
       { method: "DELETE" },
     );
     return data.message;

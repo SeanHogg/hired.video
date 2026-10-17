@@ -19,6 +19,7 @@ import { socialConnectionServiceFor } from "../services/social/social-connection
 import { SocialConnectionError } from "../services/social/social-connection-service.js";
 import { SecretsError } from "../services/social/secrets.js";
 import type { SocialOAuthState } from "../services/social/social-oauth.js";
+import { logger } from "../lib/logger.js";
 
 /** Mirrors the frontend's IntegrationOAuthFailure (lib/studio/integration-oauth.ts). */
 export type SocialCallbackFailure =
@@ -75,7 +76,7 @@ export function socialOAuthCallbackHandler(opts: SocialCallbackOptions) {
       const { handle } = await service.completeCallback(verified, code);
       return back("connected", { handle });
     } catch (err) {
-      console.error(`[social-oauth] ${verified.scope} ${verified.platform} callback failed:`, err);
+      logger.error("[social-oauth] callback failed", { scope: verified.scope, platform: verified.platform, error: err });
       return back("error", { reason: socialCallbackFailureReason(err) });
     }
   };

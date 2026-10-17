@@ -68,12 +68,20 @@ function BotBlockGlobeInner() {
 
   useEffect(() => {
     void refresh();
-    // Live-feed: 5-second poll while the panel is mounted. Cheap because
-    // the backend aggregates with a single COUNT per group, and the
-    // bot_block_events table is already indexed on (created_at). When
-    // the operator switches range, the polling restarts on the new range.
-    const id = setInterval(() => void refresh(), 5000);
-    return () => clearInterval(id);
+    // Live-feed: 30-second poll while the panel is mounted AND visible —
+    // a backgrounded admin tab stops polling and catches up on return.
+    // When the operator switches range, polling restarts on the new range.
+    const id = setInterval(() => {
+      if (!document.hidden) void refresh();
+    }, 30_000);
+    const onVisible = () => {
+      if (!document.hidden) void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [refresh]);
 
   const topCountry = stats?.byCountry

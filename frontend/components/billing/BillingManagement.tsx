@@ -65,13 +65,14 @@ export function BillingManagement() {
           const purchases = await billingService.getCoursePurchases();
           if (isMounted) setCoursePurchases(purchases);
         } else if (activeTab === "refunds") {
-          const [refunds, cancellations] = await Promise.all([
+          // Each list loads independently — one failing must not blank the other.
+          const [refunds, cancellations] = await Promise.allSettled([
             refundService.getRefundRequests(),
             refundService.getCancellationRequests(),
           ]);
           if (isMounted) {
-            if (refunds.success) setRefundRequests(refunds.data || []);
-            if (cancellations.success) setCancellationRequests(cancellations.data || []);
+            if (refunds.status === "fulfilled") setRefundRequests(refunds.value ?? []);
+            if (cancellations.status === "fulfilled") setCancellationRequests(cancellations.value ?? []);
           }
         }
       } catch (error) {
@@ -432,11 +433,10 @@ export function BillingManagement() {
         onSuccess={() => {
           // Reload refund requests
           if (activeTab === "refunds") {
-            refundService.getRefundRequests().then((response) => {
-              if (response.success) {
-                setRefundRequests(response.data || []);
-              }
-            });
+            refundService
+              .getRefundRequests()
+              .then((requests) => setRefundRequests(requests ?? []))
+              .catch(() => undefined);
           }
         }}
         subscriptionId={subscription?.providerSubscriptionId}

@@ -6,12 +6,14 @@
 import { z } from "zod";
 import { logger } from "../logger";
 import { apiClient } from "../api-client";
+import { decodeJwtPayload, getAuthToken } from "../api/auth-token";
 import { UnverifiedAccountError } from "../errors";
 import {
   isVerificationKnownBlocked,
   setVerificationGate,
 } from "../verification-gate";
 import {
+  LoginRequestSchema as SharedLoginRequestSchema,
   LoginResponseSchema as SharedLoginResponseSchema,
   TwoFactorChallengeSchema,
   EmailVerificationChallengeSchema,
@@ -20,15 +22,13 @@ import {
   type EmailVerificationChallenge,
 } from "@shared/api";
 import { USER_ROLES } from "@shared/user-roles";
-import { PublicUserSchema, type PublicUser } from "./user-service";
+import { PublicUserSchema, type PublicUser } from "./public-user-schema";
 
 // ============================================================================
 // SCHEMAS
 // ============================================================================
 
-export const LoginRequestSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+export const LoginRequestSchema = SharedLoginRequestSchema.extend({
   rememberMe: z.boolean().optional(),
   // Cloudflare Turnstile token from the login widget. Required by the
   // backend when TURNSTILE_SECRET_KEY is set; see Login.tsx.
@@ -547,6 +547,15 @@ export class AuthService {
    * path they would on a real 403 response.
    */
   async getCurrentUser(): Promise<UserProfile> {
+    return this.normalizeAndPersist(await this.fetchCurrentUserDto());
+  }
+
+  /**
+   * The ONE owner of `GET /api/users/me`. Returns the raw wire DTO so other
+   * projections (userService.getCurrentUser → public-profile shape) reuse
+   * this call instead of re-issuing their own.
+   */
+  async fetchCurrentUserDto(): Promise<UserProfileDTO> {
     if (isVerificationKnownBlocked()) {
       logger.info("authService.getCurrentUser: skipped (email not verified)");
       throw new UnverifiedAccountError("Email verification required");
@@ -557,7 +566,7 @@ export class AuthService {
       UserProfileDTOSchema,
     );
     logger.info("authService.getCurrentUser: response received");
-    return this.normalizeAndPersist(response.data);
+    return response.data;
   }
 
   /**
@@ -613,58 +622,25 @@ export class AuthService {
   }
 
   /**
-   * Refresh authentication token
-   */
-  async refreshToken(): Promise<LoginResponse> {
-    const refreshToken = localStorage.getItem(this.refreshTokenKey);
-    if (!refreshToken) {
-      throw new Error("No refresh token available");
-    }
-
-    const response = await apiClient.post<LoginResponse>(
-      "/api/auth/refresh",
-      { refreshToken },
-      LoginResponseSchema,
-    );
-
-    // Store new authentication data
-    this.storeAuthData(response.data);
-
-    return response.data;
-  }
-
-  /**
    * Check if user is authenticated
    */
   isAuthenticated(): boolean {
-    const token = localStorage.getItem(this.tokenKey);
+    const token = getAuthToken();
     if (!token) return false;
 
-    // Check if token is expired using robust base64url decoding for JWT
-    try {
-      const parts = token.split(".");
-      if (parts.length < 2) return false;
-      const base64Url = parts[1];
-      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-      const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-      const json = atob(padded);
-      const payload = JSON.parse(json) as { exp?: number };
-      if (typeof payload.exp !== "number") {
-        // If no exp present, assume valid (backend should include exp)
-        return true;
-      }
-      const currentTime = Date.now() / 1000;
-      return payload.exp > currentTime;
-    } catch {
-      return false;
-    }
+    // Check if the token is expired (base64url JWT payload decode).
+    const payload = decodeJwtPayload<{ exp?: unknown }>(token);
+    if (!payload) return false;
+    // If no exp present, assume valid (backend should include exp)
+    if (typeof payload.exp !== "number") return true;
+    return payload.exp > Date.now() / 1000;
   }
 
   /**
    * Get stored authentication token
    */
   getToken(): string | null {
-    return localStorage.getItem(this.tokenKey);
+    return getAuthToken();
   }
 
   /**

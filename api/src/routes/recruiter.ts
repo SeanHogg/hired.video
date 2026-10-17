@@ -11,6 +11,7 @@ import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-
 import { buildAIErrorEnvelope, type AIErrorEnvelope } from "../services/adapters/llm-error.js";
 import { TALENT_POOL_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import { NON_CANDIDATE_ROLES } from "../../../shared/user-roles.js";
+import { tryExtractJson } from "../../../shared/extract-json.js";
 import { normalizeJobUrl, computeContentHash } from "../services/job/JobService.js";
 import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "../services/company/recruiter-match.js";
 import {
@@ -35,6 +36,8 @@ import {
 	isPlacementEvent,
 } from "../services/notifications/placement-notifications.js";
 import { renderCandidatePacketHtml } from "../services/recruiter/packet-renderer.js";
+import { logger } from "../lib/logger.js";
+import { signalWork } from "../services/scheduling/work-signals.js";
 
 export const recruiterRoutes = new Hono<AppEnv>();
 
@@ -632,7 +635,7 @@ recruiterRoutes.post("/placements", async (c) => {
 		await svc.subscribeAll(placement.id, user.sub);
 		await svc.notifyEvent(placement.id, "signed");
 	} catch (err) {
-		console.warn("[recruiter] placement signed-notify failed", err);
+		logger.warn("[recruiter] placement signed-notify failed", err);
 	}
 	return c.json(responseEnvelope(rowToPlacement(placement)));
 });
@@ -903,7 +906,7 @@ recruiterRoutes.put("/placements/:id/guarantee", async (c) => {
 		try {
 			await buildPlacementNotificationService(db).notifyEvent(id, "guarantee_met");
 		} catch (err) {
-			console.warn("[recruiter] placement guarantee-notify failed", err);
+			logger.warn("[recruiter] placement guarantee-notify failed", err);
 		}
 	}
 	return c.json(responseEnvelope(rowToPlacement(updated)));
@@ -1267,10 +1270,10 @@ recruiterRoutes.post("/agent/source", async (c) => {
 
 Respond ONLY with valid JSON: {"score":..,"scoreReason":"..","outreachDraft":".."}`;
 				const { content } = await llm.callText("recruiter_agent_score", { useCase: "recruiter_match", systemPrompt: "", userMessage: prompt });
-				const parsed = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
-				if (parsed.score) score = Math.min(100, Math.max(0, Number(parsed.score)));
-				if (parsed.scoreReason) scoreReason = parsed.scoreReason;
-				if (parsed.outreachDraft) outreachDraft = parsed.outreachDraft;
+				const parsed = tryExtractJson<{ score?: number | string; scoreReason?: string; outreachDraft?: string }>(content);
+				if (parsed?.score) score = Math.min(100, Math.max(0, Number(parsed.score)));
+				if (parsed?.scoreReason) scoreReason = parsed.scoreReason;
+				if (parsed?.outreachDraft) outreachDraft = parsed.outreachDraft;
 			} catch { /* keep heuristic defaults */ }
 		}
 
@@ -1445,6 +1448,7 @@ recruiterRoutes.post("/agent/followups/schedule", async (c) => {
 			status: "pending",
 		})
 		.returning() as any);
+	await signalWork("recruiter-agent-followups", scheduledFor);
 
 	return c.json(responseEnvelope(row), 200);
 });
@@ -1666,14 +1670,8 @@ Return JSON: { "name": "...", "title": "...", "company": "...", "location": "...
 	};
 	extracted.contactInfo = contactInfo;
 
-	const hashInput = [extracted.name, extracted.title]
-		.map((s) => (s ?? "").toLowerCase().replace(/[^a-z0-9]/g, ""))
-		.join("|");
-	const hashBytes = new TextEncoder().encode(hashInput);
-	const digest = await crypto.subtle.digest("SHA-256", hashBytes);
-	const contentHash = Array.from(new Uint8Array(digest))
-		.map((b) => b.toString(16).padStart(2, "0"))
-		.join("");
+	// Same normalise-then-SHA-256 fingerprint as job dedup (name|title).
+	const contentHash = await computeContentHash(extracted.name, extracted.title);
 
 	if (!force) {
 		const [existing] = await db
@@ -1727,6 +1725,7 @@ Return JSON: { "name": "...", "title": "...", "company": "...", "location": "...
 			payload: { recruiterId, candidateId: candidate.id },
 			priority: 1,
 		} as any);
+		await signalWork("job-queue");
 	} catch { /* non-critical */ }
 
 	return {
@@ -1881,6 +1880,7 @@ recruiterRoutes.post("/match/score-candidates", async (c) => {
 		payload: { recruiterId: user.sub, jobId },
 		priority: 1,
 	} as any).returning();
+	await signalWork("job-queue");
 
 	return c.json(success({
 		queueId: queueEntry.id,
@@ -1903,6 +1903,7 @@ recruiterRoutes.post("/match/score-jobs", async (c) => {
 		payload: { recruiterId: user.sub, candidateId },
 		priority: 1,
 	} as any).returning();
+	await signalWork("job-queue");
 
 	return c.json(success({ queueId: queueEntry.id }), 202);
 });
@@ -2215,6 +2216,7 @@ recruiterRoutes.post("/sequences/:id/enroll", async (c) => {
 			currentStep: 0,
 			nextSendAt,
 		} as any).returning();
+		await signalWork("recruiter-outreach", nextSendAt);
 		return c.json(success(row), 201);
 	} catch {
 		return c.json(success({ duplicate: true }), 200);

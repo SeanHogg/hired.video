@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { creatorService, type CreatorProfile } from "@/lib/services/creator-service";
+import { useCreatorMine } from "@/hooks/queries/use-creator";
 
 interface Props {
   onProfileChange?: (next: CreatorProfile) => void;
@@ -22,37 +23,27 @@ interface Props {
 export default function CreatorProfileForm({ onProfileChange }: Props = {}) {
   const { toast } = useToast();
 
-  const [profile, setProfile] = useState<CreatorProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const mine = useCreatorMine();
+  const profile = mine.isError ? null : (mine.data ?? null);
+  const loading = mine.isPending && mine.fetchStatus !== "idle";
   const [saving, setSaving] = useState(false);
 
   const [displayName, setDisplayName] = useState("");
   const [tagline, setTagline] = useState("");
   const [bio, setBio] = useState("");
 
+  // Seed the editable fields whenever a fresh profile row lands.
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    creatorService.getMine()
-      .then((p) => {
-        if (cancelled) return;
-        setProfile(p);
-        if (p) {
-          setDisplayName(p.displayName ?? "");
-          setTagline(p.tagline ?? "");
-          setBio(p.bio ?? "");
-        }
-      })
-      .catch(() => { if (!cancelled) setProfile(null); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
+    if (!profile) return;
+    setDisplayName(profile.displayName ?? "");
+    setTagline(profile.tagline ?? "");
+    setBio(profile.bio ?? "");
+  }, [profile]);
 
   const save = async () => {
     setSaving(true);
     try {
       const updated = await creatorService.updateProfile({ displayName, tagline, bio });
-      setProfile(updated);
       onProfileChange?.(updated);
       toast({ title: "Saved", description: "Creator profile updated." });
     } catch (e: unknown) {

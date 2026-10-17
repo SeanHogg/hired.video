@@ -18,7 +18,6 @@ import { rewriteLinksForClickTracking } from "./campaign-links.js";
 import { buildRepos } from "../../repositories/index.js";
 import { USER_ROLES } from "../../../../shared/user-roles.js";
 import {
-  CAMPAIGN_STATUS_LABELS,
   renderTemplateBody,
   type AudiencePreview,
   type CampaignAudience,
@@ -41,6 +40,10 @@ import type {
   RecipientStatCounts,
   TemplateRow,
 } from "../../repositories/campaignRepository.js";
+import { logger } from "../../lib/logger.js";
+import { getEnv } from "../../utils/env.js";
+import { frontendBaseUrl } from "../../utils/public-urls.js";
+import { signalWork } from "../scheduling/work-signals.js";
 
 const LIST_CACHE_KEY = "campaigns:list:all";
 const LIST_CACHE_TTL = 60;
@@ -72,19 +75,6 @@ export interface CreateCampaignContext {
   createdByUserId: string;
   /** Sender attribution — the hired.video platform company for SA marketing. */
   senderCompanyId?: string | null;
-}
-
-function getEnv(key: string): string {
-  return (
-    process.env[key] ||
-    ((globalThis as any).__ENV?.[key] as string | undefined) ||
-    ""
-  );
-}
-
-function frontendBase(): string {
-  const url = getEnv("FRONTEND_URL");
-  return url.split(",")[0]?.trim().replace(/\/$/, "") || "https://hired.video";
 }
 
 export class CampaignService {
@@ -199,6 +189,7 @@ export class CampaignService {
       createdByUserId: ctx.createdByUserId,
     } as any);
     this.bust();
+    if (row.status === "scheduled" || row.status === "sending") await signalWork("campaigns");
     return this.toDTO(row, EMPTY_STATS);
   }
 
@@ -219,6 +210,7 @@ export class CampaignService {
     const row = await this.repo.updateCampaign(id, patch as any);
     if (!row) return null;
     this.bust();
+    if (row.status === "scheduled" || row.status === "sending") await signalWork("campaigns");
     return this.toDTO(row, await this.repo.countRecipientStats(id));
   }
 
@@ -243,6 +235,7 @@ export class CampaignService {
       scheduledAt: when,
     } as any);
     this.bust();
+    await signalWork("campaigns", when);
     return { ok: true, campaign: this.toDTO(updated!, await this.repo.countRecipientStats(id)) };
   }
 
@@ -250,6 +243,7 @@ export class CampaignService {
     const row = await this.repo.updateCampaign(id, { status } as any);
     if (!row) return null;
     this.bust();
+    if (status === "scheduled" || status === "sending") await signalWork("campaigns");
     return this.toDTO(row, await this.repo.countRecipientStats(id));
   }
 
@@ -382,7 +376,7 @@ export class CampaignService {
         sent += r.sent;
         failed += r.failed;
       } catch (err) {
-        console.error(`[campaigns] send batch failed for ${campaign.id}:`, err);
+        logger.error("[campaigns] send batch failed", { campaignId: campaign.id, error: err });
       }
     }
     if (promotedRows.length > 0 || processed > 0) this.bust();
@@ -399,7 +393,7 @@ export class CampaignService {
       const audience = campaign.audience as CampaignAudience | null;
       if (!audience) {
         await this.repo.updateCampaign(campaign.id, { status: "cancelled" } as any);
-        console.warn(`[campaigns] ${campaign.id} has no audience — cancelling`);
+        logger.warn("[campaigns] campaign has no audience — cancelling", { campaignId: campaign.id });
         return { sent: 0, failed: 0 };
       }
       const category = isMarketingCategory(campaign.category)
@@ -427,7 +421,7 @@ export class CampaignService {
     const content = await this.resolveContent(campaign);
     if (!content) {
       await this.repo.updateCampaign(campaign.id, { status: "paused" } as any);
-      console.warn(`[campaigns] ${campaign.id} has no body — pausing`);
+      logger.warn("[campaigns] campaign has no body — pausing", { campaignId: campaign.id });
       return { sent: 0, failed: 0 };
     }
 
@@ -582,7 +576,7 @@ export class CampaignService {
     userId: string | null,
     recipientId: string,
   ): Promise<string> {
-    const base = frontendBase();
+    const base = frontendBaseUrl();
     const trackedInner = await rewriteLinksForClickTracking(inner, recipientId, base);
     const { unsubscribeUrl, manageUrl } = await this.consent.footerLinks(email, userId);
     const pixel = `${base}/api/campaigns/open/${recipientId}.png`;
@@ -609,9 +603,4 @@ export class CampaignService {
   private bust(): void {
     invalidateCachedKey(LIST_CACHE_KEY);
   }
-}
-
-/** Label helper re-exported for routes that surface status in audit metadata. */
-export function campaignStatusLabel(status: string): string {
-  return CAMPAIGN_STATUS_LABELS[status as CampaignStatus] ?? status;
 }

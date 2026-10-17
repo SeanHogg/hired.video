@@ -24,13 +24,21 @@ routes = [
   "cdn.hired.video/*",
 ]
 
-# Cron triggers — the scheduled() handler in worker.ts dispatches every
-# registered cron tick into runScheduled(), which in turn fans out to the
-# follow-up drip processor, the job queue, the registered-worker dispatcher,
-# the monthly usage close, and the email-integration sweep. Each downstream
-# gates itself by date/time so a single /5 tick is enough.
+# Cron triggers — worker.ts scheduled() → runScheduled(event.cron), which
+# dispatches per schedule (api/src/services/scheduling/cron-plan.ts — keep
+# CRON_SCHEDULES there identical to this list):
+#   "*/5 * * * *"  TICK      KV-gated work queues; an idle tick makes ZERO
+#                            Postgres queries so Neon compute can suspend
+#   "*/15 * * * *" INTERVAL  registered workers, explicit-scan backfill,
+#                            paid-media report resume, :00/:30 job scrape
+#   "2 * * * *"    HOURLY    KV marker reconcile + daily/weekly/monthly jobs
+#                            selected by UTC hour (seed 03, retention/
+#                            counters/fraud 04, model drift + geocoder 05,
+#                            placement 06, month close day-1 00–03, …)
+# Workers Free caps Cron Triggers per account, so three schedules, not one
+# per job.
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["*/5 * * * *", "*/15 * * * *", "2 * * * *"]
 
 [observability]
 enabled = false

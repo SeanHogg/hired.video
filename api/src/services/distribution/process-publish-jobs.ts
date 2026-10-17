@@ -9,15 +9,17 @@ import * as jobs from "../../repositories/socialPublishJobRepository.js";
 import { drainPublishJobs } from "./drain-publish-jobs.js";
 import { producedRecord, sendPublishJob, type DistributionEnv } from "./send-publish-job.js";
 import { invalidateJobLists } from "./schedule-publish-jobs.js";
+import { logger } from "../../lib/logger.js";
 
 /** When the posting-agent kill switch is off, the drainer skips agent jobs. */
 export function agentExcludeSource(env?: DistributionEnv & { POSTING_AGENT_ENABLED?: string }): "agent" | undefined {
   return env?.POSTING_AGENT_ENABLED === "false" ? "agent" : undefined;
 }
 
+/** Returns how many jobs this run claimed (0 = nothing was due). */
 export async function processSocialPublishJobs(
   env: (DistributionEnv & { POSTING_AGENT_ENABLED?: string }) | undefined,
-): Promise<void> {
+): Promise<number> {
   const summary = await drainPublishJobs({
     claim: (args) =>
       jobs.claimNextJob({
@@ -31,5 +33,6 @@ export async function processSocialPublishJobs(
     markFailed: (id, error, now) => jobs.markFailed(id, error, now),
     onSettled: (job) => invalidateJobLists(job.createdBy),
   });
-  if (summary.claimed > 0) console.log("[scheduled] social publish jobs", summary);
+  if (summary.claimed > 0) logger.info("[scheduled] social publish jobs", summary);
+  return summary.claimed;
 }

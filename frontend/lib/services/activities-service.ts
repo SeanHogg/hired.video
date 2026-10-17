@@ -25,44 +25,39 @@ export interface ActivityTimeEntry {
   status: string;
 }
 
-async function unwrap<T>(p: Promise<{ data: T }>): Promise<T> {
-  const r = await p;
-  return r.data;
-}
-
 class ActivitiesService {
   // Employer
   assign(input: AssignActivityInput) {
-    return unwrap(apiClient.post<ActivityDTO>("/api/activities", input));
+    return apiClient.fetchData<ActivityDTO>("/api/activities", { method: "POST", body: input });
   }
   listCompanyActivities() {
-    return unwrap(apiClient.get<{ activities: ActivityDTO[] }>("/api/activities/company"));
+    return apiClient.fetchData<{ activities: ActivityDTO[] }>("/api/activities/company");
   }
   listAssignableWorkers() {
-    return unwrap(apiClient.get<{ workers: AssignableWorkerDTO[] }>("/api/activities/assignable-workers"));
+    return apiClient.fetchData<{ workers: AssignableWorkerDTO[] }>("/api/activities/assignable-workers");
   }
   approve(id: string) {
-    return unwrap(apiClient.post<ActivityDTO>(`/api/activities/${id}/approve`, {}));
+    return apiClient.fetchData<ActivityDTO>(`/api/activities/${id}/approve`, { method: "POST", body: {} });
   }
   reject(id: string, reason: string) {
-    return unwrap(apiClient.post<ActivityDTO>(`/api/activities/${id}/reject`, { reason }));
+    return apiClient.fetchData<ActivityDTO>(`/api/activities/${id}/reject`, { method: "POST", body: { reason } });
   }
 
   // Worker
   listAssignedToMe() {
-    return unwrap(apiClient.get<{ activities: ActivityDTO[] }>("/api/activities/assigned"));
+    return apiClient.fetchData<{ activities: ActivityDTO[] }>("/api/activities/assigned");
   }
   getActiveTimer() {
-    return unwrap(apiClient.get<ActivityTimeEntry | null>("/api/activities/timer/active"));
+    return apiClient.fetchData<ActivityTimeEntry | null>("/api/activities/timer/active");
   }
   startTimer(id: string) {
-    return unwrap(apiClient.post<ActivityTimeEntry>(`/api/activities/${id}/timer/start`, {}));
+    return apiClient.fetchData<ActivityTimeEntry>(`/api/activities/${id}/timer/start`, { method: "POST", body: {} });
   }
   stopTimer(id: string) {
-    return unwrap(apiClient.post<ActivityTimeEntry | null>(`/api/activities/${id}/timer/stop`, {}));
+    return apiClient.fetchData<ActivityTimeEntry | null>(`/api/activities/${id}/timer/stop`, { method: "POST", body: {} });
   }
   submit(id: string) {
-    return unwrap(apiClient.post<ActivityDTO>(`/api/activities/${id}/submit`, {}));
+    return apiClient.fetchData<ActivityDTO>(`/api/activities/${id}/submit`, { method: "POST", body: {} });
   }
 }
 

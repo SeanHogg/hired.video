@@ -152,6 +152,7 @@ export const userRoles = pgTable("user_roles", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_user_roles_user").on(t.userId),
+  index("idx_user_roles_role_id").on(t.roleId),
 ]);
 
 export type UserRole = typeof userRoles.$inferSelect;
@@ -182,6 +183,8 @@ export const twoFactorCodes = pgTable("two_factor_codes", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_two_factor_codes_user").on(t.userId),
+  // Retention sweep age axis (0541).
+  index("idx_two_factor_codes_expires").on(t.expiresAt),
 ]);
 
 export type TwoFactorCode = typeof twoFactorCodes.$inferSelect;
@@ -194,7 +197,11 @@ export const emailVerificationTokens = pgTable("email_verification_tokens", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   used: boolean("used").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  // Retention sweep age axis (0541).
+  index("idx_email_verification_tokens_expires").on(t.expiresAt),
+  index("idx_email_verification_tokens_user_id").on(t.userId),
+]);
 
 export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
 export type NewEmailVerificationToken = typeof emailVerificationTokens.$inferInsert;
@@ -206,7 +213,11 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   used: boolean("used").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  // Retention sweep age axis (0541).
+  index("idx_password_reset_tokens_expires").on(t.expiresAt),
+  index("idx_password_reset_tokens_user_id").on(t.userId),
+]);
 
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type NewPasswordResetToken = typeof passwordResetTokens.$inferInsert;
@@ -414,6 +425,7 @@ export const accountInvitations = pgTable("account_invitations", {
 }, (t) => [
   index("idx_account_invitations_company_status").on(t.companyId, t.status).where(sql`company_id IS NOT NULL`),
   index("idx_account_invitations_status").on(t.status),
+  index("idx_account_invitations_invited_by").on(t.invitedBy),
 ]);
 
 export type AccountInvitation = typeof accountInvitations.$inferSelect;
@@ -451,6 +463,7 @@ export const userConnections = pgTable(
       .where(sql`${t.status} IN ('Pending', 'Accepted')`),
     index("idx_user_connections_to_user").on(t.toUserId),
     check("user_connections_status_check", sql`${t.status} IN ('Pending', 'Accepted', 'Rejected')`),
+    index("idx_user_connections_from_user_id").on(t.fromUserId),
   ],
 );
 
@@ -465,17 +478,18 @@ export const oauthAccounts = pgTable("oauth_accounts", {
   email: varchar("email", { length: 255 }),
   displayName: varchar("display_name", { length: 255 }),
   avatarUrl: text("avatar_url"),
+  /** Legacy plaintext — new writes go to the *_enc columns (0548). */
   accessToken: text("access_token"),
   refreshToken: text("refresh_token"),
+  accessTokenEnc: text("access_token_enc"),
+  refreshTokenEnc: text("refresh_token_enc"),
   tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
   scope: text("scope"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  // OAuth login lookup (0495). Non-unique; the UNIQUE guarantee lives in
-  // uq_oauth_accounts_provider_account declared alongside, applied by
-  // migration 0518 after the dedupe (link races left duplicate rows).
-  index("idx_oauth_accounts_provider_account").on(t.provider, t.providerAccountId),
+  // OAuth login lookup. The non-unique twin from 0495 was dropped in 0546;
+  // this UNIQUE index serves the lookup.
   // #2305 — UNIQUE (migration 0518_dedupe_unique_indexes.sql); duplicates resolved by 0518_dedupe_unique_indexes.sql.
   uniqueIndex("uq_oauth_accounts_provider_account").on(t.provider, t.providerAccountId),
   index("idx_oauth_accounts_user").on(t.userId),
@@ -504,6 +518,8 @@ export const loginEvents = pgTable("login_events", {
   index("idx_login_events_ip_time").on(t.ipAddress, t.createdAt.desc().nullsFirst()).where(sql`ip_address IS NOT NULL`),
   index("idx_login_events_user_time").on(t.userId, t.createdAt.desc().nullsFirst()).where(sql`user_id IS NOT NULL`),
   index("idx_login_events_email_time").on(sql`lower(email)`, sql`created_at`).where(sql`email IS NOT NULL`),
+  // Retention sweep age axis (0541).
+  index("idx_login_events_created").on(t.createdAt),
 ]);
 
 export type LoginEvent = typeof loginEvents.$inferSelect;
@@ -517,7 +533,10 @@ export const magicLinkTokens = pgTable("magic_link_tokens", {
   used: boolean("used").default(false).notNull(),
   redirect: varchar("redirect", { length: 500 }).default("/dashboard").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  // Retention sweep age axis (0541).
+  index("idx_magic_link_tokens_expires").on(t.expiresAt),
+]);
 
 export type MagicLinkToken = typeof magicLinkTokens.$inferSelect;
 export type NewMagicLinkToken = typeof magicLinkTokens.$inferInsert;
@@ -582,6 +601,9 @@ export const accountLocks = pgTable("account_locks", {
   index("idx_account_locks_unlocks_at").on(t.unlocksAt).where(sql`active = true`),
   // #2305 — legacy UNIQUE (migration 0060_sessions_and_lock.sql); duplicates resolved by 0518_dedupe_unique_indexes.sql.
   uniqueIndex("uq_account_locks_active_user").on(t.userId).where(sql`active = true`),
+  index("idx_account_locks_locked_by").on(t.lockedBy),
+  index("idx_account_locks_unlocked_by").on(t.unlockedBy),
+  index("idx_account_locks_user_id").on(t.userId),
 ]);
 
 export type AccountLock = typeof accountLocks.$inferSelect;
@@ -650,6 +672,7 @@ export const regionWaitlist = pgTable("region_waitlist", {
   index("idx_region_waitlist_country").on(t.countryCode),
   // #2305 — legacy UNIQUE (migration 0065_security_phase_2_to_6.sql); duplicates resolved by 0518_dedupe_unique_indexes.sql.
   uniqueIndex("uq_region_waitlist_email_pending").on(t.email).where(sql`status = 'pending'`),
+  index("idx_region_waitlist_reviewed_by").on(t.reviewedBy),
 ]);
 
 export type RegionWaitlist = typeof regionWaitlist.$inferSelect;

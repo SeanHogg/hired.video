@@ -17,7 +17,9 @@ import { success, error } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { describeDbError } from "../db/errors.js";
 import { buildRepos } from "../repositories/index.js";
-import { decodeEmailCursor, getInboxFor } from "../services/messaging/inboxService.js";
+import { decodeEmailCursor } from "../services/messaging/inboxService.js";
+import { getCachedInbox } from "../services/messaging/inboxCache.js";
+import { bumpInboxFor } from "../services/messaging/inboxCacheVersion.js";
 import {
   finalizeSyncSession,
   ingestForAccount,
@@ -29,6 +31,14 @@ import { requirePro } from "../middleware/auth-gates.js";
 import { servicesProcessor } from "../domains/services-processing/services-processor.js";
 
 export const inboxRoutes = new Hono<AppEnv>();
+
+// Every successful external-email write (read state, archive, junk, ingest)
+// changes the caller's cached inbox aggregate — bump its version once here
+// instead of in each handler.
+inboxRoutes.use("/external-emails/*", async (c, next) => {
+  await next();
+  if (c.req.method !== "GET" && c.res.status < 400) bumpInboxFor([c.var.user?.sub]);
+});
 
 /** Parse the ?accountIds=a,b,c&unread=1&archived=1&emailCursor=… query
  *  into the options shape the repo + service expect. Centralised here so
@@ -54,7 +64,7 @@ inboxRoutes.get("/", async (c) => {
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
   const repos = buildRepos(getDb());
-  const inbox = await getInboxFor({ repos }, uid, parseEmailFilters(c));
+  const inbox = await getCachedInbox({ repos }, uid, parseEmailFilters(c));
   return c.json(success(inbox), 200);
 });
 

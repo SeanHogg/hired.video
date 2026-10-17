@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { formatLocaleDate } from "@/lib/format";
 import {
   Clock,
   Copy,
@@ -338,12 +339,6 @@ function KeysManager() {
     }
   };
 
-  const formatDate = (iso: string | null | undefined) => {
-    if (!iso) return null;
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString();
-  };
-
   return (
     <div className="space-y-5">
       <Alert>
@@ -465,8 +460,8 @@ function KeysManager() {
         ) : (
           <ul className="divide-y rounded-lg border">
             {keys.map((k) => {
-              const created = formatDate(k.createdAt);
-              const lastUsed = formatDate(k.lastUsedAt);
+              const created = formatLocaleDate(k.createdAt);
+              const lastUsed = formatLocaleDate(k.lastUsedAt);
               return (
                 <li
                   key={k.id}

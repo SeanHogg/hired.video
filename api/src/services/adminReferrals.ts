@@ -17,6 +17,7 @@ import { count, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getDb, schema } from "../db/index.js";
 import { getOrSetCached } from "../utils/edge-cache.js";
+import { logger } from "../lib/logger.js";
 
 const { affiliateReferrals, affiliateProfiles, users } = schema;
 
@@ -77,10 +78,7 @@ export async function loadReferralsForUsers(
     }
     return map;
   } catch (err) {
-    console.error(
-      "[adminReferrals] Failed to load referral attribution; degrading to none:",
-      err instanceof Error ? err.message : err,
-    );
+    logger.error("[adminReferrals] Failed to load referral attribution; degrading to none", err);
     return new Map();
   }
 }
@@ -259,18 +257,15 @@ async function loadReferredUsersGrouped(): Promise<ReferredUsersGrouped> {
     const usableRows = truncated ? detailRows.slice(0, DETAIL_CAP) : detailRows;
 
     if (truncated) {
-      console.warn(
-        `[adminReferrals] grouped view detail rows capped at ${DETAIL_CAP}; ` +
-          "counts remain exact but some groups omit older referred users.",
+      logger.warn(
+        "[adminReferrals] grouped view detail rows capped; counts remain exact but some groups omit older referred users",
+        { detailCap: DETAIL_CAP },
       );
     }
 
     return assembleReferralGroups(groupsBase, usableRows, truncated);
   } catch (err) {
-    console.error(
-      "[adminReferrals] Failed to load grouped referrals; returning empty view:",
-      err instanceof Error ? err.message : err,
-    );
+    logger.error("[adminReferrals] Failed to load grouped referrals; returning empty view", err);
     return { groups: [], totalReferred: 0, totalConverted: 0, truncated: false };
   }
 }
@@ -288,10 +283,7 @@ export async function countReferredUsers(db: ReturnType<typeof getDb>): Promise<
       .from(affiliateReferrals);
     return Number(row?.n ?? 0);
   } catch (err) {
-    console.error(
-      "[adminReferrals] Failed to count referred users; degrading to 0:",
-      err instanceof Error ? err.message : err,
-    );
+    logger.error("[adminReferrals] Failed to count referred users; degrading to 0", err);
     return 0;
   }
 }

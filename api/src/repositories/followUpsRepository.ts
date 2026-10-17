@@ -15,6 +15,7 @@
 
 import { desc, eq } from "drizzle-orm";
 import { schema } from "../db/index.js";
+import { signalWork } from "../services/scheduling/work-signals.js";
 
 const { followUpSequences, followUpSteps, followUpEnrollments, followUpLogs } = schema;
 
@@ -81,6 +82,8 @@ export class FollowUpsRepository implements IFollowUpsRepository {
 
   async insertEnrollment(input: FollowUpEnrollmentInsert): Promise<FollowUpEnrollmentRow> {
     const [row] = await this.db.insert(followUpEnrollments).values(input as any).returning();
+    const due = (row as FollowUpEnrollmentRow | undefined)?.nextSendAt;
+    if (due) await signalWork("followups", new Date(due));
     return row as FollowUpEnrollmentRow;
   }
 

@@ -22,6 +22,7 @@ import {
 } from "../adapters/llm-client.js";
 import { TokenBudgetExceededError } from "../../domains/billing/token-ledger.js";
 import { AppError } from "../../middleware/errorHandler.js";
+import { logger } from "../../lib/logger.js";
 
 export const BiasFlagSchema = z.object({
   phrase: z.string().min(1).max(300),
@@ -94,7 +95,7 @@ export async function lintScorecardText(
     return data;
   } catch (err) {
     if (err instanceof TokenBudgetExceededError) throw err;
-    console.error("[scorecard_bias_check] LLM error:", err);
+    logger.error("[scorecard_bias_check] LLM error", err);
     throw new AppError(
       "BIAS_LINTER_UNAVAILABLE",
       "Bias linter is temporarily unavailable.",

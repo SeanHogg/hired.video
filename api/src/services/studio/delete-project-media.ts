@@ -22,6 +22,7 @@ import { getDb, schema } from "../../db/index.js";
 import { studioProjectRenderVariants as variants } from "../../db/schema/renderVariants.js";
 import { reclaimVideoR2 } from "../storage/reclaim-video-r2.js";
 import { invalidatePublicVideoFeed } from "./public-video-feed.js";
+import { logger } from "../../lib/logger.js";
 
 type Db = ReturnType<typeof getDb>;
 
@@ -83,7 +84,7 @@ export async function deleteProjectWithMedia(projectId: string, deps: DeleteProj
   try {
     await (deps.reclaim ?? reclaimVideoR2)(owned);
   } catch (err) {
-    console.warn("[delete-project-media] R2 reclaim failed:", projectId, err instanceof Error ? err.message : err);
+    logger.warn("[delete-project-media] R2 reclaim failed", { projectId, error: err });
   }
   return true;
 }

@@ -13,20 +13,8 @@
 import { useEffect, useState } from "react";
 import { Loader2, Users, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
-
-interface MutualUser {
-  userId: string;
-  displayName: string;
-  avatarUrl: string | null;
-}
-
-interface PathStep {
-  userId: string;
-  displayName: string;
-  avatarUrl: string | null;
-}
+import { graphService, type PersonRef } from "@/lib/services/graph-service";
 
 interface MutualsRowProps {
   targetUserId: string;
@@ -37,9 +25,9 @@ export default function MutualConnectionsRow({ targetUserId }: MutualsRowProps) 
   // meaningless — and 401s — for a signed-out viewer. Self-gate on auth so a
   // public profile view never fires the auth-required graph call.
   const { isAuthenticated } = useAuth();
-  const [mutuals, setMutuals] = useState<MutualUser[] | null>(null);
+  const [mutuals, setMutuals] = useState<PersonRef[] | null>(null);
   const [loadingMutuals, setLoadingMutuals] = useState(true);
-  const [path, setPath] = useState<PathStep[] | null>(null);
+  const [path, setPath] = useState<PersonRef[] | null>(null);
   const [loadingPath, setLoadingPath] = useState(false);
 
   useEffect(() => {
@@ -48,12 +36,11 @@ export default function MutualConnectionsRow({ targetUserId }: MutualsRowProps) 
       return;
     }
     let cancelled = false;
-    apiClient
-      .get(`/api/graph/mutuals/${encodeURIComponent(targetUserId)}`)
-      .then((res) => {
+    graphService
+      .mutuals(targetUserId)
+      .then((body) => {
         if (cancelled) return;
-        const body = (res as any).data?.data ?? (res as any).data ?? {};
-        setMutuals((body.items ?? body.mutuals ?? []) as MutualUser[]);
+        setMutuals(body?.mutuals ?? []);
       })
       .catch(() => {
         if (!cancelled) setMutuals([]);
@@ -66,9 +53,9 @@ export default function MutualConnectionsRow({ targetUserId }: MutualsRowProps) 
     if (path) return;
     setLoadingPath(true);
     try {
-      const res = await apiClient.get(`/api/graph/path/${encodeURIComponent(targetUserId)}`);
-      const body = (res as any).data?.data ?? (res as any).data ?? {};
-      setPath((body.path ?? []) as PathStep[]);
+      // The intermediaries between viewer and target (empty = no warm path).
+      const body = await graphService.path(targetUserId);
+      setPath(body?.degree === "none" ? [] : (body?.via ?? []));
     } catch {
       setPath([]);
     } finally {
@@ -96,13 +83,13 @@ export default function MutualConnectionsRow({ targetUserId }: MutualsRowProps) 
           {mutuals.slice(0, 5).map((m) => (
             <div
               key={m.userId}
-              title={m.displayName}
+              title={m.name ?? undefined}
               className="h-6 w-6 rounded-full bg-muted ring-2 ring-background flex items-center justify-center text-[10px] font-medium"
             >
               {m.avatarUrl ? (
                 <img src={m.avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
               ) : (
-                m.displayName?.slice(0, 1) ?? "?"
+                m.name?.slice(0, 1) || "?"
               )}
             </div>
           ))}
@@ -125,7 +112,7 @@ export default function MutualConnectionsRow({ targetUserId }: MutualsRowProps) 
         <div className="rounded border bg-muted/30 p-2 text-xs flex items-center gap-2 overflow-x-auto">
           {path.map((step, i) => (
             <span key={step.userId} className="flex items-center gap-2">
-              <span className="font-medium">{step.displayName}</span>
+              <span className="font-medium">{step.name}</span>
               {i < path.length - 1 && <ArrowRight className="h-3 w-3 text-muted-foreground" />}
             </span>
           ))}

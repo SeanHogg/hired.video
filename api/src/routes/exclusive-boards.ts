@@ -6,6 +6,9 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
+import { isAdminRole } from "../middleware/superAdmin.js";
+import { buildRepos } from "../repositories/index.js";
+import { emitNotification } from "../services/notifications/notificationService.js";
 
 export const exclusiveBoardRoutes = new Hono<AppEnv>();
 
@@ -153,13 +156,7 @@ exclusiveBoardRoutes.patch("/bids/:id/accept", requirePro("Exclusive Job Boards"
   if (!bid) return c.json(error("NOT_FOUND", "Bid not found"), 404);
 
   // Only admins/superadmins can accept bids on system-managed boards
-  const [actor] = await db
-    .select({ role: schema.users.role })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
-
-  if (!actor || !["admin", "super_admin"].includes(actor.role ?? "")) {
+  if (!isAdminRole(c.var.user)) {
     return c.json(error("FORBIDDEN", "Only admins can accept bids"), 403);
   }
   if (bid.status !== "pending") return c.json(error("CONFLICT", "Only pending bids can be accepted"), 409);
@@ -190,13 +187,17 @@ exclusiveBoardRoutes.patch("/bids/:id/accept", requirePro("Exclusive Job Boards"
   }
 
   // Notify the bidder
-  await db.insert(schema.notifications).values({
-    userId: bid.bidderId,
-    type: "bid_accepted",
-    title: "Bid accepted",
-    message: `Your bid was accepted! Your job posting is now live on the exclusive board for ${bid.durationDays ?? 30} days.`,
-    data: { bidId: bid.id, boardId: bid.boardId } as any,
-  } as any).catch(() => undefined);
+  await emitNotification(
+    { repos: buildRepos(db) },
+    {
+      recipientIds: [bid.bidderId],
+      type: "bid_accepted",
+      actor: null,
+      title: "Bid accepted",
+      message: `Your bid was accepted! Your job posting is now live on the exclusive board for ${bid.durationDays ?? 30} days.`,
+      extraData: { bidId: bid.id, boardId: bid.boardId },
+    },
+  ).catch(() => undefined);
 
   return c.json(success({ bid: updatedBid, expiresAt: expiresAt.toISOString() }), 200);
 });
@@ -217,13 +218,7 @@ exclusiveBoardRoutes.patch("/bids/:id/reject", requirePro("Exclusive Job Boards"
 
   if (!bid) return c.json(error("NOT_FOUND", "Bid not found"), 404);
 
-  const [actor] = await db
-    .select({ role: schema.users.role })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
-
-  if (!actor || !["admin", "super_admin"].includes(actor.role ?? "")) {
+  if (!isAdminRole(c.var.user)) {
     return c.json(error("FORBIDDEN", "Only admins can reject bids"), 403);
   }
   if (bid.status !== "pending") return c.json(error("CONFLICT", "Only pending bids can be rejected"), 409);
@@ -236,13 +231,17 @@ exclusiveBoardRoutes.patch("/bids/:id/reject", requirePro("Exclusive Job Boards"
     .returning();
 
   // Notify the bidder
-  await db.insert(schema.notifications).values({
-    userId: bid.bidderId,
-    type: "bid_rejected",
-    title: "Bid not accepted",
-    message: typeof body.reason === "string" ? body.reason : "Your bid was not accepted for this exclusive board.",
-    data: { bidId: bid.id, boardId: bid.boardId } as any,
-  } as any).catch(() => undefined);
+  await emitNotification(
+    { repos: buildRepos(db) },
+    {
+      recipientIds: [bid.bidderId],
+      type: "bid_rejected",
+      actor: null,
+      title: "Bid not accepted",
+      message: typeof body.reason === "string" ? body.reason : "Your bid was not accepted for this exclusive board.",
+      extraData: { bidId: bid.id, boardId: bid.boardId },
+    },
+  ).catch(() => undefined);
 
   return c.json(success(updatedBid), 200);
 });

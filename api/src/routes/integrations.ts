@@ -15,6 +15,7 @@
  * returned: responses carry only provider / slug / is_active / last4.
  */
 import { Hono } from "hono";
+import { requestEnv } from "../utils/env.js";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -33,14 +34,11 @@ import type { OwnerScope } from "../repositories/tenantIntegrationsRepository.js
 
 export const integrationsRoutes = new Hono<AppEnv>();
 
-function envOf(c: any): Record<string, string | undefined> {
-  return (c.env ?? {}) as Record<string, string | undefined>;
-}
 
 function buildService(c: any): TenantIntegrationsService {
   return new TenantIntegrationsService({
     repos: buildRepos(getDb()),
-    env: envOf(c),
+    env: requestEnv(c),
   });
 }
 

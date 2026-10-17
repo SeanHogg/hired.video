@@ -18,28 +18,30 @@
 // `<Response>` document is semantically identical.
 import { escapeXmlText as escapeXml } from "../../../../shared/course-cover.js";
 
-function getEnv() {
-  const g = globalThis as any;
-  const spaceUrl   = g.__ENV?.SIGNALWIRE_SPACE_URL   || process.env.SIGNALWIRE_SPACE_URL   || "";
-  const projectId  = g.__ENV?.SIGNALWIRE_PROJECT_ID  || process.env.SIGNALWIRE_PROJECT_ID  || "";
-  const authToken  = g.__ENV?.SIGNALWIRE_AUTH_TOKEN  || process.env.SIGNALWIRE_AUTH_TOKEN  || "";
-  const webhookUrl = g.__ENV?.WEBHOOK_BASE_URL        || process.env.WEBHOOK_BASE_URL       ||
-                     g.__ENV?.FRONTEND_URL            || process.env.FRONTEND_URL           || "";
-  return { spaceUrl, projectId, authToken, webhookUrl };
+import { getEnv } from "../../utils/env.js";
+
+/** SignalWire credentials + webhook base, read from the Worker env. */
+function signalwireConfig() {
+  return {
+    spaceUrl: getEnv("SIGNALWIRE_SPACE_URL"),
+    projectId: getEnv("SIGNALWIRE_PROJECT_ID"),
+    authToken: getEnv("SIGNALWIRE_AUTH_TOKEN"),
+    webhookUrl: getEnv("WEBHOOK_BASE_URL") || getEnv("FRONTEND_URL"),
+  };
 }
 
 function isConfigured(): boolean {
-  const { spaceUrl, projectId, authToken } = getEnv();
+  const { spaceUrl, projectId, authToken } = signalwireConfig();
   return !!(spaceUrl && projectId && authToken);
 }
 
 function basicAuth(): string {
-  const { projectId, authToken } = getEnv();
+  const { projectId, authToken } = signalwireConfig();
   return "Basic " + btoa(`${projectId}:${authToken}`);
 }
 
 function apiUrl(path: string): string {
-  const { spaceUrl, projectId } = getEnv();
+  const { spaceUrl, projectId } = signalwireConfig();
   return `https://${spaceUrl}/api/laml/2010-04-01/Accounts/${projectId}${path}`;
 }
 

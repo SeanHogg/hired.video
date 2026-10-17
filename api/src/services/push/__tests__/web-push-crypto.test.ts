@@ -10,9 +10,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { base64UrlEncode, base64UrlToBytes } from "../../../utils/crypto.js";
 import {
-  base64UrlDecode,
-  base64UrlEncode,
   buildVapidAuthorization,
   deriveContentKeys,
   encryptPushPayload,
@@ -97,14 +96,14 @@ describe("buildVapidAuthorization (RFC 8292)", () => {
     const [, jwt, k] = match;
     assert.equal(k, publicKey);
     const [h, c, s] = jwt.split(".");
-    const claims = JSON.parse(new TextDecoder().decode(base64UrlDecode(c)));
+    const claims = JSON.parse(new TextDecoder().decode(base64UrlToBytes(c)));
     assert.equal(claims.aud, "https://fcm.googleapis.com");
     assert.equal(claims.sub, "mailto:ops@hired.video");
     assert.equal(claims.exp, 1_000 + 12 * 60 * 60);
     const ok = await subtle.verify(
       { name: "ECDSA", hash: "SHA-256" },
       verifyKey,
-      base64UrlDecode(s),
+      base64UrlToBytes(s),
       new TextEncoder().encode(`${h}.${c}`),
     );
     assert.equal(ok, true);

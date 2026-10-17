@@ -19,7 +19,7 @@ import {
 import { ACCOUNT_SETTINGS_QUERY_KEY } from "@/lib/account/account-settings-query";
 import { logger } from "@/lib/logger";
 
-export type ThemeChoice = "light" | "dark" | "system";
+export type ThemeChoice = NonNullable<AccountSettings["theme"]>;
 
 export function useThemePreference() {
   const { theme, resolvedTheme, setTheme } = useTheme();

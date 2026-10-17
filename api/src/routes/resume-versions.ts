@@ -19,7 +19,7 @@ import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
-import { ok, fail, type HandlerResult } from "../handlers/shared.js";
+import { ok, fail, failFromDomainError, type HandlerResult } from "../handlers/shared.js";
 import { ResumeContentSchema } from "../../../shared/resume.js";
 import { ConfirmedFactSchema } from "../../../shared/resume-tailor.js";
 import { FromJobRequestSchema } from "../../../shared/resume-from-job.js";
@@ -35,7 +35,8 @@ import {
 import { refreshDiffPercentFor } from "../services/resume/view.js";
 import { draftResumeFromJob } from "../services/resume/from-job.js";
 import { resolveJobForFit } from "../services/job/match-handlers.js";
-import { failFromAiError } from "../services/job/tailor-handler.js";
+import { aiDomainError } from "../services/job/tailor-handler.js";
+import { logger } from "../lib/logger.js";
 
 export const resumeVersionRoutes = new Hono<AppEnv>();
 
@@ -99,8 +100,9 @@ resumeVersionRoutes.post("/from-job", async (c) => {
     return send(c, ok(outcome.draft));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.warn("[resume-versions/from-job] LLM call failed:", message);
-    return send(c, failFromAiError(err, message) ?? fail(502, "AI_ERROR", "Couldn't draft a résumé for that job. Please try again."));
+    logger.warn("[resume-versions/from-job] LLM call failed", { error: message });
+    const aiError = aiDomainError(err, message);
+    return send(c, aiError ? failFromDomainError(aiError) : fail(502, "AI_ERROR", "Couldn't draft a résumé for that job. Please try again."));
   }
 });
 

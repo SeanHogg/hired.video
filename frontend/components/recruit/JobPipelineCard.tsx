@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Mail, Phone, FileText, Linkedin, MoreHorizontal, MapPin, Clock, Trash2, Sparkles, ClipboardCheck, Briefcase } from "lucide-react";
-import { initials } from "@/lib/utils/initials";
+import { initials } from "@/lib/format";
 import { daysSince } from "@/lib/utils/datetime";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";

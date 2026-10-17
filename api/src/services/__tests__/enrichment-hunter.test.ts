@@ -14,8 +14,8 @@ import {
   buildHunterUrl,
   mapHunterData,
   resolveDomain,
-  splitName,
 } from "../enrichment/hunter.js";
+import { splitPersonName } from "../../../../shared/person-name.js";
 
 const realFetch = globalThis.fetch;
 const realKey = process.env.HUNTER_API_KEY;
@@ -25,12 +25,18 @@ afterEach(() => {
   else process.env.HUNTER_API_KEY = realKey;
 });
 
-describe("splitName", () => {
+describe("splitPersonName (Hunter's final-token mode)", () => {
+  const split = (n: string | undefined) => splitPersonName(n, { lastName: "final" });
   it("handles empty, single, and multi-part names", () => {
-    assert.deepEqual(splitName(undefined), { first: "", last: "" });
-    assert.deepEqual(splitName("Cher"), { first: "Cher", last: "" });
-    assert.deepEqual(splitName("Ada Lovelace"), { first: "Ada", last: "Lovelace" });
-    assert.deepEqual(splitName("Mary Anne Evans"), { first: "Mary", last: "Evans" });
+    assert.deepEqual(split(undefined), { firstName: "", lastName: "" });
+    assert.deepEqual(split("Cher"), { firstName: "Cher", lastName: "" });
+    assert.deepEqual(split("Ada Lovelace"), { firstName: "Ada", lastName: "Lovelace" });
+    assert.deepEqual(split("Mary Anne Evans"), { firstName: "Mary", lastName: "Evans" });
+  });
+  it("default rest mode keeps middle names in lastName; emptyFirstName fills blanks", () => {
+    assert.deepEqual(splitPersonName("Mary Anne Evans"), { firstName: "Mary", lastName: "Anne Evans" });
+    assert.deepEqual(splitPersonName("   ", { emptyFirstName: "Unknown" }), { firstName: "Unknown", lastName: "" });
+    assert.deepEqual(splitPersonName(null), { firstName: "", lastName: "" });
   });
 });
 

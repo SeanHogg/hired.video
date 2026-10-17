@@ -7,6 +7,7 @@ import { requirePro } from "../middleware/tierEnforcement.js";
 import { cacheMiddleware } from "../utils/cache-headers.js";
 import { etagMiddleware } from "../utils/etag.js";
 import { NOTIFICATION_LIST_FIELDS, parseFields } from "../../../shared/projection.js";
+import { getCachedUnreadCount } from "../services/messaging/inboxCache.js";
 
 export const notificationRoutes = new Hono<AppEnv>();
 
@@ -43,7 +44,7 @@ notificationRoutes.get("/", async (c) => {
 notificationRoutes.get("/unread-count", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const count = await repo().countUnreadForUser(uid);
+  const count = await getCachedUnreadCount(repo(), uid);
   return c.json(success({ count }), 200);
 });
 

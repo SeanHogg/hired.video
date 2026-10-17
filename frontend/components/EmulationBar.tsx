@@ -12,6 +12,7 @@ import { usePermissionDebugger } from "@/providers/PermissionDebuggerProvider";
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import { USER_ROLES } from "@shared/user-roles";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
+import { formatDurationMinSec } from "@/lib/format";
 
 const ROLES = [
   USER_ROLES.JOB_SEEKER,
@@ -61,11 +62,6 @@ function useElapsed(startedAt: string | null) {
   return elapsed;
 }
 
-function formatDuration(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
 
 // ── Expiry warning ────────────────────────────────────────────────────────────
 function useExpiryWarning(expiresAt: string | null, onExpired: () => void) {
@@ -138,7 +134,7 @@ function useSuperAdminControls() {
   const handleExit = async () => {
     if (isImpersonating) {
       await endImpersonation();
-      toast({ title: "Impersonation ended", description: `Duration: ${formatDuration(elapsed)}` });
+      toast({ title: "Impersonation ended", description: `Duration: ${formatDurationMinSec(elapsed)}` });
     } else {
       setPersonaPreview(null);
     }
@@ -226,7 +222,7 @@ export function SuperAdminMenuItems() {
                   {c.impersonationSession.targetUser.name}
                 </div>
               )}
-              <div className="tabular-nums">{formatDuration(c.elapsed)}</div>
+              <div className="tabular-nums">{formatDurationMinSec(c.elapsed)}</div>
             </div>
           )}
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">

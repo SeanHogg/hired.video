@@ -24,6 +24,8 @@ import { payoutLedgerService } from "../services/payout/PayoutLedgerService.js";
 import { invalidateTaxYearReports } from "../services/payout/TaxReportingService.js";
 import { tryGetPayoutProvider } from "../services/payout/index.js";
 import type { NormalizedPayoutWebhookPayload } from "../services/payout/types.js";
+import { requestEnv } from "../utils/env.js";
+import { requireUser } from "./helpers/routerHelpers.js";
 import {
   ACTIVE_PAYOUT_PROVIDERS,
   isActivePayoutProvider,
@@ -35,26 +37,13 @@ export const payoutRoutes = new Hono<AppEnv>();
 
 const { payouts: payoutsTable, payoutProfiles, billingEvents } = schema;
 
-function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
-
-function requireAuth(c: any): string | Response {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  return userId;
-}
-
-function getEnv(c: unknown): Record<string, string | undefined> {
-  return (c as { env?: Record<string, string | undefined> }).env ?? {};
-}
-
 // ---------------------------------------------------------------------------
 // GET /me/balance — ledger-derived balance breakdown
 // ---------------------------------------------------------------------------
 payoutRoutes.get("/me/balance", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const balance = await payoutLedgerService.getBalance(userId);
   return c.json(success(balance), 200);
 });
@@ -63,8 +52,9 @@ payoutRoutes.get("/me/balance", async (c) => {
 // GET /me/onboarding/status — current rail + masked hint + enabled flag
 // ---------------------------------------------------------------------------
 payoutRoutes.get("/me/onboarding/status", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const status = await payoutOnboardingService.getStatus(userId);
   return c.json(success(status), 200);
 });
@@ -73,8 +63,9 @@ payoutRoutes.get("/me/onboarding/status", async (c) => {
 // POST /me/onboarding/start — body: { provider, successUrl?, cancelUrl? }
 // ---------------------------------------------------------------------------
 payoutRoutes.post("/me/onboarding/start", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const body = (await c.req.json().catch(() => ({}))) as {
     provider?: string;
     successUrl?: string;
@@ -102,7 +93,7 @@ payoutRoutes.post("/me/onboarding/start", async (c) => {
       body.provider as ActivePayoutProvider,
       successUrl,
       cancelUrl,
-      getEnv(c),
+      requestEnv(c),
     );
     return c.json(success(session), 200);
   } catch (err) {
@@ -115,8 +106,9 @@ payoutRoutes.post("/me/onboarding/start", async (c) => {
 // POST /me/onboarding/complete — body: PayoutOnboardingCompleteInput
 // ---------------------------------------------------------------------------
 payoutRoutes.post("/me/onboarding/complete", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const body = (await c.req.json().catch(() => ({}))) as Partial<PayoutOnboardingCompleteInput>;
   if (!isActivePayoutProvider(body.provider)) {
     return c.json(
@@ -148,7 +140,7 @@ payoutRoutes.post("/me/onboarding/complete", async (c) => {
 // POST /webhook/tremendous — REWARDS.* events
 // ---------------------------------------------------------------------------
 payoutRoutes.post("/webhook/tremendous", async (c) => {
-  const provider = tryGetPayoutProvider("tremendous", getEnv(c));
+  const provider = tryGetPayoutProvider("tremendous", requestEnv(c));
   if (!provider) return c.json(error("NOT_CONFIGURED", "Tremendous provider not configured"), 503);
 
   const rawBody = await c.req.text();
@@ -265,7 +257,7 @@ export async function applyPayoutWebhook(
 // request. Falls back to APP_ORIGIN env so the value is sane even when the
 // origin header is missing (e.g. local script invocation).
 function getOrigin(c: any): string {
-  const env = getEnv(c);
+  const env = requestEnv(c);
   if (env.APP_ORIGIN) return env.APP_ORIGIN;
   const url = new URL(c.req.url);
   return `${url.protocol}//${url.host}`;

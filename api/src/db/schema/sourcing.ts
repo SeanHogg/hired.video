@@ -35,6 +35,8 @@ export const jobSourcingListings = pgTable("job_sourcing_listings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_job_sourcing_listings_open").on(t.acceptsBids).where(sql`accepts_bids = TRUE`),
+  index("idx_job_sourcing_listings_created_by_user_id").on(t.createdByUserId),
+  index("idx_job_sourcing_listings_winning_bidder_id").on(t.winningBidderId),
 ]);
 
 export type JobSourcingListing = typeof jobSourcingListings.$inferSelect;

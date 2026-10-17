@@ -21,7 +21,7 @@
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { schema } from "../../db/index.js";
 import type { Session } from "../../db/schema/users.js";
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 
 const { sessions, users } = schema;
 
@@ -174,13 +174,15 @@ export async function enforceSessionCap(db: any, userId: string): Promise<void> 
 //
 // `loadSessionForJwt` runs on EVERY authenticated request, and Neon is
 // HTTP-backed, so an uncached SELECT here is a full network round-trip per
-// API call. We cache a narrow validity projection per session id through the
-// canonical L1+KV helper. Every revoke path in this module invalidates the
-// key, so revocation is immediate in the revoking isolate and via KV; other
-// warm isolates honour it within the edge-cache L1 cap (≤30s).
+// API call. We cache a narrow validity projection per session id in the
+// isolate (utils/isolate-cache.ts). NOT in Workers KV: on Workers Free
+// (~1,000 KV writes/day) a put per session per minute exhausted the budget.
+// Every revoke path in this module invalidates the key, so revocation is
+// immediate in the revoking isolate; other warm isolates honour it within
+// SESSION_CACHE_TTL_SECONDS (the same ≤30s bound the old L1 cap gave).
 // ---------------------------------------------------------------------------
 
-const SESSION_CACHE_TTL_SECONDS = 60;
+const SESSION_CACHE_TTL_SECONDS = 30;
 
 interface SessionValidity {
   id: string;
@@ -195,11 +197,11 @@ function sessionCacheKey(sessionId: string): string {
 }
 
 function invalidateSessionCache(sessionId: string): void {
-  invalidateCachedKey(sessionCacheKey(sessionId));
+  invalidateIsolateKey(sessionCacheKey(sessionId));
 }
 
 async function loadSessionValidity(db: any, sessionId: string): Promise<SessionValidity | null> {
-  return getOrSetCached<SessionValidity | null>({
+  return getOrSetIsolateCached<SessionValidity | null>({
     key: sessionCacheKey(sessionId),
     ttlSeconds: SESSION_CACHE_TTL_SECONDS,
     loader: async () => {
@@ -233,10 +235,30 @@ async function loadSessionValidity(db: any, sessionId: string): Promise<SessionV
  * which case it's been revoked as a side effect — caller should reject
  * the request).
  *
- * Bumps last_seen_at if it's been more than a minute since the last
- * touch, debounced to keep DB writes off the hot path.
+ * Bumps last_seen_at at most once per LAST_SEEN_DEBOUNCE_MS per session.
+ * last_seen_at only feeds the 14-day idle timeout and the "active
+ * sessions" list, so 15-minute resolution is plenty — and the touch does
+ * NOT invalidate the validity cache (last_seen isn't part of validity), so
+ * a touch costs one UPDATE and no follow-up SELECT + KV put.
  */
-const LAST_SEEN_DEBOUNCE_MS = 60 * 1000;
+const LAST_SEEN_DEBOUNCE_MS = 15 * 60 * 1000;
+
+/** Isolate-local record of the last touch per session. The cached validity
+ *  projection keeps the pre-touch lastSeenAt for up to its TTL, so without
+ *  this the same isolate would re-issue the UPDATE on every request until
+ *  the entry expired. Bounded: cleared wholesale past the cap. */
+const _lastTouchMs = new Map<string, number>();
+const LAST_TOUCH_MAX_ENTRIES = 10_000;
+
+function lastTouchFor(sessionId: string, cachedLastSeenMs: number): number {
+  const local = _lastTouchMs.get(sessionId);
+  return local !== undefined && local > cachedLastSeenMs ? local : cachedLastSeenMs;
+}
+
+function recordTouch(sessionId: string, atMs: number): void {
+  if (_lastTouchMs.size >= LAST_TOUCH_MAX_ENTRIES) _lastTouchMs.clear();
+  _lastTouchMs.set(sessionId, atMs);
+}
 
 export async function loadSessionForJwt(
   db: any,
@@ -253,11 +275,9 @@ export async function loadSessionForJwt(
     await revokeSession(db, state.id, "idle_timeout");
     return null;
   }
-  if (now - state.lastSeenAtMs > LAST_SEEN_DEBOUNCE_MS) {
+  if (now - lastTouchFor(state.id, state.lastSeenAtMs) > LAST_SEEN_DEBOUNCE_MS) {
+    recordTouch(state.id, now);
     await db.update(sessions).set({ lastSeenAt: new Date(now) } as any).where(eq(sessions.id, state.id));
-    // Drop the cached projection so the next read sees the fresh touch
-    // instead of re-issuing the UPDATE on every request.
-    invalidateSessionCache(state.id);
   }
   return { id: state.id, userId: state.userId };
 }

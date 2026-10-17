@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { formatMoneyCents } from "@/lib/format";
 import { FileText, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -126,7 +127,7 @@ function UsageStatementBody({ statement }: { statement: UsageStatement }) {
             {t("labels.statementTotal", { defaultValue: "Close-out total" })}
           </p>
           <p className="text-2xl font-bold">
-            {formatMoney(statement.totalCents, statement.currency)}
+            {formatMoneyCents(statement.totalCents, statement.currency)}
           </p>
         </div>
         <Button variant="outline" disabled>
@@ -162,20 +163,9 @@ function StatementLineRow({ line }: { line: UsageStatementLine }) {
       )}
       {line.overageCents > 0 && (
         <p className="text-xs text-amber-600">
-          Overage: {formatMoney(line.overageCents, "USD")}
+          Overage: {formatMoneyCents(line.overageCents, "USD")}
         </p>
       )}
     </div>
   );
-}
-
-function formatMoney(cents: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currency || "USD",
-    }).format(cents / 100);
-  } catch {
-    return `$${(cents / 100).toFixed(2)}`;
-  }
 }

@@ -30,8 +30,36 @@ import {
 import { logApiCall } from "./logger";
 import i18next from "i18next";
 import { EXPLICIT_CONTENT_CODE, explicitContentMessage, explicitInfoFrom } from "./moderation/explicit-content-error";
-import { runtimeConfig } from "./runtime-config";
 import { signalBadgeRefresh } from "./badges/refresh";
+import {
+  emulationHeaders,
+  getAuthToken,
+  getEmulationToken,
+  REFRESH_TOKEN_KEY,
+  AUTH_TOKEN_KEY,
+} from "./api/auth-token";
+import { buildApiUrl, getApiBaseUrl } from "./api/base-url";
+import { ensureFreshToken } from "./api/token-refresh";
+import {
+  nextLogId,
+  pushApiLogEntry,
+  recordLogEntryError,
+  recordLogEntryResponse,
+  truncateBodyForLog,
+} from "./api/request-log";
+
+export {
+  setEmulationTokenGetter,
+  standardAuthHeaders,
+} from "./api/auth-token";
+export { getApiBaseUrl } from "./api/base-url";
+export {
+  type ApiRequestLogEntry,
+  isFailedLogEntry,
+  getRecentApiRequests,
+  getPendingApiRequests,
+  getRecentApiFailures,
+} from "./api/request-log";
 import {
   API_ERROR_EVENT,
   type ApiErrorEvent,
@@ -213,7 +241,7 @@ function extractLooseErrorEnvelope(
  */
 function isExpectedSilentError(error: AppError): boolean {
   if (error instanceof UnverifiedAccountError) return true;
-  if (error instanceof AuthenticationError && !localStorage.getItem("auth_token")) return true;
+  if (error instanceof AuthenticationError && !getAuthToken()) return true;
   const serverCode = (error.context as { serverCode?: string } | undefined)?.serverCode;
   // `MAILBOX_REAUTH_REQUIRED` is user-state, not a server fault — Google /
   // Microsoft rejected the stored refresh token (revoked, password change,
@@ -244,12 +272,12 @@ function isExpectedSilentError(error: AppError): boolean {
  * already anonymous and nothing happened.
  */
 function handleSessionInvalidation(): boolean {
-  const hadToken = !!localStorage.getItem("auth_token");
+  const hadToken = !!getAuthToken();
   if (!hadToken) return false;
 
-  localStorage.removeItem("auth_token");
+  localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem("current_user");
-  localStorage.removeItem("refresh_token");
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
   window.dispatchEvent(new CustomEvent("auth-logout"));
   setTimeout(() => {
     window.location.replace("/");
@@ -273,162 +301,8 @@ export interface RequestConfig {
   // loop: a failed report would otherwise re-trigger GlobalErrorHandler's
   // toast, which the user could click "Report" on, etc.
   suppressErrorEvent?: boolean;
-}
-
-// ============================================================================
-// RECENT API REQUEST LOG (ring buffer for error diagnostics)
-// ============================================================================
-
-export interface ApiRequestLogEntry {
-  id: number;
-  method: string;
-  url: string;
-  requestBody?: unknown;
-  status?: number;
-  responseBody?: unknown;
-  error?: string;
-  timestamp: string;
-  durationMs?: number;
-}
-
-const MAX_LOG_ENTRIES = 10;
-// Cap each body at ~2KB so the ring buffer can never balloon (e.g. a single
-// resume fetch returning 100KB+) and so /api/errors/report stays under its
-// 64KB payload cap. Error envelopes are well under this; success bodies get
-// a JSON-stringified preview.
-const MAX_BODY_BYTES_FOR_LOG = 2048;
-let _logIdCounter = 0;
-const _recentApiRequests: ApiRequestLogEntry[] = [];
-const _evictedApiFailures: ApiRequestLogEntry[] = [];
-/** Requests still waiting for an answer. Kept apart from the ring so a slow
- *  one (a publish, an upload) is never pushed out by the polling that runs
- *  while it waits — it is exactly what a diagnostics report needs to show. */
-const _pendingApiRequests = new Map<number, ApiRequestLogEntry>();
-
-function truncateBodyForLog(body: unknown): unknown {
-  if (body == null) return body;
-  let json: string;
-  try {
-    json = JSON.stringify(body);
-  } catch {
-    return "[unserializable]";
-  }
-  if (json.length <= MAX_BODY_BYTES_FOR_LOG) return body;
-  return {
-    _truncated: true,
-    _originalBytes: json.length,
-    _preview: json.slice(0, MAX_BODY_BYTES_FOR_LOG),
-  };
-}
-
-// ============================================================================
-// IMPERSONATION (SuperAdmin X-Emulation-Token)
-// ============================================================================
-
-// Module-level getter populated by AuthProvider when an impersonation session
-// is active. Kept here (not in a React context) so the singleton apiClient can
-// read the current token on every request without prop-drilling.
-let _emulationTokenGetter: () => string | null = () => null;
-
-/** Called by AuthProvider whenever the impersonation session changes. */
-export function setEmulationTokenGetter(getter: () => string | null): void {
-  _emulationTokenGetter = getter;
-}
-
-// Admin endpoints require the real SA bearer; attaching an emulation token
-// makes superAdminMiddleware reject with 403 ("Impersonation tokens cannot
-// access SuperAdmin endpoints"). Skip the header for the /admin/ prefix.
-function shouldAttachEmulationToken(url: string): boolean {
-  try {
-    const path = /^https?:\/\//i.test(url) ? new URL(url).pathname : url;
-    return !/\/api\/admin\//i.test(path);
-  } catch {
-    return !/\/api\/admin\//i.test(url);
-  }
-}
-
-/**
- * Standard auth headers for any hand-rolled fetch client (the Bearer token
- * from localStorage + the active impersonation token), mirroring exactly what
- * the singleton `apiClient` attaches. Secondary clients (e.g. courses-api)
- * must route through this so they can't drift from — or silently omit, as
- * courses-api did, 401ing every authenticated call — the canonical auth rules.
- */
-export function standardAuthHeaders(url: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  const token = localStorage.getItem("auth_token");
-  if (token) out.Authorization = `Bearer ${token}`;
-  const emuToken = _emulationTokenGetter();
-  if (emuToken && shouldAttachEmulationToken(url)) out["X-Emulation-Token"] = emuToken;
-  return out;
-}
-
-function pushApiLogEntry(entry: ApiRequestLogEntry): void {
-  if (entry.requestBody !== undefined) {
-    entry.requestBody = truncateBodyForLog(entry.requestBody);
-  }
-  _recentApiRequests.push(entry);
-  _pendingApiRequests.set(entry.id, entry);
-  if (_recentApiRequests.length > MAX_LOG_ENTRIES) {
-    const evicted = _recentApiRequests.shift();
-    // A failure outlives the busy successes that follow it, so a report
-    // copied a minute later still shows what broke.
-    if (evicted && isFailedLogEntry(evicted)) {
-      _evictedApiFailures.push(evicted);
-      if (_evictedApiFailures.length > MAX_LOG_ENTRIES) _evictedApiFailures.shift();
-    }
-  }
-}
-
-export function isFailedLogEntry(entry: ApiRequestLogEntry): boolean {
-  return entry.error !== undefined || (entry.status !== undefined && entry.status >= 400);
-}
-
-function findLogEntry(id: number): ApiRequestLogEntry | undefined {
-  return _pendingApiRequests.get(id) ?? _recentApiRequests.find((e) => e.id === id);
-}
-
-/** The request failed without a response (transport error, timeout, a
- *  rejected body). `firstOnly`: keep an answer already recorded. */
-function recordLogEntryError(id: number, message: string, startTime: number, firstOnly = true): void {
-  const entry = findLogEntry(id);
-  _pendingApiRequests.delete(id);
-  if (!entry || (firstOnly && entry.durationMs)) return;
-  entry.error = message;
-  entry.durationMs = Date.now() - startTime;
-}
-
-function recordLogEntryResponse(
-  id: number,
-  status: number,
-  body: unknown,
-  startTime: number,
-): void {
-  const entry = findLogEntry(id);
-  _pendingApiRequests.delete(id);
-  if (entry) {
-    entry.status = status;
-    entry.responseBody = truncateBodyForLog(body);
-    entry.durationMs = Date.now() - startTime;
-  }
-}
-
-/** Returns a snapshot of the most recent API requests/responses for error diagnostics. */
-export function getRecentApiRequests(): ApiRequestLogEntry[] {
-  return [..._recentApiRequests];
-}
-
-/** Requests sent but not answered yet, oldest first, with how long each has
- *  been waiting — a post stuck on "Posting…" shows up here. */
-export function getPendingApiRequests(): Array<ApiRequestLogEntry & { waitingMs: number }> {
-  const now = Date.now();
-  return [..._pendingApiRequests.values()].map((e) => ({ ...e, waitingMs: now - Date.parse(e.timestamp) }));
-}
-
-/** The last failed requests (4xx/5xx or transport errors), oldest first —
- *  kept even after newer requests push them out of the recent log. */
-export function getRecentApiFailures(): ApiRequestLogEntry[] {
-  return [..._evictedApiFailures, ..._recentApiRequests.filter(isFailedLogEntry)].slice(-MAX_LOG_ENTRIES);
+  /** Caller-side abort (e.g. a stream reader torn down before headers). */
+  signal?: AbortSignal;
 }
 
 export interface ApiClientConfig {
@@ -482,12 +356,7 @@ export class ApiClient {
   constructor(config: ApiClientConfig = {}) {
     // Use runtime config if available, otherwise fall back to build env vars.
     // Runtime config is expected to come from /config.js (or be injected at runtime).
-    this.baseUrl =
-      config.baseUrl ||
-      runtimeConfig.apiUrl ||
-      import.meta.env.VITE_API_URL ||
-      import.meta.env.VITE_API_BASE_URL ||
-      "https://api.hired.video"; // Do not include trailing /api; endpoints include /api
+    this.baseUrl = config.baseUrl || getApiBaseUrl();
     // 6 minutes — LLM-backed endpoints (tailor, analyze, insights) can
     // legitimately run for several minutes when OpenRouter's free models
     // are slow. Single source of truth for the client-side abort; longer
@@ -566,52 +435,10 @@ export class ApiClient {
     return processedError;
   }
 
+  /** Paths go out verbatim — routes are case-sensitive and ids/tokens in
+   *  path params must never be re-cased (see lib/api/base-url.ts). */
   private createUrl(endpoint: string): string {
-    // Allow absolute URLs to pass through untouched
-    if (/^https?:\/\//i.test(endpoint)) {
-      return endpoint;
-    }
-
-    // Normalize API path casing and slashes to match the backend (which uses lowercase routes).
-    // This prevents 404s when the frontend accidentally requests e.g. /api/Users/public
-    // and avoids doubling up on /api when baseUrl already includes /api.
-    const [pathPart, queryPart] = endpoint.split("?");
-    const cleanPath = pathPart.replace(/^\/+/, ""); // remove leading slash(es)
-    const normalizedPath = cleanPath.replace(/^api\//i, (match) => match.toLowerCase());
-    const cleanEndpoint = `${normalizedPath}${queryPart ? `?${queryPart}` : ""}`;
-
-    const cleanBaseUrl = this.baseUrl.endsWith("/")
-      ? this.baseUrl.slice(0, -1)
-      : this.baseUrl;
-
-    const baseEndsWithApi = /\/api$/i.test(cleanBaseUrl);
-    const endpointStartsWithApi = /^api\//i.test(cleanEndpoint);
-
-    // Build the final URL, ensuring we never introduce double-slashes in the path.
-    const rawUrl = baseEndsWithApi && endpointStartsWithApi
-      ? `${cleanBaseUrl}/${cleanEndpoint.replace(/^api\//i, "")}`
-      : `${cleanBaseUrl}/${cleanEndpoint}`;
-
-    // Collapse any accidental double-slashes in the path portion (excluding protocol)
-    // e.g. http://localhost:8787/api//api/Users -> http://localhost:8787/api/api/Users
-    const collapsedUrl = rawUrl.replace(/([^:]\/\/)+/g, "$1");
-
-    // Normalize casing for paths under /api/ to avoid frontend casing mistakes
-    // (e.g., /api/Auth/login should map to /api/auth/login)
-    try {
-      const parsed = new URL(collapsedUrl, "http://dummy");
-      if (parsed.pathname.toLowerCase().startsWith("/api/")) {
-        const segments = parsed.pathname.split("/");
-        parsed.pathname = ["", "api", ...segments.slice(2).map((s) => s.toLowerCase())].join("/");
-      }
-      // If the caller provided a relative endpoint, preserve relative output
-      if (!/^https?:\/\//i.test(collapsedUrl)) {
-        return `${parsed.pathname}${parsed.search}`;
-      }
-      return parsed.toString();
-    } catch {
-      return collapsedUrl;
-    }
+    return buildApiUrl(endpoint, this.baseUrl);
   }
 
   private async executeRequest(
@@ -623,6 +450,9 @@ export class ApiClient {
       () => controller.abort(),
       config.timeout || this.timeout,
     );
+    const onCallerAbort = () => controller.abort();
+    if (config.signal?.aborted) controller.abort();
+    else config.signal?.addEventListener("abort", onCallerAbort, { once: true });
 
     try {
       // Prepare headers
@@ -650,10 +480,7 @@ export class ApiClient {
 
       // Attach X-Emulation-Token for active impersonation sessions — but never
       // to /api/admin/* endpoints (those require the real SA bearer).
-      const emuToken = _emulationTokenGetter();
-      if (emuToken && shouldAttachEmulationToken(url)) {
-        headers["X-Emulation-Token"] = emuToken;
-      }
+      Object.assign(headers, emulationHeaders(url));
 
       const response = await fetch(url, {
         method: config.method || "GET",
@@ -664,9 +491,11 @@ export class ApiClient {
       });
 
       clearTimeout(timeoutId);
+      config.signal?.removeEventListener("abort", onCallerAbort);
       return response;
     } catch (error) {
       clearTimeout(timeoutId);
+      config.signal?.removeEventListener("abort", onCallerAbort);
 
       if (error instanceof Error && error.name === "AbortError") {
         throw new NetworkError("Request timeout", error, transportErrorContext("timeout"));
@@ -681,30 +510,17 @@ export class ApiClient {
     }
   }
 
+  /** Map an already-parsed body (read ONCE by the caller, which also logs
+   *  it) onto the typed success envelope, or throw the typed error. */
   private async handleResponse<T>(
     response: Response,
+    responseData: unknown,
     schema?: z.ZodType<T>,
   ): Promise<ApiSuccessResponse<T>> {
-    console.log("ApiClient.handleResponse: Processing response", {
-      status: response.status,
-      statusText: response.statusText,
-      url: response.url,
-    });
-
-    const responseData = await readJsonBody(response);
-    console.log("ApiClient.handleResponse: Raw response data", responseData);
-
-    // Handle HTTP error status codes
     if (!response.ok) {
-      console.log("ApiClient.handleResponse: Response not OK, handling error", {
-        status: response.status,
-        responseData,
-      });
       return this.handleErrorResponse(response.status, responseData);
     }
 
-    // Validate response structure
-    console.log("ApiClient.handleResponse: Validating API response structure");
     const validationResult = validateApiResponse(
       responseData,
       ApiResponseSchema,
@@ -714,29 +530,16 @@ export class ApiClient {
         "error" in validationResult
           ? validationResult.error
           : "Unknown validation error";
-      console.error(
-        "ApiClient.handleResponse: API response validation failed",
-        errorMessage,
-      );
       throw new ValidationError(
         `Invalid API response structure: ${errorMessage}`,
       );
     }
 
     const apiResponse = validationResult.data;
-    console.log(
-      "ApiClient.handleResponse: API response structure valid",
-      apiResponse,
-    );
-
-    // Handle API-level errors
     if (!apiResponse.success) {
-      console.log("ApiClient.handleResponse: Response indicates error");
-      const errorResponse = apiResponse as ApiErrorResponse;
-      throw this.createErrorFromResponse(errorResponse);
+      throw this.createErrorFromResponse(apiResponse as ApiErrorResponse);
     }
 
-    // Extract and validate data
     const successResponse: ApiSuccessResponse<T> = {
       success: true,
       data: apiResponse.data as T,
@@ -756,9 +559,8 @@ export class ApiClient {
 
     // #1135 — any award-firing endpoint that echoes `badgesUnlocked`
     // (top-level or on its data payload) triggers an immediate badge-list
-    // refresh, so the unlock celebration fires within the same render cycle
-    // instead of lagging up to 60s on BadgeUnlockToaster's poll. DRY seam:
-    // routes opt in just by returning the field — no per-call-site wiring.
+    // refresh, so the unlock celebration fires within the same render cycle.
+    // DRY seam: routes opt in just by returning the field.
     const unlocked =
       (apiResponse as { badgesUnlocked?: unknown }).badgesUnlocked ??
       (apiResponse.data as { badgesUnlocked?: unknown } | null | undefined)?.badgesUnlocked;
@@ -766,13 +568,7 @@ export class ApiClient {
       signalBadgeRefresh();
     }
 
-    console.log(
-      "ApiClient.handleResponse: Success response created",
-      successResponse,
-    );
-
     if (schema) {
-      console.log("ApiClient.handleResponse: Validating data against schema");
       const dataValidation = validateApiResponse(successResponse.data, schema);
       if (!dataValidation.success) {
         const errorMessage =
@@ -787,23 +583,17 @@ export class ApiClient {
         throw new ValidationError(`Invalid response data: ${errorMessage}`);
       }
       successResponse.data = dataValidation.data;
-      console.log("ApiClient.handleResponse: Data validation successful");
     }
 
-    console.log("ApiClient.handleResponse: Returning success response");
     return successResponse;
   }
 
   private handleErrorResponse(status: number, data: unknown): never {
-    console.log("ApiClient.handleErrorResponse: Called with status", status);
 
     // Try to parse as API error response
     const errorValidation = validateApiResponse(data, ApiErrorResponseSchema);
 
     if (errorValidation.success) {
-      console.log(
-        "ApiClient.handleErrorResponse: Using structured error response",
-      );
       throw this.createErrorFromResponse(errorValidation.data, status);
     }
 
@@ -815,10 +605,6 @@ export class ApiClient {
     // code, message, and diagnostics.
     const loose = extractLooseErrorEnvelope(data);
     if (loose) {
-      console.log(
-        "ApiClient.handleErrorResponse: Using loose error envelope",
-        loose,
-      );
       throw this.createErrorFromResponse({ success: false, error: loose }, status);
     }
 
@@ -869,7 +655,6 @@ export class ApiClient {
 
   private createErrorFromResponse(errorResponse: ApiErrorResponse, httpStatus?: number): AppError {
     const { error } = errorResponse;
-    console.log("ApiClient.createErrorFromResponse: Processing error", error);
 
     switch (error.code) {
       case "VALIDATION_ERROR":
@@ -969,7 +754,7 @@ export class ApiClient {
     }
 
     const url = this.createUrl(endpoint);
-    const emulationToken = _emulationTokenGetter() ?? "";
+    const emulationToken = getEmulationToken() ?? "";
     const key = `${url} ${emulationToken}`;
 
     const existing = this.inFlightGets.get(key);
@@ -1015,7 +800,7 @@ export class ApiClient {
     let lastRequestId: string | undefined;
 
     while (attempt < maxAttempts) {
-      const logId = ++_logIdCounter;
+      const logId = nextLogId();
       const startTime = Date.now();
       const method = processedConfig.method || "GET";
 
@@ -1036,20 +821,20 @@ export class ApiClient {
         const response = await this.executeRequest(url, processedConfig);
         lastRequestId = response.headers.get("x-request-id") ?? undefined;
 
-        // Clone the response so we can read the body for logging without consuming it
-        const clonedResponse = response.clone();
-        let rawResponseBody: unknown;
+        // Parse the body ONCE — the same value feeds the diagnostics log
+        // and the envelope mapping (no clone + second JSON.parse).
+        let responseData: unknown;
         try {
-          rawResponseBody = await clonedResponse.json();
-        } catch {
-          // non-JSON response; leave undefined
+          responseData = await readJsonBody(response);
+        } catch (parseError) {
+          recordLogEntryResponse(logId, response.status, undefined, startTime);
+          throw parseError;
         }
+        recordLogEntryResponse(logId, response.status, responseData, startTime);
 
-        const apiResponse = await this.handleResponse<T>(response, schema);
+        const apiResponse = await this.handleResponse<T>(response, responseData, schema);
 
         logApiCall(method, url, response.status);
-
-        recordLogEntryResponse(logId, response.status, rawResponseBody, startTime);
 
         // Apply response interceptors
         const processedResponse =
@@ -1146,7 +931,7 @@ export class ApiClient {
     schema?: z.ZodSchema<T>,
   ): Promise<{ data: T }> {
     const url = this.createUrl(endpoint);
-    const logId = ++_logIdCounter;
+    const logId = nextLogId();
     const startTime = Date.now();
 
     pushApiLogEntry({
@@ -1210,7 +995,7 @@ export class ApiClient {
     schema?: z.ZodSchema<T>,
   ): Promise<{ data: T }> {
     const url = this.createUrl(endpoint);
-    const logId = ++_logIdCounter;
+    const logId = nextLogId();
     const startTime = Date.now();
     const method = config.method || "GET";
 
@@ -1277,7 +1062,7 @@ export class ApiClient {
    */
   async openStream(endpoint: string, config: RequestConfig = {}): Promise<Response> {
     const url = this.createUrl(endpoint);
-    const logId = ++_logIdCounter;
+    const logId = nextLogId();
     const startTime = Date.now();
     const method = config.method || "GET";
     pushApiLogEntry({ id: logId, method, url, requestBody: config.body, timestamp: new Date().toISOString() });
@@ -1333,6 +1118,19 @@ export class ApiClient {
   ): Promise<ApiSuccessResponse<T>> {
     return this.request(endpoint, { method: "DELETE" }, schema);
   }
+
+  /**
+   * The unwrapped payload of a `{ success, data }` endpoint, typed — replaces
+   * the hand-rolled `(res as any).data?.data ?? (res as any).data` unwraps.
+   */
+  async fetchData<T>(
+    endpoint: string,
+    config: RequestConfig = {},
+    schema?: z.ZodSchema<T>,
+  ): Promise<T> {
+    const res = await this.request<T>(endpoint, config, schema);
+    return res.data;
+  }
 }
 
 // ============================================================================
@@ -1342,8 +1140,10 @@ export class ApiClient {
 // Create default client instance
 export const apiClient = new ApiClient({
   onRequest: async (config) => {
-    // Add authentication token if available
-    const token = localStorage.getItem("auth_token");
+    // Slide the session forward before it lapses (single-flight; no-op unless
+    // the token is inside its last day), then attach the current bearer.
+    await ensureFreshToken();
+    const token = getAuthToken();
     if (token) {
       config.headers = {
         ...config.headers,
@@ -1351,17 +1151,6 @@ export const apiClient = new ApiClient({
       };
     }
     return config;
-  },
-
-  onError: async (error) => {
-    // Only redirect to /login when the caller had a real session that just
-    // got invalidated. Anonymous visitors hitting auth-required side calls
-    // (e.g. analytics fetches on a public resume page) must keep rendering.
-    if (error instanceof AuthenticationError && localStorage.getItem("auth_token")) {
-      localStorage.removeItem("auth_token");
-      window.location.href = "/login";
-    }
-    return error;
   },
 });
 

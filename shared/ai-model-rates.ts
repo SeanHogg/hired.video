@@ -36,6 +36,9 @@ export const AI_MODEL_RATES: readonly AiModelRate[] = [
   // OpenRouter free pool + Cloudflare Workers AI — no per-token vendor charge.
   { id: "free-pool", match: /(:free$)|(^@cf\/)/i, inputPerMillion: 0, outputPerMillion: 0 },
   { id: "cerebras", match: /^cerebras\//i, inputPerMillion: 0.1, outputPerMillion: 0.1 },
+  // OpenAI Whisper ($0.006 / audio minute), metered as 200 token-equivalents
+  // per minute (api/src/services/adapters/transcription.ts) → $30 / 1M.
+  { id: "openai-whisper", match: /^whisper/i, inputPerMillion: 0, outputPerMillion: 30 },
 ];
 
 /** Conservative fallback for an unmatched model id (priced like Opus 5.5). */

@@ -20,6 +20,7 @@
 
 import { registerEffect } from "./registry";
 import { ease } from "./easing";
+import { clamp01, numberOr } from "./params";
 import type { MotionPhase, WidgetMotion } from "@/lib/studio/editor-v2/widget-motion";
 
 export interface AnimateInput {
@@ -233,14 +234,6 @@ function shake(params: Record<string, unknown>, i: AnimateInput): AnimateOutput 
 function clipProgress(i: AnimateInput): number {
   if (i.clipDurationSec <= 0) return 0;
   return clamp01(i.clipTimeSec / i.clipDurationSec);
-}
-
-function clamp01(v: number): number {
-  return Math.max(0, Math.min(1, v));
-}
-
-function numberOr(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 
 // ── Registry entries ──────────────────────────────────────────────────

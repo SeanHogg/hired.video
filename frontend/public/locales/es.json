@@ -11093,6 +11093,8 @@
   "courseCheckout.paySuccess": "Pago realizado",
   "courseCheckout.paySuccessBody": "Inscripción desbloqueada.",
   "courseCheckout.payFailed": "El pago falló",
+  "courseCheckout.verifying": "Pago recibido: confirmando",
+  "courseCheckout.verifyingBody": "Estamos confirmando tu pago con el proveedor. Actualiza en un minuto para empezar a aprender.",
   "certificate.seoTitle": "Verificación de certificado · hired.video",
   "certificate.seoTitleValid": "{{name}} · {{course}} · hired.video",
   "certificate.seoDescription": "Verifica un certificado de aprendizaje de hired.video. Firmado, a prueba de manipulaciones y emitido al aprobar el curso.",

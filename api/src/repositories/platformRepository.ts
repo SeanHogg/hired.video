@@ -3,15 +3,12 @@
  *
  * Covers:
  *   • whitelabelTenants        — multi-tenant customization
- *   • featureFlags             — server-side rollout switches
  *   • accountInvitations       — invites issued to join an account
  *   • careerResilienceReports  — generated career insight reports
  *   • extractedProfiles        — scraped external profile data
  *
  * Grouped because these are all "platform config + system outputs"
- * rather than belonging to any user/company aggregate. Don't confuse
- * with AuthzRepository (module grants): feature flags are rolloutable
- * flags, not per-user permissions.
+ * rather than belonging to any user/company aggregate.
  */
 
 import { desc, eq } from "drizzle-orm";
@@ -19,7 +16,6 @@ import { schema } from "../db/index.js";
 
 const {
   whitelabelTenants,
-  featureFlags,
   accountInvitations,
   careerResilienceReports,
   extractedProfiles,
@@ -29,7 +25,6 @@ export type DbLike = any;
 
 export type WhitelabelTenantRow = typeof whitelabelTenants.$inferSelect;
 export type WhitelabelTenantInsert = typeof whitelabelTenants.$inferInsert;
-export type FeatureFlagRow = typeof featureFlags.$inferSelect;
 export type AccountInvitationRow = typeof accountInvitations.$inferSelect;
 export type AccountInvitationInsert = typeof accountInvitations.$inferInsert;
 export type CareerResilienceReportRow = typeof careerResilienceReports.$inferSelect;
@@ -40,9 +35,6 @@ export interface IPlatformRepository {
   findTenantById(id: string): Promise<WhitelabelTenantRow | null>;
   listTenants(): Promise<WhitelabelTenantRow[]>;
   insertTenant(input: WhitelabelTenantInsert): Promise<WhitelabelTenantRow>;
-  // feature flags
-  findFeatureFlagByKey(key: string): Promise<FeatureFlagRow | null>;
-  listFeatureFlags(): Promise<FeatureFlagRow[]>;
   // account invitations
   findInvitationById(id: string): Promise<AccountInvitationRow | null>;
   listPendingInvitations(limit?: number): Promise<AccountInvitationRow[]>;
@@ -70,15 +62,6 @@ export class PlatformRepository implements IPlatformRepository {
   async insertTenant(input: WhitelabelTenantInsert): Promise<WhitelabelTenantRow> {
     const [row] = await this.db.insert(whitelabelTenants).values(input as any).returning();
     return row as WhitelabelTenantRow;
-  }
-
-  async findFeatureFlagByKey(key: string): Promise<FeatureFlagRow | null> {
-    const [row] = await this.db.select().from(featureFlags).where(eq(featureFlags.key, key)).limit(1);
-    return (row as FeatureFlagRow) ?? null;
-  }
-
-  async listFeatureFlags(): Promise<FeatureFlagRow[]> {
-    return (await this.db.select().from(featureFlags)) as FeatureFlagRow[];
   }
 
   async findInvitationById(id: string): Promise<AccountInvitationRow | null> {

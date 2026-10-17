@@ -8,6 +8,7 @@
 // trigger the Add-Service dialog from buttons rendered in the tabs row.
 
 import { TABLE_SURFACE, TABLE_HEAD } from "@/lib/ui/table-surface";
+import { formatListPriceCents } from "@/lib/format";
 import {
   Fragment,
   forwardRef,
@@ -87,11 +88,6 @@ const defaultForm: CreateServiceInput = {
   priceVisible: true,
   deliveryDays: undefined,
 };
-
-function formatPrice(cents: number | null) {
-  if (cents === null) return "Contact for pricing";
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 interface Props {
   services: ServiceOffering[];
@@ -209,7 +205,7 @@ const OfferingsPanel = forwardRef<OfferingsPanelHandle, Props>(function Offering
             <div className="flex items-center gap-4 mt-2 text-sm flex-wrap">
               <span className="flex items-center gap-1 font-medium text-sky-600">
                 <DollarSign className="h-3.5 w-3.5" />
-                {formatPrice(s.priceCents)}
+                {formatListPriceCents(s.priceCents)}
               </span>
               <span className="flex items-center gap-1 text-muted-foreground">
                 {s.priceVisible ? (
@@ -561,7 +557,7 @@ function ServicesTable({
                 </button>
               </td>
               <td className="px-3 py-2 text-muted-foreground">
-                {formatPrice(s.priceCents)}
+                {formatListPriceCents(s.priceCents)}
               </td>
               <td className="px-3 py-2 text-muted-foreground">
                 {s.category ? (

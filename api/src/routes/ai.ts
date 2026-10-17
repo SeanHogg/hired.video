@@ -11,11 +11,13 @@ import {
   type ToolSpec,
 } from "../services/adapters/llm-client.js";
 import { aiFailure } from "../services/adapters/llm-error.js";
+import { estimateTokens } from "../services/adapters/llm-stream.js";
 import { BuilderforceClient } from "@seanhogg/builderforce-sdk";
 import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { getPrompt } from "../../../shared/ai-prompts/index.js";
+import { logger } from "../lib/logger.js";
 import {
   buildHelpDocsBlock,
   buildHelpAssistSystemPrompt,
@@ -52,10 +54,6 @@ aiRoutes.get("/models", superAdminMiddleware, async (c) => {
 // drifts between the panel's enhanced prompt and this route's default.
 const SYSTEM_PROMPT = getPrompt("career-coach").render({});
 
-function estimateTokens(text: string): number {
-  return Math.max(1, Math.round(text.length / 4));
-}
-
 function generateMockResponse(input: string): { message: string; usage: { promptTokens: number; completionTokens: number; totalTokens: number } } {
   const normalized = (input ?? "").toLowerCase();
   let message = "I'm here to help with your career journey! What would you like to work on today?";
@@ -78,8 +76,8 @@ function generateMockResponse(input: string): { message: string; usage: { prompt
     message = "Ask me anything about hiring, job searching, resume building, or video resumes and I'll do my best to help!";
   }
 
-  const promptTokens = estimateTokens(input);
-  const completionTokens = estimateTokens(message);
+  const promptTokens = estimateTokens(input.length);
+  const completionTokens = estimateTokens(message.length);
   return { message, usage: { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens } };
 }
 
@@ -219,7 +217,7 @@ aiRoutes.post("/chat", async (c) => {
     try {
       await db.insert(schema.aiChatMessages).values({ sessionId, role, content, tokensUsed } as any);
     } catch (persistErr) {
-      console.error("[ai/chat] persist message failed", { sessionId, role, tokensUsed, err: persistErr });
+      logger.error("[ai/chat] persist message failed", { sessionId, role, tokensUsed, error: persistErr });
     }
   }
 
@@ -228,7 +226,7 @@ aiRoutes.post("/chat", async (c) => {
     // the authoritative LLM cost ledger is `ai_usage_records` (charged
     // inside callMessages). Estimating from the message content keeps
     // the per-row column meaningful without needing the LLM result.
-    await persistChatMessage("user", userMessage, estimateTokens(userMessage));
+    await persistChatMessage("user", userMessage, estimateTokens(userMessage.length));
   }
 
   let responseMessage = "";
@@ -451,7 +449,7 @@ aiRoutes.post("/help-assist", async (c) => {
   } catch (err) {
     // ANY failure degrades to escalation — the client falls back to /chat,
     // which owns budget + error handling. Never surface a help-path error.
-    console.error("[ai/help-assist] degraded → escalate:", err);
+    logger.error("[ai/help-assist] degraded → escalate", err);
     return c.json(success({ escalate: true }), 200);
   }
 });

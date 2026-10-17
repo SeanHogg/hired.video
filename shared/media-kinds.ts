@@ -66,8 +66,6 @@ export const MEDIA_KINDS = [
 
 export type MediaKind = (typeof MEDIA_KINDS)[number];
 
-export const DEFAULT_MEDIA_KIND: MediaKind = "video";
-
 /** Whether the kind produces audible output. Games are runtime-rendered
  *  and almost always have sound — counted as `true` so the editor
  *  surfaces the audio asset workflow alongside sprite / level work.
@@ -101,14 +99,6 @@ export function mediaKindHasVideo(kind: MediaKind): boolean {
     kind === "comic" ||
     kind === "interactive_comic"
   );
-}
-
-/** Whether the kind permits both audio + video tracks (a podcast may
- *  optionally carry a video feed — the "video podcast" branch). Games
- *  are NOT in this set because game audio doesn't live on Timeline a1/a2
- *  tracks — it's runtime-loaded asset playback via the game engine. */
-export function mediaKindCanHaveBoth(kind: MediaKind): boolean {
-  return kind === "video" || kind === "podcast";
 }
 
 /** Whether the kind's canvas runtime is the Timeline (the default for
@@ -823,13 +813,6 @@ export const OUTPUT_PROFILES: OutputProfile[] = [
 /** Every profile registered for a given mediaKind, in declaration order. */
 export function outputProfilesFor(kind: MediaKind): OutputProfile[] {
   return OUTPUT_PROFILES.filter((p) => p.mediaKind === kind);
-}
-
-/** Lookup by stable id. Returns null for unknown ids — caller decides
- *  whether to fall back to the kind's default. */
-export function findOutputProfile(id: string | null | undefined): OutputProfile | null {
-  if (!id) return null;
-  return OUTPUT_PROFILES.find((p) => p.id === id) ?? null;
 }
 
 /** The default profile every kind ships with — used when the user hasn't

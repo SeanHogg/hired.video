@@ -369,3 +369,7 @@ export const pointsAdminService = {
     });
   },
 };
+
+/** Wire schema for GET /api/points/me — the bootstrap seeder parses the
+ *  aggregate slice through it so the cached value matches `getMe()`. */
+export const PointsSummarySchema = SummarySchema;

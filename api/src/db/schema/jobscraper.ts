@@ -14,6 +14,7 @@ import {
   timestamp,
   jsonb,
   integer,
+  index,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 
@@ -50,7 +51,9 @@ export const jobBoardSources = pgTable("job_board_sources", {
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_job_board_sources_created_by_user_id").on(t.createdByUserId),
+]);
 
 export type JobBoardSource = typeof jobBoardSources.$inferSelect;
 export type NewJobBoardSource = typeof jobBoardSources.$inferInsert;
@@ -69,7 +72,9 @@ export const jobBoardSyncLog = pgTable("job_board_sync_log", {
   skipped: integer("skipped").default(0).notNull(), // duplicates
   errors: integer("errors").default(0).notNull(),
   errorMessage: text("error_message"),
-});
+}, (t) => [
+  index("idx_job_board_sync_log_source_id").on(t.sourceId),
+]);
 
 export type JobBoardSyncLog = typeof jobBoardSyncLog.$inferSelect;
 export type NewJobBoardSyncLog = typeof jobBoardSyncLog.$inferInsert;

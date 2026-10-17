@@ -10,6 +10,7 @@ import {
   jsonb,
   integer,
   index,
+  check,
 } from "drizzle-orm/pg-core";
 
 import { users } from "./users.js";
@@ -18,6 +19,7 @@ import {
   scorecardSubmissions,
   competencies,
 } from "./scorecards.js";
+import { sql } from "drizzle-orm";
 
 export const takeHomeAssignments = pgTable(
   "take_home_assignments",
@@ -67,6 +69,8 @@ export const takeHomeSubmissions = pgTable(
   (t) => ({
     assignmentIdx: index("take_home_submissions_assignment_idx").on(t.assignmentId),
     applicationIdx: index("take_home_submissions_application_idx").on(t.applicationId),
+    candidateUserIdFkIdx: index("idx_take_home_submissions_candidate_user_id").on(t.candidateUserId),
+    evaluatorScorecardSubmissionIdFkIdx: index("idx_take_home_submissions_evaluator_scorecard_submission_id").on(t.evaluatorScorecardSubmissionId),
   }),
 );
 
@@ -98,3 +102,28 @@ export const interviewStageQuestions = pgTable(
 );
 
 export type InterviewStageQuestion = typeof interviewStageQuestions.$inferSelect;
+
+export const takeHomeInvites = pgTable(
+  "take_home_invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    stageId: uuid("stage_id").notNull(),
+    candidateEmail: varchar("candidate_email", { length: 255 }).notNull(),
+    candidateName: varchar("candidate_name", { length: 255 }),
+    inviteToken: varchar("invite_token", { length: 64 }).notNull().unique(),
+    status: varchar("status", { length: 16 }).notNull().default("pending"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    submissionId: uuid("submission_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_take_home_invites_stage").on(t.stageId),
+    check("take_home_invites_status_check", sql`${t.status} IN ('pending', 'started', 'submitted', 'expired')`),
+  ],
+);
+
+export type TakeHomeInvite = typeof takeHomeInvites.$inferSelect;
+export type NewTakeHomeInvite = typeof takeHomeInvites.$inferInsert;

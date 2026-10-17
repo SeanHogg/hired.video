@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { formatLocaleDate } from "@/lib/format";
 import {
   Check,
   ExternalLink,
@@ -87,12 +88,6 @@ export default function Partners() {
     }
   };
 
-  const formatDate = (iso: string | null | undefined) => {
-    if (!iso) return "";
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString();
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -166,7 +161,7 @@ export default function Partners() {
                           <ExternalLink className="h-3 w-3" />
                         </a>
                       ) : null}
-                      <span>{t("adminPartners.requested", { date: formatDate(p.createdAt) })}</span>
+                      <span>{t("adminPartners.requested", { date: formatLocaleDate(p.createdAt) })}</span>
                     </div>
                     {p.requestNote ? (
                       <p className="max-w-2xl text-sm text-muted-foreground">

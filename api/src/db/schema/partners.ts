@@ -65,6 +65,8 @@ export const partners = pgTable(
   (t) => [
     index("idx_partners_status").on(t.status),
     index("idx_partners_owner").on(t.ownerUserId),
+    index("idx_partners_approved_by").on(t.approvedBy),
+    index("idx_partners_created_by").on(t.createdBy),
   ],
 );
 
@@ -93,6 +95,7 @@ export const partnerApiKeys = pgTable(
   (t) => [
     uniqueIndex("uq_partner_api_keys_hash").on(t.keyHash),
     index("idx_partner_api_keys_partner").on(t.partnerId),
+    index("idx_partner_api_keys_created_by").on(t.createdBy),
   ],
 );
 
@@ -129,7 +132,6 @@ export const partnerConnections = pgTable(
     // One connection row per (partner, user) — re-connecting reuses the row.
     uniqueIndex("uq_partner_connections_partner_user").on(t.partnerId, t.userId),
     index("idx_partner_connections_user").on(t.userId),
-    index("idx_partner_connections_partner").on(t.partnerId),
   ],
 );
 

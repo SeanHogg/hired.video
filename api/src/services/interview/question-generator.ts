@@ -18,6 +18,7 @@ import { z } from "zod";
 import type { Skill } from "../resume/skills.js";
 import { hasAnyLLMProviderKey, createLLMClient } from "../adapters/llm-client.js";
 import type { Env, JwtPayload } from "../../types/index.js";
+import { logger } from "../../lib/logger.js";
 
 // ─── Public types ───────────────────────────────────────────────────────────
 
@@ -167,7 +168,7 @@ ${skillSummary || "(no skills supplied — fall back to role-fit questions for t
       skillLinks: q.skillLinks ?? [],
     }));
   } catch (err) {
-    console.error("[question-generator] LLM call failed, using mock:", err);
+    logger.error("[question-generator] LLM call failed, using mock", err);
     return buildMockQuestions({ ...args, count, skills });
   }
 }
@@ -270,7 +271,7 @@ Count: ${count}`;
       expectedAnswer: q.expectedAnswer ?? "open",
     }));
   } catch (err) {
-    console.error("[question-generator/competency] LLM error, using mock:", err);
+    logger.error("[question-generator/competency] LLM error, using mock", err);
     return buildMockCompetencyQuestions({ ...args, count });
   }
 }

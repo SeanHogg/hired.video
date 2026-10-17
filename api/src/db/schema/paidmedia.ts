@@ -60,7 +60,6 @@ export const paidMediaConnections = pgTable(
     updatedAt:            timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    index("idx_paid_media_connections_owner").on(t.userId, t.companyId),
     index("idx_paid_media_connections_platform").on(t.platform),
     uniqueIndex("uq_paid_media_connection_workspace_platform").on(t.userId, t.companyId, t.platform),
     check("paid_media_connections_access_token_enc_enc_format_check", sql`${t.accessTokenEnc} IS NULL OR ${t.accessTokenEnc} LIKE 'v1.aes-gcm.hkdf:%' OR ${t.accessTokenEnc} ~ '^[A-Za-z0-9+/=]+\\.[A-Za-z0-9+/=]+$' OR ${t.accessTokenEnc} ~ '^[0-9a-fA-F]+:[0-9a-fA-F]+$'`),
@@ -400,30 +399,6 @@ export const paidMediaConversions = pgTable(
   ],
 );
 
-// ─── Audiences (custom audience sync to platforms) ───────────────────────
-export const paidMediaAudiences = pgTable(
-  "paid_media_audiences",
-  {
-    id:           uuid("id").primaryKey().defaultRandom(),
-    userId:       text("user_id").notNull(),
-    companyId:    uuid("company_id"),
-    name:         text("name").notNull(),
-    description: text("description"),
-    // Source: "static_list" | "segment_query" | "lookalike"
-    sourceKind:   varchar("source_kind", { length: 24 }).notNull(),
-    // For static_list: { userIds: [...] }
-    // For segment_query: { query: { ... } }   — interpreted by services/paid-media/audiences/segment-query.ts
-    // For lookalike:    { seedAudienceId, country, percentile }
-    sourceSpec:   jsonb("source_spec").notNull().default("{}"),
-    sizeEstimate: integer("size_estimate"),
-    createdAt:    timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt:    timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [
-    index("idx_paid_media_audiences_owner").on(t.userId, t.companyId),
-  ],
-);
-
 // ─── Type exports ─────────────────────────────────────────────────────────
 export type PaidMediaConnection = typeof paidMediaConnections.$inferSelect;
 export type NewPaidMediaConnection = typeof paidMediaConnections.$inferInsert;
@@ -447,5 +422,3 @@ export type PaidMediaPixels = typeof paidMediaPixels.$inferSelect;
 export type NewPaidMediaPixels = typeof paidMediaPixels.$inferInsert;
 export type PaidMediaConversion = typeof paidMediaConversions.$inferSelect;
 export type NewPaidMediaConversion = typeof paidMediaConversions.$inferInsert;
-export type PaidMediaAudience = typeof paidMediaAudiences.$inferSelect;
-export type NewPaidMediaAudience = typeof paidMediaAudiences.$inferInsert;

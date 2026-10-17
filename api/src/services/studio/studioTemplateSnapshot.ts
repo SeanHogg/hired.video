@@ -15,6 +15,7 @@
 
 import { documentEntityKindOf, type DocumentEntityKind } from "../../../../shared/document-entity-kinds.js";
 import { stripResumeDocumentForTemplate } from "../../../../shared/resume-template-snapshot.js";
+import { bytesToHex } from "../../utils/crypto.js";
 
 /** Everything a template row derives from its source payload. */
 export interface TemplateSnapshot {
@@ -155,5 +156,5 @@ export function randomShortId(): string {
   } else {
     for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
   }
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return bytesToHex(bytes);
 }

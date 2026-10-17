@@ -16,7 +16,8 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { ForbiddenError } from "../../middleware/errorHandler.js";
-import { escapeHtml, formatMoney, printShell } from "../print/print-shell.js";
+import { formatMoney, printShell } from "../print/print-shell.js";
+import { escapeHtml } from "../../../../shared/html-escape.js";
 import {
   anonymizeIdentity,
   candidateInitials,

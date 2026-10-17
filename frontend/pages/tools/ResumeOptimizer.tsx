@@ -24,7 +24,7 @@ export default function ResumeOptimizer() {
         loadingLabel: t("tools.resumeOptimizer.submitLoading"),
         icon: Zap,
       }}
-      endpoint="/api/ResumeOptimizer/optimize"
+      endpoint="/api/resumeoptimizer/optimize"
       showJobDescription
       reportLabel={t("tools.resumeOptimizer.reportLabel")}
       emptyState={{

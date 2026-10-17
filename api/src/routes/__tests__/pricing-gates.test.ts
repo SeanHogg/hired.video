@@ -47,7 +47,7 @@ import {
   type PublishVideoErrorKind,
 } from "../../services/studio/compiled-video.js";
 import { startOfMonthUtc } from "../../middleware/free-tier-limits.js";
-import { flattenStoryboardTranscript, buildHeuristicCaption, projectTranscript } from "../../services/studio/social-caption.js";
+import { flattenStoryboardTranscript, buildHeuristicCaption, projectTranscript } from "../../../../shared/social-caption.js";
 import {
   FREE_INTERVIEW_SESSIONS_PER_MONTH,
   FREE_AI_MONTHLY_TOKENS,
@@ -707,6 +707,11 @@ describe("projectTranscript", () => {
   it("returns empty for a missing or malformed timeline", () => {
     assert.equal(projectTranscript({ kind: "nle", storyboard: null, timelineSpec: null }), "");
     assert.equal(projectTranscript({ kind: "nle", storyboard: null, timelineSpec: { tracks: "x" } }), "");
+  });
+
+  it("falls back to the storyboard for an nle project with no timeline yet (extension script, pre-stamp)", () => {
+    const storyboard = { scenes: [{ title: "Hook", text: "Shipped 3 launches" }] };
+    assert.equal(projectTranscript({ kind: "nle", storyboard, timelineSpec: null }), "Hook — Shipped 3 launches");
   });
 
   it("still reads the storyboard for scene projects", () => {

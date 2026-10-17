@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ResumeContent } from "@shared/resume";
 import type { ResumeLineage } from "@shared/resume-lineage";
 import { resumeService } from "@/lib/services/resume-service";
+import { useResume } from "@/hooks/queries/use-resumes";
 
 export type CompareWith = { kind: "review" } | { kind: "master" } | { kind: "saved" } | { kind: "version"; id: string };
 
@@ -31,12 +32,7 @@ export function useCompareSource(args: {
 
   const storedId =
     choice.kind === "master" ? masterId : choice.kind === "saved" ? resumeId : choice.kind === "version" ? choice.id : null;
-  const stored = useQuery({
-    queryKey: ["resume", storedId],
-    queryFn: () => resumeService.getResumeById(storedId as string),
-    enabled: open && !!storedId,
-    staleTime: 30_000,
-  });
+  const stored = useResume(storedId, { enabled: open, staleTime: 30_000 });
   const groups = useQuery({
     queryKey: ["resume-master-groups"],
     queryFn: () => resumeService.getMasterResumeGroups(),

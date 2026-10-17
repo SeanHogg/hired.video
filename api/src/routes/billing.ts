@@ -13,6 +13,20 @@ import type { UsageInvoice } from "../../../shared/usage-statement.js";
 import { inboxSeatAddonService } from "../services/billing/InboxSeatAddonService.js";
 import { handleRefundRequest, handleCancelAccount } from "../services/billing/handlers.js";
 import { requirePro } from "../middleware/auth-gates.js";
+import { emitNotification } from "../services/notifications/notificationService.js";
+import { buildRepos } from "../repositories/index.js";
+
+/** Best-effort billing notification through the single dispatcher, so the
+ *  bell row, preference-gated push and email all apply. */
+async function notifyBilling(
+  userId: string,
+  n: { title: string; message: string; extraData: Record<string, unknown> },
+): Promise<void> {
+  await emitNotification(
+    { repos: buildRepos(getDb()) },
+    { recipientIds: [userId], type: "billing", actor: null, url: "/settings?tab=billing", ...n },
+  ).catch(() => undefined);
+}
 
 export const billingRoutes = new Hono<AppEnv>();
 
@@ -334,13 +348,11 @@ billingRoutes.post("/trial/start", async (c) => {
     .returning();
 
   // Notify user
-  await db.insert(schema.notifications).values({
-    userId,
-    type: "billing",
+  await notifyBilling(userId, {
     title: "Your 14-day trial has started",
     message: TIER_COPY.trialStarted(trialEnd.toLocaleDateString()),
-    data: { subscriptionId: sub.id, trialEnd: trialEnd.toISOString() } as any,
-  } as any).catch(() => undefined);
+    extraData: { subscriptionId: sub.id, trialEnd: trialEnd.toISOString() },
+  });
 
   billingService.invalidateSubscriptionCache(userId);
   return c.json(ok({ subscriptionId: sub.id, trialEnd: trialEnd.toISOString(), daysRemaining: trialDays }), 201);
@@ -424,13 +436,11 @@ billingRoutes.post("/subscribe", async (c) => {
   } as any).catch(() => undefined);
 
   // Notify user of successful subscription
-  await db.insert(schema.notifications).values({
-    userId,
-    type: "billing",
+  await notifyBilling(userId, {
     title: `Welcome to ${plan.name}!`,
     message: `Your ${interval} subscription is now active. ${isYearly ? `You saved ${Math.round(ANNUAL_DISCOUNT_RATE * 100)}% with annual billing.` : ""}`,
-    data: { subscriptionId: sub.id, planSlug, interval } as any,
-  } as any).catch(() => undefined);
+    extraData: { subscriptionId: sub.id, planSlug, interval },
+  });
 
   billingService.invalidateSubscriptionCache(userId);
   return c.json(ok({

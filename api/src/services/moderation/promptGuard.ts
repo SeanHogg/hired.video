@@ -37,6 +37,7 @@
 
 import { AppError } from "../../middleware/errorHandler.js";
 import { HARMFUL_SLURS, lexiconTermsIn } from "../../../../shared/moderation/explicit-lexicon.js";
+import { logger } from "../../lib/logger.js";
 
 export type HarmCategory =
   | "violence"
@@ -293,9 +294,11 @@ export function assertPromptSafe(input: string | null | undefined): void {
   const result = screenPrompt(input);
   if (!result.safe) {
     // Server-side breadcrumb — the matched fragment never reaches the client.
-    console.warn(
-      `[promptGuard] blocked ${result.category} (${result.label}): "${(result.matched ?? "").slice(0, 80)}"`,
-    );
+    logger.warn("[promptGuard] blocked", {
+      category: result.category,
+      label: result.label,
+      matched: (result.matched ?? "").slice(0, 80),
+    });
     throw new PromptBlockedError(result);
   }
 }

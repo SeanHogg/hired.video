@@ -15,6 +15,29 @@ import {
 } from "@/types/account";
 import { apiClient } from "@/lib/api-client";
 
+interface AvailableAccountRow {
+  id: string;
+  name: string;
+  role: AccountOption["role"];
+  logoUrl?: string | null;
+}
+
+/** Map the /api/account/available payload (`{ result }` or a bare array —
+ *  the bootstrap slice is the bare array) onto switcher options. */
+export function toAccountOptions(raw: unknown): AccountOption[] {
+  const rows: AvailableAccountRow[] = Array.isArray(raw)
+    ? raw
+    : ((raw as { result?: AvailableAccountRow[] } | null)?.result ?? []);
+  return rows.map((account) => ({
+    id: account.id,
+    name: account.name,
+    role: account.role,
+    logoUrl: account.logoUrl ?? undefined,
+    isOwner: account.role === "admin",
+    isAdmin: account.role === "admin" || account.role === "employer",
+  }));
+}
+
 class AccountService {
   // Requests go through apiClient; no per-service base URL or headers needed
 
@@ -79,18 +102,8 @@ class AccountService {
    */
   async getAvailableAccounts(): Promise<AccountOption[]> {
     try {
-      const response = await apiClient.get<any[] | { result: any[] }>("/api/account/available");
-      const data = response.data;
-      const accounts: any[] = Array.isArray(data) ? data : (data?.result ?? []);
-
-      return accounts.map((account: any) => ({
-        id: account.id,
-        name: account.name,
-        role: account.role,
-        logoUrl: account.logoUrl ?? undefined,
-        isOwner: account.role === "admin",
-        isAdmin: account.role === "admin" || account.role === "employer",
-      }));
+      const response = await apiClient.get<unknown>("/api/account/available");
+      return toAccountOptions(response.data);
     } catch (error) {
       console.error("Error fetching available accounts:", error);
       return [];

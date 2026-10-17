@@ -39,7 +39,7 @@ import {
   // Pure HTML helpers — single-sourced in shared/scraping so the
   // Chrome extension, frontend, and API all agree on what "stripped
   // HTML" / "markdown" mean.
-  stripHtml as stripHtmlShared,
+  stripHtml,
   htmlToMarkdown as htmlToMarkdownShared,
   // JSON-LD JobPosting extraction.
   extractJobPostingsFromHtml,
@@ -50,6 +50,8 @@ import {
   // LinkedIn-specific docTitle parser: "{Company} hiring {Title} in {Location} | LinkedIn".
   parseLinkedInTitleString,
 } from "../../../../shared/scraping/index.js";
+import { logger } from "../../lib/logger.js";
+import { sha256Hex } from "../../utils/crypto.js";
 
 // Re-export the shared primitives under their historical names so every
 // current caller (tests, other services, route handlers) keeps working.
@@ -74,12 +76,6 @@ export { savedJobs as schema_savedJobs };
 // The re-export at the top of this file keeps the existing call sites
 // working without change.
 
-// Local shim for the stripHtml helper so the many call sites below
-// that read `stripHtml(...)` don't all need to change.
-function stripHtml(text: unknown): string {
-  return stripHtmlShared(text);
-}
-
 /**
  * Compute a short content fingerprint from title + company. Used to
  * catch the same job appearing at two different URLs (e.g. LinkedIn
@@ -92,11 +88,7 @@ export async function computeContentHash(title?: string, company?: string): Prom
   const input = [title, company]
     .map((s) => (s ?? '').toLowerCase().replace(/[^a-z0-9]/g, ''))
     .join('|');
-  const bytes = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  return sha256Hex(input);
 }
 
 /**
@@ -261,7 +253,7 @@ export async function deduplicateJob(input: { title: string; company?: string; l
       return { outcome: 'new', candidates };
     }
   } catch (err) {
-    console.warn('[dedup] AI duplicate check failed, falling open:', err);
+    logger.warn("[dedup] AI duplicate check failed, falling open", err);
     // Fall through with candidates so the extension can prompt
     if (candidates.length > 0) return { outcome: 'new', candidates };
   }
@@ -949,7 +941,7 @@ export async function enrichParsedWithLLM(
       hint: parsed,
     }, "job_enrich");
   } catch (err) {
-    console.warn("[jobs/enrich] LLM enrichment failed, returning original parse:", err);
+    logger.warn("[jobs/enrich] LLM enrichment failed, returning original parse", err);
     return parsed;
   }
 
@@ -1029,7 +1021,7 @@ export async function extractAndClassifyJob(input: {
       hint: heuristic,
     }, "job_extract");
   } catch (err) {
-    console.warn("[jobs/extract] LLM classification failed, falling open:", err);
+    logger.warn("[jobs/extract] LLM classification failed, falling open", err);
     // Don't punish the user for an upstream LLM outage — fall through
     // to the heuristic parse (with the structured MD description).
     return {

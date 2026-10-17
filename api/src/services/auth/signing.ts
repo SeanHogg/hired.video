@@ -7,6 +7,7 @@
  */
 
 import { getJwtSecretOptional } from "../../utils/jwt.js";
+import { hmacSha256Hex } from "../../utils/crypto.js";
 
 /** JWT_SECRET resolution, delegated to the single reader in utils/jwt.ts so
  *  signed tokens use the same key everywhere.
@@ -21,17 +22,7 @@ export function getAuthSecret(): string {
 }
 
 /** Lowercase hex HMAC-SHA256 of `message` under `secret` (defaults to the
- *  auth secret). */
-export async function hmacHex(message: string, secret: string = getAuthSecret()): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
-  return Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+ *  auth secret). Delegates to the one HMAC implementation in utils/crypto.ts. */
+export function hmacHex(message: string, secret: string = getAuthSecret()): Promise<string> {
+  return hmacSha256Hex(secret, message);
 }

@@ -5,7 +5,7 @@
 //                                          members of that company
 //   • Owner-only inside a company (companyId set, isPrivate = true)
 //
-// Distinct from `recruiterTalentPools` which is a CRM concept (relationship
+// Distinct from the archived `recruiter_talent_pools` CRM concept (relationship
 // strength, last-contacted, follow-ups). Lists are deliberately lightweight.
 
 import {
@@ -105,7 +105,7 @@ export const listItems = pgTable(
     // "What lists is this entity in?" lookup
     index("list_items_entity_idx").on(t.entityType, t.entityId),
     // Pagination over a list
-    index("list_items_list_idx").on(t.listId),
+    index("idx_list_items_added_by_user_id").on(t.addedByUserId),
   ],
 );
 

@@ -4,7 +4,7 @@
 // managing the per-user answer cache.
 
 import { Hono } from "hono";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
@@ -20,12 +20,27 @@ import {
 } from "../services/user/autofill.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import type { FormField } from "../../../shared/autofill.js";
+import { parsePagination } from "../utils/pagination.js";
+import {
+  handleDeleteCacheEntry,
+  handleHistoryDetail,
+  handleHistoryList,
+  handleSaveSubmission,
+  handleUpdateCacheEntry,
+  type AutofillDeps,
+} from "../services/user/autofill-handlers.js";
+import { sendHandlerResult } from "./helpers/routerHelpers.js";
 
 export const autofillRoutes = new Hono<AppEnv>();
 autofillRoutes.use("*", attachTokenBudget());
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
+}
+
+/** Deps for the pure write/history handlers (services/user/autofill-handlers.ts). */
+function autofillDeps(): AutofillDeps {
+  return { db: getDb(), now: () => new Date() };
 }
 
 // =====================================================================
@@ -56,27 +71,6 @@ const GenerateAnswersSchema = z.object({
   jobDescription: z.string().max(10000).optional(),
   resumeId: UuidLikeSchema.optional(),
   customInstructions: z.string().max(1000).optional(),
-});
-
-const SaveSubmissionSchema = z.object({
-  fields: z.array(z.object({
-    id: z.string(),
-    label: z.string(),
-    type: z.string(),
-    name: z.string().optional(),
-    required: z.boolean(),
-    options: z.array(z.string()).optional(),
-    selector: z.string().optional(),
-    category: z.string().optional(),
-  })),
-  answers: z.record(z.string(), z.string()),
-  sourceUrl: z.string().max(2000).optional(),
-  jobId: UuidLikeSchema.optional(),
-  savedJobId: UuidLikeSchema.optional(),
-  resumeId: UuidLikeSchema.optional(),
-  atsProvider: z.string().max(50).optional(),
-  jobDescription: z.string().max(10000).optional(),
-  status: z.enum(["draft", "submitted", "reviewed"]).optional(),
 });
 
 // =====================================================================
@@ -230,47 +224,8 @@ autofillRoutes.post("/generate", async (c) => {
  * Save a completed form submission with answers.
  */
 autofillRoutes.post("/save", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
   const body = await c.req.json().catch(() => null);
-  const parsed = SaveSubmissionSchema.safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-
-  const { fields, answers, sourceUrl, jobId, savedJobId, resumeId, atsProvider, jobDescription, status } = parsed.data;
-  const db = getDb();
-
-  const [inserted] = await db.insert(schema.applicationFormAnswers).values({
-    userId,
-    jobId: jobId ?? null,
-    savedJobId: savedJobId ?? null,
-    resumeId: resumeId ?? null,
-    sourceUrl: sourceUrl ?? null,
-    atsProvider: atsProvider ?? null,
-    formFields: fields,
-    answers,
-    jobDescription: jobDescription ?? null,
-    status: status ?? "draft",
-    submittedAt: status === "submitted" ? new Date() : null,
-  } as any).returning({ id: schema.applicationFormAnswers.id });
-
-  // If marking as submitted and a savedJob is linked, update pipeline status
-  if (status === "submitted" && savedJobId) {
-    await db.update(schema.savedJobs)
-      .set({
-        status: "applied",
-        appliedAt: new Date(),
-        statusChangedAt: new Date(),
-        updatedAt: new Date(),
-      } as any)
-      .where(and(
-        eq(schema.savedJobs.id, savedJobId),
-        eq(schema.savedJobs.userId, userId),
-      ))
-      .catch(() => {}); // Non-critical
-  }
-
-  return c.json(success({ id: inserted?.id }), 201);
+  return sendHandlerResult(c, await handleSaveSubmission(autofillDeps(), uid(c), body));
 });
 
 /**
@@ -282,84 +237,18 @@ autofillRoutes.get("/history", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
-  const page = Math.max(1, Number(c.req.query("page") ?? 1));
-  const limit = Math.min(50, Math.max(1, Number(c.req.query("limit") ?? 20)));
+  const { page, limit } = parsePagination(c, { defaultLimit: 20, maxLimit: 50 });
   const jobId = c.req.query("jobId");
-  const db = getDb();
-
-  const conditions = [eq(schema.applicationFormAnswers.userId, userId)];
-  if (jobId) conditions.push(eq(schema.applicationFormAnswers.jobId, jobId));
-
-  const rows = await db.select({
-    id: schema.applicationFormAnswers.id,
-    sourceUrl: schema.applicationFormAnswers.sourceUrl,
-    atsProvider: schema.applicationFormAnswers.atsProvider,
-    status: schema.applicationFormAnswers.status,
-    jobId: schema.applicationFormAnswers.jobId,
-    createdAt: schema.applicationFormAnswers.createdAt,
-    submittedAt: schema.applicationFormAnswers.submittedAt,
-  })
-    .from(schema.applicationFormAnswers)
-    .where(and(...conditions))
-    .orderBy(desc(schema.applicationFormAnswers.createdAt))
-    .limit(limit)
-    .offset((page - 1) * limit);
-
-  // Batch-load job titles to avoid N+1 queries
-  const jobIds = [...new Set(rows.map((r) => r.jobId).filter(Boolean))] as string[];
-  const jobMap = new Map<string, { title: string; company?: string | null }>();
-  if (jobIds.length > 0) {
-    const jobs = await db.select({ id: schema.jobItems.id, title: schema.jobItems.title, company: schema.jobItems.company })
-      .from(schema.jobItems)
-      .where(inArray(schema.jobItems.id, jobIds))
-      .catch(() => []);
-    for (const job of jobs) jobMap.set(job.id, { title: job.title, company: job.company });
-  }
-
-  const enriched = rows.map((row) => {
-    const job = row.jobId ? jobMap.get(row.jobId) : undefined;
-    return { ...row, jobTitle: job?.title, company: job?.company ?? undefined };
-  });
-
-  return c.json(success(enriched), 200);
+  return sendHandlerResult(c, await handleHistoryList(autofillDeps(), userId, { page, limit, jobId }));
 });
 
 /**
  * GET /api/autofill/history/:id
  * Single submission detail with full fields + answers.
  */
-autofillRoutes.get("/history/:id", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
-  const id = c.req.param("id");
-  const db = getDb();
-
-  const [row] = await db.select()
-    .from(schema.applicationFormAnswers)
-    .where(and(
-      eq(schema.applicationFormAnswers.id, id),
-      eq(schema.applicationFormAnswers.userId, userId),
-    ))
-    .limit(1);
-
-  if (!row) return c.json(error("NOT_FOUND", "Submission not found"), 404);
-
-  // Enrich with job info
-  let jobTitle: string | undefined;
-  let company: string | undefined;
-  if (row.jobId) {
-    const [job] = await db.select({ title: schema.jobItems.title, company: schema.jobItems.company })
-      .from(schema.jobItems)
-      .where(eq(schema.jobItems.id, row.jobId))
-      .limit(1)
-      .catch(() => []);
-    jobTitle = job?.title;
-    company = job?.company ?? undefined;
-  }
-
-  return c.json(success({ ...row, jobTitle, company }), 200);
-});
+autofillRoutes.get("/history/:id", async (c) =>
+  sendHandlerResult(c, await handleHistoryDetail(autofillDeps(), uid(c), c.req.param("id"))),
+);
 
 /**
  * GET /api/autofill/cache
@@ -391,44 +280,17 @@ autofillRoutes.get("/cache", async (c) => {
  * Update a cached answer.
  */
 autofillRoutes.put("/cache/:id", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
-  const id = c.req.param("id");
   const body = await c.req.json().catch(() => null);
-  const parsed = z.object({ answer: z.string().min(1).max(5000) }).safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-
-  const db = getDb();
-  const [updated] = await db.update(schema.answerCache)
-    .set({ answer: parsed.data.answer, updatedAt: new Date() } as any)
-    .where(and(eq(schema.answerCache.id, id), eq(schema.answerCache.userId, userId)))
-    .returning({ id: schema.answerCache.id });
-
-  if (!updated) return c.json(error("NOT_FOUND", "Cached answer not found"), 404);
-
-  return c.json(success({ id: updated.id }), 200);
+  return sendHandlerResult(c, await handleUpdateCacheEntry(autofillDeps(), uid(c), c.req.param("id"), body));
 });
 
 /**
  * DELETE /api/autofill/cache/:id
  * Delete a cached answer.
  */
-autofillRoutes.delete("/cache/:id", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
-  const id = c.req.param("id");
-  const db = getDb();
-
-  const [deleted] = await db.delete(schema.answerCache)
-    .where(and(eq(schema.answerCache.id, id), eq(schema.answerCache.userId, userId)))
-    .returning({ id: schema.answerCache.id });
-
-  if (!deleted) return c.json(error("NOT_FOUND", "Cached answer not found"), 404);
-
-  return c.json(success({ id: deleted.id }), 200);
-});
+autofillRoutes.delete("/cache/:id", async (c) =>
+  sendHandlerResult(c, await handleDeleteCacheEntry(autofillDeps(), uid(c), c.req.param("id"))),
+);
 
 autofillRoutes.all("*", (c) =>
   c.json({ error: { code: "NOT_FOUND", message: "Autofill endpoint not found" } }, 404),

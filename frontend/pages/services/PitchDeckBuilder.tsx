@@ -32,6 +32,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { confirmDialog } from "@/lib/dialogs";
+import { initials } from "@/lib/format";
 import { usePeopleTabs } from "@/hooks/use-people-tabs";
 import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -67,17 +68,6 @@ import {
 } from "@/lib/services/recruit-service";
 
 const NONE = "__none__";
-
-function initials(name: string): string {
-  return (
-    name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((w) => w[0]?.toUpperCase())
-      .join("") || "?"
-  );
-}
 
 function displayName(row: CandidateResumeRow, unnamedFallback: string): string {
   const basics = (row.content as any)?.basics;

@@ -32,6 +32,7 @@ import {
   type LLMFailoverEvent,
 } from "./llm-client.js";
 import { error } from "../../types/index.js";
+import { logger } from "../../lib/logger.js";
 
 export { LLMDispatchError } from "./llm-client.js";
 export type { LLMDispatchAttempt, LLMFailoverEvent } from "./llm-client.js";
@@ -271,7 +272,7 @@ const GENERIC_AI_FAILURE = {
  *              alongside `err` so SA can grep the correlationId line.
  */
 export function aiFailure(c: Context, err: unknown, tag?: string) {
-  if (tag) console.error(tag, err);
+  if (tag) logger.error(tag, err);
   const envelope = buildAIErrorEnvelope(err);
   if (envelope) {
     return c.json(

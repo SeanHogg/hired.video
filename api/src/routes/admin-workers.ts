@@ -4,6 +4,7 @@ import { getDb } from "../db/index.js";
 import { WorkerRunsRepository } from "../repositories/workerRunsRepository.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { ok } from "../utils/response.js";
+import { parsePagination } from "../utils/pagination.js";
 import { workers as registeredWorkers, getWorker } from "../workers/registry.js";
 import { runWorker } from "../workers/runner.js";
 
@@ -59,8 +60,7 @@ adminWorkerRoutes.get("/:name/runs", async (c) => {
   }
 
   const repo = new WorkerRunsRepository(getDb());
-  const page = Math.max(1, Number(c.req.query("page") ?? 1));
-  const limit = Math.min(100, Math.max(1, Number(c.req.query("limit") ?? 50)));
+  const { page, limit } = parsePagination(c, { defaultLimit: 50, maxLimit: 100 });
   const offset = (page - 1) * limit;
 
   const [rows, total] = await Promise.all([

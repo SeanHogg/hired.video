@@ -16,12 +16,12 @@
  *   POST   /api/help/reindex          — (re)build Vectorize from client items
  */
 
-import { Hono, type Context } from "hono";
+import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb } from "../db/index.js";
-import { isSuperAdmin } from "../middleware/superAdmin.js";
+import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { HelpMappingService } from "../services/help/help-mapping-service.js";
 import { isSemanticHelpAvailable } from "../services/help/help-embeddings.js";
 import { AI_CONTEXT_TYPES } from "../../../shared/ai-context-types.js";
@@ -43,13 +43,6 @@ const ReindexSchema = z.object({
     .array(z.object({ slug: SlugSchema, text: z.string().min(1).max(8000) }))
     .max(1000),
 });
-
-function requireSuperAdmin(c: Context<AppEnv>) {
-  const user = c.var.user;
-  if (!user?.sub) return { err: error("UNAUTHORIZED", "Authentication required"), status: 401 as const };
-  if (!isSuperAdmin(user)) return { err: error("FORBIDDEN", "SuperAdmin access required"), status: 403 as const };
-  return { user };
-}
 
 // ── Public reads (meta only) ──────────────────────────────────────────
 
@@ -76,16 +69,12 @@ helpRoutes.get("/search", async (c) => {
 
 // ── SuperAdmin curation ───────────────────────────────────────────────
 
-helpRoutes.get("/mappings", async (c) => {
-  const gate = requireSuperAdmin(c);
-  if ("err" in gate) return c.json(gate.err, gate.status);
+helpRoutes.get("/mappings", superAdminMiddleware, async (c) => {
   const svc = new HelpMappingService(getDb());
   return c.json(success({ mappings: await svc.listAll() }));
 });
 
-helpRoutes.post("/mappings", async (c) => {
-  const gate = requireSuperAdmin(c);
-  if ("err" in gate) return c.json(gate.err, gate.status);
+helpRoutes.post("/mappings", superAdminMiddleware, async (c) => {
   const parsed = SetMappingSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
     return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
@@ -95,22 +84,18 @@ helpRoutes.post("/mappings", async (c) => {
     contextKey: parsed.data.contextKey as HelpContextKey,
     slug: parsed.data.slug,
     position: parsed.data.position,
-    userId: gate.user.sub!,
+    userId: c.var.user!.sub!,
   });
   return c.json(success({ contextKey: parsed.data.contextKey, slug: parsed.data.slug }), 201);
 });
 
-helpRoutes.delete("/mappings/:id", async (c) => {
-  const gate = requireSuperAdmin(c);
-  if ("err" in gate) return c.json(gate.err, gate.status);
+helpRoutes.delete("/mappings/:id", superAdminMiddleware, async (c) => {
   const svc = new HelpMappingService(getDb());
   const removed = await svc.remove(c.req.param("id"));
   return c.json(success({ id: c.req.param("id"), removed }));
 });
 
-helpRoutes.post("/reindex", async (c) => {
-  const gate = requireSuperAdmin(c);
-  if ("err" in gate) return c.json(gate.err, gate.status);
+helpRoutes.post("/reindex", superAdminMiddleware, async (c) => {
   const parsed = ReindexSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
     return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);

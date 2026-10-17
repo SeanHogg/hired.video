@@ -13,6 +13,10 @@ export default defineConfig({
   // `_sql_migrations`, the runner's ledger, which would make the next deploy
   // re-run every migration. Tables are dropped by numbered migrations only.
   tablesFilter: declaredTableNames(),
+  // Only the public schema is push-managed. Retired tables are moved to the
+  // `archive` schema by numbered migrations (0545+) and must stay invisible
+  // to push, which would otherwise try to drop that schema.
+  schemaFilter: ["public"],
   verbose: true,
   strict: false,
 });

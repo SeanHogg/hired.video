@@ -11,8 +11,7 @@
 
 import { Hono } from "hono";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { randomBytes } from "crypto";
-import { z } from "zod";
+import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -26,16 +25,13 @@ import {
   DEFAULT_REDACTION_RULES,
   type RedactionRules,
 } from "../services/resume/redaction.js";
+import { randomHex } from "../utils/crypto.js";
 
 export const pitchDeckRoutes = new Hono<AppEnv>();
 export const pitchDeckPublicRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
-}
-
-function generateShareToken(): string {
-  return randomBytes(16).toString("hex");
 }
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
@@ -413,7 +409,7 @@ pitchDeckRoutes.post("/:id/shares", async (c) => {
     .values({
       deckId: c.req.param("id"),
       sharedByUserId: userId,
-      shareToken: generateShareToken(),
+      shareToken: randomHex(16),
       recipientName: parsed.data.recipientName ?? null,
       recipientEmail: parsed.data.recipientEmail ?? null,
       expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,

@@ -19,6 +19,15 @@ import {
 import { getOrSetCached } from "../utils/edge-cache.js";
 import { getLinkPreview } from "../services/feed/linkPreviewService.js";
 import { resolvePostLinkFields } from "../services/feed/postLinkService.js";
+import { clampLimit, parsePagination, type PaginationOptions } from "../utils/pagination.js";
+
+/** `?pageNumber=&pageSize=` (default 20, max 50) for the feed list + search. */
+const FEED_PAGE_OPTS: PaginationOptions = {
+  defaultLimit: 20,
+  maxLimit: 50,
+  limitKey: "pageSize",
+  pageKey: "pageNumber",
+};
 
 // ─── Privacy / visibility helpers ────────────────────────────────────────────
 // Feed post privacy mirrors resume privacy (KISS): Public | Recruiter | Connections | Private.
@@ -409,8 +418,7 @@ async function fetchPostDtos(
 /** GET /api/feed/posts */
 feedRoutes.get("/posts", async (c) => {
   const currentUserId = c.var.user?.sub ?? "";
-  const pageNumber = Math.max(1, Number(c.req.query("pageNumber") ?? "1") || 1);
-  const pageSize = Math.min(50, Math.max(1, Number(c.req.query("pageSize") ?? "20") || 20));
+  const { page: pageNumber, limit: pageSize } = parsePagination(c, FEED_PAGE_OPTS);
   const offset = (pageNumber - 1) * pageSize;
   const tag = c.req.query("tag")?.toLowerCase() ?? "";
   const db = getDb();
@@ -728,10 +736,10 @@ feedRoutes.get("/posts/:postId/comments", async (c) => {
   const postId = c.req.param("postId");
   const currentUserId = c.var.user?.sub ?? "";
   const db = getDb();
-  const limitRaw = Number.parseInt(c.req.query("limit") ?? "", 10);
+  // Same default/bounds the repository applies (200, 1..500).
   const rows = await buildRepos(db).media.findCommentsForFeedPost(
     postId,
-    Number.isFinite(limitRaw) ? limitRaw : undefined,
+    clampLimit(c.req.query("limit"), 200, 500),
   );
 
   return c.json(success(await buildCommentDtos(rows, currentUserId, db)), 200);
@@ -848,8 +856,7 @@ feedRoutes.delete("/comments/:commentId", async (c) => {
 feedRoutes.get("/search", async (c) => {
   const currentUserId = c.var.user?.sub ?? "";
   const searchTerm = c.req.query("searchTerm") ?? "";
-  const pageNumber = Math.max(1, Number(c.req.query("pageNumber") ?? "1") || 1);
-  const pageSize = Math.min(50, Number(c.req.query("pageSize") ?? "20") || 20);
+  const { page: pageNumber, limit: pageSize } = parsePagination(c, FEED_PAGE_OPTS);
   const offset = (pageNumber - 1) * pageSize;
 
   const db = getDb();
@@ -869,7 +876,7 @@ feedRoutes.get("/search", async (c) => {
 /** GET /api/feed/trending-tags — top hashtags by post frequency (last 30 days) */
 feedRoutes.get("/trending-tags", async (c) => {
   const db = getDb();
-  const limit = Math.min(50, Number(c.req.query("limit") ?? "20") || 20);
+  const limit = clampLimit(c.req.query("limit"), 20, 50);
 
   // Only count hashtags from Public posts and exclude community posts — trending tags
   // are anonymous-visible, so they must never leak content from non-public posts.
@@ -908,7 +915,7 @@ feedRoutes.get("/trending-tags", async (c) => {
  *  is slow-changing and a per-reaction invalidation would be far heavier
  *  than a 5-minute refresh window. */
 feedRoutes.get("/trending-posts", async (c) => {
-  const limit = Math.min(20, Math.max(1, Number(c.req.query("limit") ?? "5") || 5));
+  const limit = clampLimit(c.req.query("limit"), 5, 20);
   const db = getDb();
 
   // Reaction weights live in the shared SSoT — build the CASE from there so

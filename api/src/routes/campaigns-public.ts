@@ -13,6 +13,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
 import { getDb } from "../db/index.js";
+import { frontendBaseUrl } from "../utils/public-urls.js";
 import { CampaignService } from "../services/campaigns/CampaignService.js";
 import {
   isTrackableTarget,
@@ -21,13 +22,6 @@ import {
 
 /** Site root fallback for unsigned/forged click links — keeps the endpoint
  *  from ever being an open redirect to an attacker-supplied target. */
-function frontendBase(): string {
-  const url =
-    process.env.FRONTEND_URL ||
-    ((globalThis as any).__ENV?.FRONTEND_URL as string | undefined) ||
-    "";
-  return url.split(",")[0]?.trim().replace(/\/$/, "") || "https://hired.video";
-}
 
 export const campaignsPublicRoutes = new Hono<AppEnv>();
 
@@ -70,7 +64,7 @@ campaignsPublicRoutes.get("/click/:recipientId", async (c) => {
     (await verifyClickTarget(recipientId, target, signature));
 
   if (!safe) {
-    return c.redirect(frontendBase(), 302);
+    return c.redirect(frontendBaseUrl(), 302);
   }
 
   await CampaignService.create(getDb()).markClicked(recipientId);

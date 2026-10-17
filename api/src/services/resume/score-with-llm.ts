@@ -40,6 +40,7 @@ import { TokenBudgetExceededError } from "../../domains/billing/token-ledger.js"
 import type { LLMUseCase } from "../adapters/providers.js";
 import { AppError, ValidationError } from "../../middleware/errorHandler.js";
 import { extractJson } from "./parse.js";
+import { logger } from "../../lib/logger.js";
 
 const MIN_RESUME_TEXT_LENGTH = 20;
 const MAX_RESUME_TEXT_LENGTH = 12_000;
@@ -78,7 +79,11 @@ export async function scoreWithLenientLLMOrFallback<Wire, Canonical>(
 ): Promise<Canonical> {
   const env = args.c.env as any;
   const hasGateway = hasAnyLLMProviderKey(env);
-  const workersAi = createWorkersAiTextCaller(env, { maxInputChars: MAX_RESUME_TEXT_LENGTH * 2 });
+  const workersAi = createWorkersAiTextCaller(env, {
+    maxInputChars: MAX_RESUME_TEXT_LENGTH * 2,
+    // Charged like the gateway call it stands in for.
+    meter: { user: args.c.var.user, featureKey: args.featureKey },
+  });
   if (!hasGateway && !workersAi) {
     return args.fallback;
   }
@@ -101,10 +106,7 @@ export async function scoreWithLenientLLMOrFallback<Wire, Canonical>(
       return data;
     } catch (err) {
       if (err instanceof TokenBudgetExceededError) throw err;
-      console.error(
-        `[${args.featureKey}] gateway LLM error${workersAi ? ", falling back to Workers AI" : ""}:`,
-        err instanceof Error ? err.message : err,
-      );
+      logger.error(`[${args.featureKey}] gateway LLM error${workersAi ? ", falling back to Workers AI" : ""}`, err);
     }
   }
 
@@ -118,15 +120,11 @@ Respond with ONE JSON object only — no prose, no markdown fences.`,
       );
       const parsed = args.ingest.ingest.safeParse(extractJson(raw));
       if (parsed.success) return args.ingest.coerce(parsed.data);
-      console.error(
-        `[${args.featureKey}] Workers AI reply failed schema:`,
-        parsed.error.issues.slice(0, 5).map((i) => `${i.path.join(".")}: ${i.message}`).join("; "),
-      );
+      logger.error(`[${args.featureKey}] Workers AI reply failed schema`, {
+        issues: parsed.error.issues.slice(0, 5).map((i) => `${i.path.join(".")}: ${i.message}`).join("; "),
+      });
     } catch (err) {
-      console.error(
-        `[${args.featureKey}] Workers AI error:`,
-        err instanceof Error ? err.message : err,
-      );
+      logger.error(`[${args.featureKey}] Workers AI error`, err);
     }
   }
 

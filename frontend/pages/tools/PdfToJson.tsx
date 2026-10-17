@@ -96,7 +96,7 @@ export default function PdfToJson() {
 
       // Send extracted text to the parse endpoint for AI-powered structuring
       const { data: result } = await apiClient.requestRaw<any>(
-        "/api/resume/parse",
+        "/api/resumes/parse",
         {
           method: "POST",
           body: JSON.stringify({ content: text }),

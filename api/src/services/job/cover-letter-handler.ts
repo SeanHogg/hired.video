@@ -17,11 +17,11 @@ import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import { ResumeContentSchema, type ResumeContent } from "../../../../shared/resume.js";
 import { CoverLetterSchema, type CoverLetter } from "../../../../shared/cover-letter.js";
-import { ok, fail, requireAuth, type HandlerResult } from "../../handlers/shared.js";
+import { DomainError, requireUserId } from "../../domains/errors.js";
 import { defineLenientIngest } from "../../services/adapters/llm-client.js";
 import type { ParsedJob } from "../../services/job/JobService.js";
 import { resolveJobForFit, type MatchDeps } from "./match-handlers.js";
-import { failFromAiError } from "./tailor-handler.js";
+import { aiDomainError } from "./tailor-handler.js";
 
 export const CoverLetterInputSchema = z
   .object({
@@ -119,28 +119,32 @@ export function buildCoverLetterPrompt(job: ParsedJob, resume: ResumeContent) {
   };
 }
 
-export async function handleCoverLetter(deps: MatchDeps, viewerId: string | null, body: unknown): Promise<HandlerResult> {
-  const auth = requireAuth(viewerId);
-  if ("status" in auth) return auth;
+export async function handleCoverLetter(
+  deps: MatchDeps,
+  viewerId: string | null,
+  body: unknown,
+): Promise<{ letter: CoverLetter }> {
+  requireUserId(viewerId);
 
   const parsed = CoverLetterInputSchema.safeParse(body);
-  if (!parsed.success) return fail(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
+  if (!parsed.success) throw new DomainError(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
 
   const job = await resolveJobForFit(deps, parsed.data);
-  if (!job) return fail(404, "NOT_FOUND", "Job not found");
-  if (!deps.llm) return fail(503, "AI_UNAVAILABLE", "AI is not configured");
+  if (!job) throw new DomainError(404, "NOT_FOUND", "Job not found");
+  if (!deps.llm) throw new DomainError(503, "AI_UNAVAILABLE", "AI is not configured");
 
   const date = deps.now().toISOString().slice(0, 10);
+  let letter: CoverLetter | null;
   try {
     const { data } = await deps.llm.callJsonLenient(
       "cover_letter_generate",
       buildCoverLetterPrompt(job.parsedJob, parsed.data.resumeContent),
       CoverLetterIngest,
     );
-    const letter = toCoverLetter(data, date);
-    if (!letter) return fail(502, "AI_BAD_OUTPUT", "The AI returned an incomplete cover letter. Please try again.");
-    return ok({ letter });
+    letter = toCoverLetter(data, date);
   } catch (err) {
-    return failFromAiError(err, err instanceof Error ? err.message : String(err)) ?? fail(502, "AI_ERROR", "Cover letter generation failed");
+    throw aiDomainError(err, err instanceof Error ? err.message : String(err)) ?? new DomainError(502, "AI_ERROR", "Cover letter generation failed");
   }
+  if (!letter) throw new DomainError(502, "AI_BAD_OUTPUT", "The AI returned an incomplete cover letter. Please try again.");
+  return { letter };
 }

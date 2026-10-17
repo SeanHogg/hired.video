@@ -7,23 +7,13 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { PARTNER_KEY_PREFIX, type PartnerScope } from "../../../../shared/partner.js";
+import { randomHex, sha256Hex } from "../../utils/crypto.js";
 
 const { partnerApiKeys, partners } = schema;
 
-async function sha256Hex(input: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 /** `hvpk_<48 hex chars>` — partner key family, long entropy. */
 export async function generatePartnerKey(): Promise<{ key: string; prefix: string; hash: string }> {
-  const bytes = crypto.getRandomValues(new Uint8Array(24));
-  const hex = Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  const key = `${PARTNER_KEY_PREFIX}${hex}`;
+  const key = `${PARTNER_KEY_PREFIX}${randomHex(24)}`;
   const prefix = key.slice(0, 12);
   const hash = await sha256Hex(key);
   return { key, prefix, hash };

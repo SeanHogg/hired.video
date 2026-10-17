@@ -20,24 +20,14 @@ import type { Env, Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getJwtSecret } from "../utils/jwt.js";
+import { logger } from "../lib/logger.js";
+import { base64UrlEncode, base64UrlToBytes, randomBytes, sha256Bytes } from "../utils/crypto.js";
 
 const { webauthnCredentials, webauthnChallenges, users } = schema;
 
 export const passkeyRoutes = new Hono<AppEnv>();
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function b64url(buf: ArrayBuffer): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=/g, "");
-}
-
-function fromB64url(str: string): Uint8Array {
-  const padded = str.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(str.length / 4) * 4, "=");
-  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
-}
 
 function getRpId(url: string): string {
   try { return new URL(url).hostname; } catch { return "hired.video"; }
@@ -78,10 +68,10 @@ async function verifyES256Signature(
   clientDataJSON: Uint8Array,
   sig: Uint8Array,
 ): Promise<boolean> {
-  const clientDataHash = await crypto.subtle.digest("SHA-256", clientDataJSON);
+  const clientDataHash = await sha256Bytes(clientDataJSON);
   const verifyData = new Uint8Array(authData.length + 32);
   verifyData.set(authData);
-  verifyData.set(new Uint8Array(clientDataHash), authData.length);
+  verifyData.set(clientDataHash, authData.length);
 
   // WebAuthn signatures are DER-encoded — convert to raw (r || s) for WebCrypto
   let rawSig = sig;
@@ -114,8 +104,8 @@ passkeyRoutes.post("/register/begin", async (c) => {
   // Clean up expired challenges
   await db.delete(webauthnChallenges).where(lt(webauthnChallenges.expiresAt, new Date()));
 
-  const challengeBytes = crypto.getRandomValues(new Uint8Array(32));
-  const challengeB64 = b64url(challengeBytes.buffer);
+  const challengeBytes = randomBytes(32);
+  const challengeB64 = base64UrlEncode(challengeBytes);
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
   await db.insert(webauthnChallenges).values({
@@ -132,7 +122,7 @@ passkeyRoutes.post("/register/begin", async (c) => {
     challenge: challengeB64,
     rp: { id: rpId, name: "hired.video" },
     user: {
-      id: b64url(new TextEncoder().encode(userId).buffer as ArrayBuffer),
+      id: base64UrlEncode(userId),
       name: user?.email ?? userId,
       displayName: user?.name ?? "User",
     },
@@ -177,7 +167,7 @@ passkeyRoutes.post("/register/complete", async (c) => {
   const rpId = getRpId(origin);
 
   // 1. Decode and verify clientDataJSON
-  const clientDataBytes = fromB64url(parsed.data.response.clientDataJSON);
+  const clientDataBytes = base64UrlToBytes(parsed.data.response.clientDataJSON);
   const clientData = JSON.parse(new TextDecoder().decode(clientDataBytes)) as Record<string, unknown>;
 
   if (clientData.type !== "webauthn.create") return c.json(error("VERIFICATION_FAILED", "Invalid ceremony type"), 400);
@@ -206,7 +196,7 @@ passkeyRoutes.post("/register/complete", async (c) => {
   // 4. Decode attestationObject (CBOR — we extract authData directly)
   // For "none" attestation, the attestationObject is: {fmt: "none", attStmt: {}, authData: bytes}
   // We store the credential ID and public key from authData.
-  const attObjBytes = fromB64url(parsed.data.response.attestationObject);
+  const attObjBytes = base64UrlToBytes(parsed.data.response.attestationObject);
 
   // authData is the last major component — locate it by finding the credentialId length at offset 55
   // Standard layout: 37 bytes fixed header + variable attested credential data
@@ -221,9 +211,9 @@ passkeyRoutes.post("/register/complete", async (c) => {
     : attObjBytes.slice(-Math.min(attObjBytes.length - 10, 256));
 
   // Verify rpIdHash (first 32 bytes of authData must be SHA-256(rpId))
-  const rpIdHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rpId));
+  const rpIdHash = await sha256Bytes(rpId);
   const rpIdHashActual = authDataFinal.slice(0, 32);
-  const rpHashesMatch = new Uint8Array(rpIdHash).every((b, i) => b === rpIdHashActual[i]);
+  const rpHashesMatch = rpIdHash.every((b, i) => b === rpIdHashActual[i]);
   if (!rpHashesMatch) return c.json(error("VERIFICATION_FAILED", "RP ID hash mismatch"), 400);
 
   // Flags byte at offset 32: bit 0 = UP (user present), bit 2 = UV (user verified), bit 6 = AT (attested data present)
@@ -232,9 +222,9 @@ passkeyRoutes.post("/register/complete", async (c) => {
 
   // credentialIdLength at offset 53, credentialId at offset 55
   const credIdLen = (authDataFinal[53] << 8) | authDataFinal[54];
-  const credentialId = b64url(authDataFinal.slice(55, 55 + credIdLen).buffer);
+  const credentialId = base64UrlEncode(authDataFinal.slice(55, 55 + credIdLen));
   const coseKey = authDataFinal.slice(55 + credIdLen);
-  const publicKey = b64url(coseKey.buffer);
+  const publicKey = base64UrlEncode(coseKey);
   const signCount = (authDataFinal[33] << 24) | (authDataFinal[34] << 16) | (authDataFinal[35] << 8) | authDataFinal[36];
 
   // 5. Store credential
@@ -260,8 +250,8 @@ passkeyRoutes.post("/login/begin", async (c) => {
 
   await db.delete(webauthnChallenges).where(lt(webauthnChallenges.expiresAt, new Date()));
 
-  const challengeBytes = crypto.getRandomValues(new Uint8Array(32));
-  const challengeB64 = b64url(challengeBytes.buffer);
+  const challengeBytes = randomBytes(32);
+  const challengeB64 = base64UrlEncode(challengeBytes);
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
   await db.insert(webauthnChallenges).values({
@@ -304,7 +294,7 @@ passkeyRoutes.post("/login/complete", async (c) => {
   const rpId = getRpId(origin);
 
   // 1. Verify clientDataJSON
-  const clientDataBytes = fromB64url(parsed.data.response.clientDataJSON);
+  const clientDataBytes = base64UrlToBytes(parsed.data.response.clientDataJSON);
   const clientData = JSON.parse(new TextDecoder().decode(clientDataBytes)) as Record<string, unknown>;
 
   if (clientData.type !== "webauthn.get") return c.json(error("VERIFICATION_FAILED", "Invalid ceremony type"), 400);
@@ -339,9 +329,9 @@ passkeyRoutes.post("/login/complete", async (c) => {
     return c.json(error("VERIFICATION_FAILED", "Origin mismatch"), 400);
   }
 
-  const authDataBytes = fromB64url(parsed.data.response.authenticatorData);
-  const rpIdHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rpId));
-  if (!new Uint8Array(rpIdHash).every((b, i) => b === authDataBytes[i])) {
+  const authDataBytes = base64UrlToBytes(parsed.data.response.authenticatorData);
+  const rpIdHash = await sha256Bytes(rpId);
+  if (!rpIdHash.every((b, i) => b === authDataBytes[i])) {
     return c.json(error("VERIFICATION_FAILED", "RP ID hash mismatch"), 400);
   }
 
@@ -349,7 +339,7 @@ passkeyRoutes.post("/login/complete", async (c) => {
   if (!(flags & 0x01)) return c.json(error("VERIFICATION_FAILED", "User not present"), 400);
 
   // 5. Verify signature
-  const publicKeyBytes = fromB64url(cred.publicKey);
+  const publicKeyBytes = base64UrlToBytes(cred.publicKey);
   let publicKey: CryptoKey;
   try {
     publicKey = await importCOSEPublicKey(publicKeyBytes);
@@ -357,7 +347,7 @@ passkeyRoutes.post("/login/complete", async (c) => {
     return c.json(error("VERIFICATION_FAILED", "Could not import public key"), 400);
   }
 
-  const sigBytes = fromB64url(parsed.data.response.signature);
+  const sigBytes = base64UrlToBytes(parsed.data.response.signature);
   const valid = await verifyES256Signature(
     publicKey,
     authDataBytes,
@@ -371,7 +361,7 @@ passkeyRoutes.post("/login/complete", async (c) => {
   const newCount = (authDataBytes[33] << 24) | (authDataBytes[34] << 16) | (authDataBytes[35] << 8) | authDataBytes[36];
   if (cred.signCount > 0 && newCount <= cred.signCount) {
     // Potential cloned authenticator — log but don't block (could be a synced passkey)
-    console.warn(`[passkey] sign count regression for credential ${credentialId}: ${cred.signCount} → ${newCount}`);
+    logger.warn("[passkey] sign count regression", { credentialId, previousCount: cred.signCount, newCount });
   }
 
   await db

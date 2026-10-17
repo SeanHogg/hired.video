@@ -8,7 +8,7 @@
  * literal id `'singleton'`. Reads use a no-row fallback to the `shared/pricing.ts`
  * defaults so the system keeps working before the row is seeded.
  */
-import { pgTable, varchar, integer, timestamp, uuid } from "drizzle-orm/pg-core";
+import { pgTable, varchar, integer, timestamp, uuid, index } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 
 export const platformPricing = pgTable("platform_pricing", {
@@ -20,7 +20,9 @@ export const platformPricing = pgTable("platform_pricing", {
   seatPriceCents: integer("seat_price_cents").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   updatedByUserId: uuid("updated_by_user_id").references(() => users.id, { onDelete: "set null" }),
-});
+}, (t) => [
+  index("idx_platform_pricing_updated_by_user_id").on(t.updatedByUserId),
+]);
 
 export type PlatformPricing = typeof platformPricing.$inferSelect;
 export type NewPlatformPricing = typeof platformPricing.$inferInsert;

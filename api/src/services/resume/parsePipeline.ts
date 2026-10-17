@@ -31,6 +31,7 @@ import {
   rescanMissingDates,
 } from "./parseRefine.js";
 import { countSkillItems, mergeExtractedSkillsIntoResume, type Skill } from "./skills.js";
+import { logger } from "../../lib/logger.js";
 
 export interface ResumeParsePorts {
   callAI: AiTextCaller;
@@ -87,12 +88,12 @@ export async function runResumeParse(
 async function structureOnePass(callAI: AiTextCaller, resumeText: string): Promise<Record<string, unknown> | null> {
   try {
     const result = extractJson(await callAI(RESUME_PARSE_PROMPT, resumeText));
-    if (!isParseComplete(result)) console.warn("[parse] Single-pass result incomplete, backfilling sections");
+    if (!isParseComplete(result)) logger.warn("[parse] Single-pass result incomplete, backfilling sections");
     return Object.keys(result).length > 0 ? result : null;
   } catch (err) {
     // Disconnect is not a model failure — rethrow so we never backfill 8 more calls.
     if (isAbortError(err)) throw err;
-    console.error("[parse] Single-pass failed:", err instanceof Error ? err.message : err);
+    logger.error("[parse] Single-pass failed", err);
     return null;
   }
 }
@@ -124,7 +125,7 @@ async function backfillSections(
       return [section, extractJson(raw)[section]] as const;
     } catch (err) {
       if (isAbortError(err)) throw err;
-      console.warn(`[parse-sectional] ${section} failed:`, err instanceof Error ? err.message : err);
+      logger.warn("[parse-sectional] section failed", { section, error: err });
       return [section, undefined] as const;
     }
   });
@@ -183,7 +184,7 @@ async function refine(
 
 function logFailure<T>(promise: Promise<T>, label: string): Promise<T> {
   return promise.catch((err) => {
-    console.warn(`[parse] ${label} failed:`, err instanceof Error ? err.message : err);
+    logger.warn(`[parse] ${label} failed`, err);
     throw err;
   });
 }

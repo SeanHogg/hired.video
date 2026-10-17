@@ -19,10 +19,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useGatedResource } from "@/hooks/use-gated-resource";
 import { useSignalR } from "@/hooks/use-signalr";
+import { useInboxRefreshDriver } from "@/hooks/use-inbox-refresh-driver";
 import { apiClient } from "@/lib/api-client";
 import { chatBus } from "@/lib/chat-bus";
 import { userService } from "@/lib/services/user-service";
-import { consumeInboxSeed } from "@/lib/inbox-seed";
+import { readBootstrapSeed } from "@/lib/bootstrap-seed";
 import type { ConversationListItem } from "@/types/communication";
 import type { Connection } from "@/lib/services/user-service";
 import type { Notification as LiveNotification } from "@/lib/services/signalr-service";
@@ -143,16 +144,8 @@ interface InboxResponse {
   nextEmailCursor: string | null;
 }
 
-// SignalR / SSE is the primary push channel for live notifications; this
-// poll is the safety-net refresh for the rest of the merged inbox
-// (conversations, pending requests, external emails) and reconciliation
-// when the push channel reconnects after a drop. The provider mounts at
-// the App root, so every authenticated page (including pages that never
-// look at the inbox) inherits this poll. The base `useGatedResource`
-// pauses ticks while the tab is hidden and backs off on 5xx/429, so the
-// effective rate is much lower than the raw interval suggests — keep
-// the headline interval conservative to match.
-const POLL_INTERVAL_MS = 120_000;
+// No fixed poll: the SSE notifications hub (push), tab focus, and a 10-min
+// fallback while SSE is down drive refreshes — see useInboxRefreshDriver.
 
 const EMPTY_INBOX: InboxResponse = {
   conversations: [],
@@ -252,14 +245,13 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
   // + external emails + accounts) inherits the api-ready gate + polling
   // cadence from the base hook. SignalR adds the live notification push
   // channel on top.
-  const { data: inbox, isLoading, refresh, setData: setInbox } =
+  const { data: inbox, isLoading, isReady, refresh, setData: setInbox } =
     useGatedResource<InboxResponse>({
       fetcher: async () => {
         const response = await apiClient.get<InboxResponse>(`/api/inbox${filterQuery}`);
         return response.data ?? EMPTY_INBOX;
       },
       defaults: EMPTY_INBOX,
-      pollMs: POLL_INTERVAL_MS,
       // Re-fetch when filter query string changes — toggling an account
       // chip or unread/archived flag flips the dep and the gated hook
       // re-runs the fetcher.
@@ -270,7 +262,7 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
       // selection wouldn't match the unfiltered aggregate.
       seedFn:
         filterQuery === ""
-          ? () => (consumeInboxSeed() as InboxResponse | null) ?? null
+          ? () => readBootstrapSeed<InboxResponse>("inbox")
           : undefined,
     });
 
@@ -306,6 +298,16 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
 
   const conversations = inbox.conversations;
   const persistedNotifs = inbox.notifications;
+
+  const knownNotificationIds = useMemo(() => persistedNotifs.map((n) => n.id), [persistedNotifs]);
+  const liveNotificationIds = useMemo(() => liveNotifs.map((n) => n.id), [liveNotifs]);
+  useInboxRefreshDriver({
+    enabled: isReady,
+    isPushConnected: isConnected,
+    knownNotificationIds,
+    liveNotificationIds,
+    refresh,
+  });
   const requests = inbox.pendingRequests;
   const accounts = inbox.accounts;
   const externalEmails = useMemo(() => {

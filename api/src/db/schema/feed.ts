@@ -85,6 +85,7 @@ export const feedPostLikes = pgTable(
     // One reaction per (post, user). DB-enforced so the optimistic UI dedup
     // can't be defeated by concurrent double-clicks.
     uniqueIndex("uq_feed_post_likes_post_user").on(t.feedPostId, t.userId),
+    index("idx_feed_post_likes_user_id").on(t.userId),
   ],
 );
 
@@ -104,7 +105,7 @@ export const feedCommentReactions = pgTable(
   },
   (t) => [
     uniqueIndex("uq_feed_comment_reactions_comment_user").on(t.commentId, t.userId),
-    index("idx_feed_comment_reactions_comment").on(t.commentId),
+    index("idx_feed_comment_reactions_user_id").on(t.userId),
   ],
 );
 
@@ -123,6 +124,7 @@ export const feedPostComments = pgTable(
   },
   (t) => [
     index("idx_feed_post_comments_post_created").on(t.feedPostId, t.createdAt.desc()),
+    index("idx_feed_post_comments_user_id").on(t.userId),
   ],
 );
 
@@ -136,7 +138,10 @@ export const feedPostReports = pgTable("feed_post_reports", {
   reason: varchar("reason", { length: 100 }).notNull(),
   details: text("details"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_feed_post_reports_feed_post_id").on(t.feedPostId),
+  index("idx_feed_post_reports_user_id").on(t.userId),
+]);
 
 export type FeedPostReport = typeof feedPostReports.$inferSelect;
 export type NewFeedPostReport = typeof feedPostReports.$inferInsert;

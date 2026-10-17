@@ -12,6 +12,7 @@
 
 import { decryptToken, encryptToken } from "./encryption.js";
 import { getJwtSecret } from "../../utils/jwt.js";
+import { hexToBytes, hmacSha256Hex, hmacSha256Verify } from "../../utils/crypto.js";
 import { getEnv } from "../../utils/env.js";
 
 export type EmailProviderId = "gmail" | "outlook";
@@ -94,12 +95,7 @@ interface StatePayload {
 export async function createState(payload: StatePayload): Promise<string> {
   const secret = getJwtSecret();
   const json = JSON.stringify(payload);
-  const key = await crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(json));
-  const sigHex = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const sigHex = await hmacSha256Hex(secret, json);
   return btoa(json + "|" + sigHex);
 }
 
@@ -110,12 +106,7 @@ export async function verifyState(state: string): Promise<StatePayload | null> {
     const json = decoded.slice(0, sepIdx);
     const sigHex = decoded.slice(sepIdx + 1);
     const secret = getJwtSecret();
-    const key = await crypto.subtle.importKey(
-      "raw", new TextEncoder().encode(secret),
-      { name: "HMAC", hash: "SHA-256" }, false, ["verify"],
-    );
-    const sigBytes = new Uint8Array(sigHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
-    const valid = await crypto.subtle.verify("HMAC", key, sigBytes, new TextEncoder().encode(json));
+    const valid = await hmacSha256Verify(secret, json, hexToBytes(sigHex));
     if (!valid) return null;
     const payload = JSON.parse(json) as StatePayload;
     if (Date.now() - payload.ts > 10 * 60 * 1000) return null;

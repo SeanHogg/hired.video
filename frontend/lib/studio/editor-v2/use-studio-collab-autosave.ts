@@ -24,8 +24,12 @@ import {
 
 // Server autosave runs on a longer cadence than the local (localStorage) one so
 // a burst of edits coalesces into one network write while the local snapshot
-// still captures every keystroke for instant reload recovery.
-const SERVER_AUTOSAVE_DEBOUNCE_MS = 2500;
+// still captures every keystroke for instant reload recovery. Every write is
+// a Neon round-trip of the whole runtime slice, so 5s of quiet (30s at most
+// while editing continuously); tab hide / pagehide / blur / unmount flush a
+// pending write immediately.
+const SERVER_AUTOSAVE_DEBOUNCE_MS = 5000;
+const SERVER_AUTOSAVE_MAX_WAIT_MS = 30_000;
 
 export interface StudioCollabAutosaveInput {
   user: User | null;
@@ -214,6 +218,8 @@ export function useStudioCollabAutosave({
     enabled: !!user && !authLoading && studioRoom.isHost,
     ready: serverAutosaveReady,
     debounceMs: SERVER_AUTOSAVE_DEBOUNCE_MS,
+    maxWaitMs: SERVER_AUTOSAVE_MAX_WAIT_MS,
+    flushOnBlur: true,
     computeSnapshot: computeAutosaveSnapshot,
     isSaving: saving,
     save: saveSilently,

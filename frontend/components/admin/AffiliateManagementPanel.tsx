@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { formatCentsPlain } from "@/lib/format";
 import {
   Sheet,
   SheetContent,
@@ -143,10 +144,6 @@ export function AffiliateManagementPanel({ open, onOpenChange }: AffiliateManage
     return <Badge variant="secondary">Inactive</Badge>;
   };
 
-  const formatCurrency = (cents: number) => {
-    return `$${(cents / 100).toFixed(2)}`;
-  };
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-[90%] sm:w-[800px] sm:max-w-[800px]">
@@ -216,7 +213,7 @@ export function AffiliateManagementPanel({ open, onOpenChange }: AffiliateManage
                         </div>
                         <div className="text-right space-y-1">
                           {getStatusBadge(affiliate)}
-                          <p className="text-sm font-medium">{formatCurrency(affiliate.totalCommissionCents)}</p>
+                          <p className="text-sm font-medium">{formatCentsPlain(affiliate.totalCommissionCents)}</p>
                           <p className="text-xs text-muted-foreground">
                             {affiliate.totalReferrals} referrals • {affiliate.totalConversions} conversions
                           </p>
@@ -332,11 +329,11 @@ export function AffiliateManagementPanel({ open, onOpenChange }: AffiliateManage
                       </div>
                       <div>
                         <p className="text-sm font-medium">Total Earned</p>
-                        <p className="text-2xl font-bold">{formatCurrency(selectedAffiliate.totalCommissionCents)}</p>
+                        <p className="text-2xl font-bold">{formatCentsPlain(selectedAffiliate.totalCommissionCents)}</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium">Pending</p>
-                        <p className="text-2xl font-bold">{formatCurrency(selectedAffiliate.pendingCommissionCents)}</p>
+                        <p className="text-2xl font-bold">{formatCentsPlain(selectedAffiliate.pendingCommissionCents)}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -387,9 +384,9 @@ export function AffiliateManagementPanel({ open, onOpenChange }: AffiliateManage
                                 </p>
                               </div>
                               <div className="text-right">
-                                <p className="text-sm font-medium">{formatCurrency(conversion.commissionAmountCents)}</p>
+                                <p className="text-sm font-medium">{formatCentsPlain(conversion.commissionAmountCents)}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  {formatCurrency(conversion.subscriptionAmountCents)} sub
+                                  {formatCentsPlain(conversion.subscriptionAmountCents)} sub
                                 </p>
                               </div>
                             </div>

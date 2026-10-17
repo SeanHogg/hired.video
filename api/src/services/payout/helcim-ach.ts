@@ -30,34 +30,11 @@ import type {
   NormalizedPayoutWebhookPayload,
   PayoutEventType,
 } from "./types.js";
-
-const HELCIM_API_BASE = "https://api.helcim.com/v2";
-const HELCIM_PAY_JS = "https://secure.helcim.app/helcim-pay/services/start.js";
+import { HELCIM_PAY_JS, helcimRequest, verifyHelcimWebhookSignature } from "../adapters/helcim.js";
 
 interface HelcimAchConfig {
   apiToken: string;
   webhookToken?: string;
-}
-
-async function helcimRequest<T = unknown>(
-  config: HelcimAchConfig,
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<T> {
-  const res = await fetch(`${HELCIM_API_BASE}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      "api-token": config.apiToken,
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new Error(`Helcim ACH API error ${res.status}: ${text}`);
-  }
-  return res.json() as Promise<T>;
 }
 
 // Helcim ACH lifecycle events. Helcim names them under the same `ach.*`
@@ -87,7 +64,7 @@ export class HelcimAchPayoutProvider implements PayoutProvider {
     // Helcim's ACH path requires `amount` even in verify mode (unlike the
     // card verify path) — pass 0 so no funds move.
     const res = await helcimRequest<{ checkoutToken: string }>(
-      this.config,
+      this.config.apiToken,
       "POST",
       "/helcim-pay/initialize",
       {
@@ -124,7 +101,7 @@ export class HelcimAchPayoutProvider implements PayoutProvider {
     const res = await helcimRequest<{
       transactionId: number | string;
       status?: string;
-    }>(this.config, "POST", "/payment/ach", body);
+    }>(this.config.apiToken, "POST", "/payment/ach", body);
 
     return {
       providerPayoutId: String(res.transactionId),
@@ -137,17 +114,7 @@ export class HelcimAchPayoutProvider implements PayoutProvider {
     body: string,
     headers: Headers,
   ): Promise<NormalizedPayoutWebhookPayload | null> {
-    if (!this.config.webhookToken) {
-      throw new Error("HELCIM_WEBHOOK_TOKEN is not configured");
-    }
-    const signature = headers.get("helcim-signature");
-    if (!signature) throw new Error("Missing helcim-signature header");
-
-    const { createHmac } = await import("node:crypto");
-    const expected = createHmac("sha256", this.config.webhookToken).update(body).digest("hex");
-    if (signature !== expected) {
-      throw new Error("Helcim webhook signature verification failed");
-    }
+    await verifyHelcimWebhookSignature(body, headers, this.config.webhookToken);
 
     const payload = JSON.parse(body) as Record<string, unknown>;
     const eventTypeRaw = String(payload.eventType ?? "");

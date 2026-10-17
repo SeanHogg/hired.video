@@ -10,6 +10,8 @@ import { aiFailure } from "../services/adapters/llm-error.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { getPrompt } from "../../../shared/ai-prompts/index.js";
+import { readForm } from "../utils/multipart.js";
+import { randomHex } from "../utils/crypto.js";
 
 const { interviewSessions, interviewAnswers } = schema;
 
@@ -283,9 +285,9 @@ interviewRoutes.post("/sessions/:id/answers", async (c) => {
   let videoFile: File | null = null;
 
   if (contentType.includes("multipart/form-data")) {
-    const form = await c.req.formData().catch(() => null);
+    const form = await readForm(c);
     if (!form) return c.json(fail("VALIDATION_ERROR", "Invalid form data"), 400);
-    videoFile = form.get("video") as File | null;
+    videoFile = form.get("video") as unknown as File | null;
     const rawFields = {
       questionId: String(form.get("questionId") ?? ""),
       question: String(form.get("question") ?? ""),
@@ -480,9 +482,8 @@ interviewRoutes.post("/sessions/:id/share", async (c) => {
     return c.json(ok({ shareToken: session.shareToken, shareUrl }), 200);
   }
 
-  // Generate a short random token (12 hex chars = 6 bytes = low collision for this use case)
-  const rawToken = crypto.getRandomValues(new Uint8Array(16));
-  const shareToken = Array.from(rawToken).map((b) => b.toString(16).padStart(2, "0")).join("");
+  // Random share token: 16 bytes → 32 hex chars.
+  const shareToken = randomHex(16);
 
   await db
     .update(interviewSessions)

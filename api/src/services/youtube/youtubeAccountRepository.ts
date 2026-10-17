@@ -4,13 +4,23 @@
  * Wraps the Drizzle calls so the OAuth and upload services never touch
  * the schema directly. All public methods take a `Db` instance so unit
  * tests can swap in fakes / transactions without a global side effect.
+ *
+ * Tokens are encrypted at rest (access_token_enc / refresh_token_enc via
+ * services/crypto/credential-columns.ts). This module is the only place that
+ * sees ciphertext: reads return decrypted tokens, writes take plaintext.
  */
 
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import type { Db } from "../../db/index.js";
+import { openCredential, sealCredential } from "../crypto/credential-columns.js";
 
-export type YouTubeAccount = typeof schema.youtubeAccounts.$inferSelect;
+type YouTubeAccountRow = typeof schema.youtubeAccounts.$inferSelect;
+
+/** A `youtube_accounts` row with its tokens decrypted. */
+export type YouTubeAccount = Omit<YouTubeAccountRow, "accessToken" | "accessTokenEnc" | "refreshTokenEnc"> & {
+  accessToken: string;
+};
 
 export interface UpsertAccountInput {
   userId: string;
@@ -32,12 +42,21 @@ export interface RotateTokenInput {
 
 const { youtubeAccounts } = schema;
 
+async function decrypt(row: YouTubeAccountRow): Promise<YouTubeAccount> {
+  const { accessTokenEnc, refreshTokenEnc, ...rest } = row;
+  return {
+    ...rest,
+    accessToken: (await openCredential(accessTokenEnc, row.accessToken)) ?? "",
+    refreshToken: await openCredential(refreshTokenEnc, row.refreshToken),
+  };
+}
+
 /** Caller's currently-active YouTube account, if any. */
 export async function getActiveAccount(userId: string, db: Db = getDb()): Promise<YouTubeAccount | null> {
   const [row] = await db.select().from(youtubeAccounts)
     .where(and(eq(youtubeAccounts.userId, userId), eq(youtubeAccounts.isActive, true)))
     .limit(1);
-  return row ?? null;
+  return row ? decrypt(row) : null;
 }
 
 /** Lookup by (userId, googleId) — used for re-auth upserts. */
@@ -49,7 +68,7 @@ export async function findAccountByGoogleId(
   const [row] = await db.select().from(youtubeAccounts)
     .where(and(eq(youtubeAccounts.userId, userId), eq(youtubeAccounts.googleId, googleId)))
     .limit(1);
-  return row ?? null;
+  return row ? decrypt(row) : null;
 }
 
 /**
@@ -59,11 +78,15 @@ export async function findAccountByGoogleId(
  */
 export async function upsertAccount(input: UpsertAccountInput, db: Db = getDb()): Promise<YouTubeAccount> {
   const existing = await findAccountByGoogleId(input.userId, input.googleId, db);
+  const access = await sealCredential(input.accessToken);
+  const refresh = await sealCredential(input.refreshToken ?? existing?.refreshToken);
 
   if (existing) {
     const [updated] = await db.update(youtubeAccounts).set({
-      accessToken:    input.accessToken,
-      refreshToken:   input.refreshToken ?? existing.refreshToken,
+      accessToken:     access.plain,
+      accessTokenEnc:  access.enc,
+      refreshToken:    refresh.plain,
+      refreshTokenEnc: refresh.enc,
       tokenExpiresAt: input.tokenExpiresAt,
       scopes:         input.scopes,
       channelId:      input.channelId ?? existing.channelId,
@@ -73,14 +96,16 @@ export async function upsertAccount(input: UpsertAccountInput, db: Db = getDb())
       isActive:       true,
       updatedAt:      new Date(),
     } as any).where(eq(youtubeAccounts.id, existing.id)).returning();
-    return updated;
+    return decrypt(updated);
   }
 
   const [inserted] = await db.insert(youtubeAccounts).values({
     userId:         input.userId,
     googleId:       input.googleId,
-    accessToken:    input.accessToken,
-    refreshToken:   input.refreshToken,
+    accessToken:     access.plain,
+    accessTokenEnc:  access.enc,
+    refreshToken:    refresh.plain,
+    refreshTokenEnc: refresh.enc,
     tokenExpiresAt: input.tokenExpiresAt,
     scopes:         input.scopes,
     channelId:      input.channelId,
@@ -89,7 +114,7 @@ export async function upsertAccount(input: UpsertAccountInput, db: Db = getDb())
     email:          input.email,
     isActive:       true,
   } as any).returning();
-  return inserted;
+  return decrypt(inserted);
 }
 
 /** Persist a refreshed access token + new expiry. */
@@ -98,8 +123,10 @@ export async function rotateAccessToken(
   rotation: RotateTokenInput,
   db: Db = getDb(),
 ): Promise<void> {
+  const access = await sealCredential(rotation.accessToken);
   await db.update(youtubeAccounts).set({
-    accessToken:    rotation.accessToken,
+    accessToken:    access.plain,
+    accessTokenEnc: access.enc,
     tokenExpiresAt: rotation.tokenExpiresAt,
     updatedAt:      new Date(),
   } as any).where(eq(youtubeAccounts.id, accountId));

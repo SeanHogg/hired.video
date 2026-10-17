@@ -23,7 +23,7 @@ import {
 } from "../../../../../shared/moderation/explicit.js";
 import { invalidatePublicVideoFeed } from "../../studio/public-video-feed.js";
 import { classifyImages, type ImageInput } from "./imageClassifier.js";
-import { sha256Hex } from "./bytes.js";
+import { sha256Hex } from "../../../utils/crypto.js";
 import { adoptInputHash, getScan, touchScan, upsertScan, type StoredScan } from "./contentScanRepository.js";
 import { verdictForImageUrl } from "./imageScan.js";
 import { scanTextExplicit } from "./textScan.js";

@@ -5,6 +5,7 @@ import { AUDIT_ACTIONS } from "../../utils/audit.js";
 import { invalidateModuleStatusCache } from "./moduleStatus.js";
 import { invalidateUserModulesCache } from "../admin/RoleAccessService.js";
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
+import { slugify } from "../../../../shared/slugify.js";
 
 type Module = InferSelectModel<typeof schema.modules>;
 
@@ -45,7 +46,7 @@ export async function createModule(
   deps?: Partial<AdminModulesDeps>,
 ) {
   const d = resolveDeps(deps);
-  const slug = input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const slug = slugify(input.name, { fallback: "", maxLen: Number.POSITIVE_INFINITY });
 
   const mod = await d.repos.authz.insertModule({
     name: input.name,

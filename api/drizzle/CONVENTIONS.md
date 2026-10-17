@@ -110,6 +110,17 @@ status: varchar("status", { length: 24 }).notNull().default("active"),
 
 ## Indexes
 
+- **Every foreign-key column needs an index whose LEADING column is the
+  FK** (Postgres does not create one; parent deletes/cascades otherwise
+  seq-scan the child). Name a plain FK index `idx_<table>_<column>`.
+  CI enforces it: `node --import tsx scripts/find-unindexed-fks.ts --check`
+  (the same script lists redundant prefix/duplicate indexes).
+- `scripts/check-migrations.mjs` (CI) fails on a reused migration number,
+  an unnumbered `.sql` file, or new schema↔migration index drift.
+- Retired tables are archived, never dropped:
+  `ALTER TABLE IF EXISTS public.<t> SET SCHEMA archive` (see 0545); push only
+  manages the `public` schema (drizzle.config.ts `schemaFilter`).
+
 - One `created_at DESC` composite per "list my X newest first" query.
 - One unique per "one row per (user, key)" relationship.
 - Partial index (`WHERE col IS NOT NULL`) when ≥30% of rows have NULL.
@@ -149,7 +160,7 @@ Tables that will exceed 100M rows at 1M users:
 Strategy split:
 - **Retention-swept** (services/maintenance/retention-sweep.ts caps growth):
   `tool_runs`, `ai_chat_messages`, `request_logs`, `activity_logs`,
-  `extension_events`, `geocoder_cache`, `worker_runs`, `integration_runs`,
+  `extension_events`, `geocoder_cache`, `worker_runs`,
   `profile_sync_runs`. No partitioning needed if retention covers it.
 - **Audit-required** (can't retention-sweep): `points_ledger`,
   `point_redemptions`, `usage_ledger`, `admin_audit_log`,

@@ -7,6 +7,7 @@ import { assertImageUploadAllowed } from "../services/moderation/explicit/upload
 import { getVideoBucket, putObject } from "../services/storage/object-store.js";
 import { clampAssetLimit, getAssetPage, kindsForQuery } from "../services/storage/media-library.js";
 import { resolveUploadSourceProjectId } from "../services/studio/recordingProjectAccess.js";
+import { parseUpload, isUploadRejected } from "../utils/multipart.js";
 
 // 32MB matches the frontend `MAX_IMAGE_SIZE` cap raised per #949 —
 // flattened 4K PNGs from DrawingStage routinely exceed 16MB and the
@@ -136,19 +137,14 @@ uploadRoutes.get("/images", async (c) => {
 /** POST /api/upload/image — multipart image upload used by company/profile UIs */
 uploadRoutes.post("/image", async (c) => {
   const user = c.var.user;
-  const form = await c.req.formData().catch(() => null);
-  const part = (form?.get("file") ?? form?.get("avatar")) as File | null;
-
-  if (!part || typeof part.arrayBuffer !== "function") {
-    return c.json(fail("VALIDATION_ERROR", "Missing uploaded image file"), 400);
-  }
-
-  const contentType = part.type || "application/octet-stream";
-  if (!contentType.startsWith("image/")) {
-    return c.json(fail("VALIDATION_ERROR", "Only image uploads are allowed on this endpoint"), 415);
-  }
-
-  const bytes = await part.arrayBuffer();
+  const up = await parseUpload(c, {
+    fields: ["file", "avatar"],
+    mimes: (mime) => mime.startsWith("image/"),
+    messages: { missing: "Missing uploaded image file", type: "Only image uploads are allowed on this endpoint" },
+  });
+  // 400 missing / 415 wrong type — both keep this endpoint's VALIDATION_ERROR code.
+  if (isUploadRejected(up)) return c.json(fail("VALIDATION_ERROR", up.message), up.status);
+  const { form, file: part, bytes, contentType } = up;
   const ext = fileExt(part.name || "image");
   const key = `uploads/${user.sub}/images/${crypto.randomUUID()}${ext ? `.${ext}` : ""}`;
 
@@ -169,14 +165,9 @@ uploadRoutes.post("/image", async (c) => {
 /** POST /api/upload/single — generic multipart file upload */
 uploadRoutes.post("/single", async (c) => {
   const user = c.var.user;
-  const form = await c.req.formData().catch(() => null);
-  const part = form?.get("file") as File | null;
-
-  if (!part || typeof part.arrayBuffer !== "function") {
-    return c.json(fail("VALIDATION_ERROR", "Missing uploaded file"), 400);
-  }
-
-  const bytes = await part.arrayBuffer();
+  const up = await parseUpload(c, { messages: { missing: "Missing uploaded file" } });
+  if (isUploadRejected(up)) return c.json(fail("VALIDATION_ERROR", up.message), 400);
+  const { form, file: part, bytes } = up;
   const ext = fileExt(part.name || "file");
   const key = `uploads/${user.sub}/files/${crypto.randomUUID()}${ext ? `.${ext}` : ""}`;
 
@@ -215,14 +206,12 @@ uploadRoutes.post("/single", async (c) => {
  */
 uploadRoutes.post("/scorm-file", async (c) => {
   const user = c.var.user;
-  const form = await c.req.formData().catch(() => null);
-  const part = form?.get("file") as File | null;
-  const pkgId = (form?.get("pkgId") as string | null)?.trim() ?? "";
-  const path = (form?.get("path") as string | null)?.trim() ?? "";
+  const up = await parseUpload(c, { messages: { missing: "Missing uploaded file" } });
+  if (isUploadRejected(up)) return c.json(fail("VALIDATION_ERROR", up.message), 400);
+  const { form, file: part, bytes } = up;
+  const pkgId = (form.get("pkgId") as string | null)?.trim() ?? "";
+  const path = (form.get("path") as string | null)?.trim() ?? "";
 
-  if (!part || typeof part.arrayBuffer !== "function") {
-    return c.json(fail("VALIDATION_ERROR", "Missing uploaded file"), 400);
-  }
   // pkgId must be a uuid v4 — anything else risks collision with another
   // user's package and lets a caller scribble into arbitrary R2 prefixes
   // by passing "../somebody-elses-package".
@@ -240,7 +229,6 @@ uploadRoutes.post("/scorm-file", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "path must be a non-empty, relative, traversal-free POSIX path"), 400);
   }
 
-  const bytes = await part.arrayBuffer();
   const key = `uploads/${user.sub}/scorm/${pkgId}/${path}`;
 
   if (!(await putObject(key, bytes, part.type || "application/octet-stream"))) {
@@ -259,19 +247,13 @@ uploadRoutes.post("/scorm-file", async (c) => {
 /** POST /api/upload/video — multipart video upload used by resume/video flows */
 uploadRoutes.post("/video", async (c) => {
   const user = c.var.user;
-  const form = await c.req.formData().catch(() => null);
-  const part = form?.get("file") as File | null;
-
-  if (!part || typeof part.arrayBuffer !== "function") {
-    return c.json(fail("VALIDATION_ERROR", "Missing uploaded video file"), 400);
-  }
-
-  const contentType = part.type || "application/octet-stream";
-  if (!contentType.startsWith("video/")) {
-    return c.json(fail("VALIDATION_ERROR", "Only video uploads are allowed on this endpoint"), 415);
-  }
-
-  const bytes = await part.arrayBuffer();
+  const up = await parseUpload(c, {
+    mimes: (mime) => mime.startsWith("video/"),
+    messages: { missing: "Missing uploaded video file", type: "Only video uploads are allowed on this endpoint" },
+  });
+  // 400 missing / 415 wrong type — both keep this endpoint's VALIDATION_ERROR code.
+  if (isUploadRejected(up)) return c.json(fail("VALIDATION_ERROR", up.message), up.status);
+  const { form, file: part, bytes, contentType } = up;
   const ext = fileExt(part.name || "video");
   const key = `uploads/${user.sub}/videos/${crypto.randomUUID()}${ext ? `.${ext}` : ".webm"}`;
 

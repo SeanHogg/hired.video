@@ -22,7 +22,8 @@
  *                              replayed confirm, a concurrent cron run or a
  *                              webhook can never credit twice (#2200).
  *
- * Throws a typed `TokenPackError(kind)`; routes/token-packs.ts maps it to HTTP.
+ * Throws a typed `TokenPackError(kind)`; the token_pack checkout kind
+ * (services/billing/checkout/kinds/tokenPack.ts) maps it to CheckoutError.
  */
 import {
   findTokenPack,
@@ -41,7 +42,11 @@ import type {
   ProviderTransaction,
 } from "../payment/types.js";
 import { isApprovedOneOffPayment, type OneOffPaymentsPort } from "../payment/oneOffPayments.js";
-import type { TokenPackPurchaseInsert, TokenPackPurchaseRow } from "../../../repositories/tokensRepository.js";
+import {
+  PaymentAlreadyClaimedError,
+  type TokenPackPurchaseInsert,
+  type TokenPackPurchaseRow,
+} from "../../../repositories/tokensRepository.js";
 
 export class TokenPackError extends Error {
   constructor(public readonly kind: TokenPackErrorKind, message: string) {
@@ -90,16 +95,26 @@ function requirePayments(deps: TokenPackDeps): PackPaymentsPort {
 
 // ── use cases ──────────────────────────────────────────────────────────────
 
-export async function startTokenPackCheckout(
-  deps: TokenPackDeps,
-  input: { userId: string; packId: string; successUrl: string; cancelUrl: string },
-): Promise<{ pack: TokenPack; collection: CollectPaymentMethodResult }> {
+/** The pack this user may buy right now (known pack + Pro), without opening
+ *  the payment widget. */
+export async function requirePurchasablePack(
+  deps: Pick<TokenPackDeps, "plans">,
+  input: { userId: string; packId: string },
+): Promise<TokenPack> {
   const pack = requirePack(input.packId);
   // Packs top up the Pro allowance; free accounts upgrade to Pro first
   // (paid AI is a Pro feature — feedback_paid_ai_is_pro).
   if (!(await deps.plans.isPro(input.userId))) {
     throw new TokenPackError("PRO_REQUIRED", "Token packs are available on Pro");
   }
+  return pack;
+}
+
+export async function startTokenPackCheckout(
+  deps: TokenPackDeps,
+  input: { userId: string; packId: string; successUrl: string; cancelUrl: string },
+): Promise<{ pack: TokenPack; collection: CollectPaymentMethodResult }> {
+  const pack = await requirePurchasablePack(deps, input);
   const payments = requirePayments(deps);
   const customerId = await payments.customerIdFor(input.userId);
   const collection = await payments.initPurchase({
@@ -180,15 +195,23 @@ export async function confirmTokenPackPurchase(
   const payments = requirePayments(deps);
   // Recorded BEFORE the provider check: from here on the charge can't be
   // lost — if this request dies, the cron finishes the job.
-  const row = await deps.ledger.recordPending({
-    userId: input.userId,
-    packId: pack.id,
-    tokensGranted: pack.tokens,
-    pricePaid: pack.price.toFixed(2),
-    currency: PACK_CURRENCY,
-    // Legacy column name; holds the provider transaction id for any provider.
-    stripePaymentIntentId: input.transactionId,
-  });
+  const row = await deps.ledger
+    .recordPending({
+      userId: input.userId,
+      packId: pack.id,
+      tokensGranted: pack.tokens,
+      pricePaid: pack.price.toFixed(2),
+      currency: PACK_CURRENCY,
+      // Legacy column name; holds the provider transaction id for any provider.
+      stripePaymentIntentId: input.transactionId,
+    })
+    .catch((err: unknown) => {
+      // The payment already paid for a boost or course checkout.
+      if (err instanceof PaymentAlreadyClaimedError) {
+        throw new TokenPackError("PAYMENT_NOT_VERIFIED", "We couldn't verify that payment");
+      }
+      throw err;
+    });
   // The reference is already recorded for another account or another pack.
   if (row.userId !== input.userId || row.packId !== pack.id) {
     throw new TokenPackError("PAYMENT_NOT_VERIFIED", "We couldn't verify that payment");

@@ -38,7 +38,8 @@ import {
 } from "../../../../shared/pricing.js";
 import { aiCallCostUsd } from "../../../../shared/ai-model-rates.js";
 import { companySubscriptions } from "../../db/schema/billing.js";
-import { isAdminRole, deriveAudience, deriveTier } from "../../domains/billing/audience.js";
+import { deriveAudience, deriveTier } from "../../domains/billing/audience.js";
+import { isAdminRole } from "../../middleware/superAdmin.js";
 import type { JwtPayload } from "../../types/index.js";
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -1,8 +1,12 @@
 import { z } from 'zod';
 import { apiClient } from "@/lib/api-client";
+import { RefundRequestSchema as SharedRefundRequestSchema } from "@shared/billing";
 
 // Zod schemas for type validation
-export const CreateRefundRequestSchema = z.object({
+// POST /api/billing/refund-request body — derived from the shared wire
+// schema (@shared/billing RefundRequestSchema); the modal additionally
+// requires a positive amount and caps free text.
+export const CreateRefundRequestSchema = SharedRefundRequestSchema.extend({
   subscriptionId: z.string().optional(),
   chargeId: z.string().optional(),
   amountCents: z.number().int().positive(),
@@ -10,7 +14,8 @@ export const CreateRefundRequestSchema = z.object({
   description: z.string().max(1000).optional(),
 });
 
-export const RefundRequestSchema = z.object({
+/** A stored refund request row (read shape) — not the POST body. */
+export const RefundRequestRecordSchema = z.object({
   id: z.string(),
   userId: z.string(),
   subscriptionId: z.string().optional(),
@@ -82,7 +87,7 @@ export const CancellationStatsSchema = z.object({
 
 // TypeScript types derived from schemas
 export type CreateRefundRequest = z.infer<typeof CreateRefundRequestSchema>;
-export type RefundRequest = z.infer<typeof RefundRequestSchema>;
+export type RefundRequest = z.infer<typeof RefundRequestRecordSchema>;
 export type CreateCancellationRequest = z.infer<typeof CreateCancellationRequestSchema>;
 export type CancellationRequest = z.infer<typeof CancellationRequestSchema>;
 export type RefundPolicy = z.infer<typeof RefundPolicySchema>;
@@ -90,26 +95,11 @@ export type RefundReasons = z.infer<typeof RefundReasonsSchema>;
 export type RefundStats = z.infer<typeof RefundStatsSchema>;
 export type CancellationStats = z.infer<typeof CancellationStatsSchema>;
 
-type ServiceResult<T> = { success: boolean; data?: T; error?: { message: string } };
-
-// Wraps apiClient calls in the legacy { success, data?, error? } envelope that
-// existing callers (BillingManagement, RefundRequestModal) check via
-// `response.success`. suppressErrorEvent skips the global "API error" toast —
-// callers handle user-facing error messaging themselves.
-async function call<T>(
-  method: "GET" | "POST",
-  path: string,
-  body?: unknown,
-): Promise<ServiceResult<T>> {
-  try {
-    const res = await apiClient.request<T>(path, { method, body, suppressErrorEvent: true });
-    return { success: true, data: res.data };
-  } catch (err) {
-    return {
-      success: false,
-      error: { message: err instanceof Error ? err.message : "Unknown error" },
-    };
-  }
+// The unwrapped payload; throws the typed apiClient error on failure.
+// suppressErrorEvent skips the global "API error" toast — callers
+// (BillingManagement, RefundRequestModal) own their error messaging.
+function call<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+  return apiClient.fetchData<T>(path, { method, body, suppressErrorEvent: true });
 }
 
 /**
@@ -117,7 +107,7 @@ async function call<T>(
  */
 export class RefundService {
   private baseUrl = '/api/billing';
-  private adminBaseUrl = '/api/ProductDashboard';
+  private adminBaseUrl = '/api/admin';
 
   // User-facing refund methods
   createRefundRequest(request: CreateRefundRequest) {

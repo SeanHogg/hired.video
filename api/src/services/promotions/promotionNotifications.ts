@@ -9,6 +9,7 @@ import { emitNotification } from "../notifications/notificationService.js";
 import { SOCIAL_PLATFORM_META } from "../../../../shared/social-platforms.js";
 import type { PromotionPlatform } from "../../../../shared/promotions.js";
 import type { PromotionSubmission } from "./promotionRepository.js";
+import { logger } from "../../lib/logger.js";
 
 export async function notifyPromotionOutcome(row: PromotionSubmission): Promise<void> {
   if (row.status !== "published" && row.status !== "rejected") return;
@@ -31,6 +32,6 @@ export async function notifyPromotionOutcome(row: PromotionSubmission): Promise<
       },
     );
   } catch (err) {
-    console.error("[promotions] outcome notification failed:", err);
+    logger.error("[promotions] outcome notification failed", err);
   }
 }

@@ -14,6 +14,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
+import { clampLimit } from "../utils/pagination.js";
 import {
   DEFAULT_FEATURED_CREATOR_WEIGHTS as D,
   getFeaturedCreators,
@@ -22,7 +23,7 @@ import {
 export const featuredCreatorsRoutes = new Hono<AppEnv>();
 
 featuredCreatorsRoutes.get("/", async (c) => {
-  const limit = Math.min(parseInt(c.req.query("limit") ?? "20", 10) || 20, 100);
+  const limit = clampLimit(c.req.query("limit"), 20, 100);
   const category = c.req.query("category") || null;
   const weights = {
     rating: parseFloat(c.req.query("wRating") ?? String(D.rating)) || D.rating,

@@ -12,6 +12,7 @@
 import { z } from "zod";
 import type { Env, JwtPayload } from "../../types/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../adapters/llm-client.js";
+import { logger } from "../../lib/logger.js";
 
 export interface AnswerScoreBreakdown {
   situation: number;
@@ -118,7 +119,7 @@ ${args.answerText}`;
     );
     return data;
   } catch (err) {
-    console.error("[answer-scorer] LLM call failed, using mock:", err);
+    logger.error("[answer-scorer] LLM call failed, using mock", err);
     return mockScore(args);
   }
 }

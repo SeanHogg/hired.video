@@ -3,6 +3,8 @@
 // `worker_runs` table for SuperAdmin observability and cadence
 // gating. See migration 0080.
 
+import type { WorkQueue } from "../services/scheduling/work-signals.js";
+
 export type WorkerStatus = "running" | "success" | "partial" | "error";
 export type WorkerTrigger = "cron" | "manual";
 
@@ -28,10 +30,14 @@ export interface WorkerDefinition {
   name: string;
   displayName: string;
   description: string;
-  // Cadence between cron-triggered runs. The /5 cron tick checks
-  // `now - max(started_at) >= cadenceMs` per worker; manual triggers
-  // ignore this.
+  // Cadence between cron-triggered runs. The /15 interval cron checks
+  // `now - max(started_at) >= cadenceMs` per worker (one DISTINCT ON
+  // query for all of them); manual triggers ignore this.
   cadenceMs: number;
+  // Optional KV pending-work queue (services/scheduling/work-signals.ts).
+  // When set, the cron dispatcher only considers this worker while that
+  // queue's marker is due — an empty queue costs no Postgres query.
+  workQueue?: WorkQueue;
   batchSize: number;
   run: (ctx: WorkerRunContext) => Promise<void>;
 }

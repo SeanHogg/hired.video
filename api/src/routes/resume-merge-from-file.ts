@@ -32,6 +32,7 @@ import {
 import { ocrResumeImage, parseResumeTextWithAI } from "./resume-parse.js";
 import { gateUploadOcr } from "./resume-upload-ocr-gate.js";
 import { fail, ok } from "../utils/response.js";
+import { readFormFiles } from "../utils/multipart.js";
 
 type Ctx = Context<AppEnv>;
 type Content = Record<string, unknown>;
@@ -88,8 +89,7 @@ export async function mergeFromFileHandler(c: Ctx): Promise<Response> {
 /** JSON body or multipart upload → one validated input, or the 400 to return. */
 async function readMergeFromFileInput(c: Ctx): Promise<MergeFromFileInput | Response> {
   if ((c.req.header("Content-Type") ?? "").includes("multipart/form-data")) {
-    const form = await c.req.formData().catch(() => null);
-    const files = (form?.getAll("file") ?? []).filter((f): f is File => f instanceof File);
+    const { form, files } = await readFormFiles(c);
     if (!form || files.length === 0) return c.json(fail("VALIDATION_ERROR", "No file provided."), 400);
     const field = (name: string): string | undefined => {
       const value = form.get(name);

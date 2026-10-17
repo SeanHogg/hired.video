@@ -6,6 +6,7 @@
  */
 
 import type { AvailableAPI } from "@/lib/types/ai-context";
+import { buildApiUrl } from "@/lib/api/base-url";
 
 // ============================================================================
 // TYPES
@@ -87,8 +88,7 @@ class SwaggerService {
   }
 
   private async fetchSchemaInternal(): Promise<OpenAPISchema> {
-    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-    const response = await fetch(`${apiUrl}/swagger/v1/swagger.json`);
+    const response = await fetch(buildApiUrl("/swagger/v1/swagger.json"));
 
     if (!response.ok) {
       throw new Error(`Failed to fetch OpenAPI schema: ${response.statusText}`);

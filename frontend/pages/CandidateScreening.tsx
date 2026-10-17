@@ -13,6 +13,7 @@
 // in the Consolidated Gap Register.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ApplicationQuestion } from "@shared/screening";
 import { useParams, Link } from "react-router-dom";
 import { CheckCircle2, Circle, Clock, ExternalLink, Loader2 } from "lucide-react";
 import { useSEO } from "@/lib/seo";
@@ -194,15 +195,6 @@ export default function CandidateScreening() {
 }
 
 // ── Per-item card ─────────────────────────────────────────────────────────────
-
-interface ApplicationQuestion {
-  id: string;
-  prompt: string;
-  kind: string;
-  answerType: "text" | "boolean" | "single_select" | "multi_select";
-  options?: string[];
-  required?: boolean;
-}
 
 function ScreeningItemCard({
   item,

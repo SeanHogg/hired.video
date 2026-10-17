@@ -46,6 +46,8 @@ export const candidateVideoConsents = pgTable(
       "candidate_video_consents_status_check",
       sql`${t.status} IN ('pending', 'approved', 'declined', 'expired', 'revoked')`,
     ),
+    index("idx_candidate_video_consents_approved_video_id").on(t.approvedVideoId),
+    index("idx_candidate_video_consents_talent_pool_candidate_id").on(t.talentPoolCandidateId),
   ],
 );
 

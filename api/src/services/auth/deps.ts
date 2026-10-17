@@ -23,6 +23,9 @@ import { verifyTrustedDeviceCookie } from "./trustedDevice.js";
 import { realMxCheck, realBreachCheck } from "./signupGuard.js";
 import { getJwtSecret } from "../../utils/jwt.js";
 import { isDevEnvironment } from "../../utils/runtime-env.js";
+import { logger } from "../../lib/logger.js";
+import { getEnv } from "../../utils/env.js";
+import { randomHex } from "../../utils/crypto.js";
 
 const emailer: EmailerPort = {
   sendVerification: sendVerificationEmail,
@@ -40,15 +43,8 @@ const onboarding: OnboardingPort = {
   triggerDrip: triggerOnboardingDrip,
 };
 
-/** Produce random hex bytes. Uses Web Crypto (available in CF Workers + Node 22+). */
-function randomHex(bytes: number): string {
-  const arr = new Uint8Array(bytes);
-  crypto.getRandomValues(arr);
-  return Array.from(arr).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 function getTurnstileSecret(): string {
-  return process.env.TURNSTILE_SECRET_KEY || (globalThis as any).__ENV?.TURNSTILE_SECRET_KEY || "";
+  return getEnv("TURNSTILE_SECRET_KEY");
 }
 
 const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
@@ -83,7 +79,7 @@ function buildCaptcha(): CaptchaPort {
         // Network / Turnstile outage — fail closed to keep spam out. If
         // this becomes a reliability problem we can switch to fail-open
         // with a separate alarm, but the safer default is reject.
-        console.error("[captcha] Turnstile verify failed:", err);
+        logger.error("[captcha] Turnstile verify failed", err);
         return false;
       }
     },

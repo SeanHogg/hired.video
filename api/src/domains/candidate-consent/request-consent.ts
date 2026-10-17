@@ -21,6 +21,7 @@ import {
   type CandidateConsentDeps,
 } from "./ports.js";
 import { assertApproverEmailAllowed, resolveApproverEmail } from "./approver-email.js";
+import { logger } from "../../lib/logger.js";
 
 export interface ConsentActor {
   userId: string;
@@ -55,7 +56,7 @@ async function emailConsentLink(row: CandidateVideoConsentRow, token: string, de
       expiresAt: new Date(row.expiresAt),
     });
   } catch (e) {
-    console.error("[candidate-consent] consent email failed", { consentId: row.id, error: (e as Error).message });
+    logger.error("[candidate-consent] consent email failed", { consentId: row.id, error: (e as Error).message });
   }
 }
 

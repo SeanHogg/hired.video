@@ -28,7 +28,7 @@ import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import { schema } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
-import { ok, fail, requireAuth, type HandlerResult } from "../../handlers/shared.js";
+import { DomainError, requireUserId } from "../../domains/errors.js";
 import type { LLMClient, LLMUsage } from "../../services/adapters/llm-client.js";
 import { defineLenientIngest } from "../../services/adapters/llm-client.js";
 import { coerceEnum } from "../../services/adapters/lenient-coerce.js";
@@ -40,6 +40,7 @@ import {
   ResumeContentSchema,
   type ResumeContent,
 } from "../../../../shared/resume.js";
+import { logger } from "../../lib/logger.js";
 
 export type DbPort = any;
 
@@ -534,7 +535,7 @@ async function saveMatchScore(
     // Caching is a nice-to-have; the score is already returned to the
     // caller. Log and move on.
      
-    console.warn("[match] saveMatchScore failed:", err instanceof Error ? err.message : err);
+    logger.warn("[match] saveMatchScore failed", err);
   }
 }
 
@@ -573,20 +574,19 @@ export async function handleAnalyze(
   deps: MatchDeps,
   viewerId: string | null,
   body: unknown,
-): Promise<HandlerResult> {
-  const auth = requireAuth(viewerId);
-  if ("status" in auth) return auth;
+) {
+  const userId = requireUserId(viewerId);
 
   const parsed = MatchInputSchema.safeParse(body);
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
+    throw new DomainError(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
   }
 
-  const resume = await resolveResume(deps, auth.userId, parsed.data.resumeId);
-  if (!resume) return fail(404, "NOT_FOUND", "No resume found. Please create a resume first.");
+  const resume = await resolveResume(deps, userId, parsed.data.resumeId);
+  if (!resume) throw new DomainError(404, "NOT_FOUND", "No resume found. Please create a resume first.");
 
   const job = await resolveJob(deps, parsed.data);
-  if (!job) return fail(404, "NOT_FOUND", "Job not found. Track the job before scoring.");
+  if (!job) throw new DomainError(404, "NOT_FOUND", "Job not found. Track the job before scoring.");
 
   const resumeText = resumeContentToText(resume.content);
   const resumeId = resume.id as string;
@@ -604,41 +604,41 @@ export async function handleAnalyze(
         AnalyzeWithSkillsResponseSchema,
       );
       detach(deps, () => saveMatchScore(deps, {
-        userId: auth.userId,
+        userId,
         jobId: job.jobId,
         resumeId,
         score: result.score,
         recommendations: result.summaryRecommendations,
       }));
-      return ok({
+      return {
         score: result.score,
         summaryRecommendations: result.summaryRecommendations,
         matchedSkills: result.matchedSkills,
         missingSkills: result.missingSkills,
         resumeId,
         sourceUrl: job.sourceUrl,
-      });
+      };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const { score, message } = keywordScore(job.text, resumeText);
-      return ok({
+      return {
         score,
         summaryRecommendations: message + `\n\n_LLM error: ${msg.slice(0, 300)}_`,
         ...keywordSkillLists(resume.content, job.text),
         resumeId,
         sourceUrl: job.sourceUrl,
-      });
+      };
     }
   }
 
   const { score, message } = keywordScore(job.text, resumeText);
-  return ok({
+  return {
     score,
     summaryRecommendations: message,
     ...keywordSkillLists(resume.content, job.text),
     resumeId,
     sourceUrl: job.sourceUrl,
-  });
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -649,22 +649,21 @@ export async function handleByid(
   deps: MatchDeps,
   viewerId: string | null,
   body: unknown,
-): Promise<HandlerResult> {
-  const auth = requireAuth(viewerId);
-  if ("status" in auth) return auth;
+) {
+  const userId = requireUserId(viewerId);
 
   const parsed = MatchByIdSchema.safeParse(body);
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "jobId and resumeId are required");
+    throw new DomainError(400, "VALIDATION_ERROR", "jobId and resumeId are required");
   }
 
   const { jobId, resumeId } = parsed.data;
 
   const job = await resolveJob(deps, { jobId });
-  if (!job) return fail(404, "NOT_FOUND", "Job not found");
+  if (!job) throw new DomainError(404, "NOT_FOUND", "Job not found");
 
-  const resume = await resolveResume(deps, auth.userId, resumeId);
-  if (!resume) return fail(404, "NOT_FOUND", "Resume not found");
+  const resume = await resolveResume(deps, userId, resumeId);
+  if (!resume) throw new DomainError(404, "NOT_FOUND", "Resume not found");
 
   const resumeText = resumeContentToText(resume.content);
 
@@ -682,20 +681,20 @@ export async function handleByid(
         AnalyzeResponseSchema,
       );
       detach(deps, () => saveMatchScore(deps, {
-        userId: auth.userId,
+        userId,
         jobId: job.jobId,
         resumeId: resume.id as string,
         score: result.score,
         recommendations: result.summaryRecommendations,
       }));
-      return ok({ ...result, jobId, resumeId });
+      return { ...result, jobId, resumeId };
     } catch {
       // fall through to keyword overlap
     }
   }
 
   const { score, message } = keywordScore(job.text, resumeText);
-  return ok({ score, summaryRecommendations: message, jobId, resumeId });
+  return { score, summaryRecommendations: message, jobId, resumeId };
 }
 
 // ---------------------------------------------------------------------------
@@ -707,23 +706,22 @@ export async function handleInsights(
   deps: MatchDeps,
   viewerId: string | null,
   body: unknown,
-): Promise<HandlerResult> {
-  const auth = requireAuth(viewerId);
-  if ("status" in auth) return auth;
+) {
+  const userId = requireUserId(viewerId);
 
   const parsed = MatchInsightsSchema.safeParse(body);
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
+    throw new DomainError(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
   }
 
-  const resume = await resolveResume(deps, auth.userId, parsed.data.resumeId);
-  if (!resume) return fail(404, "NOT_FOUND", "No resume found. Please create a resume first.");
+  const resume = await resolveResume(deps, userId, parsed.data.resumeId);
+  if (!resume) throw new DomainError(404, "NOT_FOUND", "No resume found. Please create a resume first.");
 
   const jobText = htmlToPlainText(parsed.data.jobHtml).slice(0, TEXT_CAP);
   const resumeText = resumeContentToText(resume.content);
 
   if (!deps.llm) {
-    return fail(503, "AI_ERROR", "AI service not configured. Please contact support.");
+    throw new DomainError(503, "AI_ERROR", "AI service not configured. Please contact support.");
   }
 
   try {
@@ -760,9 +758,9 @@ Return JSON matching this structure exactly:
       InsightsResponseIngest,
     );
 
-    return ok({ ...result, resumeId: resume.id });
+    return { ...result, resumeId: resume.id };
   } catch {
-    return fail(500, "AI_ERROR", "Failed to generate insights. Please try again.");
+    throw new DomainError(500, "AI_ERROR", "Failed to generate insights. Please try again.");
   }
 }
 
@@ -774,13 +772,12 @@ export async function handleByContent(
   deps: MatchDeps,
   viewerId: string | null,
   body: unknown,
-): Promise<HandlerResult> {
-  const auth = requireAuth(viewerId);
-  if ("status" in auth) return auth;
+) {
+  requireUserId(viewerId);
 
   const parsed = MatchByContentSchema.safeParse(body);
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "jobContent and resumeContent are required");
+    throw new DomainError(400, "VALIDATION_ERROR", "jobContent and resumeContent are required");
   }
 
   const jobText = parsed.data.jobContent.slice(0, TEXT_CAP);
@@ -799,12 +796,12 @@ export async function handleByContent(
         },
         AnalyzeResponseSchema,
       );
-      return ok(result);
+      return result;
     } catch {
       // fall through
     }
   }
 
   const { score, message } = keywordScore(jobText, resumeText);
-  return ok({ score, summaryRecommendations: message });
+  return { score, summaryRecommendations: message };
 }

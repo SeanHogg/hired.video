@@ -1,10 +1,14 @@
 import { Hono } from "hono";
-import { z } from "zod";
+import { getEnv } from "../utils/env.js";
+import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import * as sw from "../services/adapters/signalwire.js";
+import { parsePagination } from "../utils/pagination.js";
+import { readForm } from "../utils/multipart.js";
+import { logger } from "../lib/logger.js";
 
 export const phoneRoutes = new Hono<AppEnv>();
 
@@ -104,10 +108,7 @@ phoneRoutes.post("/numbers", async (c) => {
   const activeCount = existing[0]?.count ?? 0;
 
   // Provision via SignalWire
-  const webhookBase = (globalThis as any).__ENV?.WEBHOOK_BASE_URL ||
-                      process.env.WEBHOOK_BASE_URL ||
-                      (globalThis as any).__ENV?.FRONTEND_URL ||
-                      process.env.FRONTEND_URL || "";
+  const webhookBase = getEnv("WEBHOOK_BASE_URL") || getEnv("FRONTEND_URL");
 
   const provisioned = await sw.provisionNumber({ phoneNumber, webhookBase }).catch((err) => {
     throw new Error(`Failed to provision number: ${err.message}`);
@@ -179,7 +180,7 @@ phoneRoutes.delete("/numbers/:id", async (c) => {
 
   if (num.signalwirePhoneSid) {
     await sw.releaseNumber(num.signalwirePhoneSid).catch((err) => {
-      console.error("SignalWire release failed:", err.message);
+      logger.error("[phone] SignalWire release failed", { error: err.message });
     });
   }
 
@@ -197,8 +198,7 @@ phoneRoutes.delete("/numbers/:id", async (c) => {
 phoneRoutes.get("/calls", async (c) => {
   const userId = uid(c);
   const query  = c.req.query();
-  const limit  = Math.min(parseInt(query.limit ?? "50"), 100);
-  const offset = parseInt(query.offset ?? "0");
+  const { limit, offset } = parsePagination(c, { defaultLimit: 50, maxLimit: 100 });
   const db     = getDb();
 
   const conditions = [eq(schema.callLogs.userId, userId)];
@@ -251,11 +251,7 @@ phoneRoutes.post("/call", async (c) => {
     .limit(1);
   if (!num) return c.json(fail("NOT_FOUND", "Phone number not found"), 404);
 
-  const webhookBase = (globalThis as any).__ENV?.WEBHOOK_BASE_URL
-    || process.env.WEBHOOK_BASE_URL
-    || (globalThis as any).__ENV?.FRONTEND_URL
-    || process.env.FRONTEND_URL
-    || "";
+  const webhookBase = getEnv("WEBHOOK_BASE_URL") || getEnv("FRONTEND_URL");
   if (!webhookBase) return c.json(fail("CONFIG_ERROR", "WEBHOOK_BASE_URL not configured"), 500);
 
   let result: { sid: string; status: string };
@@ -286,7 +282,7 @@ phoneRoutes.post("/call", async (c) => {
 // SignalWire fetches this when an outbound call is answered — we return
 // TwiML that bridges to the destination and (optionally) records.
 phoneRoutes.post("/webhook/outbound-call", async (c) => {
-  const form = await c.req.formData().catch(() => null);
+  const form = await readForm(c);
   const to = form?.get("To")?.toString() ?? "";
   const callerId = form?.get("From")?.toString() ?? null;
   const xml = sw.buildOutboundCallTwiML({ to, record: true, callerId });
@@ -299,8 +295,7 @@ phoneRoutes.post("/webhook/outbound-call", async (c) => {
 phoneRoutes.get("/sms", async (c) => {
   const userId = uid(c);
   const query  = c.req.query();
-  const limit  = Math.min(parseInt(query.limit ?? "50"), 100);
-  const offset = parseInt(query.offset ?? "0");
+  const { limit, offset } = parsePagination(c, { defaultLimit: 50, maxLimit: 100 });
   const db     = getDb();
 
   const conditions = [eq(schema.smsMessages.userId, userId)];

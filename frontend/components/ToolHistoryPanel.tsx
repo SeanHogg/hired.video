@@ -11,6 +11,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { formatDateTimeMedium } from "@/lib/format";
 import { History, Play, TrendingDown, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -69,19 +70,6 @@ interface Props {
   initialToolId?: string | readonly string[];
 }
 
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
 
 function Sparkline({ points, width = 120, height = 32 }: { points: number[]; width?: number; height?: number }) {
   if (points.length < 2) return null;
@@ -214,7 +202,7 @@ function ToolHistoryGroup({ toolId, toolLabel, runs, runAgain, autoScrollIntoVie
                       <div className="text-sm font-medium truncate">
                         {run.summary || (score !== null ? `Score: ${Math.round(score)}` : "Tool run")}
                       </div>
-                      <div className="text-xs text-muted-foreground">{formatDate(run.createdAt)}</div>
+                      <div className="text-xs text-muted-foreground">{formatDateTimeMedium(run.createdAt)}</div>
                     </div>
                     {score !== null && <Badge variant="outline">{Math.round(score)}</Badge>}
                   </button>

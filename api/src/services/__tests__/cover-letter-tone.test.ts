@@ -23,9 +23,13 @@ import {
   TONE_GUIDES,
   applyToneRewrite,
   buildTonePrompt,
-  handleCoverLetterTone,
+  handleCoverLetterTone as coverLetterToneUseCase,
   type ToneWire,
 } from "../job/cover-letter-tone.js";
+import { asHandler } from "../../handlers/shared.js";
+
+// The use case returns data / throws DomainError; assert the routed envelope.
+const handleCoverLetterTone = asHandler(coverLetterToneUseCase);
 import { COVER_LETTER_TONES, type CoverLetter } from "../../../../shared/cover-letter.js";
 import type { LLMCallOpts, LLMClient, LLMOptions } from "../../services/adapters/llm-client.js";
 import { useCaseForFeatureKey } from "../../services/adapters/providers.js";

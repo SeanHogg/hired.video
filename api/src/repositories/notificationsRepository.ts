@@ -9,6 +9,7 @@
 import { and, count, desc, eq } from "drizzle-orm";
 import { schema } from "../db/index.js";
 import { pickSelectShape } from "../../../shared/projection.js";
+import { bumpInboxFor } from "../services/messaging/inboxCacheVersion.js";
 
 const { notifications } = schema;
 
@@ -55,7 +56,7 @@ export class NotificationsRepository implements INotificationsRepository {
 
   async findNotificationsForUser(userId: string, limit = 50): Promise<NotificationRow[]> {
     return (await this.db
-      .select()
+      .select({ ...NOTIFICATION_SELECT_SHAPE, userId: notifications.userId })
       .from(notifications)
       .where(eq(notifications.userId, userId))
       .orderBy(desc(notifications.createdAt))
@@ -88,6 +89,7 @@ export class NotificationsRepository implements INotificationsRepository {
       .update(notifications)
       .set({ isRead: true } as any)
       .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+    bumpInboxFor([userId]);
   }
 
   async markReadForUser(userId: string, notificationId: string): Promise<void> {
@@ -95,20 +97,24 @@ export class NotificationsRepository implements INotificationsRepository {
       .update(notifications)
       .set({ isRead: true } as any)
       .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)));
+    bumpInboxFor([userId]);
   }
 
   async deleteForUser(userId: string, notificationId: string): Promise<void> {
     await this.db
       .delete(notifications)
       .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)));
+    bumpInboxFor([userId]);
   }
 
   async insertNotification(input: NotificationInsert): Promise<void> {
     await this.db.insert(notifications).values(input as any);
+    bumpInboxFor([input.userId]);
   }
 
   async insertNotifications(inputs: NotificationInsert[]): Promise<void> {
     if (inputs.length === 0) return;
     await this.db.insert(notifications).values(inputs as any);
+    bumpInboxFor(inputs.map((i) => i.userId));
   }
 }

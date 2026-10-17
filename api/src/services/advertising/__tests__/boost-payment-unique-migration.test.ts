@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const API_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const migration = readFileSync(join(API_ROOT, "drizzle", "0523_boost_payment_unique.sql"), "utf8");
-const schemaSrc = readFileSync(join(API_ROOT, "src", "db", "schema", "gapExtensions.ts"), "utf8");
+const schemaSrc = readFileSync(join(API_ROOT, "src", "db", "schema", "advertising.ts"), "utf8");
 const code = migration.replace(/--[^\n]*/g, "");
 const NAME = "uq_boost_checkouts_provider_payment_id";
 

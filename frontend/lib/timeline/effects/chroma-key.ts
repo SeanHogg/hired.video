@@ -18,6 +18,7 @@
  */
 
 import { registerEffect } from "./registry";
+import { numberOr, stringOr } from "./params";
 import {
   applyChromaKeyToPixels,
   DEFAULT_CHROMA_KEY,
@@ -44,11 +45,3 @@ registerEffect({
     ctx.putImageData(img, 0, 0);
   },
 });
-
-function numberOr(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
-}
-
-function stringOr(v: unknown, fallback: string): string {
-  return typeof v === "string" ? v : fallback;
-}

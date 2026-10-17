@@ -9,6 +9,7 @@
  */
 
 import { registerEffect } from "./registry";
+import { clamp01, clampByte, numberOr } from "./params";
 
 // ── Sepia ─────────────────────────────────────────────────────────────
 // Standard photographic sepia matrix mixed against the original by
@@ -95,17 +96,3 @@ registerEffect({
     ctx.putImageData(img, 0, 0);
   },
 });
-
-function clamp01(v: number): number {
-  return Math.max(0, Math.min(1, v));
-}
-
-function numberOr(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
-}
-
-function clampByte(v: number): number {
-  if (v < 0) return 0;
-  if (v > 255) return 255;
-  return v;
-}

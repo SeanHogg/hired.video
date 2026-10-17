@@ -19,10 +19,10 @@ import { describe, it } from "node:test";
 import { strict as assert } from "node:assert";
 
 import { buildFakeDb } from "../../../handlers/__testing__/fake-db.js";
+import { sha256Hex } from "../../../utils/crypto.js";
 import {
   actorIfi,
   buildStatementRow,
-  sha256Hex,
   generateLrsSecret,
   basicAuthValue,
   resolveLrsBasicAuth,

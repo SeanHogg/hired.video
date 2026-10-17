@@ -5,24 +5,17 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
+import { randomHex, sha256Hex } from "../utils/crypto.js";
 
 export const apiKeyRoutes = new Hono<AppEnv>();
 
-// Generates a cryptographically random API key: hvk_<32 random hex chars>
+// Generates a cryptographically random API key: hvk_<48 random hex chars>
 async function generateApiKey(): Promise<{ key: string; prefix: string; hash: string }> {
-  const bytes = crypto.getRandomValues(new Uint8Array(24));
-  const hex = Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  const key = `hvk_${hex}`;
+  const key = `hvk_${randomHex(24)}`;
   const prefix = key.slice(0, 12); // "hvk_" + first 8 hex chars
 
   // SHA-256 hash of the full key (stored in DB for validation)
-  const msgBuf = new TextEncoder().encode(key);
-  const hashBuf = await crypto.subtle.digest("SHA-256", msgBuf);
-  const hash = Array.from(new Uint8Array(hashBuf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  const hash = await sha256Hex(key);
 
   return { key, prefix, hash };
 }

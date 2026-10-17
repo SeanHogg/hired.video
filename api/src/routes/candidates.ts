@@ -15,7 +15,6 @@
 
 import { Hono } from "hono";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { randomBytes } from "crypto";
 import { z } from "zod";
 
 import { UuidLikeSchema } from "../../../shared/validation.js";
@@ -32,6 +31,7 @@ import {
   DEFAULT_REDACTION_RULES,
   type RedactionRules,
 } from "../services/resume/redaction.js";
+import { randomHex } from "../utils/crypto.js";
 
 export const candidatesRoutes = new Hono<AppEnv>();
 // Public share route — mounted separately at /api/public/candidate-resume
@@ -40,10 +40,6 @@ export const candidateResumePublicRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
-}
-
-function generateShareToken(): string {
-  return randomBytes(16).toString("hex"); // 32-char hex, fits varchar(64).
 }
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
@@ -692,7 +688,7 @@ candidatesRoutes.post("/shares", async (c) => {
       redactionProfileId: parsed.data.redactionProfileId ?? null,
       whitelabelTenantId: parsed.data.whitelabelTenantId ?? null,
       sharedByUserId: userId,
-      shareToken: generateShareToken(),
+      shareToken: randomHex(16), // 32-char hex, fits varchar(64).
       name: parsed.data.name ?? null,
       recipientEmail: parsed.data.recipientEmail ?? null,
       expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,

@@ -33,6 +33,7 @@ import { apiClient } from "@/lib/api-client";
 import { matchService } from "@/lib/services/match-service";
 import { sentimentService } from "@/lib/services/sentiment-service";
 import { studioService } from "@/lib/services/studio-service";
+import { queryKeys } from "@/lib/query-keys";
 import { applyResumeRewrite } from "@/lib/tools/apply-rewrite";
 import { commitJourneyMutation, journeyTools } from "@/lib/tools/journey-tools";
 import { commitResumeWandMutation, resumeWandTools } from "@/lib/tools/resume-wands";
@@ -118,7 +119,7 @@ function asString(v: unknown): string | undefined {
 
 async function runScorer(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
   const resumeText = await resolveResumeText(ctx);
-  const { data } = await apiClient.post<any>("/api/ResumeScorer/score", {
+  const { data } = await apiClient.post<any>("/api/resumescorer/score", {
     resumeText,
     resumeId: ctx.bound.resumeId,
   });
@@ -127,7 +128,7 @@ async function runScorer(ctx: ToolRunContext): Promise<NormalizedToolRunResult> 
 
 async function runOptimizer(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
   const resumeText = await resolveResumeText(ctx);
-  const { data } = await apiClient.post<any>("/api/ResumeOptimizer/optimize", {
+  const { data } = await apiClient.post<any>("/api/resumeoptimizer/optimize", {
     resumeText,
     resumeId: ctx.bound.resumeId,
     jobDescription: asString(ctx.args.jobDescription),
@@ -153,7 +154,7 @@ async function runSentiment(ctx: ToolRunContext): Promise<NormalizedToolRunResul
 async function runSummarize(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
   const { resumeId } = ctx.bound;
   const { data } = await apiClient.post<any>(
-    "/api/Resume/Summarize",
+    "/api/resumes/summarize",
     resumeId ? { resumeId } : { resumeText: asString(ctx.args.resumeText) },
   );
   const summary = typeof data === "string" ? data : (data?.result ?? data?.summary ?? "");
@@ -842,7 +843,7 @@ export async function commitMutation(
       });
       const projectId = created.data?.id;
       if (!projectId) throw new Error("Studio draft created but no id returned");
-      await queryClient?.invalidateQueries({ queryKey: ["studio", "projects"] });
+      await queryClient?.invalidateQueries({ queryKey: queryKeys.studioProjects.all });
       return {
         ...result,
         summary: `Created "${name}" — open it to edit, record, or generate the voiceover.`,
@@ -868,7 +869,7 @@ export async function commitMutation(
       });
       const projectId = created.data?.id;
       if (!projectId) throw new Error("Studio draft created but no id returned");
-      await queryClient?.invalidateQueries({ queryKey: ["studio", "projects"] });
+      await queryClient?.invalidateQueries({ queryKey: queryKeys.studioProjects.all });
       // Carry the source page through to the editor so the Embed dialog
       // pre-fills "Publish to page" with the page this video was built
       // from (no draft column needed — survives the redirect; #1862).

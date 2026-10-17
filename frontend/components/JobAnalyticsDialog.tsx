@@ -53,11 +53,10 @@ export default function JobAnalyticsDialog({
     setLoading(true);
     setErrorMsg(null);
     apiClient
-      .get<{ data: JobAnalyticsResponse }>(`/api/jobs-analytics/${encodeURIComponent(jobId)}`)
-      .then((res) => {
+      .fetchData<JobAnalyticsResponse | null>(`/api/jobs-analytics/${encodeURIComponent(jobId)}`)
+      .then((body) => {
         if (cancelled) return;
-        const body = (res as any).data?.data ?? (res as any).data ?? null;
-        setData(body as JobAnalyticsResponse);
+        setData(body ?? null);
       })
       .catch((err) => {
         if (cancelled) return;

@@ -24,8 +24,9 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ResumeSectionMeta, MetaType, Resume } from "@/types/resume";
-import { resumeService } from "@/lib/services/resume-service";
-import { studioService, StudioProject, StudioProjectStatus } from "@/lib/services/studio-service";
+import { StudioProject, StudioProjectStatus } from "@/lib/services/studio-service";
+import { useResume } from "@/hooks/queries/use-resumes";
+import { useStudioProjects } from "@/hooks/queries/use-studio-projects";
 import { useToast } from "@/hooks/use-toast";
 
 interface MetadataModalProps {
@@ -71,14 +72,16 @@ export default function MetadataModal({
   const { toast } = useToast();
   const [metaData, setMetaData] = useState<ResumeSectionMeta[]>(initialMetadata);
   const [saving, setSaving] = useState(false);
-  const [resume, setResume] = useState<Resume | null>(null);
-  const [loadingResume, setLoadingResume] = useState(false);
+  const resumeQuery = useResume(resumeId, { enabled: open });
+  const resume: Resume | null = resumeQuery.data ?? null;
+  const loadingResume = resumeQuery.isLoading;
 
   // Studio picker state
   const [studioPickerOpen, setStudioPickerOpen] = useState(false);
   const [studioPickerTarget, setStudioPickerTarget] = useState<number | null>(null);
-  const [studioProjects, setStudioProjects] = useState<StudioProject[]>([]);
-  const [loadingStudio, setLoadingStudio] = useState(false);
+  const studioQuery = useStudioProjects({ enabled: studioPickerOpen });
+  const studioProjects: StudioProject[] = studioQuery.data ?? [];
+  const loadingStudio = studioQuery.isLoading;
 
   const tryUuid = () =>
     typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -88,41 +91,24 @@ export default function MetadataModal({
   useEffect(() => {
     if (open) {
       setMetaData(initialMetadata);
-      setResume(null);
     }
   }, [open, initialMetadata]);
 
   useEffect(() => {
-    const fetchResume = async () => {
-      if (open && resumeId && !resume) {
-        setLoadingResume(true);
-        try {
-          const resumeData = await resumeService.getResumeById(resumeId);
-          setResume(resumeData);
-        } catch {
-          toast({ title: "Error", description: "Failed to load resume sections.", variant: "destructive" });
-        } finally {
-          setLoadingResume(false);
-        }
-      }
-    };
-    fetchResume();
-  }, [open, resumeId, resume, toast]);
+    if (open && resumeQuery.isError) {
+      toast({ title: "Error", description: "Failed to load resume sections.", variant: "destructive" });
+    }
+  }, [open, resumeQuery.isError, toast]);
 
-  const openStudioPicker = async (index: number) => {
+  useEffect(() => {
+    if (studioPickerOpen && studioQuery.isError) {
+      toast({ title: "Error", description: "Failed to load Studio projects.", variant: "destructive" });
+    }
+  }, [studioPickerOpen, studioQuery.isError, toast]);
+
+  const openStudioPicker = (index: number) => {
     setStudioPickerTarget(index);
     setStudioPickerOpen(true);
-    if (studioProjects.length === 0) {
-      setLoadingStudio(true);
-      try {
-        const res = await studioService.getProjects();
-        setStudioProjects(res.data ?? []);
-      } catch {
-        toast({ title: "Error", description: "Failed to load Studio projects.", variant: "destructive" });
-      } finally {
-        setLoadingStudio(false);
-      }
-    }
   };
 
   const pickStudioProject = (project: StudioProject) => {

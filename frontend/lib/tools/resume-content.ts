@@ -8,6 +8,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { ResumeContent } from "@shared/resume";
 import { resumeService } from "@/lib/services/resume-service";
+import { queryKeys } from "@/lib/query-keys";
 import { resumeToPlainText } from "@/lib/resume-exporters";
 import type { ToolRunContext } from "./types";
 import { getResumeDraft } from "./resume-draft-bridge";
@@ -40,8 +41,8 @@ export async function writeResumeContent(
     return true;
   }
   await resumeService.updateResumeData(resumeId, { data: next });
-  await queryClient?.invalidateQueries({ queryKey: ["resume", resumeId] });
-  await queryClient?.invalidateQueries({ queryKey: ["resumes"] });
+  await queryClient?.invalidateQueries({ queryKey: queryKeys.resume.byId(resumeId) });
+  await queryClient?.invalidateQueries({ queryKey: queryKeys.resumes.all });
   return true;
 }
 

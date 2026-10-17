@@ -42,6 +42,7 @@ export const profileSyncRuns = pgTable("profile_sync_runs", {
   index("profile_sync_runs_user_started_idx").on(t.userId, t.startedAt),
   index("profile_sync_runs_user_connector_idx").on(t.userId, t.connectorId, t.startedAt),
   index("profile_sync_runs_source_resume_idx").on(t.sourceResumeId),
+  index("idx_profile_sync_runs_target_resume_id").on(t.targetResumeId),
 ]);
 
 export type ProfileSyncRun = typeof profileSyncRuns.$inferSelect;

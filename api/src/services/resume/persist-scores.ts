@@ -16,6 +16,7 @@
 
 import { buildRepos } from "../../repositories/index.js";
 import { getDb } from "../../db/index.js";
+import { logger } from "../../lib/logger.js";
 
 export async function persistResumeScoresIfReferenced(
   body: unknown,
@@ -33,9 +34,6 @@ export async function persistResumeScoresIfReferenced(
       await repo.updateScoresForOwner(resumeId, ownerId, scores);
     }
   } catch (err) {
-    console.warn(
-      "[resume-scores] persist failed:",
-      err instanceof Error ? err.message : err,
-    );
+    logger.warn("[resume-scores] persist failed", err);
   }
 }

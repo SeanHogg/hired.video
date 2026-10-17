@@ -17,6 +17,7 @@
 
 import { buildMapboxGeocoder, type GeocoderPort } from "../adapters/mapbox.js";
 import type { IGeocoderCacheRepository } from "../../repositories/geocoderCacheRepository.js";
+import { logger } from "../../lib/logger.js";
 
 export interface GeocoderRefreshDeps {
   repo: IGeocoderCacheRepository;
@@ -98,7 +99,7 @@ export async function runGeocoderRefresh(
       });
       fresh.push({ cacheKey: row.cacheKey, result });
     } catch (err) {
-      console.error(`[geocoder-refresh] re-geocode failed for ${row.cacheKey}:`, err);
+      logger.error("[geocoder-refresh] re-geocode failed", { cacheKey: row.cacheKey, error: err });
     }
   }
 
@@ -110,13 +111,13 @@ export async function runGeocoderRefresh(
     } catch (err) {
       // Batch write failed — fall back to per-row writes so one bad row
       // can't discard the rest (the original per-row isolation).
-      console.error("[geocoder-refresh] batch refresh failed; retrying per row:", err);
+      logger.error("[geocoder-refresh] batch refresh failed; retrying per row", err);
       for (const entry of fresh) {
         try {
           await deps.repo.refresh(entry.cacheKey, entry.result);
           refreshed++;
         } catch (rowErr) {
-          console.error(`[geocoder-refresh] refresh failed for ${entry.cacheKey}:`, rowErr);
+          logger.error("[geocoder-refresh] refresh failed", { cacheKey: entry.cacheKey, error: rowErr });
         }
       }
     }

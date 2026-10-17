@@ -201,6 +201,8 @@ export const bookingReservations = pgTable(
     check("booking_reservations_amount_cents_check", sql`${t.amountCents} >= 0`),
     check("booking_reservations_platform_fee_cents_check", sql`${t.platformFeeCents} >= 0`),
     check("booking_reservations_check", sql`${t.slotEndUtc} > ${t.slotStartUtc}`),
+    index("idx_booking_reservations_booker_user_id").on(t.bookerUserId),
+    index("idx_booking_reservations_offering_id").on(t.offeringId),
   ],
 );
 
@@ -227,6 +229,7 @@ export const bookingComments = pgTable(
   (t) => [
     index("idx_booking_comments_reservation").on(t.reservationId, t.createdAt),
     check("booking_comments_author_kind_check", sql`${t.authorKind} IN ('host', 'booker')`),
+    index("idx_booking_comments_author_user_id").on(t.authorUserId),
   ],
 );
 

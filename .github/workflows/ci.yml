@@ -59,6 +59,14 @@ jobs:
         # Gap #1643. Enforces the idempotent patterns in
         # api/drizzle/TEMPLATE.md on every new migration (≥ 0156).
         run: cd api && node scripts/lint-migrations.mjs
+      - name: Check migration hygiene
+        # Duplicate / unnumbered migration files and schema<->migration index
+        # drift, ratcheted against scripts/check-migrations.baseline.json.
+        run: cd api && node --import tsx scripts/check-migrations.mjs
+      - name: Check FK indexes
+        # Every foreign-key column needs an index whose leading column is the
+        # FK (parent deletes/cascades otherwise seq-scan the child table).
+        run: cd api && node --import tsx scripts/find-unindexed-fks.ts --check
 
   test-api:
     name: Tests (api)
@@ -324,6 +332,9 @@ jobs:
           put NEON_DB_URL         "${{ secrets.DATABASE_URL }}"
           put JWT_SECRET          "${{ secrets.JWT_SECRET }}"
           put BUILDERFORCE_API_KEY "${{ secrets.BUILDERFORCE_API_KEY }}"
+          # At-rest key for third-party credential columns (migration 0548).
+          # Never change it once set: existing ciphertexts only decrypt under it.
+          put CREDENTIALS_KMS_KEY  "${{ secrets.CREDENTIALS_KMS_KEY }}"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

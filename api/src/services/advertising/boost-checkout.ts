@@ -1,6 +1,7 @@
 /**
  * Paid boost checkout — the ONLY way a polymorphic boost is created and
- * activated (POST /api/boost-checkout and POST /api/boosts both start here).
+ * activated. Reached through POST /api/checkout {kind:"boost"} (the boost
+ * kind in services/billing/checkout/kinds/boost.ts adapts this module).
  *
  *   startBoostCheckout   price (computeBoostPricing, #1764) → boost
  *                        'pending_payment' + boost_checkouts row → draw
@@ -23,6 +24,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
+import { logger } from "../../lib/logger.js";
 import { computeBoostPricing, type BoostPricingModel } from "./pricing.js";
 import {
   isApprovedOneOffPayment,
@@ -52,6 +54,8 @@ export interface CheckoutRecord {
   usdCents: number;
   status: string;
   providerPaymentId: string | null;
+  totalCents?: number;
+  campaignDollarsCents?: number;
 }
 
 export interface BoostCheckoutPort {
@@ -155,7 +159,16 @@ async function ownedCheckout(
   return checkout;
 }
 
-function isError(v: CheckoutRecord | BoostPaymentError): v is BoostPaymentError {
+/** The caller's checkout (by checkout id or boost id), or a typed refusal. */
+export function getBoostCheckout(
+  userId: string,
+  ref: { checkoutId: string } | { boostId: string },
+  port: BoostCheckoutPort = defaultBoostCheckoutPort(),
+): Promise<CheckoutRecord | BoostPaymentError> {
+  return ownedCheckout(port, userId, ref);
+}
+
+export function isError(v: CheckoutRecord | BoostPaymentError): v is BoostPaymentError {
   return (v as BoostPaymentError).ok === false;
 }
 
@@ -223,7 +236,7 @@ export async function confirmBoostPayment(
   try {
     [tx, customerId] = await Promise.all([p.getTransaction(transactionId), p.customerIdFor(userId)]);
   } catch (err) {
-    console.warn("[boost-checkout] provider check failed; boost stays pending", { checkoutId: checkout.id, err: String(err) });
+    logger.warn("[boost-checkout] provider check failed; boost stays pending", { checkoutId: checkout.id, error: err });
     return { ok: true, activated: false, pending: true };
   }
   if (!tx || !isApprovedOneOffPayment(tx, { amountCents: checkout.usdCents, currency: BOOST_CURRENCY, customerId })) {
@@ -236,10 +249,32 @@ export async function confirmBoostPayment(
   return { ok: true, activated: true, pending: false };
 }
 
+/** The public view of a boost row (API responses). */
+export function toBoostView(row: BoostRow) {
+  return {
+    id: row.id,
+    userId: row.userId,
+    subjectType: row.subjectType,
+    subjectId: row.subjectId,
+    placementType: row.placementType,
+    pricingModel: row.pricingModel,
+    budgetCents: row.budgetCents,
+    spentCents: row.spentCents,
+    rateUnitCents: row.rateUnitCents,
+    status: row.status,
+    impressions: row.impressions,
+    clicks: row.clicks,
+    startsAt: row.startsAt,
+    endsAt: row.endsAt,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
 // ─── Production wiring ────────────────────────────────────────────────────
 
 export function defaultBoostCheckoutPort(db = getDb()): BoostCheckoutPort {
-  const { boosts, boostCheckouts, tokenPackPurchases } = schema;
+  const { boosts, boostCheckouts, tokenPackPurchases, courseCheckouts } = schema;
   const repos = buildRepos(db);
   const record = {
     id: boostCheckouts.id,
@@ -248,6 +283,8 @@ export function defaultBoostCheckoutPort(db = getDb()): BoostCheckoutPort {
     usdCents: boostCheckouts.usdCents,
     status: boostCheckouts.status,
     providerPaymentId: boostCheckouts.providerPaymentId,
+    totalCents: boostCheckouts.totalCents,
+    campaignDollarsCents: boostCheckouts.campaignDollarsCents,
   };
   return {
     async insertPendingBoost(row) {
@@ -302,6 +339,7 @@ export function defaultBoostCheckoutPort(db = getDb()): BoostCheckoutPort {
             eq(boostCheckouts.status, "pending"),
             sql`NOT EXISTS (SELECT 1 FROM ${boostCheckouts} AS used WHERE used.provider_payment_id = ${providerPaymentId})`,
             sql`NOT EXISTS (SELECT 1 FROM ${tokenPackPurchases} WHERE ${tokenPackPurchases.stripePaymentIntentId} = ${providerPaymentId})`,
+            sql`NOT EXISTS (SELECT 1 FROM ${courseCheckouts} WHERE ${courseCheckouts.providerPaymentId} = ${providerPaymentId})`,
           ),
         )
         .returning({ id: boostCheckouts.id });

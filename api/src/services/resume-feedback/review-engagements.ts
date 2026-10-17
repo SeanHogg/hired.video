@@ -17,6 +17,7 @@ import type { ReviewAccessPolicy } from "./review-access.js";
 import { toReviewDTO } from "./review-dto.js";
 import { ResumeFeedbackServiceError } from "./review-errors.js";
 import { subjectColumns } from "./review-subjects.js";
+import { bytesToHex } from "../../utils/crypto.js";
 
 export class ReviewEngagements {
   constructor(
@@ -180,10 +181,7 @@ export class ReviewEngagements {
   }
 
   private generateToken(): string {
-    const bytes = this.deps.randomBytes(32);
-    let hex = "";
-    for (const b of bytes) hex += b.toString(16).padStart(2, "0");
-    return hex;
+    return bytesToHex(this.deps.randomBytes(32));
   }
 
   private async hydrateCounts(

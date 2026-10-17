@@ -7,6 +7,7 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { tryExtractJson } from "../../../shared/extract-json.js";
 
 export const assessmentRoutes = new Hono<AppEnv>();
 
@@ -200,15 +201,18 @@ Max points per question: ${shortAnswerQs.map((q: any) => `${q.id}: ${q.points}`)
 
       const llm = createLLMClient(c.env as any, c.var.user);
       const { content } = await llm.callText("assessment_grading", { useCase: "reviews", systemPrompt: "", userMessage: gradingPrompt });
-      const parsed = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
-      if (parsed.grades) {
-        for (const [qId, grade] of Object.entries(parsed.grades as Record<string, any>)) {
+      const parsed = tryExtractJson<{
+        grades?: Record<string, { correct: boolean; points?: number; feedback?: string }>;
+        overallFeedback?: string;
+      }>(content);
+      if (parsed?.grades) {
+        for (const [qId, grade] of Object.entries(parsed.grades)) {
           const delta = (grade.points ?? 0) - (gradingResults[qId]?.points ?? 0);
           rawScore += delta;
           gradingResults[qId] = { correct: grade.correct, points: grade.points ?? 0, feedback: grade.feedback };
         }
       }
-      aiFeedback = parsed.overallFeedback ?? "";
+      aiFeedback = parsed?.overallFeedback ?? "";
     } catch { /* keep auto-grade results */ }
   }
 

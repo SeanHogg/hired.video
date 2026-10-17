@@ -70,18 +70,7 @@ export const artifactViews = pgTable(
 export type ArtifactView = typeof artifactViews.$inferSelect;
 export type NewArtifactView = typeof artifactViews.$inferInsert;
 
-export const profileViews = pgTable("profile_views", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  viewedUserId: uuid("viewed_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  viewerUserId: uuid("viewer_user_id").references(() => users.id, { onDelete: "set null" }),
-  ipAddress: varchar("ip_address", { length: 45 }),
-  userAgent: text("user_agent"),
-  referrer: text("referrer"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
 
-export type ProfileView = typeof profileViews.$inferSelect;
-export type NewProfileView = typeof profileViews.$inferInsert;
 
 export const activityLogs = pgTable("activity_logs", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -96,6 +85,7 @@ export const activityLogs = pgTable("activity_logs", {
 }, (t) => [
   // created_at leads so the retention sweep's ctid batch is an index range scan (0495).
   index("idx_activity_logs_created").on(t.createdAt),
+  index("idx_activity_logs_user_id").on(t.userId),
 ]);
 
 export type ActivityLog = typeof activityLogs.$inferSelect;
@@ -118,6 +108,10 @@ export const requestLogs = pgTable("request_logs", {
   userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   ipAddress: varchar("ip_address", { length: 45 }),
   userAgent: text("user_agent"),
+  // How many requests this row stands for: 1 when always-logged (non-GET,
+  // 4xx/5xx, slow), N for a 1-in-N sampled successful GET (0540). Every
+  // aggregate over request_logs multiplies by it.
+  sampleWeight: integer("sample_weight").default(1).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   // created_at backs the 30-day retention sweep; (user_id, created_at) backs
@@ -131,35 +125,9 @@ export const requestLogs = pgTable("request_logs", {
 export type RequestLog = typeof requestLogs.$inferSelect;
 export type NewRequestLog = typeof requestLogs.$inferInsert;
 
-export const dashboardMetrics = pgTable("dashboard_metrics", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  metricKey: varchar("metric_key", { length: 100 }).notNull(),
-  metricValue: jsonb("metric_value").notNull(),
-  period: varchar("period", { length: 50 }),
-  computedAt: timestamp("computed_at", { withTimezone: true }).defaultNow().notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
 
-export type DashboardMetric = typeof dashboardMetrics.$inferSelect;
-export type NewDashboardMetric = typeof dashboardMetrics.$inferInsert;
 
-export const userEngagementMetrics = pgTable("user_engagement_metrics", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  loginCount: integer("login_count").default(0).notNull(),
-  resumeViews: integer("resume_views").default(0).notNull(),
-  jobApplications: integer("job_applications").default(0).notNull(),
-  messagesSent: integer("messages_sent").default(0).notNull(),
-  videosCreated: integer("videos_created").default(0).notNull(),
-  lastActive: timestamp("last_active", { withTimezone: true }),
-  periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
-  periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
 
-export type UserEngagementMetric = typeof userEngagementMetrics.$inferSelect;
-export type NewUserEngagementMetric = typeof userEngagementMetrics.$inferInsert;
 
 export const notifications = pgTable("notifications", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -198,17 +166,42 @@ export const marketingLeads = pgTable("marketing_leads", {
 export type MarketingLead = typeof marketingLeads.$inferSelect;
 export type NewMarketingLead = typeof marketingLeads.$inferInsert;
 
-export const featureFlags = pgTable("feature_flags", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  key: varchar("key", { length: 100 }).notNull().unique(),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
-  enabled: boolean("enabled").default(false).notNull(),
-  rolloutPercentage: integer("rollout_percentage").default(0).notNull(), // 0-100
-  conditions: jsonb("conditions").default({}),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const jobViewEvents = pgTable(
+  "job_view_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    jobId: uuid("job_id").notNull(),
+    viewerUserId: uuid("viewer_user_id"),
+    countryCode: varchar("country_code", { length: 2 }),
+    region: varchar("region", { length: 64 }),
+    referrer: text("referrer"),
+    source: varchar("source", { length: 32 }).default("organic"),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_job_view_events_job_created").on(t.jobId, t.createdAt.desc()),
+    // Retention sweep age axis (0541).
+    index("idx_job_view_events_created").on(t.createdAt),
+  ],
+);
 
-export type FeatureFlag = typeof featureFlags.$inferSelect;
-export type NewFeatureFlag = typeof featureFlags.$inferInsert;
+export const companyViewEvents = pgTable(
+  "company_view_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id").notNull(),
+    viewerUserId: uuid("viewer_user_id"),
+    countryCode: varchar("country_code", { length: 2 }),
+    region: varchar("region", { length: 64 }),
+    referrer: text("referrer"),
+    source: varchar("source", { length: 32 }).default("organic"),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_company_view_events_company_created").on(t.companyId, t.createdAt.desc()),
+    // Retention sweep age axis (0541).
+    index("idx_company_view_events_created").on(t.createdAt),
+  ],
+);

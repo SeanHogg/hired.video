@@ -5,10 +5,12 @@ import type { StudioPurpose } from "@shared/studio-purposes";
 // #1430 — re-export the canonical SceneType from shared so any new scene
 // type added there flows into the frontend TS types automatically.
 import type { SceneType } from "@shared/scene-types";
+import type { VideoAspect as TargetVideoAspect } from "@shared/video-targeting";
 export type { SceneType };
 
 export type VideoResolution = "720p" | "1080p" | "4k";
-export type VideoAspect = "16:9" | "9:16" | "1:1" | "4:3";
+/** Canvas aspects — the shared cut aspects (@shared/video-targeting) plus legacy 4:3. */
+export type VideoAspect = TargetVideoAspect | "4:3";
 export type MotionStyle = "minimal" | "moderate" | "cinematic";
 export type TransitionStyle = "cut" | "fade" | "slide" | "cinematic-fade";
 export type BackgroundStyle = "gradient" | "dark-tech-grid" | "particles" | "solid";

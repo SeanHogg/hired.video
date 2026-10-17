@@ -27,6 +27,7 @@ import {
 import { getDb } from "../db/index.js";
 import { studioProjects, videos } from "../db/schema/index.js";
 import { cdnUrl } from "../utils/cdn.js";
+import { escapeHtml } from "../../../shared/html-escape.js";
 import {
   PeopleOpsService,
   defaultPeopleOpsServiceDeps,
@@ -211,10 +212,6 @@ embedAssetRoutes.get("/v1/loader.js", (c) => {
   return c.body(LOADER_JS);
 });
 
-function escapeAttr(s: string): string {
-  return s.replace(/[<>"'&]/g, (ch) => ({ "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "&": "&amp;" }[ch] as string));
-}
-
 embedAssetRoutes.get("/v1/frame", async (c) => {
   const view = c.req.query("view") || "roster";
   const key = c.req.query("key") || "";
@@ -230,7 +227,7 @@ embedAssetRoutes.get("/v1/frame", async (c) => {
   } catch (e) {
     const msg = e instanceof EmbedAuthError ? e.message : "Embed unavailable";
     c.header("Content-Type", "text/html; charset=utf-8");
-    return c.body(`<!doctype html><meta charset=utf-8><body style="font:14px system-ui;color:#b91c1c;padding:16px">${escapeAttr(msg)}</body>`);
+    return c.body(`<!doctype html><meta charset=utf-8><body style="font:14px system-ui;color:#b91c1c;padding:16px">${escapeHtml(msg)}</body>`);
   }
 
   c.header("Content-Type", "text/html; charset=utf-8");
@@ -403,16 +400,16 @@ embedAssetRoutes.get("/video/frame", async (c) => {
 });
 
 function VIDEO_FRAME_ERROR(msg: string): string {
-  return `<!doctype html><meta charset=utf-8><body style="margin:0;display:grid;place-items:center;height:100vh;font:14px system-ui;color:#9ca3af;background:#0f172a">${escapeAttr(msg)}</body>`;
+  return `<!doctype html><meta charset=utf-8><body style="margin:0;display:grid;place-items:center;height:100vh;font:14px system-ui;color:#9ca3af;background:#0f172a">${escapeHtml(msg)}</body>`;
 }
 
 /** Self-contained player document — flat CDN `<video>` or a YouTube
  *  iframe. No SPA bundle. */
 function VIDEO_FRAME_HTML(video: EmbeddableVideo): string {
-  const poster = video.thumbnailUrl ? ` poster="${escapeAttr(video.thumbnailUrl)}"` : "";
+  const poster = video.thumbnailUrl ? ` poster="${escapeHtml(video.thumbnailUrl)}"` : "";
   const player = video.videoUrl
-    ? `<video controls playsinline${poster} style="width:100%;height:100%;object-fit:contain;background:#000" src="${escapeAttr(video.videoUrl)}"></video>`
-    : `<iframe style="width:100%;height:100%;border:0" src="https://www.youtube.com/embed/${escapeAttr(video.youtubeVideoId ?? "")}" title="${escapeAttr(video.title)}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
+    ? `<video controls playsinline${poster} style="width:100%;height:100%;object-fit:contain;background:#000" src="${escapeHtml(video.videoUrl)}"></video>`
+    : `<iframe style="width:100%;height:100%;border:0" src="https://www.youtube.com/embed/${escapeHtml(video.youtubeVideoId ?? "")}" title="${escapeHtml(video.title)}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>html,body{margin:0;height:100%;background:#000}</style></head>

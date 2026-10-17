@@ -35,6 +35,7 @@ import { resolveAuthorEligibility } from "../services/learning/author-eligibilit
 import { CohortService, CohortNotFoundError, WorkspaceForbiddenError } from "../services/learning/cohort-service.js";
 import { AssignmentService, AssignmentSubjectNotFoundError } from "../services/learning/assignment-service.js";
 import { CohortAnalyticsService } from "../services/learning/cohort-analytics.js";
+import { logger } from "../lib/logger.js";
 
 export const cohortRoutes = new Hono<AppEnv>();
 
@@ -226,7 +227,7 @@ cohortRoutes.post("/:id/members", async (c) => {
           refType: "cohort_member",
         });
       } catch (e) {
-        console.warn("[gamification] cohort-student-joined (addMember) award failed", { error: String(e) });
+        logger.warn("[gamification] cohort-student-joined (addMember) award failed", { error: String(e) });
       }
     }
     return c.json(success(row), 201);

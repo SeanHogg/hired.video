@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { formatPriceCents } from "@/lib/format";
 import { Loader2, Video as VideoIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,11 +23,6 @@ import EmptyProgramState from "./EmptyProgramState";
 interface Props {
   userId: string;
   isOwner: boolean;
-}
-
-function formatPrice(cents: number, currency: string): string {
-  if (cents === 0) return "Free";
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
 }
 
 export default function ProfileVideoPanel({ userId, isOwner }: Props) {
@@ -129,7 +125,7 @@ function TemplateRow({ template }: { template: StudioTemplate }) {
           <p className="text-sm text-muted-foreground line-clamp-2">{template.description}</p>
         )}
         <div className="flex items-center justify-between text-sm pt-1">
-          <span className="font-semibold">{formatPrice(template.priceCents, template.currency)}</span>
+          <span className="font-semibold">{formatPriceCents(template.priceCents, template.currency)}</span>
           {template.firstParty && (
             <Badge variant="secondary" className="text-[10px]">First-party</Badge>
           )}

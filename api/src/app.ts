@@ -670,8 +670,7 @@ export function createApp() {
   mount("/api/payouts", () => import("./routes/payouts.js").then((m) => m.payoutRoutes));
   mount("/api/admin/payouts", () => import("./routes/admin-payouts.js").then((m) => m.adminPayoutRoutes));
   mount("/api/outplacement", () => import("./routes/outplacement.js").then((m) => m.outplacementRoutes));
-  mount("/api/boost-checkout", () => import("./routes/boost-checkout.js").then((m) => m.boostCheckoutRoutes));
-  mount("/api/course-checkout", () => import("./routes/course-checkout.js").then((m) => m.courseCheckoutRoutes));
+  mount("/api/checkout", () => import("./routes/checkout.js").then((m) => m.checkoutRoutes)); // ONE one-off checkout: boost | course | token_pack (shared/checkout.ts)
   mount("/api/admin/tax-reporting", () => import("./routes/tax-reporting.js").then((m) => m.taxReportingRoutes));
   mount("/api/recruiter-bd", () => import("./routes/recruiter-bd.js").then((m) => m.recruiterBdRoutes));
   mount("/api/gigs", () => import("./routes/gigs.js").then((m) => m.gigsRoutes));
@@ -689,7 +688,6 @@ export function createApp() {
   mount("/api/marketing", () => import("./routes/marketing.js").then((m) => m.marketingRoutes));
   mount("/api/settings", () => import("./routes/settings.js").then((m) => m.settingsRoutes));
   mount("/api/export", () => import("./routes/settings.js").then((m) => m.settingsRoutes)); // legacy export alias — /api/export/csv maps to /api/settings/export/csv
-  mount("/api/featureflag", () => import("./routes/featureflag.js").then((m) => m.featureFlagRoutes));
   mount("/api/bootstrap", () => import("./routes/bootstrap.js").then((m) => m.bootstrapRoutes));
   mount("/api/task", () => import("./routes/task.js").then((m) => m.taskRoutes));
   mount("/api/activities", () => import("./routes/activities.js").then((m) => m.activityRoutes));
@@ -861,7 +859,6 @@ export function createApp() {
   mount("/api/coupons", () => import("./routes/coupons.js").then((m) => m.couponRoutes)); // redeem a SuperAdmin coupon code
   mount("/api/theme-calendar", () => import("./routes/theme-calendar.js").then((m) => m.themeCalendarRoutes)); // public: events the theme picker reads (#2350)
   mount("/api/video-personalization", () => import("./routes/video-personalization.js").then((m) => m.videoPersonalizationRoutes)); // Settings › Video personalization (#2350)
-  mount("/api/token-packs", () => import("./routes/token-packs.js").then((m) => m.tokenPackRoutes)); // Pro AI-token top-up packs (buy + verify)
   mount("/api/career", () => import("./routes/career.js").then((m) => m.careerRoutes));
   mount("/api/phone", () => import("./routes/phone.js").then((m) => m.phoneRoutes));
   mount("/api/modules", () => import("./routes/modules.js").then((m) => m.moduleRoutes));
@@ -911,10 +908,6 @@ Keep responses concise (2–4 sentences). Answer questions about features, prici
 
     return c.json({ success: true, reply }, 200);
   });
-
-  // Legacy frontend service currently requests /FeatureFlag without /api prefix.
-  mount("/featureflag", () => import("./routes/featureflag.js").then((m) => m.featureFlagRoutes));
-  mount("/FeatureFlag", () => import("./routes/featureflag.js").then((m) => m.featureFlagRoutes));
 
   // Some legacy frontend services still call /sentiment/* without /api prefix
   mount("/sentiment", () => import("./routes/sentiment.js").then((m) => m.sentimentRoutes));

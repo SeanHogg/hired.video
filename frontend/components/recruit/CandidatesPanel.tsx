@@ -44,19 +44,17 @@ import {
   type CandidateResumeRow,
   type RecruitScope,
 } from "@/lib/services/recruit-service";
-import { initials } from "@/lib/utils/initials";
+import { initials } from "@/lib/format";
 import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
 import BulkScoreDialog from "@/components/recruit/BulkScoreDialog";
 import CsvImportCandidatesDialog from "@/components/recruit/CsvImportCandidatesDialog";
 import AddCandidateToJobDialog from "@/components/recruit/AddCandidateToJobDialog";
 import { studioNewEntityHref } from "@/lib/studio/studio-authoring";
+import type { Basics as ResumeBasics } from "@shared/resume";
 
-interface Basics {
-  name?: string;
-  label?: string;
-  email?: string;
-  location?: { city?: string; region?: string; countryCode?: string };
-}
+/** The résumé basics this panel reads — a partial of the shared contract
+ *  (rows may carry un-normalised content). */
+type Basics = Partial<Pick<ResumeBasics, "name" | "label" | "email" | "location">>;
 
 function basicsOf(row: CandidateResumeRow): Basics {
   const basics = (row.content as any)?.basics;

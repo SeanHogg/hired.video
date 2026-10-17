@@ -8,7 +8,7 @@
  */
 import { sendNotificationEmail } from "../adapters/email.js";
 import type { PartnerView } from "./partners.js";
-import { appBaseUrl } from "./jobSeekers.js";
+import { publicAppBaseUrl } from "../../utils/public-urls.js";
 // Approval requests go to the shared SuperAdmin recipient (overridable via SUPERADMIN_EMAIL).
 import { superAdminEmail } from "../observability/superAdminAlert.js";
 
@@ -16,7 +16,7 @@ export async function notifyAdminOfPartnerRequest(
   partner: PartnerView,
   requester: { name: string; email: string },
 ): Promise<void> {
-  const reviewUrl = `${appBaseUrl()}/admin/partners`;
+  const reviewUrl = `${publicAppBaseUrl()}/admin/partners`;
   await sendNotificationEmail({
     to: superAdminEmail(),
     title: "New partner access request",
@@ -38,7 +38,7 @@ export async function sendPartnerRequestReceipt(requester: {
     message:
       "Thanks for requesting Hired.Video partner access. Our team will review it and email you once it's approved. " +
       "You can then generate your API key from Settings → Partner Access.",
-    url: `${appBaseUrl()}/settings`,
+    url: `${publicAppBaseUrl()}/settings`,
   });
 }
 
@@ -52,7 +52,7 @@ export async function notifyOwnerApproved(
     message:
       `"${partner.name}" is now an approved Hired.Video partner. ` +
       "Head to Settings → Partner Access to generate your API key and install the @seanhogg/hired-video-sdk package.",
-    url: `${appBaseUrl()}/settings`,
+    url: `${publicAppBaseUrl()}/settings`,
   });
 }
 
@@ -66,6 +66,6 @@ export async function notifyOwnerRejected(
     message:
       `We're unable to approve partner access for "${partner.name}" at this time. ` +
       "If you think this was a mistake, reply to this email and we'll take another look.",
-    url: `${appBaseUrl()}/settings`,
+    url: `${publicAppBaseUrl()}/settings`,
   });
 }

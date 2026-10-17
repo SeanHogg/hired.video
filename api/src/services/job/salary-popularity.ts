@@ -19,7 +19,8 @@
 
 import { sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetCached } from "../../utils/edge-cache.js";
+import { slugify } from "../../../../shared/slugify.js";
 
 const NOISE_TOKENS = new Set([
   "remote",
@@ -50,11 +51,10 @@ export interface PopularCity {
   jobCount: number;
 }
 
+/** Salary URL slug — the shared slugify in its legacy shape (no NFKD fold,
+ *  uncapped, "" when empty) so already-indexed /salary URLs stay stable. */
 export function slugifyForSalary(input: string): string {
-  return input
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  return slugify(input, { fallback: "", maxLen: Number.POSITIVE_INFINITY, stripDiacritics: false });
 }
 
 /** Strip seniority / level qualifiers so "Senior Software Engineer" and
@@ -165,10 +165,4 @@ async function loadPopularCities(): Promise<PopularCity[]> {
   return [...counts.values()]
     .sort((a, b) => b.count - a.count)
     .map<PopularCity>((c) => ({ slug: c.slug, label: c.label, jobCount: c.count }));
-}
-
-/** Test/dev helper to drop the cached popularity lists. */
-export function clearSalaryPopularityCache() {
-  invalidateCachedKey(ROLES_CACHE_KEY);
-  invalidateCachedKey(CITIES_CACHE_KEY);
 }

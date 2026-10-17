@@ -1,8 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { readAttribution } from "@/lib/attribution";
-
-const API_BASE = (import.meta as any).env?.VITE_API_URL ?? "/api";
+import { oauthStartUrl } from "@/lib/services/oauth-service";
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -83,7 +82,7 @@ export default function OAuthProviders({ mode, redirect = "/dashboard", role, en
             if (attr.utmCampaign) params.set("utm_campaign", attr.utmCampaign);
             if (attr.utmTerm) params.set("utm_term", attr.utmTerm);
             if (attr.utmContent) params.set("utm_content", attr.utmContent);
-            window.location.href = `${API_BASE}/api/auth/oauth/${p.key}?${params.toString()}`;
+            window.location.href = oauthStartUrl(p.key, params);
           }}
         >
           {p.icon}

@@ -24,6 +24,8 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { ok } from "../utils/response.js";
 import { sendGenericEmail } from "../services/adapters/email.js";
 import { createIpRateLimiter, getClientIp } from "../middleware/rateLimiter.js";
+import { logger } from "../lib/logger.js";
+import { escapeHtml } from "../../../shared/html-escape.js";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -69,14 +71,6 @@ const reportRateLimiter = createIpRateLimiter({
 });
 
 // ── Formatting ────────────────────────────────────────────────────────────────
-
-function escapeHtml(s: string): string {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
 
 function buildEmailHtml(report: ErrorReport, clientIp: string): string {
   const fields: Array<[string, string]> = [
@@ -162,7 +156,7 @@ errorsRoutes.post("/report", reportRateLimiter, async (c) => {
 
   const emailOk = await sendGenericEmail(REPORT_RECIPIENT, subject, html, "hired.video error reporter")
     .catch((err) => {
-      console.error("[errors/report] email send threw:", err);
+      logger.error("[errors/report] email send threw", err);
       return false;
     });
 

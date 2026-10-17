@@ -230,15 +230,4 @@ export const jobAlerts = pgTable("job_alerts", {
 export type JobAlert = typeof jobAlerts.$inferSelect;
 export type NewJobAlert = typeof jobAlerts.$inferInsert;
 
-export const jobWebsites = pgTable("job_websites", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: varchar("name", { length: 255 }).notNull(),
-  url: text("url").notNull(),
-  scrapingEnabled: boolean("scraping_enabled").default(false).notNull(),
-  lastScrapedAt: timestamp("last_scraped_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
 
-export type JobWebsite = typeof jobWebsites.$inferSelect;
-export type NewJobWebsite = typeof jobWebsites.$inferInsert;

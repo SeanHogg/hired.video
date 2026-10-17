@@ -14,8 +14,18 @@
 import { and, desc, eq, gte, inArray, isNull, lt, ne, or, sql, sum } from "drizzle-orm";
 import { ADMIN_GRANT_PACK_ID } from "../../../shared/token-packs.js";
 import { schema } from "../db/index.js";
+import { signalWork } from "../services/scheduling/work-signals.js";
 
-const { userTokenBalance, tokenPackPurchases, aiUsageRecords, toolRuns } = schema;
+const { userTokenBalance, tokenPackPurchases, aiUsageRecords, toolRuns, boostCheckouts, courseCheckouts } = schema;
+
+/** The provider transaction id was already claimed by a boost or course
+ *  checkout — it can't also pay for a token pack. */
+export class PaymentAlreadyClaimedError extends Error {
+  constructor() {
+    super("Payment already claimed by another checkout");
+    this.name = "PaymentAlreadyClaimedError";
+  }
+}
 
 export type DbLike = any;
 
@@ -130,13 +140,22 @@ export class TokensRepository implements ITokensRepository {
   }
 
   async recordPendingPurchase(input: TokenPackPurchaseInsert): Promise<TokenPackPurchaseRow> {
+    const ref = input.stripePaymentIntentId;
+    // One provider payment pays for exactly one thing: refuse a transaction
+    // id a boost or course checkout already claimed. Mirrors the reverse
+    // NOT EXISTS (token_pack_purchases) guards in the boost and course
+    // claimPayment statements, so whichever claim lands second is refused.
+    if (ref && (await this.isPaymentClaimedElsewhere(ref))) throw new PaymentAlreadyClaimedError();
     const rows = await (this.db.insert(tokenPackPurchases) as any)
       .values({ ...input, status: "pending" })
       .onConflictDoNothing()
       .returning();
     const created = rows?.[0] as TokenPackPurchaseRow | undefined;
-    if (created) return created;
-    const ref = input.stripePaymentIntentId;
+    if (created) {
+      // Wake the cron's token-pack reconcile queue (KV marker).
+      await signalWork("token-packs");
+      return created;
+    }
     if (!ref) throw new Error("recordPendingPurchase: a payment reference is required");
     const [existing] = await this.db
       .select()
@@ -144,6 +163,16 @@ export class TokensRepository implements ITokensRepository {
       .where(eq(tokenPackPurchases.stripePaymentIntentId, ref))
       .limit(1);
     return existing as TokenPackPurchaseRow;
+  }
+
+  private async isPaymentClaimedElsewhere(providerPaymentId: string): Promise<boolean> {
+    const result = await this.db.execute(sql`
+      SELECT EXISTS (SELECT 1 FROM ${boostCheckouts} WHERE ${boostCheckouts.providerPaymentId} = ${providerPaymentId})
+          OR EXISTS (SELECT 1 FROM ${courseCheckouts} WHERE ${courseCheckouts.providerPaymentId} = ${providerPaymentId})
+        AS claimed
+    `);
+    const rows: Array<{ claimed?: unknown }> = Array.isArray(result) ? result : (result?.rows ?? []);
+    return rows[0]?.claimed === true || rows[0]?.claimed === "t";
   }
 
   async settlePendingPurchase(purchaseId: string): Promise<boolean> {

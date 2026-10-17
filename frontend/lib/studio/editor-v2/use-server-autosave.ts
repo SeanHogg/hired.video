@@ -93,6 +93,9 @@ interface Options {
   tracksUnsavedWork?: boolean;
   /** Flush a pending write on tab hide / pagehide / unmount (default true). */
   flushOnLeave?: boolean;
+  /** Also flush when the window loses focus (switching to another app
+   *  without hiding the tab). For long-debounce editors (default false). */
+  flushOnBlur?: boolean;
 }
 
 export interface ServerAutosave {
@@ -125,6 +128,7 @@ export function useServerAutosave({
   overwrite,
   tracksUnsavedWork = true,
   flushOnLeave = true,
+  flushOnBlur = false,
 }: Options): ServerAutosave {
   const [status, setStatus] = useState<AutosaveStatus>("idle");
   const [conflict, setConflict] = useState<AutosaveConflict | null>(null);
@@ -312,12 +316,14 @@ export function useServerAutosave({
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", flush);
     window.addEventListener("online", onOnline);
+    if (flushOnBlur) window.addEventListener("blur", flush);
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", flush);
       window.removeEventListener("online", onOnline);
+      if (flushOnBlur) window.removeEventListener("blur", flush);
     };
-  }, [enabled, flushOnLeave]);
+  }, [enabled, flushOnLeave, flushOnBlur]);
 
   // Another tab saved this document: this copy is no longer the newest.
   // While mounted, this editor (not the global flush) owns its queued write.

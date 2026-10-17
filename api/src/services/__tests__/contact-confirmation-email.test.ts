@@ -28,9 +28,9 @@ describe("buildContactConfirmationEmail", () => {
   it("echoes the submitter's subject and message back to them", () => {
     const { html } = buildContactConfirmationEmail(base);
     assert.ok(html.includes("Demo request"));
-    // escapeHtml escapes & < > " but not the apostrophe, so the message
-    // echoes back verbatim.
-    assert.ok(html.includes("We're a team of 12 and want a walkthrough."));
+    // The shared escapeHtml (shared/html-escape.ts) escapes the strict set
+    // & < > " ' — so the apostrophe echoes back as &#39;.
+    assert.ok(html.includes("We&#39;re a team of 12 and want a walkthrough."));
   });
 
   it("uses a fixed, brand-stamped subject line", () => {

@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { formatDistanceToNow } from "date-fns";
+import { safeRelativeTime } from "@/lib/format";
 import {
   Sheet,
   SheetContent,
@@ -90,14 +90,6 @@ function providerOpenUrl(detail: ExternalEmailDetail): string | null {
     return `https://outlook.live.com/mail/0/inbox/id/${detail.providerMessageId}`;
   }
   return null;
-}
-
-function safeRelativeTime(iso: string): string {
-  try {
-    return formatDistanceToNow(new Date(iso), { addSuffix: true });
-  } catch {
-    return "";
-  }
 }
 
 export function InboxDetailSheet({

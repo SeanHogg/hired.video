@@ -122,10 +122,10 @@ export async function handleUpdateCacheEntry(
     .update(answerCache)
     .set({ answer: parsed.data.answer, updatedAt: deps.now() } as any)
     .where(and(eq(answerCache.id, cacheId), eq(answerCache.userId, auth.userId)))
-    .returning();
+    .returning({ id: answerCache.id });
 
-  if (!updated) return fail(404, "NOT_FOUND", "Cache entry not found");
-  return ok(updated);
+  if (!updated) return fail(404, "NOT_FOUND", "Cached answer not found");
+  return ok({ id: updated.id });
 }
 
 export async function handleDeleteCacheEntry(
@@ -135,10 +135,12 @@ export async function handleDeleteCacheEntry(
 ): Promise<HandlerResult> {
   const auth = requireAuth(viewerId);
   if ("status" in auth) return auth;
-  await deps.db
+  const [deleted] = await deps.db
     .delete(answerCache)
-    .where(and(eq(answerCache.id, cacheId), eq(answerCache.userId, auth.userId)));
-  return ok(null);
+    .where(and(eq(answerCache.id, cacheId), eq(answerCache.userId, auth.userId)))
+    .returning({ id: answerCache.id });
+  if (!deleted) return fail(404, "NOT_FOUND", "Cached answer not found");
+  return ok({ id: deleted.id });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -174,15 +176,20 @@ export async function handleHistoryList(
     .limit(limit)
     .offset((page - 1) * limit);
 
-  // Batch-load job titles to avoid N+1
+  // Batch-load job titles to avoid N+1. Enrichment is best-effort: a failed
+  // lookup returns the list without job info rather than failing it.
   const jobIds = [...new Set((rows as any[]).map((r) => r.jobId).filter(Boolean))] as string[];
   const jobMap = new Map<string, { title: string; company?: string | null }>();
   if (jobIds.length > 0) {
-    const jobs = await deps.db
-      .select({ id: jobItems.id, title: jobItems.title, company: jobItems.company })
-      .from(jobItems)
-      .where(inArray(jobItems.id, jobIds));
-    for (const j of jobs as any[]) jobMap.set(j.id, { title: j.title, company: j.company });
+    try {
+      const jobs = await deps.db
+        .select({ id: jobItems.id, title: jobItems.title, company: jobItems.company })
+        .from(jobItems)
+        .where(inArray(jobItems.id, jobIds));
+      for (const j of jobs as any[]) jobMap.set(j.id, { title: j.title, company: j.company });
+    } catch {
+      // Best-effort enrichment.
+    }
   }
 
   const enriched = (rows as any[]).map((r) => {
@@ -215,13 +222,17 @@ export async function handleHistoryDetail(
   let jobTitle: string | undefined;
   let company: string | undefined;
   if (row.jobId) {
-    const [job] = await deps.db
-      .select({ title: jobItems.title, company: jobItems.company })
-      .from(jobItems)
-      .where(eq(jobItems.id, row.jobId))
-      .limit(1);
-    jobTitle = job?.title;
-    company = job?.company ?? undefined;
+    try {
+      const [job] = await deps.db
+        .select({ title: jobItems.title, company: jobItems.company })
+        .from(jobItems)
+        .where(eq(jobItems.id, row.jobId))
+        .limit(1);
+      jobTitle = job?.title;
+      company = job?.company ?? undefined;
+    } catch {
+      // Best-effort enrichment — return the submission without job info.
+    }
   }
 
   return ok({ ...row, jobTitle, company });

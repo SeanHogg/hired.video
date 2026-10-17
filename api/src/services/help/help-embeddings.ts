@@ -19,20 +19,30 @@
  * explicit (precision). Embeddings power free-text SEARCH only.
  */
 
-const EMBEDDING_MODEL = "@cf/baai/bge-base-en-v1.5";
+import {
+  WORKERS_AI_EMBEDDING_MODEL,
+  resolveWorkersAi,
+  runWorkersAi,
+  type WorkersAiBinding,
+} from "../adapters/workers-ai.js";
+
+// Embeddings stay on Workers AI rather than the gateway's `embeddings` API:
+// the `help-content` index is 768-dim bge-base vectors (a different model
+// would need a new index + full reindex), and these calls have no billed
+// user (reindex is an admin/system job, search may be anonymous) — so they
+// run through the shared Workers AI adapter without a meter.
 
 interface VectorizeBindings {
   vectorize: VectorizeIndex;
-  ai: { run: (model: string, inputs: Record<string, unknown>) => Promise<unknown> };
+  ai: WorkersAiBinding;
 }
 
 /** Resolve the Vectorize + AI bindings, or null when either is absent. */
 export function getVectorizeBindings(): VectorizeBindings | null {
-  const env = (globalThis as any).__ENV as
-    | { VECTORIZE?: VectorizeIndex; AI?: VectorizeBindings["ai"] }
-    | undefined;
-  if (!env?.VECTORIZE || !env?.AI) return null;
-  return { vectorize: env.VECTORIZE, ai: env.AI };
+  const env = (globalThis as { __ENV?: { VECTORIZE?: VectorizeIndex } }).__ENV;
+  const ai = resolveWorkersAi(undefined);
+  if (!env?.VECTORIZE || !ai) return null;
+  return { vectorize: env.VECTORIZE, ai };
 }
 
 /** True when semantic search can run in this environment. */
@@ -46,7 +56,7 @@ async function embed(
   text: string,
 ): Promise<number[] | null> {
   try {
-    const out = (await ai.run(EMBEDDING_MODEL, { text: [text] })) as {
+    const out = (await runWorkersAi(ai, WORKERS_AI_EMBEDDING_MODEL, { text: [text] })) as {
       data?: number[][];
     };
     const vec = out?.data?.[0];

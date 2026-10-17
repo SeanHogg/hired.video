@@ -55,6 +55,7 @@ export const recruiterClients = pgTable(
     index("idx_recruiter_clients_recruiter").on(t.recruiterUserId, t.status),
     index("idx_recruiter_clients_workspace").on(t.workspaceId),
     check("recruiter_clients_status_check", sql`${t.status} IN ('prospect', 'qualified', 'contract', 'active', 'churned')`),
+    index("idx_recruiter_clients_company_id").on(t.companyId),
   ],
 );
 
@@ -147,6 +148,7 @@ export const recruiterDeals = pgTable(
     index("idx_recruiter_deals_owner").on(t.ownerUserId),
     index("idx_recruiter_deals_workspace").on(t.workspaceId),
     check("recruiter_deals_win_probability_bps_check", sql`${t.winProbabilityBps} IS NULL OR (${t.winProbabilityBps} >= 0 AND ${t.winProbabilityBps} <= 10000)`),
+    index("idx_recruiter_deals_pipeline_id").on(t.pipelineId),
   ],
 );
 

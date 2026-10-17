@@ -37,6 +37,7 @@ import {
   type DocumentKey,
 } from "../services/learning/lrs-service.js";
 import type { LrsDocumentType } from "../db/schema/learning.js";
+import { clampLimit } from "../utils/pagination.js";
 
 export const xapiLrsRoutes = new Hono<{ Variables: Variables } & AppEnv>();
 
@@ -120,7 +121,8 @@ xapiLrsRoutes.get("/statements", async (c) => {
     registration: q.registration,
     since: q.since,
     until: q.until,
-    limit: q.limit ? parseInt(q.limit, 10) : undefined,
+    // Same default/bounds the LRS service applies (100, 1..500).
+    limit: clampLimit(q.limit, 100, 500),
     ascending: q.ascending === "true",
   });
   // Single-statement lookup returns the bare statement; list returns the

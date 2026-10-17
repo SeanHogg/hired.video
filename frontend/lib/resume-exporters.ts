@@ -14,6 +14,7 @@
 
 import { workEntryTags, type Resume, type ResumeContent } from "@/types/resume";
 import { slugify } from "@shared/slugify";
+import { escapeHtml } from "@shared/html-escape";
 import { alertDialog } from "@/lib/dialogs";
 import i18n from "@/lib/i18n/i18n";
 
@@ -174,15 +175,6 @@ export function exportResumeText(resume: Resume): void {
 // -----------------------------------------------------------------------------
 // Word (.doc) — HTML-based, no dependencies
 // -----------------------------------------------------------------------------
-
-export function escapeHtml(s: string): string {
-  return (s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 function resumeToWordHtml(content: ResumeContent): string {
   const b = content.basics;

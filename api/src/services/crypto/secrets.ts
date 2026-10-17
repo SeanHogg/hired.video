@@ -190,12 +190,3 @@ export async function decryptSecret(ctx: SecretsContext, encoded: string): Promi
     );
   }
 }
-
-/**
- * Detect whether a stored ciphertext has been migrated to the v1 format.
- * Useful for migrations / backfill jobs that want to opportunistically
- * re-encrypt legacy rows on next read.
- */
-export function isMigrated(encoded: string): boolean {
-  return encoded.startsWith(NEW_PREFIX);
-}

@@ -83,16 +83,14 @@ describe("userService connection methods", () => {
   });
 
   describe("rejectConnectionRequest", () => {
-    it("DELETEs /api/Users/connections/:id", async () => {
+    it("DELETEs /api/users/connections/:id", async () => {
       del.mockResolvedValueOnce({ data: null });
       await userService.rejectConnectionRequest(baseConn.id);
       expect(del).toHaveBeenCalledTimes(1);
       const path = del.mock.calls[0]![0] as string;
-      // path is case-sensitive on some servers but the backend route is mounted
-      // case-insensitively — we still assert the trailing id so the correct row is targeted.
-      expect(path.toLowerCase()).toBe(
-        `/api/users/connections/${baseConn.id}`.toLowerCase(),
-      );
+      // Hono routes are case-sensitive and apiClient sends paths verbatim,
+      // so the path must match the backend route byte-for-byte.
+      expect(path).toBe(`/api/users/connections/${baseConn.id}`);
     });
   });
 

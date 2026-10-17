@@ -49,7 +49,7 @@ export const roleFeatureAccess = pgTable(
   (t) => [
     // One override row per (role, feature) — upsert target.
     uniqueIndex("uq_role_feature_access").on(t.role, t.featureKey),
-    index("idx_role_feature_access_role").on(t.role),
+    index("idx_role_feature_access_updated_by").on(t.updatedBy),
   ],
 );
 

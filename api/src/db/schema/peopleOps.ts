@@ -202,6 +202,10 @@ export const peopleEmployees = pgTable(
     statusCheck: check("people_employees_status_check", sql`${t.status} IN ('active', 'inactive', 'on_leave', 'terminated')`),
     salaryCentsCheck: check("people_employees_salary_cents_check", sql`${t.salaryCents} IS NULL OR ${t.salaryCents} >= 0`),
     equitySharesCheck: check("people_employees_equity_shares_check", sql`${t.equityShares} IS NULL OR ${t.equityShares} >= 0`),
+    invitationIdFkIdx: index("idx_people_employees_invitation_id").on(t.invitationId),
+    managerIdFkIdx: index("idx_people_employees_manager_id").on(t.managerId),
+    segmentIdFkIdx: index("idx_people_employees_segment_id").on(t.segmentId),
+    userIdFkIdx: index("idx_people_employees_user_id").on(t.userId),
   }),
 );
 
@@ -256,6 +260,9 @@ export const peopleOneOnOnes = pgTable(
     byDate: index("idx_people_one_on_ones_date").on(t.tenantId, t.segmentId, t.scheduledDate),
     statusCheck: check("people_one_on_ones_status_check", sql`${t.status} IN ('scheduled', 'completed', 'cancelled', 'rescheduled')`),
     meetingTypeCheck: check("people_one_on_ones_meeting_type_check", sql`${t.meetingType} IN ('video', 'phone', 'in_person', 'hybrid')`),
+    participantIdFkIdx: index("idx_people_one_on_ones_participant_id").on(t.participantId),
+    segmentIdFkIdx: index("idx_people_one_on_ones_segment_id").on(t.segmentId),
+    supervisorIdFkIdx: index("idx_people_one_on_ones_supervisor_id").on(t.supervisorId),
   }),
 );
 
@@ -306,6 +313,8 @@ export const peopleGoals = pgTable(
     statusCheck: check("people_goals_status_check", sql`${t.status} IN ('not_started','in_progress','completed','on_hold','blocked','cancelled','at_risk')`),
     priorityCheck: check("people_goals_priority_check", sql`${t.priority} IN ('low','medium','high','critical')`),
     progressCheck: check("people_goals_progress_check", sql`${t.progress} >= 0 AND ${t.progress} <= 100`),
+    employeeIdFkIdx: index("idx_people_goals_employee_id").on(t.employeeId),
+    segmentIdFkIdx: index("idx_people_goals_segment_id").on(t.segmentId),
   }),
 );
 

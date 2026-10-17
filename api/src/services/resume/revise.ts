@@ -39,6 +39,7 @@ import {
   type ReviseFocus,
 } from "../../../../shared/video-plan.js";
 import type { ResumeContent } from "../../../../shared/resume.js";
+import { logger } from "../../lib/logger.js";
 
 export const REVISE_INSTRUCTION_MAX = 500;
 /** What the AI caller may read for a revise (prompt + the whole compact
@@ -244,7 +245,7 @@ async function answerQuestion(original: Json, question: string, callAI: AiTextCa
       `Owner's question: ${question}\n\nHow the workspace read this resume:\n${describeReading(original)}\n\nResume JSON:\n${promptResume(original)}`,
     );
   } catch (err) {
-    console.warn("[revise] AI answer failed:", err instanceof Error ? err.message : err);
+    logger.warn("[revise] AI answer failed", err);
     return { ok: false, code: "AI_FAILED", message: "The AI couldn't answer that right now. Try again shortly." };
   }
   const reply = readReply(raw);
@@ -310,7 +311,7 @@ export async function reviseResumeContent(
       `${describeFocus(focus, original)}Owner's message: ${ask}\n\nHow the workspace read this resume:\n${describeReading(original)}\n\nCurrent video plan (meta.video):\n${JSON.stringify(readVideoPlan(original))}\n\nCurrent resume JSON:\n${promptResume(original)}`,
     );
   } catch (err) {
-    console.warn("[revise] AI call failed:", err instanceof Error ? err.message : err);
+    logger.warn("[revise] AI call failed", err);
     return { ok: false, code: "AI_FAILED", message: "The AI couldn't make that change right now. Try again shortly." };
   }
 

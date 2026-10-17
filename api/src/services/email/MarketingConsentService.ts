@@ -20,26 +20,11 @@ import {
   type UpdatePreferencesInput,
   MARKETING_CATEGORIES,
 } from "../../../../shared/email-consent.js";
+import { frontendBaseUrl } from "../../utils/public-urls.js";
+import { randomBase64Url } from "../../utils/crypto.js";
 
-function getEnv(key: string): string {
-  return (
-    process.env[key] ||
-    ((globalThis as any).__ENV?.[key] as string | undefined) ||
-    ""
-  );
-}
-
-function frontendBase(): string {
-  const url = getEnv("FRONTEND_URL");
-  return url.split(",")[0]?.trim().replace(/\/$/, "") || "https://hired.video";
-}
-
-/** 32 random bytes → base64url. Unguessable bearer credential. */
-function generateToken(): string {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return Buffer.from(bytes).toString("base64url");
-}
+/** 32 random bytes → unpadded base64url. Unguessable bearer credential. */
+const TOKEN_BYTES = 32;
 
 export interface FooterLinks {
   /** One-click unsubscribe-all (works without JS — CAN-SPAM). */
@@ -59,7 +44,7 @@ export class MarketingConsentService {
     return this.repo.insertPref({
       email,
       userId: userId ?? null,
-      token: generateToken(),
+      token: randomBase64Url(TOKEN_BYTES),
       unsubscribedAll: false,
       categories: {},
     } as any);
@@ -68,8 +53,8 @@ export class MarketingConsentService {
   async footerLinks(email: string, userId?: string | null): Promise<FooterLinks> {
     const row = await this.getOrCreate(email, userId);
     return {
-      unsubscribeUrl: `${frontendBase()}/api/email/unsubscribe/${row.token}`,
-      manageUrl: `${frontendBase()}/email-preferences/${row.token}`,
+      unsubscribeUrl: `${frontendBaseUrl()}/api/email/unsubscribe/${row.token}`,
+      manageUrl: `${frontendBaseUrl()}/email-preferences/${row.token}`,
     };
   }
 

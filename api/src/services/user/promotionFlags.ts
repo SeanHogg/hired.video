@@ -19,6 +19,7 @@
 
 import { inArray } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
+import { logger } from "../../lib/logger.js";
 
 type Db = ReturnType<typeof getDb>;
 
@@ -43,7 +44,7 @@ export async function loadPromoteWithoutAuth(
       .where(inArray(schema.privacyPreferences.userId, ids));
     for (const row of rows) result.set(row.userId, row.promoteWithoutAuth === true);
   } catch (err) {
-    console.warn("[promotionFlags] lookup failed; defaulting to gated", err);
+    logger.warn("[promotionFlags] lookup failed; defaulting to gated", err);
   }
   return result;
 }

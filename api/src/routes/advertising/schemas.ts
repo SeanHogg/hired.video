@@ -23,14 +23,6 @@ export const CreateBoostSchema = z.object({
   durationDays:  z.number().int().min(1).max(90),
 });
 
-export const CreateCompanyBoostSchema = z.object({
-  companyId:     UuidLikeSchema,
-  placementType: z.enum(["directory_featured", "dashboard_spotlight", "discovery_feed", "all"]),
-  pricingModel:  z.enum(["flat", "cpm"]),
-  budgetCents:   z.number().int().min(1000), // minimum $10
-  durationDays:  z.number().int().min(1).max(90),
-});
-
 // ─── Campaigns ────────────────────────────────────────────────────────────
 
 const CAMPAIGN_OBJECTIVES = ["AWARENESS", "TRAFFIC", "APPLICATIONS", "EMPLOYER_BRAND"] as const;

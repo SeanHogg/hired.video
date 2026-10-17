@@ -7,7 +7,11 @@ import { servicesProcessor } from "../domains/services-processing/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { aiFailure } from "../services/adapters/llm-error.js";
 import { AiStreamFailure, aiStreamResponse, wantsEventStream } from "../services/adapters/ai-stream-response.js";
-import { handleValueProposition } from "../services/job/value-proposition-handler.js";
+import { handleValueProposition as valuePropositionUseCase } from "../services/job/value-proposition-handler.js";
+import { asHandler } from "../handlers/shared.js";
+
+// The use case returns the pitch / throws DomainError; map to the envelope.
+const handleValueProposition = asHandler(valuePropositionUseCase);
 
 export const valuePropositionRoutes = new Hono<AppEnv>();
 valuePropositionRoutes.use("*", attachTokenBudget());

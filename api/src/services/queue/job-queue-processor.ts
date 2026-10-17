@@ -15,15 +15,17 @@ import { getDb, schema } from "../../db/index.js";
 import { getEmailProvider } from "../adapters/email.js";
 import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "../company/recruiter-match.js";
 import { DripQueuesRepository } from "../../repositories/dripQueuesRepository.js";
+import { logger } from "../../lib/logger.js";
 
 const JOBS_PER_TICK = 50;
 
-export async function processJobQueue(): Promise<void> {
+/** Returns how many pending jobs were attempted (0 = queue empty). */
+export async function processJobQueue(): Promise<number> {
   const repo = new DripQueuesRepository(getDb());
   const now = new Date();
 
   const pending = await repo.listPendingJobs(JOBS_PER_TICK);
-  if (pending.length === 0) return;
+  if (pending.length === 0) return 0;
 
   const completed: string[] = [];
   try {
@@ -37,14 +39,15 @@ export async function processJobQueue(): Promise<void> {
         const failed = job.attempts + 1 >= job.maxAttempts;
         await repo
           .markJobFailedAttempt(job.id, failed, String(err?.message ?? err), now)
-          .catch((e) => console.error(`[scheduled] failed to record job ${job.id} failure:`, e));
+          .catch((e) => logger.error("[scheduled] failed to record job failure", { jobId: job.id, error: e }));
       }
     }
   } finally {
     await repo.markJobsCompleted(completed, now);
   }
 
-  console.log(`[scheduled] Processed ${pending.length} background job(s).`);
+  logger.info("[scheduled] Processed background jobs", { count: pending.length });
+  return pending.length;
 }
 
 async function dispatchQueueJob(job: typeof schema.queueJobToProcess.$inferSelect): Promise<void> {
@@ -64,18 +67,18 @@ async function dispatchQueueJob(job: typeof schema.queueJobToProcess.$inferSelec
       const { recruiterId, jobId } = payload;
       if (!recruiterId || !jobId) throw new Error("Missing recruiterId or jobId");
       const result = await scoreAllCandidatesForJob(String(recruiterId), String(jobId));
-      console.log(`[scheduled] Scored ${result.scored} candidates for job ${jobId} (${result.skipped} skipped)`);
+      logger.info("[scheduled] Scored candidates for job", { jobId, scored: result.scored, skipped: result.skipped });
       break;
     }
     case "recruiter_score_jobs": {
       const { recruiterId: rId, candidateId: cId } = payload;
       if (!rId || !cId) throw new Error("Missing recruiterId or candidateId");
       const result = await scoreAllJobsForCandidate(String(rId), String(cId));
-      console.log(`[scheduled] Scored ${result.scored} jobs for candidate ${cId} (${result.skipped} skipped)`);
+      logger.info("[scheduled] Scored jobs for candidate", { candidateId: cId, scored: result.scored, skipped: result.skipped });
       break;
     }
     default:
       // Unknown job types are logged but not failed — allows future types to drain gracefully
-      console.warn(`[scheduled] Unknown job type: ${job.type}`);
+      logger.warn("[scheduled] Unknown job type", { jobType: job.type });
   }
 }

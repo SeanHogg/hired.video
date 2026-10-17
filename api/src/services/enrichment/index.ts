@@ -24,6 +24,7 @@
 
 import { getDb, schema } from "../../db/index.js";
 import { HunterEnrichmentProvider } from "./hunter.js";
+import { logger } from "../../lib/logger.js";
 
 const { enrichmentProviderCalls } = schema;
 
@@ -155,7 +156,7 @@ export async function enrichAndAudit(
     })
     .catch((err) => {
       // Audit must never break the user-facing call.
-      console.warn("[enrichment] audit insert failed", err, { elapsedMs: Date.now() - start });
+      logger.warn("[enrichment] audit insert failed", { error: err, elapsedMs: Date.now() - start });
     });
   return result;
 }

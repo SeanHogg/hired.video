@@ -31,6 +31,7 @@ import { Hono } from "hono";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
+import { frontendBaseUrl } from "../utils/public-urls.js";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { hasAnyLLMProviderKey, createLLMClient } from "../services/adapters/llm-client.js";
@@ -46,6 +47,7 @@ import { interviewRetranscribeRoutes } from "./interview-retranscribe.js";
 import { sendGenericEmail } from "../services/adapters/email.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import type { ResumeContent } from "../../../shared/resume.js";
+import { randomHex } from "../utils/crypto.js";
 
 const { studioAsyncInterviews, studioAsyncResponses, users, jobApplications } = schema;
 
@@ -74,15 +76,7 @@ const ASSIGNABLE_ROLES: ReadonlySet<string> = new Set([
   USER_ROLES.SUPER_ADMIN,
 ]);
 
-function getFrontendBaseUrl(): string {
-  const url = process.env.FRONTEND_URL ?? "";
-  return url.split(",")[0]?.trim() || "https://hired.video";
-}
 
-function randomToken(byteLength = 24): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 // ─── Schemas ────────────────────────────────────────────────────────────────
 
@@ -344,7 +338,7 @@ interviewAssignmentRoutes.post("/assign", async (c) => {
     );
   }
 
-  const token = randomToken(24);
+  const token = randomHex(24);
   const now = new Date();
   const tokenExpiresAt = new Date(now.getTime() + parsed.data.linkExpiryHours * 3_600_000);
   const responseDeadline = new Date(now.getTime() + parsed.data.responseWindowHours * 3_600_000);
@@ -389,7 +383,7 @@ interviewAssignmentRoutes.post("/assign", async (c) => {
     ok({
       id: created.id,
       inviteToken: token,
-      inviteUrl: `${getFrontendBaseUrl()}/interview/${token}`,
+      inviteUrl: `${frontendBaseUrl()}/interview/${token}`,
       assignmentType,
       inviteTokenExpiresAt: tokenExpiresAt.toISOString(),
       questionResponseDeadline: responseDeadline.toISOString(),
@@ -425,7 +419,7 @@ interviewAssignmentRoutes.post("/:id/resend", async (c) => {
 
   // Reset the magic link clock; question response deadline is left alone
   // so the recruiter can extend without re-mailing if they want.
-  const newToken = randomToken(24);
+  const newToken = randomHex(24);
   const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 3_600_000); // 7d default on resend
   const [updated] = await db
     .update(studioAsyncInterviews)
@@ -455,7 +449,7 @@ interviewAssignmentRoutes.post("/:id/resend", async (c) => {
     ok({
       id: updated.id,
       inviteToken: newToken,
-      inviteUrl: `${getFrontendBaseUrl()}/interview/${newToken}`,
+      inviteUrl: `${frontendBaseUrl()}/interview/${newToken}`,
       inviteTokenExpiresAt: tokenExpiresAt.toISOString(),
       resendCount: updated.resendCount,
     }),
@@ -1144,7 +1138,7 @@ async function sendInviteEmail(args: {
   assignmentType: "assign" | "invite" | "self" | null;
   isResend?: boolean;
 }): Promise<void> {
-  const url = `${getFrontendBaseUrl()}/interview/${args.token}`;
+  const url = `${frontendBaseUrl()}/interview/${args.token}`;
   const expiresFormatted = args.expiresAt.toLocaleString("en-US", {
     dateStyle: "medium",
     timeStyle: "short",

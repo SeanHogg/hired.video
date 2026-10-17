@@ -24,6 +24,8 @@ import { RedemptionEngine, type RedemptionOutcome } from "./redemption-engine.js
 import { buildTremendousClient } from "../../services/tremendous/client.js";
 import { NotificationService } from "../../services/notifications/notificationService.js";
 import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getPublicBadgeCatalog } from "./badge-catalog.js";
+import { getCachedPointsSummary, invalidatePointsSummary } from "./summary-cache.js";
 
 export interface AwardArgs {
   userId: string;
@@ -140,8 +142,10 @@ export class GamificationService {
   // ── high-level award helpers callers use ────────────────────────────
 
   /** Generic award entry point. Use the named helpers when possible. */
-  award(action: ActionKey | string, args: AwardArgs): Promise<AwardOutcome> {
-    return this.engine.awardForAction(action, args);
+  async award(action: ActionKey | string, args: AwardArgs): Promise<AwardOutcome> {
+    const outcome = await this.engine.awardForAction(action, args);
+    if (outcome.status === "awarded") invalidatePointsSummary(args.userId);
+    return outcome;
   }
 
   /** Award when the caller doesn't have a JWT (Stripe webhook, cron
@@ -581,13 +585,18 @@ export class GamificationService {
 
   // ── reads for routes ────────────────────────────────────────────────
 
-  async getUserSummary(userId: string) {
+  /** Cached per user (summary-cache.ts); invalidated by every write below. */
+  getUserSummary(userId: string) {
+    return getCachedPointsSummary(userId, () => this.loadUserSummary(userId));
+  }
+
+  private async loadUserSummary(userId: string) {
     const [balance, streak, counters, earns, allBadges, recent] = await Promise.all([
       this.repos.points.findBalance(userId),
       this.repos.points.findStreak(userId),
       this.repos.points.findCounters(userId),
       this.repos.points.listUserBadgeEarns(userId),
-      this.repos.points.listBadges(),
+      getPublicBadgeCatalog(this.repos.points),
       this.repos.points.findRecentLedger(userId, 20),
     ]);
 
@@ -659,11 +668,15 @@ export class GamificationService {
   // ── superadmin helpers ──────────────────────────────────────────────
 
   async adminSuspend(userId: string, reason: string, adminUserId: string) {
-    return this.repos.points.setSuspension(userId, true, reason, adminUserId);
+    const result = await this.repos.points.setSuspension(userId, true, reason, adminUserId);
+    invalidatePointsSummary(userId);
+    return result;
   }
 
   async adminReinstate(userId: string, adminUserId: string) {
-    return this.repos.points.setSuspension(userId, false, null, adminUserId);
+    const result = await this.repos.points.setSuspension(userId, false, null, adminUserId);
+    invalidatePointsSummary(userId);
+    return result;
   }
 
   async adminAdjust(args: {
@@ -672,7 +685,7 @@ export class GamificationService {
     reason: string;
     adminUserId: string;
   }) {
-    return this.engine.writeManualLedger({
+    const result = await this.engine.writeManualLedger({
       userId: args.userId,
       delta: args.delta,
       category: "adjust",
@@ -683,6 +696,8 @@ export class GamificationService {
       refType: "admin_adjust",
       metadata: { reason: args.reason, adminUserId: args.adminUserId },
     });
+    invalidatePointsSummary(args.userId);
+    return result;
   }
 
   async resolveFraudFlag(args: {
@@ -734,13 +749,13 @@ export class GamificationService {
 
   // ── Redemption ─────────────────────────────────────────────────────
 
-  redeem(args: {
+  async redeem(args: {
     userId: string;
     skuId: string;
     recipientName?: string;
     recipientEmail?: string;
   }): Promise<RedemptionOutcome> {
-    return this.redemption.redeem({
+    const outcome = await this.redemption.redeem({
       skuId: args.skuId,
       user: {
         userId: args.userId,
@@ -748,6 +763,8 @@ export class GamificationService {
         recipientEmail: args.recipientEmail,
       },
     });
+    invalidatePointsSummary(args.userId);
+    return outcome;
   }
 
   /** SuperAdmin path: approve a redemption parked at `pending` due to

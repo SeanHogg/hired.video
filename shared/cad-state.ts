@@ -244,27 +244,9 @@ export function removeLayer(state: CadState, name: string): CadState {
   };
 }
 
-/** Patch a layer's visible / locked / color fields. */
-export function updateLayer(
-  state: CadState,
-  name: string,
-  patch: Partial<Omit<CadLayer, "name">>,
-): CadState {
-  const existing = state.layers ?? [];
-  return {
-    ...state,
-    layers: existing.map((l) => (l.name === name ? { ...l, ...patch } : l)),
-  };
-}
-
 /** Stable id helper for shape insertion. */
 export function makeShapeId(): string {
   return `cad-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-/** Resolve a shape by id. */
-export function findShape(state: CadState, id: string): CadShape | null {
-  return state.shapes.find((s) => s.id === id) ?? null;
 }
 
 /** Append a shape — returns a new state with the shape on top of the
@@ -273,40 +255,7 @@ export function addShape(state: CadState, shape: CadShape): CadState {
   return { ...state, shapes: [...state.shapes, shape] };
 }
 
-/** Remove a shape by id; no-op when the id doesn't resolve. */
-export function removeShape(state: CadState, id: string): CadState {
-  return {
-    ...state,
-    shapes: state.shapes.filter((s) => s.id !== id),
-    selectedIds: state.selectedIds.filter((s) => s !== id),
-  };
-}
-
-/** Update a shape in place (matching id). Discriminated-union
- *  arithmetic preserved — callers pass a `Partial<CadShape>` of the
- *  same kind. */
-export function updateShape<T extends CadShape>(
-  state: CadState,
-  id: string,
-  patch: Partial<T>,
-): CadState {
-  return {
-    ...state,
-    shapes: state.shapes.map((s) =>
-      s.id === id ? ({ ...s, ...patch } as CadShape) : s,
-    ),
-  };
-}
-
 /** Replace the selection set. Empty array deselects. */
 export function setSelection(state: CadState, ids: string[]): CadState {
   return { ...state, selectedIds: ids };
-}
-
-/** Total drawing extents — used for export-pipeline page sizing. */
-export function drawingBoundsMm(state: CadState): {
-  widthMm: number;
-  heightMm: number;
-} {
-  return { widthMm: state.widthMm, heightMm: state.heightMm };
 }

@@ -16,16 +16,9 @@
  * is lower than blocking a whole signup wave on third-party downtime.
  */
 
-const REQUEST_TIMEOUT_MS = 1500;
+import { sha1Hex } from "../../utils/crypto.js";
 
-async function sha1Hex(input: string): Promise<string> {
-  const bytes = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest("SHA-1", bytes);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .toUpperCase();
-}
+const REQUEST_TIMEOUT_MS = 1500;
 
 /**
  * Returns true if the password appears in HIBP's breach corpus.
@@ -38,7 +31,8 @@ export async function isBreachedPassword(
   minOccurrences = 1,
 ): Promise<boolean> {
   if (!password || password.length < 1) return false;
-  const sha1 = await sha1Hex(password);
+  // HIBP range responses are uppercase hex.
+  const sha1 = (await sha1Hex(password)).toUpperCase();
   const prefix = sha1.slice(0, 5);
   const suffix = sha1.slice(5);
 

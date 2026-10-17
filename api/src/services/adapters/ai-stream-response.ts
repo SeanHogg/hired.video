@@ -19,6 +19,7 @@ import { buildTokenBudgetDTO } from "../billing/BillingService.js";
 import { eventStreamResponse } from "../../utils/event-stream.js";
 import { buildAIErrorEnvelope } from "./llm-error.js";
 import type { LLMStreamSink } from "./llm-stream.js";
+import { logger } from "../../lib/logger.js";
 
 /** Did the client ask for a streamed answer? */
 export function wantsEventStream(c: Context<AppEnv>): boolean {
@@ -89,7 +90,7 @@ export function aiStreamResponse<T>(
         const data = await produce(sink);
         emit({ type: "result", data, tokenBudget: await tokenBudgetFor(c) });
       } catch (err) {
-        console.error(opts.tag, err instanceof Error ? err.message : err);
+        logger.error(opts.tag, { error: err instanceof Error ? err.message : err });
         emit(aiStreamErrorEvent(err));
       }
     },

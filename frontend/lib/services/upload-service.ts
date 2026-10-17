@@ -5,6 +5,8 @@ import {
   type UploadedAssetPage,
 } from "@shared/uploaded-assets";
 import { apiClient } from "../api-client";
+import { buildApiUrl } from "../api/base-url";
+import { standardAuthHeaders } from "../api/auth-token";
 
 export type UploadAvatarResponse = {
   avatarUrl: string;
@@ -232,17 +234,12 @@ export async function uploadVideo(
         reject(new Error("Network error during upload"));
       };
 
-      // Get the base URL from apiClient configuration
-      const baseUrl = import.meta.env.VITE_API_URL ||
-                      import.meta.env.VITE_API_BASE_URL ||
-                      "https://api.hired.video";
-
-      xhr.open("POST", `${baseUrl}/api/upload/video`);
-
-      // Add auth token if available
-      const token = localStorage.getItem("auth_token");
-      if (token) {
-        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      // XHR (not apiClient) for upload progress events; URL + auth headers
+      // (Bearer + X-Emulation-Token) come from the same SSoT as apiClient.
+      const url = buildApiUrl("/api/upload/video");
+      xhr.open("POST", url);
+      for (const [name, value] of Object.entries(standardAuthHeaders(url))) {
+        xhr.setRequestHeader(name, value);
       }
       // Do NOT set Content-Type - let the browser set it with the boundary
 
@@ -269,7 +266,8 @@ export async function uploadFile(file: File): Promise<string> {
   const response = await apiClient.post<FileUploadResponse>(
     "/api/upload/single",
     formData,
+    z.object({ url: z.string() }),
   );
 
-  return response.data.url || "";
+  return response.data.url;
 }

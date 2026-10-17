@@ -355,7 +355,7 @@ export type { ConversationRow, ConversationInsert, ConversationParticipantRow, C
 export type { FollowUpSequenceRow, FollowUpStepRow, FollowUpEnrollmentRow, FollowUpLogRow } from "./followUpsRepository.js";
 export type { VideoRow, VideoInsert, StudioVoiceCloneRow, StudioProjectRow, PitchDeckRow, FeedPostRow } from "./mediaRepository.js";
 export type { MarketingLeadRow, AffiliateProfileRow, EmailCampaignRow } from "./marketingRepository.js";
-export type { WhitelabelTenantRow, FeatureFlagRow, AccountInvitationRow, AccountInvitationInsert } from "./platformRepository.js";
+export type { WhitelabelTenantRow, AccountInvitationRow, AccountInvitationInsert } from "./platformRepository.js";
 export type { StudioTemplateRow, StudioTemplateInsert, StudioTemplatePatch, TemplateLicenseRow, TemplateLicenseInsert, TemplateKind, CreatorTemplateEarningsRow, LicensedStudioTemplateRow } from "./studioTemplatesRepository.js";
 export type { PointsBalanceRow, PointsLedgerRow, PointsLedgerInsert, PointsCountersRow, PointsStreakRow, PointsFraudFlagRow, PointsFraudFlagInsert, BadgeRow, UserBadgeRow, UserBadgeInsert } from "./pointsRepository.js";
 export type {

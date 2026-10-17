@@ -1,12 +1,11 @@
 /**
  * Helcim accounting/billing connector (#1349 Phase 3, #1437 + #1438).
  *
- * Pushes a workforce invoice / payout out to Helcim. Helcim API auth is
- * a single `api-token` header — same shape that
- * [services/billing/payment/helcim.ts](../../billing/payment/helcim.ts) uses for payment-method
- * collection. We deliberately don't share the HelcimPaymentProvider class
- * because workforce-side calls are server-to-server invoice / recurring
- * billing endpoints, not customer-method tokenisation.
+ * Pushes a workforce invoice / payout out to Helcim. Transport, auth and
+ * errors come from the shared adapter (services/adapters/helcim.ts), the
+ * same client the payment and ACH payout providers use. This class is not
+ * HelcimPaymentProvider because workforce calls are server-to-server
+ * invoice / recurring-billing endpoints, not customer-method tokenisation.
  *
  * Env: `HELCIM_API_TOKEN` (required for live calls). When absent the
  * connector returns `local:{id}` provider refs so the local audit trail
@@ -19,34 +18,17 @@ import type {
   PayoutExportPayload,
   ConnectorResult,
 } from "./types.js";
-
-const HELCIM_API_BASE = "https://api.helcim.com/v2";
+import { HelcimApiError, helcimApiTokenFromEnv, helcimRequest } from "../../adapters/helcim.js";
 
 function getHelcimToken(): string | null {
-  const env = (globalThis as { __ENV?: Record<string, string | undefined> }).__ENV;
-  return env?.HELCIM_API_TOKEN ?? env?.HELCIM_API_KEY ?? null;
+  return helcimApiTokenFromEnv((globalThis as { __ENV?: Record<string, string | undefined> }).__ENV);
 }
 
-async function helcimFetch<T>(
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<T> {
+/** Authenticated call via the shared Helcim adapter (services/adapters/helcim.ts). */
+function helcimFetch<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = getHelcimToken();
   if (!token) throw new Error("HELCIM_API_TOKEN not configured");
-  const res = await fetch(`${HELCIM_API_BASE}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      "api-token": token,
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => res.statusText);
-    throw new Error(`Helcim API ${res.status}: ${txt}`);
-  }
-  return res.json() as Promise<T>;
+  return helcimRequest<T>(token, method, path, body);
 }
 
 export class HelcimWorkforceConnector implements AccountingConnector {
@@ -95,7 +77,7 @@ export class HelcimWorkforceConnector implements AccountingConnector {
         ok: false,
         error: String((e as Error).message),
         // 5xx is retriable; 4xx (auth, schema) is not.
-        retriable: /\b5\d\d\b/.test((e as Error).message),
+        retriable: e instanceof HelcimApiError ? e.retriable : true,
       };
     }
   }

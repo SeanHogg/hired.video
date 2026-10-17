@@ -35,22 +35,13 @@ import { emptyTimeline } from "../../../shared/timeline.js";
 import { cdnUrl, r2KeyFromCdnUrl } from "../utils/cdn.js";
 import { deleteR2Keys } from "../services/storage/r2-delete.js";
 import { getVideoBucket, putObject } from "../services/storage/object-store.js";
+// sha256Hex dedupes source uploads — a re-upload of the same bytes by the
+// same workspace owner returns the existing nle_media_sources row.
+import { sha256Hex } from "../utils/crypto.js";
+import { parseUpload, isUploadRejected } from "../utils/multipart.js";
+import { logger } from "../lib/logger.js";
 
 const { studioProjects, nleMediaSources, nleMediaTags } = schema;
-
-/**
- * Hash a buffer with sha-256 and return a hex digest. Used to dedupe
- * source uploads — a re-upload of the same bytes by the same workspace
- * owner returns the existing nle_media_sources row instead of writing
- * new R2 bytes. Single source of truth; both POST /sources and any
- * future bulk-import path go through this.
- */
-async function sha256Hex(buf: ArrayBuffer): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", buf);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
 
 /**
  * Persist source bytes to R2 and return the resulting CDN URL. Reused
@@ -70,7 +61,7 @@ async function uploadSourceToR2(
     await putObject(key, bytes, contentType);
   } else {
     // Local dev: warn and return a fake URL so the row still inserts.
-    console.warn("[nle] R2 binding missing; source not persisted:", key);
+    logger.warn("[nle] R2 binding missing; source not persisted", { key });
   }
   return cdnUrl(key);
 }
@@ -607,14 +598,11 @@ nleRoutes.post("/sources", async (c) => {
   const user = c.var.user;
   if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
 
-  const form = await c.req.formData().catch(() => null);
-  if (!form) return c.json(fail("VALIDATION_ERROR", "Multipart body required"), 400);
+  const up = await parseUpload(c, { messages: { missing: "Missing file" } });
+  if (isUploadRejected(up)) return c.json(fail("VALIDATION_ERROR", up.form ? up.message : "Multipart body required"), 400);
+  const { form, file, bytes } = up;
 
-  const file = form.get("file") as File | null;
   const kind = String(form.get("kind") ?? "");
-  if (!file || typeof file.arrayBuffer !== "function") {
-    return c.json(fail("VALIDATION_ERROR", "Missing file"), 400);
-  }
   if (!["video", "audio", "image"].includes(kind)) {
     return c.json(fail("VALIDATION_ERROR", "Invalid kind"), 400);
   }
@@ -641,7 +629,6 @@ nleRoutes.post("/sources", async (c) => {
     target = { ownerUserId: user.sub, ownerCompanyId: null };
   }
 
-  const bytes = await file.arrayBuffer();
   const contentHash = await sha256Hex(bytes);
   const db = getDb();
 
@@ -706,12 +693,9 @@ nleRoutes.post("/sources/:id/proxy", async (c) => {
   if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
 
   const id = c.req.param("id");
-  const form = await c.req.formData().catch(() => null);
-  if (!form) return c.json(fail("VALIDATION_ERROR", "Multipart body required"), 400);
-  const file = form.get("file") as File | null;
-  if (!file || typeof file.arrayBuffer !== "function") {
-    return c.json(fail("VALIDATION_ERROR", "Missing proxy file"), 400);
-  }
+  const up = await parseUpload(c, { messages: { missing: "Missing proxy file" } });
+  if (isUploadRejected(up)) return c.json(fail("VALIDATION_ERROR", up.form ? up.message : "Multipart body required"), 400);
+  const { file, bytes } = up;
 
   const db = getDb();
   const [existing] = await db
@@ -729,14 +713,13 @@ nleRoutes.post("/sources/:id/proxy", async (c) => {
     throw e;
   }
 
-  const bytes = await file.arrayBuffer();
   const proxyHash = await sha256Hex(bytes);
   const bucket = getVideoBucket();
   const key = `nle-proxies/${existing.userId}/${existing.id}-${proxyHash}.mp4`;
   if (bucket) {
     await putObject(key, bytes, file.type || "video/mp4");
   } else {
-    console.warn("[nle] R2 binding missing; proxy not persisted:", key);
+    logger.warn("[nle] R2 binding missing; proxy not persisted", { key });
   }
   const proxyUrl = cdnUrl(key);
 

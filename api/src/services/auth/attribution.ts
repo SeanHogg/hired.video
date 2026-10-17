@@ -14,6 +14,7 @@
 
 import { and, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
+import { logger } from "../../lib/logger.js";
 
 const { affiliateProfiles, affiliateReferrals, affiliateLinkClicks, users } = schema;
 
@@ -80,6 +81,6 @@ export async function recordReferralAttribution(
     // Idempotency: a duplicate insert under the partial unique index
     // (migration 0116) is the expected outcome for a retried signup — the
     // existing row already attributes the user.
-    console.error("[attribution] referral insert failed (likely duplicate):", err);
+    logger.error("[attribution] referral insert failed (likely duplicate)", err);
   }
 }

@@ -20,6 +20,7 @@ import {
   invalidateNotificationPreferences,
   resolvePreferencesFromRow,
 } from "../services/notifications/preferences.js";
+import { randomHex } from "../utils/crypto.js";
 
 const { accountPreferences, cookiePreferences, jobPreferences, users, privacyPreferences } = schema;
 
@@ -473,7 +474,7 @@ settingsRoutes.delete("/security/sessions/:id", async (c) => {
 settingsRoutes.post("/security/2fa/enable", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const backupCodes = Array.from({ length: 8 }, () => Array.from(crypto.getRandomValues(new Uint8Array(4))).map((b) => b.toString(16).padStart(2, "0")).join(""));
+  const backupCodes = Array.from({ length: 8 }, () => randomHex(4));
   return c.json(success({ qrCode: "https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=otpauth%3A%2F%2Ftotp%2Fhired.video", backupCodes }), 200);
 });
 

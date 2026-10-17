@@ -21,6 +21,7 @@ import { FraudSignalsRepository } from "../../repositories/fraudSignalsRepositor
 import { chunk } from "../../utils/chunk.js";
 import type { Repos } from "../../repositories/index.js";
 import { evaluate as evaluateFraud } from "../../domains/gamification/fraud-engine.js";
+import { logger } from "../../lib/logger.js";
 
 /** The DB handle exposed by `getDb()`. Drizzle's query-chain types are
  *  not round-trip stable across minor versions, but the call-site
@@ -66,7 +67,7 @@ export async function runFraudSweep(
     } catch (e) {
       // Same isolation as the per-user reads: the users whose signals
       // couldn't be read count as errors; the sweep continues.
-      console.error("[fraud-sweep] signal batch failed", batch.length, e);
+      logger.error("[fraud-sweep] signal batch failed", { batchSize: batch.length, error: e });
       result.scanned += batch.length;
       result.errors += batch.length;
       continue;
@@ -108,7 +109,7 @@ export async function runFraudSweep(
           }
         }
       } catch (e) {
-        console.error("[fraud-sweep] user failed", userId, e);
+        logger.error("[fraud-sweep] user failed", { userId, error: e });
         result.errors += 1;
       }
     }

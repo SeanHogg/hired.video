@@ -21,7 +21,6 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
-import { useQuery } from "@tanstack/react-query";
 import {
   Clock,
   Copy,
@@ -49,13 +48,13 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
-import { resumeService } from "@/lib/services/resume-service";
 import { generatePitchScript } from "@/lib/services/video-pitch-service";
 import { usePitchProject } from "@/hooks/use-pitch-project";
 import PitchSaveControls from "@/components/tools/video-pitch/PitchSaveControls";
 import WebcamRecorderWithUpload from "@/components/studio/WebcamRecorderWithUpload";
 import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 import { toast } from "sonner";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 
 type Length = 30 | 60 | 90;
 type Tone = "casual" | "professional" | "enthusiastic";
@@ -115,11 +114,7 @@ export default function VideoPitchLab() {
     }
   }
 
-  const { data: resumes = [] } = useQuery({
-    queryKey: ["resumes"],
-    queryFn: () => resumeService.getUserResumes(),
-    enabled: isAuthenticated,
-  });
+  const { data: resumes = [] } = useUserResumes();
 
   async function handleGenerateScript() {
     if (!isAuthenticated) {

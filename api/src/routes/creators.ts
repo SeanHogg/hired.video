@@ -68,6 +68,11 @@ import {
   type PayoutProvider,
 } from "../../../shared/payout-profile.js";
 import { invalidateTaxYearReports } from "../services/payout/TaxReportingService.js";
+import { clampLimit } from "../utils/pagination.js";
+import { requestEnv } from "../utils/env.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { buildRepos } from "../repositories/index.js";
+import { emitNotification } from "../services/notifications/notificationService.js";
 
 const {
   creatorProfiles,
@@ -84,7 +89,6 @@ const {
   studioReviewComments,
   userProfiles,
   users,
-  notifications,
 } = schema;
 
 const DEFAULT_PLATFORM_FEE_BPS = 500; // 5% (+ CC processing passed to buyer at checkout)
@@ -94,20 +98,8 @@ const INCLUDED_REVISIONS = 3;
 
 export const creatorRoutes = new Hono<AppEnv>();
 
-function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
-
-function getEnv(c: unknown): Record<string, string | undefined> {
-  return (c as { env?: Record<string, string | undefined> }).env ?? {};
-}
-
-function requireAuth(c: any): string | Response {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  return userId;
-}
-
+/** Best-effort system notification to one party of a promo project, routed
+ *  through the single dispatcher so prefs + push apply. */
 async function notify(
   db: ReturnType<typeof getDb>,
   userId: string,
@@ -116,10 +108,10 @@ async function notify(
   message: string,
   data?: Record<string, unknown>,
 ) {
-  await db
-    .insert(notifications)
-    .values({ userId, type, title, message, data: data ?? null } as any)
-    .catch(() => undefined);
+  await emitNotification(
+    { repos: buildRepos(db) },
+    { recipientIds: [userId], type, actor: null, title, message, extraData: data },
+  ).catch(() => undefined);
 }
 
 function calcFees(priceCents: number, feeBps: number) {
@@ -211,8 +203,9 @@ async function setProgramFlag(
 // hidden from public surfaces (browse, public profile) until the subscription
 // is active — visibility is gated downstream by `isCreatorVisible(userId)`.
 creatorRoutes.post("/opt-in", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
 
   const body = await c.req.json().catch(() => ({})) as {
     programs?: unknown;
@@ -278,8 +271,9 @@ creatorRoutes.post("/opt-in", async (c) => {
 // POST /me/programs/:program — enable a program on the active enrollment.
 // Requires current terms acceptance for the program.
 creatorRoutes.post("/me/programs/:program", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const program = c.req.param("program");
   if (!isCreatorProgram(program)) {
     return c.json(error("VALIDATION_ERROR", "Unknown program"), 400);
@@ -304,8 +298,9 @@ creatorRoutes.post("/me/programs/:program", async (c) => {
 // Per spec: cancelling a single program does NOT end the enrollment row;
 // it just disables that program. The row stays open with ended_at null.
 creatorRoutes.delete("/me/programs/:program", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const program = c.req.param("program");
   if (!isCreatorProgram(program)) {
     return c.json(error("VALIDATION_ERROR", "Unknown program"), 400);
@@ -322,8 +317,9 @@ creatorRoutes.delete("/me/programs/:program", async (c) => {
 // Sets ended_at on the active row and clears all program flags. Re-enrolling
 // is done by hitting /opt-in again (which inserts a new row).
 creatorRoutes.post("/me/cancel", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const db = getDb();
   const existing = await getCreator(db, userId);
   if (!existing) return c.json(error("NOT_FOUND", "No active enrollment"), 404);
@@ -351,8 +347,9 @@ creatorRoutes.post("/me/cancel", async (c) => {
 
 // GET /me — own creator profile
 creatorRoutes.get("/me", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const db = getDb();
   const row = await getCreator(db, userId);
   return c.json(success(row), 200);
@@ -360,8 +357,9 @@ creatorRoutes.get("/me", async (c) => {
 
 // PATCH /me — update creator profile fields
 creatorRoutes.patch("/me", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
   const db = getDb();
   const existing = await getCreator(db, userId);
@@ -441,16 +439,18 @@ async function getOrCreatePayoutProfile(db: ReturnType<typeof getDb>, userId: st
 // folds them into human-facing buckets (promo video / voice / template /
 // service / course / article / contract). Cached read-through in the service.
 creatorRoutes.get("/me/earnings-rollup", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const rollup = await payoutLedgerService.getEarningsRollup(userId);
   return c.json(success(rollup), 200);
 });
 
 // GET /me/payout-profile — read or lazily create the caller's payout row.
 creatorRoutes.get("/me/payout-profile", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const db = getDb();
   const row = await getOrCreatePayoutProfile(db, userId);
   return c.json(success(payoutRowToDTO(row)), 200);
@@ -458,8 +458,9 @@ creatorRoutes.get("/me/payout-profile", async (c) => {
 
 // PATCH /me/payout-profile — update entity / tax / address / payout fields.
 creatorRoutes.patch("/me/payout-profile", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const body = await c.req.json().catch(() => ({})) as PayoutProfileUpdateInput;
 
   if (body.entityType && !(ENTITY_TYPES as readonly string[]).includes(body.entityType)) {
@@ -507,7 +508,7 @@ creatorRoutes.patch("/me/payout-profile", async (c) => {
       patch.taxIdNonce = null;
       patch.taxIdKmsKeyId = null;
     } else {
-      const enc = await encryptTaxId(cleaned, getEnv(c));
+      const enc = await encryptTaxId(cleaned, requestEnv(c));
       patch.taxIdLast4 = cleaned.slice(-4);
       patch.taxIdEncrypted = null;
       patch.taxIdCiphertext = enc.ciphertext;
@@ -560,8 +561,9 @@ creatorRoutes.patch("/me/payout-profile", async (c) => {
 // the route returns 400 instead of guessing.
 // ---------------------------------------------------------------------------
 creatorRoutes.post("/me/payout-profile/tax-form-envelope", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
 
   const db = getDb();
   const [profile] = await db
@@ -596,7 +598,7 @@ creatorRoutes.post("/me/payout-profile/tax-form-envelope", async (c) => {
     return c.json(error("VALIDATION_ERROR", "recipientEmail is required"), 400);
   }
 
-  const env = getEnv(c);
+  const env = requestEnv(c);
   const connector = getESignConnector(env.ESIGN_PROVIDER ?? null);
   const envelope = await connector.createEnvelope({
     documentId: `payout-profile:${profile.id}:${profile.taxFormType}`,
@@ -638,7 +640,7 @@ creatorRoutes.post("/me/payout-profile/tax-form-envelope", async (c) => {
 // GET /browse — public discovery list
 creatorRoutes.get("/browse", async (c) => {
   const db = getDb();
-  const limit = Math.min(parseInt(c.req.query("limit") ?? "30", 10) || 30, 100);
+  const limit = clampLimit(c.req.query("limit"), 30, 100);
   const category = c.req.query("category");
 
   const baseConds = [
@@ -756,8 +758,9 @@ creatorRoutes.get("/public/:userId", async (c) => {
 
 // GET /portfolio — own items
 creatorRoutes.get("/portfolio", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const db = getDb();
   const rows = await db
     .select()
@@ -791,8 +794,9 @@ creatorRoutes.get("/portfolio/public/:userId", async (c) => {
 
 // POST /portfolio — create item
 creatorRoutes.post("/portfolio", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const body = await c.req.json().catch(() => ({})) as {
     title?: string;
     description?: string;
@@ -832,8 +836,9 @@ creatorRoutes.post("/portfolio", async (c) => {
 
 // PUT /portfolio/:id — update item
 creatorRoutes.put("/portfolio/:id", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
   const db = getDb();
   const [existing] = await db
@@ -857,8 +862,9 @@ creatorRoutes.put("/portfolio/:id", async (c) => {
 
 // DELETE /portfolio/:id
 creatorRoutes.delete("/portfolio/:id", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const db = getDb();
   const [existing] = await db
     .select({ id: portfolioItems.id })
@@ -872,8 +878,9 @@ creatorRoutes.delete("/portfolio/:id", async (c) => {
 
 // POST /portfolio/:id/feature — set as featured (clears other featured items first)
 creatorRoutes.post("/portfolio/:id/feature", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const db = getDb();
   const [item] = await db
     .select()
@@ -903,8 +910,9 @@ creatorRoutes.post("/portfolio/:id/feature", async (c) => {
 // POST /projects — create a promo project from an inquiry
 // Body: { inquiryId, title, briefResumeId?, briefJobId?, briefNotes?, briefAssets?, conversationId? }
 creatorRoutes.post("/projects", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const body = await c.req.json().catch(() => ({})) as {
     inquiryId?: string;
     title?: string;
@@ -1027,8 +1035,9 @@ creatorRoutes.post("/projects", async (c) => {
 
 // GET /projects — list, filtered by role (creator | customer)
 creatorRoutes.get("/projects", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const db = getDb();
   const role = c.req.query("role"); // "creator" | "customer"
   const where =
@@ -1047,8 +1056,9 @@ creatorRoutes.get("/projects", async (c) => {
 
 // GET /projects/:id — single project + revisions + comments
 creatorRoutes.get("/projects/:id", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const db = getDb();
   const [project] = await db
     .select()
@@ -1078,8 +1088,9 @@ creatorRoutes.get("/projects/:id", async (c) => {
 
 // POST /projects/:id/revisions — creator submits a new revision
 creatorRoutes.post("/projects/:id/revisions", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const body = await c.req.json().catch(() => ({})) as {
     videoUrl?: string;
     thumbnailUrl?: string;
@@ -1153,8 +1164,9 @@ creatorRoutes.post("/projects/:id/revisions", async (c) => {
 
 // POST /projects/:id/revisions/:revId/decision — customer approves / requests changes
 creatorRoutes.post("/projects/:id/revisions/:revId/decision", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const body = await c.req.json().catch(() => ({})) as { decision?: string; feedback?: string };
   if (!body.decision || !["approved", "changes_requested"].includes(body.decision)) {
     return c.json(error("VALIDATION_ERROR", "decision must be 'approved' or 'changes_requested'"), 400);
@@ -1209,8 +1221,9 @@ creatorRoutes.post("/projects/:id/revisions/:revId/decision", async (c) => {
 
 // POST /projects/:id/buy-extra-revision — customer pays for an additional revision
 creatorRoutes.post("/projects/:id/buy-extra-revision", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const db = getDb();
   const [project] = await db
     .select()
@@ -1267,8 +1280,9 @@ creatorRoutes.post("/projects/:id/buy-extra-revision", async (c) => {
 
 // POST /projects/:id/accept — customer accepts delivery, escrow released
 creatorRoutes.post("/projects/:id/accept", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const body = await c.req.json().catch(() => ({})) as { portfolioConsent?: boolean };
   const db = getDb();
   const [project] = await db
@@ -1352,8 +1366,9 @@ creatorRoutes.post("/projects/:id/accept", async (c) => {
 
 // POST /projects/:id/dispute — open dispute (manual admin resolution)
 creatorRoutes.post("/projects/:id/dispute", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const body = await c.req.json().catch(() => ({})) as { reason?: string };
   const db = getDb();
   const [project] = await db

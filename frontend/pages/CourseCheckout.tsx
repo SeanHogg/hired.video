@@ -4,19 +4,16 @@
  *
  * Route: `/checkout/course/:courseId`
  *
- * Flow:
- *   1. POST /api/course-checkout/start { courseId } → mints a pending row.
+ * Flow (the one checkout surface, shared/checkout.ts):
+ *   1. POST /api/checkout { kind: "course", courseId } → mints (or resumes)
+ *      a pending checkout with the server-side price split.
  *   2. The page renders price + creator-cut + platform-fee split + a
- *      "Pay $X" button that triggers the existing payment provider.
- *   3. On payment success, the provider's success handler POSTs
- *      /api/course-checkout/:id/confirm-payment { providerPaymentId }
- *      which flips the row to `paid` and creates the enrolment.
+ *      "Pay $X" button.
+ *   3. useCheckoutPayment opens the payment widget for exactly the price
+ *      (POST /api/checkout/:id/pay), then POST /api/checkout/:id/confirm
+ *      with the widget's transaction id — the server re-reads it from the
+ *      provider before flipping the checkout to `paid` and enrolling.
  *   4. We navigate to `/learn/:enrollmentId` once the enrolment lands.
- *
- * All network calls go through `courseCheckoutService`; the existing
- * /api/payment endpoint owns provider-specific UI (Stripe Elements /
- * Helcim drop-in). When that endpoint isn't configured for a deployment,
- * the page surfaces a clear status.
  */
 
 import { useEffect, useState } from "react";
@@ -29,7 +26,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { usePageChrome } from "@/lib/seo";
 import { courseService, type Course } from "@/lib/services/course-service";
-import { courseCheckoutService, type CourseCheckoutRow } from "@/lib/services/course-checkout-service";
+import { checkoutService } from "@/lib/services/checkout-service";
+import { useCheckoutPayment } from "@/hooks/use-checkout-payment";
+import { apiServerErrorCode } from "@/lib/api-error-code";
+import type { CheckoutConfirmDTO, CheckoutDTO } from "@shared/checkout";
 import { CONTENT_CARD, EYEBROW_CHIP } from "@/components/content/content-ui";
 import { HERO_CTA_PRIMARY } from "@/components/marketing/MarketingHero";
 import { cn } from "@/lib/utils";
@@ -44,7 +44,8 @@ export default function CourseCheckout() {
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [course, setCourse] = useState<Course | null>(null);
-  const [checkout, setCheckout] = useState<CourseCheckoutRow | null>(null);
+  const [checkout, setCheckout] = useState<CheckoutDTO<"course"> | null>(null);
+  const { pay } = useCheckoutPayment();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -53,19 +54,18 @@ export default function CourseCheckout() {
     setLoading(true);
     (async () => {
       try {
-        const row = await courseCheckoutService.start(courseId);
+        const row = await checkoutService.start<"course">({ kind: "course", courseId });
         if (cancelled) return;
         // Course-detail fetch for the UI side.
-        const detail = await courseService.getDetails(row.courseId).catch(() => null);
+        const detail = await courseService.getDetails(row.details.courseId).catch(() => null);
         if (cancelled) return;
         setCheckout(row);
         if (detail) setCourse(detail.course);
-        if (row.status === "paid" && row.enrollmentId) {
-          navigate(`/learn/${row.enrollmentId}`, { replace: true });
+        if (row.status === "paid" && row.details.enrollmentId) {
+          navigate(`/learn/${row.details.enrollmentId}`, { replace: true });
         }
       } catch (e: unknown) {
-        const code = (e as { code?: string } | null)?.code;
-        if (code === "ALREADY_ENROLLED") {
+        if (apiServerErrorCode(e) === "ALREADY_ENROLLED") {
           // Happy path: user already paid → just route them in.
           const enrollments = await courseService.listMyEnrollments().catch(() => []);
           const existing = enrollments.find((r) => r.courseId === courseId);
@@ -86,19 +86,22 @@ export default function CourseCheckout() {
   const handlePay = async () => {
     if (!checkout) return;
     setPaying(true);
-    try {
-      const enrollmentId = await courseCheckoutService.payAndConfirm(checkout);
+    const result = await pay<CheckoutConfirmDTO<"course">>(checkout.id);
+    setPaying(false);
+    const enrollmentId = result.status === "paid" ? result.confirmation.outcome.enrollmentId : null;
+    if (enrollmentId) {
       toast({ title: t("courseCheckout.paySuccess"), description: t("courseCheckout.paySuccessBody") });
       navigate(`/learn/${enrollmentId}`, { replace: true });
-    } catch (e: unknown) {
+    } else if (result.status === "paid" || result.status === "verifying") {
+      toast({ title: t("courseCheckout.verifying"), description: t("courseCheckout.verifyingBody") });
+    } else if (result.status === "error") {
       toast({
         title: t("courseCheckout.payFailed"),
-        description: e instanceof Error ? e.message : t("actions.tryAgain"),
+        description: result.error instanceof Error && result.error.message ? result.error.message : t("actions.tryAgain"),
         variant: "destructive",
       });
-    } finally {
-      setPaying(false);
     }
+    // cancelled: the widget closed; the checkout stays pending for a retry.
   };
 
   if (!isAuthenticated) {
@@ -154,11 +157,11 @@ export default function CourseCheckout() {
             </div>
             <div className="flex items-center justify-between gap-3 px-4 py-3">
               <dt className="text-sm text-muted-foreground">{t("courseCheckout.creatorCut")}</dt>
-              <dd className="font-mono text-sm tabular-nums text-muted-foreground">{money(checkout.creatorCutCents)}</dd>
+              <dd className="font-mono text-sm tabular-nums text-muted-foreground">{money(checkout.details.creatorCutCents)}</dd>
             </div>
             <div className="flex items-center justify-between gap-3 px-4 py-3">
               <dt className="text-sm text-muted-foreground">{t("courseCheckout.platformFee")}</dt>
-              <dd className="font-mono text-sm tabular-nums text-muted-foreground">{money(checkout.platformFeeCents)}</dd>
+              <dd className="font-mono text-sm tabular-nums text-muted-foreground">{money(checkout.details.platformFeeCents)}</dd>
             </div>
           </dl>
 

@@ -17,6 +17,7 @@ import {
 } from "../../../../../shared/moderation/explicit.js";
 import { PromptBlockedError, screenPrompt, type HarmCategory } from "../promptGuard.js";
 import { TEXT_SYSTEM_PROMPT, parseClassifierVerdict } from "./classifierPrompt.js";
+import { logger } from "../../../lib/logger.js";
 
 /** "system + user → raw model text" — the AiTextCaller port. */
 export type TextClassifier = (systemPrompt: string, userMessage: string) => Promise<string>;
@@ -67,7 +68,7 @@ export async function scanTextExplicit(
     if (err instanceof PromptBlockedError) {
       return { verdict: "block", categories: [GUARD_CATEGORY[err.category]], reason: `rule: ${err.category}` };
     }
-    console.warn("[explicit-scan] text classifier failed:", err instanceof Error ? err.message : err);
+    logger.warn("[explicit-scan] text classifier failed", err);
     return unscreenedVerdict("text classifier failed");
   }
 }

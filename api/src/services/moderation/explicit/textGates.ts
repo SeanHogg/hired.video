@@ -14,11 +14,12 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../../db/index.js";
 import { userProfiles, users } from "../../../db/schema/users.js";
 import { ownerStatusOf, type ExplicitVerdict } from "../../../../../shared/moderation/explicit.js";
-import { sha256Hex } from "./bytes.js";
+import { sha256Hex } from "../../../utils/crypto.js";
 import { getScan, upsertScan } from "./contentScanRepository.js";
 import { ExplicitContentError } from "./errors.js";
 import { scanTextExplicit } from "./textScan.js";
 import { createExplicitScanDeps, type ExplicitScanDeps, type ExplicitScanEnv } from "./deps.js";
+import { logger } from "../../../lib/logger.js";
 
 type TextSubject = "profile" | "video_personalization";
 
@@ -58,7 +59,7 @@ export async function guardPublicText(
     await assertPublicTextAllowed(args, createExplicitScanDeps(env));
   } catch (err) {
     if (err instanceof ExplicitContentError) throw err;
-    console.error(`[explicit-scan] ${args.subject} text scan failed:`, err instanceof Error ? err.message : err);
+    logger.error("[explicit-scan] text scan failed", { subject: args.subject, error: err });
   }
 }
 

@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api-client";
+import { getVideoForm } from "@/lib/services/studio-features-service";
 
 export type CourseStatus = "draft" | "in_review" | "published" | "unlisted" | "flagged";
 export type CourseDifficulty = "beginner" | "intermediate" | "advanced";
@@ -124,6 +125,8 @@ export interface CourseLesson {
   estimatedMinutes: number | null;
   isRequired: boolean;
   knowledgeCheckFormId: string | null;
+  /** #1520 — optional companion Studio video for the lesson. */
+  companionStudioProjectId?: string | null;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -157,6 +160,7 @@ export interface CreateLessonInput {
   estimatedMinutes?: number;
   isRequired?: boolean;
   sortOrder?: number;
+  companionStudioProjectId?: string | null;
 }
 
 export type UpdateLessonInput = Partial<CreateLessonInput>;
@@ -399,16 +403,7 @@ export const courseService = {
     passingScorePct?: number;
     maxAttempts?: number;
   } | null> {
-    const res = await apiClient.get<{
-      id: string;
-      title: string;
-      fields: Array<{ key: string; label: string; type: string; options?: string[] }>;
-      answerKey: Record<string, { correctAnswer: string; points: number; rationale?: string }> | null;
-      passingScorePct: number | null;
-      maxAttempts: number | null;
-      formType: string;
-    }>(`/api/studio/forms/${formId}`);
-    const form = res.data;
+    const form = await getVideoForm(formId);
     if (!form || form.formType !== "knowledge_check" || !form.answerKey) return null;
     const questions = form.fields
       .filter((f) => f.type === "select" && Array.isArray(f.options) && f.options.length > 0)

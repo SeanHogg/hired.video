@@ -20,6 +20,7 @@ import type { AppEnv } from "../types/index.js";
 import { error, success } from "../types/index.js";
 import { isVideoPublishPlatform } from "../../../shared/social-platforms.js";
 import { checkDelivery, ingestDelivery, subscriptionReply } from "../services/distribution/metrics/ingest-webhook.js";
+import { logger } from "../lib/logger.js";
 
 export const socialWebhookRoutes = new Hono<AppEnv>();
 
@@ -46,7 +47,7 @@ socialWebhookRoutes.post("/:platform", async (c) => {
   if (!valid) return c.json(error("INVALID_SIGNATURE", "Signature check failed"), 401);
 
   const work = ingestDelivery(platform, body, c.env).catch((err) =>
-    console.error(`[social-webhooks] ${platform} ingest failed:`, err instanceof Error ? err.message : err),
+    logger.error("[social-webhooks] ingest failed", { platform, error: err instanceof Error ? err.message : err }),
   );
   try {
     c.executionCtx.waitUntil(work);

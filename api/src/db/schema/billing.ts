@@ -10,6 +10,7 @@ import {
   numeric,
   index,
   uniqueIndex,
+  check,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
@@ -148,6 +149,7 @@ export const refundRequests = pgTable("refund_requests", {
 }, (t) => [
   index("idx_refund_requests_user_status").on(t.userId, t.status),
   index("idx_refund_requests_invoice").on(t.invoiceId).where(sql`invoice_id IS NOT NULL`),
+  index("idx_refund_requests_resolved_by").on(t.resolvedBy),
 ]);
 
 export type RefundRequest = typeof refundRequests.$inferSelect;
@@ -161,23 +163,14 @@ export const billingEvents = pgTable("billing_events", {
   payload: jsonb("payload"),
   processedAt: timestamp("processed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_billing_events_user_id").on(t.userId),
+]);
 
 export type BillingEvent = typeof billingEvents.$inferSelect;
 export type NewBillingEvent = typeof billingEvents.$inferInsert;
 
-export const usageRecords = pgTable("usage_records", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  featureKey: varchar("feature_key", { length: 100 }).notNull(),
-  quantity: integer("quantity").default(1).notNull(),
-  periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
-  periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
 
-export type UsageRecord = typeof usageRecords.$inferSelect;
-export type NewUsageRecord = typeof usageRecords.$inferInsert;
 
 // ─── Employer / company seat-based subscriptions ─────────────────────────────
 // One row per company plan. seatCount × pricePerSeatCents = monthly charge.
@@ -214,3 +207,29 @@ export const companySubscriptions = pgTable("company_subscriptions", {
 
 export type CompanySubscription = typeof companySubscriptions.$inferSelect;
 export type NewCompanySubscription = typeof companySubscriptions.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// #809 — paid extra-inbox slots above the 3 included with Pro
+// ---------------------------------------------------------------------------
+export const inboxSeatAddons = pgTable(
+  "inbox_seat_addons",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+    quantity: integer("quantity").notNull().default(0),
+    /** Helcim recurring-plan / Stripe subscription-line ID we mirror updates from. */
+    providerSubscriptionId: text("provider_subscription_id"),
+    unitPriceCents: integer("unit_price_cents").notNull().default(500),
+    status: varchar("status", { length: 16 }).notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_inbox_seat_addons_status").on(t.status),
+    check("inbox_seat_addons_quantity_check", sql`${t.quantity} >= 0 AND ${t.quantity} <= 50`),
+    check("inbox_seat_addons_status_check", sql`${t.status} IN ('active', 'cancelled', 'past_due')`),
+  ],
+);
+
+export type InboxSeatAddon = typeof inboxSeatAddons.$inferSelect;
+export type NewInboxSeatAddon = typeof inboxSeatAddons.$inferInsert;

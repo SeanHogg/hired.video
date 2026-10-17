@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { formatLocaleDate } from "@/lib/format";
 import { ExternalLink, Loader2, Plug } from "lucide-react";
 import {
   Card,
@@ -79,12 +80,6 @@ export default function ConnectedPlatformsCard() {
     }
   };
 
-  const formatDate = (iso: string | null | undefined) => {
-    if (!iso) return "";
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString();
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -111,7 +106,7 @@ export default function ConnectedPlatformsCard() {
           <ul className="divide-y">
             {grants.map((grant) => {
               const meta = STATUS_META[grant.status];
-              const connectedDate = formatDate(grant.consentAgreedAt ?? grant.createdAt);
+              const connectedDate = formatLocaleDate(grant.consentAgreedAt ?? grant.createdAt);
               return (
                 <li
                   key={grant.id}

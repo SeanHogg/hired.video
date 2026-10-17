@@ -23,9 +23,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { resumeService, type ResumeSummary } from "@/lib/services/resume-service";
+import type { ResumeSummary } from "@/lib/services/resume-service";
 import { useAuth } from "@/lib/auth";
-import { useQuery } from "@tanstack/react-query";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 
 interface ResumeSelectionStepProps {
   onResumeSelected: (resumeData: {
@@ -52,11 +52,7 @@ export default function ResumeSelectionStep({
   const [isDragging, setIsDragging] = useState(false);
 
   // Fetch user's resumes if authenticated
-  const { data: resumes = [] } = useQuery({
-    queryKey: ["resumes"],
-    queryFn: () => resumeService.getUserResumes(),
-    enabled: isAuthenticated,
-  });
+  const { data: resumes = [] } = useUserResumes();
 
   // File handling
   const handleDragOver = useCallback((e: React.DragEvent) => {

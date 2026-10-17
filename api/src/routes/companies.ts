@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
-import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { buildAIErrorEnvelope } from "../services/adapters/llm-error.js";
@@ -13,11 +12,30 @@ import { slugify } from "../../../shared/slugify.js";
 import { COMPANY_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import { bumpSearchVersion, getCachedSearch } from "../utils/search-cache.js";
 import { toJsonSafe } from "../utils/json-safe.js";
+import { parsePagination } from "../utils/pagination.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { withCacheHeaders } from "../utils/cache-headers.js";
 import { recordArtifactView, ipCountryFromCtx } from "../services/analytics/artifactView.js";
 import { buildApiDeps } from "../services/apiDeps.js";
 import { LocationService } from "../services/location/LocationService.js";
+import { logger } from "../lib/logger.js";
+import { hashClientIp } from "../utils/crypto.js";
+import {
+  handleCreateLocation,
+  handleCreateTeamMember,
+  handleDeleteLocation,
+  handleDeleteTeamMember,
+  handleFollowCompany,
+  handleFollowingStatus,
+  handleListLocations,
+  handleListTeamMembers,
+  handleUnfollowCompany,
+  handleUpdateLocation,
+  handleUpdateTeamMember,
+  type CompanyDeps,
+} from "../services/company/handlers.js";
+import { toHandlerResult } from "../handlers/shared.js";
+import { sendHandlerResult } from "./helpers/routerHelpers.js";
 
 const {
   companyProfiles,
@@ -34,6 +52,11 @@ export const companyRoutes = new Hono<AppEnv>();
 
 function userId(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
+}
+
+/** Deps for the company use cases in services/company/handlers.ts. */
+function companyDeps(): CompanyDeps {
+  return { db: getDb(), now: () => new Date() };
 }
 
 /** Render a structured headquarters object as a single display string —
@@ -163,25 +186,6 @@ async function recordCompanyView(
   } as any);
 }
 
-/** Short, non-cryptographic hash of the client IP + daily salt. Mirrors
- *  hashClientIp in routes/resumes.ts — shared pattern for anonymous
- *  dedup without storing the raw address. */
-function hashClientIp(c: any): string | null {
-  const ip =
-    c.req.header?.("cf-connecting-ip") ??
-    c.req.header?.("x-forwarded-for")?.split(",")[0]?.trim() ??
-    null;
-  if (!ip) return null;
-  const salt = new Date().toISOString().slice(0, 10);
-  const enc = new TextEncoder().encode(`${ip}|${salt}`);
-  let h = 0x811c9dc5;
-  for (let i = 0; i < enc.length; i++) {
-    h ^= enc[i];
-    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
-  }
-  return h.toString(16).padStart(8, "0");
-}
-
 // Public company listing
 /** Fire-and-forget: tag a company's headquarters into `content_locations`
  *  (kind "company") so the structured geo filter on /public can match it
@@ -208,14 +212,13 @@ function tagCompanyGeo(c: any, companyId: string, hq: unknown) {
         });
       }
     } catch (err) {
-      console.error("[company] geo tag failed:", err);
+      logger.error("[company] geo tag failed", err);
     }
   })();
 }
 
 companyRoutes.get("/public", async (c) => {
-  const page = Math.max(1, Number(c.req.query("page") ?? 1));
-  const limit = Math.min(100, Math.max(1, Number(c.req.query("limit") ?? 10)));
+  const { page, limit } = parsePagination(c, { defaultLimit: 10, maxLimit: 100 });
   const search = c.req.query("search")?.trim();
 
   // Structured geo filter (#1178): mirror the unified-search pattern — resolve
@@ -340,33 +343,27 @@ companyRoutes.get("/:id/jobs", async (c) => {
 companyRoutes.post("/:id/follow", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-  const company = await findCompanyByIdOrSlug(db, c.req.param("id"));
+  const company = await findCompanyByIdOrSlug(getDb(), c.req.param("id"));
   if (!company) return c.json(error("NOT_FOUND", "Company not found"), 404);
-  await db.insert(companyFollowers).values({ userId: uid, companyId: company.id }).onConflictDoNothing();
-  return c.json(success({ success: true }), 200);
+  return c.json(success(await handleFollowCompany(companyDeps(), uid, company.id)), 200);
 });
 
 // Unfollow a company
 companyRoutes.delete("/:id/follow", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-  const company = await findCompanyByIdOrSlug(db, c.req.param("id"));
+  const company = await findCompanyByIdOrSlug(getDb(), c.req.param("id"));
   if (!company) return c.json(error("NOT_FOUND", "Company not found"), 404);
-  await db.delete(companyFollowers).where(and(eq(companyFollowers.userId, uid), eq(companyFollowers.companyId, company.id)));
-  return c.json(success({ success: true }), 200);
+  return c.json(success(await handleUnfollowCompany(companyDeps(), uid, company.id)), 200);
 });
 
 // Is the current user following this company?
 companyRoutes.get("/:id/following-status", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(success({ isFollowing: false }), 200);
-  const db = getDb();
-  const company = await findCompanyByIdOrSlug(db, c.req.param("id"));
+  const company = await findCompanyByIdOrSlug(getDb(), c.req.param("id"));
   if (!company) return c.json(success({ isFollowing: false }), 200);
-  const [row] = await db.select({ id: companyFollowers.userId }).from(companyFollowers).where(and(eq(companyFollowers.userId, uid), eq(companyFollowers.companyId, company.id))).limit(1);
-  return c.json(success({ isFollowing: !!row }), 200);
+  return c.json(success(await handleFollowingStatus(companyDeps(), uid, company.id)), 200);
 });
 
 // Company stats
@@ -410,7 +407,12 @@ companyRoutes.post("/", async (c) => {
   const blocked = await servicesProcessor.enforce(c, "company_db_write");
   if (blocked) return blocked;
 
-  const slug = String(body.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  // Legacy company-slug derivation (no NFKD, uncapped) — kept byte-identical.
+  const slug = slugify(String(body.name), {
+    fallback: "",
+    maxLen: Number.POSITIVE_INFINITY,
+    stripDiacritics: false,
+  });
   const db = getDb();
   const [row] = await db.insert(companyProfiles).values({ ownerId: uid, name: body.name, slug, ...buildWritableFields(body) } as any).returning();
 
@@ -527,139 +529,68 @@ companyRoutes.put("/:id", async (c) => {
 
 // ─── Company Locations ────────────────────────────────────────────────────
 // CRUD for the multi-office structure referenced by CompanyProfile.locations.
-
-const LocationSchema = z.object({
-  label: z.string().max(100).optional().nullable(),
-  address: z.string().max(255).optional().nullable(),
-  city: z.string().max(100).optional().nullable(),
-  region: z.string().max(100).optional().nullable(),
-  postalCode: z.string().max(20).optional().nullable(),
-  countryCode: z.string().max(8).optional().nullable(),
-  isPrimary: z.boolean().optional(),
-  displayOrder: z.number().int().min(0).optional(),
-});
+// Business rules live in services/company/handlers.ts; the route resolves
+// `:id` (uuid or slug) and authorizes writes with requireCompanyOwner.
 
 companyRoutes.get("/:id/locations", async (c) => {
-  const db = getDb();
-  const company = await findCompanyByIdOrSlug(db, c.req.param("id"));
+  const company = await findCompanyByIdOrSlug(getDb(), c.req.param("id"));
   if (!company) return c.json(error("NOT_FOUND", "Company not found"), 404);
-  const rows = await db
-    .select()
-    .from(companyLocations)
-    .where(eq(companyLocations.companyId, company.id))
-    .orderBy(asc(companyLocations.displayOrder));
-  return c.json(success(rows), 200);
+  return c.json(success(await handleListLocations(companyDeps(), company.id)), 200);
 });
 
 companyRoutes.post("/:id/locations", async (c) => {
   const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
   if (denied) return denied;
-  const parsed = LocationSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid location", parsed.error.flatten()), 400);
-  const db = getDb();
-  const [row] = await db
-    .insert(companyLocations)
-    .values({ companyId: access!.companyId, ...parsed.data } as any)
-    .returning();
-  return c.json(success(row), 201);
+  const body = await c.req.json().catch(() => ({}));
+  return sendHandlerResult(c, await toHandlerResult(handleCreateLocation(companyDeps(), access!.companyId, body), 201));
 });
 
 companyRoutes.put("/:id/locations/:locationId", async (c) => {
   const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
   if (denied) return denied;
-  const parsed = LocationSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid location", parsed.error.flatten()), 400);
-  const db = getDb();
-  const [row] = await db
-    .update(companyLocations)
-    .set({ ...parsed.data, updatedAt: new Date() } as any)
-    .where(and(
-      eq(companyLocations.id, c.req.param("locationId")),
-      eq(companyLocations.companyId, access!.companyId),
-    ))
-    .returning();
-  if (!row) return c.json(error("NOT_FOUND", "Location not found"), 404);
-  return c.json(success(row), 200);
+  const body = await c.req.json().catch(() => ({}));
+  return sendHandlerResult(
+    c,
+    await toHandlerResult(handleUpdateLocation(companyDeps(), access!.companyId, c.req.param("locationId"), body)),
+  );
 });
 
 companyRoutes.delete("/:id/locations/:locationId", async (c) => {
   const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
   if (denied) return denied;
-  const db = getDb();
-  await db
-    .delete(companyLocations)
-    .where(and(
-      eq(companyLocations.id, c.req.param("locationId")),
-      eq(companyLocations.companyId, access!.companyId),
-    ));
+  await handleDeleteLocation(companyDeps(), access!.companyId, c.req.param("locationId"));
   return c.json(success(null, "Location deleted"), 200);
 });
 
 // ─── Company Team Members ─────────────────────────────────────────────────
 
-const TeamMemberSchema = z.object({
-  userId: UuidLikeSchema.optional().nullable(),
-  name: z.string().min(1).max(255),
-  title: z.string().max(255).optional().nullable(),
-  bio: z.string().max(2000).optional().nullable(),
-  avatarUrl: z.string().url().optional().nullable(),
-  linkedinUrl: z.string().url().optional().nullable(),
-  displayOrder: z.number().int().min(0).optional(),
-});
-
 companyRoutes.get("/:id/team", async (c) => {
-  const db = getDb();
-  const company = await findCompanyByIdOrSlug(db, c.req.param("id"));
+  const company = await findCompanyByIdOrSlug(getDb(), c.req.param("id"));
   if (!company) return c.json(error("NOT_FOUND", "Company not found"), 404);
-  const rows = await db
-    .select()
-    .from(companyTeamMembers)
-    .where(eq(companyTeamMembers.companyId, company.id))
-    .orderBy(asc(companyTeamMembers.displayOrder));
-  return c.json(success(rows), 200);
+  return c.json(success(await handleListTeamMembers(companyDeps(), company.id)), 200);
 });
 
 companyRoutes.post("/:id/team", async (c) => {
   const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
   if (denied) return denied;
-  const parsed = TeamMemberSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid team member", parsed.error.flatten()), 400);
-  const db = getDb();
-  const [row] = await db
-    .insert(companyTeamMembers)
-    .values({ companyId: access!.companyId, ...parsed.data } as any)
-    .returning();
-  return c.json(success(row), 201);
+  const body = await c.req.json().catch(() => ({}));
+  return sendHandlerResult(c, await toHandlerResult(handleCreateTeamMember(companyDeps(), access!.companyId, body), 201));
 });
 
 companyRoutes.put("/:id/team/:memberId", async (c) => {
   const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
   if (denied) return denied;
-  const parsed = TeamMemberSchema.partial().safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid team member", parsed.error.flatten()), 400);
-  const db = getDb();
-  const [row] = await db
-    .update(companyTeamMembers)
-    .set({ ...parsed.data, updatedAt: new Date() } as any)
-    .where(and(
-      eq(companyTeamMembers.id, c.req.param("memberId")),
-      eq(companyTeamMembers.companyId, access!.companyId),
-    ))
-    .returning();
-  if (!row) return c.json(error("NOT_FOUND", "Team member not found"), 404);
-  return c.json(success(row), 200);
+  const body = await c.req.json().catch(() => ({}));
+  return sendHandlerResult(
+    c,
+    await toHandlerResult(handleUpdateTeamMember(companyDeps(), access!.companyId, c.req.param("memberId"), body)),
+  );
 });
 
 companyRoutes.delete("/:id/team/:memberId", async (c) => {
   const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
   if (denied) return denied;
-  const db = getDb();
-  await db
-    .delete(companyTeamMembers)
-    .where(and(
-      eq(companyTeamMembers.id, c.req.param("memberId")),
-      eq(companyTeamMembers.companyId, access!.companyId),
-    ));
+  await handleDeleteTeamMember(companyDeps(), access!.companyId, c.req.param("memberId"));
   return c.json(success(null, "Team member deleted"), 200);
 });
 
@@ -887,7 +818,7 @@ Return JSON: { "name": "...", "industry": "...", "size": "...", "location": "...
   }
 
   // Dedup: check for existing company by name (case-insensitive)
-  const slug = extracted.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 100);
+  const slug = slugify(extracted.name, { fallback: "", maxLen: 100, stripDiacritics: false });
 
   const [existing] = await db
     .select()

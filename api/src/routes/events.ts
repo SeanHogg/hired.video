@@ -29,12 +29,15 @@ import { z } from "zod";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { buildApiDeps } from "../services/apiDeps.js";
+import { requestEnv } from "../utils/env.js";
+import { parsePagination } from "../utils/pagination.js";
 import type { UserRow } from "../repositories/usersRepository.js";
 import { LocationService } from "../services/location/LocationService.js";
 import { EventService } from "../services/event/EventService.js";
 import { EventRsvpService } from "../services/event/EventRsvpService.js";
 import { EventMatchmakingService } from "../services/event/EventMatchmakingService.js";
 import { EventBlastService } from "../services/event/EventBlastService.js";
+import { logger } from "../lib/logger.js";
 import {
   CreateEventSchema,
   EventSearchFilterSchema,
@@ -44,12 +47,11 @@ import {
 
 export const eventRoutes = new Hono<AppEnv>();
 
-function getEnv(c: any): Record<string, string | undefined> {
-  return (c?.env ?? {}) as Record<string, string | undefined>;
-}
 
 // ─── GET / — discovery search ──────────────────────────────────────────
 eventRoutes.get("/", async (c) => {
+  // Bounds mirror EventSearchFilterSchema (limit 1..100, default 20).
+  const { limit, offset } = parsePagination(c, { defaultLimit: 20, maxLimit: 100 });
   const query = {
     q: c.req.query("q"),
     category: c.req.query("category"),
@@ -64,13 +66,13 @@ eventRoutes.get("/", async (c) => {
     radiusKm: c.req.query("radiusKm") ? Number(c.req.query("radiusKm")) : undefined,
     hostUserId: c.req.query("hostUserId"),
     scope: (c.req.query("scope") as any) ?? "upcoming",
-    limit: c.req.query("limit") ? Number(c.req.query("limit")) : 20,
-    offset: c.req.query("offset") ? Number(c.req.query("offset")) : 0,
+    limit,
+    offset,
   };
   const parsed = EventSearchFilterSchema.safeParse(query);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid query", parsed.error.flatten()), 400);
 
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const events = new EventService(deps);
   const location = new LocationService(deps);
 
@@ -111,7 +113,7 @@ eventRoutes.get("/", async (c) => {
 
 // ─── GET /categories ───────────────────────────────────────────────────
 eventRoutes.get("/categories", async (c) => {
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const cats = await deps.repos.events.listCategories(null);
   return c.json(success(cats), 200);
 });
@@ -122,7 +124,7 @@ eventRoutes.get("/mine", async (c) => {
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const scope = (c.req.query("scope") as "upcoming" | "past" | "all") ?? "upcoming";
 
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const events = new EventService(deps);
 
   const [hosted, attending] = await Promise.all([
@@ -161,7 +163,7 @@ eventRoutes.post("/", async (c) => {
   const parsed = CreateEventSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
 
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const events = new EventService(deps);
   const row = await events.create(userId, parsed.data);
 
@@ -184,7 +186,7 @@ eventRoutes.post("/", async (c) => {
 
 // ─── GET /slug/:slug ───────────────────────────────────────────────────
 eventRoutes.get("/slug/:slug", async (c) => {
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const row = await deps.repos.events.findBySlug(c.req.param("slug"));
   if (!row) return c.json(error("NOT_FOUND", "Event not found"), 404);
   if (!isVisibleToViewer(row, c.var.user?.sub ?? null)) {
@@ -196,7 +198,7 @@ eventRoutes.get("/slug/:slug", async (c) => {
 
 // ─── GET /:id ──────────────────────────────────────────────────────────
 eventRoutes.get("/:id", async (c) => {
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const row = await deps.repos.events.findById(c.req.param("id"));
   if (!row) return c.json(error("NOT_FOUND", "Event not found"), 404);
   if (!isVisibleToViewer(row, c.var.user?.sub ?? null)) {
@@ -215,7 +217,7 @@ eventRoutes.patch("/:id", async (c) => {
   const parsed = UpdateEventSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
 
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const events = new EventService(deps);
   const updated = await events.update(c.req.param("id"), userId, parsed.data);
   if (!updated) return c.json(error("FORBIDDEN", "Cannot edit this event"), 403);
@@ -233,7 +235,7 @@ eventRoutes.post("/:id/publish", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const events = new EventService(deps);
   const updated = await events.update(c.req.param("id"), userId, { publish: true });
   if (!updated) return c.json(error("FORBIDDEN", "Cannot publish this event"), 403);
@@ -246,7 +248,7 @@ eventRoutes.post("/:id/cancel", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const events = new EventService(deps);
   const updated = await events.cancel(c.req.param("id"), userId);
   if (!updated) return c.json(error("FORBIDDEN", "Cannot cancel this event"), 403);
@@ -263,7 +265,7 @@ eventRoutes.post("/:id/rsvp", async (c) => {
   const parsed = RsvpSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
 
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const rsvp = new EventRsvpService(deps);
   const result = await rsvp.rsvp(c.req.param("id"), userId, parsed.data);
   if (!result) return c.json(error("NOT_FOUND", "Event not found or cancelled"), 404);
@@ -282,7 +284,7 @@ eventRoutes.post("/:id/rsvp", async (c) => {
 
 // ─── GET /:id/attendees ────────────────────────────────────────────────
 eventRoutes.get("/:id/attendees", async (c) => {
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const eventId = c.req.param("id");
   const row = await deps.repos.events.findById(eventId);
   if (!row) return c.json(error("NOT_FOUND", "Event not found"), 404);
@@ -319,7 +321,7 @@ eventRoutes.get("/:id/attendees/pending", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const eventId = c.req.param("id");
   const event = await deps.repos.events.findById(eventId);
   if (!event) return c.json(error("NOT_FOUND", "Event not found"), 404);
@@ -366,7 +368,7 @@ eventRoutes.post("/:id/attendees/:attendeeId/approve", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   void attendeeActionSchema.safeParse(await c.req.json().catch(() => ({})));
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const rsvp = new EventRsvpService(deps);
   const ok = await rsvp.approve(c.req.param("id"), c.req.param("attendeeId"), userId);
   if (!ok) return c.json(error("FORBIDDEN", "Cannot approve this RSVP"), 403);
@@ -376,7 +378,7 @@ eventRoutes.post("/:id/attendees/:attendeeId/approve", async (c) => {
 eventRoutes.post("/:id/attendees/:attendeeId/reject", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const rsvp = new EventRsvpService(deps);
   const ok = await rsvp.reject(c.req.param("id"), c.req.param("attendeeId"), userId);
   if (!ok) return c.json(error("FORBIDDEN", "Cannot reject this RSVP"), 403);
@@ -386,7 +388,7 @@ eventRoutes.post("/:id/attendees/:attendeeId/reject", async (c) => {
 eventRoutes.post("/:id/attendees/:attendeeId/check-in", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const rsvp = new EventRsvpService(deps);
   const result = await rsvp.checkIn(c.req.param("id"), c.req.param("attendeeId"), userId);
   if (result === false) return c.json(error("FORBIDDEN", "Cannot check in this attendee"), 403);
@@ -404,7 +406,7 @@ eventRoutes.post("/:id/attendees/:attendeeId/check-in", async (c) => {
         refType: "event",
       });
     } catch (e) {
-      console.warn("[gamification] event-attended award failed", { error: String(e) });
+      logger.warn("[gamification] event-attended award failed", { error: String(e) });
     }
   }
 
@@ -419,7 +421,7 @@ eventRoutes.get("/:id/matches", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const matchmaking = new EventMatchmakingService(deps);
 
   let matches = await matchmaking.topForViewer(c.req.param("id"), userId, 10);
@@ -456,7 +458,7 @@ eventRoutes.get("/:id/analytics", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const event = await deps.repos.events.findById(c.req.param("id"));
   if (!event) return c.json(error("NOT_FOUND", "Event not found"), 404);
 
@@ -500,7 +502,7 @@ eventRoutes.get("/:id/attendees/export.csv", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const event = await deps.repos.events.findById(c.req.param("id"));
   if (!event) return c.json(error("NOT_FOUND", "Event not found"), 404);
 
@@ -563,7 +565,7 @@ eventRoutes.post("/:id/blast", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Subject and message are required"), 400);
   }
 
-  const deps = buildApiDeps(getEnv(c));
+  const deps = buildApiDeps(requestEnv(c));
   const blast = new EventBlastService(deps);
   if (!(await blast.canBlast(c.req.param("id"), userId))) {
     return c.json(error("FORBIDDEN", "Only the host or co-hosts can blast attendees"), 403);

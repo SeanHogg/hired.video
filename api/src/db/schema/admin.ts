@@ -46,26 +46,12 @@ export const impersonationRoleSwitches = pgTable("impersonation_role_switches", 
   fromRole: varchar("from_role", { length: 100 }).notNull(),
   toRole: varchar("to_role", { length: 100 }).notNull(),
   switchedAt: timestamp("switched_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_impersonation_role_switches_session_id").on(t.sessionId),
+]);
 
 export type ImpersonationRoleSwitch = typeof impersonationRoleSwitches.$inferSelect;
 export type NewImpersonationRoleSwitch = typeof impersonationRoleSwitches.$inferInsert;
-
-// ---------------------------------------------------------------------------
-// Role-level permission overrides (layers on top of coded defaults)
-// ---------------------------------------------------------------------------
-export const rolePermissionOverrides = pgTable("role_permission_overrides", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  role: varchar("role", { length: 100 }).notNull(),
-  permissionKey: varchar("permission_key", { length: 200 }).notNull(),
-  granted: boolean("granted").notNull(), // true = explicit grant, false = explicit revoke
-  reason: text("reason"),
-  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
-
-export type RolePermissionOverride = typeof rolePermissionOverrides.$inferSelect;
-export type NewRolePermissionOverride = typeof rolePermissionOverrides.$inferInsert;
 
 // ---------------------------------------------------------------------------
 // Modules (feature bundles)
@@ -98,6 +84,8 @@ export const userModuleAssignments = pgTable("user_module_assignments", {
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
 }, (t) => [
   index("idx_user_module_assignments_user").on(t.userId),
+  index("idx_user_module_assignments_assigned_by").on(t.assignedBy),
+  index("idx_user_module_assignments_module_id").on(t.moduleId),
 ]);
 
 export type UserModuleAssignment = typeof userModuleAssignments.$inferSelect;
@@ -116,6 +104,7 @@ export const userPermissionOverrides = pgTable("user_permission_overrides", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_user_permission_overrides_user").on(t.userId),
+  index("idx_user_permission_overrides_granted_by").on(t.grantedBy),
 ]);
 
 export type UserPermissionOverride = typeof userPermissionOverrides.$inferSelect;
@@ -173,6 +162,7 @@ export const adminAuditLog = pgTable("admin_audit_log", {
   index("idx_admin_audit_log_target").on(t.targetId),
   index("idx_admin_audit_log_created").on(t.createdAt.desc().nullsFirst()),
   index("idx_admin_audit_log_actor_created").on(t.actorId, t.createdAt.desc().nullsFirst()).where(sql`actor_id IS NOT NULL`),
+  index("idx_admin_audit_log_impersonation_session_id").on(t.impersonationSessionId),
 ]);
 
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;

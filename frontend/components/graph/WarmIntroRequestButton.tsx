@@ -31,7 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
 import { graphService, type PersonRef } from "@/lib/services/graph-service";
-import { initials } from "@/lib/utils/initials";
+import { initials } from "@/lib/format";
 
 interface WarmIntroRequestButtonProps {
   targetUserId: string;

@@ -10,6 +10,7 @@
 // <ShareMenu> (LinkedIn / X / Facebook / WhatsApp / Email / copy / native).
 
 import { useEffect, useState } from "react";
+import { formatPriceCents } from "@/lib/format";
 import { Navigate, useParams } from "react-router-dom";
 import {
   Check,
@@ -47,15 +48,6 @@ interface VoiceCloneDetail {
   accent: string | null;
   purchaseCount: number;
   platformFeeBps: number | null;
-}
-
-function formatPrice(cents: number, currency: string): string {
-  if (cents === 0) return "Free";
-  const major = cents / 100;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency || "USD",
-  }).format(major);
 }
 
 function VoiceSEO({ clone }: { clone: VoiceCloneDetail }) {
@@ -173,7 +165,7 @@ export default function VoicePublicDetail() {
     <>
       <ShareMenu url={shareUrl} title={clone.name} text={clone.description ?? undefined} />
       <span className="font-semibold tabular-nums">
-        {formatPrice(clone.priceCents, clone.currency)}
+        {formatPriceCents(clone.priceCents, clone.currency)}
       </span>
       <Button size="sm" onClick={handleAddToCart} disabled={inCart} className="gap-2">
         {inCart ? (

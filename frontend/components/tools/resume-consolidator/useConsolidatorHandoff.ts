@@ -9,23 +9,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
-import { resumeService } from "@/lib/services/resume-service";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { useOpenReview } from "@/lib/tools/use-open-review";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 
 export function useConsolidatorHandoff() {
   const { t } = useTranslation();
   const openReview = useOpenReview();
   const { resumeId: deepLinkResumeId } = useToolEntityParams();
   const { isAuthenticated } = useAuth();
-  const { data: resumes = [] } = useQuery({
-    queryKey: ["resumes-owned"],
-    queryFn: () => resumeService.getUserResumes(),
-    enabled: isAuthenticated,
-  });
+  const { data: resumes = [] } = useUserResumes();
 
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [pickedTarget, setTargetId] = useState<string | null>(null);

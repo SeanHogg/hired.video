@@ -1,6 +1,7 @@
 /**
- * Tremendous API client. Used by the gamification redemption engine to
- * dispatch gift cards.
+ * Tremendous API client — the ONLY HTTP client for Tremendous. Used by the
+ * gamification redemption engine (gift cards), the partner pool, and the
+ * creator payout rail (services/payout/tremendous.ts wraps it).
  *
  * Env:
  *   TREMENDOUS_API_KEY        — bearer token (sandbox: testapi-* /
@@ -23,23 +24,33 @@
  * so the redemption engine can decide whether to retry or fail the row.
  */
 
+export const TREMENDOUS_PRODUCTION_BASE_URL = "https://api.tremendous.com/api/v2";
+export const TREMENDOUS_SANDBOX_BASE_URL = "https://testflight.tremendous.com/api/v2";
+
 export interface TremendousEnv {
   apiKey: string;
   baseUrl?: string;
-  fundingSourceId: string;
-  campaignId: string;
+  /** Funding source to debit; omitted → the account's primary source. */
+  fundingSourceId?: string;
+  /** Campaign (catalog + branding); omitted → pass `productIds` per order. */
+  campaignId?: string;
 }
 
 export interface CreateOrderArgs {
   /** External id we own — Tremendous dedups on this. Use the redemption
    *  row id so the SAME redemption never dispatches twice. */
   externalId: string;
-  recipientName: string;
+  /** Optional — payout recipients are identified by email alone. */
+  recipientName?: string;
   recipientEmail: string;
   /** Amount in dollars (NOT cents). Tremendous expects a number. */
   amountDollars: number;
+  /** ISO-4217; defaults to USD. */
+  currency?: string;
   /** Optional message in the gift-card email. */
   message?: string;
+  /** Extra custom fields (e.g. a payout memo). */
+  customFields?: Array<{ id: string; value: string }>;
   /** Optional product id list to restrict the user's catalog of choices.
    *  When omitted, uses the campaign-default catalog. */
   productIds?: string[];
@@ -64,21 +75,25 @@ export class TremendousClient {
   private readonly baseUrl: string;
 
   constructor(private readonly env: TremendousEnv) {
-    this.baseUrl = env.baseUrl ?? "https://api.tremendous.com/api/v2";
+    this.baseUrl = env.baseUrl ?? TREMENDOUS_PRODUCTION_BASE_URL;
   }
 
   async createOrder(args: CreateOrderArgs): Promise<TremendousOrderResult> {
+    const customFields = [
+      ...(args.message ? [{ id: "message", value: args.message }] : []),
+      ...(args.customFields ?? []),
+    ];
     const body = {
       external_id: args.externalId,
-      payment: { funding_source_id: this.env.fundingSourceId },
+      ...(this.env.fundingSourceId ? { payment: { funding_source_id: this.env.fundingSourceId } } : {}),
       rewards: [
         {
-          value: { denomination: args.amountDollars, currency_code: "USD" },
+          value: { denomination: args.amountDollars, currency_code: args.currency ?? "USD" },
           delivery: { method: "EMAIL" },
-          recipient: { name: args.recipientName, email: args.recipientEmail },
-          campaign_id: this.env.campaignId,
+          recipient: { ...(args.recipientName ? { name: args.recipientName } : {}), email: args.recipientEmail },
+          ...(this.env.campaignId ? { campaign_id: this.env.campaignId } : {}),
           ...(args.productIds ? { products: args.productIds } : {}),
-          ...(args.message ? { custom_fields: [{ id: "message", value: args.message }] } : {}),
+          ...(customFields.length > 0 ? { custom_fields: customFields } : {}),
         },
       ],
     };

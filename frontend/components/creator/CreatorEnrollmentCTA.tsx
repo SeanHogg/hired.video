@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { USER_ROLES } from "@shared/user-roles";
-import { creatorService } from "@/lib/services/creator-service";
+import { useCreatorMine } from "@/hooks/queries/use-creator";
 import CreatorEnrollmentWizard from "@/components/creator/CreatorEnrollmentWizard";
 
 /**
@@ -22,19 +22,13 @@ import CreatorEnrollmentWizard from "@/components/creator/CreatorEnrollmentWizar
  */
 export default function CreatorEnrollmentCTA() {
   const effectiveRole = useEffectiveRole();
-  const [enrolled, setEnrolled] = useState<boolean | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   const isCreatorRole = effectiveRole === USER_ROLES.CREATOR;
 
-  useEffect(() => {
-    if (!isCreatorRole) return;
-    let cancelled = false;
-    creatorService.getMine()
-      .then((p) => { if (!cancelled) setEnrolled(p !== null); })
-      .catch(() => { if (!cancelled) setEnrolled(false); });
-    return () => { cancelled = true; };
-  }, [isCreatorRole]);
+  const mine = useCreatorMine({ enabled: isCreatorRole });
+  // null = still loading; a failed read counts as "not enrolled".
+  const enrolled: boolean | null = mine.isError ? false : mine.isSuccess ? mine.data !== null : null;
 
   // Hidden for non-creators, while loading, and once enrolled.
   if (!isCreatorRole || enrolled !== false) return null;
@@ -68,7 +62,7 @@ export default function CreatorEnrollmentCTA() {
       <CreatorEnrollmentWizard
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
-        onEnrolled={() => { setEnrolled(true); setWizardOpen(false); }}
+        onEnrolled={() => setWizardOpen(false)}
       />
     </>
   );

@@ -35,7 +35,12 @@ import { useAutosaveConflictPrompt } from "@/components/workspace/AutosaveConfli
 import type { IntakeSource } from "./use-resume-intake";
 import { resumeTitle } from "./preview-resume";
 
-export const SAVE_DEBOUNCE_MS = 800;
+/** Each save rewrites the whole résumé jsonb, so edits coalesce for 3s of
+ *  quiet (never longer than SAVE_MAX_WAIT_MS of continuous typing). A
+ *  pending write is flushed on blur, tab hide, pagehide and unmount, so the
+ *  longer window never loses an edit. */
+export const SAVE_DEBOUNCE_MS = 3_000;
+export const SAVE_MAX_WAIT_MS = 15_000;
 /** Longest stretch of editing between two autosave version rows. */
 export const VERSION_INTERVAL_MS = 30_000;
 
@@ -110,6 +115,8 @@ export function useDraftAutosave({
     enabled: !!savedResumeId && !!content,
     ready: true,
     debounceMs: SAVE_DEBOUNCE_MS,
+    maxWaitMs: SAVE_MAX_WAIT_MS,
+    flushOnBlur: true,
     computeSnapshot,
     isSaving: false,
     save: async () => {

@@ -22,6 +22,7 @@ import type { getDb } from "../../../db/index.js";
 import { schema } from "../../../db/index.js";
 import { decryptSecret } from "../secrets.js";
 import { linkedInApiVersion } from "../../../utils/linkedin-version.js";
+import { sha256Hex } from "../../../utils/crypto.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -64,10 +65,6 @@ interface CapiEnv {
   PAID_MEDIA_KMS_KEY?: string;
 }
 
-async function sha256Hex(input: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 function normaliseEmail(s: string): string { return s.trim().toLowerCase(); }
 function normalisePhone(s: string): string { return s.replace(/\D/g, ""); }

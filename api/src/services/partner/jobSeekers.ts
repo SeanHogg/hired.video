@@ -9,7 +9,9 @@
  */
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
-import { hashPassword } from "../../routes/auth.js";
+import { hashPassword } from "../auth/password.js";
+import { randomHex } from "../../utils/crypto.js";
+import { publicAppBaseUrl } from "../../utils/public-urls.js";
 import { getOrSetCached } from "../../utils/edge-cache.js";
 import { buildRepos } from "../../repositories/index.js";
 import { getVisiblePitch } from "../pitch/pitchService.js";
@@ -26,18 +28,6 @@ import type { PartnerResumeStatus, PartnerScope } from "../../../../shared/partn
 
 const { users, userProfiles } = schema;
 
-/** Public base URL of the app (where claim / consent links resolve). */
-export function appBaseUrl(): string {
-  return (
-    process?.env?.PUBLIC_APP_URL ||
-    process?.env?.FRONTEND_URL ||
-    process?.env?.APP_URL ||
-    (globalThis as any).__ENV?.PUBLIC_APP_URL ||
-    (globalThis as any).__ENV?.FRONTEND_URL ||
-    "https://hired.video"
-  ).replace(/\/$/, "");
-}
-
 async function issueClaimLink(email: string, name: string, db = getDb()): Promise<string> {
   // Mirror routes/auth.ts magic-link mint: invalidate old tokens, mint a fresh
   // 24h token (longer than the 15m login link — a partner-provisioned user may
@@ -46,14 +36,13 @@ async function issueClaimLink(email: string, name: string, db = getDb()): Promis
     .update(schema.magicLinkTokens)
     .set({ used: true } as any)
     .where(and(eq(schema.magicLinkTokens.email, email), eq(schema.magicLinkTokens.used, false)));
-  const rawBytes = crypto.getRandomValues(new Uint8Array(32));
-  const token = Array.from(rawBytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const token = randomHex(32);
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const redirect = "/dashboard";
   await db
     .insert(schema.magicLinkTokens)
     .values({ email, token, expiresAt, redirect, used: false } as any);
-  return `${appBaseUrl()}/auth/magic-link?token=${token}&redirect=${encodeURIComponent(redirect)}`;
+  return `${publicAppBaseUrl()}/auth/magic-link?token=${token}&redirect=${encodeURIComponent(redirect)}`;
 }
 
 export interface CreateJobSeekerInput {
@@ -195,7 +184,7 @@ export async function connectExistingAccount(
 
   const params = new URLSearchParams({ connection: connection.id });
   if (input.redirectUrl) params.set("redirect", input.redirectUrl);
-  const consentUrl = `${appBaseUrl()}/connect/authorize?${params.toString()}`;
+  const consentUrl = `${publicAppBaseUrl()}/connect/authorize?${params.toString()}`;
   return { ok: true, userId: user.id, connectionId: connection.id, consentUrl, status: connection.status };
 }
 

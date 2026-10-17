@@ -28,6 +28,7 @@ import {
   type SkillEvidence,
 } from "../../../../shared/resume.js";
 import type { ParsedJob } from "../job/JobService.js";
+import { logger } from "../../lib/logger.js";
 
 export const SkillSchema = z.object({
   name: z.string(),
@@ -428,10 +429,7 @@ export async function extractSkills(
       // AI_* envelope instead of leaking the heuristic as a real result.
       throw err;
     }
-    console.error(
-      "[skill-extraction] LLM error, falling back to heuristic:",
-      err,
-    );
+    logger.error("[skill-extraction] LLM error, falling back to heuristic", err);
     return buildFallbackExtraction(built.fallbackText, built.sourceType);
   }
 }

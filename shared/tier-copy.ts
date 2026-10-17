@@ -165,10 +165,6 @@ export const TIER_COPY = {
   upgradeForPersonalizedMessages: (): string =>
     `Upgrade to ${TIER_NAME.pro} for AI-personalized messages tailored to each recipient.`,
 
-  /** Used in extension/feature-flag descriptions. */
-  proUserDescription: (subject: string): string =>
-    `${subject} for ${TIER_NAME.pro} users`,
-
   /** AI chat panel error suffix when the LLM call is over budget. */
   upgradeForMoreAiTokens: (): string =>
     `Upgrade to ${TIER_NAME.pro} for more AI tokens.`,
@@ -183,5 +179,3 @@ export const TIER_COPY = {
   proFeaturesGatedNote: (): string =>
     `${TIER_NAME.pro} features are gated behind paid hired.video plans, but the core extension is free.`,
 } as const;
-
-export type TierCopyKey = keyof typeof TIER_COPY;

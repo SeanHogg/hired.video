@@ -7,18 +7,12 @@
  * auto-fires `window.print()` on load, and hides anything tagged `.no-print`
  * when actually printing.
  *
- * This module is the single source for that chrome + the HTML escaper so each
- * print surface only supplies its own body markup (+ optional extra CSS).
+ * This module is the single source for that chrome so each print surface only
+ * supplies its own body markup (+ optional extra CSS). HTML escaping lives in
+ * shared/html-escape.ts.
  */
 
-export function escapeHtml(input: unknown): string {
-  return String(input ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+import { escapeHtml } from "../../../../shared/html-escape.js";
 
 export function formatMoney(
   amount: string | number | null | undefined,

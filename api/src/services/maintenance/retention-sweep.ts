@@ -8,13 +8,13 @@
  * every policy — until each table has no expired rows left or the
  * per-run wall-clock budget is spent. (The original one-batch-per-run
  * shape capped request_logs at 5k deletes/day, so the table grew without
- * bound above ~5k requests/day.) Daily-only — the caller in
- * `scheduled.ts` gates the whole run to one UTC window; anything the
+ * bound above ~5k requests/day.) Daily-only — the HOURLY cron runs it
+ * once, in the 04:xx UTC hour (services/scheduling/cron-plan.ts); anything the
  * budget doesn't reach is picked up by the next run, so per-table state
  * isn't required.
  *
  * DRY: every retention policy in the codebase MUST be declared here.
- * Adding `processFooRetention` as a separate function in scheduled.ts
+ * Adding `processFooRetention` as a separate cron job
  * is the anti-pattern this module exists to prevent — the runner is
  * generic; the configs are data.
  *
@@ -74,7 +74,6 @@ export const RETENTION_POLICIES: readonly RetentionPolicy[] = [
 
   // Vendor API call logs — operational telemetry; 30 days for debugging
   // recent failures, beyond that it's just storage cost.
-  { table: "integration_runs",  ageColumns: ["created_at"], retentionDays: 30, batchSize: 5000 },
   { table: "profile_sync_runs", ageColumns: ["created_at"], retentionDays: 30, batchSize: 5000 },
   { table: "worker_runs",       ageColumns: ["started_at"], retentionDays: 30, batchSize: 5000 },
 
@@ -118,12 +117,53 @@ export const RETENTION_POLICIES: readonly RetentionPolicy[] = [
   // nobody can sign back into it, so the account and everything it owns
   // (FK cascade) is dead. Claimed guests are deleted at adoption.
   { table: "users",              ageColumns: ["created_at"], retentionDays: 30, batchSize: 500, scope: "is_guest" },
+
+  // First-party usage analytics (mig 0490s). The longest /admin/insights
+  // traffic window is 90 days (shared/usage.ts TRAFFIC_WINDOW_DAYS), so 95
+  // keeps every window whole. Sessions are LRU by last_seen (deleting one
+  // cascades its events); long-lived visitor sessions keep only recent events.
+  { table: "usage_events",       ageColumns: ["occurred_at"], retentionDays: 95, batchSize: 5000 },
+  { table: "usage_sessions",     ageColumns: ["last_seen"],   retentionDays: 95, batchSize: 2000 },
+
+  // Raw job/company view events — every reader windows them to 30 days
+  // (routes/artifact-metrics.ts, routes/job-analytics.ts) and no counter
+  // cache is recomputed from them, so 180 days is pure headroom.
+  { table: "job_view_events",     ageColumns: ["created_at"], retentionDays: 180, batchSize: 5000 },
+  { table: "company_view_events", ageColumns: ["created_at"], retentionDays: 180, batchSize: 5000 },
+
+  // Security telemetry. bot_block_events backs the 7/30-day admin
+  // security charts; login_events backs brute-force / risk windows (hours
+  // to days) and the per-user sign-in history.
+  { table: "bot_block_events",   ageColumns: ["created_at"], retentionDays: 30,  batchSize: 5000 },
+  { table: "login_events",       ageColumns: ["created_at"], retentionDays: 180, batchSize: 5000 },
+
+  // One-time auth tokens/codes — dead the moment they expire (every row
+  // carries an expiry; used rows expire too). One day of grace keeps a
+  // just-expired link explainable in support.
+  { table: "two_factor_codes",          ageColumns: ["expires_at"], retentionDays: 1, batchSize: 5000 },
+  { table: "magic_link_tokens",         ageColumns: ["expires_at"], retentionDays: 1, batchSize: 5000 },
+  { table: "email_verification_tokens", ageColumns: ["expires_at"], retentionDays: 1, batchSize: 5000 },
+  { table: "password_reset_tokens",     ageColumns: ["expires_at"], retentionDays: 1, batchSize: 5000 },
+
+  // Deliberately NOT here (W1-B review, 2026-10-17):
+  //   - artifact_views / video_analytics / resume_views: lifetime counts
+  //     are computed by COUNT(*) over the raw rows (profile totalViews,
+  //     resume view counts, video CTA counts, and counter-recompute's
+  //     articles.view_count), so pruning would silently shrink them. They
+  //     need a lifetime rollup column first.
+  //   - article_engagement: already the per-(article, day) rollup that the
+  //     partner pool + engagement payout read.
+  //   - job_items: the scraper never deactivates or expires the rows it
+  //     inserts, so an "inactive scraped job" policy would match nothing;
+  //     it needs a scraper-side expiry first.
+  //   - xAPI / LRS statements: learning records.
 ] as const;
 
 /** Wall-clock budget for one sweep run. Nearly all of it is spent awaiting
- *  Postgres (not Worker CPU), but the sweep shares its /5 tick with other
- *  jobs — 20s keeps it a good neighbour while still draining hundreds of
- *  thousands of rows per run. */
+ *  Postgres (not Worker CPU), but the sweep shares the 04:xx HOURLY cron
+ *  invocation with the counter recompute and fraud sweep — 20s keeps it a
+ *  good neighbour while still draining hundreds of thousands of rows per
+ *  run. */
 export const RETENTION_TIME_BUDGET_MS = 20_000;
 
 export interface RetentionRunSummary {

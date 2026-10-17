@@ -18,6 +18,7 @@
  */
 import type { SceneTransition, Timeline } from "@shared/timeline";
 import { createScratchPool, type Ctx2D, type ScratchCanvas } from "./scratch-canvas";
+import { clamp01 } from "./effects/params";
 
 export interface ActiveSceneTransition {
   transition: SceneTransition;
@@ -25,8 +26,6 @@ export interface ActiveSceneTransition {
    *  opacity (fade-to-black). */
   progress: number;
 }
-
-const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 /** The transition covering `frame`, or null on a plain frame. */
 export function activeSceneTransition(

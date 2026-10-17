@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { SkillEvidence } from "@/types/resume";
+import type { SkillLevel } from "@shared/resume";
 
 export type SkillSourceType = "job" | "resume";
 
@@ -25,7 +26,7 @@ export type SkillCategory =
 
 export type SkillImportance = "required" | "preferred" | "nice-to-have";
 
-export type SkillLevel = "Beginner" | "Intermediate" | "Advanced" | "Expert";
+export type { SkillLevel };
 
 export interface ExtractedSkill {
   name: string;

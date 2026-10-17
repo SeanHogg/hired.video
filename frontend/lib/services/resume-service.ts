@@ -7,7 +7,7 @@ import { z } from "zod";
 import { apiClient } from "../api-client";
 import { trackJobSeekerStage } from "@/lib/analytics/jobseeker-funnel";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
-import { ResumeContentSchema, ResumeSchema } from "@shared/resume";
+import { ResumeContentSchema, ResumeSchema, ResumeSummarySchema as SharedResumeSummarySchema, type Resume, type ResumeWithOwnership } from "@shared/resume";
 import { readCoverLetter } from "@shared/cover-letter";
 import type { ReviseFocus } from "@shared/video-plan";
 import { CARD_FIELDS_BY_KIND, serializeListFields } from "@shared/projection";
@@ -30,12 +30,13 @@ import { resolveResumeUploadPayload, resumeFilesFormData } from "./resume-upload
 // bug the canonical-shape refactor was meant to prevent. Never re-introduce.
 export { ResumeSchema };
 
-// Loose ResumeSummarySchema for the list endpoints that accept mixed
-// PascalCase/camelCase payloads. The canonical schema lives in
-// @shared/resume; this one is the normalization target for legacy
-// responses.
-export const ResumeSummarySchema = z
-  .object({
+// Loose list-row schema DERIVED from the canonical @shared/resume
+// ResumeSummarySchema: every shared field optional (list endpoints honour
+// `?fields=` projections), with the fields legacy payloads send as null /
+// free-form strings relaxed below. Unknown keys pass through.
+export const ResumeSummarySchema = SharedResumeSummarySchema
+  .partial()
+  .extend({
     id: nullableString(),
     userId: nullableString(),
     title: z.string().optional().nullable(),
@@ -57,66 +58,6 @@ export const ResumeSummarySchema = z
     updatedAt: z.string().optional(),
   })
   .passthrough();
-
-export const CreateResumeSchema = z.object({
-  title: z.string().min(1),
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  email: z.string().email(),
-  phone: z.string().optional(),
-  location: z.string().optional(),
-  website: z.string().optional(),
-  linkedIn: z.string().optional(),
-  github: z.string().optional(),
-  summary: z.string().optional(),
-  experience: z
-    .array(
-      z.object({
-        company: z.string(),
-        position: z.string(),
-        startDate: z.string(),
-        endDate: z.string().optional(),
-        description: z.string().optional(),
-        current: z.boolean().optional(),
-      }),
-    )
-    .optional(),
-  education: z
-    .array(
-      z.object({
-        institution: z.string(),
-        degree: z.string(),
-        field: z.string().optional(),
-        startDate: z.string(),
-        endDate: z.string().optional(),
-        gpa: z.string().optional(),
-      }),
-    )
-    .optional(),
-  skills: z.array(z.string()).optional(),
-  certifications: z
-    .array(
-      z.object({
-        name: z.string(),
-        issuer: z.string(),
-        date: z.string(),
-        expiryDate: z.string().optional(),
-      }),
-    )
-    .optional(),
-  projects: z
-    .array(
-      z.object({
-        name: z.string(),
-        description: z.string(),
-        technologies: z.array(z.string()).optional(),
-        url: z.string().optional(),
-      }),
-    )
-    .optional(),
-  isPublic: z.boolean().optional(),
-  templateId: z.string().optional(),
-});
 
 // Accept both our normalized keys and backend PascalCase keys
 export const PaginatedResumesSchema = z.object({
@@ -152,11 +93,10 @@ const MasterResumeGroupSchema = z.object({
 // TYPES
 // ============================================================================
 
-export type Resume = z.infer<typeof ResumeSchema>;
+// Canonical wire types from @shared/resume.
+export type { Resume, ResumeWithOwnership };
 export type ResumeSummary = z.infer<typeof ResumeSummarySchema>;
-export type CreateResume = z.infer<typeof CreateResumeSchema>;
 export type PaginatedResumes = z.infer<typeof PaginatedResumesSchema>;
-export type ResumeWithOwnership = z.infer<typeof ResumeWithOwnershipSchema>;
 export type MasterResumeGroup = z.infer<typeof MasterResumeGroupSchema>;
 
 // ============================================================================
@@ -454,21 +394,6 @@ export class ResumeService {
     const init = await this.buildParseRequest(file);
     const parsed = await streamResumeParse(init, onProgress);
     return { data: toParsedResumeData(parsed), confidence: 0.8 };
-  }
-
-  /**
-   * Update existing resume
-   */
-  async updateResume(
-    id: string,
-    updates: Partial<CreateResume>,
-  ): Promise<Resume> {
-    const response = await apiClient.put<Resume>(
-      `/api/resumes/${id}`,
-      updates,
-      ResumeSchema,
-    );
-    return response.data;
   }
 
   /**

@@ -8,6 +8,7 @@ import {
   ResumeFeedbackRepository,
   type IResumeFeedbackRepository,
 } from "../../repositories/resumeFeedbackRepository.js";
+import { randomBytes } from "../../utils/crypto.js";
 
 export interface ResumeFeedbackServiceDeps {
   repo: IResumeFeedbackRepository;
@@ -20,14 +21,6 @@ export function defaultResumeFeedbackServiceDeps(): ResumeFeedbackServiceDeps {
   return {
     repo: new ResumeFeedbackRepository(db),
     now: () => new Date(),
-    randomBytes: (n: number) => {
-      const a = new Uint8Array(n);
-      const g = (globalThis as { crypto?: Crypto }).crypto;
-      if (!g || typeof g.getRandomValues !== "function") {
-        throw new Error("crypto.getRandomValues is unavailable in this runtime");
-      }
-      g.getRandomValues(a);
-      return a;
-    },
+    randomBytes,
   };
 }

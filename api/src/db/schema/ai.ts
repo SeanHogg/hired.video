@@ -27,6 +27,7 @@ export const aiChatSessions = pgTable("ai_chat_sessions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_ai_chat_sessions_user_active_updated").on(t.userId, t.updatedAt.desc().nullsFirst()).where(sql`is_active = true`),
+  index("idx_ai_chat_sessions_user_id").on(t.userId),
 ]);
 
 export type AiChatSession = typeof aiChatSessions.$inferSelect;
@@ -85,6 +86,7 @@ export const aiUsageRecords = pgTable("ai_usage_records", {
   index("ai_usage_records_tool_run_id_idx").on(t.toolRunId),
   index("idx_ai_usage_records_user_created").on(t.userId, t.createdAt.desc().nullsFirst()),
   index("idx_ai_usage_records_company").on(t.companyId, t.userId, t.createdAt),
+  index("idx_ai_usage_records_session_id").on(t.sessionId),
 ]);
 
 export type AiUsageRecord = typeof aiUsageRecords.$inferSelect;

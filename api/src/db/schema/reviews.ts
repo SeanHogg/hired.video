@@ -126,6 +126,7 @@ export const reviewComments = pgTable(
   (t) => [
     index("idx_review_comments_review").on(t.reviewId, t.createdAt),
     index("idx_review_comments_parent").on(t.parentId),
+    index("idx_review_comments_user_id").on(t.userId),
   ],
 );
 

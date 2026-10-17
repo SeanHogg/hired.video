@@ -11,8 +11,12 @@ import {
   upsertPulledEvents,
   type PulledCalendarEvent,
 } from "../repositories/calendarSyncRepository.js";
-import { frontendBaseUrl } from "../utils/public-urls.js";
+import { apiBaseUrl, frontendBaseUrl } from "../utils/public-urls.js";
 import { getEnv } from "../utils/env.js";
+import { openCredential, sealCredential } from "../services/crypto/credential-columns.js";
+import { clampLimit } from "../utils/pagination.js";
+import { buildRepos } from "../repositories/index.js";
+import { emitNotification } from "../services/notifications/notificationService.js";
 
 export const calendarRoutes = new Hono<AppEnv>();
 
@@ -51,7 +55,7 @@ calendarRoutes.get("/events", requirePro("Calendar Integration"), async (c) => {
   // Hard cap on rows returned: a user with thousands of synced events would
   // otherwise OOM the Worker isolate (128 MB). 500 covers any reasonable
   // 30-day window; callers needing more pass a tighter `from`/`to`. Gap #1337.
-  const limit = Math.min(parseInt(c.req.query("limit") ?? "500", 10) || 500, 1000);
+  const limit = clampLimit(c.req.query("limit"), 500, 1000);
 
   const events = await db
     .select()
@@ -278,10 +282,6 @@ calendarRoutes.delete("/connections/:id", requirePro("Calendar Integration"), as
 // Two-step: /connect/begin → provider OAuth → /connect/callback stores tokens.
 // ---------------------------------------------------------------------------
 
-function getApiBase(): string {
-  return getEnv("API_URL") || "https://api.hired.video";
-}
-
 const CALENDAR_PROVIDERS: Record<string, { authUrl: string; tokenUrl: string; scopes: string[] }> = {
   google: {
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
@@ -313,7 +313,7 @@ calendarRoutes.get("/connect/:provider", requirePro("Calendar Integration"), asy
   const redirect = c.req.query("redirect") ?? "/settings/integrations";
   // Embed userId + provider in state for the callback
   const state = btoa(JSON.stringify({ userId, provider, redirect, ts: Date.now() }));
-  const callbackUrl = `${getApiBase()}/api/calendar/connect/${provider}/callback`;
+  const callbackUrl = `${apiBaseUrl()}/api/calendar/connect/${provider}/callback`;
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -351,7 +351,7 @@ calendarRoutes.get("/connect/:provider/callback", async (c) => {
   const cfg = CALENDAR_PROVIDERS[provider];
   const clientId = getEnv(provider === "google" ? "GOOGLE_CLIENT_ID" : "MICROSOFT_CLIENT_ID");
   const clientSecret = getEnv(provider === "google" ? "GOOGLE_CLIENT_SECRET" : "MICROSOFT_CLIENT_SECRET");
-  const callbackUrl = `${getApiBase()}/api/calendar/connect/${provider}/callback`;
+  const callbackUrl = `${apiBaseUrl()}/api/calendar/connect/${provider}/callback`;
 
   let accessToken = "";
   let refreshToken = "";
@@ -381,10 +381,13 @@ calendarRoutes.get("/connect/:provider/callback", async (c) => {
     .limit(1);
 
   const tokenExpiry = new Date(Date.now() + expiresIn * 1000);
+  const access = await sealCredential(accessToken);
+  const refresh = await sealCredential(refreshToken);
   if (existing) {
     await db.update(schema.calendarConnections).set({
-      accessToken,
-      refreshToken: refreshToken || undefined,
+      accessToken: access.plain,
+      accessTokenEnc: access.enc,
+      ...(refreshToken ? { refreshToken: refresh.plain, refreshTokenEnc: refresh.enc } : {}),
       tokenExpiresAt: tokenExpiry,
       isActive: true,
       syncEnabled: true,
@@ -395,8 +398,10 @@ calendarRoutes.get("/connect/:provider/callback", async (c) => {
       userId: stateData.userId,
       provider,
       calendarName: provider === "google" ? "Google Calendar" : "Outlook Calendar",
-      accessToken,
-      refreshToken: refreshToken || null,
+      accessToken: access.plain,
+      accessTokenEnc: access.enc,
+      refreshToken: refresh.plain,
+      refreshTokenEnc: refresh.enc,
       tokenExpiresAt: tokenExpiry,
       isActive: true,
       syncEnabled: true,
@@ -443,7 +448,9 @@ type SyncableConnection = {
   id: string;
   provider: string;
   accessToken: string | null;
+  accessTokenEnc: string | null;
   refreshToken: string | null;
+  refreshTokenEnc: string | null;
   tokenExpiresAt: Date | null;
 };
 
@@ -456,16 +463,18 @@ type SyncableConnection = {
  */
 async function ensureFreshAccessToken(conn: SyncableConnection): Promise<string | null> {
   const SKEW_MS = 2 * 60 * 1000;
+  const currentAccess = await openCredential(conn.accessTokenEnc, conn.accessToken);
+  const currentRefresh = await openCredential(conn.refreshTokenEnc, conn.refreshToken);
   const stillValid =
     !!conn.tokenExpiresAt && new Date(conn.tokenExpiresAt).getTime() - Date.now() > SKEW_MS;
-  if (stillValid && conn.accessToken) return conn.accessToken;
-  if (!conn.refreshToken) return conn.accessToken;
+  if (stillValid && currentAccess) return currentAccess;
+  if (!currentRefresh) return currentAccess;
 
   const cfg = CALENDAR_PROVIDERS[conn.provider];
-  if (!cfg) return conn.accessToken;
+  if (!cfg) return currentAccess;
   const clientId = getEnv(conn.provider === "google" ? "GOOGLE_CLIENT_ID" : "MICROSOFT_CLIENT_ID");
   const clientSecret = getEnv(conn.provider === "google" ? "GOOGLE_CLIENT_SECRET" : "MICROSOFT_CLIENT_SECRET");
-  if (!clientId || !clientSecret) return conn.accessToken;
+  if (!clientId || !clientSecret) return currentAccess;
 
   try {
     const res = await fetch(cfg.tokenUrl, {
@@ -473,31 +482,34 @@ async function ensureFreshAccessToken(conn: SyncableConnection): Promise<string 
       headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
       body: new URLSearchParams({
         grant_type: "refresh_token",
-        refresh_token: conn.refreshToken,
+        refresh_token: currentRefresh,
         client_id: clientId,
         client_secret: clientSecret,
         // Microsoft requires the scope on refresh; Google ignores it.
         ...(conn.provider === "outlook" ? { scope: cfg.scopes.join(" ") } : {}),
       }).toString(),
     });
-    if (!res.ok) return conn.accessToken;
+    if (!res.ok) return currentAccess;
     const data: any = await res.json();
     const newAccess: string | undefined = data.access_token;
-    if (!newAccess) return conn.accessToken;
+    if (!newAccess) return currentAccess;
     const expiresIn = Number(data.expires_in ?? 3600);
     const rotatedRefresh: string | undefined = data.refresh_token || undefined;
+    const sealedAccess = await sealCredential(newAccess);
+    const sealedRefresh = rotatedRefresh ? await sealCredential(rotatedRefresh) : null;
     await getDb()
       .update(schema.calendarConnections)
       .set({
-        accessToken: newAccess,
-        ...(rotatedRefresh ? { refreshToken: rotatedRefresh } : {}),
+        accessToken: sealedAccess.plain,
+        accessTokenEnc: sealedAccess.enc,
+        ...(sealedRefresh ? { refreshToken: sealedRefresh.plain, refreshTokenEnc: sealedRefresh.enc } : {}),
         tokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
         updatedAt: new Date(),
       } as any)
       .where(eq(schema.calendarConnections.id, conn.id));
     return newAccess;
   } catch {
-    return conn.accessToken;
+    return currentAccess;
   }
 }
 
@@ -823,13 +835,17 @@ calendarRoutes.post("/book-interview", requirePro("Interview Scheduling"), async
 
   // Notify candidate
   if (body.candidateId) {
-    await db.insert(schema.notifications).values({
-      userId: body.candidateId,
-      type: "interview_scheduled",
-      title: "Interview Scheduled",
-      message: `An interview has been scheduled for ${new Date(body.slot.start).toLocaleString()}. Check your calendar.`,
-      data: { eventId: event.id, jobTitle: body.jobTitle } as any,
-    } as any).catch(() => undefined);
+    await emitNotification(
+      { repos: buildRepos(db) },
+      {
+        recipientIds: [body.candidateId],
+        type: "interview_scheduled",
+        actor: null,
+        title: "Interview Scheduled",
+        message: `An interview has been scheduled for ${new Date(body.slot.start).toLocaleString()}. Check your calendar.`,
+        extraData: { eventId: event.id, jobTitle: body.jobTitle },
+      },
+    ).catch(() => undefined);
   }
 
   return c.json(success({ event, synced: connections.length > 0 }), 201);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { formatUsdPrice } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -160,13 +161,6 @@ export function BillingAnalytics() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
-  };
-
   const formatPercentage = (value: number) => {
     return `${value.toFixed(1)}%`;
   };
@@ -233,7 +227,7 @@ export function BillingAnalytics() {
                         Total Revenue
                       </p>
                       <p className="text-2xl font-bold">
-                        {formatCurrency(metrics.totalRevenue)}
+                        {formatUsdPrice(metrics.totalRevenue)}
                       </p>
                     </div>
                     <div className="p-2 bg-green-100 rounded-lg">
@@ -305,7 +299,7 @@ export function BillingAnalytics() {
                         ARPU
                       </p>
                       <p className="text-2xl font-bold">
-                        {formatCurrency(metrics.averageRevenuePerUser)}
+                        {formatUsdPrice(metrics.averageRevenuePerUser)}
                       </p>
                     </div>
                     <div className="p-2 bg-accent rounded-lg">
@@ -335,7 +329,7 @@ export function BillingAnalytics() {
                   <XAxis dataKey="month" />
                   <YAxis />
                   <Tooltip
-                    formatter={(value) => formatCurrency(Number(value))}
+                    formatter={(value) => formatUsdPrice(Number(value))}
                   />
                   <Area
                     type="monotone"
@@ -394,7 +388,7 @@ export function BillingAnalytics() {
                           {plan.subscribers} users
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          {formatCurrency(plan.revenue)}
+                          {formatUsdPrice(plan.revenue)}
                         </div>
                       </div>
                     </div>
@@ -417,7 +411,7 @@ export function BillingAnalytics() {
                   <XAxis dataKey="month" />
                   <YAxis />
                   <Tooltip
-                    formatter={(value) => formatCurrency(Number(value))}
+                    formatter={(value) => formatUsdPrice(Number(value))}
                   />
                   <Legend />
                   <Bar dataKey="revenue" fill="#8884d8" name="Revenue" />

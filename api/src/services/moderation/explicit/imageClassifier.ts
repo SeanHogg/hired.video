@@ -26,8 +26,15 @@ import {
   type ExplicitVerdict,
 } from "../../../../../shared/moderation/explicit.js";
 import { createLLMClient, hasAnyLLMProviderKey, type LLMClient, type LLMContentPart, type LLMEnv } from "../../adapters/llm-client.js";
+import {
+  WORKERS_AI_VISION_MODEL,
+  resolveWorkersAi,
+  runWorkersAi,
+  type WorkersAiBinding,
+} from "../../adapters/workers-ai.js";
 import { IMAGE_SYSTEM_PROMPT, parseClassifierVerdict } from "./classifierPrompt.js";
-import { bytesToBase64 } from "./bytes.js";
+import { bytesToBase64 } from "../../../utils/crypto.js";
+import { logger } from "../../../lib/logger.js";
 
 export interface ImageVariant {
   bytes: Uint8Array;
@@ -122,11 +129,8 @@ export function gatewayVisionClassifier(llm: LLMClient): ImageClassifier {
   };
 }
 
-export const WORKERS_AI_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
-
-export interface WorkersAiBinding {
-  run: (model: string, inputs: Record<string, unknown>) => Promise<unknown>;
-}
+// The ONE Workers AI adapter owns the binding type, model ids and metering.
+export { WORKERS_AI_VISION_MODEL, type WorkersAiBinding } from "../../adapters/workers-ai.js";
 
 /** Meta's licence-not-accepted answer from Workers AI (code 5016 / "agree"). */
 export function isLicenceNotAcceptedError(err: unknown): boolean {
@@ -139,15 +143,17 @@ export function isLicenceNotAcceptedError(err: unknown): boolean {
 const agreedBindings = new WeakSet<WorkersAiBinding>();
 
 /** Run the vision model; on a licence-not-accepted error, accept Meta's
- *  licence once per isolate (prompt "agree") and retry once. */
+ *  licence once per isolate (prompt "agree") and retry once. The scan is a
+ *  platform cost with no billed user (like the gateway leg, whose client is
+ *  built with `user = null`), so `runWorkersAi` is called without a meter. */
 async function runVision(ai: WorkersAiBinding, inputs: Record<string, unknown>): Promise<unknown> {
   try {
-    return await ai.run(WORKERS_AI_VISION_MODEL, inputs);
+    return await runWorkersAi(ai, WORKERS_AI_VISION_MODEL, inputs);
   } catch (err) {
     if (!isLicenceNotAcceptedError(err) || agreedBindings.has(ai)) throw err;
     agreedBindings.add(ai);
-    await ai.run(WORKERS_AI_VISION_MODEL, { prompt: "agree" }).catch(() => undefined);
-    return ai.run(WORKERS_AI_VISION_MODEL, inputs);
+    await runWorkersAi(ai, WORKERS_AI_VISION_MODEL, { prompt: "agree" }).catch(() => undefined);
+    return runWorkersAi(ai, WORKERS_AI_VISION_MODEL, inputs);
   }
 }
 
@@ -185,8 +191,8 @@ export interface ImageScanEnv extends LLMEnv {
 export function createImageClassifiers(env: ImageScanEnv | undefined): ImageClassifier[] {
   const out: ImageClassifier[] = [];
   if (hasAnyLLMProviderKey(env)) out.push(gatewayVisionClassifier(createLLMClient(env, null)));
-  const ai = env?.AI ?? (globalThis as { __ENV?: { AI?: WorkersAiBinding } }).__ENV?.AI;
-  if (ai && typeof ai.run === "function") out.push(workersAiVisionClassifier(ai));
+  const ai = resolveWorkersAi(env);
+  if (ai) out.push(workersAiVisionClassifier(ai));
   return out;
 }
 
@@ -214,7 +220,7 @@ async function runChain(images: readonly ImageInput[], classifiers: readonly Ima
     try {
       return await classifier.classify(images);
     } catch (err) {
-      console.warn(`[explicit-scan] ${classifier.name} failed:`, err instanceof Error ? err.message : err);
+      logger.warn("[explicit-scan] classifier failed", { classifier: classifier.name, error: err });
     }
   }
   return unscreenedVerdict("every image classifier failed");

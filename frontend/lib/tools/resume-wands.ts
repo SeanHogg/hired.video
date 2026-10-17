@@ -85,7 +85,7 @@ async function runMergeWorkEntries(ctx: ToolRunContext): Promise<NormalizedToolR
 
 async function draftSummary(ctx: ToolRunContext): Promise<string> {
   const resumeText = await resolveResumeText(ctx);
-  const { data } = await apiClient.post<unknown>("/api/Resume/Summarize", { resumeText });
+  const { data } = await apiClient.post<unknown>("/api/resumes/summarize", { resumeText });
   const d = data as { result?: unknown; summary?: unknown } | string;
   const summary = typeof d === "string" ? d : String(d?.result ?? d?.summary ?? "");
   return summary.trim();

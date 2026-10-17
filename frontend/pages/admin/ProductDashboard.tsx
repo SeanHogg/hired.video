@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { createRolePermissions, getRoleDisplayLabel } from "@/lib/role-utils";
-import { runtimeConfig } from "@/lib/runtime-config";
+import { downloadApiFile } from "@/lib/services/download-service";
 import { apiClient } from "@/lib/api-client";
 import { AffiliateService, type AffiliateAdminStats } from "@/lib/services/affiliate-service";
 import { AffiliateManagementPanel } from "@/components/admin/AffiliateManagementPanel";
@@ -209,7 +209,7 @@ export default function ProductDashboard() {
       console.log("ProductDashboard: Starting to load dashboard data...");
       // Include query parameters to ensure we get all data including SaaS metrics and time series
       const response = await apiClient.get<ProductDashboardData>(
-        "/api/ProductDashboard?IncludeSaaSMetrics=true&IncludeTimeSeriesData=true"
+        "/api/admin?IncludeSaaSMetrics=true&IncludeTimeSeriesData=true"
       );
       console.log("ProductDashboard: API response received", response);
 
@@ -252,30 +252,10 @@ export default function ProductDashboard() {
 
   const exportData = async (format: "csv") => {
     try {
-      // Stays on raw fetch (not apiClient) because the response is a CSV blob,
-      // not the JSON envelope apiClient.request validates. URL is built via
-      // runtimeConfig.apiUrl so it hits api.hired.video, not the frontend host.
-      const apiBase = (runtimeConfig.apiUrl || "").replace(/\/+$/, "");
-      const exportPath = /\/api$/i.test(apiBase) ? `/ProductDashboard/export/${format}` : `/api/ProductDashboard/export/${format}`;
-      const response = await fetch(`${apiBase}${exportPath}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to export data");
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.style.display = "none";
-      a.href = url;
-      a.download = `product-dashboard-${new Date().toISOString().split("T")[0]}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
+      await downloadApiFile(
+        `/api/admin/export/${format}`,
+        `product-dashboard-${new Date().toISOString().split("T")[0]}.${format}`,
+      );
     } catch (err) {
       console.error("Export failed:", err);
     }

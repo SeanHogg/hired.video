@@ -18,8 +18,9 @@ import type { Context } from "hono";
 import { and, asc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { getSubscription } from "../../services/billing/BillingService.js";
-import { isAdminRole } from "../billing/audience.js";
+import { isAdminRole } from "../../middleware/superAdmin.js";
 import type { JwtPayload } from "../../types/index.js";
+import { logger } from "../../lib/logger.js";
 import type {
   PlanTier,
   UsageEventType,
@@ -445,7 +446,7 @@ export const servicesProcessor: ServicesProcessor = {
     const userId = c.var.user?.sub;
     if (!userId) return;
     void this.meter({ userId, eventType, quantity, metadata }).catch((err) =>
-      console.warn(`[services-processor] meter ${eventType} failed:`, err),
+      logger.warn("[services-processor] meter failed", { eventType, error: err }),
     );
   },
 };

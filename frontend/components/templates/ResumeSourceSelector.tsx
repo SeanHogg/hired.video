@@ -7,7 +7,7 @@
 // resumes to choose from, so the dropdown would be a one-option no-op.
 
 import { FileText } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth";
-import { resumeService, type ResumeSummary } from "@/lib/services/resume-service";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 import { isResumeTemplate, type TemplateMeta } from "@/lib/templates/types";
 
 export interface ResumeSourceSelectorProps {
@@ -31,36 +31,23 @@ export interface ResumeSourceSelectorProps {
 export default function ResumeSourceSelector({ meta, value, onChange }: ResumeSourceSelectorProps) {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
-  const [userResumes, setUserResumes] = useState<ResumeSummary[]>([]);
   const isResume = isResumeTemplate(meta);
+  const { data: userResumes = [] } = useUserResumes({ enabled: isResume });
 
+  // Default the preview to the visitor's master (else first) résumé — once,
+  // when the list first lands, so a later "sample" pick isn't overridden.
+  const defaulted = useRef(false);
   useEffect(() => {
-    if (!isResume || !isAuthenticated) {
-      setUserResumes([]);
-      return;
-    }
-    let cancelled = false;
-    resumeService
-      .getUserResumes()
-      .then((rs) => {
-        if (cancelled) return;
-        setUserResumes(rs ?? []);
-        const master = (rs ?? []).find(
-          (r: any) => r.isMaster === true || r.IsMaster === true,
-        );
-        const def = master ?? (rs ?? [])[0];
-        if (!def) return;
-        const defId: string = (def as any).id ?? (def as any).Id;
-        if (value === "sample") onChange(defId);
-      })
-      .catch(() => {
-        if (!cancelled) setUserResumes([]);
-      });
-    return () => {
-      cancelled = true;
-    };
+    if (defaulted.current || !isResume || userResumes.length === 0) return;
+    defaulted.current = true;
+    const master = userResumes.find(
+      (r: any) => r.isMaster === true || r.IsMaster === true,
+    );
+    const def = master ?? userResumes[0];
+    const defId: string = (def as any).id ?? (def as any).Id;
+    if (value === "sample") onChange(defId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isResume, isAuthenticated]);
+  }, [isResume, userResumes]);
 
   if (!isResume || !isAuthenticated) return null;
 

@@ -12,9 +12,8 @@ export {
   type PipelineStage,
 } from "@shared/recruiter-pipeline";
 
-import type { PipelineStage as _PipelineStage } from "@shared/recruiter-pipeline";
+import type { PipelineStage } from "@shared/recruiter-pipeline";
 import type { PitchSummary } from "@shared/pitch";
-type PipelineStage = _PipelineStage;
 
 export interface PipelineEntry {
   id: string;

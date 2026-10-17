@@ -11,7 +11,9 @@
  * (resolveEmployeeAiContext returns null for everyone else), so personal Pro
  * users, recruiters, and job seekers keep the proven per-user path untouched.
  * This module owns the company accounting; `token-ledger.ts` is the single
- * place that throws/charges, so it imports this and decides control flow.
+ * module surface (owner-polymorphic: ownerKind 'user' | 'company') — it
+ * throws/charges and re-exposes the employer controls, so callers import
+ * token-ledger only, never this file.
  */
 
 import { and, eq, gte, inArray, lt, sum } from "drizzle-orm";
@@ -21,6 +23,7 @@ import { hasTokensForAiCall, WORKFORCE_SEAT_AI_MONTHLY_TOKENS } from "../../../.
 import { aiCallCostUsd } from "../../../../shared/ai-model-rates.js";
 import { chooseDebitSource } from "./token-debit.js";
 import { ForbiddenError } from "../../middleware/errorHandler.js";
+import { logger } from "../../lib/logger.js";
 import type { TokenBudgetSummary } from "../../services/billing/BillingService.js";
 
 const { userCompanyRoleAssociations, companySubscriptions, aiUsageRecords, companyTokenBalance, users } = schema;
@@ -133,7 +136,7 @@ export async function getMemberMonthlyCompanyUsage(
 
 /** Present a company budget in the per-user TokenBudgetSummary shape so the
  *  existing 429 builder + budget DTO can render it without a parallel type. */
-function toSummary(budget: CompanyTokenBudget): TokenBudgetSummary {
+export function toSummary(budget: CompanyTokenBudget): TokenBudgetSummary {
   return {
     planId: "workforce",
     isPro: true,
@@ -214,7 +217,7 @@ export async function recordCompanyTokenUsage(args: {
         toolRunId: args.toolRunId ?? null,
       } as any);
   } catch (err) {
-    console.warn(`[company-token-ledger] usage insert failed for ${args.featureKey}:`, err);
+    logger.warn("[company-token-ledger] usage insert failed", { featureKey: args.featureKey, error: err });
   }
 
   if (source === "pack") {
@@ -230,7 +233,7 @@ export async function recordCompanyTokenUsage(args: {
           },
         });
     } catch (err) {
-      console.warn(`[company-token-ledger] pack debit failed for ${args.companyId}:`, err);
+      logger.warn("[company-token-ledger] pack debit failed", { companyId: args.companyId, error: err });
     }
   }
 }

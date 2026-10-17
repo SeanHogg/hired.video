@@ -34,10 +34,8 @@ import {
   VerifyEmailSchema,
   VerifyTwoFactorSchema,
   ResendTwoFactorSchema,
-  hashPassword,
-  verifyPassword,
-  generateVerificationCode,
-} from "../auth.js";
+} from "../../services/auth/schemas.js";
+import { hashPassword, verifyPassword, generateVerificationCode } from "../../services/auth/password.js";
 import { PUBLIC_SIGNUP_ROLES } from "../../../../shared/user-roles.js";
 
 // ═══════════════════════════════════════════════════════════════════════════

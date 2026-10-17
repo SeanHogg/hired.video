@@ -10,6 +10,9 @@
  * `use-signalr.ts` and `use-comm-hub.ts` work without changes.
  */
 
+import { apiClient } from "../api-client";
+import { getAuthToken } from "../api/auth-token";
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface Notification {
@@ -33,6 +36,12 @@ export type NotificationHandler = (notification: Notification) => void;
 export type UserStatusHandler = (statusUpdate: UserStatusUpdate) => void;
 export type ConnectionStateHandler = (state: ConnectionState) => void;
 
+/** The hub's `summary` event (sent after the unread dump). */
+export interface NotificationSummary {
+  unreadCount: number;
+}
+export type SummaryHandler = (summary: NotificationSummary) => void;
+
 /** Mirrors the subset of HubConnectionState the UI cares about. */
 export enum ConnectionState {
   Disconnected = "Disconnected",
@@ -45,6 +54,9 @@ export enum ConnectionState {
 
 const BACKOFF_MS = [0, 2_000, 10_000, 30_000]; // same as old signalr config
 const MAX_BACKOFF_MS = 30_000;
+// The hub dumps unread notifications + a `summary` event and then closes, so a
+// NORMAL close is a poll cycle — re-poll on this heartbeat, not the error backoff.
+const HEARTBEAT_MS = 60_000;
 
 // ── Service ──────────────────────────────────────────────────────────────────
 
@@ -52,12 +64,17 @@ class NotificationSSEService {
   private notificationHandlers: NotificationHandler[] = [];
   private userStatusHandlers: UserStatusHandler[] = [];
   private connectionStateHandlers: ConnectionStateHandler[] = [];
+  private summaryHandlers: SummaryHandler[] = [];
+  // A reconnect that came due while the tab was hidden; runs on visible.
+  private reconnectDeferred = false;
 
   private _state: ConnectionState = ConnectionState.Disconnected;
-  private abortController: AbortController | null = null;
+  private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   private retryCount = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
+  // Bumped per connect(); a superseded connection never schedules a reconnect.
+  private generation = 0;
 
   // ── Connection lifecycle ─────────────────────────────────────────────────
 
@@ -71,14 +88,20 @@ class NotificationSSEService {
 
     this.stopped = false;
     this.retryCount = 0;
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", this.handleVisibilityChange);
+    }
     await this.connect();
   }
 
   async stop(): Promise<void> {
     this.stopped = true;
+    this.reconnectDeferred = false;
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", this.handleVisibilityChange);
+    }
     this.clearRetryTimer();
-    this.abortController?.abort();
-    this.abortController = null;
+    this.cancelReader();
     this.setState(ConnectionState.Disconnected);
   }
 
@@ -87,41 +110,32 @@ class NotificationSSEService {
   private async connect(): Promise<void> {
     if (this.stopped) return;
 
-    const apiBaseUrl =
-      (window as any).APP_CONFIG?.API_URL ||
-      import.meta.env.VITE_API_URL ||
-      "http://localhost:5000";
-
-    const token = localStorage.getItem("authToken") || "";
-    if (!token) {
+    // Same bearer + X-Emulation-Token + base URL as every apiClient call.
+    if (!getAuthToken()) {
       this.setState(ConnectionState.Disconnected);
       return;
     }
 
-    this.setState(
+    // A heartbeat re-poll stays Connected — the state must not flap per poll.
+    if (this._state !== ConnectionState.Connected) this.setState(
       this.retryCount === 0
         ? ConnectionState.Connecting
         : ConnectionState.Reconnecting,
     );
 
-    this.abortController?.abort();
-    this.abortController = new AbortController();
+    this.cancelReader();
+    const generation = ++this.generation;
+    const superseded = () => this.stopped || generation !== this.generation;
 
     try {
-      const res = await fetch(
-        `${apiBaseUrl}/api/hubs/notifications`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "text/event-stream",
-          },
-          credentials: "include",
-          signal: this.abortController.signal,
-        },
-      );
-
-      if (!res.ok) {
-        throw new Error(`SSE HTTP ${res.status}`);
+      const res = await apiClient.openStream("/api/hubs/notifications", {
+        headers: { Accept: "text/event-stream" },
+        // Background hub: a dropped connection just reconnects, never toasts.
+        suppressErrorEvent: true,
+      });
+      if (superseded()) {
+        void res.body?.cancel().catch(() => undefined);
+        return;
       }
 
       this.retryCount = 0;
@@ -129,15 +143,20 @@ class NotificationSSEService {
 
       await this.readStream(res);
 
-      // Stream closed normally — schedule reconnect to pick up new events
-      if (!this.stopped) {
-        this.scheduleReconnect();
+      // Stream closed normally — re-poll on the heartbeat for new events.
+      if (!superseded()) {
+        this.scheduleReconnect("heartbeat");
       }
-    } catch (err: any) {
-      if (err?.name === "AbortError" || this.stopped) return;
-      console.warn("[NotificationSSE] connection error:", err.message);
-      this.scheduleReconnect();
+    } catch (err) {
+      if (superseded()) return;
+      console.warn("[NotificationSSE] connection error:", err instanceof Error ? err.message : err);
+      this.scheduleReconnect("error");
     }
+  }
+
+  private cancelReader(): void {
+    void this.reader?.cancel().catch(() => undefined);
+    this.reader = null;
   }
 
   // ── SSE stream reader ────────────────────────────────────────────────────
@@ -145,6 +164,7 @@ class NotificationSSEService {
   private async readStream(res: Response): Promise<void> {
     const reader = res.body?.getReader();
     if (!reader) return;
+    this.reader = reader;
 
     const decoder = new TextDecoder();
     let buffer = "";
@@ -170,7 +190,12 @@ class NotificationSSEService {
         this.parseSSEBlock(buffer);
       }
     } finally {
-      reader.releaseLock();
+      if (this.reader === reader) this.reader = null;
+      try {
+        reader.releaseLock();
+      } catch {
+        // Already released by cancel().
+      }
     }
   }
 
@@ -226,9 +251,13 @@ class NotificationSSEService {
         this.userStatusHandlers.forEach((h) => h(status));
         break;
       }
+      case "summary": {
+        const summary: NotificationSummary = { unreadCount: Number(data?.unreadCount) || 0 };
+        this.summaryHandlers.forEach((h) => h(summary));
+        break;
+      }
       case "connected":
-      case "summary":
-        // lifecycle events — no action needed
+        // lifecycle event — no action needed
         break;
       default:
         break;
@@ -237,21 +266,46 @@ class NotificationSSEService {
 
   // ── Reconnection ─────────────────────────────────────────────────────────
 
-  private scheduleReconnect(): void {
+  /**
+   * `heartbeat`: the stream closed normally — stay Connected and re-poll in
+   * HEARTBEAT_MS. `error`: back off 0/2s/10s/30s as Reconnecting. Either way a
+   * reconnect that comes due while the tab is hidden waits for visibility.
+   */
+  private scheduleReconnect(kind: "heartbeat" | "error"): void {
     if (this.stopped) return;
 
-    this.setState(ConnectionState.Reconnecting);
-    const delay =
-      BACKOFF_MS[Math.min(this.retryCount, BACKOFF_MS.length - 1)] ??
-      MAX_BACKOFF_MS;
-    this.retryCount++;
+    let delay: number;
+    if (kind === "heartbeat") {
+      delay = HEARTBEAT_MS;
+    } else {
+      this.setState(ConnectionState.Reconnecting);
+      delay =
+        BACKOFF_MS[Math.min(this.retryCount, BACKOFF_MS.length - 1)] ??
+        MAX_BACKOFF_MS;
+      this.retryCount++;
+    }
 
     this.clearRetryTimer();
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
-      this.connect();
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        this.reconnectDeferred = true;
+        return;
+      }
+      void this.connect();
     }, delay);
   }
+
+  private handleVisibilityChange = (): void => {
+    if (this.stopped || document.visibilityState !== "visible") return;
+    // Back in view: run a deferred reconnect, or cut a pending heartbeat
+    // short so the unread state is fresh the moment the user looks.
+    if (this.reconnectDeferred || this.retryTimer != null) {
+      this.reconnectDeferred = false;
+      this.clearRetryTimer();
+      void this.connect();
+    }
+  };
 
   private clearRetryTimer(): void {
     if (this.retryTimer != null) {
@@ -284,6 +338,17 @@ class NotificationSSEService {
       const i = this.userStatusHandlers.indexOf(handler);
       if (i > -1) this.userStatusHandlers.splice(i, 1);
     };
+  }
+
+  /** Fires on each `summary` event; returns an unsubscribe fn. */
+  onSummary(handler: SummaryHandler): () => void {
+    this.summaryHandlers.push(handler);
+    return () => this.offSummary(handler);
+  }
+
+  offSummary(handler: SummaryHandler): void {
+    const i = this.summaryHandlers.indexOf(handler);
+    if (i > -1) this.summaryHandlers.splice(i, 1);
   }
 
   onConnectionStateChange(handler: ConnectionStateHandler): () => void {

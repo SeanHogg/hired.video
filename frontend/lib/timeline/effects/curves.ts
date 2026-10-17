@@ -17,6 +17,7 @@
  */
 
 import { registerEffect } from "./registry";
+import { clamp01, clampByte, numberOr, stringOr } from "./params";
 
 const CHANNEL_OPTIONS = [
   { value: "luma", labelKey: "studio.effects.option.channel.luma" },
@@ -127,22 +128,6 @@ function buildToneLut(
   return lut;
 }
 
-function clamp01(v: number): number {
-  return v < 0 ? 0 : v > 1 ? 1 : v;
-}
-
-function clampByte(v: number): number {
-  return v < 0 ? 0 : v > 255 ? 255 : v;
-}
-
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * (t < 0 ? 0 : t > 1 ? 1 : t);
-}
-
-function numberOr(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
-}
-
-function stringOr(v: unknown, fallback: string): string {
-  return typeof v === "string" ? v : fallback;
 }

@@ -12,11 +12,12 @@
  * Gating: opt-in via `VITE_STUDIO_REALTIME` (truthy) — mirrors the game
  * room's `VITE_GAME_REALTIME_URL` rollout flag. When unset the hook returns a
  * disabled stub and the editor falls back to solo autosave with zero
- * behavioural change. URL host follows `runtimeConfig.apiUrl` (so requests
+ * behavioural change. URL host follows `getApiBaseUrl()` (so requests
  * land on api.hired.video, not the SPA origin).
  */
 
-import { runtimeConfig } from "@/lib/runtime-config";
+import { buildApiUrl } from "@/lib/api/base-url";
+import { getAuthToken } from "@/lib/api/auth-token";
 
 /** True when real-time collaboration is switched on for this build. */
 export function studioRealtimeEnabled(): boolean {
@@ -31,13 +32,11 @@ export function studioRealtimeEnabled(): boolean {
  *  token, SSR) so the caller self-gates. */
 export function studioCollabSocketUrl(projectId: string): string | null {
   if (typeof window === "undefined") return null;
-  const token = window.localStorage.getItem("auth_token");
+  const token = getAuthToken();
   if (!token) return null;
-  const base = runtimeConfig.apiUrl.replace(/\/$/, "");
-  if (!base) return null;
   let url: URL;
   try {
-    url = new URL(`${base}/api/studio/${encodeURIComponent(projectId)}/collab-socket`);
+    url = new URL(buildApiUrl(`/api/studio/${encodeURIComponent(projectId)}/collab-socket`));
   } catch {
     return null;
   }

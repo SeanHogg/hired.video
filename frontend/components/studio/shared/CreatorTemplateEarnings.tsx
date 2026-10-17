@@ -22,6 +22,7 @@
  */
 import { useEffect, useState } from "react";
 import { DollarSign, ExternalLink, ShoppingBag, Store } from "lucide-react";
+import { formatMoneyCents } from "@/lib/format";
 import {
   Card,
   CardContent,
@@ -35,19 +36,6 @@ import {
   type CreatorTemplateEarnings,
 } from "@/lib/services/studio-templates-service";
 
-function formatCents(cents: number, currency: string): string {
-  const amount = (cents ?? 0) / 100;
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currency || "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `$${amount.toFixed(2)}`;
-  }
-}
 
 export default function CreatorTemplateEarnings() {
   const [data, setData] = useState<CreatorTemplateEarnings | null>(null);
@@ -98,7 +86,7 @@ export default function CreatorTemplateEarnings() {
               Total earned
             </div>
             <div className="mt-1 text-xl font-semibold">
-              {formatCents(data.totalEarningsCents, data.currency)}
+              {formatMoneyCents(data.totalEarningsCents, data.currency, 2)}
             </div>
           </div>
           <div className="rounded-md border border-border bg-card px-3 py-2">
@@ -152,12 +140,12 @@ export default function CreatorTemplateEarnings() {
                   {row.paidLicenseCount} paid · listed at{" "}
                   {row.priceCents === 0
                     ? "Free"
-                    : formatCents(row.priceCents, row.currency)}
+                    : formatMoneyCents(row.priceCents, row.currency, 2)}
                 </p>
               </div>
               <div className="text-right">
                 <div className="text-sm font-semibold">
-                  {formatCents(row.earningsCents, row.currency)}
+                  {formatMoneyCents(row.earningsCents, row.currency, 2)}
                 </div>
                 {row.listingSlug && row.visibility === "public" && (
                   <a

@@ -13,38 +13,16 @@ import { getDb, schema } from "../../db/index.js";
 import { EMBED_KEY_PLACEHOLDER, EMBED_SURFACES } from "../../../../shared/embed.js";
 import { resolveSegmentForCompany } from "../people-ops/segment.js";
 import type { PeopleSegmentScope } from "../people-ops/segment.js";
+import { randomHex, sha256Hex } from "../../utils/crypto.js";
+import { publicAppBaseUrl } from "../../utils/public-urls.js";
 
 const { companyEmbedKeys } = schema;
 
-async function sha256Hex(input: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-/** Public base URL of the app (the embed loader origin). */
-function appBaseUrl(): string {
-  return (
-    process?.env?.PUBLIC_APP_URL ||
-    process?.env?.APP_URL ||
-    (globalThis as any).__ENV?.PUBLIC_APP_URL ||
-    "https://hired.video"
-  ).replace(/\/$/, "");
-}
-
 /** hvk_<48 hex chars> — same family as user api keys, longer entropy. */
 export async function generateEmbedKey(): Promise<{ key: string; prefix: string; hash: string }> {
-  const bytes = crypto.getRandomValues(new Uint8Array(24));
-  const hex = Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  const key = `hvk_${hex}`;
+  const key = `hvk_${randomHex(24)}`;
   const prefix = key.slice(0, 12);
-  const hashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
-  const hash = Array.from(new Uint8Array(hashBuf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  const hash = await sha256Hex(key);
   return { key, prefix, hash };
 }
 
@@ -272,7 +250,7 @@ export async function resolveEmbedRequest(
  * env var at build/deploy time — never the real key.
  */
 export function buildEmbedSnippet(companySlugOrId: string, view: string): string {
-  const base = appBaseUrl();
+  const base = publicAppBaseUrl();
   return [
     `<!-- hired.video embed — ${view} -->`,
     `<!-- The key is injected at build/deploy time from an environment variable.`,

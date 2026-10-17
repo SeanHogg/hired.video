@@ -27,6 +27,7 @@ import {
 } from "@/lib/services/paid-media-service";
 import { advertisingService, type AdSet as InternalAdSet } from "@/lib/services/advertising-service";
 import { studioService } from "@/lib/services/studio-service";
+import { useStudioProjects } from "@/hooks/queries/use-studio-projects";
 import AdSetEditor from "@/components/advertising/AdSetEditor";
 import {
   CampaignSizeViewToggle,
@@ -235,10 +236,7 @@ function CampaignsTab({ workspace }: { workspace: WorkspaceParam }) {
     queryKey: ["studio", "campaigns"],
     queryFn: async () => (await studioService.getCampaigns()).data ?? [],
   });
-  const studioProjectsQ = useQuery({
-    queryKey: ["studio", "projects"],
-    queryFn: async () => (await studioService.getProjects()).data ?? [],
-  });
+  const studioProjectsQ = useStudioProjects();
 
   const internalIds = new Set((internalCampaignsQ.data ?? []).map((c) => c.id));
   const adSetsEnabled = !!selectedCampaignId && internalIds.has(selectedCampaignId);

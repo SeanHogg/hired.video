@@ -1049,19 +1049,6 @@ export async function markDocumentSigned(
   return row;
 }
 
-/** Nightly cron helper — flips signed-but-expired docs to status='expired'.
- *  Idempotent so it can re-run safely. */
-export async function expireOverdueDocuments(db = getDb()) {
-  return await db.update(placementDocuments).set({
-    status: "expired",
-    updatedAt: new Date(),
-  } as any).where(and(
-    eq(placementDocuments.status, "signed"),
-    sql`${placementDocuments.expiresAt} IS NOT NULL`,
-    sql`${placementDocuments.expiresAt} <= NOW()`,
-  ));
-}
-
 /** Get a single document row — used by the upload route to read
  *  the existing `metadata.contentType` before serving the file. */
 export async function getDocumentForCaller(

@@ -82,6 +82,7 @@ import { dispatchActions, type ActionContext, type ActionEffect } from "./action
 import "./action-handlers.js"; // registers the Phase-4 L2 handlers
 import type { InboxActionRunInsert } from "../../repositories/inboxActionsRepository.js";
 import type { NotificationInsert } from "../../repositories/notificationsRepository.js";
+import { logger } from "../../lib/logger.js";
 
 export interface IngestDeps {
   // Full repos container — the L2 action engine reaches Contacts / JD /
@@ -267,7 +268,7 @@ export async function ingestForAccount(
       insertPayloads,
     );
   } catch (err) {
-    console.error("[email-ingest] bulk insert failed:", err);
+    logger.error("[email-ingest] bulk insert failed", err);
     result.errorMessage = describeDbError(err);
     return result;
   }
@@ -457,10 +458,7 @@ export async function ingestForAccount(
         }
       }
     } catch (err) {
-      console.error(
-        `[email-ingest] message ${wireMsg.providerMessageId} failed:`,
-        err,
-      );
+      logger.error("[email-ingest] message failed", { providerMessageId: wireMsg.providerMessageId, error: err });
       // Continue — one bad message shouldn't drop the rest of the chunk.
       result.errorMessage = describeDbError(err);
     }
@@ -472,7 +470,7 @@ export async function ingestForAccount(
     try {
       await deps.repos.externalEmailMessages.patchMany(patches);
     } catch (err) {
-      console.error("[email-ingest] bulk patch failed:", err);
+      logger.error("[email-ingest] bulk patch failed", err);
       result.errorMessage = describeDbError(err);
     }
   }
@@ -485,14 +483,14 @@ export async function ingestForAccount(
     try {
       await deps.repos.inboxActionRuns.recordRuns(actionRunInserts);
     } catch (err) {
-      console.error("[email-ingest] action-run audit insert failed:", err);
+      logger.error("[email-ingest] action-run audit insert failed", err);
     }
   }
   if (notificationInserts.length > 0) {
     try {
       await deps.repos.notifications.insertNotifications(notificationInserts);
     } catch (err) {
-      console.error("[email-ingest] action notification insert failed:", err);
+      logger.error("[email-ingest] action notification insert failed", err);
     }
   }
 
@@ -558,7 +556,7 @@ export async function finalizeSyncSession(
       },
     });
   } catch (err) {
-    console.error("[email-finalize] sync-run upsert failed:", err);
+    logger.error("[email-finalize] sync-run upsert failed", err);
     const reason = describeDbError(err);
     result.errorMessage = result.errorMessage
       ? `${result.errorMessage}; sync-run: ${reason}`
@@ -588,10 +586,10 @@ export async function finalizeSyncSession(
     result.cursorAdvanced = true;
   } catch (err) {
     const reason = describeDbError(err);
-    console.error(
-      `[email-finalize] cursor-advance failed for account ${account.id} (messages already persisted):`,
-      err,
-    );
+    logger.error("[email-finalize] cursor-advance failed (messages already persisted)", {
+      accountId: account.id,
+      error: err,
+    });
     result.errorMessage = result.errorMessage
       ? `${result.errorMessage}; cursor-advance: ${reason}`
       : `cursor-advance: ${reason}`;

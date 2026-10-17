@@ -16,6 +16,7 @@
 
 import { getOrSetCached } from "../../utils/edge-cache.js";
 import { fetchPublicUrl, parseProxyTarget } from "../../utils/image-proxy.js";
+import { logger } from "../../lib/logger.js";
 import {
   emptyLinkPreview,
   normalizePreviewUrl,
@@ -120,7 +121,7 @@ export async function getLinkPreview(
     return { ok: true, preview };
   } catch (err) {
     if (!(err instanceof TransientPreviewError)) {
-      console.warn("[link-preview] unexpected failure", err);
+      logger.warn("[link-preview] unexpected failure", err);
     }
     return { ok: true, preview: emptyLinkPreview(normalized) };
   }

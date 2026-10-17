@@ -1,23 +1,17 @@
 /**
- * Integrations registry + execution log.
+ * Integrations registry.
  *
  * `integrations` is the single source of truth for both system-shipped
  * providers (PeopleDataLabs, GitHub, etc.) and creator-built ones. The
  * `kind` column differentiates them; everything else (capabilities,
- * enable/disable, run history) is shared.
+ * enable/disable) is shared.
  *
- * `integration_credentials` references env-var names rather than secret
- * values — actual API keys live in Cloudflare env / secrets manager and
- * are looked up by name at call time. That way the registry row itself
- * is safe to return to the frontend.
- *
- * `integration_runs` is append-only telemetry. Used by the SuperAdmin
- * dashboard to surface error rates, cost, and cache-hit ratio per
- * provider; also by per-creator analytics for creator integrations.
+ * The never-used `integration_credentials` and `integration_runs` tables
+ * were archived (moved to the `archive` schema) by migration 0545.
  */
 
 import {
-  pgTable, uuid, text, varchar, integer, boolean, timestamp, jsonb, index, uniqueIndex,
+  pgTable, uuid, text, varchar, integer, boolean, timestamp, jsonb, index,
 } from "drizzle-orm/pg-core";
 
 export const integrations = pgTable("integrations", {
@@ -48,39 +42,5 @@ export const integrations = pgTable("integrations", {
   index("integrations_review_status_idx").on(t.reviewStatus),
 ]);
 
-export const integrationCredentials = pgTable("integration_credentials", {
-  id:               uuid("id").primaryKey().defaultRandom(),
-  integrationId:    uuid("integration_id").notNull().references(() => integrations.id, { onDelete: "cascade" }),
-  envVarName:       varchar("env_var_name", { length: 128 }).notNull(),
-  extra:            jsonb("extra").notNull().default({} as any),
-  lastVerifiedAt:   timestamp("last_verified_at", { withTimezone: true }),
-  createdAt:        timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt:        timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [
-  uniqueIndex("integration_credentials_integration_idx").on(t.integrationId),
-]);
-
-export const integrationRuns = pgTable("integration_runs", {
-  id:               uuid("id").primaryKey().defaultRandom(),
-  integrationId:    uuid("integration_id").notNull().references(() => integrations.id, { onDelete: "cascade" }),
-  userId:           uuid("user_id"),
-  kind:             varchar("kind", { length: 16 }).notNull(),
-  status:           varchar("status", { length: 24 }).notNull(),
-  query:            jsonb("query").notNull().default({} as any),
-  result:           jsonb("result"),
-  costCents:        integer("cost_cents").notNull().default(0),
-  cacheHit:         boolean("cache_hit").notNull().default(false),
-  errorMessage:     text("error_message"),
-  durationMs:       integer("duration_ms"),
-  createdAt:        timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [
-  index("integration_runs_integration_idx").on(t.integrationId),
-  index("integration_runs_user_idx").on(t.userId),
-  index("integration_runs_created_idx").on(t.createdAt),
-]);
-
 export type IntegrationRow = typeof integrations.$inferSelect;
 export type IntegrationInsert = typeof integrations.$inferInsert;
-export type IntegrationCredentialRow = typeof integrationCredentials.$inferSelect;
-export type IntegrationRunRow = typeof integrationRuns.$inferSelect;
-export type IntegrationRunInsert = typeof integrationRuns.$inferInsert;

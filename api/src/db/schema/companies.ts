@@ -120,6 +120,7 @@ export const companyProfiles = pgTable("company_profiles", {
 }, (t) => [
   // pg_trgm GIN — backs `ILIKE '%term%'` company search (0495).
   index("idx_company_profiles_name_trgm").using("gin", t.name.op("gin_trgm_ops")),
+  index("idx_company_profiles_owner_id").on(t.ownerId),
 ]);
 
 export type CompanyProfile = typeof companyProfiles.$inferSelect;
@@ -145,6 +146,7 @@ export const companyEmbedKeys = pgTable("company_embed_keys", {
 }, (t) => [
   index("idx_company_embed_keys_company").on(t.companyId, t.isActive),
   uniqueIndex("uq_company_embed_keys_hash").on(t.keyHash),
+  index("idx_company_embed_keys_created_by").on(t.createdBy),
 ]);
 
 export type CompanyEmbedKey = typeof companyEmbedKeys.$inferSelect;
@@ -238,6 +240,7 @@ export const companyTeamMembers = pgTable("company_team_members", {
   uniqueIndex("company_team_members_company_user_unique")
     .on(table.companyId, table.userId)
     .where(sql`user_id IS NOT NULL`),
+  index("idx_company_team_members_user_id").on(table.userId),
 ]);
 
 export type CompanyTeamMember = typeof companyTeamMembers.$inferSelect;
@@ -259,11 +262,11 @@ export const companyViews = pgTable("company_views", {
   userAgent: text("user_agent"),
   viewedAt: timestamp("viewed_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
-  index("company_views_company_id_idx").on(table.companyId),
   index("company_views_viewed_at_idx").on(table.viewedAt),
   // Dashboard "recent views for company X" feed; the per-column indexes
   // covered lookups but forced a sort step on read.
   index("idx_company_views_company_viewed").on(table.companyId, table.viewedAt.desc()),
+  index("idx_company_views_viewer_id").on(table.viewerId),
 ]);
 
 export type CompanyView = typeof companyViews.$inferSelect;

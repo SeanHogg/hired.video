@@ -19,6 +19,7 @@ import { UploadedAssetsRepository } from "../../repositories/uploadedAssetsRepos
 import { deriveAssetRecord, type AssetRecord, type AssetRecordHint } from "./asset-record.js";
 import { invalidateMediaLibrary } from "./media-library-cache.js";
 import { readImageDimensions } from "./image-dimensions.js";
+import { logger } from "../../lib/logger.js";
 
 interface BucketEnv {
   VIDEO_BUCKET?: R2Bucket;
@@ -78,7 +79,7 @@ export function createObjectStore(deps: ObjectStoreDeps) {
     ): Promise<boolean> {
       const bucket = deps.getBucket();
       if (!bucket) {
-        console.warn("[object-store] No R2 binding (VIDEO_BUCKET) — object not stored:", key);
+        logger.warn("[object-store] No R2 binding (VIDEO_BUCKET) — object not stored", { key });
         return false;
       }
       // Read the header + length before the put hands the body to R2.
@@ -91,7 +92,7 @@ export function createObjectStore(deps: ObjectStoreDeps) {
         try {
           await deps.recordAsset(record);
         } catch (err) {
-          console.warn("[object-store] uploaded_assets record failed:", key, err instanceof Error ? err.message : err);
+          logger.warn("[object-store] uploaded_assets record failed", { key, error: err });
         }
       }
       return true;

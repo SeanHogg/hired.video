@@ -57,17 +57,6 @@ export type PartnerEmbedTheme = (typeof PARTNER_EMBED_THEMES)[number];
 export const PARTNER_RESUME_STATUSES = ["ready", "parsing", "none"] as const;
 export type PartnerResumeStatus = (typeof PARTNER_RESUME_STATUSES)[number];
 
-/** Accepted MIME types for a partner résumé `file` upload. PDF + DOCX are
- *  extracted to text server-side (unpdf / docx unzip); text/JSON parse directly.
- *  Legacy binary `.doc` (OLE) and images are not supported — send `rawText`. */
-export const PARTNER_RESUME_UPLOAD_MIME_TYPES = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-  "text/plain",
-  "application/json",
-  "application/vnd.hired.jsonresume+json",
-] as const;
-
 /** Max decoded size of a partner résumé `file` upload (bytes). Sized for real
  *  PDF/DOCX résumés (a few MB) with headroom. */
 export const PARTNER_RESUME_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
@@ -91,15 +80,3 @@ export const PARTNER_ERROR_CODES = [
   "INVALID_RESUME", // 422 — file decoded but no usable résumé content
 ] as const;
 export type PartnerErrorCode = (typeof PARTNER_ERROR_CODES)[number];
-
-/** Which scope each partner SDK method requires — SSoT for docs + tests. */
-export const PARTNER_METHOD_SCOPES = {
-  "jobSeekers.create": "write:job_seekers",
-  "jobSeekers.uploadResume": "write:resumes",
-  "jobSeekers.getProfile": "read:profile",
-  "jobSeekers.getByExternalUserId": "read:connections",
-  createEmbedToken: "read:profile",
-  connect: "write:connections",
-  "connections.list": "read:connections",
-  "connections.revoke": "write:connections",
-} as const satisfies Record<string, PartnerScope>;

@@ -22,6 +22,7 @@ import { getDb, schema } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
 import { findAcceptedPeersByUser } from "../../repositories/userConnectionsRepository.js";
 import { emitNotification, resolveActor } from "../notifications/notificationService.js";
+import { logger } from "../../lib/logger.js";
 
 /** All accepted-connection peer ids for one user, bidirectional. */
 async function fetchAcceptedPeers(userId: string): Promise<Set<string>> {
@@ -317,7 +318,7 @@ export async function requestWarmIntro(
         },
       );
     } catch (err) {
-      console.error("[warm-intro] notification insert failed:", err);
+      logger.error("[warm-intro] notification insert failed", err);
     }
   })();
 
@@ -732,7 +733,7 @@ export async function forwardWarmIntro(
         },
       );
     } catch (err) {
-      console.error("[warm-intro] forward notification failed:", err);
+      logger.error("[warm-intro] forward notification failed", err);
     }
   })();
 
@@ -834,7 +835,7 @@ export async function declineWarmIntro(
         },
       );
     } catch (err) {
-      console.error("[warm-intro] decline notification failed:", err);
+      logger.error("[warm-intro] decline notification failed", err);
     }
   })();
 

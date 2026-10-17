@@ -74,6 +74,7 @@ export const affiliateConversions = pgTable("affiliate_conversions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_affiliate_conversions_affiliate_created").on(t.affiliateId, t.createdAt.desc().nullsFirst()),
+  index("idx_affiliate_conversions_referral_id").on(t.referralId),
 ]);
 
 export type AffiliateConversion = typeof affiliateConversions.$inferSelect;
@@ -90,7 +91,9 @@ export const affiliatePayouts = pgTable("affiliate_payouts", {
   processedAt: timestamp("processed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_affiliate_payouts_affiliate_id").on(t.affiliateId),
+]);
 
 export type AffiliatePayout = typeof affiliatePayouts.$inferSelect;
 export type NewAffiliatePayout = typeof affiliatePayouts.$inferInsert;
@@ -131,6 +134,8 @@ export const affiliateLinkClicks = pgTable("affiliate_link_clicks", {
   clickedAt: timestamp("clicked_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_affiliate_link_clicks_sector").on(t.landingSector, t.clickedAt.desc().nullsFirst()).where(sql`"landing_sector" IS NOT NULL`),
+  index("idx_affiliate_link_clicks_affiliate_id").on(t.affiliateId),
+  index("idx_affiliate_link_clicks_converted_referral_id").on(t.convertedReferralId),
 ]);
 
 export type AffiliateLinkClick = typeof affiliateLinkClicks.$inferSelect;

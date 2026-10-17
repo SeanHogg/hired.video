@@ -546,7 +546,7 @@ export class DashboardService {
    */
   async getDashboard(): Promise<DashboardResponse<BaseDashboard>> {
     try {
-      const response = (await apiClient.get("/api/userdashboard")) as {
+      const response = (await apiClient.get("/api/dashboard")) as {
         data: any;
       };
       const dashboard = BaseDashboardSchema.parse(response.data);
@@ -607,7 +607,7 @@ export class DashboardService {
   > {
     try {
       const response = (await apiClient.get(
-        "/api/userdashboard/jobseeker",
+        "/api/dashboard/jobseeker",
       )) as { data: any };
 
       const parsed = JobSeekerDashboardSchema.safeParse(response.data);
@@ -635,7 +635,7 @@ export class DashboardService {
   async getRecruiterDashboard(): Promise<DashboardResponse<RecruiterDashboard>> {
     try {
       const response = (await apiClient.get(
-        "/api/userdashboard/recruiter",
+        "/api/dashboard/recruiter",
       )) as { data: any };
 
       // Lenient parse (mirrors getJobSeekerDashboard) — keep the rich
@@ -665,7 +665,7 @@ export class DashboardService {
    */
   async getEmployerDashboard(): Promise<DashboardResponse<EmployerDashboard>> {
     try {
-      const response = (await apiClient.get("/api/userdashboard/employer")) as {
+      const response = (await apiClient.get("/api/dashboard/employer")) as {
         data: any;
       };
       const dashboard = EmployerDashboardSchema.parse(response.data);
@@ -688,7 +688,7 @@ export class DashboardService {
    */
   async getAdminDashboard(): Promise<DashboardResponse<BaseDashboard>> {
     try {
-      const response = (await apiClient.get("/api/userdashboard/admin")) as {
+      const response = (await apiClient.get("/api/dashboard/admin")) as {
         data: any;
       };
       const dashboard = BaseDashboardSchema.parse(response.data);
@@ -712,7 +712,7 @@ export class DashboardService {
   async getAffiliateDashboard(): Promise<DashboardResponse<BaseDashboard>> {
     try {
       const response = (await apiClient.get(
-        "/api/Affiliate/dashboard",
+        "/api/affiliates/dashboard",
       )) as { data: any };
 
       // Transform affiliate dashboard data to match BaseDashboard structure
@@ -746,7 +746,7 @@ export class DashboardService {
     request: RecordActivityRequest,
   ): Promise<DashboardResponse<void>> {
     try {
-      await apiClient.post("/api/userdashboard/activity", request);
+      await apiClient.post("/api/dashboard/activity", request);
       return { success: true };
     } catch (error) {
       console.error("Error recording activity:", error);
@@ -765,7 +765,7 @@ export class DashboardService {
     request: RecordEngagementRequest,
   ): Promise<DashboardResponse<void>> {
     try {
-      await apiClient.post("/api/userdashboard/engagement", request);
+      await apiClient.post("/api/dashboard/engagement", request);
       return { success: true };
     } catch (error) {
       console.error("Error recording engagement:", error);
@@ -784,7 +784,7 @@ export class DashboardService {
    */
   async refreshDashboardMetrics(): Promise<DashboardResponse<void>> {
     try {
-      await apiClient.post("/api/userdashboard/refresh");
+      await apiClient.post("/api/dashboard/refresh");
       return { success: true };
     } catch (error) {
       console.error("Error refreshing dashboard metrics:", error);

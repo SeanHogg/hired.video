@@ -14,6 +14,7 @@
  */
 
 import { registerEffect } from "./registry";
+import { clamp01, numberOr, wrap01 } from "./params";
 import { rgbToHsl, hslToRgb, hueQualifierWeight } from "./hsl-math";
 
 registerEffect({
@@ -65,18 +66,3 @@ registerEffect({
     ctx.putImageData(data, 0, 0);
   },
 });
-
-function clamp01(v: number): number {
-  return v < 0 ? 0 : v > 1 ? 1 : v;
-}
-
-function wrap01(v: number): number {
-  let x = v;
-  while (x < 0) x += 1;
-  while (x >= 1) x -= 1;
-  return x;
-}
-
-function numberOr(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
-}

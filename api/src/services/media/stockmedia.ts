@@ -9,6 +9,9 @@
  * `stockMediaAssets` (hash PK) + `userStockMediaUsage` (per-user join).
  */
 
+import { sha256Hex } from "../../utils/crypto.js";
+import { logger } from "../../lib/logger.js";
+
 export type StockProvider = "unsplash" | "pexels" | "pixabay";
 export type StockMediaType = "image" | "video" | "audio";
 
@@ -218,19 +221,19 @@ export async function searchStockMedia(
   // Unsplash supports images only.
   if (keys.unsplash && mediaType === "image") {
     tasks.push(searchUnsplash(keys.unsplash, params).catch((e) => {
-      console.warn("[stockmedia] unsplash error:", e);
+      logger.warn("[stockmedia] unsplash error", e);
       return [];
     }));
   }
   if (keys.pexels && (mediaType === "image" || mediaType === "video")) {
     tasks.push(searchPexels(keys.pexels, params).catch((e) => {
-      console.warn("[stockmedia] pexels error:", e);
+      logger.warn("[stockmedia] pexels error", e);
       return [];
     }));
   }
   if (keys.pixabay && (mediaType === "image" || mediaType === "video")) {
     tasks.push(searchPixabay(keys.pixabay, params).catch((e) => {
-      console.warn("[stockmedia] pixabay error:", e);
+      logger.warn("[stockmedia] pixabay error", e);
       return [];
     }));
   }
@@ -258,14 +261,7 @@ export async function searchStockMedia(
   };
 }
 
-// ─── Hashing + extension helpers ────────────────────────────────────────────
-export async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", buffer);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
+// ─── Extension helpers ──────────────────────────────────────────────────────
 export function extensionForMime(mime: string): string {
   const m = mime.toLowerCase();
   if (m.includes("jpeg")) return "jpg";

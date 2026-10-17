@@ -14,6 +14,7 @@
 
 import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
+import { slugify } from "../../../../shared/slugify.js";
 
 const {
   companyProfiles,
@@ -285,12 +286,11 @@ export interface CreateCompanyInput {
   isVerified?: boolean;
 }
 
-function toSlug(name: string): string {
-  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 90);
-}
-
 export async function adminCreateCompany(input: CreateCompanyInput, db = getDb()) {
-  const slug = input.slug?.trim() || toSlug(input.name);
+  // Company slugs keep the legacy non-normalizing derivation so they line up
+  // with the extract-and-dedup lookup in routes/companies.ts.
+  const slug =
+    input.slug?.trim() || slugify(input.name, { fallback: "", maxLen: 90, stripDiacritics: false });
   const [row] = await db
     .insert(companyProfiles)
     .values({

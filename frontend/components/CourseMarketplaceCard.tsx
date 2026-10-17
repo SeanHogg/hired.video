@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { formatDurationMinutes, formatListPriceCents } from "@/lib/format";
 import { GraduationCap, Clock, Award, Users, Star } from "lucide-react";
 import { CardContent } from "@/components/ui/card";
 import BaseCard from "@/components/ui/BaseCard";
@@ -29,20 +30,6 @@ export interface CourseMarketplaceItem {
   ratingCount: number;
   publishedAt: string | null;
   author: { id: string; name: string; avatarUrl: string | null; slug: string };
-}
-
-function formatPrice(cents: number | null) {
-  if (cents == null) return "Contact for pricing";
-  if (cents === 0) return "Free";
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
-function formatDuration(minutes: number | null) {
-  if (minutes == null) return null;
-  if (minutes < 60) return `${minutes}m`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 export default function CourseMarketplaceCard({ item }: { item: CourseMarketplaceItem }) {
@@ -116,8 +103,8 @@ export default function CourseMarketplaceCard({ item }: { item: CourseMarketplac
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           {item.difficulty && <span className="capitalize">{item.difficulty}</span>}
-          {formatDuration(item.estimatedMinutes) && (
-            <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {formatDuration(item.estimatedMinutes)}</span>
+          {formatDurationMinutes(item.estimatedMinutes) && (
+            <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {formatDurationMinutes(item.estimatedMinutes)}</span>
           )}
           {item.enrollmentCount > 0 && (
             <span className="flex items-center gap-1"><Users className="h-3 w-3" /> {item.enrollmentCount}</span>
@@ -129,7 +116,7 @@ export default function CourseMarketplaceCard({ item }: { item: CourseMarketplac
           )}
         </div>
         <div className="flex items-center justify-between text-sm mt-auto pt-2 border-t">
-          <span className="font-semibold">{formatPrice(item.priceCents)}</span>
+          <span className="font-semibold">{formatListPriceCents(item.priceCents, { free: true })}</span>
         </div>
         <Button asChild size="sm" className="w-full">
           <Link to={href}>View course</Link>

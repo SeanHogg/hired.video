@@ -36,7 +36,6 @@ export type UserId = Brand<string, "UserId">;
 export type ResumeId = Brand<string, "ResumeId">;
 export type CompanyId = Brand<string, "CompanyId">;
 export type JobId = Brand<string, "JobId">;
-export type SubscriptionId = Brand<string, "SubscriptionId">;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -55,8 +54,6 @@ export const parseUserId = (raw: string): UserId => parseUuid("UserId", raw);
 export const parseResumeId = (raw: string): ResumeId => parseUuid("ResumeId", raw);
 export const parseCompanyId = (raw: string): CompanyId => parseUuid("CompanyId", raw);
 export const parseJobId = (raw: string): JobId => parseUuid("JobId", raw);
-export const parseSubscriptionId = (raw: string): SubscriptionId =>
-  parseUuid("SubscriptionId", raw);
 
 /** Safe variants — return null on invalid input. Use when the caller is
  *  already framing a VALIDATION_ERROR response and doesn't want exceptions. */

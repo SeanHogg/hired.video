@@ -28,12 +28,11 @@ import { ToolShell } from "@/components/tools/ToolShell";
 import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
 import { useAuth } from "@/lib/auth";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
-import { resumeService } from "@/lib/services/resume-service";
 import { autofillService } from "@/lib/services/autofill-service";
 import { appendDiagnosticReference } from "@/lib/llm-diagnostic";
-import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { FormField, FieldAnswer } from "@shared/autofill";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 
 type InputMode = "url" | "questions";
 
@@ -69,11 +68,7 @@ export default function FormAutofill() {
   const [copied, setCopied] = useState(false);
 
   // Fetch user's resumes
-  const { data: resumes, isLoading: resumesLoading } = useQuery({
-    queryKey: ["resumes", user?.id],
-    queryFn: () => resumeService.getUserResumes(),
-    enabled: isAuthenticated && !!user?.id,
-  });
+  const { data: resumes, isLoading: resumesLoading } = useUserResumes();
 
   // Analyze form
   const handleAnalyze = async () => {

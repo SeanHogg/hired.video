@@ -59,6 +59,7 @@ import { WorkspaceForbiddenError } from "../services/studio/workspace.js";
 import { listAccessibleWorkspaces } from "../services/studio/workspace.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
 import { frontendBaseUrl } from "../utils/public-urls.js";
+import { logger } from "../lib/logger.js";
 
 export const paidMediaRoutes = new Hono<AppEnv>();
 
@@ -83,7 +84,7 @@ function withinErrorHandling<T>(c: any, fn: () => Promise<T>): Promise<Response>
         return c.json(error("WORKSPACE_FORBIDDEN", err.message), 403);
       }
       const msg = err instanceof Error ? err.message : String(err);
-      console.error("[paid-media]", msg);
+      logger.error("[paid-media] request failed", err);
       return c.json(error("INTERNAL", msg), 500);
     });
 }

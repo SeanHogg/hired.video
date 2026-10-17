@@ -22,6 +22,7 @@ import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
+import { logger } from "../lib/logger.js";
 import {
   createLLMClient,
   hasAnyLLMProviderKey,
@@ -128,7 +129,7 @@ Prefer existing keys. Only suggest a new combination when no static match exists
         }
       }
     } catch (err) {
-      console.warn("[template-extractor] LLM extraction failed, using baseline:", err);
+      logger.warn("[template-extractor] LLM extraction failed, using baseline", err);
     }
   }
 

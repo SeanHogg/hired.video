@@ -19,6 +19,14 @@ import type { getDb } from "../../db/index.js";
 import { schema } from "../../db/index.js";
 import { NotificationService } from "../notifications/notificationService.js";
 import { invalidateLearnerDashboard } from "./learner-dashboard.js";
+import {
+  base64ToBytes,
+  base64UrlDecode,
+  base64UrlEncode,
+  base64UrlToBytes,
+  hmacSha256Base64Url,
+  timingSafeEqual,
+} from "../../utils/crypto.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -219,7 +227,7 @@ export class CertificateService {
     const signatureOk =
       alg === "ed25519"
         ? await this.verifyEd25519(b64, sig)
-        : constantTimeEqual(sig, await this.hmac(b64));
+        : timingSafeEqual(sig, await this.hmac(b64));
     if (!signatureOk) {
       return { valid: false, reason: "tampered" };
     }
@@ -241,18 +249,8 @@ export class CertificateService {
     return `${b64}.${sig}`;
   }
 
-  private async hmac(message: string): Promise<string> {
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(this.secret),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"],
-    );
-    const bytes = new Uint8Array(
-      await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message)),
-    );
-    return base64UrlEncode(bytes);
+  private hmac(message: string): Promise<string> {
+    return hmacSha256Base64Url(this.secret, message);
   }
 
   // ── Ed25519 (asymmetric) helpers (#1500) ──────────────────────────────
@@ -331,44 +329,4 @@ function canonicalJson(obj: Record<string, unknown>): string {
   const ordered: Record<string, unknown> = {};
   for (const k of keys) ordered[k] = obj[k];
   return JSON.stringify(ordered);
-}
-
-function base64UrlEncode(input: string | Uint8Array): string {
-  const bytes = typeof input === "string" ? new TextEncoder().encode(input) : input;
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]!);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function base64UrlDecode(input: string): string {
-  const padded = input.replace(/-/g, "+").replace(/_/g, "/") +
-    "=".repeat((4 - (input.length % 4)) % 4);
-  const bin = atob(padded);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new TextDecoder().decode(bytes);
-}
-
-function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return result === 0;
-}
-
-/** Decode standard base64 (e.g. a stored PKCS8/raw key) to bytes. */
-function base64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-}
-
-/** Decode base64url (the signature segment) to bytes. */
-function base64UrlToBytes(b64url: string): Uint8Array {
-  const padded =
-    b64url.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (b64url.length % 4)) % 4);
-  return base64ToBytes(padded);
 }

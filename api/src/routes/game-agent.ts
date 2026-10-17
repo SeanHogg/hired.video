@@ -52,6 +52,7 @@ import {
 } from "../../../shared/world-3d-edit.js";
 import type { GameState } from "../../../shared/game-state.js";
 import { toJSONSchema } from "zod";
+import { logger } from "../lib/logger.js";
 
 export const gameAgentRoutes = new Hono<AppEnv>();
 
@@ -167,7 +168,7 @@ gameAgentRoutes.post("/:projectId/turn", async (c) => {
       toolChoice: "auto",
     });
   } catch (e) {
-    console.warn("[game-agent] LLM call failed", e);
+    logger.warn("[game-agent] LLM call failed", e);
     return c.json(fail("LLM_FAILED", "AI agent could not respond. Try again."), 502);
   }
 

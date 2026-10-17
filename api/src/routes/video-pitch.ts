@@ -17,6 +17,7 @@ import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import type { ResumeContent } from "../../../shared/resume.js";
 import { getPrompt } from "../../../shared/ai-prompts/index.js";
+import { logger } from "../lib/logger.js";
 import {
   PitchError,
   clearCurrentPitch,
@@ -127,7 +128,7 @@ videoPitchRoutes.post("/script", async (c) => {
     );
     return c.json(ok({ script: data.script, targetWordCount }));
   } catch (err) {
-    console.error("[video-pitch] LLM call failed, using mock:", err);
+    logger.error("[video-pitch] LLM call failed, using mock", err);
     const script = mockScript(parsed.data.tone, parsed.data.length, resumeContext);
     return c.json(ok({ script, targetWordCount }));
   }

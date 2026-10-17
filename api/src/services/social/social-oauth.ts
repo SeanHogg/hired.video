@@ -13,19 +13,20 @@
 
 import type { SocialLane, SocialPlatform } from "../../../../shared/social-platforms.js";
 import { getJwtSecret } from "../../utils/jwt.js";
+import { apiBaseUrl } from "../../utils/public-urls.js";
+import {
+  hexToBytes,
+  hmacSha256Hex,
+  hmacSha256Verify,
+  randomBase64Url,
+  sha256Base64Url,
+} from "../../utils/crypto.js";
 import {
   socialPlatformConfig,
   type SocialIdentity,
   type SocialOAuthTokens,
 } from "./platform-config.js";
 
-function getEnv(key: string): string {
-  return process.env[key] || (globalThis as any).__ENV?.[key] || "";
-}
-
-function apiBase(): string {
-  return getEnv("API_URL") || getEnv("BASE_URL") || "https://api.hired.video";
-}
 
 /** The callback the platform redirects to. One fixed URL per scope (NOT per
  *  platform) so only two redirect URIs need registering in each developer
@@ -34,8 +35,8 @@ function apiBase(): string {
  *  handler knows which store to write. */
 export function socialCallbackUrl(scope: "self" | "managed"): string {
   return scope === "managed"
-    ? `${apiBase()}/api/admin/social/oauth/callback`
-    : `${apiBase()}/api/social/oauth/callback`;
+    ? `${apiBaseUrl()}/api/admin/social/oauth/callback`
+    : `${apiBaseUrl()}/api/social/oauth/callback`;
 }
 
 // ─── Signed state ────────────────────────────────────────────────────────────
@@ -56,19 +57,12 @@ export interface SocialOAuthState {
   nonce: string;
 }
 
-function hmacKeyMaterial(): Uint8Array {
-  // getJwtSecret() throws when unconfigured instead of handing importKey a
-  // zero-length key (which surfaced as an opaque HMAC DataError 500).
-  return new TextEncoder().encode(getJwtSecret());
-}
+// getJwtSecret() throws when unconfigured instead of handing importKey a
+// zero-length key (which surfaced as an opaque HMAC DataError 500).
 
 async function signState(state: SocialOAuthState): Promise<string> {
   const payload = JSON.stringify(state);
-  const key = await crypto.subtle.importKey(
-    "raw", hmacKeyMaterial(), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
-  const sigHex = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const sigHex = await hmacSha256Hex(getJwtSecret(), payload);
   return btoa(unescape(encodeURIComponent(payload)) + "|" + sigHex);
 }
 
@@ -78,11 +72,7 @@ export async function verifyState(raw: string): Promise<SocialOAuthState | null>
     const sep = decoded.lastIndexOf("|");
     const payload = decoded.slice(0, sep);
     const sigHex = decoded.slice(sep + 1);
-    const key = await crypto.subtle.importKey(
-      "raw", hmacKeyMaterial(), { name: "HMAC", hash: "SHA-256" }, false, ["verify"],
-    );
-    const sigBytes = new Uint8Array(sigHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
-    const ok = await crypto.subtle.verify("HMAC", key, sigBytes, new TextEncoder().encode(payload));
+    const ok = await hmacSha256Verify(getJwtSecret(), payload, hexToBytes(sigHex));
     if (!ok) return null;
     const st = JSON.parse(payload) as SocialOAuthState;
     if (Date.now() - st.ts > 10 * 60 * 1000) return null; // 10-min TTL
@@ -94,19 +84,13 @@ export async function verifyState(raw: string): Promise<SocialOAuthState | null>
 
 // ─── PKCE ────────────────────────────────────────────────────────────────────
 
-function base64UrlEncode(bytes: Uint8Array): string {
-  let s = "";
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
 function randomVerifier(): string {
-  return base64UrlEncode(crypto.getRandomValues(new Uint8Array(48)));
+  return randomBase64Url(48);
 }
 
-async function challengeFor(verifier: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
-  return base64UrlEncode(new Uint8Array(digest));
+/** S256 code challenge: unpadded base64url SHA-256 of the verifier. */
+function challengeFor(verifier: string): Promise<string> {
+  return sha256Base64Url(verifier);
 }
 
 // ─── Build authorize URL ─────────────────────────────────────────────────────
@@ -132,7 +116,7 @@ export async function buildSocialAuthUrl(args: BuildAuthArgs): Promise<string> {
     companyId: args.companyId,
     redirectTo: args.redirectTo,
     ts: Date.now(),
-    nonce: base64UrlEncode(crypto.getRandomValues(new Uint8Array(12))),
+    nonce: randomBase64Url(12),
   };
 
   const params = new URLSearchParams({

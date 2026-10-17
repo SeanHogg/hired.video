@@ -4,6 +4,8 @@
  *   - Auto-captioning recorded webcam/screen videos
  *   - Delivery coaching (filler word detection, pacing analysis)
  */
+import type { JwtPayload } from "../../types/index.js";
+import { chargeLedger, type LLMUsage } from "./llm-client.js";
 
 export interface TranscriptionWord {
   word: string;
@@ -18,8 +20,23 @@ export interface TranscriptionResult {
   words: TranscriptionWord[];
 }
 
+export const WHISPER_MODEL = "whisper-1";
+/** Whisper bills per audio minute, the ledger in tokens: one minute of audio
+ *  is charged as 200 token-equivalents (≈ the transcript of a minute of normal
+ *  speech; priced by the `openai-whisper` row in shared/ai-model-rates.ts). */
+export const WHISPER_TOKENS_PER_MINUTE = 200;
+
+/** Ledger usage for one Whisper call of `durationSec` seconds of audio. */
+export function whisperUsage(durationSec: number): LLMUsage {
+  const tokens = Math.max(1, Math.round((Math.max(0, durationSec) / 60) * WHISPER_TOKENS_PER_MINUTE));
+  return { promptTokens: 0, completionTokens: tokens, totalTokens: tokens, model: WHISPER_MODEL, requestedModel: WHISPER_MODEL };
+}
+
 /**
  * Transcribe audio/video using OpenAI Whisper API with word-level timestamps.
+ * The gateway has no audio endpoint, so this is a direct provider call; with
+ * `meter`, it is charged to the billed user through the same `chargeLedger`
+ * choke point as every gateway call.
  */
 export async function transcribeAudio(
   apiKey: string,
@@ -28,11 +45,12 @@ export async function transcribeAudio(
   options?: {
     language?: string;
     prompt?: string;
+    meter?: { user: JwtPayload | null | undefined; featureKey: string };
   },
 ): Promise<TranscriptionResult> {
   const formData = new FormData();
   formData.append("file", new Blob([audioBuffer]), filename);
-  formData.append("model", "whisper-1");
+  formData.append("model", WHISPER_MODEL);
   formData.append("response_format", "verbose_json");
   formData.append("timestamp_granularities[]", "word");
   if (options?.language) formData.append("language", options.language);
@@ -55,6 +73,10 @@ export async function transcribeAudio(
     duration: number;
     words?: Array<{ word: string; start: number; end: number }>;
   };
+
+  if (options?.meter) {
+    await chargeLedger(options.meter.user, options.meter.featureKey, whisperUsage(json.duration ?? 0), {});
+  }
 
   return {
     text: json.text,

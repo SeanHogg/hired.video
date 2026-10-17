@@ -130,15 +130,6 @@ export class FeatureFlagService {
   }
 
   /**
-   * Seed the cache from the /api/bootstrap response (gap #1367). Avoids a
-   * dedicated /api/featureflag round-trip at mount — the bootstrap aggregate
-   * already evaluated every flag for this user server-side.
-   */
-  seedFromBootstrap(userFlags: Record<string, boolean>): void {
-    this.updateCache(userFlags);
-  }
-
-  /**
    * Clear feature flags cache
    */
   clearCache(): void {

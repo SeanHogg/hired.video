@@ -1,33 +1,41 @@
 /**
  * useStudioProjectRow — the studio project row a workspace is (a kit's
- * project), read once per id, for the ⋯ rows that act on the project
- * (Details, templates, clone / delete, embed). `setProject` keeps it in step
- * after those edit it. Null until there is a project and it loaded.
+ * project), for the ⋯ rows that act on the project (Details, templates,
+ * clone / delete, embed) and the kit's document layers. ONE React Query
+ * entry per id (`["studio-project", id]`), so KitHeader and
+ * use-kit-document-layers share a single GET /api/studio/projects/:id.
+ * `setProject` writes the cache so every reader stays in step after an edit.
+ * Null until there is a project and it loaded (or when the read fails).
  */
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 
 export function useStudioProjectRow(projectId: string | null) {
-  const [project, setProject] = useState<StudioProject | null>(null);
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.studioProject.byId(projectId);
+  const { data } = useQuery({
+    queryKey,
+    queryFn: async (): Promise<StudioProject | null> => {
+      try {
+        return (await studioService.getProject(projectId as string)).data ?? null;
+      } catch {
+        return null;
+      }
+    },
+    enabled: !!projectId,
+    // Re-read on each kit open (as before), but concurrent readers on the
+    // same page share the one in-flight request.
+    staleTime: 0,
+  });
 
-  useEffect(() => {
-    if (!projectId) {
-      setProject(null);
-      return;
-    }
-    let cancelled = false;
-    studioService
-      .getProject(projectId)
-      .then((res) => {
-        if (!cancelled) setProject(res.data ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) setProject(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
+  const setProject = useCallback(
+    (next: StudioProject | null) => {
+      if (projectId) queryClient.setQueryData(queryKeys.studioProject.byId(projectId), next);
+    },
+    [queryClient, projectId],
+  );
 
-  return { project, setProject };
+  return { project: projectId ? (data ?? null) : null, setProject };
 }

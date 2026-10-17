@@ -22,7 +22,7 @@
  * user" so this code doesn't need its own concurrency guard.
  */
 
-import { and, eq, lte } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { schema } from "../../db/index.js";
 import type { AccountLock } from "../../db/schema/users.js";
 
@@ -109,19 +109,4 @@ async function getActiveLock(db: any, userId: string): Promise<AccountLock | nul
     .where(and(eq(accountLocks.userId, userId), eq(accountLocks.active, true)))
     .limit(1);
   return row ?? null;
-}
-
-/**
- * Sweep job — clear every lock whose auto-unlock time has passed. Safe
- * to run on a cron or just-in-time at login. Returns the count cleared
- * for telemetry.
- */
-export async function sweepExpiredLocks(db: any): Promise<number> {
-  const now = new Date();
-  const result = await db
-    .update(accountLocks)
-    .set({ active: false, unlockedAt: now } as any)
-    .where(and(eq(accountLocks.active, true), lte(accountLocks.unlocksAt, now)))
-    .returning({ id: accountLocks.id });
-  return result.length ?? 0;
 }

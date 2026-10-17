@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { publicProfilePath } from "@shared/public-paths";
+import { formatListPriceCents } from "@/lib/format";
 import { useTranslation } from "react-i18next";
 import { ShoppingBag, Clock, MessageSquare, Sparkles } from "lucide-react";
 import { CardContent } from "@/components/ui/card";
@@ -23,11 +24,6 @@ export interface ServiceMarketplaceItem {
   provider: { id: string; name: string };
   providerSlug: string | null;
   providerAvatarUrl: string | null;
-}
-
-function formatPrice(cents: number | null) {
-  if (cents == null) return "Contact for pricing";
-  return `$${(cents / 100).toFixed(2)}`;
 }
 
 export default function ServiceMarketplaceCard({ item }: { item: ServiceMarketplaceItem }) {
@@ -85,7 +81,7 @@ export default function ServiceMarketplaceCard({ item }: { item: ServiceMarketpl
           </div>
         )}
         <div className="flex items-center justify-between text-sm mt-auto pt-2 border-t">
-          <span className="font-semibold">{formatPrice(item.priceCents)}</span>
+          <span className="font-semibold">{formatListPriceCents(item.priceCents)}</span>
           {item.deliveryDays != null && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" /> {item.deliveryDays}d

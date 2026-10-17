@@ -84,7 +84,6 @@ export const nleMediaSources = pgTable(
     binFolder: text("bin_folder"),
   },
   (table) => [
-    index("idx_nle_media_sources_user").on(table.userId),
     index("idx_nle_media_sources_company").on(table.companyId),
     index("idx_nle_media_sources_bin_folder").on(table.userId, table.binFolder),
     // #1804 — LIKE 'prefix/%' on folder rename. Default-collation btree
@@ -128,7 +127,6 @@ export const nleMediaTags = pgTable(
   (table) => [
     primaryKey({ columns: [table.sourceId, table.tag] }),
     index("idx_nle_media_tags_tag").on(table.tag),
-    index("idx_nle_media_tags_source").on(table.sourceId),
   ],
 );
 

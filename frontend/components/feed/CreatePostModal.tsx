@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from "react";
+import { initialsFromWords } from "@/lib/format";
 import { ZodError } from "zod";
 import {
   X,
@@ -78,12 +79,7 @@ export default function CreatePostModal({
   // when the text loses the URL (incl. the post/close resets below).
   const { preview: linkPreview, loading: linkPreviewLoading } = useComposerLinkPreview(content);
 
-  const initials = (user?.name || user?.email || "?")
-    .split(" ")
-    .map((n: string) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+  const initials = initialsFromWords(user?.name || user?.email || "?");
 
   const avatar = (user as any)?.avatar ?? "";
 

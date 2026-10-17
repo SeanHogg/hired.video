@@ -13,11 +13,32 @@
 import { getEnv } from "./env.js";
 
 const DEFAULT_FRONTEND_URL = "https://hired.video";
+const DEFAULT_API_URL = "https://api.hired.video";
 
 /** Absolute frontend origin (first entry of FRONTEND_URL, no trailing slash). */
 export function frontendBaseUrl(): string {
   const first = getEnv("FRONTEND_URL").split(",")[0]?.trim().replace(/\/+$/, "") ?? "";
   return /^https?:\/\//i.test(first) ? first : DEFAULT_FRONTEND_URL;
+}
+
+/**
+ * Absolute public API origin (no trailing slash) — the host OAuth callbacks
+ * and webhooks are registered against. `API_URL` (secret) wins, then the
+ * `BASE_URL` var, then the production default.
+ */
+export function apiBaseUrl(): string {
+  const raw = (getEnv("API_URL") || getEnv("BASE_URL")).trim().replace(/\/+$/, "");
+  return raw || DEFAULT_API_URL;
+}
+
+/**
+ * Public app origin for links that land on the SPA from outside (embed
+ * loaders, claim/consent links). `PUBLIC_APP_URL` overrides; otherwise the
+ * frontend origin.
+ */
+export function publicAppBaseUrl(): string {
+  const override = getEnv("PUBLIC_APP_URL").trim().replace(/\/+$/, "");
+  return override || frontendBaseUrl();
 }
 
 /** Publishing integrations whose OAuth consent returns to the SPA. */

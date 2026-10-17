@@ -18,6 +18,7 @@ import {
   type CandidateVideoConsent,
   type CandidateVideoConsentStatus,
 } from "../../../../shared/candidate-video-consent.js";
+import { randomHex, sha256Hex } from "../../utils/crypto.js";
 
 /** What the consent email needs (the email adapter's input shape). */
 export interface ConsentEmail {
@@ -66,8 +67,7 @@ const TOKEN_RE = /^[0-9a-f]{64}$/;
 
 /** 32 random bytes, hex — the raw token that only ever lives in the email. */
 export function generateConsentToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return randomHex(32);
 }
 
 export function isWellFormedConsentToken(token: unknown): token is string {
@@ -75,9 +75,8 @@ export function isWellFormedConsentToken(token: unknown): token is string {
 }
 
 /** sha256 hex — what candidate_video_consents.token_hash stores. */
-export async function hashConsentToken(token: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+export function hashConsentToken(token: string): Promise<string> {
+  return sha256Hex(token);
 }
 
 export function consentExpiry(now: Date): Date {

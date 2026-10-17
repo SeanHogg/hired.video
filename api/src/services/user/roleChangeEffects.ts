@@ -19,6 +19,7 @@ import { invalidatePublicReferences } from "../profile/public-references-cache.j
 import { invalidatePitchCaches } from "../pitch/pitchService.js";
 import { invalidatePartnerProfilesForUser } from "../partner/connections.js";
 import type { getDb } from "../../db/index.js";
+import { logger } from "../../lib/logger.js";
 
 export interface RoleChangeCacheBusters {
   subscription: (userId: string) => void;
@@ -44,6 +45,6 @@ export async function onUserRoleChanged(
   busters.subscription(userId);
   busters.publicReferences(userId);
   await busters.pitch(userId).catch((err) =>
-    console.warn("[role-change] pitch cache invalidation failed:", err instanceof Error ? err.message : err),
+    logger.warn("[role-change] pitch cache invalidation failed", err),
   );
 }

@@ -11,6 +11,7 @@
 import type { Context, MiddlewareHandler } from "hono";
 import type { Variables, AppEnv } from "../types/index.js";
 import { buildTokenBudgetDTO } from "../services/billing/BillingService.js";
+import { logger } from "../lib/logger.js";
 import {
   buildTokenBudgetExceededResponse,
   tokenLedger,
@@ -83,7 +84,7 @@ export function attachTokenBudget(): MiddlewareHandler<AppEnv> {
     try {
       budget = await buildTokenBudgetDTO(userId);
     } catch (err) {
-      console.warn("[token-budget] buildTokenBudgetDTO failed:", err);
+      logger.warn("[token-budget] buildTokenBudgetDTO failed", err);
       return;
     }
 

@@ -158,7 +158,7 @@ type JobApplication = z.infer<typeof JobApplicationSchema>;
 type JobAlert = z.infer<typeof JobAlertSchema>;
 
 // Saved jobs are returned by the API as flat JobSummary entities
-// (see GET /api/Job/saved → jobService.getSavedJobs()).
+// (see GET /api/jobs/saved → jobService.getSavedJobs()).
 type SavedJob = JobSummary;
 
 export default function Jobs() {
@@ -370,32 +370,38 @@ export default function Jobs() {
     handleTotalItemsChange,
   } = usePagination(totalJobs, 9);
 
+  // The request's filter set, derived from state. The URL-sync effects
+  // above always hand back fresh objects, so the fetch keys on the
+  // SERIALIZED filters — one request per distinct filter set, never a
+  // duplicate on mount (they used to fire /api/jobs/public twice).
+  const jobFilters = useMemo<JobFilters>(
+    () => ({
+      search: searchFilters.search || undefined,
+      // Free-text `location` is the legacy fallback — when the viewer picks
+      // something in the LocationFilter the structured ids take over.
+      location: geoFilter.text || searchFilters.location || undefined,
+      countryId: geoFilter.countryId ?? undefined,
+      stateId: geoFilter.stateId ?? undefined,
+      cityId: geoFilter.cityId ?? undefined,
+      radiusKm: geoFilter.radiusKm ?? undefined,
+      employmentType: searchFilters.employmentType || undefined,
+      experienceLevel: searchFilters.experienceLevel || undefined,
+      workSetting: searchFilters.workSetting || undefined,
+      isRemote: geoFilter.remote ?? searchFilters.remote ?? undefined,
+      sector: sectorFilter ?? undefined,
+      page: currentPage,
+      limit: itemsPerPage,
+    }),
+    [searchFilters, geoFilter, sectorFilter, currentPage, itemsPerPage],
+  );
+  const jobFiltersKey = JSON.stringify(jobFilters);
+
   // Fetch jobs data
   const fetchJobs = async () => {
     try {
       setIsLoading(true);
       setError(null);
-
-      const filters: JobFilters = {
-        search: searchFilters.search || undefined,
-        // Free-text `location` is now the legacy fallback — when the
-        // viewer picks something in the LocationFilter the structured
-        // ids below take over.
-        location: geoFilter.text || searchFilters.location || undefined,
-        countryId: geoFilter.countryId ?? undefined,
-        stateId: geoFilter.stateId ?? undefined,
-        cityId: geoFilter.cityId ?? undefined,
-        radiusKm: geoFilter.radiusKm ?? undefined,
-        employmentType: searchFilters.employmentType || undefined,
-        experienceLevel: searchFilters.experienceLevel || undefined,
-        workSetting: searchFilters.workSetting || undefined,
-        isRemote: geoFilter.remote ?? searchFilters.remote ?? undefined,
-        sector: sectorFilter ?? undefined,
-        page: currentPage,
-        limit: itemsPerPage,
-      };
-
-      const result = await jobService.getPublicJobs(filters);
+      const result = await jobService.getPublicJobs(jobFilters);
       setJobs(result.items);
       setTotalJobs(result.total);
       handleTotalItemsChange(result.total);
@@ -407,10 +413,11 @@ export default function Jobs() {
     }
   };
 
-  // Fetch jobs when filters or page changes
+  // Fetch jobs when the effective filter set (or page) changes.
   useEffect(() => {
     fetchJobs();
-  }, [searchFilters, geoFilter, sectorFilter, currentPage, itemsPerPage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobFiltersKey]);
 
   // Lists filter: load list membership when ?list_id changes.
   useEffect(() => {
@@ -514,7 +521,7 @@ export default function Jobs() {
     try {
       setApplicationsLoading(true);
       const response = await apiClient.get<JobApplication[]>(
-        "/api/Job/applications",
+        "/api/jobs/applications",
         z.array(JobApplicationSchema)
       );
       setApplications(response.data);
@@ -530,7 +537,7 @@ export default function Jobs() {
     try {
       setAlertsLoading(true);
       const response = await apiClient.get<JobAlert[]>(
-        "/api/Job/alerts",
+        "/api/jobs/alerts",
         z.array(JobAlertSchema)
       );
       setAlerts(response.data);
@@ -543,7 +550,7 @@ export default function Jobs() {
 
   const handleToggleActive = async (alertId: string, currentStatus: boolean) => {
     try {
-      await apiClient.patch(`/api/Job/alerts/${alertId}/toggle`, {
+      await apiClient.patch(`/api/jobs/alerts/${alertId}/toggle`, {
         isActive: !currentStatus,
       });
       setAlerts((prev) =>
@@ -561,7 +568,7 @@ export default function Jobs() {
     if (!deleteAlertId) return;
 
     try {
-      await apiClient.delete(`/api/Job/alerts/${deleteAlertId}`);
+      await apiClient.delete(`/api/jobs/alerts/${deleteAlertId}`);
       setAlerts((prev) => prev.filter((alert) => alert.id !== deleteAlertId));
       toast.success(t("messages.jobAlertDeleted"));
     } catch {
@@ -632,7 +639,7 @@ export default function Jobs() {
 
     setIsSubmittingAlert(true);
     try {
-      await apiClient.put(`/api/Job/alerts/${editAlert.id}`, {
+      await apiClient.put(`/api/jobs/alerts/${editAlert.id}`, {
         name: alertName.trim(),
         keywords: alertKeywords.trim() || undefined,
         location: alertLocation.trim() || undefined,

@@ -29,15 +29,7 @@ import {
   type UpdateAttributePatch,
   type UpdateStagePatch,
 } from "../../repositories/scorecardsRepository.js";
-
-/** 32-byte hex magic-link token. Mirrors the async-interview invite shape. */
-function randomInviteToken(): string {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
+import { randomHex } from "../../utils/crypto.js";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import {
@@ -951,7 +943,8 @@ export class ScorecardsService {
     const match = existing.find((s) => s.applicationId === input.applicationId);
     if (match) return match;
 
-    const token = randomInviteToken();
+    // 32-byte hex magic-link token — same shape as the async-interview invite.
+    const token = randomHex(32);
     const expiresAt = new Date(
       this.now().getTime() + assignment.dueInHours * 60 * 60 * 1000,
     );

@@ -68,6 +68,8 @@ import { parseReviseFocus, reviseResumeContent, REVISE_MAX_INPUT_CHARS } from ".
 import { createIpRateLimiter } from "../middleware/rateLimiter.js";
 import { fail, ok } from "../utils/response.js";
 import { computeDiffPercent } from "../utils/resume-diff.js";
+import { parsePagination } from "../utils/pagination.js";
+import { readFormFiles } from "../utils/multipart.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import {
   CreateResumeSchema,
@@ -114,6 +116,9 @@ import {
 } from "../services/resume/view.js";
 import { buildRepos } from "../repositories/index.js";
 import { healAndValidateContent } from "../services/resume/content.js";
+import { logger } from "../lib/logger.js";
+// Daily-salted anonymous-viewer bucket — same-day view dedup without storing the raw IP.
+import { hashClientIp } from "../utils/crypto.js";
 
 export {
   PRIVACY_TO_LEVEL,
@@ -133,42 +138,6 @@ export {
   persistSentimentScore,
 };
 export type { ResumeViewerExtras };
-
-/** Compute a short sha256 hash of the client's IP plus a daily salt so
- *  anonymous viewers can be coarsely deduped within a day without the
- *  raw IP landing in the DB. Returns null if no IP header is present
- *  (local test contexts). */
-export function hashClientIp(c: any): string | null {
-  const ip =
-    c.req.header?.("cf-connecting-ip") ??
-    c.req.header?.("x-forwarded-for")?.split(",")[0]?.trim() ??
-    null;
-  if (!ip) return null;
-  const salt = new Date().toISOString().slice(0, 10); // daily salt
-  // Web Crypto is available in CF Workers + Node 20+. Fallback to a
-  // non-crypto hash keeps tests and local dev from crashing if Web
-  // Crypto is missing; this path is not security-critical — the hash
-  // just dedupes anonymous views.
-  try {
-    const enc = new TextEncoder().encode(`${ip}|${salt}`);
-    if (typeof crypto !== "undefined" && (crypto as any).subtle) {
-      // Synchronous hash isn't available via Web Crypto; callers that
-      // want a stable hash per-request can await the async helper
-      // directly. This function returns a short fallback so the DB
-      // write stays non-blocking for the common case.
-    }
-    // Cheap deterministic fallback — FNV-1a. Not cryptographic, just a
-    // bucket id for same-day dedup.
-    let h = 0x811c9dc5;
-    for (let i = 0; i < enc.length; i++) {
-      h ^= enc[i];
-      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
-    }
-    return h.toString(16).padStart(8, "0");
-  } catch {
-    return null;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // TRANSITIONAL BRIDGES — during the shim removal, many call sites still
@@ -331,10 +300,7 @@ resumeRoutes.get("/public", async (c) => {
   const result = await handleListPublicResumes(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user?.sub ?? null,
-    {
-      page: Number(c.req.query("page") ?? 1) || 1,
-      limit: Number(c.req.query("limit") ?? 20) || 20,
-    },
+    parsePagination(c, { defaultLimit: 20, maxLimit: 100 }),
   );
   // `?fields=` projection (gap #1370). Resume `content` is a heavy JSONB
   // blob; list views (browse, search results) rarely need it. Projecting
@@ -526,10 +492,9 @@ resumeRoutes.post("/revise", anonResumeParseGate, attachTokenBudget(), async (c)
  */
 resumeRoutes.post("/createfromfile", async (c) => {
   const user = c.var.user;
-  const form = await c.req.formData().catch(() => null);
   // Several `file` entries = one document's pages (a rasterised scan); the
   // shared intake joins them in upload order.
-  const files = (form?.getAll("file") ?? []).filter((f): f is File => f instanceof File);
+  const { files } = await readFormFiles(c);
   if (files.length === 0) {
     return c.json(fail("VALIDATION_ERROR", "No file provided."), 422);
   }
@@ -570,10 +535,9 @@ resumeRoutes.post("/createfromfile", async (c) => {
       try {
         content = await parseResumeTextWithAI(c, source.text);
       } catch (err) {
-        console.warn(
-          "[createfromfile] AI parse failed, storing raw text fallback:",
-          err instanceof Error ? err.message : err,
-        );
+        logger.warn("[createfromfile] AI parse failed, storing raw text fallback", {
+          error: err instanceof Error ? err.message : err,
+        });
         content = { raw: source.text };
       }
     }
@@ -673,10 +637,9 @@ resumeRoutes.post("/createfromtext", async (c) => {
     try {
       content = await parseResumeTextWithAI(c, text);
     } catch (err) {
-      console.warn(
-        "[createfromtext] AI parse failed, storing raw text fallback:",
-        err instanceof Error ? err.message : err,
-      );
+      logger.warn("[createfromtext] AI parse failed, storing raw text fallback", {
+        error: err instanceof Error ? err.message : err,
+      });
       content = { raw: text };
     }
   }
@@ -735,10 +698,9 @@ resumeRoutes.post("/summarize", attachTokenBudget(), async (c) => {
         return c.json(ok({ result: summary }), 200);
       }
     } catch (err) {
-      console.warn(
-        "[resume/summarize] LLM error, falling back to deterministic summary:",
-        err instanceof Error ? err.message : err,
-      );
+      logger.warn("[resume/summarize] LLM error, falling back to deterministic summary", {
+        error: err instanceof Error ? err.message : err,
+      });
     }
   }
 
@@ -945,33 +907,39 @@ resumeRoutes.post("/:id/versions", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Invalid version payload"), 400);
   }
   const db = getDb();
-  const [parent] = await db
-    .select({
-      userId: schema.resumeInformation.userId,
-      content: schema.resumeInformation.content,
-    })
-    .from(schema.resumeInformation)
-    .where(eq(schema.resumeInformation.id, id))
-    .limit(1);
-  if (!parent) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-  if (parent.userId !== userId) return c.json(fail("FORBIDDEN", "Not your resume"), 403);
-
-  const [{ maxVersion }] = await db
-    .select({ maxVersion: sql<number>`COALESCE(MAX(${schema.resumeVersions.versionNumber}), 0)` })
-    .from(schema.resumeVersions)
-    .where(eq(schema.resumeVersions.resumeId, id));
-
-  const [created] = await db
-    .insert(schema.resumeVersions)
-    .values({
-      resumeId: id,
-      userId,
-      versionNumber: (maxVersion ?? 0) + 1,
-      label: parsed.data.label,
-      resumeData: parent.content as any,
-      isAutosave: parsed.data.isAutosave ?? false,
-    })
-    .returning();
+  // ONE round-trip: snapshot the parent's content into the next version
+  // number, only when the caller owns the résumé (was parent SELECT → MAX
+  // SELECT → INSERT). Zero rows back = missing or not theirs; the probe
+  // below only runs on that failure path to pick the status code.
+  const v = schema.resumeVersions;
+  const r = schema.resumeInformation;
+  const inserted = await db.execute(sql`
+    INSERT INTO ${v} (resume_id, user_id, version_number, label, resume_data, is_autosave)
+    SELECT ${r.id}, ${r.userId},
+           COALESCE((SELECT MAX(${v.versionNumber}) FROM ${v} WHERE ${v.resumeId} = ${id}), 0) + 1,
+           ${parsed.data.label ?? null}::varchar, ${r.content}, ${parsed.data.isAutosave ?? false}::boolean
+      FROM ${r}
+     WHERE ${r.id} = ${id} AND ${r.userId} = ${userId}
+    RETURNING id, resume_id AS "resumeId", user_id AS "userId", version_number AS "versionNumber",
+              label, resume_data AS "resumeData", is_autosave AS "isAutosave",
+              proposed_by_user_id AS "proposedByUserId", review_id AS "reviewId",
+              proposal_status AS "proposalStatus", created_at AS "createdAt"
+  `);
+  const insertedRows = (Array.isArray(inserted) ? inserted : (inserted as { rows?: unknown[] }).rows ?? []) as Array<
+    typeof schema.resumeVersions.$inferSelect
+  >;
+  // Raw execute may hand timestamps back as text — normalise to the Date
+  // the ORM path returned so the response shape is unchanged.
+  const created = insertedRows[0] ? { ...insertedRows[0], createdAt: new Date(insertedRows[0].createdAt) } : undefined;
+  if (!created) {
+    const [parent] = await db
+      .select({ userId: r.userId })
+      .from(r)
+      .where(eq(r.id, id))
+      .limit(1);
+    if (!parent) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+    return c.json(fail("FORBIDDEN", "Not your resume"), 403);
+  }
 
   // Enforce the autosave cap + retention. User-labeled snapshots are
   // untouched.
@@ -1440,7 +1408,7 @@ resumeRoutes.post("/ai/consolidate-bullets", async (c) => {
     );
     return c.json(ok({ rewritten: result.rewritten, notes: result.notes }), 200);
   } catch (err) {
-    console.error("[consolidate-bullets] AI call failed:", err instanceof Error ? err.message : err);
+    logger.error("[consolidate-bullets] AI call failed", { error: err instanceof Error ? err.message : err });
     // Graceful degrade — return original, let caller decide what to show
     return c.json(ok({
       rewritten: parsed.data.bullets,

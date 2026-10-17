@@ -20,17 +20,17 @@
 
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { schema } from "../../db/index.js";
+import { logger } from "../../lib/logger.js";
 import { sendEmailChangeCurrent, sendEmailChangeNew } from "../adapters/email.js";
 import { bumpSessionVersion, revokeAllSessionsForUser } from "./sessions.js";
+import { randomHex } from "../../utils/crypto.js";
 
 const { users, emailChangeRequests } = schema;
 
 const REQUEST_TTL_MS = 60 * 60 * 1000; // 1 hour for both tokens
 
-function generateToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+/** 32-byte hex confirm token (64 chars). */
+const TOKEN_BYTES = 32;
 
 export interface RequestEmailChangeInput {
   db: any;
@@ -70,8 +70,8 @@ export async function requestEmailChange(
     .set({ consumedAt: new Date() } as any)
     .where(and(eq(emailChangeRequests.userId, userId), isNull(emailChangeRequests.consumedAt)));
 
-  const currentToken = generateToken();
-  const newToken = generateToken();
+  const currentToken = randomHex(TOKEN_BYTES);
+  const newToken = randomHex(TOKEN_BYTES);
   const expiresAt = new Date(Date.now() + REQUEST_TTL_MS);
 
   const [row] = await db
@@ -91,12 +91,12 @@ export async function requestEmailChange(
   try {
     await sendEmailChangeCurrent(currentEmail, currentName, currentEmail, newEmail, currentToken);
   } catch (err) {
-    console.error("[emailChange] Failed to send confirmation to current email:", err);
+    logger.error("[emailChange] Failed to send confirmation to current email", err);
   }
   try {
     await sendEmailChangeNew(newEmail, currentEmail, newToken);
   } catch (err) {
-    console.error("[emailChange] Failed to send verification to new email:", err);
+    logger.error("[emailChange] Failed to send verification to new email", err);
   }
 
   return { ok: true, requestId: row.id };

@@ -166,7 +166,7 @@ When helping with tasks:
 - For "suggest-schedule": Create a realistic schedule based on their tasks and deadlines
 
 TASK API REQUIREMENTS:
-To create a task via /api/Task/save, you MUST have:
+To create a task via /api/task/save, you MUST have:
 - text (string, REQUIRED): The task title/name
 - start (date, REQUIRED): When the task starts
 - description (string, optional): Detailed description

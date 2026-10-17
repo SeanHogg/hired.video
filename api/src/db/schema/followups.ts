@@ -66,7 +66,11 @@ export const followUpEnrollments = pgTable("follow_up_enrollments", {
   completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_follow_up_enrollments_recipient_user_id").on(t.recipientUserId),
+  index("idx_follow_up_enrollments_sequence_id").on(t.sequenceId),
+  index("idx_follow_up_enrollments_user_id").on(t.userId),
+]);
 
 export type FollowUpEnrollment = typeof followUpEnrollments.$inferSelect;
 export type NewFollowUpEnrollment = typeof followUpEnrollments.$inferInsert;
@@ -79,7 +83,10 @@ export const followUpLogs = pgTable("follow_up_logs", {
   sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow().notNull(),
   status: varchar("status", { length: 50 }).default("sent").notNull(), // sent | failed | opened | clicked
   errorMessage: text("error_message"),
-});
+}, (t) => [
+  index("idx_follow_up_logs_enrollment_id").on(t.enrollmentId),
+  index("idx_follow_up_logs_step_id").on(t.stepId),
+]);
 
 export type FollowUpLog = typeof followUpLogs.$inferSelect;
 export type NewFollowUpLog = typeof followUpLogs.$inferInsert;

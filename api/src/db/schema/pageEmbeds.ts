@@ -16,6 +16,7 @@ import {
   boolean,
   timestamp,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 import { studioProjects } from "./resumes.js";
@@ -35,6 +36,9 @@ export const pageEmbedVideos = pgTable("page_embed_videos", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   uniqueIndex("uq_page_embed_videos_path").on(t.pathname),
+  index("idx_page_embed_videos_created_by").on(t.createdBy),
+  index("idx_page_embed_videos_project_id").on(t.projectId),
+  index("idx_page_embed_videos_video_id").on(t.videoId),
 ]);
 
 export type PageEmbedVideo = typeof pageEmbedVideos.$inferSelect;

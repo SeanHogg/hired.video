@@ -29,6 +29,7 @@ import {
 } from "../notifications/notificationService.js";
 import { findOrCreateDirectConversation, sendMessage } from "../messaging/messagingService.js";
 import { sendModerationFlagEmail } from "../../services/adapters/email.js";
+import { logger } from "../../lib/logger.js";
 
 export type ModerationServiceDeps = {
   repos: Pick<Repos, "users" | "notifications" | "conversations">;
@@ -269,7 +270,7 @@ export async function fileReport(
       notes: input.notes ?? null,
     });
   } catch (err) {
-    console.error("[moderation] fan-out failed:", err);
+    logger.error("[moderation] fan-out failed", err);
   }
 
   return {
@@ -337,12 +338,12 @@ async function fanOutNewReport(
             entityId: payload.entityId,
             notes: payload.notes ?? null,
           }).catch((err) =>
-            console.error("[moderation] flag email failed for admin", a.id, err),
+            logger.error("[moderation] flag email failed for admin", { adminId: a.id, error: err }),
           ),
         ),
     );
   } catch (err) {
-    console.error("[moderation] flag email fan-out failed:", err);
+    logger.error("[moderation] flag email fan-out failed", err);
   }
 
   // Inbox thread fan-out — each admin gets a direct conversation with
@@ -359,7 +360,7 @@ async function fanOutNewReport(
             `for "${prettyReason(payload.reason)}". Report id: ${payload.reportId}.`,
         });
       } catch (err) {
-        console.error("[moderation] thread fan-out failed for admin", adminId, err);
+        logger.error("[moderation] thread fan-out failed for admin", { adminId, error: err });
       }
     }),
   );
@@ -419,7 +420,7 @@ export async function resolveReport(
       },
     });
   } catch (err) {
-    console.error("[moderation] resolver notify failed:", err);
+    logger.error("[moderation] resolver notify failed", err);
   }
 
   // If action was taken, notify the entity owner too so they know
@@ -444,7 +445,7 @@ export async function resolveReport(
         },
       });
     } catch (err) {
-      console.error("[moderation] owner notify failed:", err);
+      logger.error("[moderation] owner notify failed", err);
     }
   }
 
@@ -464,7 +465,7 @@ export async function resolveReport(
         (input.resolution ? `\n\nNotes: ${input.resolution}` : ""),
     });
   } catch (err) {
-    console.error("[moderation] thread recap failed:", err);
+    logger.error("[moderation] thread recap failed", err);
   }
 
   return {

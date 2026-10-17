@@ -12,6 +12,7 @@
  */
 
 import { registerAudioEffect } from "./audio-registry";
+import { numberOr } from "./params";
 
 // ── Parametric EQ ─────────────────────────────────────────────────────
 //
@@ -217,8 +218,4 @@ function timeConstantAlpha(timeMs: number, sampleRate: number): number {
   if (timeMs <= 0) return 0;
   const samples = (timeMs / 1000) * sampleRate;
   return Math.exp(-1 / samples);
-}
-
-function numberOr(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }

@@ -36,6 +36,8 @@
  * from src/routes/* or src/services/*.
  */
 
+import { logger } from "../../lib/logger.js";
+
 // ---------------------------------------------------------------------------
 // AST introspection — walks Drizzle's SQL objects to extract predicates
 // ---------------------------------------------------------------------------
@@ -218,10 +220,9 @@ export function compilePredicate(cond: unknown): Predicate {
   // tests that hit new operators extend this evaluator instead of silently
   // seeing "match all rows".
    
-  console.warn(
-    "[fake-db] unrecognised predicate — defaulting to match-all. chunks:",
-    chunks.map((c) => (isSQL(c) ? "SQL{...}" : chunkText(c) || (c as any)?.constructor?.name)),
-  );
+  logger.warn("[fake-db] unrecognised predicate — defaulting to match-all", {
+    chunks: chunks.map((c) => (isSQL(c) ? "SQL{...}" : chunkText(c) || (c as any)?.constructor?.name)),
+  });
   return () => true;
 }
 

@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { eq, desc } from "drizzle-orm";
-import { randomBytes } from "crypto";
 import type { Variables, AppEnv } from "../types/index.js";
+import { randomHex } from "../utils/crypto.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { aiFailure } from "../services/adapters/llm-error.js";
-import { extractJson as extractJsonShared } from "../services/resume/parse.js";
+import { tryExtractJson } from "../../../shared/extract-json.js";
 import { getPrompt } from "../../../shared/ai-prompts/index.js";
 
 export const careerRoutes = new Hono<AppEnv>();
@@ -43,7 +43,7 @@ careerRoutes.post("/resilience-score", async (c) => {
         systemPrompt: RESILIENCE_SYSTEM_PROMPT,
         userMessage: buildResiliencePrompt(currentRole, yearsExperience, topSkills ?? [], industry),
       });
-      const parsed = extractJson(content);
+      const parsed = tryExtractJson(content);
       if (parsed) reportJson = parsed;
     } catch (err) {
       // Configured-but-threw: surface a typed AI_* envelope (with
@@ -55,7 +55,7 @@ careerRoutes.post("/resilience-score", async (c) => {
   }
 
   const riskScore = reportJson.riskScore ?? fallbackScore;
-  const shareToken = randomBytes(16).toString("hex");
+  const shareToken = randomHex(16);
 
   const db = getDb();
   const [report] = await db.insert(schema.careerResilienceReports).values({
@@ -152,14 +152,4 @@ function buildFallbackReport(role: string, score: number, skills: string[]): any
       in5Years: score >= 55 ? "-15% to +10% (high variance)" : "+10% to +30%",
     },
   };
-}
-
-/** Extract JSON from LLM output — delegates to shared resume-parse utility.
- *  Returns null instead of throwing on failure for backward compat. */
-function extractJson(text: string): any | null {
-  try {
-    return extractJsonShared(text);
-  } catch {
-    return null;
-  }
 }

@@ -10,13 +10,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
-import { jobService } from "@/lib/services/job-service";
-import { resumeService } from "@/lib/services/resume-service";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { useOpenReview } from "@/lib/tools/use-open-review";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
+import { useSavedJobs } from "@/hooks/queries/use-jobs";
 
 export type JobSource = "paste" | "upload" | "saved";
 
@@ -43,16 +42,8 @@ export function useTailorHandoff() {
     if (restored.selectedResumeId) setSelectedResumeId(restored.selectedResumeId);
   }, [restored, isAuthenticated]);
 
-  const resumes = useQuery({
-    queryKey: ["resumes", user?.id],
-    queryFn: () => resumeService.getUserResumes(),
-    enabled: isAuthenticated && !!user?.id,
-  });
-  const savedJobs = useQuery({
-    queryKey: ["saved-jobs", user?.id],
-    queryFn: () => jobService.getSavedJobs(),
-    enabled: isAuthenticated && !!user?.id,
-  });
+  const resumes = useUserResumes();
+  const savedJobs = useSavedJobs();
 
   // Tailoring starts from the master unless another résumé is picked.
   const masterId = useMemo(

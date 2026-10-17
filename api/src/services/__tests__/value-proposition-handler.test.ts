@@ -14,10 +14,15 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
-import { handleValueProposition, buildValuePropositionMessage } from "../job/value-proposition-handler.js";
-import { handleByid, type MatchDeps } from "../job/match-handlers.js";
+import { handleValueProposition as valuePropositionUseCase, buildValuePropositionMessage } from "../job/value-proposition-handler.js";
+import { handleByid as byidUseCase, type MatchDeps } from "../job/match-handlers.js";
 import type { LLMClient, LLMOptions } from "../../services/adapters/llm-client.js";
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
+import { asHandler } from "../../handlers/shared.js";
+
+// Use cases return data / throw DomainError; assert the routed envelope.
+const handleValueProposition = asHandler(valuePropositionUseCase);
+const handleByid = asHandler(byidUseCase);
 
 const USER_ID = randomUUID();
 const OTHER_USER_ID = randomUUID();

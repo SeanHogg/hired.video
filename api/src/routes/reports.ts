@@ -9,13 +9,14 @@
  */
 import { Hono } from "hono";
 import { aliasedTable, desc, eq } from "drizzle-orm";
-import { z } from "zod";
+import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
 import { buildRepos } from "../repositories/index.js";
+import { clampLimit } from "../utils/pagination.js";
 import {
   REPORT_ENTITY_TYPES,
   REPORT_REASONS,
@@ -96,7 +97,7 @@ adminReportRoutes.get("/", async (c) => {
   if (!isSuperAdmin(c.var.user)) return c.json(error("FORBIDDEN", "SuperAdmin only"), 403);
   const db = getDb();
   const status = c.req.query("status");
-  const limit = Math.min(parseInt(c.req.query("limit") ?? "100", 10) || 100, 500);
+  const limit = clampLimit(c.req.query("limit"), 100, 500);
 
   const allowedStatus = (REPORT_STATUSES as readonly string[]).includes(status ?? "")
     ? (status as (typeof REPORT_STATUSES)[number])

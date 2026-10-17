@@ -10,6 +10,7 @@
  * Anyone writing a new handler should import from here. Do NOT re-define
  * HandlerResult locally; extending it means changing one file, not seven.
  */
+import { DomainError } from "../domains/errors.js";
 
 // ---------------------------------------------------------------------------
 // Envelope
@@ -51,8 +52,13 @@ export function captureCallerSource(skipFrames = 1): ErrorSource | null {
   if (!raw) return null;
   // V8 stack: first line is "Error", then one frame per "    at …" line.
   // We skip the "Error" header + this helper's own frame + caller-supplied skip.
-  const lines = raw.split("\n").slice(2 + skipFrames);
+  return firstStackFrame(raw.split("\n").slice(2 + skipFrames));
+}
+
+/** First parseable `at …` frame, skipping frames for which `skip` is true. */
+function firstStackFrame(lines: string[], skip: (line: string) => boolean = () => false): ErrorSource | null {
   for (const line of lines) {
+    if (skip(line)) continue;
     // Two possible shapes:
     //   "    at funcName (file:line:col)"
     //   "    at file:line:col"
@@ -88,6 +94,61 @@ export function fail(
       timestamp: new Date().toISOString(),
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Domain → HTTP mapping. Services return plain data and throw DomainError
+// (domains/errors.ts); the route layer turns that into the envelope here so
+// services never import ok()/fail().
+// ---------------------------------------------------------------------------
+
+/** The DomainError's throw site (frames inside domains/errors are skipped). */
+function domainErrorSource(err: DomainError): ErrorSource | null {
+  if (!err.stack) return null;
+  return firstStackFrame(err.stack.split("\n").slice(1), (line) => /domains[\\/]errors\.[jt]s/.test(line));
+}
+
+/** The failure envelope for a DomainError — same shape as `fail()`. */
+export function failFromDomainError(err: DomainError): HandlerResult<ErrorEnvelope> {
+  const _source = domainErrorSource(err);
+  return {
+    status: err.status,
+    body: {
+      success: false,
+      error: {
+        code: err.code,
+        message: err.message,
+        ...(err.details !== undefined ? { details: err.details } : {}),
+        ...(_source ? { _source } : {}),
+      },
+      timestamp: new Date().toISOString(),
+    },
+  };
+}
+
+/**
+ * Await a use case and map it onto the HTTP envelope: its data → `ok(data,
+ * successStatus)`, a thrown DomainError → the matching `fail` envelope. Any
+ * other error propagates unchanged (route / global error handler).
+ */
+export async function toHandlerResult<T>(
+  run: Promise<T>,
+  successStatus = 200,
+): Promise<HandlerResult> {
+  try {
+    return ok(await run, successStatus);
+  } catch (err) {
+    if (err instanceof DomainError) return failFromDomainError(err);
+    throw err;
+  }
+}
+
+/** Wrap a use case so it returns the HTTP envelope (route + test adapter). */
+export function asHandler<A extends unknown[], T>(
+  useCase: (...args: A) => Promise<T>,
+  successStatus = 200,
+): (...args: A) => Promise<HandlerResult> {
+  return (...args: A) => toHandlerResult(useCase(...args), successStatus);
 }
 
 // ---------------------------------------------------------------------------

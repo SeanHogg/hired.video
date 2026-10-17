@@ -1,30 +1,41 @@
 /**
  * Bootstrap service — collapses the post-login / page-refresh waterfall
- * into a single round-trip (gap #1367).
+ * into a single /api/bootstrap round-trip (gaps #1367/#1368, W1-C) and
+ * seeds every consumer so none of them refetch on first load:
  *
- * Before: AuthProvider fired 5–7 sequential or near-sequential requests on
- * mount (verification status, token budget, feature flags, unread count,
- * etc.). After: one /api/bootstrap call returns all of them at once and
- * seeds the downstream caches so every consumer hook reads from memory
- * instead of re-fetching.
+ *   verification      → returned to AuthProvider (verify gate)
+ *   tokenBudget       → bootstrap-seed "tokenBudget"   → useTokenBudget
+ *   subscription      → bootstrap-seed "subscription"  → useSubscription
+ *   inboxSummary      → bootstrap-seed "inbox"         → useCommHub
+ *   roleAccess        → React Query roleAccess.byRole  → useRoleAccess
+ *   points            → React Query points.me          → usePointsSummary
+ *   accountsAvailable → React Query accountsAvailable  → useAvailableAccounts
+ *   impersonation     → returned to AuthProvider (orphan-session cleanup)
  *
- * The aggregate route uses Promise.allSettled server-side so a single
- * slow / failing slice doesn't 5xx the whole bootstrap — missing slices
- * come back as null and the individual hooks gracefully fall back to
- * their existing per-endpoint fetches.
+ * Every slice is nullable: a failed slice leaves its consumer to fetch its
+ * own endpoint, exactly as before.
  */
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
-import { FeatureFlagSchema, featureFlagService } from "./feature-flag-service";
-import type { TokenBudget } from "./billing-service";
-import { setInboxSeed } from "../inbox-seed";
+import { queryClient } from "../query-client";
+import { queryKeys } from "../query-keys";
+import { setBootstrapSeed } from "../bootstrap-seed";
+import { PointsSummarySchema } from "./points-service";
+import { toAccountOptions } from "./account-service";
+import type { TokenBudget, SubscriptionSummary } from "./billing-service";
+import type { RoleAccessMineResponse } from "./role-access-service";
 
-// `TokenBudget` + `InboxResponse` are interfaces, not Zod schemas — we
-// pass-through validate with `z.unknown()` so server-side schema changes
-// don't fail-closed the whole bootstrap, then cast via `.transform` to the
-// canonical interface so consumers see a typed payload. Downstream code
-// will reject on use if the shape regresses.
+// Slices typed by interfaces (not zod) pass through `z.unknown()` so a
+// server-side shape change can't fail-closed the whole bootstrap; the
+// consumer rejects on use if a shape regresses.
+const passthrough = <T,>() =>
+  z
+    .unknown()
+    .nullable()
+    .optional()
+    .transform((v) => (v ?? null) as T | null);
+
 const BootstrapResponseSchema = z.object({
   verification: z
     .object({
@@ -33,38 +44,34 @@ const BootstrapResponseSchema = z.object({
       sentAt: z.string().optional(),
     })
     .nullable(),
-  tokenBudget: z
-    .unknown()
+  tokenBudget: passthrough<TokenBudget>(),
+  subscription: passthrough<SubscriptionSummary>(),
+  roleAccess: passthrough<RoleAccessMineResponse>(),
+  points: z.unknown().nullable().optional(),
+  accountsAvailable: z.unknown().nullable().optional(),
+  impersonation: z
+    .object({ active: z.object({ id: z.string() }).passthrough().nullable() })
     .nullable()
-    .transform((v) => v as TokenBudget | null),
-  featureFlags: z.object({
-    flags: z.array(FeatureFlagSchema),
-    userFlags: z.record(z.string(), z.boolean()),
-  }),
-  notifications: z.object({
-    unreadCount: z.number(),
-  }),
+    .optional(),
   inboxSummary: z.unknown().nullable(),
   serverTime: z.string(),
 });
 
 export type BootstrapPayload = z.infer<typeof BootstrapResponseSchema>;
 
-/** Fetch the bootstrap aggregate. Caller is responsible for triggering this
- *  ONCE on AuthProvider mount; the per-slice services + hooks pull from the
- *  seeded caches afterward. Returns null on auth failure (caller should
- *  treat that as "not signed in"). */
-export async function fetchBootstrap(): Promise<BootstrapPayload | null> {
+/** Fetch the bootstrap aggregate. AuthProvider calls this ONCE per sign-in
+ *  / refresh; the per-slice hooks then read from the seeded caches.
+ *  `userId` keys the user-scoped React Query entries. Returns null on
+ *  auth/network failure (the per-endpoint flows recover on their own). */
+export async function fetchBootstrap(userId: string | null | undefined): Promise<BootstrapPayload | null> {
   try {
     const response = await apiClient.get<BootstrapPayload>(
       "/api/bootstrap",
       BootstrapResponseSchema,
     );
-    seedFromBootstrap(response.data);
+    if (userId) seedFromBootstrap(response.data, userId);
     return response.data;
   } catch (err) {
-    // 401 / network error — let the existing per-endpoint flows recover
-    // (they all already handle their own auth failures).
     if (typeof window !== "undefined" && (window as { __DEBUG__?: boolean }).__DEBUG__) {
       console.warn("[bootstrap] aggregate fetch failed; per-endpoint fallback will take over", err);
     }
@@ -72,35 +79,27 @@ export async function fetchBootstrap(): Promise<BootstrapPayload | null> {
   }
 }
 
-/** Seed the per-slice caches so downstream hooks don't re-fetch. */
-function seedFromBootstrap(payload: BootstrapPayload): void {
-  // Feature flags → cached map keyed by flag.key.
-  featureFlagService.seedFromBootstrap(payload.featureFlags.userFlags);
+function seedFromBootstrap(payload: BootstrapPayload, userId: string): void {
+  if (payload.tokenBudget) setBootstrapSeed("tokenBudget", payload.tokenBudget);
+  if (payload.subscription) setBootstrapSeed("subscription", payload.subscription);
+  if (payload.inboxSummary) setBootstrapSeed("inbox", payload.inboxSummary);
 
-  // Token budget → re-use the existing "token-budget:update" event channel
-  // so `useTokenBudget` patches its state without an extra fetch.
-  if (payload.tokenBudget && typeof window !== "undefined") {
-    window.dispatchEvent(
-      new CustomEvent("token-budget:update", { detail: payload.tokenBudget }),
+  if (payload.roleAccess) {
+    queryClient.setQueryData(
+      queryKeys.roleAccess.byRole(userId, payload.roleAccess.role),
+      payload.roleAccess,
     );
   }
 
-  // Notification unread-count → broadcast for any NotificationsPill that
-  // listens on this channel; falls back to /api/notifications/unread-count
-  // for components that don't.
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(
-      new CustomEvent("notifications:unread-count", {
-        detail: { count: payload.notifications.unreadCount },
-      }),
-    );
+  if (payload.points) {
+    const points = PointsSummarySchema.safeParse(payload.points);
+    if (points.success) queryClient.setQueryData(queryKeys.points.me(userId), points.data);
   }
 
-  // Inbox aggregate → stash in the shared seed slot so `useCommHub` reads
-  // it on mount and skips its own /api/inbox round-trip. setInboxSeed
-  // also dispatches an `inbox:hydrate` event so any already-mounted
-  // CommHubProvider hydrates live without waiting for re-mount.
-  if (payload.inboxSummary) {
-    setInboxSeed(payload.inboxSummary);
+  if (payload.accountsAvailable) {
+    queryClient.setQueryData(
+      queryKeys.accountsAvailable.byUser(userId),
+      toAccountOptions(payload.accountsAvailable),
+    );
   }
 }

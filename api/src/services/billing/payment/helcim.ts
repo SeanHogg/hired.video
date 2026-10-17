@@ -36,6 +36,7 @@
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "../../../db/index.js";
 import type { BillingAddress } from "../../../../../shared/billing-address.js";
+import { HELCIM_PAY_JS, HelcimApiError, helcimRequest as helcimApiRequest, verifyHelcimWebhookSignature } from "../../adapters/helcim.js";
 import type {
   PaymentProvider,
   CollectPaymentMethodResult,
@@ -101,8 +102,6 @@ interface HelcimStoredCard {
   cardExpiryYear?: number | string;
 }
 
-const HELCIM_API_BASE = "https://api.helcim.com/v2";
-const HELCIM_PAY_JS = "https://secure.helcim.app/helcim-pay/services/start.js";
 const HELCIM_JS_SCRIPT = "https://secure.myhelcim.com/js/version2.js";
 
 /** Which front-end collection flow this provider should serve. */
@@ -124,29 +123,14 @@ interface HelcimConfig {
   collectionFlow: HelcimCollectionFlow;
 }
 
-async function helcimRequest<T = unknown>(
+/** Authenticated call via the shared Helcim adapter (services/adapters/helcim.ts). */
+function helcimRequest<T = unknown>(
   config: HelcimConfig,
   method: string,
   path: string,
   body?: unknown,
 ): Promise<T> {
-  const res = await fetch(`${HELCIM_API_BASE}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      // Helcim v2 API authenticates via api-token header only — no account-id.
-      // See: https://devdocs.helcim.com/docs/authentication-with-the-helcim-api-and-helcimpayjs
-      "api-token": config.apiToken,
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new Error(`Helcim API error ${res.status}: ${text}`);
-  }
-
-  return res.json() as Promise<T>;
+  return helcimApiRequest<T>(config.apiToken, method, path, body);
 }
 
 // ---------------------------------------------------------------------------
@@ -502,26 +486,8 @@ export class HelcimPaymentProvider implements PaymentProvider {
   }
 
   async verifyWebhook(body: string, headers: Headers): Promise<NormalizedWebhookPayload> {
-    if (!this.config.webhookToken) {
-      throw new Error("HELCIM_WEBHOOK_TOKEN is not configured");
-    }
-    const signature = headers.get("helcim-signature");
-    if (!signature) throw new Error("Missing helcim-signature header");
+    const expected = await verifyHelcimWebhookSignature(body, headers, this.config.webhookToken);
 
-    // Helcim signs webhooks with HMAC-SHA256. Compare in constant time so the
-    // verification can't be turned into a byte-by-byte signature oracle via
-    // response-timing (a plain `!==` short-circuits on the first wrong byte).
-    const { createHmac, timingSafeEqual } = await import("node:crypto");
-    const expected = createHmac("sha256", this.config.webhookToken).update(body).digest("hex");
-    const sigBuf = Buffer.from(signature);
-    const expBuf = Buffer.from(expected);
-    // timingSafeEqual throws on unequal lengths; the HMAC hex is always 64
-    // chars, so a length mismatch is already an invalid signature.
-    if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
-      throw new Error("Helcim webhook signature verification failed");
-    }
-
-     
     const payload = JSON.parse(body) as Record<string, any>;
     const event = unwrapHelcimRecord<Record<string, any>>(payload) ?? payload;
     const eventType: NormalizedEventType = HELCIM_EVENT_MAP[event.eventType ?? payload.eventType] ?? "unknown";
@@ -597,7 +563,7 @@ export class HelcimPaymentProvider implements PaymentProvider {
         `/card-transactions/${transactionId}`,
       );
     } catch (err) {
-      if (err instanceof Error && /error 404/.test(err.message)) return null;
+      if (err instanceof HelcimApiError && err.status === 404) return null;
       throw err;
     }
     return mapHelcimCardTransaction(raw, transactionId);

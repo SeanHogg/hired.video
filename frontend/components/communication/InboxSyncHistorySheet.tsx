@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { formatDistanceToNow } from "date-fns";
+import { safeRelativeTime } from "@/lib/format";
 import {
   Sheet,
   SheetContent,
@@ -29,14 +29,6 @@ type SyncRun = EmailSyncRun;
 export interface InboxSyncHistorySheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-function safeRelativeTime(iso: string): string {
-  try {
-    return formatDistanceToNow(new Date(iso), { addSuffix: true });
-  } catch {
-    return "";
-  }
 }
 
 const STATUS_BADGE: Record<string, string> = {

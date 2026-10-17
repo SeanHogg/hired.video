@@ -1,5 +1,6 @@
 import { ExternalLink, FolderOpen } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { formatMonthYear } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,13 +16,6 @@ interface ProjectsSectionProps {
 export default function ProjectsSection({ projects, isOwner, onEdit }: ProjectsSectionProps) {
   const { t } = useTranslation();
   if (projects.length === 0 && !isOwner) return null;
-
-  const formatDate = (dateString: string) => {
-    if (!dateString || dateString === "Present") return dateString || "";
-    const dateObj = new Date(dateString);
-    if (isNaN(dateObj.getTime())) return dateString;
-    return dateObj.toLocaleDateString("en-US", { year: "numeric", month: "short" });
-  };
 
   return (
     <Card>
@@ -56,9 +50,9 @@ export default function ProjectsSection({ projects, isOwner, onEdit }: ProjectsS
                 </div>
                 {(project.startDate || project.endDate) && (
                   <p className="text-sm text-muted-foreground mb-2">
-                    {formatDate(project.startDate)}
+                    {formatMonthYear(project.startDate, "")}
                     {project.startDate && project.endDate ? " - " : ""}
-                    {formatDate(project.endDate) || t("labels.present")}
+                    {formatMonthYear(project.endDate, "") || t("labels.present")}
                     {project.roles && project.roles.length > 0 &&
                       ` · ${project.roles.join(", ")}`}
                   </p>

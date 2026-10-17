@@ -15,6 +15,7 @@ import { ARTICLE_LIST_FIELDS, parseFields, projectRows } from "../../../../share
 import { resolveUserRef } from "../../services/user/resolveUserRef.js";
 import { publicArticlePathById } from "../../services/articles/public-article-path.js";
 import { withCacheHeaders } from "../../utils/cache-headers.js";
+import { clampLimit } from "../../utils/pagination.js";
 import { toPublicCard } from "./shared.js";
 
 const { articles, users, userProfiles } = schema;
@@ -28,7 +29,7 @@ export const articlePublicRoutes = new Hono<AppEnv>();
 
 articlePublicRoutes.get("/public", async (c) => {
   const db = getDb();
-  const limit = Math.min(parseInt(c.req.query("limit") ?? "20", 10) || 20, 100);
+  const limit = clampLimit(c.req.query("limit"), 20, 100);
   const kindFilter = c.req.query("kind");
   // Sector + audience filters from #1165. Both optional; legacy queries
   // without these params behave identically to before.
@@ -74,7 +75,7 @@ articlePublicRoutes.get("/public/by-user/:userId", async (c) => {
   // (see resolveUserRef + toPublicCard's `author.slug`). Resolve before
   // filtering so vanity-slug links don't silently return [].
   const userId = await resolveUserRef(db, c.req.param("userId"));
-  const limit = Math.min(parseInt(c.req.query("limit") ?? "50", 10) || 50, 100);
+  const limit = clampLimit(c.req.query("limit"), 50, 100);
   if (!userId || !(await isCreatorVisible(userId))) {
     return c.json(success([] as unknown[]), 200);
   }

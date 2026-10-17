@@ -6,6 +6,8 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
+import { buildRepos } from "../repositories/index.js";
+import { emitNotification } from "../services/notifications/notificationService.js";
 
 /**
  * Employee Community — Pro Employer feature.
@@ -113,18 +115,17 @@ communityRoutes.post("/posts", requirePro("Employee Community"), async (c) => {
 
   const recipientIds = members.map((m) => m.userId).filter((id) => id !== userId);
   if (recipientIds.length > 0) {
-    await db
-      .insert(schema.notifications)
-      .values(
-        recipientIds.map((rid) => ({
-          userId: rid,
-          type: "community_post",
-          title: "New community post",
-          message: `A new post was shared in the ${parsed.data.channel} channel.`,
-          data: { postId: post.id, channel: parsed.data.channel, companyId: parsed.data.companyId } as any,
-        })),
-      )
-      .catch(() => undefined); // fire-and-forget
+    await emitNotification(
+      { repos: buildRepos(db) },
+      {
+        recipientIds,
+        type: "community_post",
+        actor: null,
+        title: "New community post",
+        message: `A new post was shared in the ${parsed.data.channel} channel.`,
+        extraData: { postId: post.id, channel: parsed.data.channel, companyId: parsed.data.companyId },
+      },
+    ).catch(() => undefined); // best-effort
   }
 
   return c.json(success(post), 201);

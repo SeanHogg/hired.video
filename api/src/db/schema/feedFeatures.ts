@@ -58,6 +58,7 @@ export const feedFeatures = pgTable(
   (t) => [
     uniqueIndex("uq_feed_features_entity").on(t.entityKind, t.entityId),
     index("idx_feed_features_active_rank").on(t.isActive, t.rank),
+    index("idx_feed_features_created_by").on(t.createdBy),
   ],
 );
 

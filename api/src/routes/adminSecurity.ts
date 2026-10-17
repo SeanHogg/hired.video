@@ -24,6 +24,7 @@ import { getDb, schema } from "../db/index.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { lockAccount, unlockAccount, isAccountLocked } from "../services/auth/lock.js";
+import { clampLimit } from "../utils/pagination.js";
 
 const { users, accountLocks, botBlockEvents, regionWaitlist } = schema;
 
@@ -161,7 +162,7 @@ adminSecurityRoutes.get("/bot-stats", async (c) => {
 });
 
 adminSecurityRoutes.get("/bot-events", async (c) => {
-  const limit = Math.min(parseInt(c.req.query("limit") ?? "100", 10) || 100, 500);
+  const limit = clampLimit(c.req.query("limit"), 100, 500);
   const db = getDb();
   const rows = await db
     .select()

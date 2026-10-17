@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { and, desc, eq, count } from "drizzle-orm";
+import { getEnv } from "../utils/env.js";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
@@ -7,6 +8,8 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
 import { isDevEnvironment } from "../utils/runtime-env.js";
+import { logger } from "../lib/logger.js";
+import { hexToBytes, hmacSha256Verify } from "../utils/crypto.js";
 
 export const hiringOnboardingRoutes = new Hono<AppEnv>();
 
@@ -331,7 +334,7 @@ hiringOnboardingRoutes.post("/offers/:id/send-for-signature", requirePro("E-Sign
   const signerName: string = body.signerName ?? offer.candidateName;
   const signerEmail: string = body.signerEmail ?? offer.candidateEmail;
 
-  const apiKey = process.env.DROPBOX_SIGN_API_KEY ?? (globalThis as any).__ENV?.DROPBOX_SIGN_API_KEY ?? "";
+  const apiKey = getEnv("DROPBOX_SIGN_API_KEY");
 
   let signatureRequestId: string | null = null;
   let signingUrl: string | null = null;
@@ -377,7 +380,7 @@ hiringOnboardingRoutes.post("/offers/:id/send-for-signature", requirePro("E-Sign
         }
       }
     } catch (err) {
-      console.error("[e-sign] Dropbox Sign error:", err);
+      logger.error("[e-sign] Dropbox Sign error", err);
     }
   }
 
@@ -404,17 +407,12 @@ hiringOnboardingRoutes.post("/offers/:id/send-for-signature", requirePro("E-Sign
 hiringOnboardingRoutes.post("/offers/webhook/dropbox-sign", async (c) => {
   const rawBody = await c.req.text();
   const sig = c.req.header("x-hello-sign-signature") ?? "";
-  const apiKey = process.env.DROPBOX_SIGN_API_KEY ?? (globalThis as any).__ENV?.DROPBOX_SIGN_API_KEY ?? "";
+  const apiKey = getEnv("DROPBOX_SIGN_API_KEY");
 
   // Verify HMAC-SHA256 signature
   if (apiKey && sig) {
     try {
-      const key = await crypto.subtle.importKey(
-        "raw", new TextEncoder().encode(apiKey),
-        { name: "HMAC", hash: "SHA-256" }, false, ["verify"],
-      );
-      const sigBytes = new Uint8Array(sig.match(/.{2}/g)!.map((b: string) => parseInt(b, 16)));
-      const valid = await crypto.subtle.verify("HMAC", key, sigBytes, new TextEncoder().encode(rawBody));
+      const valid = await hmacSha256Verify(apiKey, rawBody, hexToBytes(sig));
       if (!valid) return c.json({ error: "Invalid signature" }, 401);
     } catch { /* non-fatal — log and continue */ }
   }

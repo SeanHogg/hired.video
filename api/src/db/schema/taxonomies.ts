@@ -118,6 +118,7 @@ export const personMergeQueue = pgTable("person_merge_queue", {
   idxPersonMergeQueueOwnerStatus: index("idx_person_merge_queue_owner_status").on(t.ownerUserId, t.status),
   idxPersonMergeQueueWorkspaceStatus: index("idx_person_merge_queue_workspace_status").on(t.workspaceId, t.status),
   statusCheck: check("person_merge_queue_status_check", sql`${t.status} IN ('pending', 'approved', 'rejected', 'merged', 'expired')`),
+  sourcePersonIdFkIdx: index("idx_person_merge_queue_source_person_id").on(t.sourcePersonId),
 }));
 export type PersonMergeQueueRow = typeof personMergeQueue.$inferSelect;
 export type NewPersonMergeQueueRow = typeof personMergeQueue.$inferInsert;

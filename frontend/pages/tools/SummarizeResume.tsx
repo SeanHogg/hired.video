@@ -15,14 +15,13 @@ import {
 } from "@/components/ui/select";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
-import { resumeService } from "@/lib/services/resume-service";
-import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { RESUME_TEXT_FILE_ACCEPT, getResumeTextFromFile, isResumeTextFile } from "@/lib/services/resume-text";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolShell } from "@/components/tools/ToolShell";
 import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 
 export default function SummarizeResume() {
   const { t } = useTranslation();
@@ -74,11 +73,7 @@ export default function SummarizeResume() {
   }, [restored, isAuthenticated]);
 
   // Fetch user's resumes if authenticated
-  const { data: resumes } = useQuery({
-    queryKey: ["resumes"],
-    queryFn: () => resumeService.getUserResumes(),
-    enabled: isAuthenticated,
-  });
+  const { data: resumes } = useUserResumes();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -120,7 +115,7 @@ export default function SummarizeResume() {
 
     try {
       // Call the summarization API with resume text
-      const response = await apiClient.post("/api/Resume/Summarize", {
+      const response = await apiClient.post("/api/resumes/summarize", {
         resumeText: resumeText,
       });
       handleSummaryResponse(response.data, {});
@@ -160,7 +155,7 @@ export default function SummarizeResume() {
 
       // Parse extracted text into structured JSON via AI
       const { data: parseResult } = await apiClient.requestRaw<any>(
-        "/api/resume/parse",
+        "/api/resumes/parse",
         {
           method: "POST",
           body: JSON.stringify({ content: extractedText }),
@@ -170,7 +165,7 @@ export default function SummarizeResume() {
       const resumeContent = parseResult.result || parseResult;
 
       // Now summarize the parsed content
-      const summaryResponse = await apiClient.post("/api/Resume/Summarize", {
+      const summaryResponse = await apiClient.post("/api/resumes/summarize", {
         resumeText: resumeContent,
       });
       handleSummaryResponse(summaryResponse.data, {});
@@ -198,7 +193,7 @@ export default function SummarizeResume() {
 
     try {
       // Pass the resume ID to the API - it will fetch and use the SerializedResume property
-      const response = await apiClient.post("/api/Resume/Summarize", {
+      const response = await apiClient.post("/api/resumes/summarize", {
         resumeId: selectedResumeId,
       });
       handleSummaryResponse(response.data, { resumeId: selectedResumeId });

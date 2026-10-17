@@ -20,6 +20,7 @@ import {
   Star,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
+import { formatCentsPlain, initialsFromWords } from "@/lib/format";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
@@ -78,15 +79,6 @@ function ServiceStatusBadge({ loading, active }: { loading: boolean; active: boo
   if (loading) return <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />;
   if (!active) return null;
   return <Badge variant="default" className="text-[10px] bg-green-600 px-1.5 py-0">{t("status.active")}</Badge>;
-}
-
-function initials(name: string) {
-  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-}
-
-function formatPrice(cents: number | null): string | null {
-  if (cents === null) return null;
-  return `$${(cents / 100).toFixed(2)}`;
 }
 
 type ActiveTab = "dashboard" | "creator" | "inquiries";
@@ -691,7 +683,7 @@ export default function ServicesManagement() {
                             <CardContent className="p-4">
                               <div className="flex items-start gap-4">
                                 <Avatar className="h-10 w-10 shrink-0">
-                                  <AvatarFallback>{initials(buyer.name)}</AvatarFallback>
+                                  <AvatarFallback>{initialsFromWords(buyer.name)}</AvatarFallback>
                                 </Avatar>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -706,7 +698,7 @@ export default function ServicesManagement() {
                                     {" · "}
                                     {inquiry.orderType === "purchase" && (
                                       <span className="text-sky-600 font-medium">
-                                        {formatPrice(inquiry.paidAmountCents) ?? t("labels.contactForPricing")}
+                                        {inquiry.paidAmountCents === null ? t("labels.contactForPricing") : formatCentsPlain(inquiry.paidAmountCents)}
                                       </span>
                                     )}
                                   </p>
@@ -791,7 +783,7 @@ export default function ServicesManagement() {
                             <CardContent className="p-4">
                               <div className="flex items-start gap-4">
                                 <Avatar className="h-10 w-10 shrink-0">
-                                  <AvatarFallback>{initials(provider.name)}</AvatarFallback>
+                                  <AvatarFallback>{initialsFromWords(provider.name)}</AvatarFallback>
                                 </Avatar>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -803,7 +795,7 @@ export default function ServicesManagement() {
                                     {" · "}
                                     {inquiry.orderType === "purchase" ? (
                                       <span className="text-sky-600 font-medium">
-                                        {formatPrice(inquiry.paidAmountCents) ?? t("labels.contactForPricing")}
+                                        {inquiry.paidAmountCents === null ? t("labels.contactForPricing") : formatCentsPlain(inquiry.paidAmountCents)}
                                       </span>
                                     ) : (
                                       <span className="text-muted-foreground">{t("labels.orderType.inquiry")}</span>

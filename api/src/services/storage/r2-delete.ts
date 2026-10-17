@@ -9,6 +9,7 @@
 
 import { cdnUrl } from "../../utils/cdn.js";
 import { getVideoBucket } from "./object-store.js";
+import { logger } from "../../lib/logger.js";
 
 /** R2 accepts up to 1000 keys per delete call. */
 const R2_DELETE_BATCH = 1000;
@@ -39,7 +40,7 @@ export async function deleteR2Keys(keys: ReadonlyArray<string | null | undefined
       await bucket.delete(batch);
       deleted += batch.length;
     } catch (err) {
-      console.warn(`[r2-delete] failed to delete ${batch.length} key(s):`, err);
+      logger.warn("[r2-delete] failed to delete keys", { count: batch.length, error: err });
     }
   }
   await purgeEdgeCopies(present);

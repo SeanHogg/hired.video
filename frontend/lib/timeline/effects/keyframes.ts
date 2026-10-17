@@ -18,6 +18,7 @@
  */
 import type { MotionEasing } from "@/lib/studio/editor-v2/widget-motion";
 import { ease } from "./easing";
+import { clamp01 } from "./params";
 
 export interface Keyframe {
   /** Position in the clip, 0..1. */
@@ -51,10 +52,6 @@ export function isKeyframeTrack(v: unknown): v is KeyframeTrack {
   if (typeof v !== "object" || v === null || Array.isArray(v)) return false;
   const frames = (v as { keyframes?: unknown }).keyframes;
   return Array.isArray(frames) && frames.length > 0 && frames.every(isKeyframe);
-}
-
-function clamp01(v: number): number {
-  return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
 /** Value of a track at clip progress `progress` (clamped to 0..1). Before

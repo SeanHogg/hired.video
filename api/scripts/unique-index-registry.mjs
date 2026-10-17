@@ -112,16 +112,6 @@ export const LEGACY_UNIQUE_INDEXES = Object.freeze([
     resolve: "DELETE FROM email_campaign_recipients WHERE id IN ({losers})",
   },
   {
-    // One live provider subscription per account; the newest is the one renewing.
-    name: "uq_email_push_subscriptions_account",
-    table: "email_push_subscriptions",
-    columns: "account_id",
-    where: null,
-    keyNotNull: ["account_id"],
-    keep: "created_at DESC NULLS LAST",
-    resolve: "DELETE FROM email_push_subscriptions WHERE id IN ({losers})",
-  },
-  {
     name: "email_sync_runs_session_unq",
     table: "email_sync_runs",
     columns: "account_id, sync_session_id",
@@ -162,8 +152,7 @@ export const LEGACY_UNIQUE_INDEXES = Object.freeze([
   {
     // One provider identity → one link. Login resolves by this key, so a
     // duplicate is a dead row; keep the first link (the account that has
-    // been signing in with it). Non-unique idx_oauth_accounts_provider_account
-    // (0495) stays for the lookup until this lands.
+    // been signing in with it).
     name: "uq_oauth_accounts_provider_account",
     table: "oauth_accounts",
     columns: "provider, provider_account_id",

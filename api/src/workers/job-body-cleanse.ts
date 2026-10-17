@@ -2,6 +2,7 @@ import { and, asc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import { cleanseDescription } from "../services/cleanse/htmlToMarkdown.js";
 import type { WorkerDefinition, WorkerRunContext } from "./types.js";
+import { logger } from "../lib/logger.js";
 
 const BATCH_SIZE = 50;
 const HOUR_MS = 60 * 60 * 1000;
@@ -94,7 +95,7 @@ async function processOne(
         } as never)
         .where(eq(schema.jobItems.id, row.id));
     } catch (innerErr) {
-      console.error(`[job-body-cleanse] Failed to mark ${row.id} as failed:`, innerErr);
+      logger.error("[job-body-cleanse] Failed to mark row as failed", { jobItemId: row.id, error: innerErr });
     }
   }
 }

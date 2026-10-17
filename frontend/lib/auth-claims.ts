@@ -8,13 +8,12 @@
  * from localStorage so those code paths can answer "is this user a
  * SuperAdmin?" synchronously without grabbing the React context.
  *
- * Mirrors the same token key + decoding scheme as auth-service.ts so
- * the two can never disagree.
+ * Reads the token + decodes it through lib/api/auth-token (the SSoT every
+ * transport uses), so the two can never disagree.
  */
 
 import { USER_ROLES } from "@shared/user-roles";
-
-const TOKEN_KEY = "auth_token";
+import { decodeJwtPayload, getAuthToken } from "./api/auth-token";
 
 interface JwtPayload {
   sub?: string;
@@ -23,35 +22,16 @@ interface JwtPayload {
   exp?: number;
 }
 
-function decodeBase64Url(input: string): string | null {
-  try {
-    const base64 = input.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-    return atob(padded);
-  } catch {
-    return null;
-  }
-}
-
 function readPayload(): JwtPayload | null {
-  if (typeof localStorage === "undefined") return null;
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = getAuthToken();
   if (!token) return null;
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  const json = decodeBase64Url(parts[1]);
-  if (!json) return null;
-  try {
-    const payload = JSON.parse(json) as JwtPayload;
-    // Drop expired tokens — a stale localStorage shouldn't keep
-    // pretending the user is signed in.
-    if (typeof payload.exp === "number" && payload.exp * 1000 < Date.now()) {
-      return null;
-    }
-    return payload;
-  } catch {
+  const payload = decodeJwtPayload<JwtPayload>(token);
+  // Drop expired tokens — a stale localStorage shouldn't keep
+  // pretending the user is signed in.
+  if (!payload || (typeof payload.exp === "number" && payload.exp * 1000 < Date.now())) {
     return null;
   }
+  return payload;
 }
 
 /** True iff the currently-stored JWT carries the SuperAdmin role.

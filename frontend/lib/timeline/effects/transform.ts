@@ -13,6 +13,7 @@
  */
 
 import { registerEffect } from "./registry";
+import { numberOr } from "./params";
 
 registerEffect({
   kind: "transform",
@@ -49,7 +50,3 @@ registerEffect({
     ctx.restore();
   },
 });
-
-function numberOr(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
-}

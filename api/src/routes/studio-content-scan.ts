@@ -17,6 +17,7 @@ import { createExplicitScanDeps } from "../services/moderation/explicit/deps.js"
 import { MAX_FRAMES } from "../services/moderation/explicit/videoScan.js";
 import { ProjectScanError, getProjectScanStatus, submitProjectFrames } from "../services/moderation/explicit/projectScan.js";
 import type { ImageInput } from "../services/moderation/explicit/imageClassifier.js";
+import { readFormFiles } from "../utils/multipart.js";
 
 export const studioContentScanRoutes = new Hono<AppEnv>();
 
@@ -40,8 +41,7 @@ studioContentScanRoutes.get("/projects/:id/public-scan", async (c) => {
 
 studioContentScanRoutes.post("/projects/:id/public-scan", async (c) => {
   if (!UuidLikeSchema.safeParse(c.req.param("id")).success) return c.json(error("NOT_FOUND", "Project not found"), 404);
-  const form = await c.req.formData().catch(() => null);
-  const parts = (form?.getAll("frame") ?? []).filter((p): p is File => typeof p === "object" && p !== null && "arrayBuffer" in p);
+  const { files: parts } = await readFormFiles(c, "frame");
   if (parts.length === 0) return c.json(error("VALIDATION_ERROR", "At least one frame is required"), 400);
   if (parts.length > MAX_FRAMES) return c.json(error("VALIDATION_ERROR", `At most ${MAX_FRAMES} frames`), 400);
   if (parts.some((p) => p.type !== "image/jpeg" || p.size > MAX_FRAME_BYTES)) {

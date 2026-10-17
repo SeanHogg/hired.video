@@ -9,6 +9,8 @@
  */
 
 import { schema } from "../../db/index.js";
+import { sha256Hex } from "../../utils/crypto.js";
+import { logger } from "../../lib/logger.js";
 
 const { botBlockEvents } = schema;
 
@@ -33,14 +35,6 @@ export interface RecordBotBlockInput {
   asn?: string | null;
 }
 
-async function sha256Hex(input: string): Promise<string> {
-  const bytes = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 function emailDomain(email: string | null | undefined): string | null {
   if (!email) return null;
   const at = email.lastIndexOf("@");
@@ -61,6 +55,6 @@ export async function recordBotBlock(input: RecordBotBlockInput): Promise<void> 
     } as any);
   } catch (err) {
     // Telemetry failure must never block the request flow.
-    console.error("[botBlock] insert failed:", err);
+    logger.error("[botBlock] insert failed", err);
   }
 }

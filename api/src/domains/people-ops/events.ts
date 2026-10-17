@@ -19,6 +19,7 @@
  */
 
 import type { IAuditRepository } from "../../repositories/auditRepository.js";
+import { logger } from "../../lib/logger.js";
 import type {
   IPeopleEmployeesRepository,
   SegmentScope,
@@ -109,7 +110,7 @@ const AUDIT_ACTION: Record<PeopleOpsEvent["kind"], string> = {
 };
 
 function defaultRunDetached(task: () => Promise<void>): void {
-  void task().catch((err) => console.error("[people-ops:events] sink failed:", err));
+  void task().catch((err) => logger.error("[people-ops:events] sink failed", err));
 }
 
 /**

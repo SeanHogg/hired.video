@@ -73,6 +73,7 @@ import {
   type AiTextCaller,
 } from "../../../../shared/social-caption.js";
 import type { VideoPublishPlatform } from "../../../../shared/social-platforms.js";
+import { logger } from "../../lib/logger.js";
 
 export interface DistributionEnv {
   TIKTOK_CONTENT_POSTING_AUDIT?: string;
@@ -285,7 +286,7 @@ async function planUser(
         liveAgentDigestDeps(),
       );
     } catch (err) {
-      console.warn("[posting-agent] digest failed", err);
+      logger.warn("[posting-agent] digest failed", err);
     }
   }
 

@@ -11,6 +11,7 @@ import { buildRepos } from "../repositories/index.js";
 import { getDb } from "../db/index.js";
 import { success, error } from "../types/index.js";
 import type { AppEnv } from "../types/index.js";
+import { clampLimit } from "../utils/pagination.js";
 
 export const campaignDollarsRoutes = new Hono<AppEnv>();
 
@@ -37,7 +38,7 @@ campaignDollarsRoutes.get("/balance", async (c) => {
 campaignDollarsRoutes.get("/transactions", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const limit = Math.min(parseInt(c.req.query("limit") ?? "50", 10) || 50, 200);
+  const limit = clampLimit(c.req.query("limit"), 50, 200);
   const repos = buildRepos(getDb());
   const transactions = await repos.points.listCampaignDollarsTransactions(userId, limit);
   return c.json(success({ transactions }), 200);

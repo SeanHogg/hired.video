@@ -4,7 +4,6 @@
  */
 
 import { UserProfile } from "@/lib/services/user-service";
-import { AccountUsageType } from "./account";
 
 // Backend enums - must match exactly
 export enum TaskType {
@@ -143,7 +142,6 @@ export interface UserCompanyRoleAssociation {
   isPaidAccountDateTime?: string;
   paidPurchasePrice?: number;
   paidPurchaseDateTime?: string;
-  accountUsageType?: AccountUsageType;
 }
 
 export enum InviteStatus {

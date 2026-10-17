@@ -85,6 +85,9 @@ export const boardBids = pgTable("board_bids", {
   check("board_bids_board_or_job", sql`${t.boardId} IS NOT NULL OR ${t.jobId} IS NOT NULL`),
   check("board_bids_status_check", sql`${t.status} IN ('pending', 'accepted', 'rejected', 'withdrawn', 'expired', 'active', 'completed')`),
   check("board_bids_target_type_check", sql`${t.targetType} IS NULL OR ${t.targetType} IN ('board', 'job')`),
+  index("idx_board_bids_approved_by_user_id").on(t.approvedByUserId),
+  index("idx_board_bids_bidder_id").on(t.bidderId),
+  index("idx_board_bids_board_id").on(t.boardId),
 ]);
 
 export type BoardBid = typeof boardBids.$inferSelect;

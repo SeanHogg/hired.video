@@ -42,6 +42,7 @@ import {
   publishJobCost,
 } from "./subrequest-budget.js";
 import { computeRetryAt } from "../../../../shared/posting-agent.js";
+import { logger } from "../../lib/logger.js";
 
 export { PUBLISH_JOBS_PER_RUN };
 
@@ -123,7 +124,7 @@ export async function drainPublishJobs(deps: DrainDeps, now: Date = new Date()):
     } catch (err) {
       // Recording the outcome failed; the job stays `running` and is
       // reclaimed after STALE_RUNNING_MS, where the idempotency check runs.
-      console.error(`[distribution] job ${job.id} outcome not recorded:`, messageOf(err));
+      logger.error("[distribution] job outcome not recorded", { jobId: job.id, error: err });
     }
     try {
       deps.onSettled?.(job);

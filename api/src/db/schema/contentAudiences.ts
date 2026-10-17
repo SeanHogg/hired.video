@@ -49,7 +49,6 @@ export const contentAudiences = pgTable(
       t.entityKind,
       t.audienceKey,
     ),
-    index("content_audiences_entity_idx").on(t.entityKind, t.entityId),
     uniqueIndex("content_audiences_entity_audience_uniq").on(
       t.entityKind,
       t.entityId,

@@ -64,6 +64,7 @@ export const onboardingChecklists = pgTable("onboarding_checklists", {
   index("onboarding_checklists_created_by_idx").on(t.createdByUserId, t.createdAt.desc().nullsFirst()),
   index("onboarding_checklists_candidate_idx").on(t.candidateUserId),
   check("onboarding_checklists_completion_pct_range", sql`${t.completionPercentage} IS NULL OR (${t.completionPercentage} >= 0 AND ${t.completionPercentage} <= 100)`),
+  index("idx_onboarding_checklists_offer_letter_id").on(t.offerLetterId),
 ]);
 
 export type OnboardingChecklist = typeof onboardingChecklists.$inferSelect;
@@ -84,6 +85,7 @@ export const onboardingTasks = pgTable("onboarding_tasks", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("onboarding_tasks_checklist_idx").on(t.checklistId, t.sortOrder),
+  index("idx_onboarding_tasks_completed_by_user_id").on(t.completedByUserId),
 ]);
 
 export type OnboardingTask = typeof onboardingTasks.$inferSelect;

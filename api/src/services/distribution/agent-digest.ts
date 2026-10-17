@@ -8,6 +8,7 @@
  */
 import { isInQuietHours, localDayStart } from "../../../../shared/posting-agent.js";
 import { isChannelAllowed, type NotificationPreferences } from "../../../../shared/notification-preferences.js";
+import { escapeHtml } from "../../../../shared/html-escape.js";
 
 export type AgentDigestDraft = {
   id: string;
@@ -111,14 +112,6 @@ function channelAllowed(
 ): boolean {
   if (!prefs) return true;
   return isChannelAllowed(prefs as NotificationPreferences, channel, DIGEST_TYPE);
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function formatScheduled(at: Date, timeZone: string): string {

@@ -1,5 +1,6 @@
 import { count, desc } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
+import { logger } from "../lib/logger.js";
 
 /** Typed constants for all admin audit actions. */
 export const AUDIT_ACTIONS = {
@@ -93,7 +94,7 @@ export async function auditLog(entry: AuditEntry): Promise<void> {
       impersonationSessionId: entry.impersonationSessionId,
     } as any);
   } catch (err) {
-    console.error("[audit] Failed to write audit log entry:", err);
+    logger.error("[audit] Failed to write audit log entry", err);
   }
 }
 
@@ -118,6 +119,6 @@ export async function auditLogBatch(entries: AuditEntry[]): Promise<void> {
       })) as any,
     );
   } catch (err) {
-    console.error("[audit] Failed to write batched audit log entries:", err);
+    logger.error("[audit] Failed to write batched audit log entries", err);
   }
 }

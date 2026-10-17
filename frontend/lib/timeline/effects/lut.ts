@@ -13,6 +13,7 @@
  */
 
 import { registerEffect } from "./registry";
+import { clamp01, numberOr } from "./params";
 
 registerEffect({
   kind: "lut",
@@ -86,14 +87,6 @@ function mix3(a: [number, number, number], b: [number, number, number], t: numbe
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
-}
-
-function clamp01(v: number): number {
-  return Math.max(0, Math.min(1, v));
-}
-
-function numberOr(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 
 /**

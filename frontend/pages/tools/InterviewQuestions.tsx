@@ -62,7 +62,6 @@ import { USER_ROLES } from "@shared/user-roles";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useInterviewQuestionGenerator } from "@/hooks/use-interview-question-generator";
 import PracticeInterviewButton from "@/components/interview-practice/PracticeInterviewButton";
-import { resumeService } from "@/lib/services/resume-service";
 import { jobService } from "@/lib/services/job-service";
 import {
   assignInterview,
@@ -74,6 +73,7 @@ import {
   type SourceContext,
 } from "@/lib/services/interview-assignments-service";
 import { toast } from "sonner";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 
 type SourceMode = "resume" | "job" | "text" | "target-only";
 
@@ -180,11 +180,7 @@ export default function InterviewQuestions() {
     user?.role === USER_ROLES.ADMIN ||
     user?.role === USER_ROLES.SUPER_ADMIN;
 
-  const { data: resumes = [] } = useQuery({
-    queryKey: ["resumes"],
-    queryFn: () => resumeService.getUserResumes(),
-    enabled: isAuthenticated && mode === "resume",
-  });
+  const { data: resumes = [] } = useUserResumes({ enabled: mode === "resume" });
   const { data: userJobs = [] } = useQuery({
     queryKey: ["user-jobs"],
     queryFn: () => jobService.getUserJobs(),

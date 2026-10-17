@@ -9,7 +9,8 @@ import { HiringRouteGate } from "@/components/routing/HiringRouteGate";
 // for side effects keeps App.tsx out of the loop on every locale change.
 import "@/lib/i18n/i18n";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/query-client";
 import { ThemeProvider } from "next-themes";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, useSearchParams } from "react-router-dom";
@@ -45,7 +46,7 @@ import { HeaderFiltersProvider } from "@/lib/header-filters";
 import { runtimeConfig } from "@/lib/runtime-config";
 import { logger } from "@/lib/logger";
 import { performanceMonitor } from "@/lib/performance";
-import { initializeErrorTracking, reportError, reportMessage } from "@/lib/error-tracking";
+import { initializeErrorTracking, reportError } from "@/lib/error-tracking";
 import { installPaidMediaPixels } from "@/lib/paid-media-pixels";
 import { readAttribution } from "@/lib/attribution";
 import { useAttributionCapture } from "@/lib/hooks/useAttributionCapture";
@@ -499,36 +500,6 @@ function ProfileRedirect() {
   if (!target) return <PageLoader />;
   return <Navigate to={publicProfilePath(target)} replace />;
 }
-
-// Create a client with production-ready configuration
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: runtimeConfig.isProduction ? 3 : 1,
-      staleTime: 10 * 60 * 1000, // 10 minutes
-      gcTime: 15 * 60 * 1000, // 15 minutes
-      // Tab-switch refetch was firing every active query on focus return
-      // and was the single biggest source of avoidable API traffic.
-      // Hooks that need fresh data on focus opt in per-query.
-      refetchOnWindowFocus: false,
-    },
-    mutations: {
-      retry: runtimeConfig.isProduction ? 2 : 0,
-      onError: (error) => {
-        logger.error("Mutation error", {
-          error: error instanceof Error ? error.message : String(error),
-        });
-
-        // Report to error tracking
-        if (error instanceof Error) {
-          reportError(error, { type: "mutation" });
-        } else {
-          reportMessage(`Mutation error: ${String(error)}`, "error", { type: "mutation" });
-        }
-      },
-    },
-  },
-});
 
 // Initialize error tracking (GlitchTip/Sentry compatible)
 initializeErrorTracking();

@@ -6,6 +6,7 @@
  */
 import { and, desc, eq, gte, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { getDb, type Db } from "../db/index.js";
+import { signalWork } from "../services/scheduling/work-signals.js";
 import { socialPublishJobs, type SocialPublishJobInsert, type SocialPublishJobRow } from "../db/schema/distribution.js";
 import { studioProjects } from "../db/schema/resumes.js";
 import { videos } from "../db/schema/videos.js";
@@ -35,7 +36,10 @@ export const FEED_SUBJECT_STUDIO_PROJECT = "studio_project";
  *  and left out of the result. */
 export async function insertJobs(rows: SocialPublishJobInsert[], db: Db = getDb()): Promise<PublishJob[]> {
   if (rows.length === 0) return [];
-  return db.insert(socialPublishJobs).values(rows).onConflictDoNothing().returning();
+  const inserted = await db.insert(socialPublishJobs).values(rows).onConflictDoNothing().returning();
+  const dueTimes = inserted.filter((j) => j.status === "scheduled").map((j) => new Date(j.runAt).getTime());
+  if (dueTimes.length > 0) await signalWork("social-publish", new Date(Math.min(...dueTimes)));
+  return inserted;
 }
 
 /** Restrict a claim to these (destination, lane) kinds — the ones whose
@@ -167,6 +171,7 @@ export async function requeueJob(id: string, userId: string, now: Date, db: Db =
       ),
     )
     .returning();
+  if (row) await signalWork("social-publish", new Date(row.runAt));
   return row ?? null;
 }
 
@@ -430,7 +435,9 @@ export async function approveAgentDraft(id: string, userId: string, now: Date, d
       updatedAt: now,
     })
     .where(and(eq(socialPublishJobs.id, id), eq(socialPublishJobs.createdBy, userId), eq(socialPublishJobs.source, "agent"), eq(socialPublishJobs.status, "draft")));
-  return (result.rowCount ?? 0) > 0;
+  const approved = (result.rowCount ?? 0) > 0;
+  if (approved) await signalWork("social-publish");
+  return approved;
 }
 
 /** Attach a fitted cut to an agent job so the drainer can post it (R16). */
@@ -479,7 +486,9 @@ export async function approveAllAgentDrafts(userId: string, now: Date, db: Db = 
     .update(socialPublishJobs)
     .set({ status: "scheduled", updatedAt: now })
     .where(and(eq(socialPublishJobs.createdBy, userId), eq(socialPublishJobs.source, "agent"), eq(socialPublishJobs.status, "draft")));
-  return result.rowCount ?? 0;
+  const approved = result.rowCount ?? 0;
+  if (approved > 0) await signalWork("social-publish");
+  return approved;
 }
 
 /** Expire old agent drafts (runAt <= now). */

@@ -23,9 +23,9 @@ import assert from "node:assert/strict";
 import {
   deriveAudience,
   deriveTier,
-  isAdminRole,
   type Audience,
 } from "../../domains/billing/audience.js";
+import { isAdminRole } from "../../middleware/superAdmin.js";
 import {
   standardAccessPolicy,
   _internal,

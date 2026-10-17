@@ -7,6 +7,7 @@ import { z } from "zod";
 import { apiClient } from "../api-client";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
 import { CARD_FIELDS_BY_KIND, serializeListFields } from "@shared/projection";
+import { CompanyLocationSchema as SharedCompanyLocationSchema } from "@shared/companies";
 import { isValidCompanyName } from "../utils/company-validation";
 
 // ============================================================================
@@ -32,7 +33,7 @@ const mapCompanyVisibility = (val: unknown): string => {
   return "private";
 };
 
-// Metadata item returned by GET /api/Companies/public
+// Metadata item returned by GET /api/companies/public
 export const CompanyMetadataSchema = z.object({
   id: nullableString(),
   slug: nullableString(),
@@ -66,8 +67,10 @@ export const CompanyMetadataSchema = z.object({
   reviewAvgOverall: nullableNumber(),
 });
 
-// Full Company Profile (GET /api/Companies/{id})
-const CompanyLocationSchema = z
+// Full Company Profile (GET /api/companies/{id})
+// `headquarters` is the company_profiles jsonb address (city/state/country);
+// `locations` are company_locations rows — wire shape @shared/companies.
+const CompanyHeadquartersSchema = z
   .object({
     address: nullableString(),
     city: nullableString(),
@@ -130,8 +133,8 @@ const CompanyDataSchema = z.object({
   industry: z.string().nullable().transform((v) => v ?? "Not specified").optional().default("Not specified"),
   size: z.string().nullable().transform((v) => v ?? "Not specified").optional().default("Not specified"),
   founded: nullableNumber(),
-  headquarters: CompanyLocationSchema.default({}),
-  locations: z.array(CompanyLocationSchema).optional().default([]),
+  headquarters: CompanyHeadquartersSchema.default({}),
+  locations: z.array(SharedCompanyLocationSchema.passthrough()).optional().default([]),
   contact: CompanyContactSchema.default({}),
   financials: CompanyFinancialsSchema,
   benefits: CompanyBenefitsSchema.default({
@@ -271,7 +274,7 @@ export class CompanyService {
     );
     if (fields) params.set("fields", fields);
 
-    const endpoint = `/api/Companies/public${params.toString() ? `?${params.toString()}` : ""}`;
+    const endpoint = `/api/companies/public${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await apiClient.get<PaginatedCompanies>(
       endpoint,
       PaginatedCompaniesSchema,
@@ -294,7 +297,7 @@ export class CompanyService {
    */
   async getCompanyProfileById(id: string): Promise<CompanyProfile> {
     const response = await apiClient.get<CompanyProfile>(
-      `/api/Companies/${id}`,
+      `/api/companies/${id}`,
       CompanyProfileSchema,
     );
     return response.data;
@@ -303,7 +306,7 @@ export class CompanyService {
   /**
    * Get specific company by ID (legacy metadata-only)
    * Note: Many pages use full profile; prefer getCompanyProfileById for details pages.
-   * The /api/Companies/:id endpoint now returns the nested CompanyProfile shape, so
+   * The /api/companies/:id endpoint now returns the nested CompanyProfile shape, so
    * we fetch the profile and project it down to the flat metadata fields callers expect.
    */
   async getCompanyById(id: string): Promise<CompanyMetadata> {
@@ -346,7 +349,7 @@ export class CompanyService {
     });
 
     const response = await apiClient.get<any[]>(
-      `/api/Companies/${id}/jobs?${params.toString()}`,
+      `/api/companies/${id}/jobs?${params.toString()}`,
       z.array(z.any()), // We'll use the Job schema from job-service when available
     );
 
@@ -357,14 +360,14 @@ export class CompanyService {
    * Follow a company
    */
   async followCompany(id: string): Promise<void> {
-    await apiClient.post(`/api/Companies/${id}/follow`);
+    await apiClient.post(`/api/companies/${id}/follow`);
   }
 
   /**
    * Unfollow a company
    */
   async unfollowCompany(id: string): Promise<void> {
-    await apiClient.delete(`/api/Companies/${id}/follow`);
+    await apiClient.delete(`/api/companies/${id}/follow`);
   }
 
   /**
@@ -372,7 +375,7 @@ export class CompanyService {
    */
   async getFollowedCompanies(): Promise<CompanyMetadata[]> {
     const response = await apiClient.get<CompanyMetadata[]>(
-      "/api/Companies/me/followed",
+      "/api/companies/me/followed",
       z.array(CompanyMetadataSchema),
     );
 
@@ -385,7 +388,7 @@ export class CompanyService {
    */
   async getMyCompanies(): Promise<CompanyMetadata[]> {
     const response = await apiClient.get<CompanyMetadata[]>(
-      "/api/Companies/me",
+      "/api/companies/me",
       z.array(CompanyMetadataSchema),
     );
 
@@ -399,7 +402,7 @@ export class CompanyService {
    */
   async getCompaniesByUserId(userId: string): Promise<CompanyMetadata[]> {
     const response = await apiClient.get<CompanyMetadata[]>(
-      `/api/Companies/by-user/${userId}`,
+      `/api/companies/by-user/${userId}`,
       z.array(CompanyMetadataSchema),
     );
 
@@ -414,7 +417,7 @@ export class CompanyService {
    */
   async createCompany(request: CreateCompanyRequest): Promise<CompanyProfile> {
     const meta = await apiClient.post<CompanyMetadata>(
-      "/api/Companies",
+      "/api/companies",
       request,
       CompanyMetadataSchema,
     );
@@ -429,7 +432,7 @@ export class CompanyService {
   async isFollowingCompany(id: string): Promise<boolean> {
     try {
       const response = await apiClient.get<{ isFollowing: boolean }>(
-        `/api/Companies/${id}/following-status`,
+        `/api/companies/${id}/following-status`,
         z.object({ isFollowing: z.boolean() }),
       );
       return response.data.isFollowing;
@@ -458,7 +461,7 @@ export class CompanyService {
       followersCount: number;
       activeJobsCount: number;
     }>(
-      `/api/Companies/${id}/stats`,
+      `/api/companies/${id}/stats`,
       z.object({
         jobsCount: z.number(),
         followersCount: z.number(),
@@ -473,7 +476,7 @@ export class CompanyService {
    */
   async getTrendingCompanies(limit = 10): Promise<CompanyMetadata[]> {
     const response = await apiClient.get<CompanyMetadata[]>(
-      `/api/Companies/trending?limit=${limit}`,
+      `/api/companies/trending?limit=${limit}`,
       z.array(CompanyMetadataSchema),
     );
 
@@ -515,7 +518,7 @@ export class CompanyService {
    */
   async getCompanyBySlug(slug: string): Promise<CompanyMetadata> {
     const response = await apiClient.get<CompanyMetadata>(
-      `/api/Companies/slug/${slug}`,
+      `/api/companies/slug/${slug}`,
       CompanyMetadataSchema,
     );
 
@@ -527,7 +530,7 @@ export class CompanyService {
    * handler in api/src/routes/companies.ts (which reads body.name etc.).
    */
   async updateCompany(id: string, request: UpdateCompanyRequest): Promise<CompanyProfile> {
-    await apiClient.put(`/api/Companies/${id}`, request);
+    await apiClient.put(`/api/companies/${id}`, request);
     return await this.getCompanyProfileById(id);
   }
 }

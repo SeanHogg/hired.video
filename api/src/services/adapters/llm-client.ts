@@ -37,6 +37,7 @@ import {
   type ResponseFormat,
 } from "@seanhogg/builderforce-sdk";
 import { isSuperAdmin } from "../../middleware/superAdmin.js";
+import { logger } from "../../lib/logger.js";
 import { buildModelRequestParams } from "./model-request-rules.js";
 import { tokenLedger } from "../../domains/billing/token-ledger.js";
 import { screenPrompt, PromptBlockedError } from "../moderation/promptGuard.js";
@@ -656,7 +657,7 @@ export async function chargeLedger(
       ...(opts.exempt ? { exempt: true } : {}),
     });
   } catch (err) {
-    console.warn(`[llm-client] charge failed for ${billedUserId}/${featureKey}:`, err);
+    logger.warn("[llm-client] charge failed", { billedUserId, featureKey, error: err });
   }
 }
 
@@ -923,10 +924,12 @@ export function createLLMClient(
         .join("\n");
       const screen = screenPrompt(userText);
       if (!screen.safe) {
-        console.warn(
-          `[llm-client ${correlationId}] ${opts.useCase} prompt blocked: ` +
-            `${screen.category} (${screen.label})`,
-        );
+        logger.warn("[llm-client] prompt blocked", {
+          correlationId,
+          useCase: opts.useCase,
+          category: screen.category,
+          label: screen.label,
+        });
         throw new PromptBlockedError(screen);
       }
     }
@@ -1027,15 +1030,13 @@ export function createLLMClient(
           // recorded on the queryable usage-ledger metadata downstream
           // (token-ledger.charge → servicesProcessor.meter) so SA can
           // dashboard SLA breaches, not just grep logs (gap #515 option b).
-          console.warn(
-            `[llm-client ${correlationId}] substitution-alarm`,
-            JSON.stringify({
-              useCase: opts.useCase,
-              requestedModel: profile.model,
-              resolvedModel: usage.model,
-              latencyMs,
-            }),
-          );
+          logger.warn("[llm-client] substitution-alarm", {
+            correlationId,
+            useCase: opts.useCase,
+            requestedModel: profile.model,
+            resolvedModel: usage.model,
+            latencyMs,
+          });
         }
         const finishReason =
           choice?.finish_reason ?? (toolCalls.length > 0 ? "tool_calls" : "stop");
@@ -1066,19 +1067,26 @@ export function createLLMClient(
         // and Worker subrequests on calls guaranteed to fail identically.
         // Stop and surface the trail we have. Gaps #2263 / #1570 / #2309.
         if (isChainTerminal(err)) {
-          console.warn(
-            `[llm-client ${correlationId}] ${opts.useCase} ${profile.model} ` +
-              `failed terminally (${cls.kind}${cls.status ? ` ${cls.status}` : ""}); ` +
-              `short-circuiting ${opts.chain.length - 1 - i} remaining profile(s)`,
-          );
+          logger.warn("[llm-client] attempt failed terminally; short-circuiting chain", {
+            correlationId,
+            useCase: opts.useCase,
+            model: profile.model,
+            kind: cls.kind,
+            status: cls.status,
+            remainingProfiles: opts.chain.length - 1 - i,
+          });
           break;
         }
         if (i < opts.chain.length - 1) {
-          console.warn(
-            `[llm-client ${correlationId}] ${opts.useCase} ${profile.model} ` +
-              `failed (${cls.kind}${cls.status ? ` ${cls.status}` : ""}), ` +
-              `falling back to ${opts.chain[i + 1].model}: ${cls.message.slice(0, 150)}`,
-          );
+          logger.warn("[llm-client] attempt failed; falling back", {
+            correlationId,
+            useCase: opts.useCase,
+            model: profile.model,
+            kind: cls.kind,
+            status: cls.status,
+            fallbackModel: opts.chain[i + 1].model,
+            message: cls.message.slice(0, 150),
+          });
         }
       }
     }
@@ -1095,7 +1103,8 @@ export function createLLMClient(
     // support payload (llm-error.ts) so every call in the chain stays
     // resolvable.
     const gatewayTraceId = [...attempts].reverse().find((a) => a.traceId)?.traceId;
-    console.error(`[llm-client ${correlationId}] dispatch exhausted`, {
+    logger.error("[llm-client] dispatch exhausted", {
+      correlationId,
       useCase: opts.useCase,
       gatewayTraceId,
       attempts,

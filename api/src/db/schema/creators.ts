@@ -244,6 +244,9 @@ export const promoProjects = pgTable(
     index("idx_promo_projects_creator").on(t.creatorId),
     index("idx_promo_projects_status").on(t.status),
     index("idx_promo_projects_inquiry").on(t.inquiryId),
+    index("idx_promo_projects_conversation_id").on(t.conversationId),
+    index("idx_promo_projects_service_offering_id").on(t.serviceOfferingId),
+    index("idx_promo_projects_studio_project_id").on(t.studioProjectId),
   ],
 );
 
@@ -279,7 +282,6 @@ export const promoProjectRevisions = pgTable(
     decidedAt: timestamp("decided_at", { withTimezone: true }),
   },
   (t) => [
-    index("idx_promo_revisions_project").on(t.projectId),
     uniqueIndex("uq_promo_revisions_project_number").on(t.projectId, t.revisionNumber),
   ],
 );
@@ -313,6 +315,7 @@ export const promoProjectExtraRevisionPurchases = pgTable(
   },
   (t) => [
     index("idx_extra_rev_purchases_project").on(t.projectId),
+    index("idx_promo_project_extra_revision_purchases_customer_id").on(t.customerId),
   ],
 );
 
@@ -326,3 +329,39 @@ export type NewPromoProjectExtraRevisionPurchase = typeof promoProjectExtraRevis
 // into `reviews` and dropped the original table; the cached
 // creatorProfiles.averageRating + ratingCount columns will be wired
 // to the new source in Phase D.
+
+/**
+ * YouTube video imported by a creator into their public channel.
+ * Source-of-truth row for the channel page's "Videos" tab when the
+ * user's `profile_mode` resolves to `channel`. The eventual
+ * `creator_content` view will UNION these with native videos so
+ * recruiter search hits one index regardless of where the clip lives.
+ */
+export const creatorYoutubeIngests = pgTable(
+  "creator_youtube_ingests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    youtubeVideoId: varchar("youtube_video_id", { length: 32 }).notNull(),
+    sourceUrl: text("source_url").notNull(),
+    title: text("title"),
+    description: text("description"),
+    thumbnailUrl: text("thumbnail_url"),
+    channelName: text("channel_name"),
+    channelUrl: text("channel_url"),
+    durationSec: integer("duration_sec"),
+    displayOrder: integer("display_order").default(0).notNull(),
+    isHidden: boolean("is_hidden").default(false).notNull(),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    userVideoUq: uniqueIndex("creator_youtube_ingests_user_video_uq").on(
+      t.userId,
+      t.youtubeVideoId,
+    ),
+    creatorYoutubeIngestsUserIdx: index("creator_youtube_ingests_user_idx").on(t.userId, t.isHidden, t.ingestedAt.desc().nullsFirst()),
+  }),
+);
+
+export type CreatorYoutubeIngest = typeof creatorYoutubeIngests.$inferSelect;
+export type NewCreatorYoutubeIngest = typeof creatorYoutubeIngests.$inferInsert;

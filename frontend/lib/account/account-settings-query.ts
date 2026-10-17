@@ -1,6 +1,6 @@
 /**
  * Canonical read-through cache for the signed-in user's account settings
- * (`/api/Settings/account`). Both <LocaleSync> (applies `language`) and
+ * (`/api/settings/account`). Both <LocaleSync> (applies `language`) and
  * <ThemeSync> (applies `theme`) read from this single React-Query entry, so
  * the settings endpoint is fetched once per session and deduped across all
  * consumers — never one fetch per syncing concern.

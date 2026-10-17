@@ -1,3 +1,5 @@
+import type { ReactionCount } from "@shared/feed-reactions";
+
 // Feed-related TypeScript types and interfaces
 
 export interface FeedPostMedia {
@@ -33,12 +35,8 @@ export interface FeedPostLike {
   createdAt?: string;
 }
 
-// One bucket of a reaction rollup — mirrors `ReactionCount` in
-// shared/feed-reactions.ts.
-export interface ReactionCount {
-  type: string;
-  count: number;
-}
+// One bucket of a reaction rollup — SSoT in shared/feed-reactions.ts.
+export type { ReactionCount };
 
 export interface FeedPostComment {
   id: string;

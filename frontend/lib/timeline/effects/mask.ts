@@ -11,6 +11,7 @@
  */
 
 import { registerEffect } from "./registry";
+import { clamp01, numberOr } from "./params";
 
 registerEffect({
   kind: "mask-rect",
@@ -65,12 +66,4 @@ registerEffect({
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
-}
-
-function clamp01(v: number): number {
-  return clamp(v, 0, 1);
-}
-
-function numberOr(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }

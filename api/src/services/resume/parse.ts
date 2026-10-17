@@ -226,29 +226,8 @@ export function buildMetaResume(
 }
 
 // ─── extractJson ───────────────────────────────────────────────────────────
-
-/** Strip markdown fences and extract the first JSON object from an LLM response. */
-export function extractJson(raw: string): Record<string, unknown> {
-  let cleaned = raw
-    .replace(/^```(?:json)?\s*\n?/i, "")
-    .replace(/\n?```\s*$/i, "")
-    .trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    /* fall through */
-  }
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start !== -1 && end > start) {
-    try {
-      return JSON.parse(cleaned.slice(start, end + 1));
-    } catch {
-      /* fall through */
-    }
-  }
-  throw new Error("No valid JSON found in LLM response");
-}
+// SSoT lives in shared/extract-json (also used by shared/social-caption).
+export { extractJson } from "../../../../shared/extract-json.js";
 
 // ─── isParseComplete ───────────────────────────────────────────────────────
 

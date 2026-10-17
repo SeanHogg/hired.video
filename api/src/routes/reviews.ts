@@ -31,10 +31,13 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { ReviewsRepository } from "../repositories/reviewsRepository.js";
+import { parsePagination } from "../utils/pagination.js";
 import { StudioTemplatesRepository } from "../repositories/studioTemplatesRepository.js";
 import { resolveTemplateReviewSubject } from "../services/reviews/templateReviewSubject.js";
-import { USER_ROLES } from "../../../shared/user-roles.js";
+import { isAdminRole } from "../middleware/superAdmin.js";
 import { TIER_COPY, UPGRADE_URL } from "../../../shared/tier-copy.js";
+import { logger } from "../lib/logger.js";
+import { hashClientIp } from "../utils/crypto.js";
 import {
   getSubjectDescriptor,
   isSubjectType,
@@ -76,14 +79,7 @@ async function proGate(c: any, featureName: string): Promise<Response | null> {
   if (!uid) {
     return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   }
-  const roles = (c.var.user?.roles as string[] | undefined) ?? [];
-  const role = (c.var.user as any)?.role ?? "";
-  if (
-    roles.includes(USER_ROLES.SUPER_ADMIN) ||
-    roles.includes(USER_ROLES.ADMIN) ||
-    role === USER_ROLES.SUPER_ADMIN ||
-    role === USER_ROLES.ADMIN
-  ) {
+  if (isAdminRole(c.var.user)) {
     return null;
   }
   const sub = await getSubscription(uid);
@@ -101,23 +97,6 @@ async function proGate(c: any, featureName: string): Promise<Response | null> {
     );
   }
   return null;
-}
-
-/** Same scheme as companies.ts hashClientIp — non-cryptographic, daily salt. */
-function hashClientIp(c: any): string | null {
-  const ip =
-    c.req.header?.("cf-connecting-ip") ??
-    c.req.header?.("x-forwarded-for")?.split(",")[0]?.trim() ??
-    null;
-  if (!ip) return null;
-  const salt = new Date().toISOString().slice(0, 10);
-  const enc = new TextEncoder().encode(`${ip}|${salt}`);
-  let h = 0x811c9dc5;
-  for (let i = 0; i < enc.length; i++) {
-    h ^= enc[i];
-    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
-  }
-  return h.toString(16).padStart(8, "0");
 }
 
 /** Pull the registrable domain out of a website URL. Returns null on
@@ -632,8 +611,7 @@ reviewRoutes.get("/:subjectType/:subjectId", async (c) => {
   if (typeof subjectType !== "string") return subjectType;
 
   const subjectId = c.req.param("subjectId");
-  const page = Math.max(1, Number(c.req.query("page") ?? 1));
-  const limit = Math.min(50, Math.max(1, Number(c.req.query("limit") ?? 10)));
+  const { page, limit } = parsePagination(c, { defaultLimit: 10, maxLimit: 50 });
   const offset = (page - 1) * limit;
 
   const db = getDb();
@@ -825,12 +803,12 @@ async function upsertHandler(c: any): Promise<Response> {
   try {
     await syncFeedPostForReview(db, row);
   } catch (err) {
-    console.warn("[reviews] feed sync failed:", err);
+    logger.warn("[reviews] feed sync failed", err);
   }
   try {
     await recomputeAggregateCache(db, row.subjectType, row.subjectId);
   } catch (err) {
-    console.warn("[reviews] aggregate cache recompute failed:", err);
+    logger.warn("[reviews] aggregate cache recompute failed", err);
   }
 
   // Award the reviewer for posting a company review (new reviews only;
@@ -918,12 +896,12 @@ async function editHandler(c: any, existing: typeof reviews.$inferSelect): Promi
   try {
     await syncFeedPostForReview(db, row);
   } catch (err) {
-    console.warn("[reviews] feed sync failed:", err);
+    logger.warn("[reviews] feed sync failed", err);
   }
   try {
     await recomputeAggregateCache(db, row.subjectType, row.subjectId);
   } catch (err) {
-    console.warn("[reviews] aggregate cache recompute failed:", err);
+    logger.warn("[reviews] aggregate cache recompute failed", err);
   }
 
   return c.json(success({ review: rowToReview(row) }), 200);
@@ -951,12 +929,12 @@ reviewRoutes.delete("/:reviewId", async (c) => {
   try {
     await deleteFeedPostForReview(db, existing.id);
   } catch (err) {
-    console.warn("[reviews] feed teardown failed:", err);
+    logger.warn("[reviews] feed teardown failed", err);
   }
   try {
     await recomputeAggregateCache(db, existing.subjectType, existing.subjectId);
   } catch (err) {
-    console.warn("[reviews] aggregate cache recompute failed:", err);
+    logger.warn("[reviews] aggregate cache recompute failed", err);
   }
   return c.json(success({ deleted: true }), 200);
 });

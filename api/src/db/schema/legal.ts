@@ -47,12 +47,12 @@ export const legalDocuments = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
-    index("idx_legal_documents_kind").on(t.kind),
     // Only one current document per (kind, locale) at a time.
     uniqueIndex("uq_legal_documents_current_kind")
       .on(t.kind, t.locale)
       .where(sql`${t.isCurrent} = true`),
     uniqueIndex("uq_legal_documents_kind_version_locale").on(t.kind, t.version, t.locale),
+    index("idx_legal_documents_published_by").on(t.publishedBy),
   ],
 );
 
@@ -85,11 +85,11 @@ export const legalDocumentAcceptances = pgTable(
     context: varchar("context", { length: 64 }),
   },
   (t) => [
-    index("idx_legal_acceptances_user").on(t.userId),
     index("idx_legal_acceptances_kind").on(t.kind),
     // A user can accept the same document multiple times (e.g. re-confirm),
     // but the most recent acceptance per (user, kind) is what we surface.
     index("idx_legal_acceptances_user_kind").on(t.userId, t.kind, t.acceptedAt),
+    index("idx_legal_document_acceptances_document_id").on(t.documentId),
   ],
 );
 

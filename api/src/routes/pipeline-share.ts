@@ -8,8 +8,8 @@
  *   /api/pipeline/public                      (public read of the kanban)
  */
 import { Hono } from "hono";
-import { randomBytes } from "crypto";
 import { and, desc, eq } from "drizzle-orm";
+import { randomHex } from "../utils/crypto.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -32,7 +32,7 @@ pipelineShareRoutes.post("/", async (c) => {
   const label = typeof body?.label === "string" ? body.label.slice(0, 200) : null;
   const expiresAtRaw = typeof body?.expiresAt === "string" ? body.expiresAt : null;
 
-  const token = randomBytes(24).toString("hex");
+  const token = randomHex(24);
   const db = getDb();
   const [link] = await db
     .insert(schema.pipelineShareLinks)

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { ApiSuccessResponse } from "@shared/api";
 import { useTranslation } from "react-i18next";
 import {
   Calculator,
@@ -175,30 +176,17 @@ export default function SalaryCalculator() {
 
     try {
       // Call the dedicated Salary Calculator API endpoint
-      const response = await apiClient.post("/api/SalaryCalculator/analyze", {
+      const response = await apiClient.post("/api/salaryanalyzer/analyze", {
         jobTitle: jobTitle.trim(),
         location: location_.trim(),
         yearsExperience: experience[0],
         industry: industry,
       });
 
-      // Type the API response properly
-      interface ApiErrorResponse {
-        success: false;
-        error: { message: string };
-      }
-      interface ApiSuccessResponse {
-        success: true;
-        data: SalaryAnalysisResult;
-      }
-      type ApiResponse = ApiErrorResponse | ApiSuccessResponse | SalaryAnalysisResult;
-
-      const apiResponse = response.data as ApiResponse;
-
-      // Check for API error response
-      if ('success' in apiResponse && apiResponse.success === false && 'error' in apiResponse) {
-        throw new Error(apiResponse.error.message || t("errors.salaryAnalysisFailed"));
-      }
+      // apiClient unwraps the shared ApiResponse envelope (@shared/api) and
+      // throws on `success: false`; older API versions nest the result once
+      // more under `data`.
+      const apiResponse = response.data as SalaryAnalysisResult | ApiSuccessResponse<SalaryAnalysisResult>;
 
       // Get the result data — the raw shape varies between API versions so
       // we treat it as `any` and pull known fields defensively.

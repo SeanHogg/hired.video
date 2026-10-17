@@ -19,7 +19,6 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ToolShell } from "@/components/tools/ToolShell";
 import { ResumeAnalysisInputCard } from "@/components/tools/resume-analysis/ResumeAnalysisInputCard";
@@ -33,7 +32,6 @@ import {
   type ResumeAnalysisResult,
 } from "@/components/tools/resume-analysis/resume-analysis-shared";
 import { useAuth } from "@/lib/auth";
-import { resumeService } from "@/lib/services/resume-service";
 import { apiClient } from "@/lib/api-client";
 import { streamAiJson } from "@/lib/services/ai-stream";
 import { StreamingAnswerPreview } from "@/components/tools/StreamingAnswerPreview";
@@ -41,6 +39,7 @@ import { getResumeTextFromFile, isResumeTextFile } from "@/lib/services/resume-t
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 
 export type { ResumeAnalysisResult } from "@/components/tools/resume-analysis/resume-analysis-shared";
 
@@ -113,11 +112,7 @@ export function ResumeAnalysisToolPage({
     if (restored.jobDescription) setJobDescription(restored.jobDescription);
   }, [restored, isAuthenticated]);
 
-  const { data: resumes } = useQuery({
-    queryKey: ["resumes"],
-    queryFn: () => resumeService.getUserResumes(),
-    enabled: isAuthenticated,
-  });
+  const { data: resumes } = useUserResumes();
 
   // ─── File handling ──────────────────────────────────────────────────────
 
@@ -262,7 +257,7 @@ export function ResumeAnalysisToolPage({
         throw new Error(t("errors.couldNotExtractText"));
       }
       const { data: parseResult } = await apiClient.post<{ result?: string }>(
-        "/api/resume/parse",
+        "/api/resumes/parse",
         { content: extracted },
       );
       const content =

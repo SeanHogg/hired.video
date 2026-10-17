@@ -266,6 +266,7 @@ export const courseCertificates = pgTable(
     uniqueIndex("uq_course_certificates_active_enrollment")
       .on(t.enrollmentId)
       .where(sql`${t.revokedAt} IS NULL`),
+    index("idx_course_certificates_enrollment_id").on(t.enrollmentId),
   ],
 );
 
@@ -287,8 +288,11 @@ export const lmsConnectors = pgTable(
     provider: varchar("provider", { length: 40 }).notNull(),
     displayName: varchar("display_name", { length: 255 }),
     baseUrl: text("base_url"),
+    /** Legacy plaintext — new writes go to the *_enc columns (0548). */
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
+    accessTokenEnc: text("access_token_enc"),
+    refreshTokenEnc: text("refresh_token_enc"),
     scope: text("scope"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     status: varchar("status", { length: 20 }).default("connected").notNull(),
@@ -331,11 +335,10 @@ export type NewLmsCoursePublish = typeof lmsCoursePublishes.$inferInsert;
 
 // ---------------------------------------------------------------------------
 // course_checkouts — paid-enrolment ledger (build-strategy "Course payment /
-// cart wiring"). Models boost-checkout: a pre-create row holds the total +
-// status, the existing /api/payment provider (Stripe / Helcim) collects USD
-// out-of-band and posts the providerPaymentId via /confirm-payment. On
-// confirmation we create the matching course_enrollments row + flip the
-// checkout to `paid`.
+// cart wiring"). Checkout kind "course" of POST /api/checkout: a pre-create
+// row holds the total + status; the one-off payment widget collects USD and
+// /api/checkout/:id/confirm re-reads the transaction from the provider before
+// flipping the checkout to `paid` and creating the course_enrollments row.
 //
 // Idempotency: the partial unique index on (userId, courseId, status='pending')
 // keeps a refresh from minting two pending checkouts for the same course.
@@ -369,6 +372,11 @@ export const courseCheckouts = pgTable(
     uniqueIndex("uq_course_checkouts_pending_user_course")
       .on(t.userId, t.courseId)
       .where(sql`${t.status} = 'pending'`),
+    // One provider payment pays for at most one course checkout (mig 0535).
+    uniqueIndex("uq_course_checkouts_provider_payment_id")
+      .on(t.providerPaymentId)
+      .where(sql`${t.providerPaymentId} IS NOT NULL`),
+    index("idx_course_checkouts_enrollment_id").on(t.enrollmentId),
   ],
 );
 

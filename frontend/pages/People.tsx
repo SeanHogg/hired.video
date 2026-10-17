@@ -614,7 +614,7 @@ export default function People() {
 
     // Load available jobs
     try {
-      const response = await apiClient.get<any>("/api/job/user-jobs");
+      const response = await apiClient.get<any>("/api/jobs/user-jobs");
       setAvailableJobs(response.data || []);
     } catch (error) {
       console.error("Failed to load jobs:", error);

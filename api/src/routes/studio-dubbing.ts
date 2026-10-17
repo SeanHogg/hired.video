@@ -118,7 +118,10 @@ studioDubbingRoutes.post("/dubbing/transcribe", async (c) => {
     }
     const buf = await audioRes.arrayBuffer();
     const filename = new URL(audioUrl).pathname.split("/").pop() || "audio.wav";
-    transcription = await transcribeAudio(apiKey, buf, filename, { language: sourceLanguage });
+    transcription = await transcribeAudio(apiKey, buf, filename, {
+      language: sourceLanguage,
+      meter: { user: c.var.user, featureKey: "studio_dubbing_transcribe" },
+    });
   } catch (err) {
     return c.json(
       error("TRANSCRIPTION_FAILED", err instanceof Error ? err.message : "Whisper call failed"),

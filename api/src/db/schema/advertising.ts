@@ -11,8 +11,18 @@
  */
 
 import {
-  pgTable, uuid, text, varchar, integer, boolean, timestamp, jsonb, index, numeric,
+  pgTable,
+  uuid,
+  text,
+  varchar,
+  integer,
+  boolean,
+  timestamp,
+  jsonb,
+  index,
+  numeric,
   check,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
@@ -44,7 +54,6 @@ export const boosts = pgTable("boosts", {
   createdAt:             timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:             timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
-  index("idx_boosts_subject").on(t.subjectType, t.subjectId),
   // Subject + recency — renderer orders by created_at to break ties when
   // multiple boosts overlap on the same subject.
   index("idx_boosts_subject_created").on(t.subjectType, t.subjectId, t.createdAt.desc()),
@@ -297,3 +306,36 @@ export const careerResilienceReports = pgTable("career_resilience_reports", {
 }, (t) => [
   index("idx_career_resilience_user").on(t.userId),
 ]);
+
+// ---------------------------------------------------------------------------
+// #177 — paid boost checkout ledger
+// ---------------------------------------------------------------------------
+export const boostCheckouts = pgTable(
+  "boost_checkouts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    boostId: uuid("boost_id").references(() => boosts.id, { onDelete: "set null" }),
+    totalCents: integer("total_cents").notNull(),
+    campaignDollarsCents: integer("campaign_dollars_cents").notNull().default(0),
+    usdCents: integer("usd_cents").notNull().default(0),
+    providerPaymentId: text("provider_payment_id"),
+    status: varchar("status", { length: 16 }).notNull().default("pending"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_boost_checkouts_user").on(t.userId, t.createdAt.desc()),
+    // One provider payment pays for at most one boost (mig 0523). The
+    // service's atomic claim already enforces it; this closes the race.
+    uniqueIndex("uq_boost_checkouts_provider_payment_id")
+      .on(t.providerPaymentId)
+      .where(sql`${t.providerPaymentId} IS NOT NULL`),
+    check("boost_checkouts_status_check", sql`${t.status} IN ('pending', 'paid', 'failed', 'refunded')`),
+    index("idx_boost_checkouts_boost_id").on(t.boostId),
+  ],
+);
+
+export type BoostCheckout = typeof boostCheckouts.$inferSelect;
+export type NewBoostCheckout = typeof boostCheckouts.$inferInsert;

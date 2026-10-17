@@ -210,6 +210,8 @@ export const xapiStatements = pgTable(
     index("idx_xapi_user_stored").on(t.userId, t.storedAt),
     index("idx_xapi_enrollment").on(t.enrollmentId, t.storedAt),
     index("idx_xapi_verb").on(t.verbId, t.storedAt),
+    index("idx_xapi_statements_course_id").on(t.courseId),
+    index("idx_xapi_statements_lesson_id").on(t.lessonId),
   ],
 );
 
@@ -398,6 +400,7 @@ export const learningAssignments = pgTable(
     index("idx_learning_assignments_member").on(t.memberId),
     check("learning_assignments_subject_type_check", sql`${t.subjectType} IN ('course','path')`),
     check("learning_assignments_status_check", sql`${t.status} IN ('active','archived')`),
+    index("idx_learning_assignments_assigned_by_user_id").on(t.assignedByUserId),
   ],
 );
 
@@ -479,6 +482,7 @@ export const lrsCredentials = pgTable(
     uniqueIndex("uq_lrs_credentials_key_id").on(t.keyId),
     index("idx_lrs_credentials_owner_user").on(t.ownerUserId, t.createdAt),
     index("idx_lrs_credentials_owner_company").on(t.ownerCompanyId, t.createdAt),
+    index("idx_lrs_credentials_created_by").on(t.createdBy),
   ],
 );
 

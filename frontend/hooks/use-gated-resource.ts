@@ -241,7 +241,7 @@ export function useGatedResource<T>({
     // Seed-skip: if an upstream aggregate already hydrated this resource,
     // adopt the seed and skip the initial fetch. Subsequent poll ticks
     // still fire normally so freshness recovers within `pollMs`. Caller
-    // is responsible for TTL'ing the seed (see lib/inbox-seed.ts).
+    // is responsible for TTL'ing the seed (see lib/bootstrap-seed.ts).
     const seed = seedFn?.() ?? null;
 
     // ---- Shared-cache path (gap #1692) ----

@@ -8,6 +8,7 @@ import {
   jsonb,
   numeric,
   integer,
+  index,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 
@@ -26,7 +27,9 @@ export const performanceCycles = pgTable("performance_cycles", {
   status: varchar("status", { length: 50 }).default("active").notNull(), // draft | active | completed
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_performance_cycles_created_by_user_id").on(t.createdByUserId),
+]);
 
 export type PerformanceCycle = typeof performanceCycles.$inferSelect;
 export type NewPerformanceCycle = typeof performanceCycles.$inferInsert;
@@ -49,7 +52,11 @@ export const performanceReviews = pgTable("performance_reviews", {
   acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_performance_reviews_cycle_id").on(t.cycleId),
+  index("idx_performance_reviews_reviewee_user_id").on(t.revieweeUserId),
+  index("idx_performance_reviews_reviewer_user_id").on(t.reviewerUserId),
+]);
 
 export type PerformanceReview = typeof performanceReviews.$inferSelect;
 export type NewPerformanceReview = typeof performanceReviews.$inferInsert;
@@ -68,7 +75,10 @@ export const performanceGoals = pgTable("performance_goals", {
   completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_performance_goals_cycle_id").on(t.cycleId),
+  index("idx_performance_goals_user_id").on(t.userId),
+]);
 
 export type PerformanceGoal = typeof performanceGoals.$inferSelect;
 export type NewPerformanceGoal = typeof performanceGoals.$inferInsert;

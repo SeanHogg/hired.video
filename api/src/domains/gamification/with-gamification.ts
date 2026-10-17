@@ -25,6 +25,7 @@ import { buildRepos } from "../../repositories/index.js";
 import { pickScoringRole, type ScoringRole } from "../../../../shared/user-roles.js";
 import { GamificationService } from "./index.js";
 import type { AwardOutcome } from "./points-engine.js";
+import { logger } from "../../lib/logger.js";
 
 /** Cloudflare Worker env shape that survives the `Bindings` type-erasure
  *  the redemption engine needs (TREMENDOUS_*). Not all bindings are
@@ -77,7 +78,7 @@ export async function withGamification(
   try {
     await fn(gamificationFromContext(c), role, userId);
   } catch (e) {
-    console.warn(`[gamification] ${label} failed`, {
+    logger.warn(`[gamification] ${label} failed`, {
       userId,
       error: e instanceof Error ? e.message : String(e),
     });
@@ -104,7 +105,7 @@ export async function withGamificationBadges(
     const outcome = await fn(gamificationFromContext(c), role, userId);
     return outcome.status === "awarded" ? outcome.badgesUnlocked : [];
   } catch (e) {
-    console.warn(`[gamification] ${label} failed`, {
+    logger.warn(`[gamification] ${label} failed`, {
       userId,
       error: e instanceof Error ? e.message : String(e),
     });

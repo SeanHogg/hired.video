@@ -19,6 +19,7 @@
  */
 import { useEffect, useState } from "react";
 import type { ComponentType } from "react";
+import { formatMoneyCents } from "@/lib/format";
 import {
   Briefcase,
   DollarSign,
@@ -54,20 +55,6 @@ const SOURCE_ICON: Record<EarningsSourceKey, ComponentType<{ className?: string 
   contract: Wrench,
   other: DollarSign,
 };
-
-function formatCents(cents: number, currency: string): string {
-  const amount = (cents ?? 0) / 100;
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currency || "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `$${amount.toFixed(2)}`;
-  }
-}
 
 export default function CreatorEarningsBreakdown() {
   const [data, setData] = useState<CreatorEarningsRollupDTO | null>(null);
@@ -117,7 +104,7 @@ export default function CreatorEarningsBreakdown() {
               Total earned
             </div>
             <div className="mt-1 text-xl font-semibold">
-              {formatCents(data.totalEarnedCents, data.currency)}
+              {formatMoneyCents(data.totalEarnedCents, data.currency, 2)}
             </div>
           </div>
           <div className="rounded-md border border-border bg-card px-3 py-2">
@@ -149,7 +136,7 @@ export default function CreatorEarningsBreakdown() {
                   </p>
                 </div>
                 <div className="text-right text-sm font-semibold">
-                  {formatCents(row.earningsCents, data.currency)}
+                  {formatMoneyCents(row.earningsCents, data.currency, 2)}
                 </div>
               </li>
             );

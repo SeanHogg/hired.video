@@ -38,11 +38,10 @@ export default function JobEmbed() {
     if (!id) return;
     let cancelled = false;
     apiClient
-      .get(`/api/jobs/${encodeURIComponent(id)}`)
-      .then((res) => {
+      .fetchData<PublicJob | null>(`/api/jobs/${encodeURIComponent(id)}`)
+      .then((body) => {
         if (cancelled) return;
-        const body = (res as any).data?.data ?? (res as any).data ?? null;
-        setJob(body as PublicJob);
+        setJob(body ?? null);
       })
       .catch((err) => {
         if (!cancelled) setErrorMsg(err instanceof Error ? err.message : "Job not found");

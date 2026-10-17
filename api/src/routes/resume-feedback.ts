@@ -53,6 +53,7 @@ import { eq } from "drizzle-orm";
 import { buildRepos } from "../repositories/index.js";
 import { emitNotification, resolveActor } from "../services/notifications/notificationService.js";
 import { sendReviewInviteEmail, buildReviewUrl } from "../services/adapters/email.js";
+import { logger } from "../lib/logger.js";
 
 export const resumeFeedbackRoutes = new Hono<AppEnv>();
 
@@ -128,7 +129,7 @@ async function fireInviteSideEffects(
         itemLabel: "resume",
         message: review.message,
         expiryLabel,
-      }).catch((err) => console.error("[resume-feedback] invite email failed:", err));
+      }).catch((err) => logger.error("[resume-feedback] invite email failed", err));
     }
 
     if (review.reviewerId) {
@@ -144,12 +145,12 @@ async function fireInviteSideEffects(
           target: { id: review.id, type: "resume_review" },
           url: `/resume-review/${review.id}`,
         },
-      ).catch((err) => console.error("[resume-feedback] invite notification failed:", err));
+      ).catch((err) => logger.error("[resume-feedback] invite notification failed", err));
     } else if (email) {
       // External invitee with no account — capture as a marketing lead so we
       // can follow up about joining (they gave feedback without signing up).
       await captureReviewerLead(repos, email, recipientName).catch((err) =>
-        console.error("[resume-feedback] lead capture failed:", err),
+        logger.error("[resume-feedback] lead capture failed", err),
       );
     }
   }
@@ -177,10 +178,10 @@ async function fireSubmitSideEffects(review: ResumeReviewDTO): Promise<void> {
       target: { id: review.id, type: "resume_review" },
       url: `/resume-review/${review.id}`,
     },
-  ).catch((err) => console.error("[resume-feedback] submit notification failed:", err));
+  ).catch((err) => logger.error("[resume-feedback] submit notification failed", err));
   if (!review.reviewerId && review.reviewerEmail) {
     await captureReviewerLead(repos, review.reviewerEmail, review.reviewerName).catch((err) =>
-      console.error("[resume-feedback] submit lead capture failed:", err),
+      logger.error("[resume-feedback] submit lead capture failed", err),
     );
   }
 }
@@ -239,7 +240,7 @@ resumeFeedbackRoutes.post("/reviews/invite", async (c) => {
     // Best-effort fan-out — emails + notifications + lead capture. Don't block
     // (or fail) the response on a flaky provider.
     void fireInviteSideEffects(userId, reviews, parsed.data.expiresInHours).catch((err) =>
-      console.error("[resume-feedback] invite side effects failed:", err),
+      logger.error("[resume-feedback] invite side effects failed", err),
     );
     return c.json(success(reviews), 201);
   } catch (e) {

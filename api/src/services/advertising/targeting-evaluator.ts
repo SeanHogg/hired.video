@@ -24,6 +24,7 @@ import {
 import { AdTargetingRepository } from "../../repositories/adTargetingRepository.js";
 import { getOrSetCached } from "../../utils/edge-cache.js";
 import { buildTargetingWhere } from "./targeting-sql.js";
+import { sha256Hex } from "../../utils/crypto.js";
 
 export interface EligibilityDecision {
   eligible: boolean;
@@ -123,10 +124,7 @@ export function canonicalTargeting(value: unknown): string {
 }
 
 export async function targetingCacheKey(targeting: AdSetTargeting): Promise<string> {
-  const bytes = new TextEncoder().encode(canonicalTargeting(targeting));
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const hex = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
-  return `ad-reach:v1:${hex}`;
+  return `ad-reach:v1:${await sha256Hex(canonicalTargeting(targeting))}`;
 }
 
 export interface ReachEstimate {

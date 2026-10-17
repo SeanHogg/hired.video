@@ -41,6 +41,8 @@ export const promotionSubmissions = pgTable(
     check("promotion_submissions_platform_check", sql`${t.platform} IN ('youtube', 'tiktok', 'instagram', 'x', 'facebook')`),
     check("promotion_submissions_status_check", sql`${t.status} IN ('pending', 'published', 'failed', 'rejected')`),
     check("promotion_submissions_screening_verdict_check", sql`${t.screeningVerdict} IN ('pass', 'flag', 'block', 'unscreened')`),
+    index("idx_promotion_submissions_reviewed_by").on(t.reviewedBy),
+    index("idx_promotion_submissions_submitted_by").on(t.submittedBy),
   ],
 );
 

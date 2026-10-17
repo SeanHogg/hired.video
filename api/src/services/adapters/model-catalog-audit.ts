@@ -25,6 +25,7 @@
 import { BuilderforceClient, BuilderforceApiError } from "@seanhogg/builderforce-sdk";
 import { USE_CASE_PROFILES, type LLMUseCase } from "./providers.js";
 import { buildModelRequestParams, isListedInGatewayCatalog } from "./model-request-rules.js";
+import { escapeHtml } from "../../../../shared/html-escape.js";
 
 export interface ModelCatalogRow {
   /** The `vendor/model[:tier]` hint our profiles send to the gateway. */
@@ -207,14 +208,6 @@ export async function auditModelCatalog(env: CatalogAuditEnv | undefined): Promi
     Promise.all(unlisted.map(async (m) => [m, sdk ? await probeModel(sdk, m) : null] as const)),
   ]);
   return auditAgainstCatalog(configured, catalog, new Map(probes));
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
 }
 
 /** Render the drift-alert email body. Lists each missing model + the use cases

@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { InboxEmptyState } from "@/components/email/InboxEmptyState";
 import { ReconnectMailboxBanner } from "@/components/email/ReconnectMailbox";
-import { formatDistanceToNow } from "date-fns";
+import { safeRelativeTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -93,14 +93,6 @@ function iconForItem(item: HubItem) {
       return <ShieldCheck className="h-4 w-4 text-emerald-600" />;
     default:
       return <Info className="h-4 w-4 text-primary" />;
-  }
-}
-
-function safeRelativeTime(iso: string): string {
-  try {
-    return formatDistanceToNow(new Date(iso), { addSuffix: true });
-  } catch {
-    return "";
   }
 }
 

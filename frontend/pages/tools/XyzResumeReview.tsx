@@ -6,15 +6,14 @@
  */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
 import { ToolShell } from "@/components/tools/ToolShell";
 import ResumeSelectItem, { type ResumeRow } from "@/components/tools/ResumeSelectItem";
 import XyzReviewAllWizard from "@/components/build/xyz/XyzReviewAllWizard";
 import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
-import { resumeService } from "@/lib/services/resume-service";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 
 export default function XyzResumeReview() {
   const { t } = useTranslation();
@@ -23,11 +22,7 @@ export default function XyzResumeReview() {
   const [picked, setPicked] = useState(boundResumeId ?? "");
   const resumeId = boundResumeId ?? (picked || null);
 
-  const { data: resumes } = useQuery({
-    queryKey: ["resumes"],
-    queryFn: () => resumeService.getUserResumes(),
-    enabled: isAuthenticated && !boundResumeId,
-  });
+  const { data: resumes } = useUserResumes({ enabled: !boundResumeId });
 
   return (
     <ToolShell

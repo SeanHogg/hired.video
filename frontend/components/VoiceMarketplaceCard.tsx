@@ -14,6 +14,7 @@
 "use client";
 
 import { Link } from "react-router-dom";
+import { formatPriceCents } from "@/lib/format";
 import { Mic, Play, Pause, ShoppingCart, Check, Globe2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,12 +45,6 @@ export interface VoiceMarketplaceCardItem {
 
 interface Props {
   item: VoiceMarketplaceCardItem;
-}
-
-function formatPrice(cents: number, currency: string): string {
-  if (cents === 0) return "Free";
-  const major = cents / 100;
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(major);
 }
 
 export default function VoiceMarketplaceCard({ item }: Props) {
@@ -116,7 +111,7 @@ export default function VoiceMarketplaceCard({ item }: Props) {
               title={item.name}
             />
             <span className="font-semibold text-sm tabular-nums">
-              {formatPrice(item.priceCents, item.currency)}
+              {formatPriceCents(item.priceCents, item.currency)}
             </span>
           </div>
         </div>

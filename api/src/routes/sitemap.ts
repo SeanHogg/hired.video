@@ -11,6 +11,7 @@ import {
   getPopularCities,
 } from "../services/job/salary-popularity.js";
 import { getOrSetCached } from "../utils/edge-cache.js";
+import { slugify } from "../../../shared/slugify.js";
 import { publicStudioProjectWhere } from "../repositories/studioPublicEngagementRepository.js";
 // Resume-preset template slugs — the always-available fallback for the static
 // template list when the generated manifest can't be fetched. The full static
@@ -309,7 +310,9 @@ async function buildSitemapXml(reqOrigin: string): Promise<string> {
   // the /salary index page and the related-links surfaces on each leaf.
   const jobSlugs = [...new Set(
     jobRows
-      .map((j) => j.title?.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))
+      .map((j) =>
+        slugify(j.title, { fallback: "", maxLen: Number.POSITIVE_INFINITY, stripDiacritics: false }),
+      )
       .filter(Boolean)
   )].slice(0, 200) as string[];
 

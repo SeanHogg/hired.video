@@ -25,24 +25,15 @@
  */
 
 import type { EnrichmentInput, EnrichmentProvider, EnrichmentResult } from "./index.js";
+import { getEnv } from "../../utils/env.js";
+import { splitPersonName } from "../../../../shared/person-name.js";
 
 const HUNTER_BASE = "https://api.hunter.io/v2/email-finder";
 
 function readKey(): string | null {
-  return (
-    process.env.HUNTER_API_KEY ??
-    (globalThis as any).__ENV?.HUNTER_API_KEY ??
-    null
-  );
+  return getEnv("HUNTER_API_KEY") || null;
 }
 
-/** Split a free-form name into first/last for Hunter's required params. */
-export function splitName(name: string | undefined): { first: string; last: string } {
-  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return { first: "", last: "" };
-  if (parts.length === 1) return { first: parts[0], last: "" };
-  return { first: parts[0], last: parts[parts.length - 1] };
-}
 
 /** Pure: derive the lookup domain from explicit domain or a company name
  *  that already looks like a domain. Returns null when we have nothing to
@@ -58,7 +49,8 @@ export function resolveDomain(input: EnrichmentInput): string | null {
 
 /** Pure: build the Hunter request URL for an input + key. Exported for tests. */
 export function buildHunterUrl(input: EnrichmentInput, apiKey: string): string {
-  const { first, last } = splitName(input.name);
+  // Hunter wants first + family name only — middle names are dropped.
+  const { firstName: first, lastName: last } = splitPersonName(input.name, { lastName: "final" });
   const params = new URLSearchParams({ api_key: apiKey });
   const domain = resolveDomain(input);
   if (domain) params.set("domain", domain);

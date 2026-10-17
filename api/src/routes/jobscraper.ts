@@ -23,23 +23,13 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { scrapeJobSource } from "../services/job/scraper.js";
+import { adminMiddleware } from "../middleware/superAdmin.js";
 
 export const jobScraperAdminRoutes = new Hono<AppEnv>();
 export const jobScraperUserRoutes = new Hono<AppEnv>();
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-async function requireAdmin(userId: string): Promise<boolean> {
-  const db = getDb();
-  const [row] = await db
-    .select({ role: schema.users.role })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
-  return ["admin", "super_admin"].includes(row?.role ?? "");
-}
+// Every admin job-source endpoint requires internal staff (Admin / SuperAdmin).
+jobScraperAdminRoutes.use("*", adminMiddleware);
 
 const SourceSchema = z.object({
   name: z.string().min(1).max(255),
@@ -55,10 +45,6 @@ const SourceSchema = z.object({
 // Admin: GET /api/admin/job-sources
 // ---------------------------------------------------------------------------
 jobScraperAdminRoutes.get("/", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  if (!await requireAdmin(userId)) return c.json(error("FORBIDDEN", "Admin only"), 403);
-
   const db = getDb();
   const sources = await db
     .select()
@@ -72,9 +58,7 @@ jobScraperAdminRoutes.get("/", async (c) => {
 // Admin: POST /api/admin/job-sources
 // ---------------------------------------------------------------------------
 jobScraperAdminRoutes.post("/", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  if (!await requireAdmin(userId)) return c.json(error("FORBIDDEN", "Admin only"), 403);
+  const userId = c.var.user!.sub;
 
   const body = await c.req.json().catch(() => null);
   const parsed = SourceSchema.safeParse(body);
@@ -98,10 +82,6 @@ jobScraperAdminRoutes.post("/", async (c) => {
 // Admin: PATCH /api/admin/job-sources/:id
 // ---------------------------------------------------------------------------
 jobScraperAdminRoutes.patch("/:id", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  if (!await requireAdmin(userId)) return c.json(error("FORBIDDEN", "Admin only"), 403);
-
   const db = getDb();
   const body = await c.req.json().catch(() => ({}));
 
@@ -128,10 +108,6 @@ jobScraperAdminRoutes.patch("/:id", async (c) => {
 // Admin: DELETE /api/admin/job-sources/:id
 // ---------------------------------------------------------------------------
 jobScraperAdminRoutes.delete("/:id", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  if (!await requireAdmin(userId)) return c.json(error("FORBIDDEN", "Admin only"), 403);
-
   const db = getDb();
   await db.delete(schema.jobBoardSources).where(eq(schema.jobBoardSources.id, c.req.param("id")));
   return c.json(success({ deleted: true }), 200);
@@ -141,10 +117,6 @@ jobScraperAdminRoutes.delete("/:id", async (c) => {
 // Admin: POST /api/admin/job-sources/:id/sync — manual trigger
 // ---------------------------------------------------------------------------
 jobScraperAdminRoutes.post("/:id/sync", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  if (!await requireAdmin(userId)) return c.json(error("FORBIDDEN", "Admin only"), 403);
-
   const db = getDb();
   const [source] = await db
     .select()
@@ -164,10 +136,6 @@ jobScraperAdminRoutes.post("/:id/sync", async (c) => {
 // Admin: GET /api/admin/job-sources/:id/logs — sync history
 // ---------------------------------------------------------------------------
 jobScraperAdminRoutes.get("/:id/logs", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  if (!await requireAdmin(userId)) return c.json(error("FORBIDDEN", "Admin only"), 403);
-
   const db = getDb();
   const logs = await db
     .select()

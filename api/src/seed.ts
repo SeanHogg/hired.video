@@ -2,17 +2,12 @@ import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "./db/index.js";
 import { HIRED_VIDEO_SEED_COMPANY } from "./services/job/JobService.js";
 import { USER_ROLES } from "../../shared/user-roles.js";
+import { slugify } from "../../shared/slugify.js";
 import { allSectorArticleDrafts } from "../../shared/sector-article-templates.js";
+import { logger } from "./lib/logger.js";
+import { hashPassword } from "./services/auth/password.js";
 
 const { users, companyProfiles, userCompanyRoleAssociations, articles } = schema;
-
-function toSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 100);
-}
 
 async function ensureCompanyProfile(
   db: ReturnType<typeof getDb>,
@@ -32,13 +27,13 @@ async function ensureCompanyProfile(
     .values({
       ownerId,
       name,
-      slug: toSlug(name),
+      slug: slugify(name, { fallback: "", maxLen: 100, stripDiacritics: false }),
       description,
       isVerified: true,
       isActive: true,
     } as any)
     .returning({ id: companyProfiles.id });
-  console.log("[seed] Created company profile", name);
+  logger.info("[seed] Created company profile", { name });
   return created.id;
 }
 
@@ -69,29 +64,7 @@ async function ensureCompanyMembership(
     role,
     isActive: true,
   } as any);
-  console.log("[seed] Granted membership", role, "for", userId, "on", companyId);
-}
-
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: 100_000, hash: "SHA-256" },
-    keyMaterial,
-    256,
-  );
-  const saltHex = Array.from(salt).map((b) => b.toString(16).padStart(2, "0")).join("");
-  const hashHex = Array.from(new Uint8Array(bits))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  return `${saltHex}:${hashHex}`;
+  logger.info("[seed] Granted membership", { role, userId, companyId });
 }
 
 /** Inputs that determine *what* the seed inserts. Separated from
@@ -149,7 +122,7 @@ export async function runSeed(
       .returning();
 
     userId = created?.id;
-    console.log("[seed] Created super admin user", opts.email);
+    logger.info("[seed] Created super admin user", { email: opts.email });
   } else {
     userId = existingUser.id;
   }
@@ -181,7 +154,7 @@ export async function seedSuperAdminAndCompany(): Promise<void> {
   try {
     await runSeed(getDb(), defaultSeedOpts());
   } catch (err) {
-    console.error("[seed] Failed to seed super admin / company:", err);
+    logger.error("[seed] Failed to seed super admin / company", err);
   }
 }
 
@@ -225,6 +198,6 @@ async function seedSectorArticles(
     inserted += 1;
   }
   if (inserted > 0) {
-    console.log(`[seed] Inserted ${inserted} sector articles`);
+    logger.info("[seed] Inserted sector articles", { inserted });
   }
 }

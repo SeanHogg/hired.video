@@ -5,6 +5,7 @@ import {
   Briefcase,
 } from "lucide-react";
 import { useState } from "react";
+import { formatMonthYear } from "@/lib/format";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { workEntryTags, type Work, type WorkEntryTag } from "@/types/resume";
@@ -35,15 +36,8 @@ function TimelineItem({
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
-  const formatDate = (dateString: string) => {
-    if (dateString === "Present" || !dateString) return dateString || t("labels.present");
-    const dateObj = new Date(dateString);
-    if (isNaN(dateObj.getTime())) return dateString;
-    return dateObj.toLocaleDateString("en-US", { year: "numeric", month: "short" });
-  };
-
-  const formattedStart = formatDate(startDate);
-  const formattedEnd = formatDate(endDate);
+  const formattedStart = formatMonthYear(startDate, t("labels.present"));
+  const formattedEnd = formatMonthYear(endDate, t("labels.present"));
 
   return (
     <div className="relative">

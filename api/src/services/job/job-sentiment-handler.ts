@@ -16,10 +16,11 @@
  * tool refreshes the same column.
  */
 
-import { ok, fail, type HandlerResult } from "../../handlers/shared.js";
+import { DomainError } from "../../domains/errors.js";
 import { scoreSentiment } from "../../../../shared/sentiment.js";
 import { jobRowToLLMText } from "./match-handlers.js";
 import type { IJobsRepository } from "../../repositories/jobsRepository.js";
+import { logger } from "../../lib/logger.js";
 
 export interface JobSentimentDeps {
   jobs: IJobsRepository;
@@ -28,29 +29,26 @@ export interface JobSentimentDeps {
 export async function handleJobSentimentPrediction(
   deps: JobSentimentDeps,
   body: unknown,
-): Promise<HandlerResult> {
+): Promise<{ score: number }> {
   const jobId =
     typeof body === "object" && body !== null
       ? (body as { jobId?: unknown }).jobId
       : undefined;
 
   if (typeof jobId !== "string" || jobId.length === 0) {
-    return fail(400, "VALIDATION_ERROR", "jobId is required");
+    throw new DomainError(400, "VALIDATION_ERROR", "jobId is required");
   }
 
   const row = await deps.jobs.findJobById(jobId);
-  if (!row) return fail(404, "NOT_FOUND", "Job not found");
+  if (!row) throw new DomainError(404, "NOT_FOUND", "Job not found");
 
   const score = scoreSentiment(jobRowToLLMText(row as Record<string, unknown>));
 
   try {
     await deps.jobs.updateJobSentimentScore(jobId, Math.round(score));
   } catch (err) {
-    console.warn(
-      "[job-sentimentprediction] persist failed:",
-      err instanceof Error ? err.message : err,
-    );
+    logger.warn("[job-sentimentprediction] persist failed", err);
   }
 
-  return ok({ score });
+  return { score };
 }

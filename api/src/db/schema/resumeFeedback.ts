@@ -96,6 +96,7 @@ export const resumeReviews = pgTable(
     check("resume_reviews_resume_subject_check", sql`${t.subjectType} <> 'resume' OR ${t.resumeId} = ${t.subjectId}`),
     check("resume_reviews_source_check", sql`${t.source} IN ('self_share', 'coaching')`),
     check("resume_reviews_status_check", sql`${t.status} IN ('pending', 'active', 'submitted', 'completed', 'cancelled')`),
+    index("idx_resume_reviews_coaching_inquiry_id").on(t.coachingInquiryId),
   ],
 );
 
@@ -140,6 +141,8 @@ export const resumeReviewAnnotations = pgTable(
     index("idx_resume_annotations_parent").on(t.parentAnnotationId),
     check("resume_annotations_kind_check", sql`${t.kind} IN ('sticky_note', 'highlight', 'comment')`),
     check("resume_annotations_status_check", sql`${t.status} IN ('open', 'accepted', 'dismissed', 'resolved')`),
+    index("idx_resume_review_annotations_author_id").on(t.authorId),
+    index("idx_resume_review_annotations_resolved_by_user_id").on(t.resolvedByUserId),
   ],
 );
 

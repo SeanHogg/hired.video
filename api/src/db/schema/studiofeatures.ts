@@ -49,7 +49,9 @@ import { users } from "./users.js";
 // and uniqueness keys differ.
 // ---------------------------------------------------------------------------
 export const oauthConnectionColumns = {
+  /** Legacy plaintext — new writes go to refresh_token_enc (0548). */
   refreshToken:   text("refresh_token"),
+  refreshTokenEnc: text("refresh_token_enc"),
   tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
   /** Space-separated scope list as returned by the provider. */
   scopes:         text("scopes"),
@@ -155,7 +157,6 @@ export const studioVoiceClones = pgTable(
   (t) => [
     index("idx_studio_voice_clones_user").on(t.userId),
     index("idx_studio_voice_clones_visibility").on(t.visibility),
-    index("idx_studio_voice_clones_slug").on(t.listingSlug),
   ],
 );
 
@@ -185,7 +186,6 @@ export const studioVoiceCloneLicenses = pgTable(
     grantedAt:        timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    index("idx_studio_voice_clone_licenses_user").on(t.userId),
     index("idx_studio_voice_clone_licenses_clone").on(t.voiceCloneId),
     index("uq_studio_voice_clone_licenses_pair").on(t.userId, t.voiceCloneId),
   ],
@@ -207,7 +207,10 @@ export const studioCaptions = pgTable(
     vttContent:  text("vtt_content"),             // pre-rendered WebVTT
     createdAt:   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("idx_studio_captions_project").on(t.projectId)],
+  (t) => [
+    index("idx_studio_captions_project").on(t.projectId),
+    index("idx_studio_captions_user_id").on(t.userId),
+  ],
 );
 
 // ---------------------------------------------------------------------------
@@ -228,7 +231,9 @@ export const youtubeAccounts = pgTable(
     channelTitle: text("channel_title"),
     displayName:  text("display_name"),
     email:        text("email"),
-    accessToken:  text("access_token").notNull(),
+    /** Legacy plaintext (nullable since 0548) — new writes go to access_token_enc. */
+    accessToken:  text("access_token"),
+    accessTokenEnc: text("access_token_enc"),
     ...oauthConnectionColumns,
   },
   (t) => [index("idx_youtube_accounts_user").on(t.userId)],
@@ -314,6 +319,7 @@ export const studioAtsPackages = pgTable(
     // Was a plain index; #1607 promoted it to UNIQUE to enforce the
     // "unique URL slug" contract the inline comment claims.
     uniqueIndex("uq_studio_ats_packages_slug").on(t.slug),
+    index("idx_studio_ats_packages_project_id").on(t.projectId),
   ],
 );
 
@@ -433,7 +439,6 @@ export const studioAsyncInterviews = pgTable(
   (t) => [
     index("idx_async_interviews_recruiter").on(t.recruiterId),
     index("idx_async_interviews_candidate").on(t.candidateId),
-    index("idx_async_interviews_token").on(t.inviteToken),
     index("idx_async_interviews_application").on(t.applicationId),
     index("idx_async_interviews_token_active").on(t.inviteToken).where(sql`invite_token IS NOT NULL`),
     index("idx_async_interviews_decision").on(t.recruiterId, t.decision).where(sql`decision IS NOT NULL`),
@@ -754,7 +759,7 @@ export const studioReviewComments = pgTable(
   (t) => [
     index("idx_studio_review_comments_project").on(t.projectId),
     index("idx_studio_review_comments_parent").on(t.parentId),
-    index("idx_review_comments_project").on(t.projectId),
+    index("idx_studio_review_comments_author_user_id").on(t.authorUserId),
   ],
 );
 

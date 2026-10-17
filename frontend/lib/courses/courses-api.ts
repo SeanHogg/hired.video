@@ -1,47 +1,30 @@
 /**
  * Courses + Learning Paths API client.
  *
- * Thin wrapper around fetch — keeps every URL/path in one place so the
+ * Thin wrapper around apiClient — keeps every URL/path in one place so the
  * SCORM player, ScormPlayer-host page, course editor and learner UI all
  * agree on the same endpoints.
  */
 
-import { standardAuthHeaders } from "../api-client";
-
-const API = ((import.meta as ImportMeta & { env: Record<string, string> }).env.VITE_API_URL ?? "/api").replace(/\/$/, "");
+import { apiClient, type RequestConfig } from "../api-client";
+import { fetchApiBlob } from "../services/download-service";
 
 // Every backend route this client targets (`/courses`, `/learning-paths`,
-// `/verify`) is mounted under `/api`. The paths below are written WITHOUT
-// the `/api` prefix, so we must add it whenever the configured base origin
-// doesn't already end in `/api`. In dev `VITE_API_URL` is unset → `API` is
-// the relative `/api` (prefix present); in production it's the bare API
-// origin (e.g. `https://api.hired.video`, prefix absent). Without this the
-// prod URL collapses to `https://api.hired.video/courses/...` and 404s —
-// the bug that left passed courses without an issued certificate. Mirrors
-// the `/api` reconciliation the shared api-client already performs.
-function apiUrl(path: string): string {
-  const baseHasApi = /\/api$/i.test(API);
-  return `${API}${baseHasApi ? "" : "/api"}${path}`;
-}
-
+// `/learning`, `/verify`, …) is mounted under `/api`; the paths below are
+// written WITHOUT that prefix and `call()` adds it. The transport (base URL,
+// Bearer + X-Emulation-Token, logging, typed errors) is the shared apiClient.
 async function call<T>(
   path: string,
-  init: RequestInit & { auth?: string | null } = {},
+  init: { method?: RequestConfig["method"]; body?: unknown } = {},
 ): Promise<T> {
-  const url = apiUrl(path);
-  const headers = new Headers(init.headers ?? {});
-  headers.set("Content-Type", "application/json");
-  // Attach the canonical auth headers (Bearer + active impersonation token) so
-  // these calls authenticate like every other client. authMiddleware reads the
-  // Authorization header ONLY — there is no cookie fallback — so relying on
-  // `credentials: "include"` alone 401'd cross-origin (api.hired.video) prod.
-  for (const [k, v] of Object.entries(standardAuthHeaders(url))) headers.set(k, v);
-  // An explicit token (SCORM host page) still wins over the localStorage one.
-  if (init.auth) headers.set("Authorization", `Bearer ${init.auth}`);
-  const res = await fetch(url, { ...init, headers, credentials: "include" });
-  const json = await res.json().catch(() => ({})) as { data?: T; error?: { message?: string } };
-  if (!res.ok) throw new Error(json.error?.message ?? `Request failed: ${res.status}`);
-  return (json.data ?? null) as T;
+  // requestRaw (not fetchData): a few of these routes answer with a bare
+  // `{ data }` body. Callers own their error UX, so no global toast.
+  const res = await apiClient.requestRaw<{ data?: T }>(`/api${path}`, {
+    method: init.method,
+    body: init.body,
+    suppressErrorEvent: true,
+  });
+  return (res.data?.data ?? null) as T;
 }
 
 // ── SCORM CMI persistence ────────────────────────────────────────────
@@ -58,22 +41,21 @@ export interface ScormCommitInput {
   suspendData?: string;
 }
 
-export function commitScormState(enrollmentId: string, input: ScormCommitInput, auth?: string | null) {
+export function commitScormState(enrollmentId: string, input: ScormCommitInput) {
   return call(`/courses/scorm/${enrollmentId}/commit`, {
     method: "POST",
     body: JSON.stringify(input),
-    auth,
   });
 }
 
-export function loadScormState(enrollmentId: string, lessonId: string, auth?: string | null) {
+export function loadScormState(enrollmentId: string, lessonId: string) {
   return call<{
     cmi: Record<string, unknown>;
     suspendData: string | null;
     completionStatus: string | null;
     scoreRaw: number | null;
     totalTimeSec: number;
-  } | null>(`/courses/scorm/${enrollmentId}/${lessonId}`, { auth });
+  } | null>(`/courses/scorm/${enrollmentId}/${lessonId}`);
 }
 
 // ── xAPI emit ────────────────────────────────────────────────────────
@@ -94,11 +76,10 @@ export interface XapiStatementInput {
   timestamp?: string;
 }
 
-export function emitXapi(input: XapiStatementInput, auth?: string | null) {
+export function emitXapi(input: XapiStatementInput) {
   return call(`/courses/xapi/statements`, {
     method: "POST",
     body: JSON.stringify(input),
-    auth,
   });
 }
 
@@ -113,19 +94,16 @@ export function patchLessonProgress(
     scoreMax?: number;
     timeSpentSec?: number;
   },
-  auth?: string | null,
 ) {
   return call(`/courses/enrollments/${enrollmentId}/progress`, {
     method: "PATCH",
     body: JSON.stringify(body),
-    auth,
   });
 }
 
-export function issueCertificate(enrollmentId: string, auth?: string | null) {
+export function issueCertificate(enrollmentId: string) {
   return call(`/courses/enrollments/${enrollmentId}/certificate`, {
     method: "POST",
-    auth,
   });
 }
 
@@ -149,17 +127,17 @@ export function verifyCertificate(certNumber: string) {
 
 // ── Learning paths ───────────────────────────────────────────────────
 
-export function getPathProgress(pathId: string, auth?: string | null) {
+export function getPathProgress(pathId: string) {
   return call<{
     unlocked: string[];
     passed: string[];
     locked: Array<{ courseId: string; missing: string[] }>;
     complete: boolean;
-  }>(`/learning-paths/${pathId}/progress`, { auth });
+  }>(`/learning-paths/${pathId}/progress`);
 }
 
-export function enrollInPath(pathId: string, auth?: string | null) {
-  return call(`/learning-paths/${pathId}/enroll`, { method: "POST", auth });
+export function enrollInPath(pathId: string) {
+  return call(`/learning-paths/${pathId}/enroll`, { method: "POST" });
 }
 
 // ── Cohorts / classrooms + assignments (#1887/#1888/#1890) ─────────────
@@ -366,16 +344,10 @@ export const LEARNING_EXPORT_KINDS = {
 export type LearningExportKind = keyof typeof LEARNING_EXPORT_KINDS;
 
 /** Fetch an export artifact as a Blob (these endpoints return RAW payloads, not
- *  the `{ data }` envelope, so `call()` can't be used). Auth headers are
- *  attached like every other client call. */
+ *  the `{ data }` envelope, so `call()` can't be used). */
 export async function fetchLearningExport(kind: LearningExportKind): Promise<{ blob: Blob; filename: string }> {
   const { path, filename } = LEARNING_EXPORT_KINDS[kind];
-  const url = apiUrl(path);
-  const headers = new Headers();
-  for (const [k, v] of Object.entries(standardAuthHeaders(url))) headers.set(k, v);
-  const res = await fetch(url, { headers, credentials: "include" });
-  if (!res.ok) throw new Error(`Export failed: ${res.status}`);
-  return { blob: await res.blob(), filename };
+  return { blob: await fetchApiBlob(`/api${path}`), filename };
 }
 
 export interface LrsCredentialView {

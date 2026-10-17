@@ -9,6 +9,9 @@ import { z } from "zod";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { logger } from "../lib/logger.js";
+import { hexToBytes, hmacSha256Verify } from "../utils/crypto.js";
+import { openCredential, sealCredential } from "../services/crypto/credential-columns.js";
 
 type Db = ReturnType<typeof getDb>;
 
@@ -92,18 +95,30 @@ atsRoutes.post("/connections", async (c) => {
   const table = getAtsTable();
   if (!table) return c.json(error("SERVICE_UNAVAILABLE", "ATS connections not available"), 503);
 
+  const sealed = await sealCredential(apiKey);
   const [row] = (await db.insert(table).values({
     companyId,
     provider,
-    apiKey,
+    apiKey: sealed.plain,
+    apiKeyEnc: sealed.enc,
     webhookSecret: webhookSecret ?? null,
     config: config ?? {},
     isActive: true,
   } as any).onConflictDoUpdate({
     target: [table.companyId, table.provider],
-    set: { apiKey, webhookSecret: webhookSecret ?? null, config: config ?? {}, isActive: true, updatedAt: new Date() } as any,
-  }).returning().catch(() => [])) as any[];
+    set: { apiKey: sealed.plain, apiKeyEnc: sealed.enc, webhookSecret: webhookSecret ?? null, config: config ?? {}, isActive: true, updatedAt: new Date() } as any,
+  }).returning({
+    id: table.id,
+    companyId: table.companyId,
+    provider: table.provider,
+    config: table.config,
+    isActive: table.isActive,
+    lastSyncAt: table.lastSyncAt,
+    createdAt: table.createdAt,
+    updatedAt: table.updatedAt,
+  }).catch(() => [])) as any[];
 
+  // Never echo the API key or webhook secret back to the client.
   return c.json(success(row ?? {}), row ? 201 : 503);
 });
 
@@ -168,7 +183,7 @@ atsRoutes.post("/sync/:connectionId", async (c) => {
     db,
     company.ownerId,
     conn.provider as Provider,
-    conn.apiKey,
+    (await openCredential(conn.apiKeyEnc, conn.apiKey)) ?? "",
     (conn.config ?? {}) as Record<string, unknown>,
   );
 
@@ -405,7 +420,7 @@ async function upsertCandidatesForOwner(
       })) as any)
       .returning({ id: schema.talentPoolCandidates.id, email: schema.talentPoolCandidates.candidateEmail })
       .catch((e) => {
-        console.error(`[ats:${provider}] upsert failed:`, e);
+        logger.error(`[ats:${provider}] upsert failed`, e);
         return [] as Array<{ id: string; email: string | null }>;
       });
     imported = inserted.length;
@@ -465,7 +480,7 @@ atsRoutes.post("/webhook/:provider", async (c) => {
       await handleWebhookEvent(db, providerName, company.ownerId, eventType, body);
     }
   } else {
-    console.info(`[ats:${providerName}] webhook event=${eventType} — no connection, not processed`);
+    logger.info(`[ats:${providerName}] webhook event — no connection, not processed`, { eventType });
   }
 
   return c.json({ received: true }, 200);
@@ -473,12 +488,7 @@ atsRoutes.post("/webhook/:provider", async (c) => {
 
 async function verifyHmacSignature(sig: string, payload: string, secret: string): Promise<boolean> {
   try {
-    const key = await crypto.subtle.importKey(
-      "raw", new TextEncoder().encode(secret),
-      { name: "HMAC", hash: "SHA-256" }, false, ["verify"],
-    );
-    const sigBytes = new Uint8Array(sig.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
-    return crypto.subtle.verify("HMAC", key, sigBytes, new TextEncoder().encode(payload));
+    return await hmacSha256Verify(secret, payload, hexToBytes(sig));
   } catch {
     return false;
   }
@@ -542,7 +552,7 @@ async function handleWebhookEvent(
   eventType: string,
   body: any,
 ): Promise<void> {
-  console.info(`[ats:${provider}] webhook event=${eventType}`);
+  logger.info(`[ats:${provider}] webhook event`, { eventType });
 
   const candidate = extractCandidateFromWebhook(provider, body);
   let talentPoolId: string | null = null;
@@ -563,7 +573,7 @@ async function handleWebhookEvent(
       notes: stage ? `ATS ${provider} stage: ${stage}` : `ATS ${provider} event: ${eventType}`,
       metadata: { provider, eventType, stage } as any,
     } as any)
-    .catch((e) => console.error(`[ats:${provider}] interaction insert failed:`, e));
+    .catch((e) => logger.error(`[ats:${provider}] interaction insert failed`, e));
 }
 
 atsRoutes.all("*", (c) =>

@@ -16,6 +16,7 @@ import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import { WorkspaceForbiddenError } from "../services/studio/workspace.js";
+import { parseUpload, isUploadRejected } from "../utils/multipart.js";
 import {
   getRenderVariant,
   RenderVariantError,
@@ -56,21 +57,19 @@ studioRenderVariantRoutes.get("/projects/:projectId/render-variants/:variantKey"
 studioRenderVariantRoutes.post("/projects/:projectId/render-variants/:variantKey", async (c) => {
   const projectId = c.req.param("projectId");
   if (!UuidLikeSchema.safeParse(projectId).success) return c.json(error("VALIDATION_ERROR", "Invalid project id"), 400);
-  const form = await c.req.formData().catch(() => null);
-  const file = form?.get("video") as File | null;
-  if (!file || typeof file.arrayBuffer !== "function") {
-    return c.json(error("VALIDATION_ERROR", "Missing video file"), 400);
-  }
+  const up = await parseUpload(c, { fields: ["video"], messages: { missing: "Missing video file" } });
+  if (isUploadRejected(up)) return c.json(error("VALIDATION_ERROR", up.message), 400);
+  const { form, file, bytes } = up;
   try {
     const variant = await storeRenderVariant({
       actorUserId: c.var.user.sub,
       projectId,
       variantKey: c.req.param("variantKey"),
-      contentRevision: String(form?.get("revision") ?? ""),
-      bytes: await file.arrayBuffer(),
+      contentRevision: String(form.get("revision") ?? ""),
+      bytes,
       contentType: file.type,
-      branded: String(form?.get("branded") ?? "") === "true",
-      title: String(form?.get("title") ?? "").slice(0, 255) || "Fitted cut",
+      branded: String(form.get("branded") ?? "") === "true",
+      title: String(form.get("title") ?? "").slice(0, 255) || "Fitted cut",
     });
     return c.json(success({ variant }), 201);
   } catch (err) {

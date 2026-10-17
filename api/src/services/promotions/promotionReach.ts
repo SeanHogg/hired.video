@@ -15,6 +15,7 @@ import { SOCIAL_VIEW_READERS, type SocialViewReader } from "../social/publishers
 import { socialConnectionServiceFor } from "../social/social-connection-factory.js";
 import type { SocialEnv } from "../social/social-connection-service.js";
 import * as repo from "./promotionRepository.js";
+import { logger } from "../../lib/logger.js";
 
 const TTL_SECONDS = 60 * 60;
 const SUMMARY_KEY = "promo:reach:summary";
@@ -43,7 +44,7 @@ async function readViews(rows: repo.PromotionSubmission[], env: SocialEnv | unde
         const views = await reader(token, published.map((r) => r.externalId!));
         for (const r of published) out[r.id] = views.get(r.externalId!) ?? null;
       } catch (err) {
-        console.warn(`[promotions] ${platform} reach read failed:`, err instanceof Error ? err.message : err);
+        logger.warn("[promotions] reach read failed", { platform, error: err });
       }
     }),
   );

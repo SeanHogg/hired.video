@@ -477,11 +477,6 @@ export async function getMonthlyAIUsage(userId: string): Promise<AIUsageMonthDTO
 }
 
 /** @deprecated Use `getTokenBudgetSummary` instead. */
-export async function getProAIUsage(userId: string): Promise<AIUsageMonthDTO> {
-  return getMonthlyAIUsage(userId);
-}
-
-/** @deprecated Use `getTokenBudgetSummary` instead. */
 export async function getAIUsageForUser(userId: string): Promise<AIUsageMonthDTO> {
   return getMonthlyAIUsage(userId);
 }
@@ -501,21 +496,6 @@ export async function deletePaymentMethod(userId: string, paymentMethodId: strin
 
   await db.delete(paymentMethods).where(eq(paymentMethods.id, paymentMethodId));
   return `Payment method ${paymentMethodId} deleted`;
-}
-
-export async function createSetupSession(
-  stripeInstance: import("stripe").default,
-  customerId: string,
-  successUrl: string,
-  cancelUrl: string): Promise<string> {
-  const session = await stripeInstance.checkout.sessions.create({
-    mode: "setup",
-    customer: customerId,
-    payment_method_types: ["card"],
-    success_url: successUrl || "https://hired.video/settings/billing?setup=success",
-    cancel_url: cancelUrl || "https://hired.video/settings/billing?setup=cancel",
-  });
-  return session.url ?? "https://hired.video/settings/billing";
 }
 
 /** Sync a Stripe subscription object to the local DB. */

@@ -61,11 +61,13 @@ import { evaluateCourseCompletion } from "../services/learning/course-completion
 import { gamificationFromContext, withGamification } from "../domains/gamification/with-gamification.js";
 import { NotificationService } from "../services/notifications/notificationService.js";
 import { getJwtSecret } from "../utils/jwt.js";
+import { clampLimit } from "../utils/pagination.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
 import { bumpSearchVersion } from "../utils/search-cache.js";
 import { cloneCourseModulesAndLessons, pickFreeCourseSlug } from "../repositories/courseCloneRepository.js";
 import { invalidateCohortAnalyticsCache } from "../services/learning/cohort-analytics.js";
 import { invalidateLearnerDashboard } from "../services/learning/learner-dashboard.js";
+import { logger } from "../lib/logger.js";
 import { getVideoBucket } from "../services/storage/object-store.js";
 
 const {
@@ -157,10 +159,9 @@ async function invalidateLearnerCohortCaches(
       invalidateCohortAnalyticsCache(m.cohortId);
     }
   } catch (e) {
-    console.warn(
-      "[courses] cohort-analytics cache invalidation failed",
-      e instanceof Error ? e.message : String(e),
-    );
+    logger.warn("[courses] cohort-analytics cache invalidation failed", {
+      error: e instanceof Error ? e.message : String(e),
+    });
   }
 }
 
@@ -329,7 +330,7 @@ courseRoutes.get("/scorm-asset/:userId/:pkgId/*", async (c) => {
 
 courseRoutes.get("/public", async (c) => {
   const db = getDb();
-  const limit = Math.min(parseInt(c.req.query("limit") ?? "20", 10) || 20, 100);
+  const limit = clampLimit(c.req.query("limit"), 20, 100);
   // Defensive: degrades to an empty list if the courses tables aren't yet
   // applied to this environment's DB (migrations 0041/0042).
   try {
@@ -385,7 +386,7 @@ courseRoutes.get("/public", async (c) => {
 courseRoutes.get("/public/by-user/:userId", async (c) => {
   const db = getDb();
   const userId = c.req.param("userId");
-  const limit = Math.min(parseInt(c.req.query("limit") ?? "50", 10) || 50, 100);
+  const limit = clampLimit(c.req.query("limit"), 50, 100);
   if (!(await isCreatorVisible(userId))) {
     return c.json(success([] as unknown[]), 200);
   }
@@ -1162,8 +1163,8 @@ courseRoutes.post("/:id/enroll", async (c) => {
   }
 
   // Free courses only for the direct /enroll path — paid enrolment routes
-  // through /api/course-checkout/start (which mints a course_checkouts row,
-  // then hands off to the existing Stripe/Helcim flow). Frontend catches
+  // through POST /api/checkout {kind:"course"} (which mints a course_checkouts
+  // row, then the one-off payment widget + provider-verified confirm). Frontend catches
   // the 402 and switches to the checkout page; the response carries the
   // checkout-start URL so a future "deep-link to checkout" surface
   // doesn't need to re-derive it.
@@ -1171,7 +1172,7 @@ courseRoutes.post("/:id/enroll", async (c) => {
     return c.json(
       error(
         "PAYMENT_REQUIRED",
-        `This course costs ${(course.priceCents / 100).toFixed(2)} ${course.priceVisible ? "USD" : ""}. POST /api/course-checkout/start to begin checkout.`,
+        `This course costs ${(course.priceCents / 100).toFixed(2)} ${course.priceVisible ? "USD" : ""}. POST /api/checkout {kind:"course"} to begin checkout.`,
         { courseId: course.id, priceCents: course.priceCents },
       ),
       402,
@@ -1368,7 +1369,7 @@ courseRoutes.patch("/enrollments/:enrollmentId/progress", async (c) => {
           );
         }
       } catch (e) {
-        console.warn("[courses] cert issuance failed", e instanceof Error ? e.message : String(e));
+        logger.warn("[courses] cert issuance failed", { error: e instanceof Error ? e.message : String(e) });
       }
     }
 
@@ -1392,7 +1393,7 @@ courseRoutes.patch("/enrollments/:enrollmentId/progress", async (c) => {
         }
       }
     } catch (e) {
-      console.warn("[courses] cohort-assignment completion fan-out failed", e instanceof Error ? e.message : String(e));
+      logger.warn("[courses] cohort-assignment completion fan-out failed", { error: e instanceof Error ? e.message : String(e) });
     }
 
     // Path completion fan-out — for every path this course belongs to,
@@ -1433,7 +1434,7 @@ courseRoutes.patch("/enrollments/:enrollmentId/progress", async (c) => {
         }
       }
     } catch (e) {
-      console.warn("[courses] path-completion fan-out failed", e instanceof Error ? e.message : String(e));
+      logger.warn("[courses] path-completion fan-out failed", { error: e instanceof Error ? e.message : String(e) });
     }
   }
 

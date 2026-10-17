@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { formatDateTimeMedium } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -23,20 +24,6 @@ interface ReviewCommentsProps {
   reviewId: string;
 }
 
-function formatDate(value: string | Date): string {
-  try {
-    const d = typeof value === "string" ? new Date(value) : value;
-    return d.toLocaleString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return "";
-  }
-}
 
 export function ReviewComments({ reviewId }: ReviewCommentsProps) {
   const { user, isAuthenticated } = useAuth();
@@ -182,7 +169,7 @@ function CommentRow({ comment, currentUserId, onReply, onDelete }: CommentRowPro
             Owner reply
           </Badge>
         )}
-        <span className="text-xs text-muted-foreground">{formatDate(comment.createdAt)}</span>
+        <span className="text-xs text-muted-foreground">{formatDateTimeMedium(comment.createdAt)}</span>
         {onReply && (
           <button
             type="button"

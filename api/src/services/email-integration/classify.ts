@@ -31,6 +31,7 @@ import {
   categoryKeys,
   isVisibleCategory,
 } from "../../../../shared/email-classification/index.js";
+import { logger } from "../../lib/logger.js";
 
 const GENERIC_SUMMARY_PROMPT = `You produce a one-sentence summary of an email.
 Constraints:
@@ -122,7 +123,7 @@ export async function classifyEmail(
           : null,
     };
   } catch (err) {
-    console.error("[email-classifier] LLM stage failed:", err);
+    logger.error("[email-classifier] LLM stage failed", err);
     return { category: "other", score: 0.2, source: "llm" };
   }
 }
@@ -145,7 +146,7 @@ export async function summariseEmail(
     });
     return (result.content ?? "").trim() || null;
   } catch (err) {
-    console.error("[email-classifier] summary stage failed:", err);
+    logger.error("[email-classifier] summary stage failed", err);
     return null;
   }
 }

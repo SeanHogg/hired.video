@@ -123,7 +123,6 @@ export const studioTemplates = pgTable(
     index("idx_studio_templates_creator").on(t.creatorId),
     index("idx_studio_templates_company").on(t.companyId),
     index("idx_studio_templates_visibility").on(t.visibility),
-    index("idx_studio_templates_slug").on(t.listingSlug),
     // Mirror the studio_projects pattern: filter on non-default kinds
     // for the upcoming per-kind chooser surface in /studio.
     index("idx_studio_templates_media_kind")
@@ -184,7 +183,6 @@ export const templateLicenses = pgTable(
     grantedAt:        timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    index("idx_template_licenses_user").on(t.userId),
     index("idx_template_licenses_template").on(t.templateKind, t.templateId),
     uniqueIndex("uq_template_licenses_grant").on(t.userId, t.templateKind, t.templateId),
   ],

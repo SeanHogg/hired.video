@@ -26,9 +26,11 @@ import { eq, and, desc, inArray, or, sql } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { USER_ROLES } from "../../../shared/user-roles.js";
+import { isSuperAdmin } from "../middleware/superAdmin.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
 import { NotificationService } from "../services/notifications/notificationService.js";
+import { clampLimit } from "../utils/pagination.js";
+import { logger } from "../lib/logger.js";
 
 const {
   serviceOfferings,
@@ -123,7 +125,7 @@ serviceRoutes.post("/", async (c) => {
   db.update(userProfiles)
     .set({ providesServices: true, updatedAt: new Date() } as any)
     .where(and(eq(userProfiles.userId, userId), eq(userProfiles.providesServices, false)))
-    .catch((err) => console.warn("[services] auto-flip providesServices failed:", err));
+    .catch((err) => logger.warn("[services] auto-flip providesServices failed", err));
   return c.json(success(row), 201);
 });
 
@@ -153,10 +155,7 @@ serviceRoutes.put("/:id", async (c) => {
   if ("imageUrl" in body) patch.imageUrl = body.imageUrl;
   // Only superadmins can flip the platform-service flag (recruiting funnel).
   if (typeof body.isPlatformService === "boolean") {
-    const isSuperAdmin =
-      (c.var.user as any)?.isSuperAdmin === true ||
-      (c.var.user as any)?.roles?.includes(USER_ROLES.SUPER_ADMIN);
-    if (isSuperAdmin) patch.isPlatformService = body.isPlatformService;
+    if (isSuperAdmin(c.var.user)) patch.isPlatformService = body.isPlatformService;
   }
 
   const [updated] = await db
@@ -195,7 +194,7 @@ serviceRoutes.delete("/:id", async (c) => {
 // ---------------------------------------------------------------------------
 serviceRoutes.get("/browse", async (c) => {
   const db = getDb();
-  const limit = Math.min(parseInt(c.req.query("limit") ?? "30", 10) || 30, 100);
+  const limit = clampLimit(c.req.query("limit"), 30, 100);
   // Defensive: degrades to empty if `is_platform_service` (#194) hasn't been
   // applied yet via migration 0037, so /search keeps rendering during deploy.
   try {
@@ -470,8 +469,7 @@ serviceRoutes.get("/team/leaderboard", async (c) => {
   const db = getDb();
 
   // Caller must be a member of this company (or super-admin).
-  const isSuperAdmin = c.var.user?.isSuperAdmin === true;
-  if (!isSuperAdmin) {
+  if (!isSuperAdmin(c.var.user)) {
     const [assoc] = await db
       .select({ id: schema.userCompanyRoleAssociations.id })
       .from(schema.userCompanyRoleAssociations)

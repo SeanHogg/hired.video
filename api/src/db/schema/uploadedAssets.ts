@@ -43,6 +43,7 @@ export const uploadedAssets = pgTable(
       sql`${t.kind} IN ('image', 'ai_image', 'avatar', 'video', 'recording', 'audio', 'voice', 'file', 'scorm')`,
     ),
     check("uploaded_assets_size_check", sql`${t.sizeBytes} >= 0`),
+    index("idx_uploaded_assets_source_project_id").on(t.sourceProjectId),
   ],
 );
 

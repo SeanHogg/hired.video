@@ -77,6 +77,9 @@ export const contentLocations = pgTable(
       .where(sql`${t.role} = 'origin'`),
     check("content_locations_entity_kind_check", sql`${t.entityKind} IN ('job', 'resume', 'video', 'service', 'article', 'voice', 'template', 'talent_pool_candidate', 'user_profile', 'company', 'event')`),
     check("content_locations_role_check", sql`${t.role} IN ('origin', 'serves')`),
+    index("idx_content_locations_city_id").on(t.cityId),
+    index("idx_content_locations_country_id").on(t.countryId),
+    index("idx_content_locations_state_id").on(t.stateId),
   ],
 );
 

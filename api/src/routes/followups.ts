@@ -5,6 +5,7 @@ import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { signalWork } from "../services/scheduling/work-signals.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
 
 export const followUpRoutes = new Hono<AppEnv>();
@@ -184,6 +185,7 @@ followUpRoutes.post("/enroll", requirePro("Automated Follow-ups"), async (c) => 
       nextSendAt: nextSendAt ?? undefined,
     } as any)
     .returning();
+  if (nextSendAt) await signalWork("followups", nextSendAt);
 
   return c.json(success(enrollment), 201);
 });
@@ -231,6 +233,7 @@ followUpRoutes.patch("/enrollments/:id/:action", requirePro("Automated Follow-up
     .set({ status: statusMap[action], updatedAt: new Date() } as any)
     .where(eq(schema.followUpEnrollments.id, enrollment.id))
     .returning();
+  if (action === "resume") await signalWork("followups");
 
   return c.json(success(updated), 200);
 });
@@ -338,6 +341,7 @@ followUpRoutes.post("/trigger", requirePro("Smart Outreach"), async (c) => {
       nextSendAt,
     } as any)
     .returning();
+  await signalWork("followups", nextSendAt);
 
   return c.json(success({ enrolled: true, enrollmentId: enrollment.id, nextSendAt: nextSendAt.toISOString() }), 201);
 });

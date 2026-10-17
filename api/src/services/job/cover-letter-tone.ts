@@ -22,9 +22,9 @@ import {
   type CoverLetter,
   type CoverLetterTone,
 } from "../../../../shared/cover-letter.js";
-import { ok, fail, requireAuth, type HandlerResult } from "../../handlers/shared.js";
+import { DomainError, requireUserId } from "../../domains/errors.js";
 import { defineLenientIngest, type LLMClient } from "../../services/adapters/llm-client.js";
-import { failFromAiError } from "./tailor-handler.js";
+import { aiDomainError } from "./tailor-handler.js";
 import { toHighlights, toParagraphs } from "./cover-letter-handler.js";
 
 export const COVER_LETTER_TONE_FEATURE_KEY = "cover_letter_tone";
@@ -132,14 +132,14 @@ export async function handleCoverLetterTone(
   deps: CoverLetterToneDeps,
   viewerId: string | null,
   body: unknown,
-): Promise<HandlerResult> {
-  const auth = requireAuth(viewerId);
-  if ("status" in auth) return auth;
+): Promise<{ letter: CoverLetter }> {
+  requireUserId(viewerId);
 
   const parsed = CoverLetterToneInputSchema.safeParse(body);
-  if (!parsed.success) return fail(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
-  if (!deps.llm) return fail(503, "AI_UNAVAILABLE", "AI is not configured");
+  if (!parsed.success) throw new DomainError(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
+  if (!deps.llm) throw new DomainError(503, "AI_UNAVAILABLE", "AI is not configured");
 
+  let letter: CoverLetter | null;
   try {
     const { data } = await deps.llm.callJsonLenient(
       COVER_LETTER_TONE_FEATURE_KEY,
@@ -147,10 +147,10 @@ export async function handleCoverLetterTone(
       ToneIngest,
       { exempt: true },
     );
-    const letter = applyToneRewrite(parsed.data.letter, data, parsed.data.tone);
-    if (!letter) return fail(502, "AI_BAD_OUTPUT", "The AI returned an incomplete letter. Please try again.");
-    return ok({ letter });
+    letter = applyToneRewrite(parsed.data.letter, data, parsed.data.tone);
   } catch (err) {
-    return failFromAiError(err, err instanceof Error ? err.message : String(err)) ?? fail(502, "AI_ERROR", "Tone rewrite failed");
+    throw aiDomainError(err, err instanceof Error ? err.message : String(err)) ?? new DomainError(502, "AI_ERROR", "Tone rewrite failed");
   }
+  if (!letter) throw new DomainError(502, "AI_BAD_OUTPUT", "The AI returned an incomplete letter. Please try again.");
+  return { letter };
 }

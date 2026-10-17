@@ -10,11 +10,11 @@
  * charge as pending before its check — a paid pack is never lost (#2352).
  */
 import { useCallback, useState } from "react";
-import { usePaymentFlow } from "@/hooks/use-payment-flow";
+import { useCheckoutPayment } from "@/hooks/use-checkout-payment";
 import { TOKEN_BUDGET_CACHE_KEY } from "@/hooks/use-token-budget";
 import { refreshSharedResource } from "@/hooks/use-gated-resource";
 import { broadcastTokenBudget } from "@/lib/api-client";
-import { tokenPackService, tokenPackPurchaseErrorKey } from "@/lib/services/token-pack-service";
+import { tokenPackCheckoutId, tokenPackPurchaseErrorKey } from "@/lib/services/token-pack-service";
 import { confirmRememberedTokenPack } from "@/lib/billing/pending-token-pack-confirms";
 import { useAuth } from "@/lib/auth";
 
@@ -27,54 +27,35 @@ export type TokenPackPurchaseState =
   | { status: "error"; packId: string; errorKey: string };
 
 export function useTokenPackPurchase() {
-  const { startPayment, cleanup } = usePaymentFlow();
+  const { pay, cleanup } = useCheckoutPayment();
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const [state, setState] = useState<TokenPackPurchaseState>({ status: "idle" });
 
-  const fail = useCallback((packId: string, err: unknown) => {
-    setState({ status: "error", packId, errorKey: tokenPackPurchaseErrorKey(err) });
-  }, []);
-
   const buy = useCallback(
     async (packId: string) => {
       setState({ status: "processing", packId });
-      // Start the checkout ourselves so a typed refusal (PRO_REQUIRED,
-      // PAYMENTS_UNAVAILABLE…) keeps its code; the payment hook would
-      // flatten it to a message string.
-      let collection;
-      try {
-        collection = await tokenPackService.startCheckout(packId);
-      } catch (err) {
-        fail(packId, err);
+      const result = await pay(tokenPackCheckoutId(packId), {
+        returnUrl: `${window.location.origin}/settings?tab=billing`,
+        confirm: async (transactionId) => {
+          if (!userId) throw new Error("signed out");
+          return confirmRememberedTokenPack({ packId, transactionId, userId });
+        },
+      });
+      if (result.status === "paid" || result.status === "verifying") {
+        broadcastTokenBudget(result.confirmation.tokenBudget);
+        await refreshSharedResource(TOKEN_BUDGET_CACHE_KEY);
+        setState(
+          result.status === "verifying"
+            ? { status: "pending", packId }
+            : { status: "done", packId, tokensGranted: result.confirmation.tokensGranted },
+        );
         return;
       }
-      await startPayment({
-        initCollection: async () => collection,
-        paymentMethodType: "card",
-        onSuccess: async (data) => {
-          if (!data.transactionId || !userId) {
-            fail(packId, null);
-            return;
-          }
-          setState({ status: "processing", packId });
-          try {
-            const result = await confirmRememberedTokenPack({ packId, transactionId: data.transactionId, userId });
-            broadcastTokenBudget(result.tokenBudget);
-            await refreshSharedResource(TOKEN_BUDGET_CACHE_KEY);
-            setState(
-              result.pending
-                ? { status: "pending", packId }
-                : { status: "done", packId, tokensGranted: result.tokensGranted },
-            );
-          } catch (err) {
-            fail(packId, err);
-          }
-        },
-        onError: () => fail(packId, null),
-      });
+      const err = result.status === "error" ? result.error : null;
+      setState({ status: "error", packId, errorKey: tokenPackPurchaseErrorKey(err) });
     },
-    [startPayment, fail, userId],
+    [pay, userId],
   );
 
   const reset = useCallback(() => {

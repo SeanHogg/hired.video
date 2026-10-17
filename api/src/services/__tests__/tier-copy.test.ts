@@ -237,11 +237,4 @@ describe("TIER_COPY templates — Misc upsells", () => {
       "You've used all 10 free AI requests for this month. Upgrade to Pro for more AI tokens.",
     );
   });
-
-  it("proUserDescription — feature-flag style description", () => {
-    assert.equal(
-      TIER_COPY.proUserDescription("AI-ranked notification feed"),
-      "AI-ranked notification feed for Pro users",
-    );
-  });
 });

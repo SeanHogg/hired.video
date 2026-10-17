@@ -14,6 +14,7 @@
  */
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
+import { getEnv } from "../utils/env.js";
 import type { AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
@@ -118,10 +119,7 @@ emailPreferencesRoutes.put("/preferences/me", async (c) => {
 // the endpoint is open (dev/test) — the worst a forged call can do is suppress
 // an address from MARKETING mail, never leak data.
 emailPreferencesRoutes.post("/webhooks/sendpulse", async (c) => {
-  const required =
-    process.env.EMAIL_WEBHOOK_SECRET ||
-    ((globalThis as any).__ENV?.EMAIL_WEBHOOK_SECRET as string | undefined) ||
-    "";
+  const required = getEnv("EMAIL_WEBHOOK_SECRET");
   if (required && c.req.query("key") !== required) {
     return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Bad webhook key" } }, 401);
   }

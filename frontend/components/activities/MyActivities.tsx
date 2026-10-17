@@ -18,7 +18,7 @@ import {
   type ActivityDTO,
   type ActivityTimeEntry,
 } from "@/lib/services/activities-service";
-import { formatMoney, formatDuration } from "@/lib/activities/format";
+import { formatMoneyCents, formatDurationHms } from "@/lib/format";
 
 export default function MyActivities(): JSX.Element | null {
   const { t } = useTranslation();
@@ -112,11 +112,11 @@ export default function MyActivities(): JSX.Element | null {
                     <span className="inline-flex items-center gap-1">
                       {a.payType === "hourly" ? <Clock className="h-3.5 w-3.5" /> : <DollarSign className="h-3.5 w-3.5" />}
                       {a.payType === "hourly"
-                        ? t("activities.mine.rate", { amount: formatMoney(a.rateCents ?? 0, a.currency) })
-                        : t("activities.mine.fixed", { amount: formatMoney(a.amountCents ?? 0, a.currency) })}
+                        ? t("activities.mine.rate", { amount: formatMoneyCents(a.rateCents ?? 0, a.currency) })
+                        : t("activities.mine.fixed", { amount: formatMoneyCents(a.amountCents ?? 0, a.currency) })}
                     </span>
                     {a.payType === "hourly" && (
-                      <span className="font-mono tabular-nums">{formatDuration(trackedSec)}</span>
+                      <span className="font-mono tabular-nums">{formatDurationHms(trackedSec)}</span>
                     )}
                     {a.dueDate && <span>{t("activities.mine.due", { date: new Date(a.dueDate).toLocaleDateString() })}</span>}
                   </div>
@@ -142,7 +142,7 @@ export default function MyActivities(): JSX.Element | null {
                         onClick={() => runAction(a.id, () => activitiesService.stopTimer(a.id), "activities.mine.timerError")}
                       >
                         {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Square className="mr-2 h-4 w-4" />}
-                        {t("activities.mine.stop", { elapsed: formatDuration(liveElapsedSec) })}
+                        {t("activities.mine.stop", { elapsed: formatDurationHms(liveElapsedSec) })}
                       </Button>
                     ) : (
                       <Button
@@ -168,7 +168,7 @@ export default function MyActivities(): JSX.Element | null {
                   </Button>
                   {a.payType === "hourly" && (
                     <span className="text-xs text-muted-foreground">
-                      {t("activities.mine.willEarn", { amount: formatMoney(earned, a.currency) })}
+                      {t("activities.mine.willEarn", { amount: formatMoneyCents(earned, a.currency) })}
                     </span>
                   )}
                 </div>
@@ -181,7 +181,7 @@ export default function MyActivities(): JSX.Element | null {
               {a.status === "approved" && (
                 <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-500">
                   <CheckCircle2 className="h-4 w-4" />
-                  <span>{t("activities.mine.approved", { amount: formatMoney(a.earnedCents, a.currency) })}</span>
+                  <span>{t("activities.mine.approved", { amount: formatMoneyCents(a.earnedCents, a.currency) })}</span>
                   <Link to="/settings?tab=payouts" className="underline underline-offset-2">
                     {t("activities.mine.viewPayouts")}
                   </Link>

@@ -2,7 +2,7 @@
  * Component tests for AIResumeScorer.
  *
  * Regression: the file-upload path used to call `apiClient.requestRaw` for
- * `/api/resume/parse`, which doesn't unwrap the standard `{ data: ... }`
+ * `/api/resumes/parse`, which doesn't unwrap the standard `{ data: ... }`
  * envelope. The page then read `parseResult.result` (undefined on the
  * envelope) and the `||` fallback fed the whole envelope object into
  * `scoreResume`, where `content.trim()` blew up with "e.trim is not a
@@ -233,7 +233,7 @@ describe("AIResumeScorer — file upload (regression: e.trim is not a function)"
       work: [{ name: "Acme", position: "Senior Engineer" }],
     });
     routePost({
-      "/resume/parse": () => ({ result: parsedJsonString }),
+      "/resumes/parse": () => ({ result: parsedJsonString }),
       "/resumescorer/score": () => SAMPLE_SCORE,
     });
 
@@ -251,7 +251,7 @@ describe("AIResumeScorer — file upload (regression: e.trim is not a function)"
 
     // Both endpoints were called.
     const calls = (apiClient.post as Mock).mock.calls;
-    const parseCall = calls.find(([url]) => /\/resume\/parse$/i.test(url as string));
+    const parseCall = calls.find(([url]) => /\/resumes\/parse$/i.test(url as string));
     const scoreCall = calls.find(([url]) => /\/resumescorer\/score$/i.test(url as string));
     expect(parseCall).toBeDefined();
     expect(scoreCall).toBeDefined();
@@ -263,12 +263,12 @@ describe("AIResumeScorer — file upload (regression: e.trim is not a function)"
     expect(scoreBody.resumeText).toBe(parsedJsonString);
   });
 
-  it("falls back to the extracted text when /resume/parse returns no `result` field", async () => {
+  it("falls back to the extracted text when /resumes/parse returns no `result` field", async () => {
     // Defensive case — even if the parse endpoint shape regresses, the
     // score endpoint must still receive a string (not an object).
     (getResumeTextFromFile as Mock).mockResolvedValue("raw extracted resume text");
     routePost({
-      "/resume/parse": () => ({}), // no `result` — simulate shape drift
+      "/resumes/parse": () => ({}), // no `result` — simulate shape drift
       "/resumescorer/score": () => SAMPLE_SCORE,
     });
 
@@ -323,10 +323,10 @@ describe("AIResumeScorer — paste text", () => {
     const [url, body] = (apiClient.post as Mock).mock.calls[0];
     expect(url).toMatch(/\/resumescorer\/score$/i);
     expect(body).toEqual({ resumeText: "Resume body goes here" });
-    // /resume/parse must NOT be called for the paste-text flow — it's only
+    // /resumes/parse must NOT be called for the paste-text flow — it's only
     // for files that need AI parsing.
     expect(
-      (apiClient.post as Mock).mock.calls.some(([u]) => /\/resume\/parse$/i.test(u as string)),
+      (apiClient.post as Mock).mock.calls.some(([u]) => /\/resumes\/parse$/i.test(u as string)),
     ).toBe(false);
   });
 });

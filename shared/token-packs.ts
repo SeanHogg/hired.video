@@ -1,6 +1,8 @@
 /**
- * Token-pack purchase contract — shared by the API (routes/token-packs.ts →
- * services/billing/token-packs) and the frontend buy sheet.
+ * Token-pack purchase contract — shared by the API (POST /api/checkout
+ * {kind:"token_pack"} → services/billing/checkout/kinds/tokenPack.ts →
+ * services/billing/token-packs) and the frontend buy sheet. The HTTP request
+ * shapes live in shared/checkout.ts.
  *
  * Flow: the client asks the server to START a checkout for a pack id; the
  * server prices it from TOKEN_PACKS (the client never sends an amount) and
@@ -13,24 +15,11 @@
  * if the provider can't answer, confirm returns `pending: true` and the
  * 5-minute cron finishes the credit (gap #2352).
  */
-import { z } from "zod";
 import type { TokenBudgetDTO } from "./billing.js";
 
 /** `token_pack_purchases.pack_id` for SuperAdmin grants (price 0) — never
  *  counted as revenue. */
 export const ADMIN_GRANT_PACK_ID = "admin_grant";
-
-export const StartTokenPackCheckoutSchema = z.object({
-  successUrl: z.string().url().optional(),
-  cancelUrl: z.string().url().optional(),
-});
-export type StartTokenPackCheckoutInput = z.infer<typeof StartTokenPackCheckoutSchema>;
-
-export const ConfirmTokenPackSchema = z.object({
-  packId: z.string().min(1).max(50),
-  transactionId: z.string().min(1).max(100),
-});
-export type ConfirmTokenPackInput = z.infer<typeof ConfirmTokenPackSchema>;
 
 /**
  * HelcimPay.js `invoiceNumber` for a pack checkout (gap #2352). The widget

@@ -155,68 +155,61 @@ export interface Integration {
   updatedAt: string;
 }
 
-async function unwrap<T>(p: Promise<{ data: T }>): Promise<T> {
-  const r = await p;
-  return r.data;
-}
-
 class WorkforceService {
   punchIn(args: { taskId?: string | null; notes?: string | null; billable?: boolean } = {}) {
-    return unwrap(apiClient.post<TaskTimeEntry>("/api/workforce/punch-in", args));
+    return apiClient.fetchData<TaskTimeEntry>("/api/workforce/punch-in", { method: "POST", body: args });
   }
 
   punchOut() {
-    return unwrap(apiClient.post<TaskTimeEntry | null>("/api/workforce/punch-out", {}));
+    return apiClient.fetchData<TaskTimeEntry | null>("/api/workforce/punch-out", { method: "POST", body: {} });
   }
 
   getActive() {
-    return unwrap(apiClient.get<TaskTimeEntry | null>("/api/workforce/active"));
+    return apiClient.fetchData<TaskTimeEntry | null>("/api/workforce/active");
   }
 
   getWeek(periodStart: string) {
-    return unwrap(apiClient.get<{ entries: TaskTimeEntry[] }>(
-      `/api/workforce/week?periodStart=${encodeURIComponent(periodStart)}`,
-    ));
+    return apiClient.fetchData<{ entries: TaskTimeEntry[] }>(`/api/workforce/week?periodStart=${encodeURIComponent(periodStart)}`);
   }
 
   submitTimesheet(periodStart: string) {
-    return unwrap(apiClient.post<Timesheet>("/api/workforce/timesheets/submit", { periodStart }));
+    return apiClient.fetchData<Timesheet>("/api/workforce/timesheets/submit", { method: "POST", body: { periodStart } });
   }
 
   approveTimesheet(id: string) {
-    return unwrap(apiClient.post<Timesheet>(`/api/workforce/timesheets/${id}/approve`, {}));
+    return apiClient.fetchData<Timesheet>(`/api/workforce/timesheets/${id}/approve`, { method: "POST", body: {} });
   }
 
   rejectTimesheet(id: string, reason: string) {
-    return unwrap(apiClient.post<Timesheet>(`/api/workforce/timesheets/${id}/reject`, { reason }));
+    return apiClient.fetchData<Timesheet>(`/api/workforce/timesheets/${id}/reject`, { method: "POST", body: { reason } });
   }
 
   listMyTimesheets() {
-    return unwrap(apiClient.get<{ timesheets: Timesheet[] }>("/api/workforce/timesheets"));
+    return apiClient.fetchData<{ timesheets: Timesheet[] }>("/api/workforce/timesheets");
   }
 
   getApprovalQueue() {
-    return unwrap(apiClient.get<{ queue: ApprovalQueueRow[] }>("/api/workforce/approval-queue"));
+    return apiClient.fetchData<{ queue: ApprovalQueueRow[] }>("/api/workforce/approval-queue");
   }
 
   getRoster() {
-    return unwrap(apiClient.get<{ roster: RosterRow[] }>("/api/workforce/roster"));
+    return apiClient.fetchData<{ roster: RosterRow[] }>("/api/workforce/roster");
   }
 
   getDeskMargin() {
-    return unwrap(apiClient.get<{ rows: DeskMarginRow[] }>("/api/workforce/desk-margin"));
+    return apiClient.fetchData<{ rows: DeskMarginRow[] }>("/api/workforce/desk-margin");
   }
 
   listDocuments() {
-    return unwrap(apiClient.get<{ documents: PlacementDocument[] }>("/api/workforce/documents"));
+    return apiClient.fetchData<{ documents: PlacementDocument[] }>("/api/workforce/documents");
   }
 
   createDocument(input: CreateDocumentInput) {
-    return unwrap(apiClient.post<PlacementDocument>("/api/workforce/documents", input));
+    return apiClient.fetchData<PlacementDocument>("/api/workforce/documents", { method: "POST", body: input });
   }
 
   reconcileSeats() {
-    return unwrap(apiClient.post<{ results: SeatReconcileResult[] }>("/api/workforce/reconcile-seats", {}));
+    return apiClient.fetchData<{ results: SeatReconcileResult[] }>("/api/workforce/reconcile-seats", { method: "POST", body: {} });
   }
 
   /** Deactivate an employee (off-board). Hits the existing account API
@@ -227,30 +220,24 @@ class WorkforceService {
   }
 
   listIntegrations() {
-    return unwrap(apiClient.get<{ integrations: Integration[] }>("/api/workforce/integrations"));
+    return apiClient.fetchData<{ integrations: Integration[] }>("/api/workforce/integrations");
   }
 
   disconnectIntegration(provider: IntegrationProvider, companyId: string) {
-    return unwrap(apiClient.post<{ disconnected: boolean }>(
-      `/api/workforce/integrations/${provider}/disconnect`,
-      { companyId },
-    ));
+    return apiClient.fetchData<{ disconnected: boolean }>(`/api/workforce/integrations/${provider}/disconnect`, { method: "POST", body: { companyId } });
   }
 
   /** Employer's shared AI token pool + per-member usage/sub-caps (#1679).
    *  Resolves to null when the caller manages no workspace (an empty state,
    *  not an error — the endpoint returns 200 with `pool: null`). */
   async getTokenPool(): Promise<TokenPoolView | null> {
-    const { pool } = await unwrap(apiClient.get<{ pool: TokenPoolView | null }>("/api/workforce/token-pool"));
+    const { pool } = await apiClient.fetchData<{ pool: TokenPoolView | null }>("/api/workforce/token-pool");
     return pool;
   }
 
   /** Set (number) or clear (null) a member's monthly AI-token sub-cap. */
   setMemberTokenLimit(userId: string, limit: number | null) {
-    return unwrap(apiClient.patch<{ updated: boolean }>(
-      `/api/workforce/members/${userId}/token-limit`,
-      { limit },
-    ));
+    return apiClient.fetchData<{ updated: boolean }>(`/api/workforce/members/${userId}/token-limit`, { method: "PATCH", body: { limit } });
   }
 }
 

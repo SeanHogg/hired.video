@@ -41,6 +41,7 @@ import {
   recordImportStart,
 } from "../services/sync/sync-run-service.js";
 import type { ResumeContent } from "../../../shared/resume.js";
+import { clampLimit } from "../utils/pagination.js";
 
 export const vendorSyncRoutes = new Hono<AppEnv>();
 
@@ -346,14 +347,12 @@ vendorSyncRoutes.get("/runs", async (c) => {
   const user = c.var.user;
   const connectorId = c.req.query("connectorId") || undefined;
   const resumeId = c.req.query("resumeId") || undefined;
-  const limitRaw = c.req.query("limit");
-  const limit = limitRaw ? parseInt(limitRaw, 10) : undefined;
-
   const runs = await listRuns({
     userId: user.sub,
     connectorId,
     resumeId,
-    limit: Number.isFinite(limit) ? limit : undefined,
+    // Same default/bounds listRuns applies (50, 1..200).
+    limit: clampLimit(c.req.query("limit"), 50, 200),
   });
 
   return c.json(ok({ runs }), 200);

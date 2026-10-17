@@ -14,7 +14,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { markUserLogin } from "../auth.js";
+import { markUserLogin } from "../../services/auth/loginStamp.js";
 
 type UpdateCall = {
   table: unknown;

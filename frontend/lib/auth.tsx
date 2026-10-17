@@ -4,8 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { logger } from "./logger";
 import { authService, type UserProfile, type ProfileUpdate, type EmailVerificationChallenge , TwoFactorChallenge as ServiceTwoFactorChallenge } from "./services/auth-service";
 import * as impersonationService from "./services/impersonation-service";
-import { fetchBootstrap } from "./services/bootstrap-service";
-import { clearInboxSeed } from "./inbox-seed";
+import { fetchBootstrap, type BootstrapPayload } from "./services/bootstrap-service";
+import { clearBootstrapSeeds } from "./bootstrap-seed";
 import { apiClient, setEmulationTokenGetter } from "./api-client";
 import { PersonaPreviewContext } from "@/providers/PersonaPreviewProvider";
 import { attributionPayload } from "./attribution";
@@ -216,8 +216,9 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
           // unread-count into one /api/bootstrap call and seeds the
           // downstream caches so per-slice hooks read from memory.
           // Falls back to per-endpoint fetches on any sub-slice failure.
+          let bootstrap: BootstrapPayload | null = null;
           try {
-            const bootstrap = await fetchBootstrap();
+            bootstrap = await fetchBootstrap(storedUser?.id);
             if (isGuestEmail(storedUser?.email)) {
               // Guests have no email to verify — never the verify gate.
               setIsEmailVerified(true);
@@ -242,16 +243,17 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
           // reload (emulation tokens are memory-only, so after a reload the
           // backend row still exists but the frontend can no longer use it —
           // ending it frees the SA to start a new session).
+          // The bootstrap's `impersonation` slice carries the active row for
+          // SuperAdmins (no extra round-trip); only a failed slice falls back
+          // to the dedicated endpoint. Cleanup never blocks first paint.
           const storedForOrphanCheck = authService.getStoredUser();
           if (storedForOrphanCheck?.role === USER_ROLES.SUPER_ADMIN) {
-            try {
-              const active = await impersonationService.getActiveImpersonation();
-              if (active?.id) {
-                await impersonationService.endImpersonation(active.id);
-              }
-            } catch (err) {
-              logger.warn?.("AuthProvider: orphan impersonation cleanup failed", err);
-            }
+            const activeLookup = bootstrap?.impersonation
+              ? Promise.resolve(bootstrap.impersonation.active)
+              : impersonationService.getActiveImpersonation();
+            void activeLookup
+              .then((active) => (active?.id ? impersonationService.endImpersonation(active.id) : undefined))
+              .catch((err) => logger.warn?.("AuthProvider: orphan impersonation cleanup failed", err));
           }
         } else {
           logger.info("AuthProvider: not authenticated; skipping user fetch");
@@ -366,12 +368,15 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       if (profile) {
         const user = userProfileToUser(profile);
         console.log("AuthContext.login: Converted profile to user", user);
-        setUser(user);
         // Post-login bootstrap (gap #1367) — same single round-trip the
-        // refresh path uses. Seeds verification + flags + tokenBudget +
-        // unread-count before the dashboard mounts.
+        // refresh path uses. Runs BEFORE setUser so the seeded caches
+        // (budget, plan, role access, points, inbox, accounts) are in place
+        // when the signed-in tree mounts — no per-hook refetch burst.
+        const bootstrapPromise = fetchBootstrap(profile.id);
+        await bootstrapPromise;
+        setUser(user);
         try {
-          const bootstrap = await fetchBootstrap();
+          const bootstrap = await bootstrapPromise;
           if (bootstrap?.verification) {
             setIsEmailVerified(bootstrap.verification.emailConfirmed);
             if (!bootstrap.verification.emailConfirmed) {
@@ -512,10 +517,9 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
-      // Drop the cached inbox seed so the next signed-in user doesn't
-      // briefly see the previous user's hub before /api/bootstrap fires
-      // (gap #1368).
-      clearInboxSeed();
+      // Drop the bootstrap seeds so the next signed-in user doesn't
+      // briefly see the previous user's hub / plan / budget (gap #1368).
+      clearBootstrapSeeds();
       setUser(null);
     }
   };

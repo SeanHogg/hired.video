@@ -19,6 +19,7 @@
  */
 
 import { registerEffect } from "./registry";
+import { clamp01, numberOr, stringOr } from "./params";
 import { hexToRgbaString } from "@/lib/utils/color";
 
 // ── Snow ──────────────────────────────────────────────────────────────
@@ -171,15 +172,4 @@ registerEffect({
   },
 });
 
-function clamp01(v: number): number {
-  return Math.max(0, Math.min(1, v));
-}
-
-function numberOr(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
-}
-
-function stringOr(v: unknown, fallback: string): string {
-  return typeof v === "string" ? v : fallback;
-}
 

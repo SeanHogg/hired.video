@@ -13,10 +13,14 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
-import { handleCoverLetter, toCoverLetter } from "../job/cover-letter-handler.js";
+import { handleCoverLetter as coverLetterUseCase, toCoverLetter } from "../job/cover-letter-handler.js";
 import type { MatchDeps } from "../job/match-handlers.js";
 import type { LLMClient, LLMOptions } from "../../services/adapters/llm-client.js";
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
+import { asHandler } from "../../handlers/shared.js";
+
+// The use case returns data / throws DomainError; assert the routed envelope.
+const handleCoverLetter = asHandler(coverLetterUseCase);
 
 const USER_ID = randomUUID();
 const NOW = new Date("2026-10-04T15:00:00Z");

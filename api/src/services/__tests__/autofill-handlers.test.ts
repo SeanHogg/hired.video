@@ -161,13 +161,13 @@ describe("handleSaveSubmission", () => {
     assert.equal(res.status, 400);
   });
 
-  it("rejects malformed sourceUrl / invalid UUIDs at the schema layer", async () => {
+  it("rejects an oversized sourceUrl / invalid UUIDs at the schema layer", async () => {
     const deps = makeDeps();
     assert.equal(
       (await handleSaveSubmission(deps, "user-1", {
         fields: validFields,
         answers: validAnswers,
-        sourceUrl: "not-a-url",
+        sourceUrl: `https://example.com/${"x".repeat(2000)}`,
       })).status,
       400,
     );
@@ -195,7 +195,16 @@ describe("handleUpdateCacheEntry", () => {
       answer: "New answer",
     });
     assert.equal(res.status, 200);
+    assert.deepEqual((res.body as any).data, { id: "c1" });
     assert.equal(deps._state.answerCache[0].answer, "New answer");
+  });
+
+  it("rejects an empty answer", async () => {
+    const deps = makeDeps({
+      answerCache: [{ id: "c1", userId: "user-1", answer: "x" }],
+    });
+    const res = await handleUpdateCacheEntry(deps, "user-1", "c1", { answer: "" });
+    assert.equal(res.status, 400);
   });
 
   it("returns 401 for anonymous callers", async () => {
@@ -234,7 +243,17 @@ describe("handleDeleteCacheEntry", () => {
     });
     const res = await handleDeleteCacheEntry(deps, "user-1", "c1");
     assert.equal(res.status, 200);
+    assert.deepEqual((res.body as any).data, { id: "c1" });
     assert.equal(deps._state.answerCache.length, 0);
+  });
+
+  it("returns 404 when the entry doesn't exist or belongs to another user", async () => {
+    const deps = makeDeps({
+      answerCache: [{ id: "c1", userId: "user-2", answer: "x" }],
+    });
+    const res = await handleDeleteCacheEntry(deps, "user-1", "c1");
+    assert.equal(res.status, 404);
+    assert.equal(deps._state.answerCache.length, 1);
   });
 
   it("returns 401 for anonymous callers", async () => {

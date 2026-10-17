@@ -14,22 +14,13 @@
 import { Hono } from "hono";
 import { gte, lt, sql } from "drizzle-orm";
 import type { AppEnv } from "../types/index.js";
-import { success, error } from "../types/index.js";
+import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { isAdminRole } from "../domains/billing/audience.js";
+import { adminMiddleware } from "../middleware/superAdmin.js";
 
 export const aiCostReconciliationRoutes = new Hono<AppEnv>();
 
-function requireAdmin(c: any): true | Response {
-  const user = c.var.user;
-  if (!user) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  if (!isAdminRole(user)) return c.json(error("FORBIDDEN", "Admin role required"), 403);
-  return true;
-}
-
-aiCostReconciliationRoutes.get("/", async (c) => {
-  const guard = requireAdmin(c);
-  if (guard !== true) return guard;
+aiCostReconciliationRoutes.get("/", adminMiddleware, async (c) => {
   const days = Math.min(Math.max(parseInt(c.req.query("days") ?? "30", 10) || 30, 1), 365);
   const since = new Date(Date.now() - days * 86_400_000);
 

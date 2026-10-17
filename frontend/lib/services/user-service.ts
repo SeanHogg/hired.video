@@ -5,11 +5,13 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
-import { UnverifiedAccountError } from "../errors";
-import { isVerificationKnownBlocked } from "../verification-gate";
+import { authService } from "./auth-service";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
 import { CARD_FIELDS_BY_KIND, serializeListFields } from "@shared/projection";
 import { PitchSummarySchema } from "@shared/pitch";
+import { PublicUserSchema, type PublicUser } from "./public-user-schema";
+
+export { PublicUserSchema, type PublicUser } from "./public-user-schema";
 
 // ============================================================================
 // SCHEMAS
@@ -131,126 +133,6 @@ export const UserProfileSchema = z.object({
   }).optional(),
 });
 
-// Public users list item from GET /api/users/public
-// Now returns full UserProfileDTO with computed properties
-export const PublicUserSchema = z.object({
-  id: nullableString(),
-  // Discriminator the card-feed pipeline uses to route to PeopleCard. Without
-  // this declared, Zod strips it and downstream `item.type === "people"`
-  // checks (e.g. the Creators category filter) silently fail.
-  type: z.literal("people").optional(),
-  slug: nullableString(),
-  // Booking host handle (#1902) — declared so Zod doesn't strip it from the
-  // detail response, which would leave <BookingsSection/> permanently empty.
-  externalPublicHandle: nullableString(),
-  email: nullableString(),
-  userName: nullableString(),
-  // Computed properties from nested Data object
-  firstName: nullableString(),
-  lastName: nullableString(),
-  fullName: nullableString(),
-  avatar: nullableString(),
-  headline: nullableString(),
-  location: nullableString(),
-  currentRole: nullableString(),
-  currentCompany: nullableString(),
-  openToWork: nullableBoolean(),
-  showEmail: nullableBoolean(),
-  showPhone: nullableBoolean(),
-  showLocation: nullableBoolean(),
-  skills: z
-    .array(z.string())
-    .nullable()
-    .transform((val) => (val === null ? undefined : val))
-    .optional(),
-  // Nested data object
-  data: z.object({
-    firstName: nullableString(),
-    lastName: nullableString(),
-    avatar: nullableString(),
-    headline: nullableString(),
-    summary: nullableString(),
-    location: nullableString(),
-    website: nullableString(),
-    linkedIn: nullableString(),
-    github: nullableString(),
-    gitHub: nullableString(),
-    twitter: nullableString(),
-    phone: nullableString(),
-    currentRole: nullableString(),
-    currentCompany: nullableString(),
-    openToWork: nullableBoolean(),
-    showEmail: nullableBoolean(),
-    showPhone: nullableBoolean(),
-    showLocation: nullableBoolean(),
-    skills: z
-      .array(z.string())
-      .nullable()
-      .transform((val) => (val === null ? undefined : val))
-      .optional(),
-  }).optional(),
-  role: z
-    .union([z.string(), z.number()])
-    .nullable()
-    .transform((val) => (val === null ? undefined : val))
-    .optional(),
-  emailConfirmed: nullableBoolean(),
-  isPro: nullableBoolean(),
-  isDemo: nullableBoolean(),
-  isVerified: nullableBoolean(),
-  profileViews: nullableNumber(),
-  isCreator: nullableBoolean(),
-  // Bookings-host enrollment (#1902) — declared so Zod doesn't strip it,
-  // which would force <BookingsSection/> back to its guaranteed-404 probe.
-  bookingsActive: nullableBoolean(),
-  creatorPrograms: z
-    .object({
-      video: z.boolean(),
-      voice: z.boolean(),
-      services: z.boolean(),
-      articles: z.boolean(),
-      courses: z.boolean(),
-      templates: z.boolean(),
-    })
-    .nullable()
-    .transform((v) => (v === null ? undefined : v))
-    .optional(),
-  // Top-level fields the backend `toUserProfileDto` sends alongside `data`.
-  // Modelled here (not just on `data`) so callers reading them directly off
-  // the DTO — like authService.getCurrentUser — don't have them stripped.
-  profileVisibility: z.enum(["public", "private", "connections"]).optional(),
-  confidentialMode: nullableBoolean(),
-  confidentialBlocklist: z.array(z.string()).nullish(),
-  openToRemote: nullableBoolean(),
-  industries: z
-    .array(z.string())
-    .nullable()
-    .transform((val) => (val === null ? undefined : val))
-    .optional(),
-  preferredRoles: z
-    .array(z.string())
-    .nullable()
-    .transform((val) => (val === null ? undefined : val))
-    .optional(),
-  salaryExpectation: nullableNumber(),
-  salaryCurrency: nullableString(),
-  yearsOfExperience: nullableNumber(),
-  providesServices: nullableBoolean(),
-  // See UserProfileSchema — opt-in flag that lets unauthenticated visitors
-  // view the full /people/:slug page.
-  promoteWithoutAuth: nullableBoolean(),
-  // Per-section visibility resolved server-side via
-  // resolveProfileSections(stored, role) — every key always set. The raw
-  // partial (only owner-set keys) ships alongside so the Settings UI can
-  // distinguish "user toggled this" from "inherited from role default".
-  profileSections: z.record(z.string(), z.boolean()).nullable().optional(),
-  profileSectionsRaw: z.record(z.string(), z.boolean()).nullable().optional(),
-  // Current video pitch (#2133) — declared so Zod doesn't strip it.
-  pitch: PitchSummarySchema.nullish(),
-  createdAt: nullableString(),
-  updatedAt: nullableString(),
-});
-
 export const ConnectionSchema = z.object({
   id: z.string(),
   fromUserId: z.string(),
@@ -326,7 +208,6 @@ export const SendConnectionRequestSchema = z.object({
 // ============================================================================
 
 export type UserProfile = z.infer<typeof UserProfileSchema>;
-export type PublicUser = z.infer<typeof PublicUserSchema>;
 export type Connection = z.infer<typeof ConnectionSchema>;
 export type ConnectionStatus = z.infer<typeof ConnectionStatusSchema>;
 export type UserFilters = z.infer<typeof UserFiltersSchema>;
@@ -515,19 +396,11 @@ export class UserService {
   }
 
   /**
-   * Get current user profile (/api/users/me).
-   * Short-circuits via the shared verification gate so unverified
-   * sessions don't burn a 403 round-trip on each studio / intake mount.
+   * Current user in the public-profile projection. `/api/users/me` is owned
+   * by authService (verification gate included); this only re-projects it.
    */
   async getCurrentUser(): Promise<UserProfile> {
-    if (isVerificationKnownBlocked()) {
-      throw new UnverifiedAccountError("Email verification required");
-    }
-    const response = await apiClient.get<PublicUser>(
-      "/api/users/me",
-      PublicUserSchema,
-    );
-    return this.normalizePublicUserToProfile(response.data);
+    return this.normalizePublicUserToProfile(await authService.fetchCurrentUserDto());
   }
 
   /**
@@ -588,7 +461,7 @@ export class UserService {
    * Reject connection request
    */
   async rejectConnectionRequest(connectionId: string): Promise<void> {
-    await apiClient.delete(`/api/Users/connections/${connectionId}`);
+    await apiClient.delete(`/api/users/connections/${connectionId}`);
   }
 
   /**

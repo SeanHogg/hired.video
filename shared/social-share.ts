@@ -75,8 +75,3 @@ export const SHARE_NETWORKS: readonly ShareNetworkDef[] = [
       `mailto:?subject=${enc(title)}&body=${enc([text, url].filter(Boolean).join("\n\n"))}`,
   },
 ] as const;
-
-/** Look up a single network definition by id. */
-export function shareNetwork(id: string): ShareNetworkDef | undefined {
-  return SHARE_NETWORKS.find((n) => n.id === id);
-}

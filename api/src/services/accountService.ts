@@ -98,37 +98,6 @@ export async function loadAccountContext(
   };
 }
 
-/** Convenience: just the boolean answer to "is this user on a paid plan
- *  right now?" (factoring any SuperAdmin override). Delegates to the
- *  existing `resolveEffectivePlan` domain service — we don't duplicate
- *  that logic here, we just supply the snapshots it needs. */
-export async function isUserPaid(
-  deps: AccountServiceDeps,
-  userId: string,
-  now: Date = new Date(),
-): Promise<boolean> {
-  const { resolveEffectivePlan } = await import("../domains/planOverride/resolver.js");
-  const ctx = await loadAccountContext(deps, userId);
-  if (!ctx) return false;
-
-  const subSnapshot = {
-    planSlug: ctx.plan?.slug ?? null,
-    planName: ctx.plan?.name ?? null,
-    isInternal: ctx.user.isSuperAdmin || ctx.user.role === "admin" || ctx.user.role === "super_admin",
-  };
-  const overrideSnapshot = ctx.planOverride
-    ? {
-        planSlug: ctx.planOverride.planSlug ?? null,
-        monthlyTokenLimit: ctx.planOverride.monthlyTokenLimit ?? null,
-        expiresAt: ctx.planOverride.expiresAt ?? null,
-        reason: ctx.planOverride.reason,
-        grantedBy: ctx.planOverride.grantedBy,
-        grantedAt: ctx.planOverride.grantedAt,
-      }
-    : null;
-  return resolveEffectivePlan(subSnapshot, overrideSnapshot, now).isPaid;
-}
-
 /** End-of-life for a user session: invalidate every refresh token,
  *  bump the lastLogout audit row, and — if the caller is a SuperAdmin
  *  closing out an impersonation — close that session too.

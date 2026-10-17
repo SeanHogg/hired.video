@@ -1,8 +1,9 @@
 /**
  * Cross-cutting helpers for Hono route handlers in this codebase.
  *
- * Two responsibilities only:
+ * Responsibilities:
  *   • requireUser(c) — returns the authenticated user id or a 401 envelope.
+ *   • sendHandlerResult(c, result) — renders a pure handler's result.
  *   • mapServiceError(c, err) — translates a thrown ServiceError into the
  *     project's `error()` envelope with the right HTTP status.
  *
@@ -14,6 +15,7 @@
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { error } from "../../types/index.js";
+import type { HandlerResult } from "../../handlers/shared.js";
 import {
   ServiceError,
   type ServiceErrorCode,
@@ -45,6 +47,14 @@ const SERVICE_ERROR_STATUS: Record<ServiceErrorCode, ContentfulStatusCode> = {
   CONFLICT: 409,
   VALIDATION_ERROR: 400,
 };
+
+/** Render a pure handler's `{ status, body }` result (handlers/shared.ts
+ *  `ok()` / `fail()`) as the JSON response. */
+export function sendHandlerResult(c: Context, result: HandlerResult): Response {
+  return c.newResponse(JSON.stringify(result.body), result.status as ContentfulStatusCode, {
+    "Content-Type": "application/json; charset=UTF-8",
+  });
+}
 
 /** Render a `ServiceError` into the standard JSON error envelope. */
 export function mapServiceError(c: Context, err: unknown): Response {

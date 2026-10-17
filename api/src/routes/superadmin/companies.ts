@@ -11,6 +11,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
+import { parsePagination } from "../../utils/pagination.js";
 import {
   listCompanies,
   getCompanyFeatureTree,
@@ -26,11 +27,12 @@ export const superadminCompanyRoutes = new Hono<AppEnv>();
 
 superadminCompanyRoutes.get("/", async (c) => {
   const status = (c.req.query("status") as CompanyStatus) || "all";
+  const { page, limit } = parsePagination(c, { defaultLimit: 25, maxLimit: 100 });
   const result = await listCompanies({
     search: c.req.query("search") || undefined,
     status,
-    page: Number(c.req.query("page")) || 1,
-    limit: Number(c.req.query("limit")) || 25,
+    page,
+    limit,
   });
   return c.json(success(result));
 });

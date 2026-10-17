@@ -16,6 +16,7 @@ import {
   referenceDisplayText,
   type ReferenceContactLike,
 } from "../../../../shared/resume-references.js";
+import { logger } from "../../lib/logger.js";
 
 const { resumeInformation } = schema;
 
@@ -72,7 +73,7 @@ export async function syncLinkedReferences(
     const rows = await buildLinkedReferenceUpdate(db, ownerUserId, contact, previous, now);
     return rows.length;
   } catch (err) {
-    console.error("[references] linked-reference sync failed:", err instanceof Error ? err.message : err);
+    logger.error("[references] linked-reference sync failed", err);
     return 0;
   }
 }

@@ -74,6 +74,8 @@ export const candidateResumes = pgTable(
     uniqueIndex("candidate_resumes_active_per_candidate_unique")
       .on(table.companyId, table.talentPoolCandidateId)
       .where(sql`is_active = true AND talent_pool_candidate_id IS NOT NULL`),
+    index("idx_candidate_resumes_imported_by_user_id").on(table.importedByUserId),
+    index("idx_candidate_resumes_merged_from_user_resume_id").on(table.mergedFromUserResumeId),
   ],
 );
 
@@ -160,7 +162,9 @@ export const candidateResumeShares = pgTable(
   (table) => [
     index("candidate_resume_shares_company_id_idx").on(table.companyId),
     index("candidate_resume_shares_candidate_resume_id_idx").on(table.candidateResumeId),
-    index("candidate_resume_shares_token_idx").on(table.shareToken),
+    index("idx_candidate_resume_shares_redaction_profile_id").on(table.redactionProfileId),
+    index("idx_candidate_resume_shares_shared_by_user_id").on(table.sharedByUserId),
+    index("idx_candidate_resume_shares_whitelabel_tenant_id").on(table.whitelabelTenantId),
   ],
 );
 
@@ -201,6 +205,9 @@ export const pitchDecks = pgTable(
   (table) => [
     index("pitch_decks_company_id_idx").on(table.companyId),
     index("pitch_decks_job_id_idx").on(table.jobId),
+    index("idx_pitch_decks_created_by_user_id").on(table.createdByUserId),
+    index("idx_pitch_decks_redaction_profile_id").on(table.redactionProfileId),
+    index("idx_pitch_decks_whitelabel_tenant_id").on(table.whitelabelTenantId),
   ],
 );
 
@@ -233,11 +240,12 @@ export const pitchDeckCandidates = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    index("pitch_deck_candidates_deck_id_idx").on(table.deckId),
     uniqueIndex("pitch_deck_candidates_deck_candidate_unique").on(
       table.deckId,
       table.candidateResumeId,
     ),
+    index("idx_pitch_deck_candidates_candidate_resume_id").on(table.candidateResumeId),
+    index("idx_pitch_deck_candidates_redaction_profile_id").on(table.redactionProfileId),
   ],
 );
 
@@ -271,7 +279,7 @@ export const pitchDeckShares = pgTable(
   },
   (table) => [
     index("pitch_deck_shares_deck_id_idx").on(table.deckId),
-    index("pitch_deck_shares_token_idx").on(table.shareToken),
+    index("idx_pitch_deck_shares_shared_by_user_id").on(table.sharedByUserId),
   ],
 );
 

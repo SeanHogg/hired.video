@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
+import { uploadFile } from "./upload-service";
 import type { ApiSuccessResponse } from "@shared/api";
 import { STUDIO_PURPOSES, type StudioPurpose } from "@shared/studio-purposes";
 import { SCENE_TYPES } from "@shared/scene-types";
@@ -1128,9 +1129,8 @@ export const studioService = {
    * Returns a CDN URL that can be saved in the script and reloaded later.
    */
   async uploadSceneAudio(file: File): Promise<ApiSuccessResponse<{ url: string }>> {
-    const form = new FormData();
-    form.append("file", file);
-    return apiClient.post("/api/upload/single", form, z.object({ url: z.string() }));
+    // POST /api/upload/single is owned by upload-service.uploadFile.
+    return { success: true, data: { url: await uploadFile(file) } };
   },
 
   /**

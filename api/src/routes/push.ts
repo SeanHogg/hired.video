@@ -8,7 +8,8 @@
  * Delivery itself is `services/push/web-push.ts` (notification dispatcher).
  */
 
-import { Hono, type Context } from "hono";
+import { Hono } from "hono";
+import { requireUser } from "./helpers/routerHelpers.js";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -27,18 +28,15 @@ const SubscribeSchema = z.object({
 
 const UnsubscribeSchema = z.object({ endpoint: z.string().url().max(2048) });
 
-function requireUserId(c: Context<AppEnv>): string | null {
-  return c.var.user?.sub ?? null;
-}
-
 // Env read only (no DB / network) — nothing worth caching.
 pushRoutes.get("/vapid-public-key", (c) =>
   c.json(success({ publicKey: getVapidPublicKey() }), 200),
 );
 
 pushRoutes.post("/subscriptions", async (c) => {
-  const userId = requireUserId(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const parsed = SubscribeSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid push subscription"), 400);
   await buildRepos(getDb()).pushSubscriptions.upsert({
@@ -51,8 +49,9 @@ pushRoutes.post("/subscriptions", async (c) => {
 });
 
 pushRoutes.delete("/subscriptions", async (c) => {
-  const userId = requireUserId(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const parsed = UnsubscribeSchema.safeParse({ endpoint: c.req.query("endpoint") });
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "endpoint is required"), 400);
   await buildRepos(getDb()).pushSubscriptions.deleteForUser(userId, parsed.data.endpoint);

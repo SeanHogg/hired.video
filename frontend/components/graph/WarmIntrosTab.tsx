@@ -25,7 +25,7 @@ import {
   graphService,
   type WarmIntroSummary,
 } from "@/lib/services/graph-service";
-import { initials } from "@/lib/utils/initials";
+import { initials } from "@/lib/format";
 
 export function WarmIntrosTab() {
   const [incoming, setIncoming] = useState<WarmIntroSummary[]>([]);

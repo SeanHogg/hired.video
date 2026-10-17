@@ -16,10 +16,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
-import { useQuery } from "@tanstack/react-query";
 import { resumeService } from "@/lib/services/resume-service";
 import { RESUME_TEXT_FILE_ACCEPT, getResumeTextFromFile, isResumeTextFile } from "@/lib/services/resume-text";
 import type { ResumeSummary } from "@/lib/services/resume-service";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
@@ -62,11 +62,7 @@ export function ResumeInputTabs({ value, onChange, onError, defaultTab, initialR
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: resumes } = useQuery({
-    queryKey: ["resumes"],
-    queryFn: () => resumeService.getUserResumes(),
-    enabled: isAuthenticated,
-  });
+  const { data: resumes } = useUserResumes();
 
   // Auto-populate from an initially selected resume so downstream tool runs
   // can fire immediately (e.g. when opened from the Resumes context menu).

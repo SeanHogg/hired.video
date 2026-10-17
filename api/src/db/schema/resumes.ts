@@ -23,7 +23,9 @@ export const metaResumes = pgTable("meta_resumes", {
   isPrimary: boolean("is_primary").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_meta_resumes_user_id").on(t.userId),
+]);
 
 export type MetaResume = typeof metaResumes.$inferSelect;
 export type NewMetaResume = typeof metaResumes.$inferInsert;
@@ -77,6 +79,7 @@ export const resumeInformation = pgTable("resume_information", {
     .on(table.slug)
     .where(sql`${table.slug} IS NOT NULL`),
   index("idx_resume_information_user_updated").on(table.userId, table.updatedAt.desc().nullsFirst()).where(sql`archived_at IS NULL`),
+  index("idx_resume_information_meta_resume_id").on(table.metaResumeId),
 ]);
 
 export type ResumeInformation = typeof resumeInformation.$inferSelect;
@@ -109,6 +112,8 @@ export const resumeVersions = pgTable("resume_versions", {
   // #2305 — legacy UNIQUE (migration 0121_taxonomies_archive_versions.sql); duplicates resolved by 0518_dedupe_unique_indexes.sql.
   uniqueIndex("uq_resume_versions_resume_version").on(t.resumeId, t.versionNumber),
   check("resume_versions_proposal_status_check", sql`${t.proposalStatus} IS NULL OR ${t.proposalStatus} IN ('proposed', 'accepted', 'rejected')`),
+  index("idx_resume_versions_proposed_by_user_id").on(t.proposedByUserId),
+  index("idx_resume_versions_user_id").on(t.userId),
 ]);
 
 export type ResumeVersion = typeof resumeVersions.$inferSelect;
@@ -123,6 +128,7 @@ export const watchedResumes = pgTable("watched_resumes", {
   // A viewer can only watch a given resume once. Enforced at the index
   // level so duplicate POST /watch/:id calls are idempotent.
   uniqueIndex("watched_resumes_viewer_resume_unique").on(table.viewerId, table.resumeId),
+  index("idx_watched_resumes_resume_id").on(table.resumeId),
 ]);
 
 export type WatchedResume = typeof watchedResumes.$inferSelect;
@@ -146,6 +152,7 @@ export const resumeViews = pgTable("resume_views", {
 }, (table) => [
   index("resume_views_resume_id_idx").on(table.resumeId),
   index("resume_views_viewed_at_idx").on(table.viewedAt),
+  index("idx_resume_views_viewer_id").on(table.viewerId),
 ]);
 
 export type ResumeView = typeof resumeViews.$inferSelect;
@@ -299,6 +306,8 @@ export const studioProjects = pgTable("studio_projects", {
   index("idx_studio_projects_media_kind").on(table.mediaKind).where(sql`((media_kind)::text <> 'video'::text)`),
   check("studio_projects_kind_check", sql`${table.kind} IN ('scene', 'nle')`),
   check("studio_projects_media_kind_check", sql`${table.mediaKind} IN ('video', 'podcast', 'voice', 'animation', 'game', 'comic', 'interactive_comic', 'image', 'cad', 'cad_3d', 'document')`),
+  index("idx_studio_projects_resume_id").on(table.resumeId),
+  index("idx_studio_projects_user_id").on(table.userId),
 ]);
 
 export type StudioProject = typeof studioProjects.$inferSelect;
@@ -317,7 +326,6 @@ export const studioProjectSubjects = pgTable("studio_project_subjects", {
   subjectId:   text("subject_id").notNull(),
   createdAt:   timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
-  index("idx_studio_project_subjects_project").on(table.projectId),
   index("idx_studio_project_subjects_subject").on(table.subjectKind, table.subjectId),
   uniqueIndex("uq_studio_project_subjects_triple").on(table.projectId, table.subjectKind, table.subjectId),
 ]);

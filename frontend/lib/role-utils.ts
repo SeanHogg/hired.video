@@ -7,7 +7,7 @@
  * and centralizes role-based permission logic.
  */
 
-import { USER_ROLES, canPostJobsRole, type UserRole } from "@shared/user-roles";
+import { USER_ROLES, canPostJobsRole, parseRoleAlias, type UserRole } from "@shared/user-roles";
 
 // Backend enum values from hiredvideoRoles
 export const BACKEND_ROLE_VALUES = {
@@ -88,42 +88,9 @@ export function normalizeRole(
     }
   }
 
-  // Handle string role values (case-insensitive)
-  const roleStr = String(role).toLowerCase().trim();
-  switch (roleStr) {
-    case "jobseeker":
-    case "job_seeker":
-    case "job seeker":
-      return USER_ROLES.JOB_SEEKER;
-    case "recruiter":
-      return USER_ROLES.RECRUITER;
-    case "employer":
-    case "business": // Legacy role, maps to Employer
-      return USER_ROLES.EMPLOYER;
-    case "employee":
-      return USER_ROLES.EMPLOYEE;
-    case "creator": // First-class role (2026-06-13) — content-creator persona
-      return USER_ROLES.CREATOR;
-    case "affiliate": // First-class role (2026-06-13) — was previously coerced to employer
-      return USER_ROLES.AFFILIATE;
-    case "admin":
-    case "administrator":
-      return USER_ROLES.ADMIN;
-    case "superadmin":
-    case "super_admin":
-    case "super admin":
-      return USER_ROLES.SUPER_ADMIN;
-    default:
-      // Try exact match with USER_ROLES values
-      const upperRole = roleStr.toUpperCase();
-      if (Object.values(USER_ROLES).includes(roleStr as UserRole)) {
-        return roleStr as UserRole;
-      }
-      if (Object.values(USER_ROLES).includes(upperRole as UserRole)) {
-        return upperRole as UserRole;
-      }
-      return USER_ROLES.JOB_SEEKER;
-  }
+  // String role values (case-insensitive aliases) — shared SSoT; anything
+  // unrecognised defaults to job_seeker.
+  return parseRoleAlias(String(role)) ?? USER_ROLES.JOB_SEEKER;
 }
 
 /**

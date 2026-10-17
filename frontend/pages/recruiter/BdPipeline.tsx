@@ -58,16 +58,13 @@ export default function BdPipeline() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [stagesRes, dealsRes, rollupRes] = await Promise.all([
-        apiClient.get("/api/recruiter-bd/stages"),
-        apiClient.get("/api/recruiter-bd/deals"),
-        apiClient.get("/api/recruiter-bd/rollup"),
+      const [stagesBody, dealsBody, rollupBody] = await Promise.all([
+        apiClient.fetchData<{ items?: Stage[] }>("/api/recruiter-bd/stages"),
+        apiClient.fetchData<{ items?: Deal[] }>("/api/recruiter-bd/deals"),
+        apiClient.fetchData<Rollup>("/api/recruiter-bd/rollup"),
       ]);
-      const stagesBody = ((stagesRes as any).data?.data ?? (stagesRes as any).data) as { items?: Stage[] };
-      const dealsBody = ((dealsRes as any).data?.data ?? (dealsRes as any).data) as { items?: Deal[] };
-      const rollupBody = ((rollupRes as any).data?.data ?? (rollupRes as any).data) as Rollup;
-      setStages(stagesBody.items ?? []);
-      setDeals(dealsBody.items ?? []);
+      setStages(stagesBody?.items ?? []);
+      setDeals(dealsBody?.items ?? []);
       setRollup(rollupBody);
     } catch {
       toast.error("Failed to load pipeline");

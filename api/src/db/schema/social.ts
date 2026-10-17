@@ -73,6 +73,7 @@ export const managedAccounts = pgTable(
   },
   (t) => [
     uniqueIndex("uq_managed_accounts_platform").on(t.platform),
+    index("idx_managed_accounts_connected_by_user_id").on(t.connectedByUserId),
   ],
 );
 

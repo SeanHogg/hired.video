@@ -127,7 +127,7 @@ interface SalaryAnalysis {
 async function runSalary(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
   const jobTitle = str(ctx.args.jobTitle);
   if (!jobTitle) throw new Error("Salary analysis needs a job title.");
-  const { data } = await apiClient.post<SalaryAnalysis>("/api/SalaryCalculator/analyze", {
+  const { data } = await apiClient.post<SalaryAnalysis>("/api/salaryanalyzer/analyze", {
     jobTitle,
     location: str(ctx.args.location),
     industry: str(ctx.args.industry),

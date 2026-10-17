@@ -924,6 +924,12 @@ export async function createVideoForm(projectId: string, form: Omit<VideoForm, "
   return res.data;
 }
 
+/** GET /api/studio/forms/:id — owner read, answer key included. */
+export async function getVideoForm(id: string): Promise<VideoForm> {
+  const res = await apiClient.get<VideoForm>(`/api/studio/forms/${id}`);
+  return res.data;
+}
+
 export async function updateVideoForm(id: string, patch: Partial<Omit<VideoForm, "id" | "projectId" | "fields">>): Promise<VideoForm> {
   const res = await apiClient.patch<VideoForm>(`/api/studio/forms/${id}`, patch);
   return res.data;

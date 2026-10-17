@@ -83,7 +83,7 @@ export type { ResumeContent as ResumeData } from "@shared/resume";
 // Upload / search / merge analysis — frontend-only types, not wire-bound.
 // ---------------------------------------------------------------------------
 
-import type { ResumeContent, ResumePrivacy, MergeSectionType } from "@shared/resume";
+import type { ResumeContent, ResumePrivacy } from "@shared/resume";
 
 // ---------------------------------------------------------------------------
 // ResumeWithOwnership — re-exported from shared/resume.ts, which holds
@@ -118,73 +118,16 @@ export interface ResumeUploadResponse {
   confidence: number;
 }
 
-export interface ArrayDiff {
-  onlyInSource: number;
-  onlyInTarget: number;
-  shared: number;
-}
-
-export type ScalarFieldDiffs = Record<string, { source: string; target: string }>;
-
-export interface CrossSectionConflict {
-  suggestedSection: string;
-  reason: string;
-}
-
-export interface SectionMatch {
-  sectionType: MergeSectionType;
-  sourceIndex: number;
-  targetIndex: number | null;
-  confidence: number;
-  matchReason: string;
-  mergeAction: "auto" | "manual" | "skip";
-  hasContentDifferences?: boolean;
-  highlightDiff?: ArrayDiff;
-  keywordDiff?: ArrayDiff;
-  scalarDiffs?: ScalarFieldDiffs;
-  /** Set when the source entry's identity also appears in a different
-   *  section type within the same source resume — e.g. a volunteer row
-   *  whose `organization` matches a `work[].name`. Almost always means
-   *  the parser misclassified the entry. */
-  crossSectionConflict?: CrossSectionConflict;
-}
-
-export interface BasicsConflict {
-  field: string;
-  sourceValue: string;
-  targetValue: string;
-}
-
-export interface MergeAnalysis {
-  basics: {
-    conflicts: BasicsConflict[];
-    autoMerge: boolean;
-  };
-  sectionMatches: SectionMatch[];
-  newSections: Array<{
-    sectionType: MergeSectionType;
-    sourceIndex: number;
-    item: Record<string, unknown>;
-    crossSectionConflict?: CrossSectionConflict;
-  }>;
-  summary: {
-    totalSections: number;
-    autoMerge: number;
-    manualReview: number;
-    skip: number;
-    newItems: number;
-  };
-}
-
-export interface MergeDecision {
-  sectionType: string;
-  sourceIndex: number;
-  targetIndex: number | null;
-  action: "merge" | "replace" | "skip" | "add";
-  mergeHighlights?: "combine" | "source_only" | "target_only";
-  selectedHighlights?: string[];
-  scalarChoices?: Record<string, "source" | "target">;
-}
+export type {
+  ArrayDiff,
+  ScalarFieldDiffs,
+  CrossSectionConflict,
+  SectionMatch,
+  BasicsConflict,
+  MergeAnalysis,
+  MergeDecision,
+} from "@shared/resume-merge-decisions";
+import type { MergeAnalysis, MergeDecision } from "@shared/resume-merge-decisions";
 
 export interface MergeRequest {
   sourceResumeId?: string;

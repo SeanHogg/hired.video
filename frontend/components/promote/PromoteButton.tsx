@@ -2,7 +2,8 @@
  * Generic "Promote" button + modal. Drops in next to any user-generated
  * subject the owner controls — reviews, feed posts, videos, résumés, voice
  * clones, etc. The modal collects budget + duration and starts the paid
- * boost checkout (POST /api/boosts); the server enforces ownership.
+ * boost checkout (POST /api/checkout {kind:"boost"}); the server enforces
+ * ownership.
  *
  * Paying: Campaign $ are drawn first. Any USD left owing opens the app's
  * payment widget right away (useBoostPayment — same flow as token packs),
@@ -36,9 +37,10 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { boostService, type Boost } from "@/lib/services/boost-service";
 import { useBoostPayment, type BoostPaymentState } from "@/hooks/use-boost-payment";
+import type { BoostableSubject } from "@shared/checkout";
 
 interface PromoteButtonProps {
-  subjectType: string;
+  subjectType: BoostableSubject;
   subjectId: string;
   /** Display label for the modal copy ("Promote your review of Acme"). */
   subjectLabel: string;

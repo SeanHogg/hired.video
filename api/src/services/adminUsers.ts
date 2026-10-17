@@ -2,6 +2,7 @@ import { and, count, desc, eq, exists, gte, ilike, inArray, lt, or, sql, sum, ty
 import { ADMIN_GRANT_PACK_ID } from "../../../shared/token-packs.js";
 import { isDeepStrictEqual } from "node:util";
 import { getDb, schema } from "../db/index.js";
+import { logger } from "../lib/logger.js";
 import { AUDIT_ACTIONS } from "../utils/audit.js";
 import {
   type ApiDeps,
@@ -86,10 +87,7 @@ async function loadPlanOverridesForUsers(
       .from(schema.userPlanOverrides)
       .where(inArray(schema.userPlanOverrides.userId, userIds));
   } catch (err) {
-    console.error(
-      "[adminUsers] Failed to load plan overrides; degrading to no-override view:",
-      err instanceof Error ? err.message : err,
-    );
+    logger.error("[adminUsers] Failed to load plan overrides; degrading to no-override view", err);
     return [];
   }
 }

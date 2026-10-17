@@ -11,7 +11,7 @@ import { getDb, schema } from "../../db/index.js";
 import { aiFailure } from "../../services/adapters/llm-error.js";
 import { checkTokenBudget } from "../../middleware/tierEnforcement.js";
 import { createAiTextCaller, hasAiTextProvider } from "../../services/adapters/ai-text-caller.js";
-import { CAPTION_TONES, generateSocialCaption } from "../../services/studio/social-caption.js";
+import { CAPTION_TONES, generateProjectSocialCaption } from "../../../../shared/social-caption.js";
 import { VIDEO_PUBLISH_PLATFORMS } from "../../../../shared/social-platforms.js";
 import { ok, fail } from "./shared.js";
 
@@ -27,7 +27,7 @@ export const socialCaptionRoutes = new Hono<AppEnv>();
 // POST /api/studio/social/generate-caption — AI hook + caption + hashtags from
 // what the project's video says (#203), sized for the networks the post goes
 // to (#2045: the tightest of their text limits). Use case:
-// services/studio/social-caption.
+// shared/social-caption (generateProjectSocialCaption).
 const SocialCaptionSchema = z.object({
   projectId: UuidLikeSchema,
   tone: z.enum(CAPTION_TONES).default("professional"),
@@ -63,7 +63,7 @@ socialCaptionRoutes.post("/social/generate-caption", async (c) => {
     ? createAiTextCaller(c.env, user, { label: "linkedin_post_gen", useCase: "linkedin_post" })
     : null;
   try {
-    return c.json(ok(await generateSocialCaption(project, { tone: parsed.data.tone, platforms: parsed.data.platforms }, callAI)));
+    return c.json(ok(await generateProjectSocialCaption(project, { tone: parsed.data.tone, platforms: parsed.data.platforms }, callAI)));
   } catch (err) {
     // A model answered but not with a usable post: a typed AI_* envelope,
     // never the heuristic post dressed up as the AI's.

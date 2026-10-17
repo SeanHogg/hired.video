@@ -59,7 +59,7 @@ export class SentimentService {
    */
   async analyzeResumeSentiment(resumeId: string): Promise<number> {
     const response = await apiClient.post<SentimentAnalysisResponse>(
-      "/api/Resume/SentimentPrediction",
+      "/api/resumes/sentimentprediction",
       { resumeId },
       SentimentAnalysisResponseSchema,
     );

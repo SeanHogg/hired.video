@@ -12,6 +12,7 @@ import { invalidatePublicEngagement } from "../../services/studio/public-engagem
 import { resolveActableEngagementRow } from "../../services/studio/engagement-row-access.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../../services/adapters/llm-client.js";
 import { ok, fail, viewerCanActOnProject, studioThumbnails } from "./shared.js";
+import { logger } from "../../lib/logger.js";
 
 export const thumbnailRoutes = new Hono<AppEnv>();
 
@@ -87,7 +88,7 @@ thumbnailRoutes.post("/projects/:projectId/thumbnails/score", async (c) => {
         return llmRank ? { ...cand, score: llmRank.score } : cand;
       });
     } catch (err) {
-      console.warn("[thumbnails/score] LLM scoring failed, falling back to heuristic:", err);
+      logger.warn("[thumbnails/score] LLM scoring failed, falling back to heuristic", err);
     }
   }
 

@@ -23,7 +23,7 @@ import { isNotRenderVariant } from "../../repositories/renderVariantRepository.j
 import type { Db } from "../../db/index.js";
 import { users, type User } from "../../db/schema/users.js";
 import { videos } from "../../db/schema/videos.js";
-import { creatorYoutubeIngests } from "../../db/schema/creator.js";
+import { creatorYoutubeIngests } from "../../db/schema/creators.js";
 
 // NOTE: this module previously imported `postgres` and
 // `drizzle-orm/postgres-js` to type the `db` parameter. Those packages

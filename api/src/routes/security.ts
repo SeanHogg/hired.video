@@ -6,13 +6,12 @@
  */
 
 import { Hono } from "hono";
-import { jwtVerify } from "jose";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { getJwtSecret } from "../utils/jwt.js";
+import { requireUser } from "./helpers/routerHelpers.js";
 import { classifySignupEligibility, detectCountry } from "../services/auth/geo.js";
 import { recordBotBlock } from "../services/auth/botBlock.js";
 import {
@@ -30,21 +29,6 @@ import { mintTrustedDeviceCookie } from "../services/auth/trustedDevice.js";
 const { users, regionWaitlist } = schema;
 
 export const securityRoutes = new Hono<AppEnv>();
-
-async function requireUserId(c: any): Promise<string | null> {
-  const authHeader = c.req.header("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
-  try {
-    const { payload } = await jwtVerify(
-      authHeader.slice(7),
-      new TextEncoder().encode(getJwtSecret()),
-      { algorithms: ["HS256"] },
-    );
-    return (payload.sub as string) ?? null;
-  } catch {
-    return null;
-  }
-}
 
 // ---------------------------------------------------------------------
 // Geo eligibility — public. The FE register page calls this and self-
@@ -114,8 +98,9 @@ securityRoutes.post("/region-waitlist", async (c) => {
 // ---------------------------------------------------------------------
 
 securityRoutes.post("/totp/setup", async (c) => {
-  const userId = await requireUserId(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Auth required"), 401);
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const db = getDb();
   const [user] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
   if (!user) return c.json(error("NOT_FOUND", "User not found"), 404);
@@ -126,8 +111,9 @@ securityRoutes.post("/totp/setup", async (c) => {
 const ConfirmTotpSchema = z.object({ code: z.string().regex(/^\d{6}$/) });
 
 securityRoutes.post("/totp/confirm", async (c) => {
-  const userId = await requireUserId(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Auth required"), 401);
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const body = await c.req.json().catch(() => null);
   const parsed = ConfirmTotpSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request body"), 400);
@@ -140,8 +126,9 @@ securityRoutes.post("/totp/confirm", async (c) => {
 });
 
 securityRoutes.post("/totp/disable", async (c) => {
-  const userId = await requireUserId(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Auth required"), 401);
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const body = await c.req.json().catch(() => null);
   const parsed = ConfirmTotpSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request body"), 400);
@@ -156,16 +143,18 @@ securityRoutes.post("/totp/disable", async (c) => {
 // ---------------------------------------------------------------------
 
 securityRoutes.get("/backup-codes/count", async (c) => {
-  const userId = await requireUserId(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Auth required"), 401);
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const db = getDb();
   const remaining = await countUnusedBackupCodes(db, userId);
   return c.json(success({ remaining }));
 });
 
 securityRoutes.post("/backup-codes/regenerate", async (c) => {
-  const userId = await requireUserId(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Auth required"), 401);
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const db = getDb();
   const codes = await generateBackupCodes(db, userId);
   return c.json(success({ codes }));
@@ -176,8 +165,9 @@ securityRoutes.post("/backup-codes/regenerate", async (c) => {
 // successful 2FA verify when the user ticked "trust this device".
 // ---------------------------------------------------------------------
 securityRoutes.post("/trust-device", async (c) => {
-  const userId = await requireUserId(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Auth required"), 401);
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const cookie = await mintTrustedDeviceCookie(userId);
   c.header(
     "Set-Cookie",

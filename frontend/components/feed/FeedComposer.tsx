@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { initialsFromWords } from "@/lib/format";
 import {
   Video,
   Image as ImageIcon,
@@ -23,12 +24,7 @@ type ComposerUser = {
 };
 
 function avatarBits(user: ComposerUser) {
-  const initials = ((user.name as string) || (user.email as string) || "?")
-    .split(" ")
-    .map((n: string) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+  const initials = initialsFromWords((user.name as string) || (user.email as string) || "?");
   return { initials, avatar: (user.avatar as string) ?? "" };
 }
 

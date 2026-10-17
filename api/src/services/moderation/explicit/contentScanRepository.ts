@@ -55,15 +55,6 @@ export async function getScan(subjectType: ScanSubjectKind, subjectId: string, d
   return row ? toStored(row) : null;
 }
 
-export async function getScans(subjectType: ScanSubjectKind, subjectIds: readonly string[], db: Db = getDb()): Promise<Map<string, StoredScan>> {
-  if (subjectIds.length === 0) return new Map();
-  const rows = await db
-    .select()
-    .from(contentScans)
-    .where(and(eq(contentScans.subjectType, subjectType), inArray(contentScans.subjectId, [...subjectIds])));
-  return new Map(rows.map((r) => [r.subjectId, toStored(r)]));
-}
-
 /** A final (pass / block) verdict already computed for the same bytes. */
 export async function findFinalByInputHash(subjectType: ScanSubjectKind, inputHash: string, db: Db = getDb()): Promise<StoredScan | null> {
   const [row] = await db

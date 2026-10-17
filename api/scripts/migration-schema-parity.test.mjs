@@ -59,7 +59,8 @@ function stripSqlComments(sql) {
 
 /** Parse every `CREATE TABLE [IF NOT EXISTS] [schema.]"name"` across migrations. */
 /** Tables that exist after replaying every migration in order: CREATE adds,
- *  a later DROP TABLE removes (e.g. 0521 drops linkedin_accounts), so a
+ *  a later DROP TABLE or SET SCHEMA archive removes (e.g. 0521 drops
+ *  linkedin_accounts, 0545 archives 17 unreferenced tables), so a
  *  deliberately dropped table is neither "created" nor an orphan. */
 function readCreatedTables() {
   const files = readdirSync(DRIZZLE_DIR).filter((f) => f.endsWith(".sql")).sort();
@@ -71,6 +72,9 @@ function readCreatedTables() {
   // pattern in 0122c_job_items_rebuild.sql) shouldn't count as orphans
   // since they never persist past the migration.
   const renameRe = /ALTER\s+TABLE\s+(?:"?[a-z_][a-z0-9_]*"?\.)?"?([a-z_][a-z0-9_]*)"?\s+RENAME\s+TO\s+"?([a-z_][a-z0-9_]*)"?/gi;
+  // Archive-first retirement (0545+): `ALTER TABLE … SET SCHEMA archive` moves
+  // a table out of public, so it no longer needs a pgTable declaration.
+  const archiveRe = /ALTER\s+TABLE(?:\s+IF\s+EXISTS)?\s+(?:"?public"?\.)?"?([a-z_][a-z0-9_]*)"?\s+SET\s+SCHEMA\s+"?archive"?/gi;
   for (const f of files) {
     const text = stripSqlComments(readFileSync(join(DRIZZLE_DIR, f), "utf8"));
     const renamedAway = new Set();
@@ -80,6 +84,7 @@ function readCreatedTables() {
     const events = [
       ...[...text.matchAll(createRe)].map((m) => ({ at: m.index, create: [m[1]] })),
       ...[...text.matchAll(dropRe)].map((m) => ({ at: m.index, drop: m[1].split(",") })),
+      ...[...text.matchAll(archiveRe)].map((m) => ({ at: m.index, drop: [m[1]] })),
     ].sort((x, y) => x.at - y.at);
     for (const e of events) {
       for (const raw of e.create ?? []) {
@@ -158,7 +163,7 @@ describe("schema ↔ migration parity (gap #1186 regression)", () => {
       // Superseded by canonical `content_reports` + ModerationService. The legacy
       // pgTable + route were removed in the #1835 pass (it shadowed /api/reports);
       // the physical table from 0182 is left orphaned pending a data-archive
-      // migration. See gapPass4.ts + Gap Register #1835.
+      // migration. See Gap Register #1835.
       "content_reports_v2",
     ]);
     const orphans = [...created]

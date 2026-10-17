@@ -6,7 +6,7 @@
  * roadmap note. Writers live elsewhere (middleware/requestLogger.ts,
  * services/observability/config-snapshot.ts); this module only reads.
  */
-import { and, avg, count, desc, eq, gte, max, min, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, max, min, sql, type SQL } from "drizzle-orm";
 import { schema } from "../db/index.js";
 import { CONFIG_SNAPSHOT_ACTION } from "../services/observability/config-snapshot.js";
 import type { ApiHealthReport } from "../../../shared/observability.js";
@@ -20,6 +20,16 @@ export interface IObservabilityRepository {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// request_logs is sampled (middleware/requestLogPolicy.ts): each row stands
+// for `sample_weight` requests, so request counts SUM the weight and the
+// latency average is weighted. Distinct-user counts need no weight — the
+// writer always logs a user's first request per isolate per day.
+const weight = sql`${requestLogs.sampleWeight}`;
+const weightedCount = sql<number>`coalesce(sum(${weight}), 0)::bigint`;
+const weightedWhen = (cond: SQL) =>
+  sql<number>`coalesce(sum(CASE WHEN ${cond} THEN ${weight} ELSE 0 END), 0)::bigint`;
+const weightedAvgMs = sql<number>`sum(${requestLogs.durationMs}::numeric * ${weight}) / nullif(sum(CASE WHEN ${requestLogs.durationMs} IS NULL THEN 0 ELSE ${weight} END), 0)`;
 const iso = (v: unknown): string | null => (v ? new Date(v as string).toISOString() : null);
 
 export class ObservabilityRepository implements IObservabilityRepository {
@@ -47,16 +57,16 @@ export class ObservabilityRepository implements IObservabilityRepository {
       this.db
         .select({
           route: routeKey,
-          calls: count(),
-          serverErrors: count(sql`CASE WHEN ${requestLogs.statusCode} >= 500 THEN 1 END`),
-          clientErrors: count(sql`CASE WHEN ${requestLogs.statusCode} BETWEEN 400 AND 499 THEN 1 END`),
-          avgMs: avg(requestLogs.durationMs),
+          calls: weightedCount,
+          serverErrors: weightedWhen(sql`${requestLogs.statusCode} >= 500`),
+          clientErrors: weightedWhen(sql`${requestLogs.statusCode} BETWEEN 400 AND 499`),
+          avgMs: weightedAvgMs,
           lastSeen: max(requestLogs.createdAt),
         })
         .from(requestLogs)
         .where(inWindow)
         .groupBy(routeKey)
-        .orderBy(desc(count()))
+        .orderBy(desc(weightedCount))
         .limit(100),
       this.db
         .select({
@@ -64,18 +74,18 @@ export class ObservabilityRepository implements IObservabilityRepository {
           status: requestLogs.statusCode,
           errorCode: requestLogs.errorCode,
           errorSource: max(requestLogs.errorSource),
-          count: count(),
+          count: weightedCount,
           lastSeen: max(requestLogs.createdAt),
         })
         .from(requestLogs)
         .where(and(inWindow, gte(requestLogs.statusCode, 400)))
         .groupBy(routeKey, requestLogs.statusCode, requestLogs.errorCode)
-        .orderBy(desc(count()))
+        .orderBy(desc(weightedCount))
         .limit(50),
       this.db
         .select({
           releaseId: requestLogs.releaseId,
-          requests: count(),
+          requests: weightedCount,
           firstSeen: min(requestLogs.createdAt),
           lastSeen: max(requestLogs.createdAt),
         })
@@ -86,8 +96,8 @@ export class ObservabilityRepository implements IObservabilityRepository {
         .limit(10),
       this.db
         .select({
-          requests: count(),
-          serverErrors: count(sql`CASE WHEN ${requestLogs.statusCode} >= 500 THEN 1 END`),
+          requests: weightedCount,
+          serverErrors: weightedWhen(sql`${requestLogs.statusCode} >= 500`),
         })
         .from(requestLogs)
         .where(inWindow),

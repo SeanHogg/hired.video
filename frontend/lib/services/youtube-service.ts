@@ -39,29 +39,6 @@ export const YouTubeAuthUrlResponseSchema = z.object({
   authUrl: z.string(),
 });
 
-/**
- * YouTube video publish request
- */
-export interface YouTubePublishRequest {
-  title: string;
-  description: string;
-  privacy: "public" | "private" | "unlisted";
-  tags?: string[];
-}
-
-/**
- * YouTube video publish response
- */
-export interface YouTubePublishResponse {
-  youtubeVideoId: string;
-  youtubeUrl: string;
-}
-
-export const YouTubePublishResponseSchema = z.object({
-  youtubeVideoId: z.string(),
-  youtubeUrl: z.string(),
-});
-
 // ============================================================================
 // YOUTUBE SERVICE
 // ============================================================================
@@ -74,14 +51,14 @@ export const youtubeService = {
    * Get connected YouTube account information
    */
   async getAccount(): Promise<ApiSuccessResponse<YouTubeAccount | null>> {
-    return apiClient.get("/api/YouTube/account", YouTubeAccountSchema.nullable());
+    return apiClient.get("/api/youtube/account", YouTubeAccountSchema.nullable());
   },
 
   /**
    * Get YouTube OAuth authorization URL
    */
   async getAuthUrl(): Promise<ApiSuccessResponse<YouTubeAuthUrlResponse>> {
-    return apiClient.get("/api/YouTube/auth-url", YouTubeAuthUrlResponseSchema);
+    return apiClient.get("/api/youtube/auth-url", YouTubeAuthUrlResponseSchema);
   },
 
   /**
@@ -89,7 +66,7 @@ export const youtubeService = {
    */
   async handleCallback(code: string): Promise<ApiSuccessResponse<YouTubeAccount>> {
     return apiClient.post(
-      "/api/YouTube/callback",
+      "/api/youtube/callback",
       { code },
       YouTubeAccountSchema
     );
@@ -99,21 +76,7 @@ export const youtubeService = {
    * Disconnect YouTube account
    */
   async disconnect(): Promise<ApiSuccessResponse<void>> {
-    return apiClient.post("/api/YouTube/disconnect", {}, z.void());
-  },
-
-  /**
-   * Publish a video to YouTube
-   */
-  async publishVideo(
-    videoId: string,
-    request: YouTubePublishRequest
-  ): Promise<ApiSuccessResponse<YouTubePublishResponse>> {
-    return apiClient.post(
-      `/api/YouTube/publish/${videoId}`,
-      request,
-      YouTubePublishResponseSchema
-    );
+    return apiClient.post("/api/youtube/disconnect", {}, z.void());
   },
 
   /**

@@ -9,6 +9,8 @@
  * `produce` owns its error reporting (emit a domain error event); a throw
  * that escapes it just closes the stream.
  */
+import { logger } from "../lib/logger.js";
+
 export function eventStreamResponse<E>(
   produce: (emit: (event: E) => void) => Promise<void>,
   { encode, heartbeat, heartbeatMs }: { encode: (event: E) => string; heartbeat: E; heartbeatMs: number },
@@ -29,7 +31,7 @@ export function eventStreamResponse<E>(
       };
       timer = setInterval(() => emit(heartbeat), heartbeatMs);
       void produce(emit)
-        .catch((err) => console.error("[event-stream] producer failed:", err instanceof Error ? err.message : err))
+        .catch((err) => logger.error("[event-stream] producer failed", err))
         .finally(() => {
           clearInterval(timer);
           if (closed) return;

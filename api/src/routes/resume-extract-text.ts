@@ -20,13 +20,13 @@ import { extractResumeTextFromUploads } from "../services/resume/uploadText.js";
 import { ocrResumeImage } from "./resume-parse.js";
 import { gateUploadOcr } from "./resume-upload-ocr-gate.js";
 import { fail, ok } from "../utils/response.js";
+import { readFormFiles } from "../utils/multipart.js";
 
 export async function resumeExtractTextHandler(c: Context<AppEnv>): Promise<Response> {
   if (!(c.req.header("Content-Type") ?? "").includes("multipart/form-data")) {
     return c.json(fail("VALIDATION_ERROR", "Upload the file as multipart/form-data under `file`."), 400);
   }
-  const form = await c.req.formData().catch(() => null);
-  const files = (form?.getAll("file") ?? []).filter((f): f is File => f instanceof File);
+  const { files } = await readFormFiles(c);
   if (files.length === 0) return c.json(fail("VALIDATION_ERROR", "No file provided."), 400);
 
   const ocr = await gateUploadOcr(c, files, "extract_text");

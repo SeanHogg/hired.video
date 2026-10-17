@@ -36,6 +36,8 @@ import { tokenBudgetFor } from "../services/adapters/ai-stream-response.js";
 import { isAbortError } from "../utils/abort.js";
 import { eventStreamResponse } from "../utils/event-stream.js";
 import { fail, ok } from "../utils/response.js";
+import { readFormFiles } from "../utils/multipart.js";
+import { logger } from "../lib/logger.js";
 
 type Ctx = Context<AppEnv>;
 
@@ -77,7 +79,7 @@ export async function resumeParseHandler(c: Ctx): Promise<Response> {
         // Client gone — drop the stream quietly. Do not emit PARSE_FAILED
         // (nothing is listening) and do not treat abort as a parse error.
         if (isAbortError(err) || c.req.raw.signal.aborted) return;
-        console.error("[parse] stream failed:", err instanceof Error ? err.message : err);
+        logger.error("[parse] stream failed", { error: err instanceof Error ? err.message : err });
         emit({ type: "error", code: "PARSE_FAILED", message: NOTHING_TO_READ });
       }
     },
@@ -91,8 +93,7 @@ async function readParseInput(c: Ctx): Promise<ParseInput | null> {
     // `getAll("file")` — a scanned PDF has no text layer, so the browser
     // rasterises its pages and uploads them as an image sequence; the shared
     // intake joins those transcripts back into one document.
-    const form = await c.req.formData().catch(() => null);
-    const files = (form?.getAll("file") ?? []).filter((f): f is File => f instanceof File);
+    const { files } = await readFormFiles(c);
     return files.length > 0 ? { kind: "files", files } : null;
   }
   const body = (await c.req.json().catch(() => ({}))) as { parsedContent?: unknown; content?: unknown; text?: unknown };

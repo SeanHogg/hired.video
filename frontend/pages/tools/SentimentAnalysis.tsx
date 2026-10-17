@@ -28,15 +28,14 @@ import SentimentRecommendations from "@/components/tools/SentimentRecommendation
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { sentimentService } from "@/lib/services/sentiment-service";
-import { resumeService } from "@/lib/services/resume-service";
 import { RESUME_TEXT_FILE_ACCEPT, isResumeTextFile } from "@/lib/services/resume-text";
 import { appendDiagnosticReference } from "@/lib/llm-diagnostic";
-import { jobService } from "@/lib/services/job-service";
-import { useQuery } from "@tanstack/react-query";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolShell } from "@/components/tools/ToolShell";
 import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
+import { useSavedJobs } from "@/hooks/queries/use-jobs";
 
 export default function SentimentAnalysis() {
   const { t } = useTranslation();
@@ -95,18 +94,10 @@ export default function SentimentAnalysis() {
   }, [restored, isAuthenticated]);
 
   // Fetch user's resumes if authenticated
-  const { data: resumes = [] } = useQuery({
-    queryKey: ["resumes"],
-    queryFn: () => resumeService.getUserResumes(),
-    enabled: isAuthenticated,
-  });
+  const { data: resumes = [] } = useUserResumes();
 
   // Fetch user's saved jobs for the "Saved Jobs" tab.
-  const { data: savedJobs = [] } = useQuery({
-    queryKey: ["saved-jobs"],
-    queryFn: () => jobService.getSavedJobs(),
-    enabled: isAuthenticated,
-  });
+  const { data: savedJobs = [] } = useSavedJobs();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();

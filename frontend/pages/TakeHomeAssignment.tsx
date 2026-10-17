@@ -43,11 +43,10 @@ export default function TakeHomeAssignment() {
     if (!token) return;
     let cancelled = false;
     apiClient
-      .get(`/api/take-home-invites/by-token/${encodeURIComponent(token)}`)
-      .then((res) => {
+      .fetchData<InviteResponse | null>(`/api/take-home-invites/by-token/${encodeURIComponent(token)}`)
+      .then((payload) => {
         if (cancelled) return;
-        const payload = (res as any).data?.data ?? (res as any).data ?? null;
-        setData(payload as InviteResponse);
+        setData(payload ?? null);
         // Auto-mark started on first view so the recruiter knows the candidate opened it.
         apiClient
           .post(`/api/take-home-invites/by-token/${encodeURIComponent(token)}/start`, {})

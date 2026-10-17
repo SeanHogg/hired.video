@@ -6,21 +6,10 @@
  */
 
 import { Building } from "lucide-react";
+import { formatDateMedium } from "@/lib/format";
 
 import { Badge } from "@/components/ui/badge";
 import type { ArtifactViewer } from "@/lib/analytics/artifact-metrics";
-
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return iso;
-  }
-}
 
 interface Props {
   viewers: ArtifactViewer[];
@@ -115,7 +104,7 @@ export default function ViewerList({ viewers, loading }: Props) {
                 </td>
               )}
               <td className="py-2.5 text-right text-muted-foreground text-xs">
-                {formatDate(viewer.lastViewed)}
+                {formatDateMedium(viewer.lastViewed)}
               </td>
             </tr>
           ))}

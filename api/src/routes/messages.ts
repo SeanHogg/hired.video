@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { requestEnv } from "../utils/env.js";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, AppEnv } from "../types/index.js";
@@ -7,20 +8,18 @@ import { getDb, schema } from "../db/index.js";
 import { buildApiDeps } from "../services/apiDeps.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { aiFailure } from "../services/adapters/llm-error.js";
+import { estimateTokens } from "../services/adapters/llm-stream.js";
 import { checkAIUsage, requirePro } from "../middleware/tierEnforcement.js";
 import {
   TIER_COPY,
   PERSONALIZE_TIER,
   type PersonalizeResponse,
 } from "../../../shared/tier-copy.js";
+import { bumpInboxFor } from "../services/messaging/inboxCacheVersion.js";
 
 const { aiChatSessions, aiChatMessages } = schema;
 
 export const messageRoutes = new Hono<AppEnv>();
-
-function estimateTokens(text: string): number {
-  return Math.max(1, Math.round(text.length / 4));
-}
 
 function generateMockResponse(input: string) {
   const normalized = (input ?? "").toLowerCase();
@@ -43,8 +42,8 @@ function generateMockResponse(input: string) {
       "Ask me anything about hiring, job searching, or resume building and I'll do my best to help.";
   }
 
-  const promptTokens = estimateTokens(input);
-  const completionTokens = estimateTokens(message);
+  const promptTokens = estimateTokens(input.length);
+  const completionTokens = estimateTokens(message.length);
   return { message, usage: { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens } };
 }
 
@@ -90,7 +89,7 @@ messageRoutes.post("/message", async (c) => {
     sessionId: session.id,
     role: "user",
     content: userMessage,
-    tokensUsed: estimateTokens(userMessage),
+    tokensUsed: estimateTokens(userMessage.length),
   } as any);
 
   const response = generateMockResponse(userMessage);
@@ -196,9 +195,6 @@ Return JSON: { "subject": "<concise email subject line>", "body": "<2-3 paragrap
 
 const { conversations, conversationParticipants, messages } = schema;
 
-function envOf(c: { env?: unknown }): Record<string, string | undefined> {
-  return (c.env ?? {}) as Record<string, string | undefined>;
-}
 
 /** GET /api/messages/inbox — list conversations the current user participates in */
 messageRoutes.get("/inbox", async (c) => {
@@ -225,7 +221,7 @@ messageRoutes.post("/conversations", async (c) => {
   const subject = typeof body.subject === "string" ? body.subject : "Direct message";
   const participantIds: string[] = Array.isArray(body.participantIds) ? body.participantIds : [];
 
-  const { conversations: convoRepo } = buildApiDeps(envOf(c)).repos;
+  const { conversations: convoRepo } = buildApiDeps(requestEnv(c)).repos;
   const convo = await convoRepo.insertConversation({ subject, type: "direct" });
 
   // One multi-row insert for every participant (was one insert each).
@@ -263,7 +259,7 @@ messageRoutes.get("/conversations/:id", async (c) => {
 
   // Annotate each message with whether current user has read it — receipts
   // scoped to THIS conversation (not the user's entire receipt history).
-  const readSet = await buildApiDeps(envOf(c)).repos.conversations.findReadMessageIdsInConversation(
+  const readSet = await buildApiDeps(requestEnv(c)).repos.conversations.findReadMessageIdsInConversation(
     convoId,
     uid,
   );
@@ -305,6 +301,8 @@ messageRoutes.post("/conversations/:id/send", async (c) => {
 
   // Touch conversation updatedAt for inbox ordering
   await db.update(conversations).set({ updatedAt: new Date() } as any).where(eq(conversations.id, convoId));
+  // New last-message preview + unread counts in every participant's cached inbox.
+  bumpInboxFor(await buildApiDeps(requestEnv(c)).repos.conversations.findParticipantUserIds(convoId));
 
   return c.json(success(msg), 201);
 });
@@ -328,7 +326,7 @@ messageRoutes.put("/conversations/:id/read", async (c) => {
   // One read + one multi-row receipt insert (only messages not already
   // read and not sent by the user). `markedRead` keeps its prior meaning:
   // the count of non-deleted messages in the conversation.
-  const markedRead = await buildApiDeps(envOf(c)).repos.conversations.markConversationReadForUser(
+  const markedRead = await buildApiDeps(requestEnv(c)).repos.conversations.markConversationReadForUser(
     convoId,
     uid,
     new Date(),

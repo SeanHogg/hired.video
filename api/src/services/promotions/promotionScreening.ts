@@ -12,6 +12,7 @@
  */
 import { z } from "zod";
 import type { LLMClient } from "../adapters/llm-client.js";
+import { logger } from "../../lib/logger.js";
 
 export type ScreeningVerdict = "pass" | "flag" | "block" | "unscreened";
 
@@ -51,7 +52,7 @@ export async function screenPromotion(args: {
     );
     return { verdict: data.verdict, notes: data.reason };
   } catch (err) {
-    console.warn("[promotions] screening unavailable:", err instanceof Error ? err.message : err);
+    logger.warn("[promotions] screening unavailable", err);
     return { verdict: "unscreened", notes: null };
   }
 }

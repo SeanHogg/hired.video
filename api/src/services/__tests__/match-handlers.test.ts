@@ -27,10 +27,10 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
 import {
-  handleAnalyze,
-  handleByContent,
-  handleByid,
-  handleInsights,
+  handleAnalyze as analyzeUseCase,
+  handleByContent as byContentUseCase,
+  handleByid as byidUseCase,
+  handleInsights as insightsUseCase,
   keywordScore,
   htmlToPlainText,
   jobRowToLLMText,
@@ -40,6 +40,13 @@ import {
 } from "../job/match-handlers.js";
 import type { LLMClient } from "../../services/adapters/llm-client.js";
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
+import { asHandler } from "../../handlers/shared.js";
+
+// Use cases return data / throw DomainError; assert the routed envelope.
+const handleAnalyze = asHandler(analyzeUseCase);
+const handleByContent = asHandler(byContentUseCase);
+const handleByid = asHandler(byidUseCase);
+const handleInsights = asHandler(insightsUseCase);
 
 // ---------------------------------------------------------------------------
 // Fake LLM

@@ -56,6 +56,7 @@ export const contentReports = pgTable(
     uniqueIndex("uq_content_reports_active")
       .on(t.reporterId, t.entityType, t.entityId)
       .where(sql`${t.status} IN ('pending', 'reviewing')`),
+    index("idx_content_reports_resolved_by").on(t.resolvedBy),
   ],
 );
 

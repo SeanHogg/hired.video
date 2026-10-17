@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { formatCentsPlain } from "@/lib/format";
 import {
   Sheet,
   SheetContent,
@@ -169,10 +170,6 @@ export function PayoutProcessingPanel({ open, onOpenChange }: PayoutProcessingPa
     }
   };
 
-  const formatCurrency = (cents: number) => {
-    return `$${(cents / 100).toFixed(2)}`;
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -238,7 +235,7 @@ export function PayoutProcessingPanel({ open, onOpenChange }: PayoutProcessingPa
                           </div>
                         </div>
                         <div className="text-right space-y-2">
-                          <p className="text-xl font-bold">{formatCurrency(payout.amountCents)}</p>
+                          <p className="text-xl font-bold">{formatCentsPlain(payout.amountCents)}</p>
                           {getStatusBadge(payout.status)}
                           <div className="flex space-x-2">
                             <Button
@@ -265,7 +262,7 @@ export function PayoutProcessingPanel({ open, onOpenChange }: PayoutProcessingPa
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Approve Payout</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Approve payout of {formatCurrency(payout.amountCents)} for {payout.affiliateUserName}?
+                                        Approve payout of {formatCentsPlain(payout.amountCents)} for {payout.affiliateUserName}?
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <div className="space-y-2">
@@ -300,7 +297,7 @@ export function PayoutProcessingPanel({ open, onOpenChange }: PayoutProcessingPa
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Reject Payout</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Reject payout of {formatCurrency(payout.amountCents)} for {payout.affiliateUserName}?
+                                        Reject payout of {formatCentsPlain(payout.amountCents)} for {payout.affiliateUserName}?
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <div className="space-y-2">
@@ -339,7 +336,7 @@ export function PayoutProcessingPanel({ open, onOpenChange }: PayoutProcessingPa
                                   <AlertDialogHeader>
                                     <AlertDialogTitle>Process Payout</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      This will initiate the payout of {formatCurrency(payout.amountCents)} to {payout.affiliateUserName}.
+                                      This will initiate the payout of {formatCentsPlain(payout.amountCents)} to {payout.affiliateUserName}.
                                       The payout will be processed immediately.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
@@ -395,7 +392,7 @@ export function PayoutProcessingPanel({ open, onOpenChange }: PayoutProcessingPa
                       </div>
                       <div>
                         <Label className="text-sm font-medium">Amount</Label>
-                        <p className="text-2xl font-bold">{formatCurrency(selectedPayout.amountCents)}</p>
+                        <p className="text-2xl font-bold">{formatCentsPlain(selectedPayout.amountCents)}</p>
                       </div>
                       <div>
                         <Label className="text-sm font-medium">Requested</Label>

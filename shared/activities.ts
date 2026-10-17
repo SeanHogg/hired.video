@@ -22,16 +22,8 @@ export type ActivityPayType = (typeof ACTIVITY_PAY_TYPES)[number];
 export const ACTIVITY_STATUSES = ["assigned", "submitted", "approved", "rejected"] as const;
 export type ActivityStatus = (typeof ACTIVITY_STATUSES)[number];
 
-/** Statuses an employer can still act on (approve / reject) vs. terminal. */
-export const ACTIVITY_ACTIONABLE_STATUSES: ActivityStatus[] = ["submitted"];
-export const ACTIVITY_TERMINAL_STATUSES: ActivityStatus[] = ["approved"];
-
 export function isActivityPayType(v: unknown): v is ActivityPayType {
   return typeof v === "string" && (ACTIVITY_PAY_TYPES as readonly string[]).includes(v);
-}
-
-export function isActivityStatus(v: unknown): v is ActivityStatus {
-  return typeof v === "string" && (ACTIVITY_STATUSES as readonly string[]).includes(v);
 }
 
 /** Employer's input when assigning an activity. `title` doubles as the

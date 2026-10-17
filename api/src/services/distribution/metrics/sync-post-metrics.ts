@@ -38,6 +38,7 @@ import {
   metricsGroupCost,
   metricsPostsThatFit,
 } from "../subrequest-budget.js";
+import { logger } from "../../../lib/logger.js";
 
 /** Posts the cron considers per run; the subrequest budget decides how many it reads. */
 export const METRICS_SYNC_BATCH = 20;
@@ -100,7 +101,7 @@ export async function syncPublicationMetrics(
       }
     } catch (err) {
       summary.groupsFailed++;
-      console.warn(`[distribution] ${platform} metrics read failed:`, err instanceof Error ? err.message : err);
+      logger.warn("[distribution] metrics read failed", { platform, error: err });
     }
   }
   if (rows.length === 0) return summary;
@@ -121,5 +122,5 @@ export async function processExternalPostMetrics(env: SocialPublisherEnv | undef
   });
   if (due.length === 0) return;
   const summary = await syncPublicationMetrics(due, env);
-  console.log("[scheduled] external post metrics", summary);
+  logger.info("[scheduled] external post metrics", summary);
 }

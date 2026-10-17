@@ -16,16 +16,9 @@ import { eq, and, sql } from "drizzle-orm";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { isAdminRole } from "../domains/billing/audience.js";
+import { adminMiddleware } from "../middleware/superAdmin.js";
 
 export const adminTemplatesReviewRoutes = new Hono<AppEnv>();
-
-function requireAdmin(c: any): true | Response {
-  const user = c.var.user;
-  if (!user) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  if (!isAdminRole(user)) return c.json(error("FORBIDDEN", "Admin role required"), 403);
-  return true;
-}
 
 type ReviewKind = "studio" | "job";
 
@@ -40,9 +33,7 @@ function tableForKind(kind: string): null | { table: any; kindLabel: ReviewKind 
   return null;
 }
 
-adminTemplatesReviewRoutes.get("/", async (c) => {
-  const guard = requireAdmin(c);
-  if (guard !== true) return guard;
+adminTemplatesReviewRoutes.get("/", adminMiddleware, async (c) => {
   const db = getDb();
   const items: Array<{ kind: ReviewKind; row: Record<string, unknown> }> = [];
   for (const kind of ["studio", "job"] as ReviewKind[]) {
@@ -65,9 +56,7 @@ adminTemplatesReviewRoutes.get("/", async (c) => {
 
 const DecisionSchema = z.object({ notes: z.string().max(5_000).optional() });
 
-adminTemplatesReviewRoutes.post("/:kind/:id/approve", async (c) => {
-  const guard = requireAdmin(c);
-  if (guard !== true) return guard;
+adminTemplatesReviewRoutes.post("/:kind/:id/approve", adminMiddleware, async (c) => {
   const target = tableForKind(c.req.param("kind"));
   if (!target) return c.json(error("VALIDATION_ERROR", "kind must be 'studio' or 'job'"), 400);
   const parsed = DecisionSchema.safeParse(await c.req.json().catch(() => ({})));
@@ -93,9 +82,7 @@ adminTemplatesReviewRoutes.post("/:kind/:id/approve", async (c) => {
   }
 });
 
-adminTemplatesReviewRoutes.post("/:kind/:id/reject", async (c) => {
-  const guard = requireAdmin(c);
-  if (guard !== true) return guard;
+adminTemplatesReviewRoutes.post("/:kind/:id/reject", adminMiddleware, async (c) => {
   const target = tableForKind(c.req.param("kind"));
   if (!target) return c.json(error("VALIDATION_ERROR", "kind must be 'studio' or 'job'"), 400);
   const parsed = DecisionSchema.safeParse(await c.req.json().catch(() => ({})));

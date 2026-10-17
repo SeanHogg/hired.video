@@ -3,9 +3,10 @@
  * charge is opened in the payment widget and later verified from the
  * provider's own record (never from client claims).
  *
- * Shared by token packs (services/billing/token-packs) and paid boosts
- * (services/advertising/boost-checkout.ts). Helcim today: `getTransaction`
- * re-reads the card transaction by the id the widget reported.
+ * Every /api/checkout kind (services/billing/checkout: boosts, paid courses,
+ * token packs) takes its money through this port. Helcim today:
+ * `getTransaction` re-reads the card transaction by the id the widget
+ * reported.
  */
 
 import { tryGetPaymentProvider } from "./index.js";

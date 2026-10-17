@@ -17,7 +17,8 @@ import { and, eq, isNull, isNotNull, sql } from "drizzle-orm";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { isAdminRole } from "../domains/billing/audience.js";
+import { adminMiddleware } from "../middleware/superAdmin.js";
+import { requestEnv } from "../utils/env.js";
 import { encryptTaxId } from "../services/payout/encryption.js";
 import {
   getAnnualReport,
@@ -30,17 +31,6 @@ export const adminPayoutRoutes = new Hono<AppEnv>();
 
 const { payoutProfiles } = schema;
 
-function requireAdmin(c: any): true | Response {
-  const user = c.var.user;
-  if (!user) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  if (!isAdminRole(user)) return c.json(error("FORBIDDEN", "Admin role required"), 403);
-  return true;
-}
-
-function getEnv(c: unknown): Record<string, string | undefined> {
-  return (c as { env?: Record<string, string | undefined> }).env ?? {};
-}
-
 // ---------------------------------------------------------------------------
 // POST /backfill-tax-ids — one-time plaintext → ciphertext migration (#775)
 //
@@ -52,12 +42,9 @@ function getEnv(c: unknown): Record<string, string | undefined> {
 // One-shot admin route (not a worker) — few rows, manually triggered after
 // deploy.
 // ---------------------------------------------------------------------------
-adminPayoutRoutes.post("/backfill-tax-ids", async (c) => {
-  const guard = requireAdmin(c);
-  if (guard !== true) return guard;
-
+adminPayoutRoutes.post("/backfill-tax-ids", adminMiddleware, async (c) => {
   const db = getDb();
-  const env = getEnv(c);
+  const env = requestEnv(c);
 
   // Rows needing migration: plaintext present, ciphertext absent.
   const pending = await db
@@ -148,10 +135,7 @@ adminPayoutRoutes.post("/backfill-tax-ids", async (c) => {
 // year keeps mutating as payouts settle, so it is NOT cached — only fully
 // past years are. Dates are revived from KV's ISO strings.
 // ---------------------------------------------------------------------------
-adminPayoutRoutes.get("/tax-year/:year", async (c) => {
-  const guard = requireAdmin(c);
-  if (guard !== true) return guard;
-
+adminPayoutRoutes.get("/tax-year/:year", adminMiddleware, async (c) => {
   const year = Number.parseInt(c.req.param("year"), 10);
   if (!Number.isInteger(year)) {
     return c.json(error("VALIDATION_ERROR", "year must be a 4-digit integer"), 400);

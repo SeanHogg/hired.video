@@ -9,6 +9,7 @@
 // <ShareMenu> (LinkedIn / X / Facebook / WhatsApp / Email / copy / native).
 
 import { useEffect, useState } from "react";
+import { formatDurationMinutes, formatListPriceCents } from "@/lib/format";
 import { publicProfilePath } from "@shared/public-paths";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
@@ -96,20 +97,6 @@ interface CoursePublicResponse {
   course: CourseDetail;
   modules: CourseModule[];
   lessons: CourseLesson[];
-}
-
-function formatPrice(cents: number | null): string {
-  if (cents == null) return "Contact for pricing";
-  if (cents === 0) return "Free";
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
-function formatDuration(minutes: number | null): string | null {
-  if (minutes == null) return null;
-  if (minutes < 60) return `${minutes}m`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 function FactCard({ label, value }: { label: string; value: string }) {
@@ -214,7 +201,7 @@ export default function CoursePublicDetail() {
 
   const { course, modules, lessons } = data;
   const shareUrl = `${window.location.origin}/courses/${course.author.slug}/${course.slug}`;
-  const duration = formatDuration(course.estimatedMinutes);
+  const duration = formatDurationMinutes(course.estimatedMinutes);
   const lessonsByModule = (moduleId: string) =>
     lessons
       .filter((l) => l.moduleId === moduleId)
@@ -285,7 +272,7 @@ export default function CoursePublicDetail() {
       <ShareMenu url={shareUrl} title={course.title} text={course.summary ?? undefined} />
       <WishlistButton entityType="course" entityId={course.id} showLabel />
       <span className="font-semibold tabular-nums">
-        {formatPrice(course.priceCents)}
+        {formatListPriceCents(course.priceCents, { free: true })}
       </span>
       {enrollment && (
         <UnenrollButton

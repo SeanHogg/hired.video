@@ -28,6 +28,7 @@ import { studioProjects } from "../db/schema/resumes.js";
 import { gamePlayInvites } from "../db/schema/games.js";
 import { canActFor } from "../services/studio/workspace.js";
 import { sendPushToUser } from "../services/push/web-push.js";
+import { randomBase64Url } from "../utils/crypto.js";
 
 export const gamesRoutes = new Hono<AppEnv>();
 
@@ -217,16 +218,10 @@ const CreateInviteSchema = z.object({
   restrictToUserId: UuidLikeSchema.optional(),
 });
 
-/** URL-safe random token. 18 bytes → ~24 base64url chars. Enough
- *  entropy to make guessing impractical; short enough that the share
- *  link fits in a single tap-to-copy line. */
-function randomInviteToken(): string {
-  const bytes = new Uint8Array(18);
-  crypto.getRandomValues(bytes);
-  let s = "";
-  for (const b of bytes) s += String.fromCharCode(b);
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
+/** Invite tokens are URL-safe: 18 random bytes → 24 base64url chars. Enough
+ *  entropy to make guessing impractical; short enough that the share link
+ *  fits in a single tap-to-copy line. */
+const INVITE_TOKEN_BYTES = 18;
 
 gamesRoutes.post("/:projectId/invites", async (c) => {
   const user = c.var.user;
@@ -254,7 +249,7 @@ gamesRoutes.post("/:projectId/invites", async (c) => {
     .values({
       projectId,
       createdBy: user.sub,
-      token: randomInviteToken(),
+      token: randomBase64Url(INVITE_TOKEN_BYTES),
       label: parsed.data.label ?? null,
       maxUses: parsed.data.maxUses ?? null,
       restrictToUserId: parsed.data.restrictToUserId ?? null,

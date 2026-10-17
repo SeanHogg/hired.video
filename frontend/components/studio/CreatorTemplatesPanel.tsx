@@ -15,6 +15,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { formatPriceCents } from "@/lib/format";
 import { Loader2, Eye, EyeOff, Globe, Trash2, Edit3, ExternalLink, Store, ImagePlus } from "lucide-react";
 import {
   Sheet,
@@ -48,11 +49,6 @@ const VISIBILITY_BADGE: Record<StudioTemplate["visibility"], { label: string; cl
   unlisted: { label: "Unlisted", className: "bg-amber-500/15 text-amber-300 border-amber-500/40" },
   private:  { label: "Private",  className: "bg-muted text-muted-foreground border-border" },
 };
-
-function formatPrice(cents: number, currency: string): string {
-  if (cents === 0) return "Free";
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
-}
 
 export default function CreatorTemplatesPanel({ open, onOpenChange, onEditTemplate }: Props) {
   const { t: tr } = useTranslation();
@@ -245,7 +241,7 @@ function TemplateRow({ template: t, busy, onEdit, onChangeVisibility, onChangeTh
             </Badge>
           </div>
           <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-            <span className="font-medium text-foreground">{formatPrice(t.priceCents, t.currency)}</span>
+            <span className="font-medium text-foreground">{formatPriceCents(t.priceCents, t.currency)}</span>
             <span className="flex items-center gap-0.5"><Eye className="w-2.5 h-2.5" />{t.viewCount}</span>
             <span>{t.purchaseCount} sold</span>
           </div>

@@ -1,7 +1,6 @@
 import {
   pgTable,
   uuid,
-  text,
   varchar,
   boolean,
   timestamp,
@@ -60,6 +59,7 @@ export const stateProvinces = pgTable(
       t.countryId,
       sql`lower(${t.name})`,
     ),
+    index("idx_state_provinces_country_id").on(t.countryId),
   ],
 );
 
@@ -98,14 +98,4 @@ export const cities = pgTable(
 export type City = typeof cities.$inferSelect;
 export type NewCity = typeof cities.$inferInsert;
 
-export const postalZipCodes = pgTable("postal_zip_codes", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  cityId: uuid("city_id").references(() => cities.id, { onDelete: "set null" }),
-  code: varchar("code", { length: 20 }).notNull(),
-  latitude: doublePrecision("latitude"),
-  longitude: doublePrecision("longitude"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
 
-export type PostalZipCode = typeof postalZipCodes.$inferSelect;
-export type NewPostalZipCode = typeof postalZipCodes.$inferInsert;

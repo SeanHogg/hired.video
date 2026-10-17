@@ -16,8 +16,8 @@
  * when that template was written.
  */
 
-import { randomBytes } from "crypto";
 import { asc, desc, eq, inArray } from "drizzle-orm";
+import { randomHex } from "../../utils/crypto.js";
 import type { Db } from "../../db/index.js";
 import { schema } from "../../db/index.js";
 import {
@@ -41,7 +41,7 @@ const { screeningRequests, screeningRequestItems } = schema;
 const TOKEN_BYTES = 24; // 48 hex chars — fits varchar(64), unguessable bearer.
 
 function newToken(): string {
-  return randomBytes(TOKEN_BYTES).toString("hex");
+  return randomHex(TOKEN_BYTES);
 }
 
 /** Parse a stored jsonb config back into the typed shape (it was validated at

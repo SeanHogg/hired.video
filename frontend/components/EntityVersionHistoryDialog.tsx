@@ -14,6 +14,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, RotateCcw } from "lucide-react";
+import { formatRelativeShort } from "@/lib/format";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,17 +57,6 @@ interface Props {
   /** Retention copy. Studio + resumes share 50-cap / 30-day; surfaced so
    *  the copy stays in lockstep with the server enforcement. */
   retentionHint?: string;
-}
-
-function formatRelative(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(ms / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
 }
 
 export default function EntityVersionHistoryDialog({
@@ -162,7 +152,7 @@ export default function EntityVersionHistoryDialog({
                     </div>
                     <div className="text-[10px] text-muted-foreground truncate">
                       {v.label ?? (v.isAutosave ? "autosave" : "snapshot")} ·{" "}
-                      {formatRelative(v.createdAt)}
+                      {formatRelativeShort(v.createdAt)}
                     </div>
                   </div>
                   <Button

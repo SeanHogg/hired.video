@@ -23,7 +23,7 @@ export const interviewSessions = pgTable("interview_sessions", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  index("idx_interview_sessions_share_token").on(t.shareToken),
+  index("idx_interview_sessions_user_id").on(t.userId),
 ]);
 
 export type InterviewSession = typeof interviewSessions.$inferSelect;

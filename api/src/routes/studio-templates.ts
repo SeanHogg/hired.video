@@ -42,16 +42,17 @@ import {
 } from "../services/studio/StudioTemplatesService.js";
 import { StudioTemplateLicensesService } from "../services/studio/StudioTemplateLicensesService.js";
 import { GRANTABLE_TEMPLATE_KINDS } from "../db/schema/studiotemplates.js";
+import { clampLimit } from "../utils/pagination.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+
+/** `?limit` for the public listings: absent → service default; else clamp 1..200 (default 100). */
+function optionalTemplateLimit(raw: string | undefined): number | undefined {
+  return raw ? clampLimit(raw, 100, 200) : undefined;
+}
 
 export const studioTemplatesRoutes = new Hono<AppEnv>();
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-function requireUserId(c: any): string | Response {
-  const userId = c.var.user?.sub as string | undefined;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  return userId;
-}
 
 function statusForCode(code: StudioTemplatesErrorCode): number {
   switch (code) {
@@ -169,8 +170,9 @@ function invalidBody(c: Context<AppEnv>, flattened: unknown) {
 }
 
 studioTemplatesRoutes.post("/templates", async (c) => {
-  const userId = requireUserId(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const parsed = PublishSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return invalidBody(c, parsed.error.flatten());
   const { sourceProjectId, ...fields } = parsed.data;
@@ -181,8 +183,9 @@ studioTemplatesRoutes.post("/templates", async (c) => {
 // (the live one in `videoScript`, else the résumé's stored design) becomes a
 // résumé template — same rules as any publish; owner-only, content stripped.
 studioTemplatesRoutes.post("/templates/from-resume/:resumeId", async (c) => {
-  const userId = requireUserId(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const resumeId = UuidLikeSchema.safeParse(c.req.param("resumeId"));
   const parsed = PublishFieldsSchema.safeParse(await c.req.json().catch(() => null));
   if (!resumeId.success) return invalidBody(c, resumeId.error.flatten());
@@ -191,8 +194,9 @@ studioTemplatesRoutes.post("/templates/from-resume/:resumeId", async (c) => {
 });
 
 studioTemplatesRoutes.get("/templates/me", async (c) => {
-  const userId = requireUserId(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const rows = await svc().listForCreator(userId);
   return c.json(success(rows));
 });
@@ -203,8 +207,9 @@ studioTemplatesRoutes.get("/templates/me", async (c) => {
 // `/templates/me/earnings` rather than `/templates/earnings/me` so the
 // `/templates/me` prefix scopes both reads under one mental model.
 studioTemplatesRoutes.get("/templates/me/earnings", async (c) => {
-  const userId = requireUserId(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const data = await svc().earningsForCreator(userId);
   return c.json(success(data));
 });
@@ -216,8 +221,9 @@ studioTemplatesRoutes.get("/templates/me/earnings", async (c) => {
 // `owner` licenses are excluded — those mirror `/templates/me` and the
 // consumer wants Created and Purchased rendered as distinct lists.
 studioTemplatesRoutes.get("/templates/me/licensed", async (c) => {
-  const userId = requireUserId(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const rows = await licenses().listLicensedStudioTemplatesForUser(userId);
   return c.json(success(rows));
 });
@@ -228,8 +234,7 @@ studioTemplatesRoutes.get("/templates/me/licensed", async (c) => {
 // listPublic supports ?search and ?limit; both are optional and clamped.
 studioTemplatesRoutes.get("/templates/public", async (c) => {
   const search = c.req.query("search")?.trim() || undefined;
-  const limitParam = c.req.query("limit");
-  const limit = limitParam ? Math.max(1, Math.min(200, Number(limitParam) || 100)) : undefined;
+  const limit = optionalTemplateLimit(c.req.query("limit"));
   const rows = await svc().listPublicCached({ search, limit });
   return c.json(success(rows));
 });
@@ -239,8 +244,7 @@ studioTemplatesRoutes.get("/templates/public", async (c) => {
 // match the literal `public` segment as id="public".
 studioTemplatesRoutes.get("/templates/public/by-user/:userId", async (c) => {
   const userId = c.req.param("userId");
-  const limitParam = c.req.query("limit");
-  const limit = limitParam ? Math.max(1, Math.min(200, Number(limitParam) || 100)) : undefined;
+  const limit = optionalTemplateLimit(c.req.query("limit"));
   const rows = await svc().listPublicForCreatorCached(userId, { limit });
   return c.json(success(rows));
 });
@@ -256,8 +260,9 @@ studioTemplatesRoutes.get("/templates/listing/:slug", async (c) => {
 });
 
 studioTemplatesRoutes.get("/templates/licenses/me", async (c) => {
-  const userId = requireUserId(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const rows = await licenses().listLicensesForUser(userId);
   return c.json(success(rows));
 });
@@ -275,8 +280,9 @@ studioTemplatesRoutes.get("/templates/:id", async (c) => {
 });
 
 studioTemplatesRoutes.patch("/templates/:id", async (c) => {
-  const userId = requireUserId(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
 
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => null);
@@ -303,8 +309,9 @@ studioTemplatesRoutes.patch("/templates/:id", async (c) => {
 });
 
 studioTemplatesRoutes.delete("/templates/:id", async (c) => {
-  const userId = requireUserId(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const id = c.req.param("id");
   try {
     await svc().deleteById(id, userId);
@@ -319,8 +326,9 @@ studioTemplatesRoutes.delete("/templates/:id", async (c) => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 studioTemplatesRoutes.post("/templates/:id/claim", async (c) => {
-  const userId = requireUserId(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const id = c.req.param("id");
   try {
     const license = await licenses().claimFree(userId, id);
@@ -336,8 +344,9 @@ studioTemplatesRoutes.post("/templates/:id/claim", async (c) => {
 // other devices. The Stripe / Helcim webhook can also POST here — both
 // paths are idempotent thanks to uq_template_licenses_grant.
 studioTemplatesRoutes.post("/templates/license", async (c) => {
-  const userId = requireUserId(c);
-  if (typeof userId !== "string") return userId;
+  const auth = requireUser(c);
+  if ("response" in auth) return auth.response;
+  const { userId } = auth;
   const body = await c.req.json().catch(() => null);
   const parsed = LicensePurchaseSchema.safeParse(body);
   if (!parsed.success) {

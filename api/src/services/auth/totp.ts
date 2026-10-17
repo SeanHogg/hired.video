@@ -13,6 +13,7 @@
 
 import { eq } from "drizzle-orm";
 import { schema } from "../../db/index.js";
+import { hmac } from "../../utils/crypto.js";
 
 const { users } = schema;
 
@@ -58,18 +59,6 @@ function base32Decode(b32: string): Uint8Array {
   return new Uint8Array(out);
 }
 
-async function hmacSha1(key: Uint8Array, msg: Uint8Array): Promise<Uint8Array> {
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw",
-    key,
-    { name: "HMAC", hash: "SHA-1" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", cryptoKey, msg);
-  return new Uint8Array(sig);
-}
-
 /** Compute the TOTP for a given secret + counter (Unix-time / period). */
 async function totpAt(secretB32: string, counter: number): Promise<string> {
   const key = base32Decode(secretB32);
@@ -78,13 +67,14 @@ async function totpAt(secretB32: string, counter: number): Promise<string> {
   // 64-bit big-endian counter
   view.setUint32(0, Math.floor(counter / 0x100000000));
   view.setUint32(4, counter >>> 0);
-  const hmac = await hmacSha1(key, new Uint8Array(buf));
-  const offset = hmac[hmac.length - 1]! & 0x0f;
+  // RFC 6238 mandates HMAC-SHA1 (what every authenticator app implements).
+  const mac = await hmac("SHA-1", key, buf);
+  const offset = mac[mac.length - 1]! & 0x0f;
   const code =
-    ((hmac[offset]! & 0x7f) << 24) |
-    ((hmac[offset + 1]! & 0xff) << 16) |
-    ((hmac[offset + 2]! & 0xff) << 8) |
-    (hmac[offset + 3]! & 0xff);
+    ((mac[offset]! & 0x7f) << 24) |
+    ((mac[offset + 1]! & 0xff) << 16) |
+    ((mac[offset + 2]! & 0xff) << 8) |
+    (mac[offset + 3]! & 0xff);
   return (code % 10 ** TOTP_DIGITS).toString().padStart(TOTP_DIGITS, "0");
 }
 

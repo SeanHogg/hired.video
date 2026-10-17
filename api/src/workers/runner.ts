@@ -1,6 +1,7 @@
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import type { WorkerDefinition, WorkerRunContext, WorkerStatus, WorkerTrigger } from "./types.js";
+import { logger } from "../lib/logger.js";
 
 // Cap the size of the `details` jsonb so a worker that fails on every row
 // can't blow up the row beyond what Postgres jsonb can comfortably hold.
@@ -89,7 +90,7 @@ export async function runWorker(
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : String(err);
     status = "error";
-    console.error(`[worker:${worker.name}] run ${runId} crashed:`, err);
+    logger.error(`[worker:${worker.name}] run crashed`, { worker: worker.name, runId, error: err });
   }
 
   const completedAt = new Date();
@@ -127,19 +128,37 @@ export async function runWorker(
   };
 }
 
-// Cron-tick gate: returns true if `cadenceMs` has elapsed since the
-// last run of this worker, so it should fire on the current tick.
-// Manual triggers bypass this entirely.
-export async function isWorkerDue(worker: WorkerDefinition, now: Date = new Date()): Promise<boolean> {
-  const db = getDb();
-  const [row] = await db
-    .select({ startedAt: schema.workerRuns.startedAt })
-    .from(schema.workerRuns)
-    .where(eq(schema.workerRuns.workerName, worker.name))
-    .orderBy(sql`started_at desc`)
-    .limit(1);
+/** Cron ticks fire a few seconds either side of the minute; a worker whose
+ *  previous run started at hh:00:04 must still count as due at the next
+ *  hh:00:01 tick, or every hourly worker would drift a whole interval. */
+export const WORKER_DUE_GRACE_MS = 2 * 60 * 1000;
 
-  if (!row) return true;
-  const ageMs = now.getTime() - new Date(row.startedAt).getTime();
-  return ageMs >= worker.cadenceMs;
+/** Latest `started_at` per worker name, in ONE query (DISTINCT ON over
+ *  worker_runs (worker_name, started_at DESC)). Workers that never ran are
+ *  absent from the map. Replaces one ORDER BY … LIMIT 1 query per worker. */
+export async function findLastRunStarts(names: readonly string[]): Promise<Map<string, Date>> {
+  if (names.length === 0) return new Map();
+  const db = getDb();
+  const rows: Array<{ workerName: string; startedAt: Date }> = await db
+    .selectDistinctOn([schema.workerRuns.workerName], {
+      workerName: schema.workerRuns.workerName,
+      startedAt: schema.workerRuns.startedAt,
+    })
+    .from(schema.workerRuns)
+    .where(inArray(schema.workerRuns.workerName, [...names]))
+    .orderBy(schema.workerRuns.workerName, desc(schema.workerRuns.startedAt));
+  return new Map(rows.map((r) => [r.workerName, new Date(r.startedAt)]));
+}
+
+/** When `worker` is next due given its last cron/manual start (epoch ms).
+ *  Never ran → due now. */
+export function workerNextDueMs(worker: WorkerDefinition, lastStartedAt: Date | undefined, nowMs: number): number {
+  if (!lastStartedAt) return nowMs;
+  return lastStartedAt.getTime() + worker.cadenceMs;
+}
+
+/** Cron-tick gate: true once `cadenceMs` (less the tick grace) has elapsed
+ *  since the worker's last run. Manual triggers bypass this entirely. */
+export function isWorkerDueAt(worker: WorkerDefinition, lastStartedAt: Date | undefined, nowMs: number): boolean {
+  return workerNextDueMs(worker, lastStartedAt, nowMs) - WORKER_DUE_GRACE_MS <= nowMs;
 }

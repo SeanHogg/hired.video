@@ -8,7 +8,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
+import { renderWithProviders as render } from "@/__tests__/test-render";
 import React from "react";
 
 const { getUserResumesMock, parseJsonResumeFileMock, extractTextFromFileMock } =
@@ -29,6 +30,12 @@ vi.mock("@/lib/extract-text", () => ({
   parseJsonResumeFile: parseJsonResumeFileMock,
   extractTextFromFile: extractTextFromFileMock,
   isResumeImageFile: (file: File) => file.type.startsWith("image/"),
+}));
+
+// The resume list is read through useUserResumes, keyed by the viewer id.
+vi.mock("@/lib/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/auth")>()),
+  useAuth: () => ({ user: { id: "viewer-1" } }),
 }));
 
 import ResumeUpload from "@/components/ResumeUpload";

@@ -1,3 +1,5 @@
+import { getEnv } from "./env.js";
+
 /**
  * Constructs a public CDN URL for an R2 object key.
  *
@@ -12,10 +14,7 @@ export function cdnUrl(key: string): string {
   if (key.startsWith("http://") || key.startsWith("https://")) {
     return key;
   }
-  const base =
-    (globalThis as any).__ENV?.CDN_BASE_URL ||
-    process?.env?.CDN_BASE_URL ||
-    "https://cdn.hired.video";
+  const base = getEnv("CDN_BASE_URL") || "https://cdn.hired.video";
   // Strip trailing slash from base, leading slash from key
   const cleanBase = base.replace(/\/+$/, "");
   const cleanKey = key.replace(/^\/+/, "");
@@ -38,11 +37,7 @@ export function r2KeyFromCdnUrl(url: string | null | undefined): string | null {
     // Already a key — return as-is.
     return url.replace(/^\/+/, "") || null;
   }
-  const candidates = [
-    (globalThis as any).__ENV?.CDN_BASE_URL,
-    process?.env?.CDN_BASE_URL,
-    "https://cdn.hired.video",
-  ].filter(Boolean) as string[];
+  const candidates = [getEnv("CDN_BASE_URL"), "https://cdn.hired.video"].filter(Boolean);
   for (const base of candidates) {
     const cleanBase = base.replace(/\/+$/, "");
     if (url.startsWith(cleanBase + "/")) {

@@ -14,58 +14,53 @@
  */
 import { createLLMClient, hasAnyLLMProviderKey } from "./llm-client.js";
 import type { LLMUseCase } from "./providers.js";
+import { WORKERS_AI_TEXT_MODEL, resolveWorkersAi, runWorkersAi, type WorkersAiMeter } from "./workers-ai.js";
+import { logger } from "../../lib/logger.js";
 
 export type AiTextCaller = (systemPrompt: string, userMessage: string) => Promise<string>;
 
 /** Default input cap. A caller whose message is a whole résumé it must hand
  *  back intact (revise) raises it — a cut-off résumé can't be edited. */
 const DEFAULT_MAX_INPUT_CHARS = 12_000;
-// `@cf/meta/llama-3.1-8b-instruct` was retired 2026-05-30 (error 5028), which
-// left this fallback dead whenever the gateway was down. Check the catalog
-// (`wrangler ai models`) before changing it.
-const WORKERS_AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 // Workers AI defaults to 256 output tokens — far too few to echo a résumé as
 // JSON, so the fallback always truncated. Match the gateway profile's cap.
 const WORKERS_AI_MAX_TOKENS = 8_000;
 
-interface WorkersAiBinding {
-  run: (
-    model: string,
-    input: { messages: Array<{ role: string; content: string }>; max_tokens?: number },
-  ) => Promise<unknown>;
-}
-
-function workersAi(env: unknown): WorkersAiBinding | null {
-  const ai =
-    (env as { AI?: WorkersAiBinding } | undefined)?.AI ??
-    (globalThis as { __ENV?: { AI?: WorkersAiBinding } }).__ENV?.AI;
-  return ai && typeof ai.run === "function" ? ai : null;
-}
-
 /** True when either the gateway or Workers AI can take a call. */
 export function hasAiTextProvider(env: unknown): boolean {
-  return hasAnyLLMProviderKey(env as Parameters<typeof hasAnyLLMProviderKey>[0]) || workersAi(env) !== null;
+  return hasAnyLLMProviderKey(env as Parameters<typeof hasAnyLLMProviderKey>[0]) || resolveWorkersAi(env) !== null;
 }
 
 /**
  * The Workers AI leg on its own, for callers that already ran the gateway
  * through a richer path (e.g. `callJsonLenient`'s strict schema) and only
- * need the fallback. Null when the AI binding isn't bound.
+ * need the fallback. Null when the AI binding isn't bound. With `meter`, each
+ * call is charged to the billed user under `meter.featureKey` — the same
+ * ledger (`chargeLedger`) the gateway path charges.
  */
 export function createWorkersAiTextCaller(
   env: unknown,
-  { maxInputChars = DEFAULT_MAX_INPUT_CHARS }: { maxInputChars?: number } = {},
+  {
+    maxInputChars = DEFAULT_MAX_INPUT_CHARS,
+    meter,
+  }: { maxInputChars?: number; meter?: Omit<WorkersAiMeter, "inputChars"> } = {},
 ): AiTextCaller | null {
-  const cfAi = workersAi(env);
+  const cfAi = resolveWorkersAi(env);
   if (!cfAi) return null;
   return async (systemPrompt, userMessage) => {
-    const res = (await cfAi.run(WORKERS_AI_MODEL, {
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage.slice(0, maxInputChars) },
-      ],
-      max_tokens: WORKERS_AI_MAX_TOKENS,
-    })) as { response?: unknown } | null;
+    const userContent = userMessage.slice(0, maxInputChars);
+    const res = (await runWorkersAi(
+      cfAi,
+      WORKERS_AI_TEXT_MODEL,
+      {
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+        max_tokens: WORKERS_AI_MAX_TOKENS,
+      },
+      meter ? { ...meter, inputChars: systemPrompt.length + userContent.length } : undefined,
+    )) as { response?: unknown } | null;
     return typeof res?.response === "string" ? res.response : JSON.stringify(res);
   };
 }
@@ -92,7 +87,9 @@ export function createAiTextCaller(
     signal?: AbortSignal;
   },
 ): AiTextCaller {
-  const fallback = createWorkersAiTextCaller(env, { maxInputChars });
+  // The fallback bills the same user under the same feature key as the
+  // gateway call it stands in for.
+  const fallback = createWorkersAiTextCaller(env, { maxInputChars, meter: { user, featureKey: label } });
   const llm = hasAnyLLMProviderKey(env as Parameters<typeof hasAnyLLMProviderKey>[0])
     ? createLLMClient(env as Parameters<typeof createLLMClient>[0], user)
     : null;
@@ -114,10 +111,9 @@ export function createAiTextCaller(
         return content;
       } catch (err) {
         if (!fallback || signal?.aborted) throw err;
-        console.warn(
-          `[${label}] gateway LLM failed, falling back to Workers AI:`,
-          err instanceof Error ? err.message : err,
-        );
+        logger.warn(`[${label}] gateway LLM failed, falling back to Workers AI`, {
+          error: err instanceof Error ? err.message : err,
+        });
       }
     }
     if (fallback) return fallback(systemPrompt, userMessage);

@@ -18,7 +18,8 @@
  */
 import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/lib/auth";
+import { useApiReady, useAuth } from "@/lib/auth";
+import { queryKeys } from "@/lib/query-keys";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { usePermissionDebugger } from "@/providers/PermissionDebuggerProvider";
 import { roleAccessService } from "@/lib/services/role-access-service";
@@ -50,17 +51,20 @@ export interface UseRoleAccess {
 }
 
 export function useRoleAccess(): UseRoleAccess {
-  const { isAuthenticated } = useAuth();
+  const { user } = useAuth();
+  const apiReady = useApiReady();
   const effectiveRole = useEffectiveRole();
   const role: UserRole = isManageableRole(effectiveRole)
     ? effectiveRole
     : USER_ROLES.JOB_SEEKER;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["role-access", role],
+    // Viewer-scoped (impersonation-safe) + role-scoped (Preview-as-role).
+    // /api/bootstrap seeds the viewer's own role entry.
+    queryKey: queryKeys.roleAccess.byRole(user?.id, role),
     queryFn: () => roleAccessService.getMine(role),
     staleTime: 5 * 60 * 1000,
-    enabled: isAuthenticated,
+    enabled: apiReady,
   });
 
   // Resolve the role's overrides against the combined client registry (shared

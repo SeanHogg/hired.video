@@ -17,6 +17,7 @@
  *          embedUrl on the canonical /embedded/resume/:id?pt= page
  */
 import { Hono } from "hono";
+import { frontendBaseUrl } from "../utils/public-urls.js";
 import { z } from "zod";
 import type { Context } from "hono";
 import type { AppEnv, JwtPayload } from "../types/index.js";
@@ -453,9 +454,7 @@ partnerRoutes.post("/v1/embed-tokens", partnerAuth("read:profile"), async (c) =>
   // token rides as `?pt=` and grants owner-level read of the connected job
   // seeker's (possibly private) resume. No bespoke partner embed page/endpoint.
   const resumeId = await getPrimaryResumeId(parsed.data.userId);
-  const base = (
-    process?.env?.FRONTEND_URL || (globalThis as any).__ENV?.FRONTEND_URL || "https://hired.video"
-  ).replace(/\/$/, "");
+  const base = frontendBaseUrl();
   let embedUrl: string | null = null;
   if (resumeId) {
     const params = new URLSearchParams({ pt: token });

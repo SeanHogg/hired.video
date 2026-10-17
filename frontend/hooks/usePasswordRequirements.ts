@@ -40,7 +40,7 @@ export const usePasswordRequirements = (): UsePasswordRequirementsReturn => {
     setError(null);
 
     try {
-      const response = await apiCall("/api/PasswordManagement/requirements");
+      const response = await apiCall("/api/passwordmanagement/requirements");
 
       if (response.success) {
         const reqs = response.data as PasswordRequirements;

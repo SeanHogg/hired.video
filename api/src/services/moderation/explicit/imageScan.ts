@@ -15,7 +15,7 @@ import {
 } from "../../../../../shared/moderation/explicit.js";
 import { classifyImages, type ImageClassifier } from "./imageClassifier.js";
 import { withScanCopy, type ImageDownscaler } from "./imageDownscaler.js";
-import { sha256Hex } from "./bytes.js";
+import { sha256Hex } from "../../../utils/crypto.js";
 import { findFinalByInputHash, getScan, upsertScan, type StoredScan } from "./contentScanRepository.js";
 import { fetchPublicUrl, parseProxyTarget, readBytesOrStream } from "../../../utils/image-proxy.js";
 

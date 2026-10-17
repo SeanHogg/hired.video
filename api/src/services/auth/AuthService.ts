@@ -17,13 +17,14 @@
  *   • Open/Closed — swapping the email provider shouldn't require
  *     touching the register handler.
  *
- * So: each public handler takes an `AuthDeps` bag and returns a
- * `HandlerResult`. The Hono route passes the real deps; tests pass
+ * So: each public handler takes an `AuthDeps` bag and returns plain data
+ * (throwing DomainError on a rule violation); the route maps it onto the
+ * HTTP envelope. The Hono route passes the real deps; tests pass
  * fakes and assert both the response and the side effects recorded on
  * the fake deps.
  *
- * The schemas, hashPassword, verifyPassword, and generateVerificationCode
- * still come from routes/auth.ts — they're pure and already tested in
+ * The schemas (./schemas), hashPassword/verifyPassword (./password) and
+ * markUserLogin (./loginStamp) are pure service-layer modules, tested in
  * auth-schemas.test.ts.
  */
 
@@ -37,10 +38,9 @@ import {
   ForgotPasswordSchema,
   ResetPasswordSchema,
   VerifyEmailSchema,
-  hashPassword,
-  verifyPassword,
-  markUserLogin,
-} from "../../routes/auth.js";
+} from "./schemas.js";
+import { hashPassword, verifyPassword } from "./password.js";
+import { markUserLogin } from "./loginStamp.js";
 import { createSession, bumpSessionVersion, revokeAllSessionsForUser } from "./sessions.js";
 import { mintTwoFactorApproveToken } from "./twoFactorApprove.js";
 import { isAccountLocked } from "./lock.js";
@@ -54,6 +54,7 @@ import { recordReferralAttribution } from "./attribution.js";
 import { createAffiliateProfileForUser } from "./affiliate.js";
 import { getDefaultProfileSections } from "../../../../shared/profile-sections.js";
 import { isLocale, type Locale } from "../../../../shared/i18n.js";
+import { logger } from "../../lib/logger.js";
 
 const { users, userProfiles, accountPreferences, passwordResetTokens, emailVerificationTokens, twoFactorCodes, loginEvents } = schema;
 
@@ -87,7 +88,7 @@ async function recordLoginEvent(deps: AuthDeps, ev: LoginEventInput): Promise<vo
       failureReason: ev.failureReason ?? null,
     } as any);
   } catch (err) {
-    console.error("[loginEvent] insert failed:", err);
+    logger.error("[loginEvent] insert failed", err);
   }
 }
 
@@ -160,12 +161,9 @@ export interface AuthDeps {
   breachCheck?: import("./signupGuard.js").BreachCheckPort;
 }
 
-// Result envelope lives in the shared handler module. auth-handlers
-// never needs `requireAuth` (its endpoints are pre-auth anyway: login,
-// register, forgot-password), so only ok/fail are imported.
-import { ok, fail, type HandlerResult } from "../../handlers/shared.js";
-export { ok, fail };
-export type { HandlerResult };
+// Use cases return plain data and throw DomainError; the route maps them
+// onto the HTTP envelope (handlers/shared.ts `toHandlerResult`).
+import { DomainError } from "../../domains/errors.js";
 
 // ---------------------------------------------------------------------------
 // JWT issuance — tiny wrapper so tests can assert the payload without
@@ -199,10 +197,10 @@ export const GUEST_TOKEN_TTL = "30d";
 // handleRegister
 // ═══════════════════════════════════════════════════════════════════════════
 
-export async function handleRegister(deps: AuthDeps, body: unknown): Promise<HandlerResult> {
+export async function handleRegister(deps: AuthDeps, body: unknown) {
   const parsed = RegisterSchema.safeParse(body);
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() });
+    throw new DomainError(400, "VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() });
   }
 
   const { email, password, role, enableAffiliate } = parsed.data;
@@ -236,7 +234,7 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
       ipAddress: deps.clientIp,
     })
   ) {
-    return fail(429, "RATE_LIMIT", "Too many signup attempts for this email. Try again later.");
+    throw new DomainError(429, "RATE_LIMIT", "Too many signup attempts for this email. Try again later.");
   }
 
   // Single composer for every signup gate (OFAC → geo → honeypot →
@@ -274,7 +272,7 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
       : guard.reason === "GEO_BLOCKED"
       ? 403
       : 400;
-    return fail(status, guard.reason ?? "SIGNUP_BLOCKED", guard.message ?? "Signup blocked");
+    throw new DomainError(status, guard.reason ?? "SIGNUP_BLOCKED", guard.message ?? "Signup blocked");
   }
   // Soft signals fired during validation (today: TURNSTILE_FAIL on
   // missing/invalid token — #1122). The signup still proceeds, but we
@@ -307,7 +305,7 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
       success: false,
       failureReason: "email_exists",
     });
-    return fail(409, "CONFLICT", "An account with this email already exists");
+    throw new DomainError(409, "CONFLICT", "An account with this email already exists");
   }
 
   const passwordHash = await hashPassword(password);
@@ -341,7 +339,7 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
     .returning({ id: users.id, email: users.email, name: users.name, role: users.role });
 
   if (!user) {
-    return fail(500, "INTERNAL_SERVER_ERROR", "Failed to create user");
+    throw new DomainError(500, "INTERNAL_SERVER_ERROR", "Failed to create user");
   }
 
   await recordLoginEvent(deps, {
@@ -366,7 +364,7 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
   try {
     await deps.email.sendVerification(user.email, user.name, verificationToken);
   } catch (err) {
-    console.error("[register] Failed to send verification email:", err);
+    logger.error("[register] Failed to send verification email", err);
   }
   // Seed a user_profiles row with role-based section visibility defaults
   // so /people/[id] hides resume sections for recruiters/employers from
@@ -383,7 +381,7 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
       } as any)
       .onConflictDoNothing({ target: userProfiles.userId });
   } catch (err) {
-    console.error("[register] Failed to seed profile section defaults:", err);
+    logger.error("[register] Failed to seed profile section defaults", err);
   }
   // Seed account_preferences.language with the visitor's pre-auth pick
   // so LocaleSync resolves to their chosen locale on the very first
@@ -400,18 +398,18 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
           set: { language: localePref },
         });
     } catch (err) {
-      console.error("[register] Failed to seed account preferences language:", err);
+      logger.error("[register] Failed to seed account preferences language", err);
     }
   }
   try {
     await deps.onboarding.seedTasks(user.id, user.role ?? "job_seeker");
   } catch (err) {
-    console.error("[register] Failed to seed onboarding tasks:", err);
+    logger.error("[register] Failed to seed onboarding tasks", err);
   }
   try {
     await deps.onboarding.triggerDrip(user.id, user.email, user.name, user.role ?? "job_seeker");
   } catch (err) {
-    console.error("[register] Failed to trigger onboarding drip:", err);
+    logger.error("[register] Failed to trigger onboarding drip", err);
   }
 
   if (enableAffiliate) {
@@ -422,7 +420,7 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
         randomHex: deps.randomHex, // deterministic in tests
       });
     } catch (err) {
-      console.error("[register] Failed to create affiliate profile:", err);
+      logger.error("[register] Failed to create affiliate profile", err);
     }
   }
 
@@ -440,25 +438,23 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
     deps.db,
   );
 
-  return ok(
-    {
-      requiresEmailVerification: true,
-      email: user.email,
-      sentAt: deps.now().toISOString(),
-      ...(deps.isDev ? { verificationToken } : {}),
-    },
-    201,
-  );
+  // The route answers 201 Created.
+  return {
+    requiresEmailVerification: true,
+    email: user.email,
+    sentAt: deps.now().toISOString(),
+    ...(deps.isDev ? { verificationToken } : {}),
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleLogin
 // ═══════════════════════════════════════════════════════════════════════════
 
-export async function handleLogin(deps: AuthDeps, body: unknown): Promise<HandlerResult> {
+export async function handleLogin(deps: AuthDeps, body: unknown) {
   const parsed = LoginSchema.safeParse(body);
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() });
+    throw new DomainError(400, "VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() });
   }
 
   const attemptedEmail = parsed.data.email;
@@ -471,7 +467,7 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
       ipAddress: deps.clientIp,
     })
   ) {
-    return fail(429, "RATE_LIMIT", "Too many login attempts for this email. Try again later.");
+    throw new DomainError(429, "RATE_LIMIT", "Too many login attempts for this email. Try again later.");
   }
 
   // Captcha gate — credential-stuffing protection. A miss (token absent
@@ -512,7 +508,7 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
       success: false,
       failureReason: "unknown_email",
     });
-    return fail(401, "UNAUTHORIZED", "Invalid email or password");
+    throw new DomainError(401, "UNAUTHORIZED", "Invalid email or password");
   }
   if (!user.isActive) {
     await recordLoginEvent(deps, {
@@ -523,7 +519,7 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
       success: false,
       failureReason: "account_disabled",
     });
-    return fail(401, "UNAUTHORIZED", "Account is disabled");
+    throw new DomainError(401, "UNAUTHORIZED", "Account is disabled");
   }
   if (user.isSuspended) {
     await recordLoginEvent(deps, {
@@ -534,7 +530,7 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
       success: false,
       failureReason: "account_suspended",
     });
-    return fail(403, "FORBIDDEN", "Account is suspended");
+    throw new DomainError(403, "FORBIDDEN", "Account is suspended");
   }
   // Lockout gate runs BEFORE the credential compare so a locked account
   // can't be probed for password validity, and so brute-force attempts
@@ -549,7 +545,7 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
       success: false,
       failureReason: `locked:${lock.reason}`,
     });
-    return fail(423, "ACCOUNT_LOCKED", "Account is temporarily locked. Try again later or contact support.");
+    throw new DomainError(423, "ACCOUNT_LOCKED", "Account is temporarily locked. Try again later or contact support.");
   }
 
   const valid = await verifyPassword(parsed.data.password, user.passwordHash);
@@ -572,7 +568,7 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
       ipAddress: deps.clientIp,
       countryCode: deps.ipCountry,
     });
-    return fail(401, "UNAUTHORIZED", "Invalid email or password");
+    throw new DomainError(401, "UNAUTHORIZED", "Invalid email or password");
   }
 
   // Credentials accepted — log the event up front so MFA-pending and
@@ -624,22 +620,22 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
     try {
       approveToken = (await mintTwoFactorApproveToken(entry.id)) ?? undefined;
     } catch (err) {
-      console.error("[login] Failed to mint 2FA approve token:", err);
+      logger.error("[login] Failed to mint 2FA approve token", err);
     }
 
     try {
       await deps.email.sendTwoFactor(user.email, user.name, entry.code, approveToken);
     } catch (err) {
-      console.error("[login] Failed to send 2FA email:", err);
+      logger.error("[login] Failed to send 2FA email", err);
     }
 
-    return ok({
+    return {
       requiresTwoFactor: true,
       tempAuthToken: entry.id,
       expiresAt: entry.expiresAt.toISOString(),
       email: user.email,
       ...(deps.isDev ? { verificationCode: entry.code } : {}),
-    });
+    };
   }
 
   const { session, refreshToken } = await createSession({
@@ -663,22 +659,22 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
 
   await markUserLogin(deps.db, user.id, deps.now());
 
-  return ok({
+  return {
     user: { id: user.id, email: user.email, name: user.name, role: user.role },
     token,
     refreshToken,
     expiresAt: new Date(deps.now().getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-  });
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleForgotPassword — always 200 to avoid email enumeration
 // ═══════════════════════════════════════════════════════════════════════════
 
-export async function handleForgotPassword(deps: AuthDeps, body: unknown): Promise<HandlerResult> {
+export async function handleForgotPassword(deps: AuthDeps, body: unknown): Promise<{ resetToken: string } | null> {
   const parsed = ForgotPasswordSchema.safeParse(body);
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "Invalid request body");
+    throw new DomainError(400, "VALIDATION_ERROR", "Invalid request body");
   }
 
   // Captcha runs as a SOFT signal — the SuperAdmin globe lights up on
@@ -718,22 +714,22 @@ export async function handleForgotPassword(deps: AuthDeps, body: unknown): Promi
     try {
       await deps.email.sendPasswordReset(user.email, user.name, token);
     } catch (err) {
-      console.error("[forgot-password] Failed to send reset email:", err);
+      logger.error("[forgot-password] Failed to send reset email", err);
     }
-    return ok(deps.isDev ? { resetToken: token } : null);
+    return deps.isDev ? { resetToken: token } : null;
   }
 
-  return ok(null);
+  return null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleResetPassword — consume token, rotate hash, stamp passwordChangedAt
 // ═══════════════════════════════════════════════════════════════════════════
 
-export async function handleResetPassword(deps: AuthDeps, body: unknown): Promise<HandlerResult> {
+export async function handleResetPassword(deps: AuthDeps, body: unknown): Promise<null> {
   const parsed = ResetPasswordSchema.safeParse(body);
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() });
+    throw new DomainError(400, "VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() });
   }
 
   const now = deps.now();
@@ -749,7 +745,7 @@ export async function handleResetPassword(deps: AuthDeps, body: unknown): Promis
     )
     .limit(1);
 
-  if (!tokenRow) return fail(400, "INVALID_TOKEN", "Reset token is invalid or has expired");
+  if (!tokenRow) throw new DomainError(400, "INVALID_TOKEN", "Reset token is invalid or has expired");
 
   const passwordHash = await hashPassword(parsed.data.password);
   await deps.db
@@ -768,17 +764,17 @@ export async function handleResetPassword(deps: AuthDeps, body: unknown): Promis
   await bumpSessionVersion(deps.db, tokenRow.userId);
   await revokeAllSessionsForUser(deps.db, tokenRow.userId, "password_reset");
 
-  return ok(null);
+  return null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleVerifyEmail — consume email verification token, flip user.emailVerified
 // ═══════════════════════════════════════════════════════════════════════════
 
-export async function handleVerifyEmail(deps: AuthDeps, body: unknown): Promise<HandlerResult> {
+export async function handleVerifyEmail(deps: AuthDeps, body: unknown): Promise<{ userId: string }> {
   const parsed = VerifyEmailSchema.safeParse(body);
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "Invalid request body");
+    throw new DomainError(400, "VALIDATION_ERROR", "Invalid request body");
   }
 
   const now = deps.now();
@@ -794,7 +790,7 @@ export async function handleVerifyEmail(deps: AuthDeps, body: unknown): Promise<
     )
     .limit(1);
 
-  if (!tokenRow) return fail(400, "INVALID_TOKEN", "Verification token is invalid or has expired");
+  if (!tokenRow) throw new DomainError(400, "INVALID_TOKEN", "Verification token is invalid or has expired");
 
   await deps.db.update(users).set({ emailVerified: true } as any).where(eq(users.id, tokenRow.userId));
   await deps.db
@@ -807,5 +803,5 @@ export async function handleVerifyEmail(deps: AuthDeps, body: unknown): Promise<
   // `emailVerified: false` and every subsequent request bounces off
   // emailVerifiedMiddleware → 403, even though the DB row now reads
   // verified.
-  return ok({ userId: tokenRow.userId });
+  return { userId: tokenRow.userId };
 }

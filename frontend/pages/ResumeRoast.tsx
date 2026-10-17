@@ -25,11 +25,10 @@ import { RESUME_TEXT_FILE_ACCEPT, getResumeTextFromFile } from "@/lib/services/r
 import FileUploadInput from "@/components/FileUploadInput";
 import { ToolShell } from "@/components/tools/ToolShell";
 import MonoChip from "@/components/templates/MonoChip";
-import { resumeService } from "@/lib/services/resume-service";
 import { readResumeContent } from "@/lib/tools/resume-content";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { resumeToPlainText } from "@/lib/resume-exporters";
-import { useQuery } from "@tanstack/react-query";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 
 // ─── API schema ───────────────────────────────────────────────────────────────
 
@@ -50,11 +49,7 @@ export default function ResumeRoast() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   // Fetch user's resumes if authenticated
-  const { data: resumes = [] } = useQuery({
-    queryKey: ["resumes"],
-    queryFn: () => resumeService.getUserResumes(),
-    enabled: isAuthenticated,
-  });
+  const { data: resumes = [] } = useUserResumes();
 
   const [resumeText, setResumeText] = useState("");
   // Tracks the saved-resume the input text came from. Set when the user

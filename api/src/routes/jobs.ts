@@ -6,6 +6,7 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import * as jobService from "../services/job/JobService.js";
 import { handleJobSentimentPrediction } from "../services/job/job-sentiment-handler.js";
+import { toHandlerResult } from "../handlers/shared.js";
 import { buildRepos } from "../repositories/index.js";
 import { buildApiDeps } from "../services/apiDeps.js";
 import { LocationService } from "../services/location/LocationService.js";
@@ -13,11 +14,14 @@ import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { requireJobPoster } from "../middleware/job-poster-gate.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
-import { USER_ROLES } from "../../../shared/user-roles.js";
+import { parsePagination } from "../utils/pagination.js";
+import { readForm } from "../utils/multipart.js";
+import { isSuperAdmin } from "../middleware/superAdmin.js";
 import { OptionalUrlSchema, UuidLikeSchema } from "../../../shared/validation.js";
 import { JOB_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import { requireJobOwner } from "../services/jobs/jobOwnership.js";
 import { bumpSearchVersion, getCachedSearch } from "../utils/search-cache.js";
+import { logger } from "../lib/logger.js";
 import {
   createScreeningInterviewFromApply,
   listApplicationsMissingScreening,
@@ -105,10 +109,10 @@ export const jobRoutes = new Hono<AppEnv>();
  */
 jobRoutes.post("/sentimentprediction", attachTokenBudget(), async (c) => {
   const body = await c.req.json().catch(() => null);
-  const result = await handleJobSentimentPrediction(
+  const result = await toHandlerResult(handleJobSentimentPrediction(
     { jobs: buildRepos(getDb()).jobs },
     body,
-  );
+  ));
   return c.json(result.body as any, result.status as any);
 });
 
@@ -151,9 +155,13 @@ async function loadPublicJobsFromQuery(
         query.isRemote === "true" ? true : query.isRemote === "false" ? false : undefined,
     });
   }
+  const { page, limit } = parsePagination(
+    { req: { query: (key: string) => query[key] } },
+    { defaultLimit: 10, maxLimit: 100 },
+  );
   return jobService.getPublicJobs({
-    page: query.page ? Number(query.page) : 1,
-    limit: query.limit ? Number(query.limit) : 10,
+    page,
+    limit,
     search: query.search,
     location: query.location,
     employmentType: query.employmentType,
@@ -353,7 +361,7 @@ jobRoutes.post("/:id/apply", async (c) => {
       candidateEmail: user?.email ?? "",
     });
   } catch (err) {
-    console.error("[apply] screening creation failed:", err);
+    logger.error("[apply] screening creation failed", err);
   }
 
   return c.json(success({ success: true, applicationId, screening }));
@@ -559,9 +567,7 @@ jobRoutes.get("/slug/:slug", async (c) => {
   const viewer = user?.sub
     ? {
         userId: user.sub,
-        isSuperAdmin:
-          user.isSuperAdmin === true ||
-          user.roles?.includes(USER_ROLES.SUPER_ADMIN) === true,
+        isSuperAdmin: isSuperAdmin(user),
       }
     : undefined;
   const job = await jobService.getJobBySlug(c.req.param("slug"), viewer);
@@ -643,8 +649,8 @@ export async function extractCreateFromFilePayload(c: AppContext): Promise<{
   let location: string | undefined;
 
   if (contentType.includes("multipart/form-data")) {
-    const form = await c.req.formData().catch(() => null);
-    const file = form?.get("file") as File | null;
+    const form = await readForm(c);
+    const file = form?.get("file") as unknown as File | null;
     if (file) {
       // Strip the extension — we'll use the filename as a fallback title
       // when the AI extractor can't find one in the content itself.
@@ -1059,9 +1065,7 @@ jobRoutes.get("/:id/metrics/time-to-hire", async (c) => {
   const viewer = user?.sub
     ? {
         userId: user.sub,
-        isSuperAdmin:
-          user.isSuperAdmin === true ||
-          user.roles?.includes(USER_ROLES.SUPER_ADMIN) === true,
+        isSuperAdmin: isSuperAdmin(user),
       }
     : undefined;
   const job = await jobService.getJobById(id, undefined, viewer);
@@ -1085,9 +1089,7 @@ jobRoutes.get("/:id", async (c) => {
   const viewer = user?.sub
     ? {
         userId: user.sub,
-        isSuperAdmin:
-          user.isSuperAdmin === true ||
-          user.roles?.includes(USER_ROLES.SUPER_ADMIN) === true,
+        isSuperAdmin: isSuperAdmin(user),
       }
     : undefined;
   const job = await jobService.getJobById(id, undefined, viewer);
@@ -1120,7 +1122,7 @@ jobRoutes.delete("/:id", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const user = c.var.user;
-  const isAdmin = user?.isSuperAdmin === true || user?.roles?.includes(USER_ROLES.SUPER_ADMIN);
+  const isAdmin = isSuperAdmin(user);
   const deleted = await jobService.deleteJob(c.req.param("id"), userId, isAdmin);
   if (!deleted) return c.json(error("NOT_FOUND", "Job not found or not owned by you"), 404);
   return c.json(success(null, "Job deleted"));

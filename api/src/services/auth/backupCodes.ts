@@ -16,6 +16,7 @@
 
 import { and, eq, isNull } from "drizzle-orm";
 import { schema } from "../../db/index.js";
+import { sha256Hex } from "../../utils/crypto.js";
 
 const { twoFactorBackupCodes } = schema;
 
@@ -33,14 +34,6 @@ function generateOneCode(): string {
   }
   // Format as XXXXX-XXXXX for readability.
   return `${out.slice(0, 5)}-${out.slice(5)}`;
-}
-
-async function sha256Hex(input: string): Promise<string> {
-  const bytes = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
 }
 
 /**

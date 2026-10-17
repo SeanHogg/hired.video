@@ -17,7 +17,9 @@
 
 import { isGuestEmail } from "../../../../shared/guest-accounts.js";
 import { publicProfilePath } from "../../../../shared/public-paths.js";
+import { escapeHtml } from "../../../../shared/html-escape.js";
 import { getEnv } from "../../utils/env.js";
+import { logger } from "../../lib/logger.js";
 
 // ============================================================================
 // EMAIL PROVIDER INTERFACE
@@ -45,11 +47,11 @@ let _tokenExpiresAt = 0;
 
 async function getSendPulseToken(clientId: string, clientSecret: string): Promise<string> {
   if (_cachedToken && Date.now() < _tokenExpiresAt) {
-    console.log("[email:sendpulse] Using cached token");
+    logger.info("[email:sendpulse] Using cached token");
     return _cachedToken;
   }
 
-  console.log("[email:sendpulse] Fetching new OAuth token");
+  logger.info("[email:sendpulse] Fetching new OAuth token");
   const res = await fetch("https://api.sendpulse.com/oauth/access_token", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -65,7 +67,7 @@ async function getSendPulseToken(clientId: string, clientSecret: string): Promis
   _cachedToken = data.access_token as string;
   // Tokens are valid for 3600s; refresh 60s early
   _tokenExpiresAt = Date.now() + ((data.expires_in ?? 3600) - 60) * 1000;
-  console.log("[email:sendpulse] Token acquired, expires in", data.expires_in ?? 3600, "s");
+  logger.info("[email:sendpulse] Token acquired", { expiresInSeconds: data.expires_in ?? 3600 });
   return _cachedToken;
 }
 
@@ -85,8 +87,8 @@ class SendPulseEmailProvider implements EmailProvider {
       const fromEmail = message.fromEmail ?? this.defaultFrom;
       const fromName = message.fromName ?? "hired.video";
 
-      console.log("[email:sendpulse] Sending email to:", message.to, "subject:", message.subject);
-      console.log("[email:sendpulse] html length:", message.html?.length ?? 0, "| first 300 chars:", message.html?.slice(0, 300) ?? "(empty)");
+      logger.info("[email:sendpulse] Sending email", { to: message.to, subject: message.subject });
+      logger.info("[email:sendpulse] html preview", { htmlLength: message.html?.length ?? 0, htmlPreview: message.html?.slice(0, 300) ?? "(empty)" });
 
       const htmlBase64 = Buffer.from(message.html, "utf-8").toString("base64");
 
@@ -105,12 +107,12 @@ class SendPulseEmailProvider implements EmailProvider {
 
       const body = await res.text().catch(() => "");
       if (!res.ok) {
-        console.error("[email:sendpulse] Send failed:", res.status, body);
+        logger.error("[email:sendpulse] Send failed", { status: res.status, body });
       } else {
-        console.log("[email:sendpulse] Send OK:", res.status, body);
+        logger.info("[email:sendpulse] Send OK", { status: res.status, body });
       }
     } catch (err) {
-      console.error("[email:sendpulse] Error:", err);
+      logger.error("[email:sendpulse] Error", err);
     }
   }
 }
@@ -235,7 +237,7 @@ export function buildCandidateVideoConsentEmail(
 export async function sendCandidateVideoConsentEmail(input: CandidateVideoConsentEmailInput): Promise<void> {
   const provider = getEmailProvider();
   if (!provider) {
-    console.warn("[email] No provider configured — skipping candidate video consent email");
+    logger.warn("[email]No provider configured — skipping candidate video consent email");
     return;
   }
   await provider.send(buildCandidateVideoConsentEmail(input));
@@ -255,7 +257,7 @@ export function getEmailProvider(): EmailProvider | null {
   const clientSecret = getEnv("EMAIL_SECRET");
 
   if (!clientId || !clientSecret) {
-    console.warn("[email] SendPulse credentials not configured — emails will be skipped");
+    logger.warn("[email]SendPulse credentials not configured — emails will be skipped");
     return null;
   }
 
@@ -624,14 +626,6 @@ const TWO_FACTOR_BODY = `
 // TEMPLATE RENDERING
 // ============================================================================
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
 function render(body: string, vars: Record<string, string>): string {
   let html = LAYOUT_HEADER + body + LAYOUT_FOOTER;
   html = html.replaceAll("{{Year}}", new Date().getFullYear().toString());
@@ -810,7 +804,7 @@ export async function sendMagicLinkEmail(
 ): Promise<void> {
   const provider = getEmailProvider();
   if (!provider) {
-    console.warn("[email] No provider configured — skipping magic link email");
+    logger.warn("[email]No provider configured — skipping magic link email");
     return;
   }
   const magicUrl = `${getBaseUrl()}/auth/magic-link?token=${encodeURIComponent(token)}`;
@@ -868,7 +862,7 @@ export async function sendEmailChangeCurrent(
 ): Promise<void> {
   const provider = getEmailProvider();
   if (!provider) {
-    console.warn("[email] No provider configured — skipping email-change-current email");
+    logger.warn("[email]No provider configured — skipping email-change-current email");
     return;
   }
   const confirmUrl = `${getBaseUrl()}/security/email-change/confirm-current?token=${encodeURIComponent(token)}`;
@@ -888,7 +882,7 @@ export async function sendEmailChangeNew(
 ): Promise<void> {
   const provider = getEmailProvider();
   if (!provider) {
-    console.warn("[email] No provider configured — skipping email-change-new email");
+    logger.warn("[email]No provider configured — skipping email-change-new email");
     return;
   }
   const verifyUrl = `${getBaseUrl()}/security/email-change/confirm-new?token=${encodeURIComponent(token)}`;
@@ -1041,7 +1035,7 @@ export interface PlanUpgradeEmailParams {
 export async function sendPlanUpgradeEmail(params: PlanUpgradeEmailParams): Promise<void> {
   const provider = getEmailProvider();
   if (!provider) {
-    console.warn("[email] No provider configured — skipping plan upgrade email");
+    logger.warn("[email]No provider configured — skipping plan upgrade email");
     return;
   }
 
@@ -1342,7 +1336,7 @@ export async function sendConnectionRequestEmail(
 ): Promise<void> {
   const provider = getEmailProvider();
   if (!provider) {
-    console.warn("[email] No provider configured — skipping connection request email");
+    logger.warn("[email]No provider configured — skipping connection request email");
     return;
   }
   const { subject, html } = buildConnectionRequestEmail({
@@ -1449,7 +1443,7 @@ export function buildReviewInviteEmail(
 export async function sendReviewInviteEmail(input: ReviewInviteEmailInput): Promise<void> {
   const provider = getEmailProvider();
   if (!provider) {
-    console.warn("[email] No provider configured — skipping review invite email");
+    logger.warn("[email]No provider configured — skipping review invite email");
     return;
   }
   const { to, subject, html } = buildReviewInviteEmail(input);
@@ -1540,7 +1534,7 @@ export function buildInvitationEmail(
 export async function sendInvitationEmail(input: InvitationEmailInput): Promise<void> {
   const provider = getEmailProvider();
   if (!provider) {
-    console.warn("[email] No provider configured — skipping invitation email");
+    logger.warn("[email]No provider configured — skipping invitation email");
     return;
   }
   const { subject, html } = buildInvitationEmail(input);
@@ -1559,7 +1553,7 @@ export async function sendGenericEmail(
 ): Promise<boolean> {
   const provider = getEmailProvider();
   if (!provider) {
-    console.warn("[email] No provider configured — skipping generic email to", to);
+    logger.warn("[email] No provider configured — skipping generic email", { to });
     return false;
   }
   await provider.send({ to, subject, html, fromName });

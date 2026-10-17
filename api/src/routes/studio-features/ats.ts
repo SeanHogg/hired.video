@@ -7,6 +7,8 @@ import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import { publicAtsPath } from "../../../../shared/public-paths.js";
+import { slugify } from "../../../../shared/slugify.js";
+import { tryExtractJson } from "../../../../shared/extract-json.js";
 import type { AppEnv } from "../../types/index.js";
 import { getDb } from "../../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../../services/adapters/llm-client.js";
@@ -52,16 +54,18 @@ Headline: ${parsed.data.headline ?? "Professional"}
 Video script:
 ${parsed.data.scriptText.slice(0, 3000)}`,
       });
-      const result = JSON.parse(content.replace(/```json?\s*/g, "").replace(/```/g, ""));
-      textSummary = result.summary ?? textSummary;
-      emailTemplate = result.email ?? "";
+      const result = tryExtractJson<{ summary?: string; email?: string }>(content);
+      if (result) {
+        textSummary = result.summary ?? textSummary;
+        emailTemplate = result.email ?? "";
+      }
     } catch {
       // Use raw script as fallback
     }
   }
 
   // Generate unique slug
-  const slug = `${parsed.data.candidateName.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}-${Date.now().toString(36)}`;
+  const slug = `${slugify(parsed.data.candidateName, { fallback: "candidate", maxLen: 40 })}-${Date.now().toString(36)}`;
 
   const db = getDb();
   const [atsPackage] = await db.insert(studioAtsPackages).values({

@@ -8,6 +8,7 @@
  */
 
 import { registerEffect } from "./registry";
+import { clamp01, numberOr } from "./params";
 
 registerEffect({
   kind: "opacity",
@@ -29,11 +30,3 @@ registerEffect({
     ctx.putImageData(data, 0, 0);
   },
 });
-
-function numberOr(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
-}
-
-function clamp01(v: number): number {
-  return Math.max(0, Math.min(1, v));
-}

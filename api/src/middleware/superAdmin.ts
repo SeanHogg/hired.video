@@ -1,5 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import type { JwtPayload, Variables, AppEnv } from "../types/index.js";
+import { error } from "../types/index.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 
 /**
@@ -7,12 +8,29 @@ import { USER_ROLES } from "../../../shared/user-roles.js";
  * a route or service needs an inline check (and `superAdminMiddleware`
  * is the wrong shape — e.g. a route that responds differently for SA vs
  * everyone else rather than 403'ing). Note: this is intentionally
- * stricter than `isAdminRole` in domains/billing/audience.ts, which also
- * lets regular Admin through.
+ * stricter than `isAdminRole` below, which also lets regular Admin through.
  */
 export function isSuperAdmin(user: JwtPayload | null | undefined): boolean {
   if (!user) return false;
   return user.isSuperAdmin === true || user.roles?.includes(USER_ROLES.SUPER_ADMIN) === true;
+}
+
+/**
+ * Internal-staff predicate: SuperAdmin OR Admin, honouring every shape a
+ * JWT carries (the `roles` array, a legacy singular `role`, and the
+ * `isSuperAdmin` claim). The ONE implementation — gates that bypass billing,
+ * module toggles or People-Ops scoping for internal users call this.
+ */
+export function isAdminRole(user: JwtPayload | null | undefined): boolean {
+  if (!user) return false;
+  if (isSuperAdmin(user)) return true;
+  const roles = user.roles ?? [];
+  const role = (user as { role?: string }).role ?? "";
+  return (
+    roles.includes(USER_ROLES.ADMIN) ||
+    role === USER_ROLES.SUPER_ADMIN ||
+    role === USER_ROLES.ADMIN
+  );
 }
 
 /**
@@ -55,5 +73,21 @@ export const superAdminMiddleware: MiddlewareHandler<AppEnv> = async (c, next) =
     return c.json({ error: { code: "FORBIDDEN", message: "Impersonation tokens cannot access SuperAdmin endpoints" } }, 403);
   }
 
+  return next();
+};
+
+/**
+ * Requires the authenticated user to be internal staff (Admin or
+ * SuperAdmin — see `isAdminRole`). Must run after authMiddleware. Replaces
+ * the per-route `requireAdmin` clones.
+ */
+export const adminMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const user = c.var.user;
+  if (!user) {
+    return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  }
+  if (!isAdminRole(user)) {
+    return c.json(error("FORBIDDEN", "Admin role required"), 403);
+  }
   return next();
 };

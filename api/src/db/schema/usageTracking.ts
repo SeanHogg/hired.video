@@ -68,6 +68,8 @@ export const usageEvents = pgTable(
     index("idx_usage_events_session").on(t.sessionId),
     index("idx_usage_events_type_time").on(t.type, t.occurredAt),
     index("idx_usage_events_feature").on(t.featureKey),
+    // Retention sweep age axis (0541).
+    index("idx_usage_events_occurred").on(t.occurredAt),
   ],
 );
 

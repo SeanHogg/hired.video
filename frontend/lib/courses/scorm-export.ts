@@ -41,6 +41,8 @@
 
 import type { CourseLesson } from "@/lib/services/course-service";
 import { escapeXmlText as escapeXml } from "@shared/course-cover";
+import { escapeHtml } from "@shared/html-escape";
+import { slugify } from "@shared/slugify";
 
 /** Optional knowledge-check form payload — when present, the launcher
  *  embeds the questions + grader + remediation hook. Mirrors
@@ -83,27 +85,6 @@ export interface ScormExportResult {
 
 const PASSING_DEFAULT_PCT = 70;
 
-/** Slugify a free-text title for use as a filename. Keeps ASCII letters,
- *  digits, and dashes; collapses everything else. */
-function slugifyForFilename(input: string): string {
-  return input
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80) || "lesson";
-}
-
-/** Escape a string for safe inclusion in HTML text or attribute context. */
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 /** Minimal markdown → HTML walker. Handles the subset the seeded library
  *  uses (headings 1-3, paragraphs, fenced code, inline code, lists, bold,
@@ -545,7 +526,7 @@ export async function buildScormZipForLesson(args: ScormExportInput): Promise<Sc
   const JSZip = (await import("jszip")).default;
   const zip = new JSZip();
 
-  const slug = slugifyForFilename(args.lesson.title);
+  const slug = slugify(args.lesson.title, { fallback: "lesson" });
   const scoIdentifier = `hv-${slug}-${args.lesson.id.slice(0, 8)}`;
   const launcherFilename = "index.html";
 

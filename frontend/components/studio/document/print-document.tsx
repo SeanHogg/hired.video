@@ -18,13 +18,7 @@ import {
   type DocumentState,
   pageDimensions,
 } from "@/lib/studio/editor-v2/document-state";
-
-function escapeHtml(s: string): string {
-  return s.replace(
-    /[&<>"]/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string,
-  );
-}
+import { escapeHtml } from "@shared/html-escape";
 
 /** Open a print window rendering the document read-only, paginated like
  *  the editor, and trigger the browser print dialog (→ Save as PDF).

@@ -24,6 +24,8 @@
  * removed in favour of the PWA-driven ingest path).
  */
 
+import { logger } from "../lib/logger.js";
+
 /** Walk `err.cause` up to 5 hops and emit `<sqlstate> — <message> —
  *  detail: ... — hint: ...` when the underlying Neon/PG error carries
  *  those fields. Falls back to the wrapper message when nothing useful
@@ -101,7 +103,7 @@ function isTransient(err: unknown): boolean {
 }
 
 export interface NeonRetryOptions {
-  /** Label used in console.warn so the line is greppable in logs. */
+  /** Label used in logger.warn so the line is greppable in logs. */
   label?: string;
   /** Sleep before the retry. Default 150ms — long enough that a stalled
    *  Neon HTTP connection has a chance to close, short enough that a
@@ -126,10 +128,7 @@ export async function runWithNeonRetry<T>(
   } catch (err) {
     if (!isTransient(err)) throw err;
     const label = opts.label ?? "neon-write";
-    console.warn(
-      `[${label}] transient Neon failure — retrying once:`,
-      describeDbError(err),
-    );
+    logger.warn(`[${label}] transient Neon failure — retrying once`, { error: describeDbError(err) });
     await new Promise((r) => setTimeout(r, opts.retryDelayMs ?? 150));
     return await fn();
   }

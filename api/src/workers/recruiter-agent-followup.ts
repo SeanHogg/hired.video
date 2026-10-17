@@ -12,9 +12,9 @@
  * (email, LinkedIn, phone). Auto-send via the messaging service can
  * layer on top once Comm Hub channel routing is firm.
  *
- * Runs every 5 minutes — short enough that scheduled follow-ups fire
- * within a useful window, long enough that we don't hammer the DB
- * when the queue is empty.
+ * Dispatched by the /15 interval cron while the `recruiter-agent-followups`
+ * KV marker is due (set by the route that schedules follow-ups), so an
+ * empty queue costs no DB query at all.
  */
 
 import { and, asc, eq, lte, sql } from "drizzle-orm";
@@ -117,6 +117,7 @@ export const recruiterAgentFollowupWorker: WorkerDefinition = {
     "rows are atomically flipped to status='sent' so a retry can't double-fire.",
   cadenceMs: FIVE_MINUTES_MS,
   batchSize: BATCH_SIZE,
+  workQueue: "recruiter-agent-followups",
   run,
 };
 

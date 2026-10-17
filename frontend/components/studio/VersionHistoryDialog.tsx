@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, History, RotateCcw } from "lucide-react";
+import { formatRelativeShort } from "@/lib/format";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,17 +35,6 @@ interface Props {
   projectId: string | null;
   currentStoryboard: unknown;
   onRestore: (storyboard: unknown) => void;
-}
-
-function formatRelative(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(ms / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
 }
 
 export default function VersionHistoryDialog({ projectId, currentStoryboard, onRestore }: Props) {
@@ -137,7 +127,7 @@ export default function VersionHistoryDialog({ projectId, currentStoryboard, onR
                       )}
                     </div>
                     <div className="text-[10px] text-muted-foreground truncate">
-                      {v.label} · {formatRelative(v.createdAt)}
+                      {v.label} · {formatRelativeShort(v.createdAt)}
                     </div>
                   </div>
                   <Button

@@ -15,6 +15,7 @@ import { sql, desc, eq } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { clampLimit } from "../utils/pagination.js";
 
 export const transcriptSearchRoutes = new Hono<AppEnv>();
 
@@ -60,7 +61,7 @@ transcriptSearchRoutes.get("/", async (c) => {
   if (q.length < 2) {
     return c.json(error("VALIDATION_ERROR", "Query must be at least 2 characters"), 400);
   }
-  const limit = Math.min(50, Math.max(1, Number.parseInt(c.req.query("limit") ?? "20", 10)));
+  const limit = clampLimit(c.req.query("limit"), 20, 50);
 
   const db = getDb();
   const pattern = `%${q.replace(/%/g, "\\%").replace(/_/g, "\\_")}%`;

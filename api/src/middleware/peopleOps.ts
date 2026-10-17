@@ -12,10 +12,10 @@
  * filter is impossible to forget.
  */
 
-import type { Context, MiddlewareHandler } from "hono";
+import type { MiddlewareHandler } from "hono";
 import type { AppEnv, Variables } from "../types/index.js";
 import { error } from "../types/index.js";
-import { USER_ROLES } from "../../../shared/user-roles.js";
+import { isAdminRole } from "./superAdmin.js";
 import { UPGRADE_URL } from "../../../shared/tier-copy.js";
 import {
   resolveSegment,
@@ -30,18 +30,6 @@ export interface PeopleVariables extends Variables {
 }
 
 export type PeopleEnv = { Bindings: AppEnv["Bindings"]; Variables: PeopleVariables };
-
-function isAdminRole(c: Context<PeopleEnv>): boolean {
-  const roles = c.var.user?.roles ?? [];
-  const role = (c.var.user as any)?.role ?? "";
-  return (
-    Boolean((c.var.user as any)?.isSuperAdmin) ||
-    roles.includes(USER_ROLES.SUPER_ADMIN) ||
-    roles.includes(USER_ROLES.ADMIN) ||
-    role === USER_ROLES.SUPER_ADMIN ||
-    role === USER_ROLES.ADMIN
-  );
-}
 
 export const peopleOpsContext: MiddlewareHandler<PeopleEnv> = async (c, next) => {
   const userId = c.var.user?.sub;
@@ -63,7 +51,7 @@ export const peopleOpsContext: MiddlewareHandler<PeopleEnv> = async (c, next) =>
   }
 
   // 2. Paid entitlement — the CHRO suite is 100% paid.
-  const isAdmin = isAdminRole(c);
+  const isAdmin = isAdminRole(c.var.user);
   if (!isAdmin) {
     const entitled = isPaidSegmentPlan(scope.plan) || (await companyHasActivePlan(scope.companyId));
     if (!entitled) {

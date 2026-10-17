@@ -3,6 +3,7 @@ import ScoreChip from "./ScoreChip";
 import type { ScoreChipSize } from "./score-chip-styles";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
+import type { ResumeScores } from "@shared/scores";
 
 /**
  * Minimum shape this component reads from a resume. Decoupled from the
@@ -13,20 +14,13 @@ import { cn } from "@/lib/utils";
  *   scores         — persisted JSONB blob (resume_information.scores)
  *                    written by the resume scorer and resume optimizer.
  */
-export interface ResumeScores {
+export interface ResumeScoreFields {
   sentimentScore?: number | null;
-  scores?: {
-    overall?: number;
-    ats?: number;
-    content?: number;
-    keyword?: number;
-    format?: number;
-    impact?: number;
-  } | null;
+  scores?: ResumeScores | null;
 }
 
 interface ResumeScoreBadgesProps {
-  resume: ResumeScores;
+  resume: ResumeScoreFields;
   size?: ScoreChipSize;
   className?: string;
   /** When provided, each chip becomes a button that fires this with the

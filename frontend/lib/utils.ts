@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { buildApiUrl } from "./api/base-url";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -51,14 +52,6 @@ export function buildImageUrl(path: string | null | undefined): string | undefin
     return path;
   }
 
-  // If it's a relative path, prepend the API base URL
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ||
-                     import.meta.env.VITE_API_URL ||
-                     'http://localhost:5000';
-
-  // Remove trailing slash from base URL and leading slash from path if present
-  const baseUrl = apiBaseUrl.replace(/\/$/, '');
-  const relativePath = path.startsWith('/') ? path : `/${path}`;
-
-  return `${baseUrl}${relativePath}`;
+  // Relative path → resolve against the API base (base-URL SSoT).
+  return buildApiUrl(path);
 }

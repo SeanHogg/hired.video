@@ -5,6 +5,7 @@
  */
 
 import { useState } from "react";
+import { formatDateMedium } from "@/lib/format";
 import { CardContent } from "@/components/ui/card";
 import BaseCard from "@/components/ui/BaseCard";
 import { Badge } from "@/components/ui/badge";
@@ -34,19 +35,6 @@ interface ReviewCardProps {
   onDelete?: () => void;
   /** Optional slot rendered under the body — typically the comments thread. */
   footer?: React.ReactNode;
-}
-
-function formatDate(value: string | Date): string {
-  try {
-    const d = typeof value === "string" ? new Date(value) : value;
-    return d.toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return "";
-  }
 }
 
 export function ReviewCard({
@@ -98,7 +86,7 @@ export function ReviewCard({
                 }
                 return <span key={field.key}>· {value}</span>;
               })}
-              <span>· {formatDate(review.createdAt)}</span>
+              <span>· {formatDateMedium(review.createdAt)}</span>
             </div>
           </div>
 

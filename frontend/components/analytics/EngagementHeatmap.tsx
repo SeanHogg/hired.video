@@ -8,12 +8,8 @@
 import { useMemo } from "react";
 
 import { TrendingDown } from "lucide-react";
+import { formatDurationMinSec } from "@/lib/format";
 
-function formatDuration(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
 
 interface Props {
   heatmap: number[];
@@ -39,7 +35,7 @@ export default function EngagementHeatmap({
     );
   }
 
-  const axisEndLabel = unit === "%" ? "100%" : formatDuration(durationSec);
+  const axisEndLabel = unit === "%" ? "100%" : formatDurationMinSec(durationSec);
   const axisStartLabel = unit === "%" ? "0%" : "0s";
 
   return (

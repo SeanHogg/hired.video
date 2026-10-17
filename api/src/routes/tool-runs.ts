@@ -11,6 +11,7 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { ownsByJob, ownsByStudioProject } from "../repositories/toolRunOwnershipRepository.js";
+import { clampLimit } from "../utils/pagination.js";
 
 export const toolRunsRoutes = new Hono<AppEnv>();
 
@@ -200,8 +201,7 @@ toolRunsRoutes.get("/", async (c) => {
   }
 
   const toolId = c.req.query("toolId");
-  const limitRaw = Number.parseInt(c.req.query("limit") ?? "50", 10);
-  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 200) : 50;
+  const limit = clampLimit(c.req.query("limit"), 50, 200);
 
   const db = getDb();
   const binding = entities[entityType];
@@ -236,8 +236,7 @@ toolRunsRoutes.get("/mine", async (c) => {
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
   const toolId = c.req.query("toolId");
-  const limitRaw = Number.parseInt(c.req.query("limit") ?? "50", 10);
-  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 200) : 50;
+  const limit = clampLimit(c.req.query("limit"), 50, 200);
 
   const db = getDb();
   const conditions: SQL[] = [eq(schema.toolRuns.userId, userId)];

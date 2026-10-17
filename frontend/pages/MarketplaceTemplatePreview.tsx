@@ -7,7 +7,7 @@
 // related templates. A new kind lands here for free once it's registered.
 
 import { Loader2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -22,7 +22,7 @@ import { useAuth } from "@/lib/auth";
 import { SAMPLE_RESUME } from "@/lib/sample-resume";
 import { useBreadcrumbs } from "@/lib/seo";
 import { useUgcSeo } from "@/lib/seo-ugc";
-import { resumeService } from "@/lib/services/resume-service";
+import { useResume } from "@/hooks/queries/use-resumes";
 import { useTemplate } from "@/lib/templates/registry";
 import { isResumeTemplate, type TemplateMeta } from "@/lib/templates/types";
 import type { Resume } from "@/types/resume";
@@ -47,26 +47,9 @@ function TemplateSEO({ meta }: { meta: TemplateMeta }) {
 /** Resolves the resume the preview renders: the bundled sample, or one of
  *  the signed-in visitor's resumes picked in ResumeSourceSelector. */
 function usePreviewResume(selection: string): Resume {
-  const [resume, setResume] = useState<Resume>(SAMPLE_RESUME);
-  useEffect(() => {
-    if (selection === "sample") {
-      setResume(SAMPLE_RESUME);
-      return;
-    }
-    let cancelled = false;
-    resumeService
-      .getResumeById(selection)
-      .then((r) => {
-        if (!cancelled && r) setResume(r);
-      })
-      .catch(() => {
-        if (!cancelled) setResume(SAMPLE_RESUME);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selection]);
-  return resume;
+  const isSample = selection === "sample";
+  const { data, isError } = useResume(isSample ? null : selection, { keepPrevious: true });
+  return isSample || isError || !data ? SAMPLE_RESUME : data;
 }
 
 export default function MarketplaceTemplatePreview() {

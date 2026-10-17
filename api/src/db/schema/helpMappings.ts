@@ -33,6 +33,7 @@ export const helpMappings = pgTable(
   (t) => [
     uniqueIndex("uq_help_mappings_context_slug").on(t.contextKey, t.slug),
     index("idx_help_mappings_context_active").on(t.contextKey, t.isActive, t.position),
+    index("idx_help_mappings_created_by").on(t.createdBy),
   ],
 );
 

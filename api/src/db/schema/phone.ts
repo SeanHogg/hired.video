@@ -42,7 +42,6 @@ export const callLogs = pgTable("call_logs", {
   notes:                text("notes"),
   createdAt:            timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  index("cl_user_idx").on(t.userId),
   index("cl_number_idx").on(t.phoneNumberId),
   index("cl_created_idx").on(t.createdAt),
   index("idx_call_logs_user_created").on(t.userId, t.createdAt.desc()),
@@ -66,7 +65,6 @@ export const smsMessages = pgTable("sms_messages", {
   signalwireSmsSid:     text("signalwire_sms_sid"),
   createdAt:            timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  index("sms_user_idx").on(t.userId),
   index("sms_number_idx").on(t.phoneNumberId),
   index("sms_created_idx").on(t.createdAt),
   index("idx_sms_messages_user_created").on(t.userId, t.createdAt.desc()),

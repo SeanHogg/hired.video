@@ -31,13 +31,17 @@ export const calendarConnections = pgTable("calendar_connections", {
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   provider: varchar("provider", { length: 50 }).notNull(), // google | outlook | ical
   providerAccountId: text("provider_account_id"),
+  /** Legacy plaintext — new writes go to access_token_enc (0548). */
   accessToken: text("access_token"),
+  accessTokenEnc: text("access_token_enc"),
   calendarId: text("calendar_id"), // provider-specific calendar ID
   calendarName: varchar("calendar_name", { length: 255 }),
   syncEnabled: boolean("sync_enabled").default(true).notNull(),
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
   ...oauthConnectionColumns,
-});
+}, (t) => [
+  index("idx_calendar_connections_user_id").on(t.userId),
+]);
 
 export type CalendarConnection = typeof calendarConnections.$inferSelect;
 export type NewCalendarConnection = typeof calendarConnections.$inferInsert;
@@ -50,7 +54,7 @@ export type NewCalendarConnection = typeof calendarConnections.$inferInsert;
 //   'coffee' → 1:1 coffee meetup created on a coffee_request accept.
 // Only rows with type IN ('event','coffee') populate the relational
 // `event_attendees` / `event_co_hosts` / `event_waitlist` tables in
-// schema/events.ts. See migration 0122 for the design rationale.
+// schema/eventAttendance.ts. See migration 0122 for the design rationale.
 export const scheduledEvents = pgTable("scheduled_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -99,6 +103,8 @@ export const scheduledEvents = pgTable("scheduled_events", {
   uniqueIndex("uq_scheduled_events_slug")
     .on(sql`lower(${t.slug})`)
     .where(sql`slug IS NOT NULL`),
+  index("idx_scheduled_events_calendar_connection_id").on(t.calendarConnectionId),
+  index("idx_scheduled_events_user_id").on(t.userId),
 ]);
 
 export type ScheduledEvent = typeof scheduledEvents.$inferSelect;

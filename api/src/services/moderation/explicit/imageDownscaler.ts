@@ -17,6 +17,7 @@
  */
 import type { ImageVariant } from "./imageClassifier.js";
 import { raiseSuperAdminAlert } from "../../observability/superAdminAlert.js";
+import { logger } from "../../../lib/logger.js";
 
 /** An original too large to buffer in the Worker, piped straight through. */
 export interface StreamedImage {
@@ -108,10 +109,10 @@ export function cloudflareImagesDownscaler(
       const message = err instanceof Error ? err.message : String(err);
       const errorClass = classifyDownscaleError(err);
       if (errorClass.kind === "input") {
-        console.warn("[explicit-scan] Cloudflare Images rejected this image (no alert):", message);
+        logger.warn("[explicit-scan] Cloudflare Images rejected this image (no alert)", { message });
         return null;
       }
-      console.warn("[explicit-scan] Cloudflare Images downscale failed:", errorClass.id, message);
+      logger.warn("[explicit-scan] Cloudflare Images downscale failed", { errorClass: errorClass.id, message });
       await onFailure(message, errorClass.id).catch(() => undefined);
       return null;
     }

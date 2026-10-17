@@ -132,7 +132,7 @@ export interface BulkPlacementRow {
 
 export const placementService = {
   async recordPlacement(request: RecordPlacementRequest): Promise<PlacementDTO> {
-    const response = await apiClient.post('/api/Recruiter/placements', request);
+    const response = await apiClient.post('/api/recruiter/placements', request);
     const parsed = PlacementResponseSchema.parse(response);
 
     if (!parsed.success || !parsed.data) {
@@ -144,7 +144,7 @@ export const placementService = {
 
   // #225 — bulk save N placements (potentially against one job) in one call.
   async bulkRecordPlacements(rows: BulkPlacementRow[]): Promise<PlacementDTO[]> {
-    const response = await apiClient.post('/api/Recruiter/placements/bulk', { placements: rows });
+    const response = await apiClient.post('/api/recruiter/placements/bulk', { placements: rows });
     const parsed = PlacementListResponseSchema.parse(response);
     if (!parsed.success || !parsed.data) {
       throw new Error(parsed.errorMessage || 'Failed to save placements');
@@ -164,14 +164,14 @@ export const placementService = {
   // #228 — placement fee splits.
   async getSplits(placementId: string): Promise<PlacementSplit[]> {
     const response = await apiClient.get<{ data?: PlacementSplit[] }>(
-      `/api/Recruiter/placements/${placementId}/splits`,
+      `/api/recruiter/placements/${placementId}/splits`,
     );
     return ((response as any)?.data ?? []) as PlacementSplit[];
   },
 
   async setSplits(placementId: string, splits: PlacementSplit[]): Promise<PlacementSplit[]> {
     const response = await apiClient.put<{ data?: PlacementSplit[] }>(
-      `/api/Recruiter/placements/${placementId}/splits`,
+      `/api/recruiter/placements/${placementId}/splits`,
       { splits: splits.map((s) => ({ ownerUserId: s.ownerUserId, ownerType: s.ownerType, percentBps: s.percentBps })) },
     );
     return ((response as any)?.data ?? []) as PlacementSplit[];
@@ -189,7 +189,7 @@ export const placementService = {
     if (filters?.pageSize) params.append('pageSize', String(filters.pageSize));
 
     const queryString = params.toString();
-    const url = `/api/Recruiter/placements${queryString ? `?${queryString}` : ''}`;
+    const url = `/api/recruiter/placements${queryString ? `?${queryString}` : ''}`;
     
     const response = await apiClient.get(url);
     const parsed = PlacementListResponseSchema.parse(response);
@@ -202,7 +202,7 @@ export const placementService = {
   },
 
   async getPlacementById(id: string): Promise<PlacementDTO> {
-    const response = await apiClient.get(`/api/Recruiter/placements/${id}`);
+    const response = await apiClient.get(`/api/recruiter/placements/${id}`);
     const parsed = PlacementResponseSchema.parse(response);
     
     if (!parsed.success || !parsed.data) {
@@ -213,7 +213,7 @@ export const placementService = {
   },
 
   async updateCommissionStatus(id: string, request: UpdateCommissionStatusRequest): Promise<PlacementDTO> {
-    const response = await apiClient.put(`/api/Recruiter/placements/${id}/commission`, request);
+    const response = await apiClient.put(`/api/recruiter/placements/${id}/commission`, request);
     const parsed = PlacementResponseSchema.parse(response);
     
     if (!parsed.success || !parsed.data) {
@@ -224,7 +224,7 @@ export const placementService = {
   },
 
   async updateGuaranteeStatus(id: string, request: UpdateGuaranteeStatusRequest): Promise<PlacementDTO> {
-    const response = await apiClient.put(`/api/Recruiter/placements/${id}/guarantee`, request);
+    const response = await apiClient.put(`/api/recruiter/placements/${id}/guarantee`, request);
     const parsed = PlacementResponseSchema.parse(response);
     
     if (!parsed.success || !parsed.data) {
@@ -235,7 +235,7 @@ export const placementService = {
   },
 
   async getCommissionSummary(): Promise<CommissionSummaryDTO> {
-    const response = await apiClient.get('/api/Recruiter/placements/summary/commission');
+    const response = await apiClient.get('/api/recruiter/placements/summary/commission');
     const parsed = CommissionSummaryResponseSchema.parse(response);
     
     if (!parsed.success || !parsed.data) {

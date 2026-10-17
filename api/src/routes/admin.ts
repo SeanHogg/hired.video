@@ -24,6 +24,7 @@ import {
 import { invalidateSubscriptionCache } from "../services/billing/BillingService.js";
 import { bumpPageEmbedsVersion } from "../services/studio/page-embed-service.js";
 import { invalidatePublicVideoFeed } from "../services/studio/public-video-feed.js";
+import { logger } from "../lib/logger.js";
 
 const PricingConfigSchema = z.object({
   proMonthlyCents: z.number().int().min(0).max(100_000_00),
@@ -398,7 +399,7 @@ adminRoutes.post("/billing/subscriptions/:subscriptionId/cancel", async (c) => {
 		try {
 			await provider.cancelSubscription(subscriptionId, false);
 		} catch (err) {
-			console.error(`[admin] Provider cancelSubscription failed:`, err);
+			logger.error("[admin] Provider cancelSubscription failed", { subscriptionId, error: err });
 			// Continue — still mark canceled in our DB
 		}
 	}
@@ -447,7 +448,7 @@ adminRoutes.post("/billing/subscriptions/:subscriptionId/refund", async (c) => {
 			const result = await provider.refundPayment(subscriptionId, amountCents, body.reason);
 			refundId = result.refundId;
 		} catch (err) {
-			console.error(`[admin] Provider refundPayment failed:`, err);
+			logger.error("[admin] Provider refundPayment failed", { subscriptionId, error: err });
 			// Continue — still mark canceled in our DB
 		}
 	}

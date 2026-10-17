@@ -186,13 +186,13 @@ export type AffiliateConversion = z.infer<typeof AffiliateConversionSchema>;
 
 export class AffiliateService {
   async getProfile(): Promise<AffiliateProfile> {
-    const response = await apiClient.get<AffiliateProfile>("/api/Affiliate/profile", AffiliateProfileSchema);
+    const response = await apiClient.get<AffiliateProfile>("/api/affiliates/profile", AffiliateProfileSchema);
     return response.data;
   }
 
   async getDashboard(): Promise<DashboardData> {
     const response: ApiSuccessResponse<DashboardData> = await apiClient.get(
-      "/api/Affiliate/dashboard",
+      "/api/affiliates/dashboard",
       DashboardSchema,
     );
     return response.data;
@@ -200,7 +200,7 @@ export class AffiliateService {
 
   async updateSpecialtySectors(specialtySectors: string[]): Promise<AffiliateProfile> {
     const response = await apiClient.patch<AffiliateProfile>(
-      "/api/Affiliate/profile",
+      "/api/affiliates/profile",
       { specialtySectors },
       AffiliateProfileSchema,
     );
@@ -209,7 +209,7 @@ export class AffiliateService {
 
   async requestPayout(): Promise<{ payoutId?: string; amountCents?: number }> {
     const response = await apiClient.post<{ payoutId?: string; amountCents?: number }>(
-      "/api/Affiliate/payout/request",
+      "/api/affiliates/payout/request",
       undefined,
     );
     return response.data;
@@ -218,7 +218,7 @@ export class AffiliateService {
   // Admin methods for SuperAdmin dashboard
   async getAdminStats(): Promise<AffiliateAdminStats> {
     const response: ApiSuccessResponse<AffiliateAdminStats> = await apiClient.get(
-      "/api/ProductDashboard/affiliate-stats",
+      "/api/admin/affiliate-stats",
       AffiliateAdminStatsSchema,
     );
     return response.data;
@@ -244,7 +244,7 @@ export class AffiliateService {
     if (params.sortDirection) queryParams.append('sortDirection', params.sortDirection);
 
     const response: ApiSuccessResponse<PaginatedAffiliates> = await apiClient.get(
-      `/api/Affiliate/admin/all?${queryParams.toString()}`,
+      `/api/affiliates/admin/all?${queryParams.toString()}`,
       PaginatedAffiliatesSchema,
     );
     return response.data;
@@ -252,31 +252,31 @@ export class AffiliateService {
 
   async getAffiliateDetail(userId: string): Promise<AffiliateDetail> {
     const response: ApiSuccessResponse<AffiliateDetail> = await apiClient.get(
-      `/api/Affiliate/admin/${userId}/details`,
+      `/api/affiliates/admin/${userId}/details`,
       AffiliateDetailSchema,
     );
     return response.data;
   }
 
   async activateAffiliate(userId: string, reason?: string): Promise<void> {
-    await apiClient.post(`/api/Affiliate/admin/${userId}/activate`, { reason });
+    await apiClient.post(`/api/affiliates/admin/${userId}/activate`, { reason });
   }
 
   async deactivateAffiliate(userId: string, reason?: string): Promise<void> {
-    await apiClient.post(`/api/Affiliate/admin/${userId}/deactivate`, { reason });
+    await apiClient.post(`/api/affiliates/admin/${userId}/deactivate`, { reason });
   }
 
   async suspendAffiliate(userId: string, reason: string): Promise<void> {
-    await apiClient.post(`/api/Affiliate/admin/${userId}/suspend`, { reason });
+    await apiClient.post(`/api/affiliates/admin/${userId}/suspend`, { reason });
   }
 
   async unsuspendAffiliate(userId: string, reason?: string): Promise<void> {
-    await apiClient.post(`/api/Affiliate/admin/${userId}/unsuspend`, { reason });
+    await apiClient.post(`/api/affiliates/admin/${userId}/unsuspend`, { reason });
   }
 
   async getAffiliateReferrals(userId: string): Promise<AffiliateReferral[]> {
     const response: ApiSuccessResponse<AffiliateReferral[]> = await apiClient.get(
-      `/api/Affiliate/admin/${userId}/referrals`,
+      `/api/affiliates/admin/${userId}/referrals`,
       z.array(AffiliateReferralSchema),
     );
     return response.data;
@@ -284,7 +284,7 @@ export class AffiliateService {
 
   async getAffiliateConversions(userId: string): Promise<AffiliateConversion[]> {
     const response: ApiSuccessResponse<AffiliateConversion[]> = await apiClient.get(
-      `/api/Affiliate/admin/${userId}/conversions`,
+      `/api/affiliates/admin/${userId}/conversions`,
       z.array(AffiliateConversionSchema),
     );
     return response.data;
@@ -293,27 +293,27 @@ export class AffiliateService {
   // Admin methods for payout management
   async getPendingPayouts(): Promise<AffiliatePayoutSummary[]> {
     const response: ApiSuccessResponse<AffiliatePayoutSummary[]> = await apiClient.get(
-      "/api/Affiliate/admin/pending-payouts",
+      "/api/affiliates/admin/pending-payouts",
       z.array(AffiliatePayoutSummarySchema),
     );
     return response.data;
   }
 
   async approvePayout(payoutId: string, notes?: string): Promise<void> {
-    await apiClient.post(`/api/Affiliate/admin/payout/${payoutId}/approve`, { notes });
+    await apiClient.post(`/api/affiliates/admin/payout/${payoutId}/approve`, { notes });
   }
 
   async rejectPayout(payoutId: string, reason: string): Promise<void> {
-    await apiClient.post(`/api/Affiliate/admin/payout/${payoutId}/reject`, { reason });
+    await apiClient.post(`/api/affiliates/admin/payout/${payoutId}/reject`, { reason });
   }
 
   async processPayout(payoutId: string): Promise<void> {
-    await apiClient.post(`/api/Affiliate/admin/payout/${payoutId}/process`, {});
+    await apiClient.post(`/api/affiliates/admin/payout/${payoutId}/process`, {});
   }
 
   async getPayoutStatus(payoutId: string): Promise<AffiliatePayoutSummary> {
     const response: ApiSuccessResponse<AffiliatePayoutSummary> = await apiClient.get(
-      `/api/Affiliate/admin/payout/${payoutId}/status`,
+      `/api/affiliates/admin/payout/${payoutId}/status`,
       AffiliatePayoutSummarySchema,
     );
     return response.data;

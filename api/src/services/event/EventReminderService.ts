@@ -1,8 +1,9 @@
 /**
  * EventReminderService — fires the 1w / 24h / 1h / start reminder cadence
- * for upcoming public events. Designed to be triggered by a scheduled
- * worker (Cloudflare cron) every ~10 minutes; idempotent via
- * `event_reminders_sent` so re-runs don't double-notify.
+ * for upcoming public events. Run by the 5-minute cron tick while the
+ * `event-reminders` KV work marker is due (i.e. some event has a reminder
+ * window open); idempotent via `event_reminders_sent` so re-runs don't
+ * double-notify.
  *
  * For each (event, attendee, reminder_key) tuple where the event starts
  * within the key's window AND no row already exists in event_reminders_sent,
@@ -18,6 +19,11 @@ import type { NotificationInsert } from "../../repositories/notificationsReposit
 import { chunk } from "../../utils/chunk.js";
 
 export type ReminderDeps = Pick<ApiDeps, "repos" | "now">;
+
+/** Half-width (minutes) of each reminder window: an event is reminded when
+ *  its start is within ±this of the key's offset. The cron's KV work marker
+ *  (WorkQueueRepository.nextDueTimes) derives due times from the same value. */
+export const EVENT_REMINDER_WINDOW_MIN = 10;
 
 interface ReminderRunResult {
   scanned: number;
@@ -44,7 +50,7 @@ export class EventReminderService {
     let skipped = 0;
 
     // 1) Events per reminder window (one small query per key — fixed 4).
-    const windowMs = 10 * 60 * 1000;
+    const windowMs = EVENT_REMINDER_WINDOW_MIN * 60 * 1000;
     const perKey = await Promise.all(
       REMINDER_KEYS.map(async (key) => {
         const target = new Date(now.getTime() + REMINDER_OFFSETS_MIN[key] * 60 * 1000);

@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 import { Loader2, Briefcase } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
-import { initials } from "@/lib/utils/initials";
+import { initials } from "@/lib/format";
 import { PitchSheetButton } from "@/components/pitch/PitchPlayer";
 import {
   jobPipelineService,

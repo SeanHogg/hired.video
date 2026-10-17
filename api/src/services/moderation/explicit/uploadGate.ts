@@ -22,6 +22,7 @@ import type { ExplicitVerdict } from "../../../../../shared/moderation/explicit.
 import { createExplicitScanDeps, type ExplicitScanEnv } from "./deps.js";
 import { ExplicitContentError } from "./errors.js";
 import { scanUploadedImage } from "./imageScan.js";
+import { logger } from "../../../lib/logger.js";
 
 export async function assertImageUploadAllowed(
   args: {
@@ -42,11 +43,11 @@ export async function assertImageUploadAllowed(
       createExplicitScanDeps(env),
     );
   } catch (err) {
-    console.error("[explicit-scan] image upload scan failed:", err instanceof Error ? err.message : err);
+    logger.error("[explicit-scan] image upload scan failed", err);
     return null;
   }
   if (verdict.verdict === "block") {
-    await args.discard().catch((err) => console.error("[explicit-scan] failed to discard blocked upload:", err));
+    await args.discard().catch((err) => logger.error("[explicit-scan] failed to discard blocked upload", err));
     throw new ExplicitContentError(verdict.categories, "image");
   }
   return verdict;

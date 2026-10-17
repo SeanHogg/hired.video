@@ -7,7 +7,11 @@
  * endpoint was removed in the #757 cutover.
  */
 
+import type { UserRule } from "@shared/email-classification/rules";
+import type { InboxProfileShape } from "@shared/email-classification/profiles";
 import { apiClient } from "@/lib/api-client";
+import { buildApiUrl } from "@/lib/api/base-url";
+import { getAuthToken } from "@/lib/api/auth-token";
 
 export type EmailProviderId = "gmail" | "outlook";
 
@@ -26,12 +30,12 @@ export interface ConnectedEmailAccount {
   activeProfileId?: string | null;
 }
 
-export interface EmailUserRule {
-  id: string;
+/** Stored rule row — the shared classifier `UserRule` plus row metadata and
+ *  the concrete condition shape the rules editor writes. */
+export interface EmailUserRule extends UserRule {
   userId: string;
   /** Inbox profile this rule is scoped to; null = legacy global rule. */
   profileId?: string | null;
-  name: string;
   conditions: Array<{
     field: "from_email" | "from_domain" | "subject" | "body" | "any";
     op: "contains" | "equals" | "starts_with" | "ends_with" | "regex";
@@ -39,9 +43,6 @@ export interface EmailUserRule {
     caseSensitive?: boolean;
   }>;
   actionCategory: string;
-  actionScore: string | number;
-  isEnabled: boolean;
-  priority: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -65,31 +66,9 @@ export interface EmailSyncRun {
   errorMessage: string | null;
 }
 
-/** One category in a profile's taxonomy (mirrors shared InboxCategory). */
-export interface InboxCategory {
-  key: string;
-  label: string;
-  description?: string;
-  visible: boolean;
-}
-
-/** Runtime inbox profile (mirrors shared InboxProfileShape). */
-export interface InboxProfile {
-  id: string;
-  ownerId: string | null;
-  roles: string[];
-  name: string;
-  description: string | null;
-  isPreset: boolean;
-  presetKey: string | null;
-  taxonomy: InboxCategory[];
-  classifyPrompt: string;
-  summaryPrompt: string | null;
-  extractSchema: Record<string, unknown> | null;
-  defaultRuleSet: string | null;
-  minRelevanceScore: number;
-  version: number;
-}
+// Inbox profile + taxonomy category — SSoT in shared/email-classification/profiles.ts.
+export type { InboxCategory } from "@shared/email-classification/profiles";
+export type InboxProfile = InboxProfileShape;
 
 export interface InboxAction {
   id: string;
@@ -141,16 +120,11 @@ class EmailIntegrationService {
      *  defaults to (and the callback enforces) the same mailbox. */
     reconnectAccountEmail?: string,
   ): string {
-    const apiBase = (
-      import.meta.env.VITE_API_BASE_URL ||
-      import.meta.env.VITE_API_URL ||
-      window.location.origin
-    ).toString().replace(/\/$/, "");
     const params = new URLSearchParams({ redirect });
-    const token = typeof localStorage !== "undefined" ? localStorage.getItem("auth_token") : null;
+    const token = getAuthToken();
     if (token) params.set("link_token", token);
     if (reconnectAccountEmail) params.set("reconnectAccountEmail", reconnectAccountEmail);
-    return `${apiBase}/api/integrations/email/${provider}/connect?${params.toString()}`;
+    return buildApiUrl(`/api/integrations/email/${provider}/connect?${params.toString()}`);
   }
 
   async listAccounts(): Promise<ConnectedEmailAccount[]> {

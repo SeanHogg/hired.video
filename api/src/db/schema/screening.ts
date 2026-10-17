@@ -68,6 +68,7 @@ export const screeningTemplates = pgTable(
   (t) => [
     index("screening_templates_company_idx").on(t.companyId),
     index("screening_templates_job_idx").on(t.jobId),
+    index("idx_screening_templates_created_by_user_id").on(t.createdByUserId),
   ],
 );
 
@@ -149,10 +150,13 @@ export const screeningRequests = pgTable(
   },
   (t) => [
     index("screening_requests_company_idx").on(t.companyId),
-    index("screening_requests_token_idx").on(t.token),
     index("screening_requests_candidate_email_idx").on(t.candidateEmail),
     index("screening_requests_application_idx").on(t.applicationId),
     check("screening_requests_status_check", sql`${t.status} IN ('pending', 'in_progress', 'completed', 'expired')`),
+    index("idx_screening_requests_candidate_user_id").on(t.candidateUserId),
+    index("idx_screening_requests_created_by_user_id").on(t.createdByUserId),
+    index("idx_screening_requests_job_id").on(t.jobId),
+    index("idx_screening_requests_template_id").on(t.templateId),
   ],
 );
 

@@ -15,6 +15,7 @@ import { cdnUrl } from "../../utils/cdn.js";
 import { slugify } from "../../../../shared/slugify.js";
 import { deleteR2Keys } from "../../services/storage/r2-delete.js";
 import { putObject } from "../../services/storage/object-store.js";
+import { MB, parseUpload, isUploadRejected } from "../../utils/multipart.js";
 import { ok, fail, studioVoiceClones, studioVoiceCloneLicenses } from "./shared.js";
 import { PLATFORM_FEE_BPS_DEFAULT, MAX_PRICE_CENTS, resolveCreatorFeeBps, userHasVoiceLicense } from "./voice-clone-shared.js";
 
@@ -26,19 +27,20 @@ export const voiceCloneWriteRoutes = new Hono<AppEnv>();
 // requires Pro). Free users hit the 402 PRO_REQUIRED upgrade prompt.
 voiceCloneWriteRoutes.post("/voice-clones", requirePro("Voice Cloning"), async (c) => {
   const user = c.var.user;
-  const form = await c.req.formData().catch(() => null);
-  if (!form) return c.json(fail("VALIDATION_ERROR", "Invalid form data"), 400);
+  const up = await parseUpload(c, {
+    fields: ["audio"],
+    maxBytes: 25 * MB,
+    messages: { missing: "Missing audio sample", size: "Audio sample too large (max 25MB)" },
+  });
+  // Every rejection (malformed body, missing sample, oversize) is a 400 here.
+  if (isUploadRejected(up)) return c.json(fail("VALIDATION_ERROR", up.form ? up.message : "Invalid form data"), 400);
+  const { form, file: audioFile, bytes } = up;
 
   const name = String(form.get("name") ?? "My Voice").slice(0, 120);
   const description = String(form.get("description") ?? "").slice(0, 2000) || null;
   const language = (form.get("language") as string | null) || null;
   const gender = (form.get("gender") as string | null) || null;
   const accent = (form.get("accent") as string | null) || null;
-  const audioFile = form.get("audio") as File | null;
-  if (!audioFile) return c.json(fail("VALIDATION_ERROR", "Missing audio sample"), 400);
-  if (audioFile.size > 25 * 1024 * 1024) {
-    return c.json(fail("VALIDATION_ERROR", "Audio sample too large (max 25MB)"), 400);
-  }
 
   const db = getDb();
   const id = crypto.randomUUID();
@@ -46,7 +48,6 @@ voiceCloneWriteRoutes.post("/voice-clones", requirePro("Voice Cloning"), async (
   // Upload reference sample to object storage
   const ext = (audioFile.type.split("/")[1] || "webm").replace(/[^a-z0-9]/gi, "");
   const sampleKey = `studio/voice-clones/${user.sub}/${id}.${ext}`;
-  const bytes = await audioFile.arrayBuffer();
   const uploaded = await putObject(sampleKey, bytes, audioFile.type || "audio/webm", { userId: user.sub, cloneId: id });
   if (!uploaded) return c.json(fail("STORAGE_UNAVAILABLE", "Failed to store voice sample"), 503);
   const sampleUrl = cdnUrl(sampleKey);

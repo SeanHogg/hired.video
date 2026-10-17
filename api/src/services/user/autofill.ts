@@ -10,6 +10,8 @@ import type {
   FieldCategory,
   FieldAnswer,
 } from "../../../../shared/autofill.js";
+import { logger } from "../../lib/logger.js";
+import { sha256Hex } from "../../utils/crypto.js";
 
 // ============================================================================
 // FORM FIELD ANALYSIS
@@ -658,7 +660,7 @@ ${customInstructions ? `CUSTOM INSTRUCTIONS: ${customInstructions}` : ""}`;
 
       return { answers };
     } catch (err) {
-      console.warn("[autofill] LLM answer generation failed:", err);
+      logger.warn("[autofill] LLM answer generation failed", err);
       // Return what we have from direct mapping + cache
     }
   }
@@ -687,10 +689,5 @@ export function normalizeQuestion(text: string): string {
  * Uses Web Crypto API (available in Cloudflare Workers).
  */
 export async function hashQuestion(text: string): Promise<string> {
-  const normalized = normalizeQuestion(text);
-  const encoder = new TextEncoder();
-  const data = encoder.encode(normalized);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  return sha256Hex(normalizeQuestion(text));
 }

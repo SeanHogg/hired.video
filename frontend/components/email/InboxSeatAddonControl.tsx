@@ -15,7 +15,7 @@
  * Reducing below the number of currently-connected mailboxes is blocked —
  * you can't strand an active inbox by removing the slot under it.
  *
- * On change it PATCHes `/api/Billing/inbox-seats`, then refreshes the
+ * On change it PATCHes `/api/billing/inbox-seats`, then refreshes the
  * shared `useEmailAccounts()` cache so the sibling `<ConnectMailboxButtons />`
  * gate re-evaluates against the new cap without a manual round-trip.
  */

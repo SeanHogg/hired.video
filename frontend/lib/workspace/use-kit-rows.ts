@@ -5,34 +5,19 @@
  * THOSE out, so an older duplicate or a video whose résumé is gone stays
  * listed (and deletable) there. Null while signed out or loading.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "@/lib/auth";
-import { resumeService } from "@/lib/services/resume-service";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 import type { StudioProject } from "@/lib/services/studio-service";
 import { buildKitRows, type KitRow } from "./kits";
 
-type ResumeList = Awaited<ReturnType<typeof resumeService.getUserResumes>>;
+const NO_RESUMES: never[] = [];
 
 export function useKitRows(projects: readonly StudioProject[] | null) {
   const { t } = useTranslation();
-  const { user } = useAuth();
-  const [resumes, setResumes] = useState<ResumeList | null>(null);
-
-  useEffect(() => {
-    if (!user) {
-      setResumes(null);
-      return;
-    }
-    let cancelled = false;
-    resumeService
-      .getUserResumes()
-      .then((list) => !cancelled && setResumes(list))
-      .catch(() => !cancelled && setResumes([]));
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
+  const query = useUserResumes();
+  // Null while signed out or loading; a failed read shows no kits.
+  const resumes = query.isError ? NO_RESUMES : (query.data ?? null);
 
   return useMemo(() => {
     const rows: KitRow[] | null = resumes ? buildKitRows(resumes, projects ?? [], t("build.untitledResume")) : null;

@@ -80,7 +80,7 @@ describe("frontend ai-api-registry (compat shim)", () => {
   });
 
   describe("endpoint hygiene", () => {
-    it("every tool's endpoint starts with /api/ and is lowercase", () => {
+    it("every tool's endpoint starts with /api/ and matches backend casing", () => {
       // Spot-check across a few well-known tools rather than enumerate
       // — the shared registry's own test exhaustively asserts this.
       for (const id of [
@@ -95,9 +95,10 @@ describe("frontend ai-api-registry (compat shim)", () => {
         const api = getAPIById(id);
         expect(api, `tool "${id}" should be present`).toBeDefined();
         expect(api!.endpoint).toMatch(/^\/api\//);
-        // Path segments before `:param` placeholders must be lowercase
-        // — Hono is case-sensitive and the current backend mounts on
-        // lowercase paths only (see app.ts).
+        // Path segments before `:param` placeholders must match the
+        // backend route byte-for-byte — Hono is case-sensitive, apiClient
+        // sends paths verbatim (no re-casing), and every route these tools
+        // hit is registered lowercase (see api/src/app.ts mounts).
         const pathOnly = api!.endpoint.split(":")[0];
         expect(pathOnly).toBe(pathOnly.toLowerCase());
       }

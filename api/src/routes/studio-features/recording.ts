@@ -13,6 +13,8 @@ import { cdnUrl } from "../../utils/cdn.js";
 import { deleteR2Keys } from "../../services/storage/r2-delete.js";
 import { putObject } from "../../services/storage/object-store.js";
 import { ok, fail, studioRecordings } from "./shared.js";
+import { logger } from "../../lib/logger.js";
+import { parseUpload, isUploadRejected } from "../../utils/multipart.js";
 
 export const recordingRoutes = new Hono<AppEnv>();
 
@@ -23,28 +25,24 @@ export const recordingRoutes = new Hono<AppEnv>();
 /** Best-effort: a cache bust failure must not fail the recording write. */
 async function bustPitchCachesForTake(projectId: string | null): Promise<void> {
   await onPitchTakeChanged(projectId).catch((err) =>
-    console.warn("[studio/recording] pitch cache invalidation failed:", err instanceof Error ? err.message : err),
+    logger.warn("[studio/recording] pitch cache invalidation failed", { error: err instanceof Error ? err.message : err }),
   );
 }
 
 // POST /api/studio/recording/upload — upload a webcam/screen recording
 recordingRoutes.post("/recording/upload", async (c) => {
   const user = c.var.user;
-  const form = await c.req.formData().catch(() => null);
-  if (!form) return c.json(fail("VALIDATION_ERROR", "Invalid form data"), 400);
-
-  const file = form.get("video") as File | null;
+  const up = await parseUpload(c, { fields: ["video"], messages: { missing: "Missing video file" } });
+  if (isUploadRejected(up)) return c.json(fail("VALIDATION_ERROR", up.form ? up.message : "Invalid form data"), 400);
+  const { form, file, bytes } = up;
   const type = String(form.get("type") ?? "webcam");
   const durationMs = Number(form.get("durationMs") ?? 0);
-
-  if (!file) return c.json(fail("VALIDATION_ERROR", "Missing video file"), 400);
 
   // Linking a take to a project needs write access to it (owner / company
   // member / delegate, #2391) — checked BEFORE any blob or row is written.
   const gated = await withRecordingProjectAccess(user.sub, form.get("projectId"), async (projectId) => {
     const db = getDb();
     let videoUrl: string | null = null;
-    const bytes = await file.arrayBuffer();
     const videoKey = `studio/recordings/${user.sub}/${Date.now()}-${file.name || "recording.webm"}`;
     // The project hint links the uploaded_assets row to its studio project
     // (#733) — metadata only; the FK nulls itself if the project goes away.
@@ -108,13 +106,14 @@ recordingRoutes.post("/recording/:id/transcribe", async (c) => {
   if (!recording) return c.json(fail("NOT_FOUND", "Recording not found"), 404);
 
   // For now, we expect the frontend to send the audio directly
-  const form = await c.req.formData().catch(() => null);
-  const audioFile = form?.get("audio") as File | null;
-  if (!audioFile) return c.json(fail("VALIDATION_ERROR", "Missing audio file"), 400);
+  const up = await parseUpload(c, { fields: ["audio"], messages: { missing: "Missing audio file" } });
+  if (isUploadRejected(up)) return c.json(fail("VALIDATION_ERROR", up.message), 400);
+  const { file: audioFile, bytes: audioBuffer } = up;
 
   try {
-    const audioBuffer = await audioFile.arrayBuffer();
-    const result = await transcribeAudio(openaiKey, audioBuffer, audioFile.name || "audio.webm");
+    const result = await transcribeAudio(openaiKey, audioBuffer, audioFile.name || "audio.webm", {
+      meter: { user, featureKey: "studio_recording_transcribe" },
+    });
 
     await db.update(studioRecordings).set({
       transcription: result.text,
@@ -128,7 +127,7 @@ recordingRoutes.post("/recording/:id/transcribe", async (c) => {
       words: result.words,
     }));
   } catch (err) {
-    console.error("[recording/transcribe] error:", err);
+    logger.error("[recording/transcribe] error", err);
     return c.json(fail("TRANSCRIPTION_FAILED", `Transcription failed: ${err}`), 500);
   }
 });

@@ -2,7 +2,7 @@
  * /api/advertising — composed from focused sub-routers mounted at "/", so
  * every path is unchanged and app.ts still imports `advertisingRoutes`.
  *
- *   advertising/boosts.ts      job + company boosts
+ *   advertising/boosts.ts      job boosts
  *   advertising/campaigns.ts   campaigns, ad sets, targeting reach estimate
  *   advertising/ads.ts         ad creatives
  *   advertising/insights.ts    stats + analytics dashboard

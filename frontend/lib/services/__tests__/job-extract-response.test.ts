@@ -10,7 +10,7 @@ vi.mock("../../api-client", () => ({
 const post = vi.mocked(apiClient.post);
 const get = vi.mocked(apiClient.get);
 
-// Shaped like the real POST /api/Job/Extract answers (api/src/routes/jobs.ts).
+// Shaped like the real POST /api/jobs/extract answers (api/src/routes/jobs.ts).
 const CREATED = {
   id: "job-1",
   title: "Chief Information Officer",
@@ -74,7 +74,7 @@ describe("jobService.extractJobFromUrl", () => {
       data: { id: "job-7", title: "CIO", company: "Macomb CC", description: "Own the technology roadmap.", salaryMin: null },
     });
     const job = await jobService.extractJobFromUrl("https://jobs.example.com/cio");
-    expect(get).toHaveBeenCalledWith("/api/Job/job-7");
+    expect(get).toHaveBeenCalledWith("/api/jobs/job-7");
     expect(job).toMatchObject({ id: "job-7", description: "Own the technology roadmap.", location: "Warren, MI" });
     expect(jobTextFromSummary(job).split("\n")[0]).toBe("CIO · Macomb CC");
   });

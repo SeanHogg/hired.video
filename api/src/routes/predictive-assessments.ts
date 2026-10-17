@@ -24,7 +24,7 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { error, success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
-import { USER_ROLES } from "../../../shared/user-roles.js";
+import { isAdminRole } from "../middleware/superAdmin.js";
 import {
   ASSESSMENT_KINDS,
   getAssessmentDescriptor,
@@ -41,20 +41,9 @@ function userId(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
 }
 
-function isAdminOrSuper(c: any): boolean {
-  const roles = (c.var.user?.roles as string[] | undefined) ?? [];
-  const role = (c.var.user as any)?.role ?? "";
-  return (
-    roles.includes(USER_ROLES.SUPER_ADMIN) ||
-    roles.includes(USER_ROLES.ADMIN) ||
-    role === USER_ROLES.SUPER_ADMIN ||
-    role === USER_ROLES.ADMIN
-  );
-}
-
 /** True when the caller is allowed to run a Pro-gated assessment kind. */
 async function callerIsProEligible(c: any): Promise<boolean> {
-  if (isAdminOrSuper(c)) return true;
+  if (isAdminRole(c.var.user)) return true;
   const uid = userId(c);
   if (!uid) return false;
   const sub = await getSubscription(uid);

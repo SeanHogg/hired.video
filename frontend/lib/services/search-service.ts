@@ -104,6 +104,16 @@ export type SearchFilters = z.infer<typeof SearchFiltersSchema>;
 // SERVICE
 // ============================================================================
 
+/** The one transport for GET /api/search/public. Callers with their own
+ *  projection (e.g. the Resource Map) use this instead of a raw apiClient call. */
+export function getPublicSearch<T>(
+  params: URLSearchParams,
+  schema?: z.ZodSchema<T>,
+  config?: Parameters<typeof apiClient.get>[2],
+) {
+  return apiClient.get<T>(`/api/search/public?${params.toString()}`, schema, config);
+}
+
 export class SearchService {
   private inflight = new Map<string, Promise<SearchResponse>>();
   /**
@@ -181,8 +191,8 @@ export class SearchService {
       });
 
       // Call the unified search endpoint
-      const response = await apiClient.get<z.infer<typeof UnifiedSearchResponseSchema>>(
-        unifiedUrl,
+      const response = await getPublicSearch<z.infer<typeof UnifiedSearchResponseSchema>>(
+        params,
         UnifiedSearchResponseSchema,
       );
       const unifiedData = response.data;

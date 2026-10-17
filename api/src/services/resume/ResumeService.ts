@@ -101,6 +101,7 @@ import {
   rowToResumeSummary,
 } from "../../handlers/resume-serializer.js";
 import { isUuid } from "../../../../shared/value-types.js";
+import { logger } from "../../lib/logger.js";
 
 /** Re-shape the per-request context into the viewer object the view
  *  service expects. Kept local so the service layer stays ignorant of
@@ -385,10 +386,7 @@ export async function handleSentimentPrediction(
   try {
     await deps.repo.updateSentimentScoreForOwner(resumeId, ownerId, Math.round(score));
   } catch (err) {
-    console.warn(
-      "[sentimentprediction] persist failed:",
-      err instanceof Error ? err.message : err,
-    );
+    logger.warn("[sentimentprediction] persist failed", err);
   }
 
   return ok({ score });
@@ -739,10 +737,7 @@ export async function handleCreateVariation(
           }
         }
       } catch (err) {
-        console.warn(
-          "[createvariation] AI parse failed; keeping parent JSON:",
-          err instanceof Error ? err.message : err,
-        );
+        logger.warn("[createvariation] AI parse failed; keeping parent JSON", err);
       }
     }
   }

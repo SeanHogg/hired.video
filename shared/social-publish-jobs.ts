@@ -25,10 +25,6 @@ export const FEED_DESTINATION = "feed" as const;
 export const DISTRIBUTION_DESTINATIONS = [...VIDEO_PUBLISH_PLATFORMS, FEED_DESTINATION] as const;
 export type DistributionDestination = (typeof DISTRIBUTION_DESTINATIONS)[number];
 
-export function isDistributionDestination(v: string): v is DistributionDestination {
-  return (DISTRIBUTION_DESTINATIONS as readonly string[]).includes(v);
-}
-
 export const DISTRIBUTION_LANES = ["self", "managed"] as const;
 export type DistributionLane = (typeof DISTRIBUTION_LANES)[number];
 
@@ -158,28 +154,11 @@ export interface PostMetricCounts {
 
 // ─── AI Posting Agent (#2300) ────────────────────────────────────────────────
 
-/** Job source: user-scheduled vs AI agent. */
-export const PUBLISH_JOB_SOURCES = ["user", "agent"] as const;
-export type PublishJobSource = (typeof PUBLISH_JOB_SOURCES)[number];
-
-/** Caption source for agent posts. */
-export type AgentCaptionSource = "ai" | "template";
-
 /** Cadence presets for the AI agent. */
 export const AGENT_CADENCES = ["light", "steady", "daily"] as const;
 export type AgentCadence = (typeof AGENT_CADENCES)[number];
 
-/** Agent mode: approve each post or auto-post. */
-export const AGENT_MODES = ["approve", "auto"] as const;
-export type AgentMode = (typeof AGENT_MODES)[number];
-
-/** Agent pause reasons. */
-export const AGENT_PAUSE_REASONS = ["user", "plan", "admin"] as const;
-export type AgentPauseReason = (typeof AGENT_PAUSE_REASONS)[number];
-
 /** Agent default settings. */
-export const AGENT_DEFAULT_CADENCE: AgentCadence = "steady";
-export const AGENT_DEFAULT_MODE: AgentMode = "approve";
 export const AGENT_DEFAULT_POST_MINUTE = 720; // 12:00 local
 export const AGENT_DEFAULT_QUIET_START = 1260; // 21:00
 export const AGENT_DEFAULT_QUIET_END = 480; // 08:00

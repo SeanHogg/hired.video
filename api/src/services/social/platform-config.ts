@@ -17,10 +17,7 @@
 
 import type { SocialLane, SocialPlatform } from "../../../../shared/social-platforms.js";
 import { YOUTUBE_REQUIRED_SCOPES } from "../youtube/youtubeOAuth.js";
-
-function getEnv(key: string): string {
-  return process.env[key] || (globalThis as any).__ENV?.[key] || "";
-}
+import { getEnv } from "../../utils/env.js";
 
 export interface SocialIdentity {
   /** Platform's stable account id. */

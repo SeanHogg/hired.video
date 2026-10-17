@@ -2,34 +2,10 @@
 // Based on UserCompanyRoleAssociationEntity and related backend models
 
 import { InviteStatus } from "../../shared/account";
+import type { AccountUser, AccountOption } from "../../shared/account";
 
-export interface AccountUser {
-  id: string;
-  userId: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  fullName: string;
-  avatarUrl?: string;
-  headline?: string;
-  currentRole?: string;
-  currentCompany?: string;
-  location?: string;
-  inviteStatus: InviteStatus;
-  inviteStatusStartDateTime?: string;
-  inviteStatusEndDateTime?: string;
-  rolesAssigned: string[];
-  isPaidAccount: boolean;
-  isPaidAccountDateTime?: string;
-  accountUsageType?: AccountUsageType;
-  creationDateTime?: string;
-  updateDateTime?: string;
-  lastLoginAt?: string;
-  isOwner: boolean;
-  canDelete: boolean;
-  canEditRoles: boolean;
-  isActive: boolean;
-}
+// Wire DTOs — SSoT in shared/account.ts.
+export type { AccountUser, AccountOption, AcceptInvitationResponse } from "../../shared/account";
 
 export interface UserProfile {
   id: string;
@@ -76,11 +52,6 @@ export enum hiredvideoRole {
   Employer = "employer",
 }
 
-export enum AccountUsageType {
-  Individual = 0,
-  Employer = 1,
-  Employee = 2,
-}
 
 export enum ProfileStatus {
   NoStatus = 0,
@@ -94,14 +65,6 @@ export enum ProfileStatus {
 // no backend accepts.
 export type { InviteUserRequest, InviteUserResponse, SeatInfo } from "../../shared/account";
 
-export interface AcceptInvitationResponse {
-  success: boolean;
-  message: string;
-  companyName: string;
-  assignedRoles: string[];
-  requiredRegistration: boolean;
-  redirectUrl?: string;
-}
 
 // SSoT lives in shared/account.ts so the backend by-token details endpoint
 // builds to the exact same shape the accept page renders (gap #1673).
@@ -151,14 +114,6 @@ export interface AccountSwitchContext {
   availableAccounts: AccountOption[];
 }
 
-export interface AccountOption {
-  id: string;
-  name: string;
-  role: string;
-  logoUrl?: string;
-  isOwner: boolean;
-  isAdmin: boolean;
-}
 
 // UI State interfaces
 export interface AccountManagementState {

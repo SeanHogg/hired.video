@@ -56,7 +56,6 @@ export const studioProjectPublications = pgTable(
   (t) => ({
     projDest: unique("uq_studio_project_publications_proj_dest_variant")
       .on(t.projectId, t.destination, t.renderVariantId),
-    byProject: index("idx_studio_project_publications_project").on(t.projectId),
     byVariant: index("idx_studio_project_publications_variant").on(t.renderVariantId),
     /** Webhooks name a post by the network's id (migration 0526, #2048). */
     byDestExternal: index("idx_studio_project_publications_dest_external").on(t.destination, t.externalId),

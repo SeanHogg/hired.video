@@ -19,6 +19,7 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { ok } from "../utils/response.js";
+import { clampLimit } from "../utils/pagination.js";
 import {
   classifyOrphans,
   loadDbLinkedKeys,
@@ -89,7 +90,7 @@ adminR2Routes.get("/usage", async (c) => {
   const r2 = getVideoBucket();
   if (!r2) return c.json(fail("R2_UNAVAILABLE", "R2 binding not configured"), 500);
 
-  const limit = Math.min(50_000, Math.max(100, Number(c.req.query("limit") ?? 10_000)));
+  const limit = clampLimit(c.req.query("limit"), 10_000, 50_000, 100);
   const { objects, truncated } = await listAll(r2, limit);
 
   const summary = summarizeByUser(objects);
@@ -135,7 +136,7 @@ adminR2Routes.get("/orphans", async (c) => {
   const r2 = getVideoBucket();
   if (!r2) return c.json(fail("R2_UNAVAILABLE", "R2 binding not configured"), 500);
 
-  const limit = Math.min(50_000, Math.max(100, Number(c.req.query("limit") ?? 10_000)));
+  const limit = clampLimit(c.req.query("limit"), 10_000, 50_000, 100);
   const { objects, truncated } = await listAll(r2, limit);
 
   const db = getDb();

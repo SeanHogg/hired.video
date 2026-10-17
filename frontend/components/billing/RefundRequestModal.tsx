@@ -52,17 +52,18 @@ export function RefundRequestModal({
     setError(null);
 
     try {
-      const [policyResponse, reasonsResponse] = await Promise.all([
+      // Each half is optional — a failed policy fetch must not hide the reasons.
+      const [policyResult, reasonsResult] = await Promise.allSettled([
         refundService.getRefundPolicy(),
         refundService.getRefundReasons(),
       ]);
 
-      if (policyResponse.success) {
-        setPolicy(policyResponse.data);
+      if (policyResult.status === 'fulfilled') {
+        setPolicy(policyResult.value);
       }
 
-      if (reasonsResponse.success) {
-        setReasons(reasonsResponse.data);
+      if (reasonsResult.status === 'fulfilled') {
+        setReasons(reasonsResult.value);
       }
     } catch (err) {
       console.error('Error loading refund data:', err);
@@ -87,16 +88,11 @@ export function RefundRequestModal({
         throw new Error('Please enter a valid refund amount');
       }
 
-      const response = await refundService.createRefundRequest(formData);
-
-      if (response.success) {
-        toast.success('Refund request submitted successfully');
-        onSuccess?.();
-        onClose();
-        resetForm();
-      } else {
-        throw new Error(response.error?.message || 'Failed to submit refund request');
-      }
+      await refundService.createRefundRequest(formData);
+      toast.success('Refund request submitted successfully');
+      onSuccess?.();
+      onClose();
+      resetForm();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
       setError(errorMessage);

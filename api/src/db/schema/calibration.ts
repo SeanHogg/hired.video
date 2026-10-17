@@ -50,6 +50,7 @@ export const calibrationSessions = pgTable(
   (t) => ({
     companyIdx: index("calibration_sessions_company_idx").on(t.companyId),
     organizerIdx: index("calibration_sessions_organizer_idx").on(t.organizerId),
+    templateIdFkIdx: index("idx_calibration_sessions_template_id").on(t.templateId),
   }),
 );
 
@@ -78,7 +79,6 @@ export const calibrationSubmissions = pgTable(
     submittedAt: timestamp("submitted_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
-    sessionIdx: index("calibration_submissions_session_idx").on(t.sessionId),
     evaluatorIdx: index("calibration_submissions_evaluator_idx").on(t.evaluatorUserId),
     perEvaluatorPerApplicationUnique: uniqueIndex(
       "calibration_submissions_unique",

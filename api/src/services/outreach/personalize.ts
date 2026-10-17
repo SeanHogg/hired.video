@@ -18,6 +18,7 @@
 
 import { createLLMClient, hasAnyLLMProviderKey } from "../adapters/llm-client.js";
 import type { Env, JwtPayload } from "../../types/index.js";
+import { logger } from "../../lib/logger.js";
 
 export interface PersonalizeArgs {
   /** The already-rendered message body (after `{{var}}` substitution). */
@@ -71,7 +72,7 @@ ${base}`;
     const out = content?.trim();
     return out && out.length > 0 ? out : args.body;
   } catch (err) {
-    console.error("[outreach/personalize] LLM failed, sending base body:", err);
+    logger.error("[outreach/personalize] LLM failed, sending base body", err);
     return args.body;
   }
 }

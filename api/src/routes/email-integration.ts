@@ -63,15 +63,13 @@ import { getEntitlement } from "../domains/services-processing/entitlement-catal
 import { inboxSeatAddonService } from "../services/billing/InboxSeatAddonService.js";
 import { pricingUpgradeUrl } from "../../../shared/upgrade-slugs.js";
 import { getJwtSecretOptional } from "../utils/jwt.js";
-import { frontendBaseUrl } from "../utils/public-urls.js";
-import { getEnv } from "../utils/env.js";
+import { apiBaseUrl, frontendBaseUrl } from "../utils/public-urls.js";
+import { clampLimit } from "../utils/pagination.js";
+import { logger } from "../lib/logger.js";
 
 
-function getApiBase(): string {
-  return getEnv("API_URL") || "https://api.hired.video";
-}
 function callbackUrl(provider: string): string {
-  return `${getApiBase()}/api/integrations/email/${provider}/callback`;
+  return `${apiBaseUrl()}/api/integrations/email/${provider}/callback`;
 }
 
 /** Top-level browser navigation can't carry an Authorization header — the
@@ -237,7 +235,7 @@ emailIntegrationRoutes.get("/:provider/callback", async (c) => {
     tokens = await exchangeCode(provider, code, callbackUrl(provider));
     mailboxEmail = await cfg.fetchAccountEmail(tokens.access_token);
   } catch (err) {
-    console.error(`[email-integration:${provider}] callback failed:`, err);
+    logger.error(`[email-integration:${provider}] callback failed`, err);
     return c.redirect(`${base}/settings?tab=email&error=auth_failed`);
   }
   if (!tokens.refresh_token) {
@@ -501,7 +499,7 @@ emailIntegrationRoutes.delete("/rules/:id", async (c) => {
 emailIntegrationRoutes.get("/sync-runs", async (c) => {
   const uid = c.var.user?.sub;
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const limit = Math.min(50, Math.max(1, Number(c.req.query("limit") ?? "10") || 10));
+  const limit = clampLimit(c.req.query("limit"), 10, 50);
   const repos = buildRepos(getDb());
   const [runs, accounts] = await Promise.all([
     repos.emailSyncRuns.findRecentForUser(uid, limit),
@@ -720,7 +718,7 @@ emailIntegrationRoutes.delete("/actions/:id", async (c) => {
 emailIntegrationRoutes.get("/action-runs", async (c) => {
   const uid = c.var.user?.sub;
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const limit = Math.min(100, Math.max(1, Number(c.req.query("limit") ?? "25") || 25));
+  const limit = clampLimit(c.req.query("limit"), 25, 100);
   const repos = buildRepos(getDb());
   const runs = await repos.inboxActionRuns.findRecentForUser(uid, limit);
   return c.json(

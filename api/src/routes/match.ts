@@ -29,6 +29,7 @@ import { handleTailor } from "../services/job/tailor-handler.js";
 import { handleCoverLetter } from "../services/job/cover-letter-handler.js";
 import { handleCoverLetterTone } from "../services/job/cover-letter-tone.js";
 import { createIpRateLimiter, getClientIp } from "../middleware/rateLimiter.js";
+import { toHandlerResult } from "../handlers/shared.js";
 
 export const matchRoutes = new Hono<AppEnv>();
 matchRoutes.use("*", attachTokenBudget());
@@ -53,8 +54,11 @@ function buildMatchDeps(c: Context<AppEnv>): MatchDeps {
 
 async function relay(
   c: Context<AppEnv>,
-  handlerResult: Promise<{ status: number; body: unknown }>,
+  useCase: Promise<unknown>,
 ) {
+  // Map to the envelope synchronously so a DomainError rejection is
+  // observed even while the budget check is pending.
+  const handlerResult = toHandlerResult(useCase);
   const limitError = await checkTokenBudget(c as any);
   if (limitError) return limitError;
   const { status, body } = await handlerResult;
@@ -104,7 +108,7 @@ const toneLimiter = createIpRateLimiter({
 /** POST /api/match/cover-letter/tone — rewrite the letter in a tone (FREE, audited) */
 matchRoutes.post("/cover-letter/tone", toneLimiter, async (c) => {
   const body = await c.req.json().catch(() => null);
-  const { status, body: out } = await handleCoverLetterTone(buildMatchDeps(c), c.var.user?.sub ?? null, body);
+  const { status, body: out } = await toHandlerResult(handleCoverLetterTone(buildMatchDeps(c), c.var.user?.sub ?? null, body));
   return c.json(out as never, status as never);
 });
 

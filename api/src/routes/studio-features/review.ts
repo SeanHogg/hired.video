@@ -10,18 +10,13 @@ import type { AppEnv } from "../../types/index.js";
 import { getDb, schema } from "../../db/index.js";
 import { resolveActableEngagementRow } from "../../services/studio/engagement-row-access.js";
 import { ok, fail, viewerCanActOnProject, studioReviewComments, studioReviewLinks } from "./shared.js";
+import { randomHex } from "../../utils/crypto.js";
 
 export const reviewRoutes = new Hono<AppEnv>();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ██  17. REVIEW COMMENTS + SHARE LINKS — gap #145
 // ═══════════════════════════════════════════════════════════════════════════════
-
-function generateShareToken(): string {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 // POST /api/studio/projects/:projectId/review-links — create a public review link
 reviewRoutes.post("/projects/:projectId/review-links", async (c) => {
@@ -47,7 +42,7 @@ reviewRoutes.post("/projects/:projectId/review-links", async (c) => {
   const [link] = await db.insert(studioReviewLinks).values({
     projectId,
     userId: user.sub,
-    shareToken: generateShareToken(),
+    shareToken: randomHex(24),
     name: parsed.data.name ?? "Review link",
     expiresAt,
   } as any).returning();

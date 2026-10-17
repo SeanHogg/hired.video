@@ -12,6 +12,7 @@
 import { z } from "zod";
 import { UuidLikeSchema } from "./validation.js";
 import { ContentLocationSetSchema } from "./content-locations.js";
+import { slugify } from "./slugify.js";
 
 // ─── Enums ─────────────────────────────────────────────────────────────
 
@@ -194,17 +195,11 @@ export interface ResolvedEvent {
 
 /** Slug generator used by the create flow when the host didn't pick one. */
 export function generateEventSlug(title: string): string {
-  const base = title
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
+  const base = slugify(title, { fallback: "event", maxLen: 60 });
   // Suffix with a 6-char random base36 chunk to avoid collisions without
   // a uniqueness probe loop.
   const suffix = Math.random().toString(36).slice(2, 8);
-  return `${base || "event"}-${suffix}`;
+  return `${base}-${suffix}`;
 }
 
 /**

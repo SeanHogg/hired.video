@@ -77,7 +77,6 @@ export const usageStatements = pgTable(
   },
   (t) => ({
     userPeriodUnique: uniqueIndex("usage_statements_user_period_unique").on(t.userId, t.periodStart),
-    userIdx: index("usage_statements_user_idx").on(t.userId, t.periodStart),
     statusPeriodIdx: index("usage_statements_status_period_idx").on(t.status, t.periodEnd),
   }),
 );
@@ -118,9 +117,10 @@ export const usageInvoices = pgTable(
   },
   (t) => ({
     userPeriodUnique: uniqueIndex("usage_invoices_user_period_unique").on(t.userId, t.periodStart),
-    userIdx: index("usage_invoices_user_idx").on(t.userId, t.periodStart),
     statusIdx: index("usage_invoices_status_idx").on(t.status, t.createdAt),
     numberUnique: uniqueIndex("usage_invoices_number_unique").on(t.invoiceNumber),
+    paymentInvoiceIdFkIdx: index("idx_usage_invoices_payment_invoice_id").on(t.paymentInvoiceId),
+    statementIdFkIdx: index("idx_usage_invoices_statement_id").on(t.statementId),
   }),
 );
 

@@ -27,7 +27,9 @@ export const boards = pgTable("boards", {
   archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_boards_user_id").on(t.userId),
+]);
 
 export type Board = typeof boards.$inferSelect;
 export type NewBoard = typeof boards.$inferInsert;
@@ -135,6 +137,7 @@ export const sharedTaskParticipants = pgTable("shared_task_participants", {
   index("idx_shared_task_participants_user_id").on(t.userId),
   // #2305 — legacy UNIQUE (migration 0122_events_coffee_shared_tasks.sql); duplicates resolved by 0518_dedupe_unique_indexes.sql.
   uniqueIndex("uq_shared_task_participants_task_user").on(t.taskId, t.userId),
+  index("idx_shared_task_participants_added_by").on(t.addedBy),
 ]);
 
 export type SharedTaskParticipant = typeof sharedTaskParticipants.$inferSelect;

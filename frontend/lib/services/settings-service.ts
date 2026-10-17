@@ -19,7 +19,7 @@ export const NotificationSettingsSchema = z.object({
   weekly: z.boolean(),
 });
 
-// Backend DTO shape for privacy preferences (as returned by /api/Settings/privacy)
+// Backend DTO shape for privacy preferences (as returned by /api/settings/privacy)
 const BackendPrivacyPreferencesSchema = z.object({
   profileVisibleToPublic: z.boolean().optional(),
   profileVisibleToRecruiters: z.boolean().optional(),
@@ -112,7 +112,7 @@ export const SecuritySettingsSchema = z.object({
   allowedDevices: z.array(z.string()).optional(),
 });
 
-// Mirror of /api/Settings/cookies. Essential is always true (the server
+// Mirror of /api/settings/cookies. Essential is always true (the server
 // returns it for convenience); the other three are the user's opt-in choices.
 // consentedAt is ISO-8601 or null when the user has never explicitly chosen.
 export const CookiePreferencesSchema = z.object({
@@ -199,7 +199,7 @@ export class SettingsService {
    */
   async getAllSettings(): Promise<AllSettings> {
     const response = await apiClient.get<AllSettings>(
-      "/api/Settings",
+      "/api/settings",
       AllSettingsSchema,
     );
     return response.data;
@@ -294,7 +294,7 @@ export class SettingsService {
    */
   async getNotificationSettings(): Promise<NotificationSettings> {
     const response = await apiClient.get<z.infer<typeof BackendNotificationPreferencesSchema>>(
-      "/api/Settings/notifications",
+      "/api/settings/notifications",
       BackendNotificationPreferencesSchema,
     );
     return this.mapNotificationsFromBackend(response.data);
@@ -308,7 +308,7 @@ export class SettingsService {
   ): Promise<NotificationSettings> {
     const payload = this.mapNotificationsToBackend(settings);
     const response = await apiClient.put<z.infer<typeof BackendNotificationPreferencesSchema>>(
-      "/api/Settings/notifications",
+      "/api/settings/notifications",
       payload,
       BackendNotificationPreferencesSchema,
     );
@@ -325,7 +325,7 @@ export class SettingsService {
   async getPrivacySettings(): Promise<PrivacySettings> {
     // Use backend schema, then map to UI model
     const response = await apiClient.get<z.infer<typeof BackendPrivacyPreferencesSchema>>(
-      "/api/Settings/privacy",
+      "/api/settings/privacy",
       BackendPrivacyPreferencesSchema,
     );
     return this.mapPrivacyFromBackend(response.data);
@@ -339,7 +339,7 @@ export class SettingsService {
   ): Promise<PrivacySettings> {
     const payload = this.mapPrivacyToBackend(settings);
     const response = await apiClient.put<z.infer<typeof BackendPrivacyPreferencesSchema>>(
-      "/api/Settings/privacy",
+      "/api/settings/privacy",
       payload,
       BackendPrivacyPreferencesSchema,
     );
@@ -355,7 +355,7 @@ export class SettingsService {
    */
   async getJobPreferences(): Promise<JobPreferences> {
     const response = await apiClient.get<JobPreferences>(
-      "/api/Settings/job-preferences",
+      "/api/settings/job-preferences",
       JobPreferencesSchema,
     );
     return response.data;
@@ -368,7 +368,7 @@ export class SettingsService {
     preferences: Partial<JobPreferences>,
   ): Promise<JobPreferences> {
     const response = await apiClient.put<JobPreferences>(
-      "/api/Settings/job-preferences",
+      "/api/settings/job-preferences",
       preferences,
       JobPreferencesSchema,
     );
@@ -384,7 +384,7 @@ export class SettingsService {
    */
   async getAccountSettings(): Promise<AccountSettings> {
     const response = await apiClient.get<AccountSettings>(
-      "/api/Settings/account",
+      "/api/settings/account",
       AccountSettingsSchema,
     );
     return response.data;
@@ -397,7 +397,7 @@ export class SettingsService {
     settings: Partial<AccountSettings>,
   ): Promise<AccountSettings> {
     const response = await apiClient.put<AccountSettings>(
-      "/api/Settings/account",
+      "/api/settings/account",
       settings,
       AccountSettingsSchema,
     );
@@ -413,7 +413,7 @@ export class SettingsService {
    */
   async getSecuritySettings(): Promise<SecuritySettings> {
     const response = await apiClient.get<SecuritySettings>(
-      "/api/Settings/security",
+      "/api/settings/security",
       SecuritySettingsSchema,
     );
     return response.data;
@@ -453,7 +453,7 @@ export class SettingsService {
 
   async getCookiePreferences(): Promise<CookiePreferences> {
     const response = await apiClient.get<CookiePreferences>(
-      "/api/Settings/cookies",
+      "/api/settings/cookies",
       CookiePreferencesSchema,
     );
     return response.data;
@@ -463,7 +463,7 @@ export class SettingsService {
     patch: Partial<Pick<CookiePreferences, "analytics" | "marketing" | "personalization">>,
   ): Promise<CookiePreferences> {
     const response = await apiClient.put<CookiePreferences>(
-      "/api/Settings/cookies",
+      "/api/settings/cookies",
       patch,
       CookiePreferencesSchema,
     );
@@ -476,7 +476,7 @@ export class SettingsService {
 
   async getDoNotShare(): Promise<{ doNotShare: boolean }> {
     const response = await apiClient.get<{ doNotShare: boolean }>(
-      "/api/Settings/privacy/do-not-share",
+      "/api/settings/privacy/do-not-share",
       z.object({ doNotShare: z.boolean() }),
     );
     return response.data;
@@ -484,7 +484,7 @@ export class SettingsService {
 
   async setDoNotShare(doNotShare: boolean): Promise<{ doNotShare: boolean }> {
     const response = await apiClient.put<{ doNotShare: boolean }>(
-      "/api/Settings/privacy/do-not-share",
+      "/api/settings/privacy/do-not-share",
       { doNotShare },
       z.object({ doNotShare: z.boolean() }),
     );
@@ -498,7 +498,7 @@ export class SettingsService {
     settings: Partial<SecuritySettings>,
   ): Promise<SecuritySettings> {
     const response = await apiClient.put<SecuritySettings>(
-      "/api/Settings/security",
+      "/api/settings/security",
       settings,
       SecuritySettingsSchema,
     );
@@ -513,7 +513,7 @@ export class SettingsService {
       qrCode: string;
       backupCodes: string[];
     }>(
-      "/api/Settings/security/2fa/enable",
+      "/api/settings/security/2fa/enable",
       {},
       z.object({
         qrCode: z.string(),
@@ -527,7 +527,7 @@ export class SettingsService {
    * Disable two-factor authentication
    */
   async disableTwoFactor(code: string): Promise<void> {
-    await apiClient.post("/api/Settings/security/2fa/disable", { code });
+    await apiClient.post("/api/settings/security/2fa/disable", { code });
   }
 
   // ============================================================================
@@ -538,7 +538,7 @@ export class SettingsService {
    * Export user data (GDPR compliance)
    */
   async exportUserData(): Promise<Blob> {
-    const response = await apiClient.request<Blob>("/api/Settings/export", {
+    const response = await apiClient.request<Blob>("/api/settings/export", {
       method: "GET",
     });
     return response.data;
@@ -553,21 +553,8 @@ export class SettingsService {
     await apiClient.delete(`/api/auth/oauth/unlink/${provider}`);
   }
 
-  /**
-   * Delete user account
-   */
-  async deleteAccount(): Promise<void> {
-    await apiClient.post("/api/account/deleteaccount");
-  }
-
-  /**
-   * Request account deletion (with confirmation email)
-   */
-  async requestAccountDeletion(): Promise<void> {
-    // No dedicated request endpoint. Use deleteAccount flow which performs soft delete per business rules.
-    await this.deleteAccount();
-  }
-
+  // Account deletion is owned by accountService.deleteAccount
+  // (POST /api/account/deleteaccount).
 }
 
 // ============================================================================

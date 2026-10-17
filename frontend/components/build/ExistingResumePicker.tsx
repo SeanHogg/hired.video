@@ -13,12 +13,12 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FileText, Loader2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { IntakeOption } from "@/components/build/IntakeOption";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
 import type { ResumeContent } from "@shared/resume";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
 
 export interface ExistingResumePickerProps {
   /** Receives the chosen résumé's content, the label to echo in the chat, and
@@ -44,10 +44,7 @@ function AuthenticatedExistingResumePicker({
 
   // Same cache key the rest of the app reads, so opening the picker after a
   // visit to /resumes costs no request.
-  const { data: resumes = [], isLoading, isError } = useQuery({
-    queryKey: ["resumes"],
-    queryFn: () => resumeService.getUserResumes(),
-  });
+  const { data: resumes = [], isLoading, isError } = useUserResumes();
 
   // Nothing to offer → stay out of the way entirely (the upload/paste paths
   // remain the whole panel for a brand-new account).

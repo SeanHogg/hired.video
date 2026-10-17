@@ -2,6 +2,7 @@ import type { ErrorHandler } from "hono";
 
 import { ZodError } from "zod";
 import type { ErrorSource } from "../handlers/shared.js";
+import { logger } from "../lib/logger.js";
 
 /** Pull Postgres diagnostic fields off the underlying driver error.
  *  Drizzle wraps the driver error and rethrows with a message that begins
@@ -145,7 +146,7 @@ export const globalErrorHandler: ErrorHandler = (err, c) => {
     );
   }
 
-  console.error("[errorHandler]", err, _pg ? { pg: _pg } : undefined);
+  logger.error("[errorHandler] unhandled error", _pg ? { error: err, pg: _pg } : err);
   return c.json(
     {
       error: {

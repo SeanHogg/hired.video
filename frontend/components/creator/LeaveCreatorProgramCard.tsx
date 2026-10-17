@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { creatorService, type CreatorProfile } from "@/lib/services/creator-service";
+import { useCreatorMine } from "@/hooks/queries/use-creator";
 import { confirmDialog } from "@/lib/dialogs";
 
 interface Props {
@@ -20,26 +21,18 @@ interface Props {
 export default function LeaveCreatorProgramCard({ onProfileChange }: Props = {}) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const [profile, setProfile] = useState<CreatorProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const mine = useCreatorMine();
+  const profile = mine.isError ? null : (mine.data ?? null);
+  const loading = mine.isPending && mine.fetchStatus !== "idle";
   const [cancelling, setCancelling] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    creatorService.getMine()
-      .then((p) => { if (!cancelled) setProfile(p); })
-      .catch(() => { if (!cancelled) setProfile(null); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
+  const [left, setLeft] = useState(false);
 
   const cancel = async () => {
     if (!(await confirmDialog({ title: t("dialogs.creator.leaveProgramTitle"), description: t("dialogs.creator.leaveProgramBody"), confirmText: t("dialogs.creator.leaveProgramConfirm"), destructive: true }))) return;
     setCancelling(true);
     try {
       await creatorService.cancel();
-      setProfile(null);
+      setLeft(true);
       onProfileChange?.(null);
       toast({ title: "Left the program", description: "Your creator enrollment has ended." });
     } catch (e: unknown) {
@@ -53,7 +46,7 @@ export default function LeaveCreatorProgramCard({ onProfileChange }: Props = {})
     }
   };
 
-  if (loading || !profile) return null;
+  if (loading || !profile || left) return null;
 
   return (
     <Card>

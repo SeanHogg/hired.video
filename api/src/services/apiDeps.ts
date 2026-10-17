@@ -33,6 +33,7 @@ import {
   type GeocoderPort,
 } from "./adapters/mapbox.js";
 import { buildCachedGeocoder } from "./adapters/cached-geocoder.js";
+import { randomHex } from "../utils/crypto.js";
 
 export type { GeocoderPort } from "./adapters/mapbox.js";
 
@@ -133,10 +134,7 @@ export function buildApiDeps(env: Record<string, string | undefined> = {}): ApiD
   return {
     repos,
     now: () => new Date(),
-    randomHex: (bytes) =>
-      Array.from(crypto.getRandomValues(new Uint8Array(bytes)))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join(""),
+    randomHex,
     env: Object.freeze({ ...env }),
     email: buildEmailPort(env),
     stripe: null,         // wired lazily by services that need Stripe (checkout)

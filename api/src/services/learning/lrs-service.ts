@@ -21,6 +21,7 @@ import { and, asc, desc, eq, gt, lte, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { forwardStatementsForUser } from "./lrs-forwarder.js";
 import type { LrsPermission, LrsDocumentType } from "../../db/schema/learning.js";
+import { randomHex, sha256Hex } from "../../utils/crypto.js";
 
 const { lrsCredentials, lrsStatements, lrsDocuments } = schema;
 
@@ -29,18 +30,7 @@ type DbHandle = ReturnType<typeof getDb>;
 const XAPI_VERSION = "1.0.3";
 const VOIDED_VERB = "http://adlnet.gov/expapi/verbs/voided";
 
-// ── hashing / key minting (mirrors partner/keys.ts) ─────────────────────────
-export async function sha256Hex(input: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function randomHex(bytes: number): string {
-  return Array.from(crypto.getRandomValues(new Uint8Array(bytes)))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
+// ── key minting (mirrors partner/keys.ts) ───────────────────────────────────
 /** Mint an LRS Basic-auth credential. `keyId` is the Basic username (public);
  *  `secret` is the password, returned ONCE and stored only as a SHA-256 hash. */
 export async function generateLrsSecret(): Promise<{ keyId: string; secret: string; secretHash: string }> {

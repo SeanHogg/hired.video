@@ -22,31 +22,13 @@
 
 import type { SubscriptionSummaryDTO } from "../../../../shared/billing.js";
 import type { JwtPayload } from "../../types/index.js";
-import { USER_ROLES } from "../../../../shared/user-roles.js";
+import { isAdminRole } from "../../middleware/superAdmin.js";
 
 /** The actual billing tiers the platform sells. */
 export type Tier = "free" | "pro";
 
 /** Policy dispatch — who is calling and how should we respond? */
 export type Audience = "anonymous" | "free" | "pro" | "admin";
-
-/**
- * Roles that bypass gating entirely. SuperAdmin and Admin users are
- * internal — they always get the full experience regardless of billing
- * state, matching the behavior in `checkTokenBudget` and `requirePro`.
- */
-export function isAdminRole(user: JwtPayload | null | undefined): boolean {
-  if (!user) return false;
-  const roles = user.roles ?? [];
-  const role = (user as any).role ?? "";
-  return (
-    roles.includes(USER_ROLES.SUPER_ADMIN) ||
-    roles.includes(USER_ROLES.ADMIN) ||
-    role === USER_ROLES.SUPER_ADMIN ||
-    role === USER_ROLES.ADMIN ||
-    user.isSuperAdmin === true
-  );
-}
 
 /**
  * Derive the caller's audience from the auth context and billing DTO.

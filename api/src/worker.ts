@@ -105,13 +105,13 @@ export default {
     return app.fetch(request, env, ctx);
   },
 
-  // Cloudflare Cron Trigger — configure in wrangler.toml:
-  //   [[triggers]]
-  //   crons = ["*/5 * * * *"]
+  // Cloudflare Cron Triggers — wrangler.toml [triggers].crons registers
+  // the three schedules in services/scheduling/cron-plan.ts; runScheduled
+  // dispatches on `event.cron`.
   async scheduled(event: any, env: any, ctx: any) {
     (globalThis as any).__ENV = env;
     // Imported on demand so the cron fan-out's services don't load at isolate
     // start (Worker startup CPU cap, gap #2339).
-    ctx.waitUntil(import("./scheduled.js").then((m) => m.runScheduled()));
+    ctx.waitUntil(import("./scheduled.js").then((m) => m.runScheduled(event?.cron)));
   },
 };

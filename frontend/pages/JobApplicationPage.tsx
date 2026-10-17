@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { publicJobPath } from "@shared/public-paths";
+import type { Resume } from "@shared/resume";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,11 +23,8 @@ import {
   type JobScreeningPreview,
 } from "@/lib/services/interview-question-sets-service";
 
-interface Resume {
-  id: string;
-  title: string;
-  isMaster?: boolean;
-}
+/** Picker row — a projection of the shared résumé contract. */
+type ResumeOption = Pick<Resume, "id" | "title" | "isMaster">;
 
 export default function JobApplicationPage() {
   const { id } = useParams<{ id: string }>();
@@ -41,7 +39,7 @@ export default function JobApplicationPage() {
   ]);
 
   const [job, setJob] = useState<any>(null);
-  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [resumes, setResumes] = useState<ResumeOption[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string>("");
   const [coverLetter, setCoverLetter] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -82,7 +80,7 @@ export default function JobApplicationPage() {
       // Load user's resumes
       const resumesData = await resumeService.getUserResumes();
 
-      const mappedResumes: Resume[] = resumesData.map((r: any) => ({
+      const mappedResumes: ResumeOption[] = resumesData.map((r: any) => ({
         id: r.id || "",
         title: r.title || t("labels.untitledResume"),
         isMaster: r.isMaster || false,

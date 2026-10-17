@@ -125,7 +125,7 @@ export const JobFiltersSchema = z.object({
   // Work-setting facet (#2069): onsite | remote | hybrid.
   workSetting: z.string().optional(),
   companyId: z.string().optional(),
-  // AI-resilient sector filter (#1168). Backend `/api/Job/public` reads
+  // AI-resilient sector filter (#1168). Backend `/api/jobs/public` reads
   // this and joins against the partial sector index from migration 0112.
   sector: z.string().optional(),
   page: z.number().optional(),
@@ -167,7 +167,7 @@ export type JobFilters = z.infer<typeof JobFiltersSchema>;
 export type PaginatedJobs = z.infer<typeof PaginatedJobsSchema>;
 
 // ============================================================================
-// POST /api/Job/Extract — the ONE parser for its two answer shapes
+// POST /api/jobs/extract — the ONE parser for its two answer shapes
 // ============================================================================
 
 /** Extract's "did you mean?" answer: the page matches jobs already on file
@@ -254,7 +254,7 @@ export class JobService {
     );
     if (fields) params.set("fields", fields);
 
-    const endpoint = `/api/Job${params.toString() ? `?${params.toString()}` : ""}`;
+    const endpoint = `/api/jobs${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await apiClient.get<z.infer<typeof PaginatedJobsSchema>>(endpoint, PaginatedJobsSchema);
 
     const dto = response.data;
@@ -280,7 +280,7 @@ export class JobService {
    */
   async getUserJobs(): Promise<JobSummary[]> {
     const response = await apiClient.get<JobSummary[]>(
-      "/api/Job/GetSummaryItems",
+      "/api/jobs/getsummaryitems",
       z.array(JobSummarySchema),
     );
 
@@ -295,7 +295,7 @@ export class JobService {
    */
   async getMyPostedJobs(): Promise<JobSummary[]> {
     const response = await apiClient.get<JobSummary[]>(
-      "/api/Job/user-jobs",
+      "/api/jobs/user-jobs",
       z.array(JobSummarySchema),
     );
     return response.data;
@@ -317,7 +317,7 @@ export class JobService {
    */
   async getJobById(id: string): Promise<any> {
     // Bypass strict client-side schema; backend returns JobItemEntity shape
-    const response = await apiClient.get<any>(`/api/Job/${id}`);
+    const response = await apiClient.get<any>(`/api/jobs/${id}`);
     return response.data;
   }
 
@@ -325,7 +325,7 @@ export class JobService {
    * Create new job
    */
   async createJob(jobData: CreateJob | JobWriteBody): Promise<Job> {
-    const response = await apiClient.post<Job>("/api/Job", jobData, JobSchema);
+    const response = await apiClient.post<Job>("/api/jobs", jobData, JobSchema);
     return response.data;
   }
 
@@ -334,7 +334,7 @@ export class JobService {
    */
   async updateJob(id: string, jobData: any): Promise<any> {
     // Bypass strict client-side schema; backend expects JobItemEntity shape
-    const response = await apiClient.put<any>(`/api/Job/${id}`, jobData);
+    const response = await apiClient.put<any>(`/api/jobs/${id}`, jobData);
     return response.data;
   }
 
@@ -355,7 +355,7 @@ export class JobService {
     formData.append("file", file);
 
     const response = await apiClient.request<JobSummary>(
-      "/api/Job/CreateFromFile",
+      "/api/jobs/createfromfile",
       {
         method: "POST",
         body: formData,
@@ -377,7 +377,7 @@ export class JobService {
    */
   async extractJobFromUrl(url: string): Promise<JobSummary> {
     const response = await apiClient.post<ExtractJobResponse>(
-      "/api/Job/Extract",
+      "/api/jobs/extract",
       { url },
       ExtractJobResponseSchema,
     );
@@ -398,7 +398,7 @@ export class JobService {
    * Delete job
    */
   async deleteJob(id: string): Promise<void> {
-    await apiClient.delete(`/api/Job/${id}`);
+    await apiClient.delete(`/api/jobs/${id}`);
   }
 
   /**
@@ -419,14 +419,14 @@ export class JobService {
    * Save/bookmark job
    */
   async saveJob(jobId: string): Promise<void> {
-    await apiClient.post(`/api/Job/${jobId}/save`);
+    await apiClient.post(`/api/jobs/${jobId}/save`);
   }
 
   /**
    * Remove saved job
    */
   async unsaveJob(jobId: string): Promise<void> {
-    await apiClient.delete(`/api/Job/${jobId}/save`);
+    await apiClient.delete(`/api/jobs/${jobId}/save`);
   }
 
   /**
@@ -434,7 +434,7 @@ export class JobService {
    */
   async getSavedJobs(): Promise<JobSummary[]> {
     const response = await apiClient.get<JobSummary[]>(
-      "/api/Job/saved",
+      "/api/jobs/saved",
       z.array(JobSummarySchema),
     );
 
@@ -466,7 +466,7 @@ export class JobService {
         inviteToken: string;
         screeningRequired: "required" | "optional";
       } | null;
-    }>(`/api/Job/${jobId}/apply`, application);
+    }>(`/api/jobs/${jobId}/apply`, application);
     return res.data;
   }
 
@@ -479,7 +479,7 @@ export class JobService {
     location?: string;
     frequency: string;
   }): Promise<void> {
-    await apiClient.post("/api/Job/alerts", alert);
+    await apiClient.post("/api/jobs/alerts", alert);
   }
 
   /**
@@ -487,7 +487,7 @@ export class JobService {
    */
   async getJobBySlug(slug: string): Promise<any> {
     // Bypass strict client-side schema; backend returns JobItemEntity shape
-    const response = await apiClient.get<any>(`/api/Job/slug/${slug}`);
+    const response = await apiClient.get<any>(`/api/jobs/slug/${slug}`);
     return response.data;
   }
 

@@ -248,7 +248,7 @@ analyticsRoutes.get("/hiring-metrics", requirePro("Hiring Metrics"), async (c) =
 import { recordArtifactView, ipCountryFromCtx } from "../services/analytics/artifactView.js";
 import { getArtifactMetrics, lookupArtifactOwner } from "../services/analytics/artifactAnalytics.js";
 import { ARTIFACT_KINDS, type ArtifactKind } from "../../../shared/artifact-views.js";
-import { hashClientIp } from "./resumes.js";
+import { hashClientIp } from "../utils/crypto.js";
 
 const beaconSchema = z.object({
   artifactKind: z.enum(ARTIFACT_KINDS as unknown as [ArtifactKind, ...ArtifactKind[]]),

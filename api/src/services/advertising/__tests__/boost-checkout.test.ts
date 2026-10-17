@@ -1,7 +1,7 @@
 /**
  * Paid boost checkout — no boost goes active without a payment the
- * provider itself confirms (POST /api/boosts and POST /api/boost-checkout
- * share this service; the verifier is the one token packs use).
+ * provider itself confirms (POST /api/checkout {kind:"boost"} reaches this
+ * service; the verifier is the one token packs and courses use).
  *
  * Run: node --import tsx --test src/services/advertising/__tests__/boost-checkout.test.ts
  */

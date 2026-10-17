@@ -81,22 +81,25 @@ export interface ArtifactMetrics {
  *  that produce distinct copy. Kinds without distinct labelling fall
  *  through to "channel" via `metricsPanelKind()` in the dashboard. */
 export type ArtifactKind =
-  // Time-based studio playback — read/watch time + percent-watched copy.
-  | "video"
-  | "podcast"
-  | "voice"
-  | "animation"
-  // Static studio rasters / interactive — percent-viewed copy.
-  | "image"
-  | "comic"
-  | "game"
-  | "cad"
-  // Non-studio scrollable text — "read time" copy.
-  | "resume"
-  | "article"
-  // Non-studio static records — no time label.
-  | "job"
-  | "profile"
+  | Extract<
+      WireArtifactKind,
+      // Time-based studio playback — read/watch time + percent-watched copy.
+      | "video"
+      | "podcast"
+      | "voice"
+      | "animation"
+      // Static studio rasters / interactive — percent-viewed copy.
+      | "image"
+      | "comic"
+      | "game"
+      | "cad"
+      // Non-studio scrollable text — "read time" copy.
+      | "resume"
+      | "article"
+      // Non-studio static records — no time label.
+      | "job"
+      | "profile"
+    >
   // Fallback bucket for company / studio_template / service.
   | "channel";
 

@@ -4,6 +4,7 @@
  */
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
+import { slugify } from "../../../../shared/slugify.js";
 
 const { partners } = schema;
 
@@ -39,17 +40,8 @@ export function toPartnerView(row: PartnerRow): PartnerView {
   };
 }
 
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}
-
 async function uniqueSlug(base: string, db: ReturnType<typeof getDb>): Promise<string> {
-  const baseSlug = slugify(base) || `partner-${Date.now().toString(36)}`;
+  const baseSlug = slugify(base, { fallback: () => `partner-${Date.now().toString(36)}` });
   const existing = await db
     .select({ id: partners.id })
     .from(partners)

@@ -218,9 +218,11 @@ paymentRoutes.post("/save-payment-method", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/payment/stripe/webhook  (legacy path — Stripe dashboard config)
-// POST /api/payment/webhook         (generic path)
-// Verifies the provider signature and dispatches normalised events.
+// POST /api/payment/webhook — the ONE provider webhook URL (Helcim acquiring
+// + ACH payouts share it). The legacy /stripe/webhook alias was removed
+// 2026-10-17: production runs Helcim; if Stripe is re-enabled, point its
+// dashboard endpoint here. Verifies the provider signature and dispatches
+// normalised events.
 // ---------------------------------------------------------------------------
 async function handleWebhook(c: Context<AppEnv>) {
   const provider = tryGetPaymentProvider(getEnv(c));
@@ -288,7 +290,6 @@ async function handleWebhook(c: Context<AppEnv>) {
 }
 
 paymentRoutes.post("/webhook", handleWebhook as any);
-paymentRoutes.post("/stripe/webhook", handleWebhook as any); // legacy Stripe dashboard URL
 
 // ---------------------------------------------------------------------------
 // Webhook event dispatcher (normalised — provider-agnostic)

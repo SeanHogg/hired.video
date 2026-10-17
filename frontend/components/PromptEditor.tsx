@@ -18,6 +18,8 @@ import { resumeService } from "@/lib/services/resume-service";
 import type { ResumeSummary } from "@/lib/services/resume-service";
 import { jobService } from "@/lib/services/job-service";
 import type { JobSummary } from "@/lib/services/job-service";
+import { useUserResumes } from "@/hooks/queries/use-resumes";
+import { useSavedJobs } from "@/hooks/queries/use-jobs";
 import type { Resume as FrontendResume } from "@/types/resume";
 import type { StudioPurpose } from "@/lib/services/studio-service";
 
@@ -181,15 +183,9 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD,
   const [previewMode, setPreviewMode] = useState(false);
 
   // ── Account resume picker ───────────────────────────────────────────────
-  const [resumes, setResumes] = useState<ResumeSummary[]>([]);
+  const { data: resumes = [] } = useUserResumes();
   const [resumePickerOpen, setResumePickerOpen] = useState(false);
   const [resumeLoading, setResumeLoading] = useState(false);
-
-  useEffect(() => {
-    resumeService.getUserResumes()
-      .then(setResumes)
-      .catch(() => {});
-  }, []);
 
   async function handleSelectResume(summary: ResumeSummary) {
     const id = (summary.Id || summary.id) as string | undefined;
@@ -210,12 +206,11 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD,
   }
 
   // ── Saved / posted jobs picker ──────────────────────────────────────────
-  const [savedJobs, setSavedJobs] = useState<JobSummary[]>([]);
+  const { data: savedJobs = [] } = useSavedJobs();
   const [userJobs, setUserJobs] = useState<JobSummary[]>([]);
   const [jobPickerOpen, setJobPickerOpen] = useState(false);
 
   useEffect(() => {
-    jobService.getSavedJobs().then(setSavedJobs).catch(() => {});
     jobService.getUserJobs().then(setUserJobs).catch(() => {});
   }, []);
 

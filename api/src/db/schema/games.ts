@@ -50,6 +50,7 @@ export const gamePlayInvites = pgTable(
   (t) => [
     index("idx_game_play_invites_project").on(t.projectId),
     index("idx_game_play_invites_created_by").on(t.createdBy),
+    index("idx_game_play_invites_restrict_to_user_id").on(t.restrictToUserId),
   ],
 );
 

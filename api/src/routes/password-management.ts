@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { desc, eq } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { verifyPassword } from "../services/auth/password.js";
 
 export const passwordManagementRoutes = new Hono<AppEnv>();
 
@@ -130,17 +131,11 @@ passwordManagementRoutes.post("/validate-history", async (c) => {
     .orderBy(desc(schema.passwordHistory.createdAt))
     .limit(5);
 
-  // Re-use the PBKDF2 verify logic: check candidate against each stored hash
+  // Check the candidate against each stored hash (shared PBKDF2 verify).
   let isReused = false;
   for (const entry of history) {
-    const [saltHex, hashHex] = entry.passwordHash.split(":");
-    if (!saltHex || !hashHex) continue;
     try {
-      const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map((b: string) => parseInt(b, 16)));
-      const keyMaterial = await crypto.subtle.importKey("raw", new TextEncoder().encode(candidate), "PBKDF2", false, ["deriveBits"]);
-      const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 100_000, hash: "SHA-256" }, keyMaterial, 256);
-      const candidateHex = Array.from(new Uint8Array(bits)).map((b) => b.toString(16).padStart(2, "0")).join("");
-      if (candidateHex === hashHex) { isReused = true; break; }
+      if (await verifyPassword(candidate, entry.passwordHash)) { isReused = true; break; }
     } catch { continue; }
   }
 

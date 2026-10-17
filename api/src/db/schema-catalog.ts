@@ -82,7 +82,26 @@ export function declaredCheckNames(): Map<string, Set<string>> {
   return out;
 }
 
-const quoteIdent = (id: string): string => `"${id.replaceAll('"', '""')}"`;
+/**
+ * Every index declared with `index()` / `uniqueIndex()`, as name → table.
+ * push drops any index on a declared table that is missing here, so
+ * scripts/check-migrations.mjs compares this with the indexes the SQL
+ * migrations leave live (unique CONSTRAINTS are covered by
+ * declaredUniqueConstraints, not here).
+ */
+export function declaredIndexes(): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const table of declaredTables()) {
+    const config = getTableConfig(table);
+    if (config.schema && config.schema !== "public") continue;
+    for (const idx of config.indexes) {
+      if (idx.config.name) out.set(idx.config.name, config.name);
+    }
+  }
+  return out;
+}
+
+const quoteIdent =(id: string): string => `"${id.replaceAll('"', '""')}"`;
 
 /** The exact DDL drizzle-kit would run for this constraint. */
 export function addUniqueConstraintSql(c: DeclaredUniqueConstraint): string {
