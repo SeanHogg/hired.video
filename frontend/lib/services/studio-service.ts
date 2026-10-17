@@ -327,28 +327,6 @@ export const StudioProjectSchema = z.object({
 
 export type StudioProject = z.infer<typeof StudioProjectSchema>;
 
-export const StudioProjectStatusResponseSchema = z.object({
-  id: z.string(),
-  status: z.nativeEnum(StudioProjectStatus),
-  progressPercentage: z.number(),
-  youtubeVideoId: z.string().nullish(),
-  videoUrl: z.string().nullish(),
-  errorMessage: z.string().nullish(),
-});
-
-export type StudioProjectStatusResponse = z.infer<
-  typeof StudioProjectStatusResponseSchema
->;
-
-// ─── Publish request ──────────────────────────────────────────────────────────
-
-export interface PublishVideoRequest {
-  title: string;
-  description: string;
-  tags?: string[];
-  privacyStatus?: "public" | "private" | "unlisted";
-}
-
 // ─── Publication records (#1920) ────────────────────────────────────────────
 // "Where has this project been published?" — one record per destination,
 // mirroring the api `PublicationRecord` (publication-service.ts). `destination`
@@ -694,21 +672,6 @@ export const studioService = {
   },
 
   /**
-   * Trigger YouTube publish for a completed upload.
-   */
-  async publishVideo(
-    projectId: string,
-    request: PublishVideoRequest,
-    resumeId?: string,
-  ): Promise<ApiSuccessResponse<StudioProject>> {
-    return apiClient.post(
-      "/api/studio/publish",
-      { projectId, ...request, ...(resumeId ? { resumeId } : {}) },
-      StudioProjectSchema,
-    );
-  },
-
-  /**
    * Post the project's rendered video to the caller's own YouTube channel,
    * TikTok, Instagram, X, Facebook Page or LinkedIn account (one route for
    * every network). The project must already be rendered; the editor calls
@@ -766,18 +729,6 @@ export const studioService = {
     // Deduplicate by destination, keeping the latest (by publishedAt)
     const deduped = deduplicatePublications(res.data);
     return { ...res, data: deduped };
-  },
-
-  /**
-   * Poll for the publish/processing status of a project.
-   */
-  async getProjectStatus(
-    projectId: string,
-  ): Promise<ApiSuccessResponse<StudioProjectStatusResponse>> {
-    return apiClient.get(
-      `/api/studio/status/${projectId}`,
-      StudioProjectStatusResponseSchema,
-    );
   },
 
   /**

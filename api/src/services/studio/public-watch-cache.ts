@@ -23,13 +23,21 @@ function namespace(videoId: string): string {
   return `studio:public-watch:${videoId}`;
 }
 
-/** The cached watch payload for a lookup id; `loader` runs on a miss. */
-export async function getPublicWatchCached<T>(videoId: string, loader: () => Promise<T>): Promise<T> {
+/** The cached watch payload for a lookup id; `loader` runs on a miss.
+ *  `shouldCache` false keeps an answer out of the cache (the "pending"
+ *  placeholder: publishing flips it, and a bump's KV write may not have
+ *  landed when the owner's page refetches straight after). */
+export async function getPublicWatchCached<T>(
+  videoId: string,
+  loader: () => Promise<T>,
+  shouldCache?: (value: T) => boolean,
+): Promise<T> {
   const version = await getCacheVersion(namespace(videoId));
   return getOrSetCached({
     key: `${namespace(videoId)}:v${version}`,
     ttlSeconds: PUBLIC_WATCH_TTL_SECONDS,
     loader,
+    shouldCache,
   });
 }
 

@@ -87,6 +87,10 @@ export interface EdgeCacheOptions<T> {
   /** Optional reviver — runs after KV deserialisation. Use to coerce
    *  ISO strings back into Date objects, etc. */
   revive?: (raw: unknown) => T | null;
+  /** Optional: false keeps a loaded value out of L1/KV (it is still
+   *  returned). For transient answers that a write elsewhere flips and that
+   *  are cheap to recompute — e.g. a watch page's "pending" placeholder. */
+  shouldCache?: (value: T) => boolean;
 }
 
 /** `isCurrent()` turns false once `invalidateCachedKey` ran for this key
@@ -107,7 +111,7 @@ async function loadThrough<T>(opts: EdgeCacheOptions<T>, isCurrent: () => boolea
   }
 
   const value = await opts.loader();
-  if (!isCurrent()) return value;
+  if (!isCurrent() || (opts.shouldCache && !opts.shouldCache(value))) return value;
   l1Set(opts.key, value, opts.ttlSeconds, Date.now());
   if (kv) {
     kv.put(opts.key, JSON.stringify(value), { expirationTtl: Math.max(60, opts.ttlSeconds) })

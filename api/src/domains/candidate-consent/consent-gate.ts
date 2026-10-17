@@ -1,6 +1,6 @@
 /**
  * assertCandidateConsent — THE gate every "make this video public / post it"
- * path runs: the visibility toggle, POST /studio/publish, the status PATCH
+ * path runs: the visibility toggle, the status PATCH
  * and publishProjectVideo (post-now AND scheduled self posts), plus managed
  * promotion submissions and queued distribution jobs.
  *

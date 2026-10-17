@@ -70,6 +70,7 @@ import { useStageZoom } from "@/lib/studio/editor-v2/use-stage-zoom";
 import { useWidgetActions } from "@/lib/studio/editor-v2/use-widget-actions";
 import { useEditorCommands } from "@/lib/studio/editor-v2/use-editor-commands";
 import { useStudioExport } from "@/lib/studio/editor-v2/use-studio-export";
+import { useRenderOnLoad } from "@/lib/studio/editor-v2/use-render-on-load";
 import { printDocument } from "@/components/studio/document/print-document";
 import { useStudioDialogs } from "@/lib/studio/editor-v2/use-studio-dialogs";
 import { useStudioRail } from "@/lib/studio/editor-v2/use-studio-rail";
@@ -241,6 +242,12 @@ export default function StudioEditorV2({ loadedProject = null }: StudioEditorV2P
   const { exporting, handleExport, ensureRendered, variantSource } = useStudioExport({
     projectId, currentMediaKind, snapshot, imageCanvas: image.imageCanvas, record, isPro: subscription.isPro,
     removeBranding, gateAction, handleSave, followSavedProject, printDocument,
+  });
+  // `?render=1` (Chrome extension "Render & post"): render the loaded video once.
+  useRenderOnLoad({
+    enabled: entry.renderOnLoad && currentMediaKind === "video",
+    ready: projectReady && !!persistedProjectId && state.scenes.length > 0,
+    ensureRendered,
   });
 
   // Publish handlers (YouTube / Profile / social networks) — ONE implementation

@@ -21,6 +21,7 @@ import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
 import { SeoFinalCta } from "@/components/landing/SeoFinalCta";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { OwnerPendingActions } from "@/components/studio/watch/OwnerPendingActions";
 
 const STATUS_TITLE =
   "font-display text-[clamp(32px,4vw,48px)] font-bold leading-none tracking-[-0.03em] text-foreground";
@@ -64,6 +65,8 @@ export default function PublicVideoResume() {
   /** i18n key of the load error, if any. */
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Bumped when the owner publishes from the pending panel — refetches. */
+  const [reloadKey, setReloadKey] = useState(0);
 
   // SEO — single adapter call. Builder lives in lib/seo-ugc.ts
   // ("videoResume" kind) and emits owner-authored Meta-tab fields
@@ -97,7 +100,7 @@ export default function PublicVideoResume() {
       })
       .catch(() => setError("seoLanding.publicVideo.notPublic"))
       .finally(() => setLoading(false));
-  }, [videoId, canonical]);
+  }, [videoId, canonical, reloadKey]);
 
   if (canonical) {
     return <Navigate to={canonical} replace />;
@@ -146,6 +149,7 @@ export default function PublicVideoResume() {
           <p className="text-lg text-muted-foreground">
             {t("seoLanding.publicVideo.pendingBody", { owner: ownerLabel })}
           </p>
+          {video.id && <OwnerPendingActions projectId={video.id} onPublished={() => setReloadKey((k) => k + 1)} />}
           <Link to="/" className={TEXT_LINK}>
             {t("seoLanding.publicVideo.backHome")}
           </Link>

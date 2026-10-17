@@ -223,14 +223,6 @@ const GenerateStoryboardSchema = z.object({
   ctaText: z.string().max(100).optional(),
 });
 
-const PublishVideoSchema = z.object({
-  projectId: UuidLikeSchema,
-  title: z.string().min(1),
-  description: z.string().default(""),
-  privacyStatus: z.enum(["public", "private", "unlisted"]).default("unlisted"),
-  resumeId: UuidLikeSchema.optional(),
-});
-
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };
 }
@@ -2496,110 +2488,6 @@ studioRoutes.post("/upload", async (c) => {
   return c.json(ok(toProjectDto(updatedProject, video)), 201);
 });
 
-studioRoutes.post("/publish", async (c) => {
-  const user = c.var.user;
-  const body = await c.req.json().catch(() => null);
-  const parsed = PublishVideoSchema.safeParse(body);
-
-  if (!parsed.success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
-  }
-
-  const db = getDb();
-  const [project] = await db
-    .select()
-    .from(studioProjects)
-    .where(eq(studioProjects.id, parsed.data.projectId))
-    .limit(1);
-
-  if (!project) {
-    return c.json(fail("NOT_FOUND", "Studio project not found"), 404);
-  }
-  try {
-    await assertCanWrite(user.sub, project.userId, project.companyId ?? null);
-  } catch (e) {
-    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
-    throw e;
-  }
-  // Gated whatever the privacy: publish sets status "published", which the
-  // /m watch page serves and the profile lists.
-  const blocked = await candidateConsentGate(c, project.id);
-  if (blocked) return blocked;
-
-  let linkedVideo: typeof videos.$inferSelect | null = null;
-  if (project.videoId) {
-    // Match by id alone — the parent project's ownership was already
-    // asserted above, and the published video inherits the project's
-    // ownership semantics.
-    const [existingVideo] = await db
-      .select()
-      .from(videos)
-      .where(eq(videos.id, project.videoId))
-      .limit(1);
-    linkedVideo = existingVideo ?? null;
-  }
-
-  const publishResumeId = parsed.data.resumeId ?? project.resumeId ?? null;
-
-  if (!linkedVideo) {
-    const [createdVideo] = await db
-      .insert(videos)
-      .values({
-        userId: project.userId,         // mirror the project's owner user
-        companyId: project.companyId,   // and company (null for personal)
-        status: "Completed",
-        title: parsed.data.title,
-        description: parsed.data.description,
-        privacyStatus: parsed.data.privacyStatus,
-        resumeId: publishResumeId,
-      } as any)
-      .returning();
-    linkedVideo = createdVideo;
-  }
-
-  // Only set YouTube fields if the video was actually uploaded to YouTube.
-  // For R2-hosted videos, leave youtubeVideoId/youtubeUrl as-is (null).
-  const [updatedVideo] = await db
-    .update(videos)
-    .set({
-      title: parsed.data.title,
-      description: parsed.data.description,
-      privacyStatus: parsed.data.privacyStatus,
-      status: "Completed",
-      resumeId: publishResumeId,
-      updatedAt: new Date(),
-    } as any)
-    .where(eq(videos.id, linkedVideo.id))
-    .returning();
-  // Public video resumes surface in unified search under the `media` kind
-  // and on the home page's video wall — once they pass the explicit scan.
-  bumpSearchVersion();
-  invalidatePublicVideoFeed();
-  scheduleVideoScan(c, linkedVideo.id);
-
-  const [updatedProject] = await db
-    .update(studioProjects)
-    .set({
-      status: "published",
-      videoId: linkedVideo.id,
-      resumeId: publishResumeId,
-      updatedAt: new Date(),
-    } as any)
-    .where(eq(studioProjects.id, project.id))
-    .returning();
-
-  bumpPublicWatchCache(
-    project.id,
-    project.slug,
-    project.videoId,
-    linkedVideo.id,
-    linkedVideo.youtubeVideoId,
-    updatedVideo?.youtubeVideoId,
-  );
-
-  return c.json(ok(toProjectDto(updatedProject, updatedVideo)));
-});
-
 studioRoutes.get("/status/:projectId", async (c) => {
   const user = c.var.user;
   const projectId = c.req.param("projectId");
@@ -2638,6 +2526,10 @@ studioRoutes.get("/status/:projectId", async (c) => {
     progressPercentage,
     youtubeVideoId: linkedVideo?.youtubeVideoId ?? null,
     videoUrl: linkedVideo?.youtubeUrl ?? (linkedVideo?.r2Key ? cdnUrl(linkedVideo.r2Key) : null),
+    // The hosted MP4 itself (null before the first render). Every render
+    // uploads under a new key, so a caller waiting for a FRESH render (the
+    // Chrome extension after updating a project) watches this change.
+    renderUrl: linkedVideo?.r2Key ? cdnUrl(linkedVideo.r2Key) : null,
     errorMessage: status === "Failed" ? linkedVideo?.errorMessage ?? "Publishing failed" : null,
   }));
 });
@@ -3837,6 +3729,10 @@ studioRoutes.get("/public/:videoId", async (c) => {
     const ownerAvatar = projectInfo?.ownerAvatar ?? v?.ownerAvatar ?? null;
     return { status: 200 as const, body: ok({
       pending: true as const,
+      // Lets the watch page offer the OWNER "Publish" / "Edit" in place of a
+      // dead end — it checks ownership with the authed project read, which
+      // 404s everyone else. Null for a legacy direct upload (no project).
+      id: projectInfo?.id ?? null,
       title: projectInfo?.title || v?.title || "Video in progress",
       ownerName,
       ownerAvatar,
@@ -3958,7 +3854,9 @@ studioRoutes.get("/public/:videoId", async (c) => {
     socialCardImage: projectInfo?.socialCardImage ?? null,
     createdAt: asIso(v?.createdAt ?? new Date()),
   }) };
-  });
+  // Never cache "pending": the owner publishes from that very page and
+  // refetches at once — a cached placeholder would hide the publish.
+  }, (r) => !(r.body as { data?: { pending?: boolean } }).data?.pending);
   return c.json(result.body, result.status);
 });
 

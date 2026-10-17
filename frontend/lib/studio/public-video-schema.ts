@@ -79,6 +79,8 @@ export const PublicVideoReadySchema = z.object({
 
 const PublicVideoPendingSchema = z.object({
   pending: z.literal(true),
+  // The project's id — the watch page offers its owner Publish / Edit.
+  id: z.string().nullable().optional(),
   title: z.string().nullable().optional(),
   ownerName: z.string().nullable().optional(),
   ownerAvatar: z.string().nullable().optional(),
