@@ -32,11 +32,19 @@ import {
 } from "../services/profile/public-references-cache.js";
 import { syncLinkedReferences } from "../services/resume/linked-references.js";
 import {
+  findReferenceShareByToken,
+  insertReferenceShare,
+  listReferenceShares,
+  markReferenceShareNdaAccepted,
+  recordReferenceShareView,
+  revokeReferenceShare,
+} from "../repositories/referenceSharesRepository.js";
+import {
   isProfileSectionVisible,
   type StoredProfileSections,
 } from "../../../shared/profile-sections.js";
 
-const { referenceContacts, referenceShares, users, userProfiles } = schema;
+const { referenceContacts, users, userProfiles } = schema;
 
 export const referenceRoutes = new Hono<AppEnv>();
 
@@ -195,12 +203,7 @@ const ShareSchema = z.object({
 referenceRoutes.get("/shares", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "auth required"), 401);
-  const rows = await getDb()
-    .select()
-    .from(referenceShares)
-    .where(eq(referenceShares.ownerUserId, userId))
-    .orderBy(desc(referenceShares.createdAt));
-  return c.json(success(rows), 200);
+  return c.json(success(await listReferenceShares(userId)), 200);
 });
 
 referenceRoutes.post("/shares", async (c) => {
@@ -220,18 +223,15 @@ referenceRoutes.post("/shares", async (c) => {
     return c.json(error("VALIDATION_ERROR", "one or more contacts not found"), 400);
   }
   const expiresAt = d.expiresInDays ? new Date(Date.now() + d.expiresInDays * 86400_000) : null;
-  const [row] = await db
-    .insert(referenceShares)
-    .values({
-      ownerUserId: userId,
-      token: newToken(),
-      sharedWithEmail: d.sharedWithEmail,
-      contactIds: d.contactIds,
-      label: d.label ?? null,
-      requireNda: d.requireNda ?? true,
-      expiresAt,
-    } as any)
-    .returning();
+  const row = await insertReferenceShare({
+    ownerUserId: userId,
+    token: newToken(),
+    sharedWithEmail: d.sharedWithEmail,
+    contactIds: d.contactIds,
+    label: d.label ?? null,
+    requireNda: d.requireNda ?? true,
+    expiresAt,
+  });
   return c.json(success(row), 201);
 });
 
@@ -239,11 +239,7 @@ referenceRoutes.delete("/shares/:id", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "auth required"), 401);
   const id = c.req.param("id");
-  const [row] = await getDb()
-    .update(referenceShares)
-    .set({ revokedAt: new Date(), updatedAt: new Date() } as any)
-    .where(and(eq(referenceShares.id, id), eq(referenceShares.ownerUserId, userId)))
-    .returning();
+  const row = await revokeReferenceShare(id, userId);
   if (!row) return c.json(error("NOT_FOUND", "share not found"), 404);
   return c.json(success(row), 200);
 });
@@ -252,11 +248,7 @@ referenceRoutes.delete("/shares/:id", async (c) => {
 /** Resolve + validate a share by token. Returns the share row when
  *  reachable (not revoked, not expired) else null. */
 async function reachableShare(token: string) {
-  const [share] = await getDb()
-    .select()
-    .from(referenceShares)
-    .where(eq(referenceShares.token, token))
-    .limit(1);
+  const share = await findReferenceShareByToken(token);
   if (!share) return null;
   if (share.revokedAt) return null;
   if (share.expiresAt && new Date(share.expiresAt).getTime() < Date.now()) return null;
@@ -276,18 +268,13 @@ referenceRoutes.get("/shared/:token", async (c) => {
   if (!share) return c.json(error("NOT_FOUND", "this reference link is no longer available"), 404);
   const unlocked = !share.requireNda || !!share.ndaAcceptedAt;
   // Stamp first-view for the owner's audit trail.
-  if (!share.firstViewedAt) {
-    await getDb()
-      .update(referenceShares)
-      .set({ firstViewedAt: new Date() } as any)
-      .where(eq(referenceShares.id, share.id));
-  }
+  if (!share.firstViewedAt) await recordReferenceShareView(share.id);
   return c.json(
     success({
       label: share.label,
       requireNda: share.requireNda,
       unlocked,
-      contacts: unlocked ? await loadShareContacts(share.contactIds as string[]) : [],
+      contacts: unlocked ? await loadShareContacts(share.contactIds) : [],
     }),
     200,
   );
@@ -296,18 +283,13 @@ referenceRoutes.get("/shared/:token", async (c) => {
 referenceRoutes.post("/shared/:token/accept-nda", async (c) => {
   const share = await reachableShare(c.req.param("token"));
   if (!share) return c.json(error("NOT_FOUND", "this reference link is no longer available"), 404);
-  if (!share.ndaAcceptedAt) {
-    await getDb()
-      .update(referenceShares)
-      .set({ ndaAcceptedAt: new Date(), updatedAt: new Date() } as any)
-      .where(eq(referenceShares.id, share.id));
-  }
+  if (!share.ndaAcceptedAt) await markReferenceShareNdaAccepted(share.id);
   return c.json(
     success({
       label: share.label,
       requireNda: share.requireNda,
       unlocked: true,
-      contacts: await loadShareContacts(share.contactIds as string[]),
+      contacts: await loadShareContacts(share.contactIds),
     }),
     200,
   );

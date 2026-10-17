@@ -668,30 +668,8 @@ export const studioVideoFormSubmissions = pgTable(
   ],
 );
 
-// ---------------------------------------------------------------------------
-// Review Comments (gap #145) — Frame.io-style time-coded comments for
-// async team review of draft videos. Public review links via shareToken.
-// ---------------------------------------------------------------------------
-export const studioReviewComments = pgTable(
-  "studio_review_comments",
-  {
-    id:           uuid("id").primaryKey().defaultRandom(),
-    projectId:    uuid("project_id").notNull().references(() => studioProjects.id, { onDelete: "cascade" }),
-    parentId:     uuid("parent_id"),                       // null = root, else thread reply (self-FK in SQL migration 0152)
-    authorUserId: uuid("author_user_id").references(() => users.id, { onDelete: "set null" }),
-    authorName:   text("author_name").notNull(),
-    authorEmail:  text("author_email"),
-    body:         text("body").notNull(),
-    timestampSec: real("timestamp_sec"),                  // playback position pinned to (null = general)
-    resolved:     boolean("resolved").notNull().default(false),
-    createdAt:    timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [
-    index("idx_studio_review_comments_project").on(t.projectId),
-    index("idx_studio_review_comments_parent").on(t.parentId),
-    index("idx_studio_review_comments_author_user_id").on(t.authorUserId),
-  ],
-);
+// Review comments (gap #145) live in `comments` (comments.ts, subject
+// studio_project) since W3-A migration 0581.
 
 // Review share links live in share_links (shareLinks.ts, kind studio_review)
 // since W3-A migration 0583.

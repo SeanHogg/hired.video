@@ -16,7 +16,7 @@ import {
   markMagicLinkUsed,
   retireOpenMagicLinks,
 } from "../../repositories/authFlowRepository.js";
-import { sendMagicLinkEmail } from "../adapters/email.js";
+import { sendMagicLinkEmail } from "../adapters/email/senders/auth.js";
 import type { AuthDeps } from "./authPorts.js";
 import { issueJwt } from "./jwt.js";
 import { createSession } from "./sessions.js";

@@ -1,8 +1,8 @@
 /**
  * #96 — Contact enrichment provider abstraction.
  *
- * The credit ledger already exists (`enrichmentCredits` +
- * `enrichmentTransactions`); what was missing is the seam every
+ * The credit ledger already exists (the `enrichment_credits` wallet +
+ * its wallet_ledger rows); what was missing is the seam every
  * upstream provider gets plugged into so the credit-deduction path
  * never has to know who is fulfilling the lookup. Today we ship one
  * implementation — `NullEnrichmentProvider` — which records every

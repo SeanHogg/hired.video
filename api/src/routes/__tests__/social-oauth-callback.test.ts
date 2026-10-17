@@ -9,11 +9,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { socialCallbackFailureReason } from "../social-oauth-callback.js";
 import { SocialConnectionError } from "../../services/social/social-connection-service.js";
-import { SecretsError, encryptSocialSecret } from "../../services/social/secrets.js";
+import { SecretsError, sealConnectionSecret } from "../../services/provider-connections/connection-secrets.js";
 
 describe("socialCallbackFailureReason", () => {
   it("maps a missing token-encryption key (the prod LinkedIn failure) to not_configured", async () => {
-    const err = await encryptSocialSecret({}, "token").catch((e: unknown) => e);
+    const err = await sealConnectionSecret("token", { masterKey: "" }).catch((e: unknown) => e);
     assert.ok(err instanceof SecretsError);
     assert.equal(socialCallbackFailureReason(err), "not_configured");
   });

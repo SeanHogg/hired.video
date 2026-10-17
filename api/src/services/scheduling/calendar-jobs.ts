@@ -6,7 +6,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { logger } from "../../lib/logger.js";
-import { sendGenericEmail } from "../adapters/email.js";
+import { sendGenericEmail } from "../adapters/email/senders/notifications.js";
 import { auditModelCatalog, formatModelDriftEmailHtml } from "../adapters/model-catalog-audit.js";
 import { runMonthClose } from "../../domains/services-processing/month-close.js";
 import { runFraudSweep } from "../gamification/fraud-sweep.js";

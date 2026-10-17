@@ -24,7 +24,7 @@
  */
 
 import { getDb } from "../../db/index.js";
-import { getEmailProvider } from "../adapters/email.js";
+import { getEmailProvider } from "../adapters/email/transport.js";
 import { buildRepos } from "../../repositories/index.js";
 import { MarketingConsentService } from "../email/MarketingConsentService.js";
 import { personalizeMessage } from "./personalize.js";

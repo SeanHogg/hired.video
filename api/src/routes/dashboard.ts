@@ -449,9 +449,9 @@ dashboardRoutes.post("/ai-insights", requirePro("AI Dashboard Insights"), async 
       .from(schema.jobApplications)
       .where(and(eq(schema.jobApplications.userId, userId), gte(schema.jobApplications.appliedAt, thirtyDaysAgo))),
     db.select({ n: count() }).from(schema.jobApplications)
-      .where(and(eq(schema.jobApplications.userId, userId), eq(schema.jobApplications.status, "interview"))),
+      .where(and(eq(schema.jobApplications.userId, userId), eq(schema.jobApplications.status, "interviewing"))),
     db.select({ n: count() }).from(schema.jobApplications)
-      .where(and(eq(schema.jobApplications.userId, userId), eq(schema.jobApplications.status, "offer"))),
+      .where(and(eq(schema.jobApplications.userId, userId), eq(schema.jobApplications.status, "offered"))),
     db.select({ n: count() }).from(schema.savedJobs).where(eq(schema.savedJobs.userId, userId)),
   ]);
 

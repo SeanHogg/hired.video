@@ -22,7 +22,7 @@ import {
   retireEmailVerificationTokensForUser,
   type UserSummaryRow,
 } from "../../repositories/authFlowRepository.js";
-import { sendResendVerificationEmail } from "../adapters/email.js";
+import { sendResendVerificationEmail } from "../adapters/email/senders/auth.js";
 import { issueJwt } from "./jwt.js";
 import { getJwtSecret } from "../../utils/jwt.js";
 import { randomHex } from "../../utils/crypto.js";

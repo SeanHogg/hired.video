@@ -17,7 +17,7 @@
  * (single-flight). Without the KV binding (dev/tests) dedupe falls back to an
  * in-isolate memo, logged once. Best-effort — never throws into its caller.
  */
-import { sendGenericEmail } from "../adapters/email.js";
+import { sendGenericEmail } from "../adapters/email/senders/notifications.js";
 import { getKvNamespace } from "../../utils/edge-cache.js";
 import { logger } from "../../lib/logger.js";
 import { escapeHtml } from "../../../../shared/html-escape.js";

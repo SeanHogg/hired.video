@@ -2,7 +2,7 @@
  * Magic-link email for interview assignments (assign + resend).
  */
 import { frontendBaseUrl } from "../../utils/public-urls.js";
-import { sendGenericEmail } from "../adapters/email.js";
+import { sendGenericEmail } from "../adapters/email/senders/notifications.js";
 
 export type InviteAssignmentType = "assign" | "invite" | "self" | null;
 

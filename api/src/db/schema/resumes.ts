@@ -64,6 +64,12 @@ export const resumeInformation = pgTable("resume_information", {
    *  stale when the master's `updatedAt` is later. Written only by
    *  services/resume/lineage.ts. Migration 0498. */
   masterSyncedAt: timestamp("master_synced_at", { withTimezone: true }),
+  /** The video plan's theme + goal (`content.meta.video.themeId` /
+   *  `.targeting.goal`), denormalized for the public video feed (migration
+   *  0615). Maintained from `content` on every content write by
+   *  repositories/resumeVideoMetaColumns.ts; only valid ids are stored. */
+  videoThemeId: varchar("video_theme_id", { length: 32 }),
+  videoGoal: varchar("video_goal", { length: 16 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [

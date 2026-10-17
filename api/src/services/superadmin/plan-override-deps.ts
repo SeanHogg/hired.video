@@ -11,7 +11,7 @@ import { getDb } from "../../db/index.js";
 import { auditLog } from "../../utils/audit.js";
 import { buildRepos } from "../../repositories/index.js";
 import { invalidateSubscriptionCache } from "../billing/BillingService.js";
-import { sendPlanUpgradeEmail } from "../adapters/email.js";
+import { sendPlanUpgradeEmail } from "../adapters/email/senders/billing-notices.js";
 import type {
   AuditPort,
   PlanCachePort,

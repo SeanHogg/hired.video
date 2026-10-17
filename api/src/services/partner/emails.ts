@@ -6,7 +6,7 @@
  *   - approved → the partner owner
  *   - rejected → the partner owner
  */
-import { sendNotificationEmail } from "../adapters/email.js";
+import { sendNotificationEmail } from "../adapters/email/senders/notifications.js";
 import type { PartnerView } from "./partners.js";
 import { publicAppBaseUrl } from "../../utils/public-urls.js";
 // Approval requests go to the shared SuperAdmin recipient (overridable via SUPERADMIN_EMAIL).

@@ -28,7 +28,7 @@ import {
   resolveActor,
 } from "../notifications/notificationService.js";
 import { findOrCreateDirectConversation, sendMessage } from "../messaging/messagingService.js";
-import { sendModerationFlagEmail } from "../../services/adapters/email.js";
+import { sendModerationFlagEmail } from "../../services/adapters/email/senders/notifications.js";
 import { logger } from "../../lib/logger.js";
 
 export type ModerationServiceDeps = {

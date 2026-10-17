@@ -286,45 +286,38 @@ export class ResumeFeedbackRepository implements IResumeFeedbackRepository {
       .where(inArray(users.id, unique));
   }
 
-  // ── proposed-draft revisions ──
-  async nextVersionNumber(resumeId: string): Promise<number> {
-    const [{ maxVersion }] = await this.db
-      .select({
-        maxVersion: sql<number>`COALESCE(MAX(${resumeVersions.versionNumber}), 0)`,
-      })
-      .from(resumeVersions)
-      .where(eq(resumeVersions.resumeId, resumeId));
-    return Number(maxVersion ?? 0) + 1;
+  // ── proposed-draft revisions (entity_versions, subject_type 'resume') ──
+  private get versions(): EntityVersionRepository {
+    return new EntityVersionRepository(this.db);
   }
 
   async insertProposedVersion(input: ResumeVersionInsert): Promise<ResumeVersionRow> {
-    const [row] = await this.db.insert(resumeVersions).values(input as any).returning();
-    return row;
+    const row = await this.versions.insertNext({
+      subjectType: "resume",
+      subjectId: input.resumeId,
+      userId: input.userId,
+      label: input.label ?? null,
+      payload: input.resumeData,
+      isAutosave: input.isAutosave ?? false,
+      proposedByUserId: input.proposedByUserId ?? null,
+      reviewId: input.reviewId ?? null,
+      proposalStatus: input.proposalStatus ?? null,
+    });
+    return toResumeVersionRow(row);
   }
 
   async findVersionById(id: string): Promise<ResumeVersionRow | null> {
-    const [row] = await this.db
-      .select()
-      .from(resumeVersions)
-      .where(eq(resumeVersions.id, id))
-      .limit(1);
-    return row ?? null;
+    const row = await this.versions.findById(id);
+    return row && row.subjectType === "resume" ? toResumeVersionRow(row) : null;
   }
 
   async listProposalsForReview(reviewId: string): Promise<ResumeVersionRow[]> {
-    return this.db
-      .select()
-      .from(resumeVersions)
-      .where(and(eq(resumeVersions.reviewId, reviewId), isNotNull(resumeVersions.proposedByUserId)))
-      .orderBy(desc(resumeVersions.createdAt));
+    const rows = await this.versions.listProposalsForReview(reviewId);
+    return rows.filter((r) => r.subjectType === "resume").map(toResumeVersionRow);
   }
 
   async setProposalStatus(versionId: string, status: string): Promise<ResumeVersionRow | null> {
-    const [row] = await this.db
-      .update(resumeVersions)
-      .set({ proposalStatus: status } as any)
-      .where(eq(resumeVersions.id, versionId))
-      .returning();
-    return row ?? null;
+    const row = await this.versions.setProposalStatus(versionId, status);
+    return row ? toResumeVersionRow(row) : null;
   }
 }

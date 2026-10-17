@@ -24,7 +24,7 @@ import type { AppEnv } from "../types/index.js";
 import { frontendBaseUrl } from "../utils/public-urls.js";
 import { socialConnectionServiceFor } from "../services/social/social-connection-factory.js";
 import { SocialConnectionError } from "../services/social/social-connection-service.js";
-import { SecretsError } from "../services/social/secrets.js";
+import { SecretsError } from "../services/crypto/secrets.js";
 import type { SocialOAuthState } from "../services/social/social-oauth.js";
 import { logger } from "../lib/logger.js";
 

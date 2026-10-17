@@ -14,7 +14,7 @@ import {
   sendPasswordResetEmail,
   sendTwoFactorEmail,
   sendMagicLinkEmail,
-} from "../../services/adapters/email.js";
+} from "../../services/adapters/email/senders/auth.js";
 import { seedOnboardingTasks } from "../../lib/onboarding.js";
 import { triggerOnboardingDrip } from "../../lib/onboardingDrip.js";
 import type { AuthDeps, CaptchaPort, EmailerPort, OnboardingPort } from "./authPorts.js";

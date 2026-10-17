@@ -20,7 +20,7 @@ import {
   reissueTwoFactorChallenge,
   setTwoFactorAttempts,
 } from "../../repositories/authFlowRepository.js";
-import { sendTwoFactorEmail } from "../adapters/email.js";
+import { sendTwoFactorEmail } from "../adapters/email/senders/auth.js";
 import { issueJwt } from "./jwt.js";
 import { createSession } from "./sessions.js";
 import { verifyTotp } from "./totp.js";

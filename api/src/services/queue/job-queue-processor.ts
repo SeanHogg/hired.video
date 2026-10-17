@@ -12,7 +12,7 @@
  */
 
 import { getDb, schema } from "../../db/index.js";
-import { getEmailProvider } from "../adapters/email.js";
+import { getEmailProvider } from "../adapters/email/transport.js";
 import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "../company/recruiter-match.js";
 import { DripQueuesRepository } from "../../repositories/dripQueuesRepository.js";
 import { logger } from "../../lib/logger.js";

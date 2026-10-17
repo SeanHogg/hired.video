@@ -8,7 +8,7 @@ import { users } from "../../db/schema/users.js";
 import { buildRepos } from "../../repositories/index.js";
 import { emitNotification } from "../notifications/notificationService.js";
 import { loadNotificationPreferences } from "../notifications/preferences.js";
-import { getEmailProvider } from "../adapters/email.js";
+import { getEmailProvider } from "../adapters/email/transport.js";
 import { buildAgentPauseUrl } from "./agent-pause-token.js";
 import { frontendBaseUrl } from "../../utils/public-urls.js";
 import type { AgentDigestDeps } from "./agent-digest.js";

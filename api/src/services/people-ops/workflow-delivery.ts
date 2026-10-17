@@ -20,7 +20,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
 import { emitNotification, resolveActor } from "../notifications/notificationService.js";
-import { getEmailProvider } from "../adapters/email.js";
+import { getEmailProvider } from "../adapters/email/transport.js";
 import { escapeHtml } from "../../../../shared/html-escape.js";
 import {
   PeopleEmployeesRepository,

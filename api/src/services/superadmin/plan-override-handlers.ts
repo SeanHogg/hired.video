@@ -25,7 +25,7 @@ import {
 } from "../../domains/planOverride/resolver.js";
 import type { ISubscriptionsRepository } from "../../repositories/index.js";
 import type { IUserReader } from "../../repositories/usersRepository.js";
-import type { PlanUpgradeEmailParams } from "../adapters/email.js";
+import type { PlanUpgradeEmailParams } from "../adapters/email/templates/billing.js";
 
 // ---------------------------------------------------------------------------
 // Ports (Interface Segregation — one port per cross-cutting concern)

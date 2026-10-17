@@ -36,7 +36,8 @@ import {
   PushSubscriptionsRepository,
   type PushSubscriptionRow,
 } from "../../repositories/pushSubscriptionsRepository.js";
-import { getEmailProvider, buildNotificationEmail } from "../adapters/email.js";
+import { getEmailProvider } from "../adapters/email/transport.js";
+import { buildNotificationEmail } from "../adapters/email/templates/notifications.js";
 import { isChannelAllowed } from "../../../../shared/notification-preferences.js";
 import { loadNotificationPreferences } from "./preferences.js";
 import type { NotificationInsert } from "../../repositories/notificationsRepository.js";

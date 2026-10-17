@@ -14,7 +14,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildContactConfirmationEmail } from "../adapters/email.js";
+import { buildContactConfirmationEmail } from "../adapters/email/templates/notifications.js";
 
 describe("buildContactConfirmationEmail", () => {
   const base = {

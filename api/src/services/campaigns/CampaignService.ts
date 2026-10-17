@@ -12,7 +12,7 @@
 import { and, eq, inArray, isNotNull, like } from "drizzle-orm";
 import { schema } from "../../db/index.js";
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
-import { getEmailProvider } from "../adapters/email.js";
+import { getEmailProvider } from "../adapters/email/transport.js";
 import { MarketingConsentService } from "../email/MarketingConsentService.js";
 import { rewriteLinksForClickTracking } from "./campaign-links.js";
 import { buildRepos } from "../../repositories/index.js";

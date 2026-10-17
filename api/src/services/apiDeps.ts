@@ -183,20 +183,20 @@ export function __setDefaultApiDepsForTests(deps: ApiDeps | null): void {
 function buildEmailPort(env: Record<string, string | undefined>): EmailPort {
   return {
     async sendVerification(to, name, token) {
-      const { sendVerificationEmail } = await import("./adapters/email.js");
+      const { sendVerificationEmail } = await import("./adapters/email/senders/auth.js");
       await sendVerificationEmail(to, name, token);
       void env;
     },
     async sendPasswordReset(to, name, token) {
-      const { sendPasswordResetEmail } = await import("./adapters/email.js");
+      const { sendPasswordResetEmail } = await import("./adapters/email/senders/auth.js");
       await sendPasswordResetEmail(to, name, token);
     },
     async sendTwoFactor(to, name, code, expiryMinutes) {
-      const { sendTwoFactorEmail } = await import("./adapters/email.js");
+      const { sendTwoFactorEmail } = await import("./adapters/email/senders/auth.js");
       await sendTwoFactorEmail(to, name, code, expiryMinutes);
     },
     async sendConnectionRequest(to, name, fromName, senderProfileId, requestMessage) {
-      const { sendConnectionRequestEmail } = await import("./adapters/email.js");
+      const { sendConnectionRequestEmail } = await import("./adapters/email/senders/network.js");
       await sendConnectionRequestEmail(to, name, fromName, senderProfileId, requestMessage);
     },
   };

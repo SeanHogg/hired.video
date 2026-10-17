@@ -12,7 +12,7 @@ import {
 } from "../../repositories/candidateVideoConsentRepository.js";
 import { canActFor } from "../studio/workspace.js";
 import { forceProjectUnlisted } from "../studio/project-visibility.js";
-import { sendCandidateVideoConsentEmail } from "../adapters/email.js";
+import { sendCandidateVideoConsentEmail } from "../adapters/email/senders/recruiting.js";
 import type { CandidateConsentDeps } from "../../domains/candidate-consent/ports.js";
 import { assertCandidateConsent, enforceCandidateConsent } from "../../domains/candidate-consent/consent-gate.js";
 

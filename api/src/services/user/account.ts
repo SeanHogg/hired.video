@@ -18,7 +18,7 @@ import {
 } from "../../../../shared/account.js";
 import { ConflictError, ForbiddenError, NotFoundError } from "../../middleware/errorHandler.js";
 import { splitPersonName } from "../../../../shared/person-name.js";
-import { sendInvitationEmail } from "../adapters/email.js";
+import { sendInvitationEmail } from "../adapters/email/senders/team.js";
 import { revokeAllSessionsForUser } from "../auth/sessions.js";
 import { defaultRoleChangeCacheBusters, onUserRoleChanged } from "./roleChangeEffects.js";
 import { UsageService } from "../usage/UsageService.js";

@@ -12,7 +12,7 @@ import { DomainError } from "../../domains/errors.js";
 import { getDb } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
 import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
-import { sendConnectionRequestEmail } from "../adapters/email.js";
+import { sendConnectionRequestEmail } from "../adapters/email/senders/network.js";
 import { emitNotification, resolveActor } from "../notifications/notificationService.js";
 import { bumpInboxFor } from "../messaging/inboxCacheVersion.js";
 import type { GamificationService } from "../../domains/gamification/index.js";
