@@ -12,7 +12,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { CreateCouponSchema, UpdateCouponSchema } from "../../../shared/coupons.js";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import { buildCouponDeps } from "../services/coupons/couponDeps.js";
@@ -20,8 +19,6 @@ import { createCoupon, listCoupons, listRedemptions, updateCoupon } from "../ser
 import { couponErrorResponse } from "./coupon-errors.js";
 
 export const adminCouponRoutes = new Hono<AppEnv>();
-
-adminCouponRoutes.use("*", superAdminMiddleware);
 
 /** Malformed ids are a 404, not a Postgres uuid cast error. */
 const isId = (id: string) => UuidLikeSchema.safeParse(id).success;

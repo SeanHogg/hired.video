@@ -22,7 +22,7 @@ export function isPointsEligible(user: { role?: string | null } | null | undefin
 
 /**
  * Gamification client. Mirrors the /api/points and
- * /api/admin/impersonate/points routes. Schemas are loose-enough to
+ * /api/admin/sa/points routes. Schemas are loose-enough to
  * accept the backend's date strings (Drizzle returns Date instances
  * that JSON.stringify to ISO).
  */
@@ -272,7 +272,7 @@ export type PointsTopEarner = z.infer<typeof TopEarnerSchema>;
 export type PointsFraudFlag = z.infer<typeof FraudFlagSchema>;
 export type PointsAdminUserView = z.infer<typeof AdminUserSchema>;
 
-const ADMIN_BASE = "/api/admin/impersonate/points";
+const ADMIN_BASE = "/api/admin/sa/points";
 
 export const pointsAdminService = {
   async getDashboard(): Promise<PointsAdminDashboard> {

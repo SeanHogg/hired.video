@@ -222,12 +222,12 @@ function installFetchMock(): void {
       return jsonOk({ connectors: [LINKEDIN_CONNECTOR] });
     }
 
-    if (path.includes("/api/resumes/withownership") && method === "GET") {
-      return jsonOk([MASTER_RESUME]);
-    }
-
-    if (path.includes("/api/resumes/mastergroups") && method === "GET") {
-      return jsonOk([]);
+    // GET /api/resumes?owner=me&include=ownership | &view=groups — one path,
+    // the query picks the shape.
+    if (path.endsWith("/api/resumes") && method === "GET") {
+      const query = new URL(url, window.location.origin).searchParams;
+      if (query.get("view") === "groups") return jsonOk([]);
+      if ((query.get("include") ?? "").split(",").includes("ownership")) return jsonOk([MASTER_RESUME]);
     }
 
     const importMatch = path.match(/\/api\/vendor-sync\/([^/]+)\/import$/);

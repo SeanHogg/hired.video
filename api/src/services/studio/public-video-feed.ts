@@ -1,7 +1,7 @@
 /**
  * The public video feed — the 20 most recent public videos, read by the
  * discovery card feed and the home page's "Watch people get seen" wall
- * (`GET /api/studio/videos/public`).
+ * (`GET /api/studio/public`).
  *
  * Served through the shared read-through cache (L1 + KV) and kept until a
  * video changes: EVERY writer of the `videos` table calls

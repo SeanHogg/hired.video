@@ -31,6 +31,7 @@ import {
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 import { jobItems } from "./jobs.js";
+import { providerConnections } from "./providerConnections.js";
 
 /**
  * inbox_profiles — the role-keyed unit that generalises the hardwired
@@ -87,61 +88,9 @@ export const inboxProfiles = pgTable(
 export type InboxProfile = typeof inboxProfiles.$inferSelect;
 export type NewInboxProfile = typeof inboxProfiles.$inferInsert;
 
-export const externalEmailAccounts = pgTable(
-  "external_email_accounts",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    provider: varchar("provider", { length: 16 }).notNull(),
-    accountEmail: varchar("account_email", { length: 320 }).notNull(),
-    accountLabel: varchar("account_label", { length: 120 }),
-    oauthRefreshTokenEnc: text("oauth_refresh_token_enc"),
-    pushSubscriptionId: varchar("push_subscription_id", { length: 255 }),
-    pushExpiresAt: timestamp("push_expires_at", { withTimezone: true }),
-    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
-    /** Gmail `users.history.list` cursor — historyId from the most recent
-     *  successful sync. Null until the first run completes. */
-    lastHistoryId: varchar("last_history_id", { length: 64 }),
-    /** Outlook Graph `/me/messages/delta` link. Null until first run. */
-    lastDeltaLink: text("last_delta_link"),
-    /** Granted OAuth scopes — denormalised so we can detect partial
-     *  consent (e.g. user dropped read scope in Google account settings). */
-    scopes: jsonb("scopes"),
-    status: varchar("status", { length: 16 }).default("active").notNull(),
-    lastError: text("last_error"),
-    /** Per-account confidence floor — only messages classified at or
-     *  above this score reach the inbox feed. Defaults to 0.5 so newly
-     *  connected mailboxes get a sensible "relevant mail only" cut without
-     *  user setup. Renamed from `min_job_score` in 0206 — the meaning now
-     *  comes from the account's active profile, not a candidate taxonomy. */
-    minRelevanceScore: numeric("min_relevance_score", { precision: 4, scale: 3 })
-      .default("0.500")
-      .notNull(),
-    /** The inbox profile (taxonomy + prompt + extraction + rules) this
-     *  mailbox classifies under. NULL falls back to the Job Hunter preset
-     *  so the pre-profiles job-seeker path is byte-for-byte unchanged. */
-    activeProfileId: uuid("active_profile_id").references(() => inboxProfiles.id, {
-      onDelete: "set null",
-    }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (t) => ({
-    userProviderEmailUnq: uniqueIndex("external_email_accounts_user_provider_email_key").on(
-      t.userId,
-      t.provider,
-      t.accountEmail,
-    ),
-    userStatusIdx: index("external_email_accounts_user_status_idx").on(t.userId, t.status),
-    externalEmailAccountsPushExpiryIdx: index("external_email_accounts_push_expiry_idx").on(t.pushExpiresAt).where(sql`status = 'active' AND push_expires_at IS NOT NULL`),
-    // 0157 built this name dynamically; Postgres truncated it to 63 bytes.
-    oauthRefreshTokenEncFormatCheck: check("external_email_accounts_oauth_refresh_token_enc_enc_format_chec", sql`${t.oauthRefreshTokenEnc} IS NULL OR ${t.oauthRefreshTokenEnc} LIKE 'v1.aes-gcm.hkdf:%' OR ${t.oauthRefreshTokenEnc} ~ '^[A-Za-z0-9+/=]+\\.[A-Za-z0-9+/=]+$' OR ${t.oauthRefreshTokenEnc} ~ '^[0-9a-fA-F]+:[0-9a-fA-F]+$'`),
-    activeProfileIdFkIdx: index("idx_external_email_accounts_active_profile_id").on(t.activeProfileId),
-  }),
-);
-
-export type ExternalEmailAccount = typeof externalEmailAccounts.$inferSelect;
-export type NewExternalEmailAccount = typeof externalEmailAccounts.$inferInsert;
+// Connected mailboxes live in provider_connections (purpose "email_inbox",
+// W3-C migration 0600); ids were kept, so external_email_messages.account_id
+// and email_sync_runs.account_id still point at the same row.
 
 export const externalEmailMessages = pgTable(
   "external_email_messages",
@@ -150,7 +99,7 @@ export const externalEmailMessages = pgTable(
     userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     accountId: uuid("account_id")
       .notNull()
-      .references(() => externalEmailAccounts.id, { onDelete: "cascade" }),
+      .references(() => providerConnections.id, { onDelete: "cascade" }),
     provider: varchar("provider", { length: 16 }).notNull(),
     providerMessageId: varchar("provider_message_id", { length: 255 }).notNull(),
     providerThreadId: varchar("provider_thread_id", { length: 255 }),
@@ -286,7 +235,7 @@ export const emailSyncRuns = pgTable(
     userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     accountId: uuid("account_id")
       .notNull()
-      .references(() => externalEmailAccounts.id, { onDelete: "cascade" }),
+      .references(() => providerConnections.id, { onDelete: "cascade" }),
     /** Client-generated UUID stamped on every chunk POST of a single
      *  logical sync. Nullable to keep pre-migration-0095 rows valid;
      *  new rows always carry one. */

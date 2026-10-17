@@ -4,7 +4,7 @@
  * Two entry points:
  *   • `gamificationFromContext(c)` — build a configured GamificationService
  *     scoped to the current request. Both user routes (`/api/points/*`)
- *     and SuperAdmin routes (`/api/admin/impersonate/points/*`) use this
+ *     and SuperAdmin routes (`/api/admin/sa/points/*`) use this
  *     so the Tremendous client can read `c.env.TREMENDOUS_*` without
  *     each call site re-implementing the env passthrough.
  *

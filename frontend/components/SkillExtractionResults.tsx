@@ -1,5 +1,5 @@
 // Reusable renderer for the Skill Extractor tool. Consumes the normalized
-// API response from POST /api/skillextractor/extract and groups the skills
+// API response from POST /api/ai/tools/skill-extract and groups the skills
 // by category with importance pills. Can be embedded in any page that
 // wants to display an extraction result (the tool page, a sidebar panel,
 // or future context-menu dialogs).

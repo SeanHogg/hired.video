@@ -30,7 +30,7 @@ import {
   rowToResume,
   rowToResumeSummary,
   EMPTY_VIEWER_EXTRAS,
-} from "../../routes/resumes.js";
+} from "../../handlers/resume-serializer.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SlugSchema — the root cause of the original 400 bug.

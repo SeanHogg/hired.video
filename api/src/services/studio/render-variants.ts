@@ -152,7 +152,7 @@ export async function storeRenderVariant(
     .values({
       userId: project.userId,
       companyId: project.companyId,
-      status: "Completed",
+      status: "completed",
       r2Key,
       branded: args.branded,
       title: args.title,
@@ -201,7 +201,7 @@ export function resolvePostedVariant(
  * cut's file while it still shows what the master shows; null after a
  * re-render changed the master, or once the cut was reclaimed — the caller
  * posts the master then. `masterHash` is the master render's baked hash
- * (`timeline_spec._meta.bakedHash`).
+ * (`studio_projects.baked_hash`, mirrored from `state._meta.bakedHash`).
  */
 export async function currentCutVideoId(
   db: Db,

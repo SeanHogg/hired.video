@@ -3,13 +3,25 @@
  * routes/studio-features.ts barrel (split out of that file; paths unchanged).
  */
 import { Hono } from "hono";
-import { and, eq, desc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import type { AppEnv } from "../../types/index.js";
 import { getDb, schema } from "../../db/index.js";
 import { resolveActableEngagementRow } from "../../services/studio/engagement-row-access.js";
-import { ok, fail, viewerCanActOnProject, studioReviewComments, studioReviewLinks } from "./shared.js";
+import { ok, fail, viewerCanActOnProject } from "./shared.js";
+import {
+  deleteStudioReviewComment,
+  insertStudioReviewComment,
+  listStudioReviewComments,
+  setStudioReviewCommentResolved,
+} from "../../repositories/studioReviewCommentsRepository.js";
+import {
+  deleteStudioReviewLink,
+  findActiveStudioReviewLinkByToken,
+  insertStudioReviewLink,
+  listStudioReviewLinks,
+} from "../../repositories/studioReviewLinksRepository.js";
 import { randomHex } from "../../utils/crypto.js";
 
 export const reviewRoutes = new Hono<AppEnv>();
@@ -34,18 +46,17 @@ reviewRoutes.post("/projects/:projectId/review-links", async (c) => {
     return c.json(fail("NOT_FOUND", "Project not found"), 404);
   }
 
-  const db = getDb();
   const expiresAt = parsed.data.expiresInDays
     ? new Date(Date.now() + parsed.data.expiresInDays * 86400_000)
     : null;
 
-  const [link] = await db.insert(studioReviewLinks).values({
+  const link = await insertStudioReviewLink({
     projectId,
     userId: user.sub,
     shareToken: randomHex(24),
     name: parsed.data.name ?? "Review link",
     expiresAt,
-  } as any).returning();
+  });
 
   return c.json(ok(link), 201);
 });
@@ -57,10 +68,7 @@ reviewRoutes.get("/projects/:projectId/review-links", async (c) => {
   if (!(await viewerCanActOnProject(c.var.user?.sub, projectId))) {
     return c.json(fail("NOT_FOUND", "Project not found"), 404);
   }
-  const db = getDb();
-  const links = await db.select().from(studioReviewLinks)
-    .where(eq(studioReviewLinks.projectId, projectId))
-    .orderBy(desc(studioReviewLinks.createdAt));
+  const links = await listStudioReviewLinks(projectId);
   return c.json(ok({ links }));
 });
 
@@ -71,12 +79,9 @@ reviewRoutes.delete("/review-links/:id", async (c) => {
   if (!(await resolveActableEngagementRow(user?.sub, "review-link", id))) {
     return c.json(fail("NOT_FOUND", "Link not found"), 404);
   }
-  const db = getDb();
-  const deleted = await db.delete(studioReviewLinks)
-    .where(eq(studioReviewLinks.id, id))
-    .returning({ id: studioReviewLinks.id });
-  if (deleted.length === 0) return c.json(fail("NOT_FOUND", "Link not found"), 404);
-  return c.json(ok({ deleted: deleted[0].id }));
+  const deletedId = await deleteStudioReviewLink(id);
+  if (!deletedId) return c.json(fail("NOT_FOUND", "Link not found"), 404);
+  return c.json(ok({ deleted: deletedId }));
 });
 
 // GET /api/studio/review/:shareToken — public — resolves a review link to its
@@ -85,9 +90,7 @@ reviewRoutes.get("/review/:shareToken", async (c) => {
   const token = c.req.param("shareToken");
   const db = getDb();
 
-  const [link] = await db.select().from(studioReviewLinks)
-    .where(and(eq(studioReviewLinks.shareToken, token), eq(studioReviewLinks.isActive, true)))
-    .limit(1);
+  const link = await findActiveStudioReviewLinkByToken(token);
   if (!link) return c.json(fail("NOT_FOUND", "Review link not found or inactive"), 404);
   if (link.expiresAt && link.expiresAt.getTime() < Date.now()) {
     return c.json(fail("EXPIRED", "Review link has expired"), 410);
@@ -97,9 +100,7 @@ reviewRoutes.get("/review/:shareToken", async (c) => {
     .where(eq(schema.studioProjects.id, link.projectId))
     .limit(1);
 
-  const comments = await db.select().from(studioReviewComments)
-    .where(eq(studioReviewComments.projectId, link.projectId))
-    .orderBy(studioReviewComments.createdAt);
+  const comments = await listStudioReviewComments(db, link.projectId);
 
   return c.json(ok({
     projectId: link.projectId,
@@ -115,10 +116,7 @@ reviewRoutes.get("/projects/:projectId/comments", async (c) => {
   if (!(await viewerCanActOnProject(c.var.user?.sub, projectId))) {
     return c.json(fail("NOT_FOUND", "Project not found"), 404);
   }
-  const db = getDb();
-  const comments = await db.select().from(studioReviewComments)
-    .where(eq(studioReviewComments.projectId, projectId))
-    .orderBy(studioReviewComments.createdAt);
+  const comments = await listStudioReviewComments(getDb(), projectId);
   return c.json(ok({ comments }));
 });
 
@@ -140,16 +138,15 @@ reviewRoutes.post("/projects/:projectId/comments", async (c) => {
     return c.json(fail("NOT_FOUND", "Project not found"), 404);
   }
 
-  const db = getDb();
-  const [comment] = await db.insert(studioReviewComments).values({
+  const comment = await insertStudioReviewComment(getDb(), {
     projectId,
     parentId: parsed.data.parentId ?? null,
     authorUserId: user.sub,
     authorName: user.email?.split("@")[0] ?? "Reviewer",
-    authorEmail: user.email,
+    authorEmail: user.email ?? null,
     body: parsed.data.body,
     timestampSec: parsed.data.timestampSec ?? null,
-  }).returning();
+  });
 
   return c.json(ok(comment), 201);
 });
@@ -168,15 +165,13 @@ reviewRoutes.post("/review/:shareToken/comments", async (c) => {
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
 
   const db = getDb();
-  const [link] = await db.select().from(studioReviewLinks)
-    .where(and(eq(studioReviewLinks.shareToken, token), eq(studioReviewLinks.isActive, true)))
-    .limit(1);
+  const link = await findActiveStudioReviewLinkByToken(token);
   if (!link) return c.json(fail("NOT_FOUND", "Review link not found"), 404);
   if (link.expiresAt && link.expiresAt.getTime() < Date.now()) {
     return c.json(fail("EXPIRED", "Review link has expired"), 410);
   }
 
-  const [comment] = await db.insert(studioReviewComments).values({
+  const comment = await insertStudioReviewComment(db, {
     projectId: link.projectId,
     parentId: parsed.data.parentId ?? null,
     authorUserId: null,
@@ -184,7 +179,7 @@ reviewRoutes.post("/review/:shareToken/comments", async (c) => {
     authorEmail: parsed.data.authorEmail ?? null,
     body: parsed.data.body,
     timestampSec: parsed.data.timestampSec ?? null,
-  } as any).returning();
+  });
 
   return c.json(ok(comment), 201);
 });
@@ -203,11 +198,7 @@ reviewRoutes.patch("/comments/:id", async (c) => {
     return c.json(fail("NOT_FOUND", "Comment not found"), 404);
   }
 
-  const db = getDb();
-  const [updated] = await db.update(studioReviewComments)
-    .set({ resolved: parsed.data.resolved } as any)
-    .where(eq(studioReviewComments.id, id))
-    .returning();
+  const updated = await setStudioReviewCommentResolved(getDb(), id, parsed.data.resolved);
   return c.json(ok(updated));
 });
 
@@ -218,8 +209,6 @@ reviewRoutes.delete("/comments/:id", async (c) => {
   if (!(await resolveActableEngagementRow(user?.sub, "comment", id))) {
     return c.json(fail("NOT_FOUND", "Comment not found"), 404);
   }
-  const db = getDb();
-
-  await db.delete(studioReviewComments).where(eq(studioReviewComments.id, id));
+  await deleteStudioReviewComment(getDb(), id);
   return c.json(ok({ deleted: id }));
 });

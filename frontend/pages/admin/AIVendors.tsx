@@ -17,7 +17,7 @@
 //   4. Live gateway models    — what the gateway can actually resolve now.
 //   5. Gateway usage          — per-tenant aggregated cost.
 //
-// Wired to /api/admin/impersonate/ai/* (aiVendorRoutes), mounted on the SA tree
+// Wired to /api/admin/sa/ai/* (aiVendorRoutes), mounted on the SA tree
 // so the SuperAdmin middleware is applied at the parent. Gated behind the
 // admin-permissions resource "aiVendors" + the role-access manifest, exactly
 // like every other admin tab. These are admin-low-frequency reads — react-query
@@ -158,7 +158,7 @@ function useSubstitutions(days: number) {
     staleTime: STALE_MS,
     queryFn: async () => {
       const res = await apiClient.get<SubstitutionsResponse>(
-        `/api/admin/impersonate/ai/substitutions?days=${days}`,
+        `/api/admin/sa/ai/substitutions?days=${days}`,
       );
       return res.data;
     },
@@ -171,7 +171,7 @@ function useSchemaRetries(days: number) {
     staleTime: STALE_MS,
     queryFn: async () => {
       const res = await apiClient.get<SchemaRetriesResponse>(
-        `/api/admin/impersonate/ai/schema-retries?days=${days}`,
+        `/api/admin/sa/ai/schema-retries?days=${days}`,
       );
       return res.data;
     },
@@ -184,7 +184,7 @@ function useUseCases() {
     staleTime: STALE_MS,
     queryFn: async () => {
       const res = await apiClient.get<UseCaseRow[]>(
-        `/api/admin/impersonate/ai/use-cases`,
+        `/api/admin/sa/ai/use-cases`,
       );
       return res.data;
     },
@@ -197,7 +197,7 @@ function useCatalogAudit() {
     staleTime: STALE_MS,
     queryFn: async () => {
       const res = await apiClient.get<CatalogAudit>(
-        `/api/admin/impersonate/ai/catalog-audit`,
+        `/api/admin/sa/ai/catalog-audit`,
       );
       return res.data;
     },
@@ -210,7 +210,7 @@ function useModels() {
     staleTime: STALE_MS,
     queryFn: async () => {
       const res = await apiClient.get<ModelsResponse>(
-        `/api/admin/impersonate/ai/models`,
+        `/api/admin/sa/ai/models`,
       );
       return res.data;
     },
@@ -223,7 +223,7 @@ function useUsage(days: number) {
     staleTime: STALE_MS,
     queryFn: async () => {
       const res = await apiClient.get<UsageResponse>(
-        `/api/admin/impersonate/ai/usage?days=${days}`,
+        `/api/admin/sa/ai/usage?days=${days}`,
       );
       return res.data;
     },

@@ -22,7 +22,7 @@
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import type { PayoutBalanceDTO } from "../../../../shared/payout-profile.js";
 import {
   buildEarningsRollup,
@@ -34,7 +34,7 @@ const { payoutLedgerEntries, payouts, payoutProfiles, creatorProfiles } = schema
 /** Cache key for a creator's earnings-by-source rollup. Invalidated whenever a
  *  new accrual posts for the user (the only event that can change it). */
 const earningsRollupKey = (userId: string) => `creator-earnings-rollup:${userId}`;
-const EARNINGS_ROLLUP_TTL_SECONDS = 300;
+const EARNINGS_ROLLUP_TTL_SECONDS = 120;
 
 export type LedgerSourceKind =
   | "promo_project"
@@ -121,7 +121,7 @@ export class PayoutLedgerService {
 
     // A new accrual changes the per-source rollup — drop the cached read so the
     // Payouts & Earnings card reflects the new revenue on next load.
-    invalidateCachedKey(earningsRollupKey(input.userId));
+    invalidateIsolateKey(earningsRollupKey(input.userId));
 
     return { entryId: entry.id, created: true };
   }
@@ -239,11 +239,11 @@ export class PayoutLedgerService {
    * ledger rows by `source_kind`, then folds related kinds into the
    * human-facing buckets defined in shared/creator-earnings.ts (e.g. base
    * promo project + paid extra revision → "Promo videos"). Read-through cached
-   * (L1 isolate Map + L2 KV); invalidated by `recordAccrual` on every new
+   * isolate-locally (no KV write per miss on Workers Free); invalidated by `recordAccrual` on every new
    * accrual for the user, so it stays warm between earning events.
    */
   async getEarningsRollup(userId: string): Promise<CreatorEarningsRollupDTO> {
-    return getOrSetCached<CreatorEarningsRollupDTO>({
+    return getOrSetIsolateCached<CreatorEarningsRollupDTO>({
       key: earningsRollupKey(userId),
       ttlSeconds: EARNINGS_ROLLUP_TTL_SECONDS,
       loader: () => this.computeEarningsRollup(userId),

@@ -16,41 +16,22 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { buildRepos } from "../repositories/index.js";
-import { superAdminMiddleware } from "../middleware/superAdmin.js";
+import { adminRepos } from "../repositories/admin/index.js";
+import { recordAdminAudit } from "../services/admin/adminAudit.js";
 import {
   RoleAccessService,
   RoleAccessError,
 } from "../services/admin/RoleAccessService.js";
 import { UpsertRoleAccessSchema } from "../../../shared/role-access.js";
 
-const { adminAuditLog } = schema;
-
 export const adminRoleAccessRoutes = new Hono<AppEnv>();
 
-adminRoleAccessRoutes.use("*", superAdminMiddleware);
-
 function buildService() {
-  return new RoleAccessService(buildRepos(getDb()).roleFeatureAccess);
+  return new RoleAccessService(adminRepos().roleFeatureAccess);
 }
 
-async function audit(
-  actorId: string,
-  action: string,
-  targetId: string,
-  metadata: Record<string, unknown>,
-) {
-  await getDb()
-    .insert(adminAuditLog)
-    .values({
-      actorId,
-      action,
-      targetType: "role",
-      targetId,
-      metadata,
-    } as any)
-    .catch(() => undefined);
+function audit(actorId: string, action: string, targetId: string, metadata: Record<string, unknown>) {
+  return recordAdminAudit({ actorId, action, targetType: "role", targetId, metadata });
 }
 
 // ---------------------------------------------------------------------------

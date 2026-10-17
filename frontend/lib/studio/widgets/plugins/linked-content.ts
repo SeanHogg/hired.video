@@ -12,7 +12,8 @@
 import { CANONICAL_ORIGIN } from "@shared/structured-data";
 import type { LinkedContentWidgetParams, WidgetParams } from "@/lib/studio/editor-v2/canvas-state";
 import { getLinkedContentMeta, isLinkedContentKind, type LinkedContentKind } from "@/lib/studio/editor-v2/linked-content";
-import { stringOr, type Box } from "../frame";
+import { type Box } from "../frame";
+import { stringOr } from "@/lib/numeric";
 import { registerPlugin } from "../plugin";
 import type { DrawEnv, DrawOp } from "../draw-ops";
 import { fontShorthand, type TextStyle } from "../text-layout";

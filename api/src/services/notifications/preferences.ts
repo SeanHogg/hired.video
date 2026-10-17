@@ -4,7 +4,8 @@
  * The Settings handlers OWN the write path (persist the granular blob on
  * `account_preferences`); this module owns the READ path the dispatcher
  * hits on every notification. Reads are served through the canonical
- * read-through cache (getOrSetCached — L1 isolate Map + L2 KV) and
+ * isolate-local read-through cache (getOrSetIsolateCached — no KV write
+ * per miss on Workers Free) and
  * invalidated by the settings write, since preferences change rarely but
  * are read on every fan-out (gap #254; perf hook: no per-notification DB
  * round-trip).
@@ -19,7 +20,7 @@
 
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   mergeNotificationPreferences,
@@ -28,7 +29,8 @@ import {
 
 const { accountPreferences } = schema;
 
-const PREFS_TTL_SECONDS = 300;
+/** Isolate-local: other warm isolates converge within this TTL after a write. */
+const PREFS_TTL_SECONDS = 120;
 
 export function notificationPrefsCacheKey(userId: string): string {
   return `notif-prefs:${userId}`;
@@ -101,7 +103,7 @@ export function resolvePreferencesFromRow(row: PrefsRow): NotificationPreference
 export async function loadNotificationPreferences(
   userId: string,
 ): Promise<NotificationPreferences> {
-  return getOrSetCached<NotificationPreferences>({
+  return getOrSetIsolateCached<NotificationPreferences>({
     key: notificationPrefsCacheKey(userId),
     ttlSeconds: PREFS_TTL_SECONDS,
     loader: async () => {
@@ -122,5 +124,5 @@ export async function loadNotificationPreferences(
 
 /** Drop the cached matrix — MUST be called by every preference write. */
 export function invalidateNotificationPreferences(userId: string): void {
-  invalidateCachedKey(notificationPrefsCacheKey(userId));
+  invalidateIsolateKey(notificationPrefsCacheKey(userId));
 }

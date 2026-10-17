@@ -1,7 +1,9 @@
 /**
  * /api/advertising — job boosts (#106).
- * Create + list go through services/advertising/promotion.ts (#176 target,
- * #1764 pricing); pause / resume / cancel are simple owner-scoped updates.
+ * List goes through services/advertising/promotion.ts; pause / resume /
+ * cancel are owner-scoped transitions. CREATING a job boost is paid-only:
+ * POST /api/checkout {kind:"job_boost"} (services/billing/checkout/kinds/
+ * jobBoost.ts) — the job is sponsored only once the payment is confirmed.
  * The unpaid company-boost endpoints (#107) were removed 2026-10-17 (no
  * callers); paid promotion of any subject is POST /api/checkout {kind:"boost"}.
  */
@@ -10,8 +12,8 @@ import { Hono } from "hono";
 import { and, eq } from "drizzle-orm";
 import type { AppEnv } from "../../types/index.js";
 import { getDb, schema } from "../../db/index.js";
-import { createJobBoost, listJobBoosts } from "../../services/advertising/promotion.js";
-import { CreateBoostSchema } from "./schemas.js";
+import { listJobBoosts } from "../../services/advertising/promotion.js";
+import { AdPromotionRepository } from "../../repositories/adPromotionRepository.js";
 import { ok, uid } from "./http.js";
 
 export const advertisingBoostRoutes = new Hono<AppEnv>();
@@ -23,39 +25,17 @@ advertisingBoostRoutes.get("/boosts", async (c) => {
   return c.json(ok(await listJobBoosts(uid(c))));
 });
 
-// POST /api/advertising/boosts — create a new job boost (#176: stamps the
-// polymorphic target and still writes job_id; #1764: priced in one place).
-advertisingBoostRoutes.post("/boosts", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = CreateBoostSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: parsed.error.message } }, 400);
-  }
-  const result = await createJobBoost(uid(c), parsed.data);
-  if ("code" in result) return c.json({ success: false, error: { code: result.code, message: result.message } }, 404);
-  return c.json(ok(result.value), 201);
-});
-
-// PATCH /api/advertising/boosts/:id/pause — pause a boost
+// PATCH /api/advertising/boosts/:id/pause — pause an ACTIVE boost
 advertisingBoostRoutes.patch("/boosts/:id/pause", async (c) => {
-  const userId = uid(c);
-  const db = getDb();
-  const [boost] = await db.update(schema.jobBoosts)
-    .set({ status: "paused", updatedAt: new Date() } as any)
-    .where(and(eq(schema.jobBoosts.id, c.req.param("id")), eq(schema.jobBoosts.userId, userId)))
-    .returning();
+  const boost = await new AdPromotionRepository(getDb()).transitionJobBoostStatus(c.req.param("id"), uid(c), "active", "paused");
   if (!boost) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Boost not found" } }, 404);
   return c.json(ok(boost));
 });
 
-// PATCH /api/advertising/boosts/:id/resume — resume a paused boost
+// PATCH /api/advertising/boosts/:id/resume — resume a PAUSED boost (never an
+// unpaid pending_payment one)
 advertisingBoostRoutes.patch("/boosts/:id/resume", async (c) => {
-  const userId = uid(c);
-  const db = getDb();
-  const [boost] = await db.update(schema.jobBoosts)
-    .set({ status: "active", updatedAt: new Date() } as any)
-    .where(and(eq(schema.jobBoosts.id, c.req.param("id")), eq(schema.jobBoosts.userId, userId)))
-    .returning();
+  const boost = await new AdPromotionRepository(getDb()).transitionJobBoostStatus(c.req.param("id"), uid(c), "paused", "active");
   if (!boost) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Boost not found" } }, 404);
   return c.json(ok(boost));
 });

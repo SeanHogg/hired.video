@@ -27,9 +27,6 @@ class FakeAudit implements Partial<IAuditRepository> {
 
 class FakeNotifications {
   inserted: any[] = [];
-  async insertNotification(input: any) {
-    this.inserted.push(input);
-  }
   async insertNotifications(inputs: any[]) {
     this.inserted.push(...inputs);
   }

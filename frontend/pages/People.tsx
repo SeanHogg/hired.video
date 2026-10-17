@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Fragment, useState, useEffect, useMemo } from "react";
 import { publicProfilePath } from "@shared/public-paths";
+import { statusLabelKey } from "@shared/statuses";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -1153,16 +1154,16 @@ export default function People() {
                                 </div>
                                 <Badge
                                   variant={
-                                    submission.status === "Hired"
+                                    submission.status === "placed"
                                       ? "default"
-                                      : submission.status === "Rejected" || submission.status === "Withdrawn"
+                                      : submission.status === "rejected" || submission.status === "withdrawn"
                                       ? "destructive"
-                                      : submission.status === "Interviewing"
+                                      : submission.status === "interviewing"
                                       ? "secondary"
                                       : "outline"
                                   }
                                 >
-                                  {submission.status}
+                                  {t(statusLabelKey("submission", submission.status), { defaultValue: submission.status })}
                                 </Badge>
                               </div>
                             </CardHeader>

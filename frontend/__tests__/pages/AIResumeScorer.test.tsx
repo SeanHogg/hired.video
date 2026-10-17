@@ -234,7 +234,7 @@ describe("AIResumeScorer — file upload (regression: e.trim is not a function)"
     });
     routePost({
       "/resumes/parse": () => ({ result: parsedJsonString }),
-      "/resumescorer/score": () => SAMPLE_SCORE,
+      "/ai/tools/resume-score": () => SAMPLE_SCORE,
     });
 
     renderPage();
@@ -252,7 +252,7 @@ describe("AIResumeScorer — file upload (regression: e.trim is not a function)"
     // Both endpoints were called.
     const calls = (apiClient.post as Mock).mock.calls;
     const parseCall = calls.find(([url]) => /\/resumes\/parse$/i.test(url as string));
-    const scoreCall = calls.find(([url]) => /\/resumescorer\/score$/i.test(url as string));
+    const scoreCall = calls.find(([url]) => /\/ai\/tools\/resume-score$/i.test(url as string));
     expect(parseCall).toBeDefined();
     expect(scoreCall).toBeDefined();
 
@@ -269,7 +269,7 @@ describe("AIResumeScorer — file upload (regression: e.trim is not a function)"
     (getResumeTextFromFile as Mock).mockResolvedValue("raw extracted resume text");
     routePost({
       "/resumes/parse": () => ({}), // no `result` — simulate shape drift
-      "/resumescorer/score": () => SAMPLE_SCORE,
+      "/ai/tools/resume-score": () => SAMPLE_SCORE,
     });
 
     renderPage();
@@ -282,7 +282,7 @@ describe("AIResumeScorer — file upload (regression: e.trim is not a function)"
 
     await waitFor(() => expect(screen.getByText("74")).toBeInTheDocument());
     const scoreCall = (apiClient.post as Mock).mock.calls.find(([url]) =>
-      /\/resumescorer\/score$/i.test(url as string),
+      /\/ai\/tools\/resume-score$/i.test(url as string),
     );
     expect(scoreCall![1]).toEqual({ resumeText: "raw extracted resume text" });
   });
@@ -310,7 +310,7 @@ describe("AIResumeScorer — file upload (regression: e.trim is not a function)"
 
 describe("AIResumeScorer — paste text", () => {
   it("submits the pasted text directly and renders the score", async () => {
-    routePost({ "/resumescorer/score": () => SAMPLE_SCORE });
+    routePost({ "/ai/tools/resume-score": () => SAMPLE_SCORE });
 
     renderPage();
     fireEvent.click(await screen.findByRole("tab", { name: /Paste Text/i }));
@@ -321,7 +321,7 @@ describe("AIResumeScorer — paste text", () => {
 
     await waitFor(() => expect(screen.getByText("74")).toBeInTheDocument());
     const [url, body] = (apiClient.post as Mock).mock.calls[0];
-    expect(url).toMatch(/\/resumescorer\/score$/i);
+    expect(url).toMatch(/\/ai\/tools\/resume-score$/i);
     expect(body).toEqual({ resumeText: "Resume body goes here" });
     // /resumes/parse must NOT be called for the paste-text flow — it's only
     // for files that need AI parsing.

@@ -16,7 +16,7 @@
  */
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
-import type { IResumeRepository } from "../../repositories/index.js";
+import type { IResumeOwnerReader, IResumeWriter } from "../../repositories/resumeRepository.js";
 import { executeMerge, type MergeDecision } from "./merge.js";
 import { normalizeJsonResume } from "./parse.js";
 import { healAndValidateContent, type ResumeContentIssue } from "./content.js";
@@ -57,7 +57,7 @@ export type SideResult = { ok: true; content: Content; title: string | null } | 
 /** One side of a merge: stored (owner-scoped) or inline. Normalised so the
  *  analysis compares like with like. */
 export async function resolveMergeSide(
-  repo: Pick<IResumeRepository, "findByIdForOwner">,
+  repo: Pick<IResumeOwnerReader, "findByIdForOwner">,
   ownerId: string,
   which: "Source" | "Target",
   side: { resumeId?: string; content?: Content },
@@ -88,7 +88,7 @@ export type CommitOutcome =
 /** Persist a merge result onto `targetResumeId` — in place, or as a new
  *  version of the target's master. */
 export async function commitMerge(
-  repo: IResumeRepository,
+  repo: IResumeOwnerReader & IResumeWriter,
   ownerId: string,
   args: { targetResumeId: string; merged: Content; createNew: boolean; newTitle?: string },
 ): Promise<CommitOutcome> {

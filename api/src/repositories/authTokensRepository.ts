@@ -5,7 +5,6 @@
  *   • passwordResetTokens, emailVerificationTokens, twoFactorCodes
  *   • refreshTokens
  *   • webauthnCredentials (passkeys)
- *   • oauthAccounts
  *   • passwordHistory
  *
  * One aggregate because these all share the same lifecycle shape
@@ -27,7 +26,6 @@ const {
   twoFactorCodes,
   refreshTokens,
   webauthnCredentials: passkeys,
-  oauthAccounts,
   passwordHistory,
 } = schema;
 
@@ -43,8 +41,6 @@ export type RefreshTokenRow = typeof refreshTokens.$inferSelect;
 export type RefreshTokenInsert = typeof refreshTokens.$inferInsert;
 export type PasskeyRow = typeof passkeys.$inferSelect;
 export type PasskeyInsert = typeof passkeys.$inferInsert;
-export type OauthAccountRow = typeof oauthAccounts.$inferSelect;
-export type OauthAccountInsert = typeof oauthAccounts.$inferInsert;
 
 export interface IAuthTokensRepository {
   findValidPasswordResetToken(token: string): Promise<PasswordResetTokenRow | null>;
@@ -65,9 +61,6 @@ export interface IAuthTokensRepository {
   findPasskeysForUser(userId: string): Promise<PasskeyRow[]>;
   insertPasskey(input: PasskeyInsert): Promise<PasskeyRow>;
   deletePasskey(id: string, userId: string): Promise<boolean>;
-  findOauthAccount(provider: string, providerAccountId: string): Promise<OauthAccountRow | null>;
-  findOauthAccountsForUser(userId: string): Promise<OauthAccountRow[]>;
-  insertOauthAccount(input: OauthAccountInsert): Promise<void>;
   insertPasswordHistory(userId: string, passwordHash: string): Promise<void>;
 }
 
@@ -189,23 +182,6 @@ export class AuthTokensRepository implements IAuthTokensRepository {
     if (!row) return false;
     await this.db.delete(passkeys).where(and(eq(passkeys.id, id), eq(passkeys.userId, userId)));
     return true;
-  }
-
-  async findOauthAccount(provider: string, providerAccountId: string): Promise<OauthAccountRow | null> {
-    const [row] = await this.db
-      .select()
-      .from(oauthAccounts)
-      .where(and(eq(oauthAccounts.provider, provider), eq(oauthAccounts.providerAccountId, providerAccountId)))
-      .limit(1);
-    return (row as OauthAccountRow) ?? null;
-  }
-
-  async findOauthAccountsForUser(userId: string): Promise<OauthAccountRow[]> {
-    return (await this.db.select().from(oauthAccounts).where(eq(oauthAccounts.userId, userId))) as OauthAccountRow[];
-  }
-
-  async insertOauthAccount(input: OauthAccountInsert): Promise<void> {
-    await this.db.insert(oauthAccounts).values(input as any);
   }
 
   async insertPasswordHistory(userId: string, passwordHash: string): Promise<void> {

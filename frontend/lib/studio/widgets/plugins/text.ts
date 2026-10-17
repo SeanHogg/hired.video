@@ -4,7 +4,8 @@
  * resulting lines verbatim, so the browser never re-wraps them.
  */
 import type { TextWidgetParams, WidgetParams } from "@/lib/studio/editor-v2/canvas-state";
-import { numberOr, stringOr, type Box } from "../frame";
+import { type Box } from "../frame";
+import { numberOr, stringOr } from "@/lib/numeric";
 import { registerPlugin, type RenderContext } from "../plugin";
 import type { DrawOp } from "../draw-ops";
 import type { TextStyle } from "../text-layout";

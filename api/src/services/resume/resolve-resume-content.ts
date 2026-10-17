@@ -8,7 +8,7 @@
  *      fetch the JSON content server-side via the owner-scoped repo,
  *      so the client never has to ship the full resume payload.
  *
- * Shared by `/api/resumeoptimizer/optimize` and `/api/resumescorer/score`
+ * Shared by the `resume-optimize` and `resume-score` AI tools
  * so the two surfaces never drift on what counts as a valid request.
  */
 

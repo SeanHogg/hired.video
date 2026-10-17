@@ -35,7 +35,7 @@ const apiClient = (apiClientModule as any).apiClient as {
   post: ReturnType<typeof vi.fn>;
 };
 
-const BEACON_PATH = "/api/analytics/artifacts/beacon";
+const BEACON_PATH = "/api/analytics/events";
 const { resolveApiUrl } = apiClientModule;
 
 const fixture: ArtifactViewBeacon = {
@@ -109,7 +109,7 @@ describe("sendArtifactViewBeacon — URL contract", () => {
       reader.onerror = () => reject(reader.error);
       reader.readAsText(blob as Blob);
     });
-    expect(JSON.parse(text)).toEqual(fixture);
+    expect(JSON.parse(text)).toEqual({ kind: "artifact_view", ...fixture });
   });
 
   it("does NOT also call apiClient.post when sendBeacon returns true", async () => {
@@ -127,7 +127,7 @@ describe("sendArtifactViewBeacon — fallback", () => {
     expect(apiClient.post).toHaveBeenCalledTimes(1);
     // The path-only form is fine here — apiClient.post prepends the API
     // base URL itself, so this still resolves to api.hired.video.
-    expect(apiClient.post).toHaveBeenCalledWith(BEACON_PATH, fixture);
+    expect(apiClient.post).toHaveBeenCalledWith(BEACON_PATH, { kind: "artifact_view", ...fixture });
   });
 
   it("falls back to apiClient.post when navigator.sendBeacon returns false", async () => {
@@ -136,7 +136,7 @@ describe("sendArtifactViewBeacon — fallback", () => {
     await sendArtifactViewBeacon(fixture);
 
     expect(apiClient.post).toHaveBeenCalledTimes(1);
-    expect(apiClient.post).toHaveBeenCalledWith(BEACON_PATH, fixture);
+    expect(apiClient.post).toHaveBeenCalledWith(BEACON_PATH, { kind: "artifact_view", ...fixture });
   });
 
   it("falls back to apiClient.post when navigator.sendBeacon throws", async () => {
@@ -147,6 +147,6 @@ describe("sendArtifactViewBeacon — fallback", () => {
     await sendArtifactViewBeacon(fixture);
 
     expect(apiClient.post).toHaveBeenCalledTimes(1);
-    expect(apiClient.post).toHaveBeenCalledWith(BEACON_PATH, fixture);
+    expect(apiClient.post).toHaveBeenCalledWith(BEACON_PATH, { kind: "artifact_view", ...fixture });
   });
 });

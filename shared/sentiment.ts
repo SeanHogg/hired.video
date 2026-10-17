@@ -3,10 +3,9 @@
  * that returns a sentiment score.
  *
  * Imported by:
- *   • api/src/routes/sentiment.ts                         (raw-text route)
- *   • api/src/services/resume/ResumeService.ts            (resume route)
- *   • api/src/services/__tests__/tools-api.test.ts        (route test)
- *   • api/src/services/__tests__/resume-handlers.test.ts  (handler test)
+ *   • api/src/services/ai-tools/tools/sentiment.ts  (the `sentiment` AI tool — text / résumé / job)
+ *   • api/src/services/job/job-sentiment-handler.ts (saved-job scoring)
+ *   • api/src/services/__tests__/tools-api.test.ts  (route test)
  *
  * Lived in two copies before, with diverging ladders (55/70/85 vs
  * 52/64/78) — same resume scored differently depending on which path the

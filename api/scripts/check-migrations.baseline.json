@@ -1,25 +1,4 @@
 {
-  "schemaOnly": [
-    "article_payout_entries.uq_article_payout_entries_run_article",
-    "creator_youtube_ingests.creator_youtube_ingests_user_video_uq",
-    "external_email_accounts.external_email_accounts_user_provider_email_key",
-    "external_email_messages.external_email_messages_account_message_key",
-    "gig_bids.idx_gig_bids_project_status",
-    "gig_bids.uq_gig_bids_project_bidder",
-    "gig_milestones.idx_gig_milestones_project_ordinal",
-    "pipeline_stages.uq_pipeline_stages_recruiter_pipeline_stage",
-    "social_publish_jobs.idx_social_publish_jobs_source",
-    "studio_review_comments.idx_studio_review_comments_parent",
-    "studio_review_comments.idx_studio_review_comments_project",
-    "usage_invoices.usage_invoices_user_period_unique",
-    "usage_statements.usage_statements_user_period_unique",
-    "user_badges.user_badges_user_badge_idx"
-  ],
-  "migrationOnly": [
-    "email_marketing_preferences.uq_email_marketing_prefs_token",
-    "live_screening_invites.uq_live_screening_invites_token",
-    "payment_methods.idx_payment_methods_provider_payment_method_id",
-    "studio_projects.studio_projects_slug_unique_idx",
-    "studio_video_heatmap.idx_video_heatmap_video"
-  ]
+  "schemaOnly": [],
+  "migrationOnly": []
 }

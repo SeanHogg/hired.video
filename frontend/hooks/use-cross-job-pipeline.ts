@@ -1,11 +1,11 @@
 // useCrossJobPipeline — fetch + optimistic mutations for the cross-job
 // recruiter kanban (#405). Mirrors useJobPipeline, but reads the aggregate
-// `/api/pipeline/all` board and routes each move/remove to the entry's OWN
-// job (`entry.jobId`) since a single board spans many jobs. The pure
+// `GET /api/pipeline` board (no jobId → every manageable job). Entry
+// mutations are addressed by entry id alone (`/api/pipeline/:entryId`). The pure
 // snapshot mutations are reused from lib/recruit/pipeline-mutations so the
 // optimistic logic isn't duplicated.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -52,8 +52,16 @@ export function useCrossJobPipeline(
   const [loading, setLoading] = useState(true);
   const { stage, jobId } = filters;
 
+  // A jobId-filtered read only lists that job, so keep the full job list
+  // from the last unfiltered read for the "filter by job" dropdown.
+  const allJobsRef = useRef<CrossJobPipelineSnapshot["jobs"]>([]);
   const load = useCallback(async () => {
-    return jobPipelineService.listAll({ stage, jobId });
+    const next = await jobPipelineService.listAll({ stage, jobId });
+    if (!jobId) {
+      allJobsRef.current = next.jobs ?? [];
+      return next;
+    }
+    return allJobsRef.current.length > 0 ? { ...next, jobs: allJobsRef.current } : next;
   }, [stage, jobId]);
 
   const refresh = useCallback(async () => {
@@ -100,7 +108,7 @@ export function useCrossJobPipeline(
       if (!entry) return;
       setSnapshot((prev) => prev && (moveEntry(prev, entryId, nextStage) as CrossJobPipelineSnapshot));
       try {
-        await jobPipelineService.moveStage(entry.jobId, entryId, nextStage);
+        await jobPipelineService.moveStage(entryId, nextStage);
       } catch (e) {
         toast({
           title: t("crossJobPipeline.moveFailedTitle"),
@@ -119,7 +127,7 @@ export function useCrossJobPipeline(
       if (!entry) return;
       setSnapshot((prev) => prev && (removeEntry(prev, entryId) as CrossJobPipelineSnapshot));
       try {
-        await jobPipelineService.remove(entry.jobId, entryId);
+        await jobPipelineService.remove(entryId);
       } catch (e) {
         toast({
           title: t("crossJobPipeline.removeFailedTitle"),

@@ -11,7 +11,7 @@
 import type { ChromaKeyParams, WidgetParams } from "@/lib/studio/editor-v2/canvas-state";
 import { filtersToCss } from "@/lib/studio/video-filters";
 import type { EffectEntry } from "../frame";
-import { stringOr } from "../frame";
+import { stringOr } from "@/lib/numeric";
 import { registerPlugin } from "../plugin";
 import { emitMediaSource, mediaUrl, parseFilters, parseMediaSource } from "./image";
 import { mediaPlaceholderOps } from "./media-placeholder";

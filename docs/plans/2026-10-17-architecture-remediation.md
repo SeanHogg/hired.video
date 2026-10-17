@@ -6,10 +6,8 @@ Gap rows: #2410–#2417 (ROADMAP.md, TK1 OTHER section).
 ## Rules for every work package (read before editing)
 
 1. **Work on main, in place. Do not commit, stash, reset, checkout or revert anything.** Other sessions have uncommitted work in the tree.
-2. **In-flight files owned by another session — do not edit:**
-   `api/src/routes/studio.ts`, `api/src/services/studio/public-watch-cache.ts`, `api/src/utils/edge-cache.ts`,
-   `frontend/lib/studio/public-video-schema.ts`, `frontend/pages/PublicVideoResume.tsx`, `frontend/components/studio/watch/**`.
-   Locale JSONs are shared: add keys only (never reorder or rewrite existing keys).
+2. **Shared files:** the other session committed its studio work (5229d934); `studio.ts` etc. are now editable by the package that owns them. Always re-read a file immediately before editing it (other agents work in parallel). Locale JSONs and `api/src/app.ts` are shared: add/remove only your own lines.
+   **KV policy (owner decision):** stay on Workers Free — per-user caches use `api/src/utils/isolate-cache.ts` (no KV writes); KV is only for scheduler work markers.
 3. **Own only your package's paths.** If a fix needs a file another package owns, note it in your report instead of editing it.
 4. **Migrations:** use only your reserved number block; never edit an applied migration; every index must be declared in the schema `.ts` (CI `drizzle-kit push --force` drops undeclared indexes); follow `api/drizzle/CONVENTIONS.md`. Destructive drops are **archive-first**: `ALTER TABLE … SET SCHEMA archive` (create schema if missing), never `DROP TABLE`.
 5. **Architecture:** route → use case/service → repository; no new god files (>400 lines); extract shared primitives and migrate every duplicate in the same pass; delete dead code you orphan (verify zero refs across api/frontend/shared/packages/extension).
@@ -27,7 +25,19 @@ Gap rows: #2410–#2417 (ROADMAP.md, TK1 OTHER section).
 | W1-D Data model (indexes/orphans/crypto) | 0545–0559 |
 | W1-E Code DRY | 0560–0564 |
 | W2 API consolidation | 0565–0574 |
-| W3 Table merges | 0575–0599 |
+| W1 cleanup (used) | 0575–0578 |
+| W3-A Engagement (views/comments/reactions/shares/reports) | 0580–0589 |
+| W3-B Money + tokens + settings | 0590–0599 |
+| W3-C Provider connections | 0600–0609 |
+| W3-D1 Studio state + JSONB promotions | 0610–0619 |
+| W3-D2 Status/role/application/identity/lists/sequences/perf | 0620–0639 |
+| W3-E Versions | 0640–0649 |
+
+## Wave 3 data-migration rules
+- New canonical table → `INSERT … SELECT` backfill from every old table in the SAME migration (idempotent: `ON CONFLICT DO NOTHING` on a natural key or a carried-over id) → switch ALL code to the new table → archive old tables with `ALTER TABLE … SET SCHEMA archive` in a LATER migration file of your block (never DROP).
+- Keep every API response shape identical; keep the old row ids where possible (copy `id`) so URLs/FKs stay valid; repoint inbound FKs.
+- Polymorphic columns are `subject_type` + `subject_id` with a CHECK sourced from a `shared/` registry and an index `(subject_type, subject_id, created_at DESC)` (CONVENTIONS.md).
+- Declare every new index in schema .ts; run nothing destructive on data that can't be backfilled.
 
 ## Waves
 

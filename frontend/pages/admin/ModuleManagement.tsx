@@ -51,7 +51,7 @@ export default function ModuleManagement() {
     try {
       setLoading(true);
       setError(null);
-      const res = await apiClient.get<Module[]>("/api/admin/impersonate/modules");
+      const res = await apiClient.get<Module[]>("/api/admin/sa/modules");
       setModules(res.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("errors.failedToLoadModules"));
@@ -65,7 +65,7 @@ export default function ModuleManagement() {
   const toggle = async (mod: Module) => {
     setToggling(prev => new Set(prev).add(mod.id));
     try {
-      await apiClient.put(`/api/admin/impersonate/modules/${mod.id}`, { isActive: !mod.isActive });
+      await apiClient.put(`/api/admin/sa/modules/${mod.id}`, { isActive: !mod.isActive });
       setModules(prev => prev.map(m => m.id === mod.id ? { ...m, isActive: !m.isActive } : m));
       toast({ title: !mod.isActive ? t("messages.moduleEnabled", { name: mod.name }) : t("messages.moduleDisabled", { name: mod.name }) });
     } catch {

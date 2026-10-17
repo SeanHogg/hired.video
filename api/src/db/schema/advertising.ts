@@ -81,7 +81,8 @@ export const jobBoosts = pgTable("job_boosts", {
   budgetCents:           integer("budget_cents").notNull(),
   spentCents:            integer("spent_cents").notNull().default(0),
   rateUnitCents:         integer("rate_unit_cents").notNull().default(500), // $5.00 CPM or $0.05 CPC
-  status:                text("status").notNull().default("active"), // active | paused | completed | cancelled
+  // pending_payment (checkout started, job NOT sponsored) | active | paused | completed | cancelled
+  status:                text("status").notNull().default("active"),
   impressions:           integer("impressions").notNull().default(0),
   clicks:                integer("clicks").notNull().default(0),
   applications:          integer("applications").notNull().default(0),
@@ -100,6 +101,11 @@ export const jobBoosts = pgTable("job_boosts", {
   index("idx_job_boosts_user").on(t.userId),
   index("idx_job_boosts_status").on(t.status),
   index("idx_job_boosts_subject_created").on(t.subjectType, t.subjectId, t.createdAt.desc()),
+  // One provider payment activates at most one job boost (mig 0575) — the
+  // checkout's atomic claim already enforces it; this closes the race.
+  uniqueIndex("uq_job_boosts_stripe_payment_intent_id")
+    .on(t.stripePaymentIntentId)
+    .where(sql`${t.stripePaymentIntentId} IS NOT NULL`),
   check("job_boosts_subject_check", sql`${t.subjectType} IS NULL OR (${t.subjectType} = 'job' AND ${t.subjectId} = ${t.jobId})`),
 ]);
 

@@ -20,6 +20,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
+import { providerConnections } from "./providerConnections.js";
 
 export const COURSE_STATUSES = ["draft", "in_review", "published", "unlisted", "flagged"] as const;
 export type CourseStatus = (typeof COURSE_STATUSES)[number];
@@ -279,43 +280,15 @@ export type NewCourseCertificate = typeof courseCertificates.$inferInsert;
 // into lms_course_publishes, which the cron drains by calling the
 // provider adapter in api/src/services/lms/<provider>.ts.
 // ---------------------------------------------------------------------------
-export const lmsConnectors = pgTable(
-  "lms_connectors",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    companyId: uuid("company_id"),
-    provider: varchar("provider", { length: 40 }).notNull(),
-    displayName: varchar("display_name", { length: 255 }),
-    baseUrl: text("base_url"),
-    /** Legacy plaintext — new writes go to the *_enc columns (0548). */
-    accessToken: text("access_token"),
-    refreshToken: text("refresh_token"),
-    accessTokenEnc: text("access_token_enc"),
-    refreshTokenEnc: text("refresh_token_enc"),
-    scope: text("scope"),
-    expiresAt: timestamp("expires_at", { withTimezone: true }),
-    status: varchar("status", { length: 20 }).default("connected").notNull(),
-    lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
-    lastError: text("last_error"),
-    metadata: jsonb("metadata"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (t) => [
-    index("idx_lms_connectors_user").on(t.userId),
-    index("idx_lms_connectors_provider").on(t.provider),
-  ],
-);
-
-export type LmsConnector = typeof lmsConnectors.$inferSelect;
-export type NewLmsConnector = typeof lmsConnectors.$inferInsert;
+// Connectors themselves live in provider_connections (purpose "lms", W3-C
+// migration 0600); ids were kept, so lms_course_publishes.connector_id still
+// points at the same row.
 
 export const lmsCoursePublishes = pgTable(
   "lms_course_publishes",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    connectorId: uuid("connector_id").notNull().references(() => lmsConnectors.id, { onDelete: "cascade" }),
+    connectorId: uuid("connector_id").notNull().references(() => providerConnections.id, { onDelete: "cascade" }),
     courseId: uuid("course_id").notNull(),
     externalId: text("external_id"),
     status: varchar("status", { length: 20 }).default("pending").notNull(),

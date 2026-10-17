@@ -161,10 +161,16 @@ export const billingEvents = pgTable("billing_events", {
   stripeEventId: text("stripe_event_id").unique(),
   eventType: varchar("event_type", { length: 100 }).notNull(),
   payload: jsonb("payload"),
+  // The company a workforce event is about (seat recalcs, derived
+  // timesheets). Promoted from `payload->>'companyId'` in migration 0613 so
+  // the desk-margin read filters an indexed column; the payload keeps the
+  // key for the provider-sync reconciliation stream.
+  companyId: uuid("company_id").references(() => companyProfiles.id, { onDelete: "set null" }),
   processedAt: timestamp("processed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_billing_events_user_id").on(t.userId),
+  index("idx_billing_events_company_id").on(t.companyId),
 ]);
 
 export type BillingEvent = typeof billingEvents.$inferSelect;

@@ -1,7 +1,7 @@
 /**
  * Shared resume-score persistence helper. Both the AI Resume Scorer
- * (`/api/resumescorer/score`) and the Resume Optimizer
- * (`/api/resumeoptimizer/optimize`) write to the same `scores` JSONB
+ * (AI tool `resume-score`) and the Resume Optimizer
+ * (AI tool `resume-optimize`) write to the same `scores` JSONB
  * column on resume_information when the caller passed `{ resumeId }`.
  *
  * When no resumeId is supplied (raw-text upload path), the score is

@@ -20,11 +20,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { PRIVACY_FIELDS } from "../../services/settings/preferencesService.js";
 import {
-  PRIVACY_FIELDS,
   defaultExtensionSettings,
   mergeExtensionSettings,
-} from "../settings.js";
+} from "../../services/settings/extensionSettings.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PRIVACY_FIELDS whitelist

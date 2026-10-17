@@ -1,6 +1,7 @@
 /**
  * TokensRepository — the AI-usage metering aggregate:
- *   • userTokenBalance     — pack balance + lifetime counters
+ *   • pack balance         — wallet_balances (currency 'ai_tokens'), via
+ *                            the one WalletRepository
  *   • tokenPackPurchases   — pending/paid purchases + admin-grant ledger rows
  *   • aiUsageRecords       — per-request token burn
  *   • toolRuns             — per-invocation tool-run log (tokens, latency)
@@ -15,8 +16,9 @@ import { and, desc, eq, gte, inArray, isNull, lt, ne, or, sql, sum } from "drizz
 import { ADMIN_GRANT_PACK_ID } from "../../../shared/token-packs.js";
 import { schema } from "../db/index.js";
 import { signalWork } from "../services/scheduling/work-signals.js";
+import { userWallet, WalletRepository } from "./walletRepository.js";
 
-const { userTokenBalance, tokenPackPurchases, aiUsageRecords, toolRuns, boostCheckouts, courseCheckouts } = schema;
+const { tokenPackPurchases, aiUsageRecords, toolRuns, boostCheckouts, courseCheckouts, jobBoosts } = schema;
 
 /** The provider transaction id was already claimed by a boost or course
  *  checkout — it can't also pay for a token pack. */
@@ -29,7 +31,17 @@ export class PaymentAlreadyClaimedError extends Error {
 
 export type DbLike = any;
 
-export type UserTokenBalanceRow = typeof userTokenBalance.$inferSelect;
+/** A user's purchased-pack token balance (the pre-merge user_token_balance shape). */
+export interface UserTokenBalanceRow {
+  id: string;
+  userId: string;
+  balance: number;
+  lifetimeGranted: number;
+  lifetimeConsumed: number;
+  updatedAt: Date;
+}
+
+const AI_TOKENS = "ai_tokens" as const;
 export type TokenPackPurchaseRow = typeof tokenPackPurchases.$inferSelect;
 export type TokenPackPurchaseInsert = typeof tokenPackPurchases.$inferInsert;
 export type AiUsageRow = typeof aiUsageRecords.$inferSelect;
@@ -42,6 +54,9 @@ export interface ITokensRepository {
   findBalanceByUserId(userId: string): Promise<UserTokenBalanceRow | null>;
   findBalancesByUserIds(userIds: string[]): Promise<Array<{ userId: string; balance: number }>>;
   upsertBalance(userId: string, deltaBalance: number, deltaGranted: number): Promise<void>;
+  /** Debit `tokens` from the pack balance (clamped at 0; lifetime consumed
+   *  += tokens). Creates the row when missing. */
+  debitPackBalance(userId: string, tokens: number): Promise<void>;
   // purchases
   insertPurchase(input: TokenPackPurchaseInsert): Promise<TokenPackPurchaseRow>;
   /** Record a charge as `pending` before the provider check (gap #2352). One
@@ -87,48 +102,45 @@ export type SpendAggregate<K extends string> = { [P in K]: string } & {
 };
 
 export class TokensRepository implements ITokensRepository {
-  constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}
+  private readonly wallets: WalletRepository;
+
+  constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {
+    this.wallets = new WalletRepository(db, now);
+  }
 
   // ── balances ──────────────────────────────────────────────────────────────
 
   async findBalanceByUserId(userId: string): Promise<UserTokenBalanceRow | null> {
-    const [row] = await this.db
-      .select()
-      .from(userTokenBalance)
-      .where(eq(userTokenBalance.userId, userId))
-      .limit(1);
-    return (row as UserTokenBalanceRow) ?? null;
+    const w = await this.wallets.find(userWallet(userId), AI_TOKENS);
+    if (!w) return null;
+    return {
+      id: w.id,
+      userId: w.ownerId,
+      balance: w.balance,
+      lifetimeGranted: w.lifetimeGranted,
+      lifetimeConsumed: w.lifetimeConsumed,
+      updatedAt: w.updatedAt,
+    };
   }
 
   async findBalancesByUserIds(userIds: string[]) {
-    if (userIds.length === 0) return [];
-    const rows = await this.db
-      .select({ userId: userTokenBalance.userId, balance: userTokenBalance.balance })
-      .from(userTokenBalance)
-      .where(inArray(userTokenBalance.userId, userIds));
-    return rows as Array<{ userId: string; balance: number }>;
+    const rows = await this.wallets.findMany("user", userIds, AI_TOKENS);
+    return rows.map((w) => ({ userId: w.ownerId, balance: w.balance }));
   }
 
   /** Atomically add `deltaBalance` to the user's balance and
    *  `deltaGranted` to their lifetime-granted counter. Used by both
    *  paid pack purchases (via stripe webhook) and SuperAdmin grants. */
   async upsertBalance(userId: string, deltaBalance: number, deltaGranted: number): Promise<void> {
-     
-    await (this.db.insert(userTokenBalance) as any)
-      .values({
-        userId,
-        balance: deltaBalance,
-        lifetimeGranted: deltaGranted,
-        lifetimeConsumed: 0,
-      })
-      .onConflictDoUpdate({
-        target: userTokenBalance.userId,
-        set: {
-          balance: sql`${userTokenBalance.balance} + ${deltaBalance}`,
-          lifetimeGranted: sql`${userTokenBalance.lifetimeGranted} + ${deltaGranted}`,
-          updatedAt: this.now(),
-        },
-      });
+    await this.wallets.applyDelta(userWallet(userId), AI_TOKENS, { delta: deltaBalance, grantedAdd: deltaGranted });
+  }
+
+  async debitPackBalance(userId: string, tokens: number): Promise<void> {
+    await this.wallets.applyDelta(userWallet(userId), AI_TOKENS, {
+      delta: -tokens,
+      clampAtZero: true,
+      consumedAdd: tokens,
+    });
   }
 
   // ── purchases ─────────────────────────────────────────────────────────────
@@ -169,6 +181,7 @@ export class TokensRepository implements ITokensRepository {
     const result = await this.db.execute(sql`
       SELECT EXISTS (SELECT 1 FROM ${boostCheckouts} WHERE ${boostCheckouts.providerPaymentId} = ${providerPaymentId})
           OR EXISTS (SELECT 1 FROM ${courseCheckouts} WHERE ${courseCheckouts.providerPaymentId} = ${providerPaymentId})
+          OR EXISTS (SELECT 1 FROM ${jobBoosts} WHERE ${jobBoosts.stripePaymentIntentId} = ${providerPaymentId})
         AS claimed
     `);
     const rows: Array<{ claimed?: unknown }> = Array.isArray(result) ? result : (result?.rows ?? []);
@@ -178,22 +191,20 @@ export class TokensRepository implements ITokensRepository {
   async settlePendingPurchase(purchaseId: string): Promise<boolean> {
     // One statement, so the flip and the credit can't come apart: a crash
     // between them would otherwise leave a `paid` row with no tokens.
-    const result = await this.db.execute(sql`
+    const credit = this.wallets.creditFromSelectSql({
+      ownerKind: "user",
+      currency: AI_TOKENS,
+      source: sql`SELECT user_id AS owner_id, tokens_granted AS amount FROM flipped`,
+    });
+    const rows = await this.wallets.execute(sql`
       WITH flipped AS (
         UPDATE token_pack_purchases
         SET status = 'paid', check_attempts = check_attempts + 1, checked_at = ${this.now()}
         WHERE id = ${purchaseId} AND status = 'pending'
         RETURNING user_id, tokens_granted
       )
-      INSERT INTO user_token_balance (user_id, balance, lifetime_granted, lifetime_consumed)
-      SELECT user_id, tokens_granted, tokens_granted, 0 FROM flipped
-      ON CONFLICT (user_id) DO UPDATE SET
-        balance = user_token_balance.balance + EXCLUDED.balance,
-        lifetime_granted = user_token_balance.lifetime_granted + EXCLUDED.lifetime_granted,
-        updated_at = ${this.now()}
-      RETURNING user_id
+      ${credit}
     `);
-    const rows: unknown[] = Array.isArray(result) ? result : (result?.rows ?? []);
     return rows.length > 0;
   }
 

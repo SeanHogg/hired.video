@@ -20,7 +20,7 @@ import type { Db } from "../../db/index.js";
 import { users } from "../../db/schema/index.js";
 import { getJwtSecret } from "../../utils/jwt.js";
 import { guestEmailFor } from "../../../../shared/guest-accounts.js";
-import { issueJwt } from "./AuthService.js";
+import { issueJwt } from "./jwt.js";
 import { createSession } from "./sessions.js";
 
 const GUEST_ROLE = "job_seeker";

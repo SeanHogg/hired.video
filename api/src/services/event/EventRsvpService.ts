@@ -18,6 +18,7 @@ import type { ApiDeps } from "../apiDeps.js";
 import type { RsvpInput } from "../../../../shared/events.js";
 import { computeRsvpOutcome } from "../../../../shared/events.js";
 import type { EventAttendeeRow, EventRow } from "../../repositories/eventsRepository.js";
+import { emitNotification, resolveActor } from "../notifications/notificationService.js";
 
 export type EventRsvpDeps = Pick<ApiDeps, "repos" | "now">;
 
@@ -145,13 +146,11 @@ export class EventRsvpService {
     await this.deps.repos.events.bumpAttendeeCount(eventId, +1);
 
     if (target.userId) {
-      await this.deps.repos.notifications.insertNotification({
-        userId: target.userId,
+      await this.notifyAttendee(event, target.userId, actingUserId, {
         type: "event_rsvp_approved",
         title: `RSVP approved: ${event.title}`,
         message: `You're approved to attend "${event.title}".`,
-        data: { eventId } as any,
-      } as any);
+      });
     }
     return true;
   }
@@ -171,13 +170,11 @@ export class EventRsvpService {
     } as any);
 
     if (target.userId) {
-      await this.deps.repos.notifications.insertNotification({
-        userId: target.userId,
+      await this.notifyAttendee(event, target.userId, actingUserId, {
         type: "event_rsvp_rejected",
         title: `RSVP not approved: ${event.title}`,
         message: `The host couldn't approve your RSVP to "${event.title}".`,
-        data: { eventId } as any,
-      } as any);
+      });
     }
     return true;
   }
@@ -211,13 +208,11 @@ export class EventRsvpService {
     await this.deps.repos.events.bumpAttendeeCount(event.id, +1);
     await this.deps.repos.events.bumpWaitlistCount(event.id, -1);
 
-    await this.deps.repos.notifications.insertNotification({
-      userId: next.userId,
+    await this.notifyAttendee(event, next.userId, null, {
       type: "event_waitlist_promoted",
       title: `You're in: ${event.title}`,
       message: `A spot opened up — you're now confirmed for "${event.title}".`,
-      data: { eventId: event.id } as any,
-    } as any);
+    });
   }
 
   /** Mark a user checked-in at the door. Returns the checked-in attendee's
@@ -270,12 +265,37 @@ export class EventRsvpService {
       [(rsvper as any)?.firstName, (rsvper as any)?.lastName].filter(Boolean).join(" ") ||
       (rsvper as any)?.email ||
       "Someone";
-    await this.deps.repos.notifications.insertNotification({
-      userId: hostId,
+    const { actor } = await resolveActor(this.deps, rsvperUserId);
+    await emitNotification(this.deps, {
+      recipientIds: [hostId],
       type,
+      actor,
       title: `${rsvperName} ${verb}`,
       message: `${rsvperName} ${verb} for "${event.title}".`,
-      data: { eventId: event.id, rsvperUserId } as any,
-    } as any);
+      target: { id: event.id, type: "event" },
+      url: `/events/${event.id}/manage`,
+      extraData: { eventId: event.id, rsvperUserId },
+    });
+  }
+
+  /** Attendee-facing notice (approval / rejection / waitlist promotion)
+   *  through the one dispatcher — bell row + preference-gated push. */
+  private async notifyAttendee(
+    event: EventRow,
+    recipientId: string,
+    actingUserId: string | null,
+    copy: { type: string; title: string; message: string },
+  ): Promise<void> {
+    const actor = actingUserId ? (await resolveActor(this.deps, actingUserId)).actor : null;
+    await emitNotification(this.deps, {
+      recipientIds: [recipientId],
+      type: copy.type,
+      actor,
+      title: copy.title,
+      message: copy.message,
+      target: { id: event.id, type: "event" },
+      url: `/events/${event.id}`,
+      extraData: { eventId: event.id },
+    });
   }
 }

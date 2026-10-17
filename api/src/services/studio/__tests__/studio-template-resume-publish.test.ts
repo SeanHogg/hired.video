@@ -339,7 +339,7 @@ describe("publish a résumé document from a STUDIO PROJECT", () => {
         media: {
           findStudioProjectById: async (id: string) =>
             id === PROJECT_ID
-              ? { userId: OWNER, mediaKind: "document", companyId: null, documentState: danaLayout, storyboard: null }
+              ? { userId: OWNER, mediaKind: "document", companyId: null, state: danaLayout, storyboard: null }
               : null,
         },
         resumes: { findById: async () => null },

@@ -225,6 +225,7 @@ async function buildSitemapXml(reqOrigin: string): Promise<string> {
       .select({
         id: schema.studioProjects.id,
         storyboard: schema.studioProjects.storyboard,
+        name: schema.studioProjects.name,
         mediaKind: schema.studioProjects.mediaKind,
         ownerName: schema.users.name,
         updatedAt: schema.studioProjects.updatedAt,
@@ -395,8 +396,8 @@ async function buildSitemapXml(reqOrigin: string): Promise<string> {
     // Google so the video is indexable). Kept last so the <video:*> blocks
     // group together.
     ...projectRows.map((p) => {
-      const sb = (p.storyboard ?? null) as { _name?: string; _metaDescription?: string } | null;
-      const title = (sb?._name || p.ownerName || "Video").toString();
+      const sb = (p.storyboard ?? null) as { _metaDescription?: string } | null;
+      const title = (p.name || p.ownerName || "Video").toString();
       const description = (sb?._metaDescription || `Watch ${title} on hired.video.`).toString();
       return videoUrlEntry({
         id: p.id,

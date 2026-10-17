@@ -10,6 +10,7 @@ vi.mock('@/lib/api-client', async () => {
       get: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
+      patch: vi.fn(),
       delete: vi.fn(),
       request: vi.fn(),
       getRaw: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock('@/lib/api-client', async () => {
 
 const apiClient = (apiClientModule as any).apiClient as {
   post: ReturnType<typeof vi.fn>;
+  patch: ReturnType<typeof vi.fn>;
   delete: ReturnType<typeof vi.fn>;
 };
 
@@ -27,10 +29,10 @@ describe('resumeService promote/delete', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('promoteVariantToMaster calls API and returns boolean', async () => {
-    apiClient.post.mockResolvedValueOnce({ data: true });
+    apiClient.patch.mockResolvedValueOnce({ data: { id: 'v1' } });
     const ok = await resumeService.promoteVariantToMaster('v1');
     expect(ok).toBe(true);
-    expect(apiClient.post).toHaveBeenCalledWith('/api/resumes/v1/promote', {}, expect.anything());
+    expect(apiClient.patch).toHaveBeenCalledWith('/api/resumes/v1', { isMaster: true, parentId: null }, expect.anything());
   });
 
   it('deleteResume calls API and resolves (void)', async () => {

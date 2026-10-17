@@ -1,10 +1,13 @@
 /**
  * studio-analytics-events.ts — single source of truth for the
- * `video_analytics.event` column taxonomy.
+ * studio playback event taxonomy (stored in artifact_views.event_type via
+ * STUDIO_EVENT_TO_VIEW_EVENT_TYPE in shared/artifact-views.ts; was the
+ * `video_analytics.event` column until W3-A 0580).
  *
- * The column is stored as `text` (no CHECK constraint — events are added
- * as the product surfaces grow) but every producer + consumer must agree
- * on the enum so analytics rollups can branch correctly.
+ * The stored event_type IS CHECK-constrained (artifact_views_event_type_check,
+ * built from ARTIFACT_VIEW_EVENT_TYPES) — a new studio event adds an entry
+ * here AND a mapping in STUDIO_EVENT_TO_VIEW_EVENT_TYPE (+ a migration that
+ * widens the CHECK).
  *
  * Producers:
  *   - Frontend `<StudioPlayer/>` tracker → `view`

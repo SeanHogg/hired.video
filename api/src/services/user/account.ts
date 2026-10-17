@@ -28,6 +28,8 @@ import { eraseVideoPersonalization } from "../video-personalization/videoPersona
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
 import { logger } from "../../lib/logger.js";
 import { randomHex } from "../../utils/crypto.js";
+import { BillingAddressRepository } from "../../repositories/billingAddressRepository.js";
+import { parseRoleAlias } from "../../../../shared/user-roles.js";
 
 /** Narrow Deps slice. account.ts touches both `users` (via UsersRepository)
  *  and `accountInvitations` (via PlatformRepository) plus assorted
@@ -46,7 +48,7 @@ const resolveDeps = (deps?: Partial<AccountDeps>): AccountDeps => {
   };
 };
 
-const { users, userProfiles, accountPreferences, accountInvitations, userCompanyRoleAssociations, companyProfiles, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes, jobItems, jobApplications, resumeInformation, studioProjects, videos, socialConnections, youtubeAccounts } = schema;
+const { users, userProfiles, accountPreferences, accountInvitations, userCompanyRoleAssociations, companyProfiles, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes, jobItems, jobApplications, resumeInformation, studioProjects, videos, socialConnections, youtubeAccounts, contentLocations } = schema;
 
 /** Days a seat invitation stays valid before accept rejects it (gap #1680). */
 const INVITE_TTL_DAYS = 14;
@@ -294,7 +296,7 @@ export async function inviteAccountUser(request: InviteUserRequest, invitedByUse
   // Only `employee` (the workforce-billable role) is gated; recruiter/employer
   // invites aren't seat-billed.
   if (String(request.role).toLowerCase() === "employee" && request.companyId) {
-    const { getSeatCommitment, authorizeSeats } = await import("../workforce/index.js");
+    const { getSeatCommitment, authorizeSeats } = await import("../workforce/seats.js");
     const commitment = await getSeatCommitment(request.companyId, db);
     if (commitment.committedSeats + 1 > commitment.seatLimit) {
       if (!request.confirmPaidSeat) {
@@ -363,7 +365,11 @@ export async function updateAccountRoles(currentUserId: string, targetUserId: st
   // Only allow role changes if current user is admin.
   const [currentUser] = await db.select().from(users).where(eq(users.id, currentUserId)).limit(1);
   if (!currentUser || currentUser.role.toLowerCase() !== "admin") return;
-  await db.update(users).set({ role } as any).where(eq(users.id, targetUserId));
+  // users.role is CHECK-constrained to USER_ROLES (mig 0630) — canonicalize
+  // and ignore anything that isn't a known role.
+  const canonical = parseRoleAlias(role);
+  if (!canonical) return;
+  await db.update(users).set({ role: canonical, updatedAt: new Date() }).where(eq(users.id, targetUserId));
   // Plan, public references and pitch caches are all role-keyed.
   await onUserRoleChanged(targetUserId, defaultRoleChangeCacheBusters(db));
 }
@@ -428,7 +434,7 @@ export async function removeAccountUser(currentUserId: string, userId: string,
     // Reconcile seat billing — fewer active employees, fewer seats charged.
     // Imported dynamically to avoid a service-layer cycle (workforce → account
     // is the natural direction; the reverse import would be).
-    const { recalculateWorkforceSeats } = await import("../workforce/index.js");
+    const { recalculateWorkforceSeats } = await import("../workforce/seats.js");
     await recalculateWorkforceSeats(targetEmployment.companyId, db);
     return;
   }
@@ -463,7 +469,7 @@ async function deactivateEmployeeSeats(db: ReturnType<typeof getDb>, userId: str
       eq(userCompanyRoleAssociations.role, "employee"),
       eq(userCompanyRoleAssociations.isActive, true),
     ));
-  const { recalculateWorkforceSeats } = await import("../workforce/index.js");
+  const { recalculateWorkforceSeats } = await import("../workforce/seats.js");
   const companyIds = [...new Set(memberships.map((m) => m.companyId))];
   for (const companyId of companyIds) {
     await recalculateWorkforceSeats(companyId, db);
@@ -605,7 +611,7 @@ export async function acceptInvitation(token: string, currentUserId: string,
     // employee — that's the workforce-billable role per #1349 + #1409.
     // Dynamic import to keep the service-layer dependency graph acyclic.
     if (String(invite.role).toLowerCase() === "employee") {
-      const { recalculateWorkforceSeats } = await import("../workforce/index.js");
+      const { recalculateWorkforceSeats } = await import("../workforce/seats.js");
       await recalculateWorkforceSeats(invite.companyId, db);
     }
   }
@@ -994,6 +1000,14 @@ export async function deleteAccount(userId: string,
       updatedAt: now,
     } as any)
     .where(eq(userProfiles.userId, userId));
+
+  // The canonical billing address (billing_addresses, mig 0631) and home
+  // location (content_locations kind 'user_profile', entity_id = user id)
+  // are PII with no audit value — delete them outright.
+  await new BillingAddressRepository(db).deleteForUser(userId);
+  await db
+    .delete(contentLocations)
+    .where(and(eq(contentLocations.entityKind, "user_profile"), eq(contentLocations.entityId, userId)));
 
   // Flip every owned video to private so the public channel + homepage
   // feeds stop surfacing them. Company-owned videos (companyId set) are

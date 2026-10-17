@@ -3,7 +3,7 @@
  * list of steps, each one of
  *   tool   — run a registry tool on the open draft; its result lands in the
  *            chat as a card (and any change it makes is an Undo step);
- *   revise — send a change request to the page's chat (/api/resumes/revise),
+ *   revise — send a change request to the page's chat (/api/ai/tools/resume-revise),
  *            which edits the draft in place;
  *   panel  — a tool that needs input only you have (a job post, a file):
  *            it opens in the slide-out over the résumé.

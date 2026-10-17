@@ -8,7 +8,9 @@ import {
   integer,
   index,
   boolean,
+  check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 import { companyProfiles } from "./companies.js";
 
@@ -22,7 +24,8 @@ export const videos = pgTable("videos", {
   resumeId: uuid("resume_id"),
   title: varchar("title", { length: 255 }),
   description: text("description"),
-  status: varchar("status", { length: 50 }).default("Queued").notNull(),
+  // VIDEO_STATUSES (shared/statuses.ts); lowercase since migration 0620.
+  status: varchar("status", { length: 50 }).default("queued").notNull(),
   r2Key: text("r2_key"),
   // Render carries the hired.video watermark (migration 0497). Set at upload.
   branded: boolean("branded").notNull().default(false),
@@ -54,6 +57,7 @@ export const videos = pgTable("videos", {
 }, (t) => [
   index("idx_videos_company").on(t.companyId),
   index("idx_videos_user_created").on(t.userId, t.createdAt.desc().nullsFirst()),
+  check("videos_status_check", sql`${t.status} IN ('queued', 'processing', 'completed', 'failed')`),
 ]);
 
 export type Video = typeof videos.$inferSelect;
@@ -64,6 +68,5 @@ export type NewVideo = typeof videos.$inferInsert;
 // videos.resumeId (single FK, many videos per resume) and on
 // studio_project_subjects (polymorphic many-to-many for projects).
 
-// `youtubeAccounts` lives in `studiofeatures.ts` — that definition has the
-// extra googleId / displayName / email columns that youtubeAccountRepository
-// expects. Re-exported via the schema barrel from there.
+// YouTube channel connections live in provider_connections (purpose
+// "youtube", W3-C migration 0600).

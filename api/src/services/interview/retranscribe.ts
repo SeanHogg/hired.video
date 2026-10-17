@@ -12,7 +12,9 @@
  */
 import { and, eq, isNull, or } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
-import { schema } from "../../db/index.js";
+import { getDb, schema } from "../../db/index.js";
+import type { Env } from "../../types/index.js";
+import { hasTranscriptionProvider, transcribeResponseInBackground } from "./transcribe-response.js";
 
 const { studioAsyncInterviews, studioAsyncResponses } = schema;
 
@@ -23,7 +25,6 @@ export type RetranscribeClaim =
   | { outcome: "queued"; responseId: string; videoUrl: string };
 
 export interface RetranscribeArgs {
-  interviewId: string;
   responseId: string;
   /** The signed-in user — must be the interview's creator. */
   userId: string;
@@ -36,24 +37,28 @@ export function isRetranscribable(status: string | null | undefined): boolean {
 }
 
 export async function claimRetranscription(db: Db, args: RetranscribeArgs): Promise<RetranscribeClaim> {
-  const [interview] = await db
-    .select({ id: studioAsyncInterviews.id })
-    .from(studioAsyncInterviews)
-    .where(and(eq(studioAsyncInterviews.id, args.interviewId), eq(studioAsyncInterviews.recruiterId, args.userId)))
-    .limit(1);
-  if (!interview) return { outcome: "not_found" };
-
   const [response] = await db
     .select({
       id: studioAsyncResponses.id,
+      interviewId: studioAsyncResponses.interviewId,
       responseMode: studioAsyncResponses.responseMode,
       videoUrl: studioAsyncResponses.videoUrl,
       transcriptionStatus: studioAsyncResponses.transcriptionStatus,
     })
     .from(studioAsyncResponses)
-    .where(and(eq(studioAsyncResponses.id, args.responseId), eq(studioAsyncResponses.interviewId, args.interviewId)))
+    .where(eq(studioAsyncResponses.id, args.responseId))
     .limit(1);
   if (!response) return { outcome: "not_found" };
+
+  // Creator-only: a response on someone else's interview is indistinguishable
+  // from a missing one.
+  const [interview] = await db
+    .select({ id: studioAsyncInterviews.id })
+    .from(studioAsyncInterviews)
+    .where(and(eq(studioAsyncInterviews.id, response.interviewId), eq(studioAsyncInterviews.recruiterId, args.userId)))
+    .limit(1);
+  if (!interview) return { outcome: "not_found" };
+
   if (response.responseMode !== "video" || !response.videoUrl) return { outcome: "not_video" };
   if (!isRetranscribable(response.transcriptionStatus)) {
     return { outcome: "not_retryable", status: response.transcriptionStatus ?? "unknown" };
@@ -72,4 +77,25 @@ export async function claimRetranscription(db: Db, args: RetranscribeArgs): Prom
   if (claimed.length === 0) return { outcome: "not_retryable", status: "pending" };
 
   return { outcome: "queued", responseId: response.id, videoUrl: response.videoUrl };
+}
+
+export type RetranscribeRequestOutcome = RetranscribeClaim | { outcome: "unavailable" };
+
+/**
+ * Use case behind `POST /api/transcripts/:responseId/retranscribe`: checks a
+ * provider is configured (so a row never sticks at `pending` with no job),
+ * claims the row, then fires the same background job the respond route uses.
+ */
+export async function requestRetranscription(
+  env: Env,
+  args: RetranscribeArgs,
+  waitUntil?: (p: Promise<unknown>) => void,
+): Promise<RetranscribeRequestOutcome> {
+  if (!hasTranscriptionProvider(env)) return { outcome: "unavailable" };
+  const db = getDb();
+  const claim = await claimRetranscription(db, args);
+  if (claim.outcome === "queued") {
+    transcribeResponseInBackground(env, db, { responseId: claim.responseId, videoUrl: claim.videoUrl }, waitUntil);
+  }
+  return claim;
 }

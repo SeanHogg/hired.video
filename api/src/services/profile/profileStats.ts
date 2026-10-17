@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gte, lt, or } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import { schema } from "../../db/index.js";
+import { isArtifactView } from "../../repositories/artifactViewStreams.js";
 
 export interface RecentViewer {
   userId?: string;
@@ -45,6 +46,7 @@ export async function getProfileStats(db: Db, userId: string): Promise<ProfileSt
   const isProfileView = and(
     eq(schema.artifactViews.artifactKind, "profile"),
     eq(schema.artifactViews.artifactId, userId),
+    isArtifactView(),
   );
 
   const [
@@ -66,7 +68,7 @@ export async function getProfileStats(db: Db, userId: string): Promise<ProfileSt
       .from(schema.userConnections)
       .where(
         and(
-          eq(schema.userConnections.status, "Accepted"),
+          eq(schema.userConnections.status, "accepted"),
           or(
             eq(schema.userConnections.fromUserId, userId),
             eq(schema.userConnections.toUserId, userId),

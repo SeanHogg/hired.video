@@ -12,7 +12,7 @@ import {
   type SuggestedEdit,
   type WiredReviewSubjectType,
 } from "../../../../shared/resume-feedback.js";
-import type { IResumeFeedbackRepository, ResumeReviewRow } from "../../repositories/resumeFeedbackRepository.js";
+import type { IResumeReviewContentRepository, ResumeReviewRow } from "../../repositories/resumeFeedbackRepository.js";
 import { applySuggestedEdit, validateProposedDraft } from "./content-edit.js";
 
 export interface ReviewSubjectRef {
@@ -57,7 +57,7 @@ export function subjectColumns(subject: ReviewSubjectRef): {
 }
 
 export function createReviewSubjectAdapters(
-  repo: IResumeFeedbackRepository,
+  repo: IResumeReviewContentRepository,
 ): Record<WiredReviewSubjectType, ReviewSubjectAdapter> {
   return {
     resume: {

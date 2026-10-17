@@ -3,14 +3,16 @@
  * migration 0519_pitch_studio_projects.sql implements in SQL.
  *
  * Each user with a non-blank `users.video_pitch_url` becomes one studio
- * project (`storyboard._purpose = "pitch"`, `is_current_pitch = true`) plus
+ * project (`purpose = "pitch"`, `is_current_pitch = true`) plus
  * one linked `studio_recordings` row holding the media URL — the same shape
  * `POST /api/studio/recording/upload` writes, so every pitch read path
  * (pitchRepository → PitchSummary → shared player) treats a migrated pitch
  * exactly like a freshly recorded one.
  *
  * Pure: no DB, no env. Keep it in lock-step with the SQL — if one changes,
- * change both.
+ * change both. 0519 wrote name / purpose / revision into the storyboard
+ * JSONB (`_name` / `_purpose` / `_rev`); migration 0610 promoted them to
+ * columns, so the mapping now emits the post-0610 row shape.
  */
 
 import { PITCH_PURPOSE } from "../../../../shared/pitch.js";
@@ -34,7 +36,9 @@ export interface BackfilledPitch {
     resumeText: string;
     kind: "scene";
     mediaKind: "video";
-    storyboard: { _name: string; _purpose: typeof PITCH_PURPOSE; _rev: number };
+    name: string;
+    purpose: typeof PITCH_PURPOSE;
+    revision: number;
     status: "draft";
     isCurrentPitch: true;
     createdAt: Date;
@@ -78,7 +82,9 @@ export function mapLegacyPitch(
       resumeText: "",
       kind: "scene",
       mediaKind: "video",
-      storyboard: { _name: LEGACY_PITCH_PROJECT_NAME, _purpose: PITCH_PURPOSE, _rev: 1 },
+      name: LEGACY_PITCH_PROJECT_NAME,
+      purpose: PITCH_PURPOSE,
+      revision: 1,
       status: "draft",
       isCurrentPitch: true,
       createdAt: setAt,

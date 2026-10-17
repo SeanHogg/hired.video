@@ -24,6 +24,7 @@
  * surfaces that need the type call `ChromaKeyParams` from canvas-state.
  */
 import type { ChromaKeyParams } from "./editor-v2/canvas-state";
+import { clamp01Finite } from "@/lib/numeric";
 
 /** Default chroma-key params for a fresh enable click. Bright-green
  *  pinewood-style screen, moderate threshold, a touch of edge feather,
@@ -43,11 +44,11 @@ export function applyChromaKeyToPixels(
   params: ChromaKeyParams,
 ): Uint8ClampedArray {
   const key = parseHexColor(params.keyColor);
-  const threshold = clamp01(params.threshold);
+  const threshold = clamp01Finite(params.threshold, 0);
   // Avoid divide-by-zero in the softness branch — a 0-softness key gets
   // a 1px-wide ramp window which collapses to "below threshold".
-  const softness = Math.max(0.0001, clamp01(params.softness));
-  const spill = clamp01(params.spillSuppression ?? 0);
+  const softness = Math.max(0.0001, clamp01Finite(params.softness, 0));
+  const spill = clamp01Finite(params.spillSuppression ?? 0, 0);
   const keyYCbCr = rgbToYCbCr(key[0], key[1], key[2]);
 
   for (let i = 0; i < pixels.length; i += 4) {
@@ -102,11 +103,6 @@ function yCbCrToRgb(y: number, cb: number, cr: number): [number, number, number]
   const g = y - 0.344136 * (cb - 128) - 0.714136 * (cr - 128);
   const b = y + 1.772 * (cb - 128);
   return [clamp255(r), clamp255(g), clamp255(b)];
-}
-
-function clamp01(v: number): number {
-  if (!Number.isFinite(v)) return 0;
-  return Math.max(0, Math.min(1, v));
 }
 
 function clamp255(v: number): number {

@@ -8,22 +8,20 @@
  * `escalateToUserId` (one escalation per submission, idempotent via
  * `escalatedAt`).
  *
- * The nudge dispatcher is dependency-injected so tests can assert "would
- * have sent" without touching the email pipeline. Production wiring uses
- * the existing notifications repository.
+ * Every nudge goes through the one notification dispatcher
+ * (`emitNotifications`): bell row + preference-gated push + email.
  */
 
 import { ScorecardsRepository } from "../repositories/scorecardsRepository.js";
 import { NotificationsRepository } from "../repositories/notificationsRepository.js";
 import { UsersRepository } from "../repositories/usersRepository.js";
 import { getDb } from "../db/index.js";
-import { sendGenericEmail } from "../services/adapters/email.js";
+import { emitNotifications } from "../services/notifications/notificationService.js";
 import type { WorkerDefinition, WorkerRunContext } from "./types.js";
 import {
   planScorecardReminderSweep,
   type ReminderPlanInput,
 } from "../services/scorecards/sla-reminder.js";
-import type { NotificationInsert } from "../repositories/notificationsRepository.js";
 
 const HOURLY_MS = 60 * 60 * 1000;
 const REMIND_HORIZON_MS = 4 * HOURLY_MS;
@@ -80,53 +78,29 @@ async function run(ctx: WorkerRunContext): Promise<void> {
   ];
   if (actions.length === 0) return;
 
-  // 1) Bell notifications for every action — ONE multi-row insert.
-  await notifications.insertNotifications(
+  // 1) Bell row + preference-gated push/email for every action — ONE
+  //    multi-row insert via the shared dispatcher.
+  await emitNotifications(
+    { repos: { users, notifications } },
     actions.map((action) => {
       const copy = copyFor(action.kind);
       return {
-        userId: action.recipientUserId,
+        recipientIds: [action.recipientUserId],
         type: action.kind === "remind" ? "scorecard_reminder" : "scorecard_overdue_escalation",
+        actor: null,
         title: copy.title,
         message: copy.message,
-        data: { submissionId: action.submissionId },
-      } as NotificationInsert;
+        target: { id: action.submissionId, type: "scorecard_submission" },
+        extraData: { submissionId: action.submissionId },
+        email: true,
+      };
     }),
   );
 
   // 2) Mark reminded / escalated — one UPDATE per kind (was one per row).
-  //    Done right after the bell rows land (and before best-effort email)
-  //    so a mid-run crash can't re-notify already-notified submissions.
   await repo.updateSubmissions(plan.reminders.map((a) => a.id), { remindedAt: now });
   await repo.updateSubmissions(plan.escalations.map((a) => a.id), { escalatedAt: now });
   for (let i = 0; i < actions.length; i++) ctx.recordChanged();
-
-  // 3) Email is best-effort — failures don't block the notification or the
-  //    row updates, and an absent provider just logs a warning.
-  //    `sendGenericEmail` no-ops + logs when no provider is configured, so
-  //    the worker stays safe in tests + dev environments without creds.
-  //    Recipient emails are loaded in ONE query (was a lookup per action).
-  const recipients = await users
-    .findManyByIds([...new Set(actions.map((a) => a.recipientUserId))])
-    .catch(() => []);
-  const emailById = new Map(recipients.filter((u) => u.email).map((u) => [u.id, u.email as string]));
-  for (const action of actions) {
-    try {
-      const to = emailById.get(action.recipientUserId);
-      if (to) {
-        const copy = copyFor(action.kind);
-        await sendGenericEmail(
-          to,
-          copy.title,
-          `<p>${copy.message}</p>
-           <p>Submission ID: <code>${action.submissionId}</code></p>
-           <p>Open Hired.Video to complete it.</p>`,
-        );
-      }
-    } catch (err: any) {
-      ctx.recordFailure(action.submissionId, `email-dispatch: ${err?.message ?? err}`);
-    }
-  }
 }
 
 interface DispatchAction {

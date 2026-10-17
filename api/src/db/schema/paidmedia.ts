@@ -35,37 +35,10 @@ import { users } from "./users.js";
 export const PAID_MEDIA_PLATFORMS = ["meta", "google", "linkedin", "tiktok", "bing"] as const;
 export type PaidMediaPlatform = (typeof PAID_MEDIA_PLATFORMS)[number];
 
-// ─── Connections (OAuth credentials per workspace per platform) ────────────
-// One row per (workspace owner, platform). access_token + refresh_token
-// stored encrypted at rest by the application layer (envelope encryption
-// against PAID_MEDIA_KMS_KEY) — never read directly; route through
-// services/paid-media/oauth/secrets.ts.
-export const paidMediaConnections = pgTable(
-  "paid_media_connections",
-  {
-    id:                   uuid("id").primaryKey().defaultRandom(),
-    userId:               uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    companyId:            uuid("company_id"),                // workspace company (null = personal)
-    platform:             varchar("platform", { length: 16 }).notNull(),
-    externalUserId:       text("external_user_id"),          // platform's user id (Meta uid, Google sub, etc.)
-    externalUserHandle:   text("external_user_handle"),      // human label shown in UI
-    accessTokenEnc:       text("access_token_enc").notNull(),
-    refreshTokenEnc:      text("refresh_token_enc"),
-    accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
-    scopes:               text("scopes").notNull().default(""),
-    status:               varchar("status", { length: 24 }).notNull().default("active"), // active | expired | revoked | error
-    lastSyncedAt:         timestamp("last_synced_at", { withTimezone: true }),
-    lastError:            text("last_error"),
-    createdAt:            timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt:            timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [
-    index("idx_paid_media_connections_platform").on(t.platform),
-    uniqueIndex("uq_paid_media_connection_workspace_platform").on(t.userId, t.companyId, t.platform),
-    check("paid_media_connections_access_token_enc_enc_format_check", sql`${t.accessTokenEnc} IS NULL OR ${t.accessTokenEnc} LIKE 'v1.aes-gcm.hkdf:%' OR ${t.accessTokenEnc} ~ '^[A-Za-z0-9+/=]+\\.[A-Za-z0-9+/=]+$' OR ${t.accessTokenEnc} ~ '^[0-9a-fA-F]+:[0-9a-fA-F]+$'`),
-    check("paid_media_connections_refresh_token_enc_enc_format_check", sql`${t.refreshTokenEnc} IS NULL OR ${t.refreshTokenEnc} LIKE 'v1.aes-gcm.hkdf:%' OR ${t.refreshTokenEnc} ~ '^[A-Za-z0-9+/=]+\\.[A-Za-z0-9+/=]+$' OR ${t.refreshTokenEnc} ~ '^[0-9a-fA-F]+:[0-9a-fA-F]+$'`),
-  ],
-);
+// ─── Connections ────────────────────────────────────────────────────────────
+// OAuth credentials per workspace per platform live in provider_connections
+// (purpose "ads", W3-C migration 0600). Ids were kept, so
+// paid_media_accounts.connection_id still names the same row.
 
 // ─── Ad Accounts (one workspace may link many accounts per platform — agencies) ─
 export const paidMediaAccounts = pgTable(

@@ -1,7 +1,7 @@
 /**
  * The streaming half of the LLM port (#1342). `LLMCallOpts.stream` turns any
  * `callJson` / `callJsonLenient` / `callText` call into a streamed one: the
- * dispatch loop in llm-client.ts runs each profile attempt through
+ * dispatch loop in llm/dispatch.ts runs each profile attempt through
  * `streamCompletion` instead of the one-shot create, so the fallback chain,
  * the `isChainTerminal` short-circuit, the content guard, validation and
  * the ledger charge are the SAME code for both paths.
@@ -12,7 +12,7 @@
  * schema check runs once, on the finished answer, exactly as for a
  * non-streamed call.
  *
- * No imports from llm-client.ts at runtime (it imports this module).
+ * No imports from llm-client.ts or llm/ at runtime (llm/dispatch.ts imports this module).
  */
 import type {
   BuilderforceClient,

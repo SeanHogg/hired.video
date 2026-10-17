@@ -39,6 +39,7 @@ import {
 import { getEmailProvider, buildNotificationEmail } from "../adapters/email.js";
 import { isChannelAllowed } from "../../../../shared/notification-preferences.js";
 import { loadNotificationPreferences } from "./preferences.js";
+import type { NotificationInsert } from "../../repositories/notificationsRepository.js";
 
 export type NotificationServiceDeps = { repos: Pick<Repos, "users" | "notifications"> };
 
@@ -169,6 +170,23 @@ async function fanOutChannels(
   );
 }
 
+/** Resolve an input to its de-duplicated, actor-filtered recipients + the
+ *  stable `data` envelope. Shared by the single and batch emitters. */
+function prepareEmit(input: EmitNotificationInput) {
+  const actorId = input.actor?.id;
+  const recipients = Array.from(
+    new Set(input.recipientIds.filter((id) => id && id !== actorId)),
+  );
+  const data: Record<string, unknown> = {
+    actor: input.actor,
+    ...(input.target ? { target: input.target } : {}),
+    ...(input.url ? { url: input.url } : {}),
+    ...(input.extraData ?? {}),
+  };
+  const message = input.message ?? input.title;
+  return { recipients, data, message };
+}
+
 /**
  * Persist one notification row per recipient (single bulk write — no
  * N+1) and fan out the preference-gated push. Self-notifications are
@@ -178,38 +196,44 @@ export async function emitNotification(
   deps: NotificationServiceDeps,
   input: EmitNotificationInput,
 ): Promise<void> {
-  const actorId = input.actor?.id;
-  const recipients = Array.from(
-    new Set(input.recipientIds.filter((id) => id && id !== actorId)),
-  );
-  if (recipients.length === 0) return;
+  await emitNotifications(deps, [input]);
+}
 
-  const data = {
-    actor: input.actor,
-    ...(input.target ? { target: input.target } : {}),
-    ...(input.url ? { url: input.url } : {}),
-    ...(input.extraData ?? {}),
-  };
-  const message = input.message ?? input.title;
+/**
+ * Batch form of `emitNotification` for callers that produce several
+ * DIFFERENT notifications at once (e.g. the inbox action engine — one
+ * per matched email). Every row across every input lands in ONE
+ * multi-row insert; each input then fans out over its own channels.
+ */
+export async function emitNotifications(
+  deps: NotificationServiceDeps,
+  inputs: EmitNotificationInput[],
+): Promise<void> {
+  const prepared = inputs
+    .map((input) => ({ input, ...prepareEmit(input) }))
+    .filter((p) => p.recipients.length > 0);
+  if (prepared.length === 0) return;
 
-  await deps.repos.notifications.insertNotifications(
-    recipients.map((userId) => ({
+  const rows: NotificationInsert[] = prepared.flatMap((p) =>
+    p.recipients.map((userId) => ({
       userId,
-      type: input.type,
-      title: input.title,
-      message,
-      data: data as any,
-    })) as any,
+      type: p.input.type,
+      title: p.input.title,
+      message: p.message,
+      data: p.data,
+    })),
   );
+  await deps.repos.notifications.insertNotifications(rows);
 
-  if (input.push !== false || input.email === true) {
-    await fanOutChannels(deps, recipients, {
-      type: input.type,
-      title: input.title,
-      message,
-      url: input.url,
-      push: input.push !== false,
-      email: input.email === true,
+  for (const p of prepared) {
+    if (p.input.push === false && p.input.email !== true) continue;
+    await fanOutChannels(deps, p.recipients, {
+      type: p.input.type,
+      title: p.input.title,
+      message: p.message,
+      url: p.input.url,
+      push: p.input.push !== false,
+      email: p.input.email === true,
     });
   }
 }

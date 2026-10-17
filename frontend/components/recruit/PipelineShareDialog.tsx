@@ -87,7 +87,7 @@ export default function PipelineShareDialog({ open, onOpenChange, jobId }: Pipel
 
   const handleDelete = async (linkId: string) => {
     try {
-      await jobPipelineService.deleteShareLink(jobId, linkId);
+      await jobPipelineService.deleteShareLink(linkId);
       setLinks((prev) => prev.filter((l) => l.id !== linkId));
     } catch (e) {
       toast({

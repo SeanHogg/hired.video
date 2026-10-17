@@ -39,7 +39,7 @@ interface ReferredUsersGrouped {
 /**
  * "Group by referrer" view for /admin/users — every referred user bucketed
  * under the affiliate who brought them in. Self-fetching + SuperAdmin-only
- * (the whole /admin/impersonate API tree is SA-gated); the parent page only
+ * (the whole /api/admin/sa API tree is SA-gated); the parent page only
  * toggles it on/off.
  */
 export function ReferralGroups() {
@@ -56,7 +56,7 @@ export function ReferralGroups() {
     try {
       setLoading(true);
       setError(null);
-      const res = await apiClient.get<ReferredUsersGrouped>("/api/admin/impersonate/users/referrals");
+      const res = await apiClient.get<ReferredUsersGrouped>("/api/admin/sa/users/referrals");
       setData(res.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("errors.failedToLoadUsers"));

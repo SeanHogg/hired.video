@@ -9,7 +9,7 @@
  * must reflect approvals immediately. Platform reach (external API) IS
  * cached — see promotionReach.ts.
  */
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { publicProfilePath } from "../../../../shared/public-paths.js";
 import { getDb, schema } from "../../db/index.js";
 import type { PromotionPlatform, PromotionStatus } from "../../../../shared/promotions.js";
@@ -63,7 +63,7 @@ async function loadProject(projectId: string) {
       videoId: studioProjects.videoId,
       script: studioProjects.resumeText,
       /** The hash the master render is stamped with (baked-freshness). */
-      masterHash: sql<string | null>`${studioProjects.timelineSpec}->'_meta'->>'bakedHash'`,
+      masterHash: studioProjects.bakedHash,
     })
     .from(studioProjects)
     .where(eq(studioProjects.id, projectId))

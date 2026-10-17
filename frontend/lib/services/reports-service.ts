@@ -1,6 +1,6 @@
 /**
- * Reports / moderation client. Wraps the `/api/reports` + `/api/admin/reports`
- * endpoints with typed inputs and zod-validated responses. All enums come
+ * Content-abuse (moderation) reports client. Wraps `/api/moderation/reports`
+ * (user) + `/api/moderation/reports/admin/*` (SuperAdmin) endpoints with typed inputs and zod-validated responses. All enums come
  * from `shared/moderation.ts` so the dialog picker and the admin queue
  * filter use the same source of truth as the backend.
  */
@@ -64,12 +64,12 @@ export const reportsService = {
     reason: ReportReason;
     notes?: string;
   }): Promise<ContentReport> {
-    const res = await apiClient.post<ContentReport>("/api/reports", input);
+    const res = await apiClient.post<ContentReport>("/api/moderation/reports", input);
     return ContentReportSchema.parse(res.data);
   },
 
   async listMine(): Promise<ContentReport[]> {
-    const res = await apiClient.get<ContentReport[]>("/api/reports/me");
+    const res = await apiClient.get<ContentReport[]>("/api/moderation/reports/me");
     return z.array(ContentReportSchema).parse(res.data ?? []);
   },
 
@@ -80,7 +80,7 @@ export const reportsService = {
     if (opts.status) params.set("status", opts.status);
     if (opts.limit != null) params.set("limit", String(opts.limit));
     const qs = params.toString() ? `?${params.toString()}` : "";
-    const res = await apiClient.get<AdminQueueRow[]>(`/api/admin/reports${qs}`);
+    const res = await apiClient.get<AdminQueueRow[]>(`/api/moderation/reports/admin/queue${qs}`);
     return z.array(AdminQueueRowSchema).parse(res.data ?? []);
   },
 
@@ -92,7 +92,7 @@ export const reportsService = {
     },
   ): Promise<ContentReport> {
     const res = await apiClient.patch<ContentReport>(
-      `/api/admin/reports/${reportId}/resolve`,
+      `/api/moderation/reports/admin/${reportId}/resolve`,
       input,
     );
     return ContentReportSchema.parse(res.data);

@@ -1,5 +1,5 @@
 /**
- * Cache for `GET /api/studio/projects/public` (a subject's public studio
+ * Cache for `GET /api/studio/public?subjectKind=&subjectId=` (a subject's public studio
  * projects) — now read on EVERY job / company page view by the entity canvas
  * (#274/#275), so it goes through the two-layer edge cache.
  *

@@ -116,7 +116,7 @@ The existing per-project publish dropdown already renders `publishDestinationsFo
 - Powers Lane A (§5.0 layer 2). One row per platform: **Connect / Re-auth / Disconnect** hired.video's corporate brand account (the OAuth flow runs under the SA, token persists to `managed_accounts`).
 - Shows, per platform: brand-account handle + token health/expiry + granted scopes; **and** the developer-app status read-only from config (`client_id` present? required scopes? app-review state) so the SA can see *why* a platform's free lane is or isn't live.
 - Lane A moderation/approval queue (§5.3) + per-platform auto-publish-vs-review toggle live here too.
-- SuperAdmin-gated routes: `POST /api/admin/social/managed/:platform/auth-url`, `/callback`, `/disconnect`; `GET /api/admin/social/managed` (status board).
+- SuperAdmin-gated routes (the user routes with `?lane=managed`): `GET /api/social/:platform/auth-url?lane=managed`, `POST /api/social/:platform/disconnect?lane=managed`, `GET /api/social/platforms?lane=managed` (status board). OAuth returns to the one callback handler (provider-registered alias `/api/admin/social/oauth/callback`).
 
 ### 4.5 External API — `/api/social/*`
 - `GET  /api/social/platforms` — supported platforms + per-user lane availability **+ `managedLaneReady` per platform** (whether layers 1+2 of §5.0 are satisfied so Lane A is live). Cached per user, invalidated on connect/disconnect/plan change/managed-account change.

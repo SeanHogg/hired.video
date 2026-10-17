@@ -9,6 +9,8 @@
  * that introduced this surface.
  */
 
+import { STUDIO_ANALYTICS_EVENTS, type StudioAnalyticsEvent } from "./studio-analytics-events.js";
+
 export const ARTIFACT_KINDS = [
   // ─── Studio-project mediaKinds (mirror @shared/media-kinds.ts) ──────────
   // Every value here maps 1:1 to a `MediaKind` from shared/media-kinds.ts.
@@ -48,6 +50,10 @@ export const ARTIFACT_KINDS = [
 ] as const;
 
 export type ArtifactKind = (typeof ARTIFACT_KINDS)[number];
+
+export function isArtifactKind(value: unknown): value is ArtifactKind {
+  return typeof value === "string" && (ARTIFACT_KINDS as readonly string[]).includes(value);
+}
 
 /** Whether the artifact kind is a `studio_projects.id`-keyed row. ONE
  *  predicate consumed by the analytics owner-lookup, the impression
@@ -109,4 +115,54 @@ export interface ArtifactViewBeacon {
   viewerEmail?: string | null;
   viewerCompany?: string | null;
   referrer?: string | null;
+}
+
+// ─── Event streams in artifact_views (W3-A, migration 0580) ──────────────────
+//
+// artifact_views is the ONE polymorphic view/engagement table. The retired
+// per-feature tables (resume_views, company_views, job_view_events,
+// company_view_events, video_analytics) were folded into it; `event_type`
+// keeps their streams apart so no reader double-counts:
+//
+//   view          — an artifact view: client scroll/watch beacons (engagement
+//                   set) and server-recorded page loads (engagement NULL —
+//                   the former resume_views / company_views rows). Every
+//                   pre-0580 artifact_views row.
+//   listing_view  — job / company listing traffic with acquisition `source`
+//                   + `region` (was job_view_events / company_view_events);
+//                   retention-swept at 180 days.
+//   player_view   — studio player start (was video_analytics event='view').
+//   impression    — off-platform paid-media impression (video_analytics).
+//   cta_click     — CTA widget click (video_analytics).
+//   share         — player share button (video_analytics).
+//
+// The DB CHECK `artifact_views_event_type_check` is built from this list.
+export const ARTIFACT_VIEW_EVENT_TYPES = [
+  "view",
+  "listing_view",
+  "player_view",
+  "impression",
+  "cta_click",
+  "share",
+] as const;
+
+export type ArtifactViewEventType = (typeof ARTIFACT_VIEW_EVENT_TYPES)[number];
+
+/** Studio playback events (shared/studio-analytics-events.ts) that live in
+ *  artifact_views, keyed by their studio event name. The studio `view`
+ *  event is stored as `player_view` so it never mixes with artifact views. */
+export const STUDIO_EVENT_TO_VIEW_EVENT_TYPE = {
+  view: "player_view",
+  impression: "impression",
+  cta_click: "cta_click",
+  share: "share",
+} as const satisfies Record<StudioAnalyticsEvent, ArtifactViewEventType>;
+
+/** Reverse of STUDIO_EVENT_TO_VIEW_EVENT_TYPE — the studio event name for a
+ *  stored event_type, or null when the row is not a studio playback event. */
+export function studioEventForViewEventType(eventType: string): StudioAnalyticsEvent | null {
+  for (const studioEvent of STUDIO_ANALYTICS_EVENTS) {
+    if (STUDIO_EVENT_TO_VIEW_EVENT_TYPE[studioEvent] === eventType) return studioEvent;
+  }
+  return null;
 }

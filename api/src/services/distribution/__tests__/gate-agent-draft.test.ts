@@ -29,6 +29,7 @@ function job(over: Partial<PublishJob> = {}): PublishJob {
     destination: "linkedin",
     status: "draft",
     postSettings: {},
+    postYourself: false,
     ...over,
   } as PublishJob;
 }
@@ -74,7 +75,7 @@ describe("gateAgentDraftApprove", () => {
       userId,
       now,
       deps({
-        getAgentDraft: async () => job({ postSettings: { postYourself: true } }),
+        getAgentDraft: async () => job({ postYourself: true }),
         countAgentJobs: async () => {
           counted += 1;
           return 99;

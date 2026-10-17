@@ -1,5 +1,6 @@
 /**
- * SuperAdmin dashboard-feed curation. Mounted at /api/admin/feed-features.
+ * SuperAdmin dashboard-feed curation. Mounted at /api/admin/feed-features
+ * by the admin composite (routes/admin/index.ts), which applies the SA guard.
  *
  * Lets a SuperAdmin pin any card (tool, page, article, video, job, …) to
  * the dashboard of one or more roles, reorder, toggle, and remove. Every
@@ -15,41 +16,22 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { buildRepos } from "../repositories/index.js";
-import { superAdminMiddleware } from "../middleware/superAdmin.js";
+import { adminRepos } from "../repositories/admin/index.js";
+import { recordAdminAudit } from "../services/admin/adminAudit.js";
 import { FeedFeatureService } from "../services/feed/FeedFeatureService.js";
 import {
   CreateFeedFeatureSchema,
   UpdateFeedFeatureSchema,
 } from "../../../shared/feed-features.js";
 
-const { adminAuditLog } = schema;
-
 export const adminFeedFeatureRoutes = new Hono<AppEnv>();
 
-adminFeedFeatureRoutes.use("*", superAdminMiddleware);
-
 function buildService() {
-  return new FeedFeatureService(buildRepos(getDb()).feedFeatures);
+  return new FeedFeatureService(adminRepos().feedFeatures);
 }
 
-async function audit(
-  actorId: string,
-  action: string,
-  targetId: string,
-  metadata: Record<string, unknown>,
-) {
-  await getDb()
-    .insert(adminAuditLog)
-    .values({
-      actorId,
-      action,
-      targetType: "feed_feature",
-      targetId,
-      metadata,
-    } as any)
-    .catch(() => undefined);
+function audit(actorId: string, action: string, targetId: string, metadata: Record<string, unknown>) {
+  return recordAdminAudit({ actorId, action, targetType: "feed_feature", targetId, metadata });
 }
 
 // ---------------------------------------------------------------------------

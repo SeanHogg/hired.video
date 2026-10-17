@@ -31,10 +31,7 @@ const SKIPPED_EXACT_PATHS = new Set([
   "/api/health",
   "/sitemap.xml",
   "/robots.txt",
-  "/api/usage/track",
-  "/api/analytics/beacon",
-  "/api/analytics/artifacts/beacon",
-  "/api/analytics/ads/impression",
+  "/api/analytics/events",
 ]);
 /** Crawler-, embed- and pixel-serving prefixes. */
 const SKIPPED_PREFIXES = ["/api/og/", "/embed/", "/api/embed/", "/sitemap", "/api/campaigns/open"];

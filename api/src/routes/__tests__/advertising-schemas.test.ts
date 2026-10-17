@@ -7,15 +7,14 @@
  * modified to add exports) the schemas are reconstructed here VERBATIM from
  * `api/src/routes/advertising.ts`:
  *
- *   CreateBoostSchema        = z.object({...})   (line 31)
- *   CreateCompanyBoostSchema = z.object({...})   (line 147)
  *   CreateCampaignSchema     = z.object({...})   (line 256)
  *   CreateAdSetSchema        = z.object({...})   (line 313)
  *   CreateAdSchema           = z.object({...})   (line 386)
  *
- * `UuidLikeSchema` (shared/validation.ts) IS exported and imported from the
- * real source of truth. `jobId` / `companyId` are DB-row ids, so the #1522
- * seed-derived-UUID regression is exercised on the boost schemas.
+ * The job-boost start schema is imported from its real source of truth
+ * (shared/checkout.ts — job boosts are created only through the paid
+ * checkout). `jobId` is a DB-row id, so the #1522 seed-derived-UUID
+ * regression is exercised on it.
  *
  * Run: node --import tsx --test src/routes/__tests__/advertising-schemas.test.ts
  */
@@ -24,7 +23,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { z } from "zod";
 
-import { UuidLikeSchema } from "../../../../shared/validation.js";
+import { StartJobBoostCheckoutSchema as CreateBoostSchema } from "../../../../shared/checkout.js";
 import {
   SEED_DERIVED_UUID,
   V4_UUID,
@@ -32,27 +31,6 @@ import {
 
 // Verbatim mirrors of the un-exported schemas in `advertising.ts`. See the
 // file header for why they are reconstructed rather than imported.
-const CreateBoostSchema = z.object({
-  jobId: UuidLikeSchema,
-  placementType: z.enum(["search_top", "discovery_feed", "both"]),
-  pricingModel: z.enum(["cpm", "cpc"]),
-  budgetCents: z.number().int().min(1000),
-  durationDays: z.number().int().min(1).max(90),
-});
-
-const CreateCompanyBoostSchema = z.object({
-  companyId: UuidLikeSchema,
-  placementType: z.enum([
-    "directory_featured",
-    "dashboard_spotlight",
-    "discovery_feed",
-    "all",
-  ]),
-  pricingModel: z.enum(["flat", "cpm"]),
-  budgetCents: z.number().int().min(1000),
-  durationDays: z.number().int().min(1).max(90),
-});
-
 const CreateCampaignSchema = z.object({
   name: z.string().min(1).max(120),
   objective: z
@@ -97,6 +75,7 @@ const CreateAdSchema = z.object({
 });
 
 const validBoost = {
+  kind: "job_boost",
   jobId: V4_UUID,
   placementType: "search_top",
   pricingModel: "cpm",
@@ -176,56 +155,6 @@ describe("CreateBoostSchema", () => {
       CreateBoostSchema.safeParse({ ...validBoost, budgetCents: 1000.5 }).success,
       false,
     );
-  });
-});
-
-describe("CreateCompanyBoostSchema", () => {
-  const valid = {
-    companyId: V4_UUID,
-    placementType: "directory_featured",
-    pricingModel: "flat",
-    budgetCents: 1000,
-    durationDays: 30,
-  } as const;
-
-  it("accepts a valid company boost", () => {
-    assert.equal(CreateCompanyBoostSchema.safeParse(valid).success, true);
-  });
-  it("accepts a seed-derived companyId (gap #1522 regression)", () => {
-    assert.equal(
-      CreateCompanyBoostSchema.safeParse({ ...valid, companyId: SEED_DERIVED_UUID }).success,
-      true,
-    );
-  });
-  it("accepts each placementType value", () => {
-    for (const placementType of [
-      "directory_featured",
-      "dashboard_spotlight",
-      "discovery_feed",
-      "all",
-    ]) {
-      assert.equal(
-        CreateCompanyBoostSchema.safeParse({ ...valid, placementType }).success,
-        true,
-        placementType,
-      );
-    }
-  });
-  it("rejects budgetCents=999 (below min)", () => {
-    assert.equal(
-      CreateCompanyBoostSchema.safeParse({ ...valid, budgetCents: 999 }).success,
-      false,
-    );
-  });
-  it("rejects an unknown pricingModel (enum edge)", () => {
-    assert.equal(
-      CreateCompanyBoostSchema.safeParse({ ...valid, pricingModel: "cpc" }).success,
-      false,
-    );
-  });
-  it("rejects a missing companyId (required field)", () => {
-    const { companyId, ...rest } = valid;
-    assert.equal(CreateCompanyBoostSchema.safeParse(rest).success, false);
   });
 });
 

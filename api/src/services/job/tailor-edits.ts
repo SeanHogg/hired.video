@@ -30,22 +30,6 @@ export const coerceToString = z
   .pipe(z.string());
 
 
-/**
- * LLM-output schema for the tailor endpoint. The model returns the full
- * tailored resume as JSON (not markdown) plus a changes[] list and a
- * summary; the server then persists the JSON as a variation and echoes
- * it back to the caller. No markdown is ever shipped — every consumer
- * renders from the structured `tailoredResume` field.
- */
-export const TailorResponseSchema = z.object({
-  oldScore: z.number().min(0).max(100),
-  newScore: z.number().min(0).max(100),
-  tailoredResume: ResumeContentSchema,
-  changes: z.array(TailorChangeSchema).default([]),
-  summaryRecommendations: coerceToString,
-});
-
-
 // ─── Tailor edit contract (gap #2109 — diff-only output) ───────────────────
 //
 // The model NO LONGER echoes the whole tailored resume. It returns a small

@@ -4,10 +4,6 @@
  * retry when it failed. Renders nothing for text answers, completed
  * transcripts, and legacy rows. The server already retries transient
  * failures automatically; this is the manual fallback.
- *
- * Live review page currently uses `interview-assignments/TranscriptionStatusStrip`
- * (same behaviour). This module is the workstream-owned path so tests and
- * future callers can import from `@/components/transcription`.
  */
 "use client";
 
@@ -27,16 +23,14 @@ export type TranscriptionJobResponse = Pick<
 >;
 
 export interface TranscriptionStatusProps {
-  interviewId: string;
   response: TranscriptionJobResponse;
   /** Refetch the report — called after a retry is queued and on "Check again". */
   onRefresh: () => void | Promise<void>;
   /** Injected in tests; production uses `retranscribeAnswer`. */
-  retranscribe?: (interviewId: string, responseId: string) => Promise<void>;
+  retranscribe?: (responseId: string) => Promise<void>;
 }
 
 export function TranscriptionStatus({
-  interviewId,
   response,
   onRefresh,
   retranscribe = retranscribeAnswer,
@@ -50,7 +44,7 @@ export function TranscriptionStatus({
   const retry = async () => {
     setBusy(true);
     try {
-      await retranscribe(interviewId, response.id);
+      await retranscribe(response.id);
       toast.success(t("messages.interviewAssignments.transcription.queued"));
       await onRefresh();
     } catch (err) {

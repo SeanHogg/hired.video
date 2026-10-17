@@ -166,12 +166,7 @@ class SwaggerService {
     const lowerTags = tags.map((t) => t.toLowerCase());
 
     // Resume-related actions
-    if (
-      lowerTags.includes("resume") ||
-      lowerPath.includes("resume") ||
-      lowerPath.includes("resumeoptimizer") ||
-      lowerPath.includes("resumescorer")
-    ) {
+    if (lowerTags.includes("resume") || lowerPath.includes("resume")) {
       if (lowerPath.includes("optimize") || lowerSummary.includes("optimize")) {
         actions.push("optimize-content", "improve-summary", "keyword-optimization");
       }

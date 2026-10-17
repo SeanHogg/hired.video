@@ -22,7 +22,8 @@
  * Repo-only (no HTTP, no Drizzle); callers translate outcomes into their
  * own responses. `diff` is the same recompute port the resume handlers use.
  */
-import type { IResumeRepository, ResumeRow } from "../../repositories/index.js";
+import type { ResumeRow } from "../../repositories/index.js";
+import type { IResumeOwnerReader, IResumeWriter } from "../../repositories/resumeRepository.js";
 import { computeDiffPercent } from "../../utils/resume-diff.js";
 import { healAndValidateContent, type ResumeContentIssue } from "./content.js";
 import { isVersionStale, type ResumeLineage } from "../../../../shared/resume-lineage.js";
@@ -33,7 +34,7 @@ type Clock = () => Date;
 
 /** The master a copy of `source` belongs under (see the rules above). */
 export async function masterFor(
-  repo: IResumeRepository,
+  repo: IResumeOwnerReader,
   ownerId: string,
   source: ResumeRow,
 ): Promise<ResumeRow> {
@@ -59,7 +60,7 @@ export interface SaveVersionOutcome {
  * is never modified.
  */
 export async function saveVersionOfMaster(
-  repo: IResumeRepository,
+  repo: IResumeOwnerReader & IResumeWriter,
   ownerId: string,
   sourceId: string,
   args: { content: unknown; title?: string | null; description?: string | null },
@@ -98,7 +99,7 @@ export async function saveVersionOfMaster(
 /** Where `resumeId` sits in its owner's lineage, for the /build review bar
  *  and the staleness banner. Null when the résumé is not the owner's. */
 export async function describeLineage(
-  repo: IResumeRepository,
+  repo: IResumeOwnerReader,
   ownerId: string,
   resumeId: string,
 ): Promise<ResumeLineage | null> {
@@ -129,7 +130,7 @@ export async function describeLineage(
 /** Record that a version has taken its master's current content in.
  *  `touchUpdatedAt: false` — bookkeeping, not an edit of the version. */
 export async function markVersionSynced(
-  repo: IResumeRepository,
+  repo: IResumeOwnerReader & IResumeWriter,
   ownerId: string,
   versionId: string,
   now: Clock = () => new Date(),
@@ -150,7 +151,7 @@ export type WriteBackOutcome =
  * written (so it does not go stale against its versions for nothing).
  */
 export async function writeFactsToMaster(
-  repo: IResumeRepository,
+  repo: IResumeOwnerReader & IResumeWriter,
   ownerId: string,
   facts: readonly ConfirmedFact[],
 ): Promise<WriteBackOutcome> {

@@ -1,6 +1,6 @@
 /**
  * ReportAbuseDialog — the form behind <ReportAbuseButton>. Captures
- * reason + optional notes, POSTs to /api/reports, and confirms with a
+ * reason + optional notes, POSTs to /api/moderation/reports, and confirms with a
  * toast. The reporter is told that their report goes to the platform
  * moderation team via /inbox so the next step is discoverable.
  *

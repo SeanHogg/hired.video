@@ -1,9 +1,9 @@
 // media-library.ts — the user's media library (#950) over `uploaded_assets`
 // (#733): cursor-paginated, newest first, cached.
 //
-// Cache: L1 + KV through getOrSetCached, keyed by a per-user version token
+// Cache: isolate-local (getOrSetIsolateCached), keyed under a per-user prefix
 // (media-library-cache.ts). Every recorded upload (object-store putObject)
-// and every delete bumps the token, so a new upload shows on the next read.
+// and every delete drops the prefix, so a new upload shows on the next read.
 //
 // Backfill: images uploaded before migration 0512 have no row. When a user's
 // first page comes back empty, their pre-0512 image prefixes are listed once
@@ -21,7 +21,7 @@ import {
   type UploadedAssetKind,
   type UploadedAssetPage,
 } from "../../../../shared/uploaded-assets.js";
-import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 import { cdnUrl } from "../../utils/cdn.js";
 import { getDb } from "../../db/index.js";
 import {
@@ -30,10 +30,10 @@ import {
 } from "../../repositories/uploadedAssetsRepository.js";
 import type { UploadedAssetRow } from "../../db/schema/uploadedAssets.js";
 import { deriveAssetRecord, type AssetRecord } from "./asset-record.js";
-import { invalidateMediaLibrary, mediaLibraryVersion } from "./media-library-cache.js";
+import { invalidateMediaLibrary, mediaLibraryKeyPrefix } from "./media-library-cache.js";
 import { getVideoBucket } from "./object-store.js";
 
-const LIBRARY_TTL_SECONDS = 300;
+const LIBRARY_TTL_SECONDS = 120;
 /** Objects listed per pre-0512 prefix in the one-time backfill. */
 const BACKFILL_LIST_LIMIT = 500;
 
@@ -128,10 +128,9 @@ export async function getAssetPage(
   req: AssetPageRequest,
   deps: MediaLibraryDeps = defaultDeps(),
 ): Promise<UploadedAssetPage> {
-  const version = await mediaLibraryVersion(req.userId);
   const kinds = [...req.kinds].sort().join(",");
-  return getOrSetCached({
-    key: `media-library:${req.userId}:${version}:${kinds}:${req.limit}:${req.cursor ?? ""}`,
+  return getOrSetIsolateCached({
+    key: `${mediaLibraryKeyPrefix(req.userId)}${kinds}:${req.limit}:${req.cursor ?? ""}`,
     ttlSeconds: LIBRARY_TTL_SECONDS,
     loader: () => loadAssetPage(deps, req),
   });

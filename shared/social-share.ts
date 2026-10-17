@@ -6,7 +6,7 @@
  * page in a new tab). It is deliberately distinct from:
  *   - shared/social-platforms.ts — the OAuth *connection* identity (publish
  *     to a connected account); and
- *   - the LLM "generate a LinkedIn post" flow (LinkedInPostModal).
+ *   - the AI caption flow (POST /api/studio/social/generate-caption).
  *
  * Pure + framework-free so the reusable <ShareMenu> (and any card that wants
  * a Share affordance) builds intent URLs from one source — no per-card

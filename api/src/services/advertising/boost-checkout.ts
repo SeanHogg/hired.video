@@ -274,7 +274,7 @@ export function toBoostView(row: BoostRow) {
 // ─── Production wiring ────────────────────────────────────────────────────
 
 export function defaultBoostCheckoutPort(db = getDb()): BoostCheckoutPort {
-  const { boosts, boostCheckouts, tokenPackPurchases, courseCheckouts } = schema;
+  const { boosts, boostCheckouts, tokenPackPurchases, courseCheckouts, jobBoosts } = schema;
   const repos = buildRepos(db);
   const record = {
     id: boostCheckouts.id,
@@ -340,6 +340,7 @@ export function defaultBoostCheckoutPort(db = getDb()): BoostCheckoutPort {
             sql`NOT EXISTS (SELECT 1 FROM ${boostCheckouts} AS used WHERE used.provider_payment_id = ${providerPaymentId})`,
             sql`NOT EXISTS (SELECT 1 FROM ${tokenPackPurchases} WHERE ${tokenPackPurchases.stripePaymentIntentId} = ${providerPaymentId})`,
             sql`NOT EXISTS (SELECT 1 FROM ${courseCheckouts} WHERE ${courseCheckouts.providerPaymentId} = ${providerPaymentId})`,
+            sql`NOT EXISTS (SELECT 1 FROM ${jobBoosts} WHERE ${jobBoosts.stripePaymentIntentId} = ${providerPaymentId})`,
           ),
         )
         .returning({ id: boostCheckouts.id });

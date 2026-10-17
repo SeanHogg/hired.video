@@ -16,6 +16,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { GitMerge, ListPlus, TrendingUp, Zap } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { aiToolPath } from "@shared/ai-tools/tool-ids";
 import i18n from "@/lib/i18n/i18n";
 import {
   INIT_RESUME_SECTIONS,
@@ -43,7 +44,7 @@ function bulletRewriter(mode: BulletRewriteMode) {
     if (!original) throw new Error(i18n.t("wands.needsBullet"));
     const resumeId = requireResume(ctx);
     const { data } = await apiClient.post(
-      "/api/resumeoptimizer/rewrite-bullet",
+      aiToolPath("resume-rewrite-bullet"),
       { original, mode },
       RewriteBulletResponseSchema,
     );
@@ -85,7 +86,7 @@ async function runMergeWorkEntries(ctx: ToolRunContext): Promise<NormalizedToolR
 
 async function draftSummary(ctx: ToolRunContext): Promise<string> {
   const resumeText = await resolveResumeText(ctx);
-  const { data } = await apiClient.post<unknown>("/api/resumes/summarize", { resumeText });
+  const { data } = await apiClient.post<unknown>(aiToolPath("resume-summarize"), { resumeText });
   const d = data as { result?: unknown; summary?: unknown } | string;
   const summary = typeof d === "string" ? d : String(d?.result ?? d?.summary ?? "");
   return summary.trim();
@@ -93,7 +94,7 @@ async function draftSummary(ctx: ToolRunContext): Promise<string> {
 
 async function draftSkills(ctx: ToolRunContext): Promise<string[]> {
   const content = await resolveResumeText(ctx);
-  const { data } = await apiClient.post<{ skills?: Array<{ name?: unknown }> }>("/api/skillextractor/extract", {
+  const { data } = await apiClient.post<{ skills?: Array<{ name?: unknown }> }>(aiToolPath("skill-extract"), {
     content,
     sourceType: "resume",
   });

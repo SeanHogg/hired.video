@@ -29,7 +29,7 @@ import {
 import { emitSceneTransitions } from "./scene-transition-emit";
 import { SCENE_GRADE_EFFECT, filtersToCss } from "../video-filters";
 import { fontFamilyFor } from "../font-catalog";
-import { stringOr } from "../widgets/frame";
+import { stringOr } from "@/lib/numeric";
 import type { RenderContext } from "../widgets/plugin";
 import { TIMELINE_SCHEMA_VERSION, defaultTrack, type Clip, type ClipEffect, type Timeline, type Track } from "@shared/timeline";
 import { emitAudioRenderClips, recoverAudioLayersFromClips } from "./timeline-audio-emit";

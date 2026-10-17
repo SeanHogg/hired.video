@@ -39,6 +39,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { companyProfiles } from "./companies.js";
 import { users, accountInvitations } from "./users.js";
+import { performanceCycles } from "./performance.js";
 import type { OneOnOneAgendaItem, KeyResult, PulseQuestionDef } from "../../../../shared/people-ops.js";
 
 // ── Tenancy ──────────────────────────────────────────────────────────────
@@ -304,6 +305,9 @@ export const peopleGoals = pgTable(
     progress: integer("progress").notNull().default(0), // 0–100 (rolled up from key results)
     category: varchar("category", { length: 120 }),
     keyResults: jsonb("key_results").$type<KeyResult[]>().default([]).notNull(),
+    // Field-union from the retired user-scoped performance_goals (0634).
+    cycleId: uuid("cycle_id").references(() => performanceCycles.id, { onDelete: "set null" }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -315,6 +319,7 @@ export const peopleGoals = pgTable(
     progressCheck: check("people_goals_progress_check", sql`${t.progress} >= 0 AND ${t.progress} <= 100`),
     employeeIdFkIdx: index("idx_people_goals_employee_id").on(t.employeeId),
     segmentIdFkIdx: index("idx_people_goals_segment_id").on(t.segmentId),
+    cycleIdFkIdx: index("idx_people_goals_cycle_id").on(t.cycleId),
   }),
 );
 

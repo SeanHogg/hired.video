@@ -12,6 +12,7 @@
  * hook never crashes a partially-translated locale.
  */
 import { useTranslation } from "react-i18next";
+import { formatDateMediumOrEmpty } from "@/lib/format";
 
 export interface TimeAgoApi {
   /** Locale-aware `toLocaleDateString`. Resolution = i18next.language. */
@@ -35,15 +36,8 @@ export function useTimeAgo(): TimeAgoApi {
   // for users whose OS locale differs from the app's UI language.
   const locale = i18n.language || undefined;
 
-  const formatDate = (input: Date | string | null | undefined): string => {
-    const date = coerceDate(input);
-    if (!date) return "";
-    return date.toLocaleDateString(locale, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+  const formatDate = (input: Date | string | null | undefined): string =>
+    formatDateMediumOrEmpty(input, locale);
 
   const getTimeAgo = (input: Date | string | null | undefined): string => {
     const date = coerceDate(input);

@@ -9,7 +9,7 @@
  *   • `getReferredUsersGrouped` — the "group by referrer" view that buckets
  *     every referred user under the affiliate who brought them in.
  *
- * The whole /admin/impersonate tree is SuperAdmin-gated at the route mount,
+ * The whole /api/admin/sa tree is SuperAdmin-gated at the route mount,
  * so neither function re-checks authority.
  */
 

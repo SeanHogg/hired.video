@@ -20,7 +20,7 @@ export interface JobBoost {
   spentCents: number;
   spentDollars: number;
   rateUnitCents: number;
-  status: "active" | "paused" | "completed" | "cancelled";
+  status: "pending_payment" | "active" | "paused" | "completed" | "cancelled";
   impressions: number;
   clicks: number;
   applications: number;
@@ -137,16 +137,8 @@ export const advertisingService = {
   // ── Job Boosts ───────────────────────────────────────────────────────────
   getBoosts: () => apiFetch<JobBoost[]>("/api/advertising/boosts"),
 
-  createBoost: (data: {
-    jobId: string;
-    placementType: "search_top" | "discovery_feed" | "both";
-    pricingModel: "cpm" | "cpc";
-    budgetCents: number;
-    durationDays: number;
-  }) => apiFetch<JobBoost>("/api/advertising/boosts", {
-    method: "POST",
-    body: data,
-  }),
+  // Creating a job boost is paid-only: checkoutService.start({ kind: "job_boost" })
+  // then useCheckoutPayment (the job is sponsored only on a confirmed payment).
 
   pauseBoost: (id: string) => apiFetch<JobBoost>(`/api/advertising/boosts/${id}/pause`, { method: "PATCH" }),
   resumeBoost: (id: string) => apiFetch<JobBoost>(`/api/advertising/boosts/${id}/resume`, { method: "PATCH" }),

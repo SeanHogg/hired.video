@@ -19,7 +19,9 @@ import assert from "node:assert/strict";
 import {
   TOOLS,
   TOOL_IDS,
+  aiToolPath,
   buildEndpointUrl,
+  isAiToolId,
   getTool,
   getToolsByAction,
   getToolsForContext,
@@ -59,6 +61,13 @@ describe("ai-tools registry", () => {
         `tool "${id}" path segment "${pathOnly}" must be lowercase (Hono routes are case-sensitive)`,
       );
     }
+  });
+
+  it("tools served by the AI dispatcher use aiToolPath(id)", () => {
+    for (const id of TOOL_IDS.filter(isAiToolId)) {
+      assert.strictEqual(TOOLS[id].endpoint, aiToolPath(id), `tool "${id}" must call the dispatcher`);
+    }
+    assert.strictEqual(TOOLS["resume-score"].endpoint, "/api/ai/tools/resume-score");
   });
 
   it("every tool declares at least one contextType + supportedAction", () => {
@@ -136,8 +145,8 @@ describe("ai-tools registry", () => {
 
   it("buildEndpointUrl leaves paths without placeholders untouched", () => {
     assert.strictEqual(
-      buildEndpointUrl("/api/resume/withownership"),
-      "/api/resume/withownership",
+      buildEndpointUrl("/api/resumes?owner=me&include=ownership"),
+      "/api/resumes?owner=me&include=ownership",
     );
   });
 });

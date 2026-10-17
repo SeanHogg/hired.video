@@ -97,10 +97,19 @@ const SPEC = {
     // ── Resumes ─────────────────────────────────────────────────────────────
     "/api/resumes": {
       get: { tags: ["Resumes"], summary: "List user resumes", responses: { "200": { description: "Resume list" } } },
-      post: { tags: ["Resumes"], summary: "Create or import a resume", responses: { "201": { description: "Resume created" } } },
+      post: { tags: ["Resumes"], summary: "Create a resume: { source: blank | file | text | clone | variation | job }", responses: { "201": { description: "Resume created" } } },
     },
-    "/api/resume/roast": {
+    "/api/resumes/{id}": {
+      patch: { tags: ["Resumes"], summary: "Change state: archived, isMaster, isActive, privacy, parentId (detach), status", responses: { "200": { description: "Updated resume" } } },
+    },
+    "/api/resumes/roast": {
       post: { tags: ["Resumes", "AI"], summary: "AI resume roast (public preview)", security: [], responses: { "200": { description: "Roast results" } } },
+    },
+    "/api/ai/tools": {
+      get: { tags: ["AI"], summary: "AI tool catalog", responses: { "200": { description: "Tool ids with Pro / anonymous / streaming flags" } } },
+    },
+    "/api/ai/tools/{toolId}": {
+      post: { tags: ["AI"], summary: "Run one AI tool (score, optimize, rewrite wands, salary, sentiment, …)", parameters: [{ name: "toolId", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Tool result" } } },
     },
     // ── Recruiter ───────────────────────────────────────────────────────────
     "/api/recruiter/talent-pool": {

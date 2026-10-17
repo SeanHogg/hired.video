@@ -19,6 +19,7 @@ import { pluginForWidgetKind } from "@/lib/studio/widgets/registry";
 import PluginWidgetBody from "@/components/studio/widgets/PluginWidgetBody";
 import { SELECTION_HALO, TransformChrome } from "./TransformHandles";
 import { useTransformDrag, type TransformRect } from "./useTransformDrag";
+import { clamp01 } from "@/lib/numeric";
 
 export interface CanvasWidgetViewProps {
   widget: Widget;
@@ -38,8 +39,6 @@ export interface CanvasWidgetViewProps {
 
 /** Smallest widget side, as a fraction of the canvas. */
 const MIN_WIDGET_SIZE = 0.02;
-
-const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 /** Widgets keep their top-left on the canvas and never outgrow it. */
 function clampToCanvas(r: TransformRect): TransformRect {

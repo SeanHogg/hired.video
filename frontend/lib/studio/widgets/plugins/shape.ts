@@ -3,7 +3,7 @@
  * covers the whole box and the stroke sits INSIDE it (`filledBoxOps`).
  */
 import type { ShapeWidgetParams, WidgetParams } from "@/lib/studio/editor-v2/canvas-state";
-import { numberOr, stringOr } from "../frame";
+import { numberOr, stringOr } from "@/lib/numeric";
 import { registerPlugin } from "../plugin";
 import { filledBoxOps } from "../draw-ops";
 

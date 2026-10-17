@@ -92,26 +92,5 @@ export const pipelineTouchpoints = pgTable(
 export type PipelineTouchpoint = typeof pipelineTouchpoints.$inferSelect;
 export type NewPipelineTouchpoint = typeof pipelineTouchpoints.$inferInsert;
 
-/**
- * Tokenised read-only share link for the kanban — powers the "live hiring
- * manager portal" feature. Mirrors the studio_review_links pattern.
- */
-export const pipelineShareLinks = pgTable(
-  "pipeline_share_links",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    jobId: uuid("job_id").notNull().references(() => jobItems.id, { onDelete: "cascade" }),
-    shareToken: varchar("share_token", { length: 64 }).notNull().unique(),
-    label: varchar("label", { length: 200 }),
-    expiresAt: timestamp("expires_at", { withTimezone: true }),
-    createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (t) => [
-    index("idx_pipeline_share_links_job").on(t.jobId),
-    index("idx_pipeline_share_links_created_by_user_id").on(t.createdByUserId),
-  ],
-);
-
-export type PipelineShareLink = typeof pipelineShareLinks.$inferSelect;
-export type NewPipelineShareLink = typeof pipelineShareLinks.$inferInsert;
+// Kanban hiring-manager share links live in share_links (shareLinks.ts,
+// kind pipeline_job) since W3-A migration 0583.

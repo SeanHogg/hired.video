@@ -9,42 +9,19 @@ import {
   integer,
   index,
   uniqueIndex,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
-import { oauthConnectionColumns } from "./studiofeatures.js";
+import { providerConnections } from "./providerConnections.js";
 
 // ---------------------------------------------------------------------------
 // Calendar Integration
 // ---------------------------------------------------------------------------
 
-// OAuth tokens for connected calendars (Google, Outlook).
-// Reuses `oauthConnectionColumns` for refresh / expiry / scopes / soft-delete /
-// timestamps. `accessToken` is declared inline (nullable) because some
-// calendar flows use API-key auth instead of full OAuth.
-//
-// Calendar-specific columns: provider discriminator, provider account ID,
-// calendar ID/name, syncEnabled toggle, lastSyncedAt — none are part of the
-// shared OAuth shape.
-export const calendarConnections = pgTable("calendar_connections", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  provider: varchar("provider", { length: 50 }).notNull(), // google | outlook | ical
-  providerAccountId: text("provider_account_id"),
-  /** Legacy plaintext — new writes go to access_token_enc (0548). */
-  accessToken: text("access_token"),
-  accessTokenEnc: text("access_token_enc"),
-  calendarId: text("calendar_id"), // provider-specific calendar ID
-  calendarName: varchar("calendar_name", { length: 255 }),
-  syncEnabled: boolean("sync_enabled").default(true).notNull(),
-  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
-  ...oauthConnectionColumns,
-}, (t) => [
-  index("idx_calendar_connections_user_id").on(t.userId),
-]);
-
-export type CalendarConnection = typeof calendarConnections.$inferSelect;
-export type NewCalendarConnection = typeof calendarConnections.$inferInsert;
+// Connected calendars (Google, Outlook) live in provider_connections
+// (purpose "calendar", W3-C migration 0600); ids were kept, so
+// scheduled_events.calendar_connection_id still points at the same row.
 
 // Scheduled events — discriminated by `type`.
 //   'interview' | 'meeting' | 'review' | 'other' — private calendar items
@@ -58,7 +35,7 @@ export type NewCalendarConnection = typeof calendarConnections.$inferInsert;
 export const scheduledEvents = pgTable("scheduled_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  calendarConnectionId: uuid("calendar_connection_id").references(() => calendarConnections.id, { onDelete: "set null" }),
+  calendarConnectionId: uuid("calendar_connection_id"),
   externalEventId: text("external_event_id"), // provider calendar event ID
   title: varchar("title", { length: 500 }).notNull(),
   description: text("description"),
@@ -105,6 +82,12 @@ export const scheduledEvents = pgTable("scheduled_events", {
     .where(sql`slug IS NOT NULL`),
   index("idx_scheduled_events_calendar_connection_id").on(t.calendarConnectionId),
   index("idx_scheduled_events_user_id").on(t.userId),
+  // Named explicitly: the generated name is over Postgres' 63-byte limit (0600).
+  foreignKey({
+    name: "scheduled_events_calendar_connection_id_fk",
+    columns: [t.calendarConnectionId],
+    foreignColumns: [providerConnections.id],
+  }).onDelete("set null"),
 ]);
 
 export type ScheduledEvent = typeof scheduledEvents.$inferSelect;

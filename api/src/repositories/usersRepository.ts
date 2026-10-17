@@ -70,19 +70,32 @@ export interface UserPatch {
   updatedAt?: Date;
 }
 
-export interface IUsersRepository {
-  // ── core identity ─────────────────────────────────────────────────────
+/** Core identity reads. */
+export interface IUserReader {
   findById(id: string): Promise<UserRow | null>;
   /** Narrow two-column read for the bootstrap aggregate. */
   findVerificationStatus(id: string): Promise<{ email: string; emailVerified: boolean } | null>;
   findByEmail(email: string): Promise<UserRow | null>;
   findManyByIds(ids: string[]): Promise<UserRow[]>;
+  search(filters: UserSearchFilters, page?: number, limit?: number): Promise<UserSearchResult>;
+  /** IANA timezone for a user, read from `account_preferences.timezone`.
+   *  Returns null when the user has no preferences row yet (signup before
+   *  the preferences seed lands). Source of truth, not `users.*` — the
+   *  `users` table does NOT carry a timezone column. */
+  findTimezone(userId: string): Promise<string | null>;
+}
+
+/** Aggregate user counts (admin metrics). */
+export interface IUserStatsReader {
   countAll(): Promise<number>;
   countActive(): Promise<number>;
   countCreatedSince(since: Date): Promise<number>;
   countByRole(): Promise<Array<{ role: string; n: number }>>;
   countByRoleCreatedSince(since: Date): Promise<Array<{ role: string; n: number }>>;
-  search(filters: UserSearchFilters, page?: number, limit?: number): Promise<UserSearchResult>;
+}
+
+/** Core identity writes. */
+export interface IUserWriter {
   insertOne(input: UserInsert): Promise<UserRow>;
   updateById(id: string, patch: UserPatch): Promise<UserRow | null>;
   /** Apply the same patch to many users in a single SQL UPDATE. Used by
@@ -94,16 +107,18 @@ export interface IUsersRepository {
   setEmail(id: string, email: string, verified: boolean): Promise<void>;
   deleteById(id: string): Promise<boolean>;
   markLogin(id: string): Promise<void>;
-  /** IANA timezone for a user, read from `account_preferences.timezone`.
-   *  Returns null when the user has no preferences row yet (signup before
-   *  the preferences seed lands). Source of truth, not `users.*` — the
-   *  `users` table does NOT carry a timezone column. */
-  findTimezone(userId: string): Promise<string | null>;
-  // ── profile ───────────────────────────────────────────────────────────
+}
+
+/** User profile rows. */
+export interface IUserProfileRepository {
   findProfileByUserId(userId: string): Promise<UserProfileRow | null>;
   findProfilesByUserIds(userIds: string[]): Promise<UserProfileRow[]>;
   findProfileBySlug(slug: string): Promise<UserProfileRow | null>;
   upsertProfile(input: UserProfileInsert): Promise<UserProfileRow>;
+}
+
+/** Actor projections for fan-out / display surfaces. */
+export interface IUserActorReader {
   /** Minimal "who is this user" projection for actor surfaces
    *  (notifications, mentions, comments, connection requests). One join
    *  for the whole batch — call this once with every actor id you need
@@ -114,7 +129,10 @@ export interface IUsersRepository {
    *  abuse reports per #641). Returns ids only — callers that need
    *  display names should pair this with `findActorsByIds`. */
   findSuperAdminIds(): Promise<string[]>;
-  // ── connections (social graph) ────────────────────────────────────────
+}
+
+/** Connections (social graph). */
+export interface IUserConnectionRepository {
   findConnection(a: string, b: string): Promise<UserConnectionRow | null>;
   /** Incoming PENDING connection requests addressed to `userId`, newest
    *  first, capped at `limit` (inbox/bootstrap "pending requests" strip). */
@@ -122,6 +140,14 @@ export interface IUsersRepository {
   insertConnection(input: UserConnectionInsert): Promise<UserConnectionRow>;
   updateConnectionStatus(id: string, status: string, responseMessage?: string): Promise<void>;
 }
+
+export interface IUsersRepository
+  extends IUserReader,
+    IUserStatsReader,
+    IUserWriter,
+    IUserProfileRepository,
+    IUserActorReader,
+    IUserConnectionRepository {}
 
 export class UsersRepository implements IUsersRepository {
   constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}

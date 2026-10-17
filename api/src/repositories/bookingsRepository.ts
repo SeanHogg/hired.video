@@ -6,7 +6,7 @@
  *   booking_availability_rules — recurring weekly availability
  *   booking_availability_overrides — one-off adds / blocks
  *   booking_reservations       — each booking
- *   booking_comments           — threaded comments
+ *   comments (subject 'booking_reservation') — reservation comments
  *   booking_payout_records     — per-reservation payout ledger
  *
  * Plus reads on creator_profiles + users for handle / display-name /
@@ -18,13 +18,14 @@
 
 import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
+import { commentsOn } from "./engagementSubjectFilters.js";
 
 const {
   bookingOfferings,
   bookingAvailabilityRules,
   bookingAvailabilityOverrides,
   bookingReservations,
-  bookingComments,
+  comments,
   bookingPayoutRecords,
   creatorProfiles,
   users,
@@ -48,8 +49,25 @@ export type BookingReservationRow = typeof bookingReservations.$inferSelect;
 export type BookingReservationInsert = typeof bookingReservations.$inferInsert;
 export type BookingReservationPatch = Partial<BookingReservationInsert>;
 
-export type BookingCommentRow = typeof bookingComments.$inferSelect;
-export type BookingCommentInsert = typeof bookingComments.$inferInsert;
+/** A reservation comment, projected from `comments` in the legacy shape. */
+export interface BookingCommentRow {
+  id: string;
+  reservationId: string;
+  authorKind: string;
+  authorUserId: string | null;
+  bodyMd: string;
+  createdAt: Date;
+}
+export type BookingCommentInsert = Omit<BookingCommentRow, "id" | "createdAt">;
+
+const bookingCommentColumns = {
+  id: comments.id,
+  reservationId: comments.subjectId,
+  authorKind: sql<string>`${comments.authorKind}`,
+  authorUserId: comments.authorUserId,
+  bodyMd: comments.body,
+  createdAt: comments.createdAt,
+};
 
 export type BookingPayoutRecordRow = typeof bookingPayoutRecords.$inferSelect;
 export type BookingPayoutRecordInsert = typeof bookingPayoutRecords.$inferInsert;
@@ -66,36 +84,52 @@ export interface BookingHostIdentity {
   bookingsActive: boolean;
 }
 
-export interface IBookingsRepository {
-  // ── Host identity (read-only) ────────────────────────────────────────────
+// ── Role interfaces (ISP) ───────────────────────────────────────────────────
+// Consumers depend on the narrowest role they use; `IBookingsRepository`
+// composes them so the implementation + DI wiring stay unchanged.
+
+/** Host identity (read-only). */
+export interface IBookingHostReader {
   findHostByUserId(userId: string): Promise<BookingHostIdentity | null>;
   findHostByHandle(handle: string): Promise<BookingHostIdentity | null>;
+}
 
-  // ── Offerings ────────────────────────────────────────────────────────────
+/** Offering catalog reads. */
+export interface IBookingOfferingReader {
   listOfferingsForHost(userId: string, includeInactive?: boolean): Promise<BookingOfferingRow[]>;
   findOfferingBySlug(userId: string, slug: string): Promise<BookingOfferingRow | null>;
   findOfferingById(id: string): Promise<BookingOfferingRow | null>;
+}
+
+/** Offering catalog writes. */
+export interface IBookingOfferingWriter {
   insertOffering(input: BookingOfferingInsert): Promise<BookingOfferingRow>;
   updateOffering(id: string, patch: BookingOfferingPatch): Promise<BookingOfferingRow | null>;
   deleteOffering(id: string): Promise<boolean>;
+}
 
-  // ── Availability rules ───────────────────────────────────────────────────
+/** Availability rule + override reads. */
+export interface IBookingAvailabilityReader {
   listAvailabilityRulesForHost(userId: string): Promise<BookingAvailabilityRuleRow[]>;
-  insertAvailabilityRule(input: BookingAvailabilityRuleInsert): Promise<BookingAvailabilityRuleRow>;
-  deleteAvailabilityRule(id: string, userId: string): Promise<boolean>;
-
-  // ── Availability overrides ───────────────────────────────────────────────
   listAvailabilityOverridesForHost(
     userId: string,
     fromLocalDate: string,
     toLocalDate: string,
   ): Promise<BookingAvailabilityOverrideRow[]>;
+}
+
+/** Availability rule + override writes. */
+export interface IBookingAvailabilityWriter {
+  insertAvailabilityRule(input: BookingAvailabilityRuleInsert): Promise<BookingAvailabilityRuleRow>;
+  deleteAvailabilityRule(id: string, userId: string): Promise<boolean>;
   insertAvailabilityOverride(
     input: BookingAvailabilityOverrideInsert,
   ): Promise<BookingAvailabilityOverrideRow>;
   deleteAvailabilityOverride(id: string, userId: string): Promise<boolean>;
+}
 
-  // ── Reservations ─────────────────────────────────────────────────────────
+/** Reservation reads (incl. busy-window projection for slot resolution). */
+export interface IBookingReservationReader {
   listReservationsForHost(userId: string): Promise<BookingReservationRow[]>;
   listBusyWindowsForHost(
     userId: string,
@@ -104,18 +138,37 @@ export interface IBookingsRepository {
   ): Promise<Array<{ startUtc: Date; endUtc: Date }>>;
   findReservationById(id: string): Promise<BookingReservationRow | null>;
   findReservationByMagicToken(token: string): Promise<BookingReservationRow | null>;
+}
+
+/** Reservation writes. */
+export interface IBookingReservationWriter {
   /** Concurrency-safe insert — fails on slot collision via the partial index. */
   insertReservation(input: BookingReservationInsert): Promise<BookingReservationRow>;
   updateReservation(id: string, patch: BookingReservationPatch): Promise<BookingReservationRow | null>;
+}
 
-  // ── Comments ─────────────────────────────────────────────────────────────
+/** Reservation comment thread. */
+export interface IBookingCommentStore {
   listCommentsForReservation(reservationId: string): Promise<BookingCommentRow[]>;
   insertComment(input: BookingCommentInsert): Promise<BookingCommentRow>;
+}
 
-  // ── Payout ledger ────────────────────────────────────────────────────────
+/** Per-reservation payout ledger. */
+export interface IBookingPayoutLedger {
   insertPayoutRecord(input: BookingPayoutRecordInsert): Promise<BookingPayoutRecordRow>;
   listPayoutRecordsForHost(userId: string): Promise<BookingPayoutRecordRow[]>;
 }
+
+export interface IBookingsRepository
+  extends IBookingHostReader,
+    IBookingOfferingReader,
+    IBookingOfferingWriter,
+    IBookingAvailabilityReader,
+    IBookingAvailabilityWriter,
+    IBookingReservationReader,
+    IBookingReservationWriter,
+    IBookingCommentStore,
+    IBookingPayoutLedger {}
 
 export class BookingsRepository implements IBookingsRepository {
   constructor(
@@ -389,17 +442,23 @@ export class BookingsRepository implements IBookingsRepository {
   // ── Comments ───────────────────────────────────────────────────────────
   async listCommentsForReservation(reservationId: string): Promise<BookingCommentRow[]> {
     return (await this.db
-      .select()
-      .from(bookingComments)
-      .where(eq(bookingComments.reservationId, reservationId))
-      .orderBy(asc(bookingComments.createdAt))) as BookingCommentRow[];
+      .select(bookingCommentColumns)
+      .from(comments)
+      .where(commentsOn("booking_reservation", reservationId))
+      .orderBy(asc(comments.createdAt))) as BookingCommentRow[];
   }
 
   async insertComment(input: BookingCommentInsert): Promise<BookingCommentRow> {
     const [row] = await this.db
-      .insert(bookingComments)
-      .values(input as any)
-      .returning();
+      .insert(comments)
+      .values({
+        subjectType: "booking_reservation",
+        subjectId: input.reservationId,
+        authorKind: input.authorKind,
+        authorUserId: input.authorUserId,
+        body: input.bodyMd,
+      })
+      .returning(bookingCommentColumns);
     return row as BookingCommentRow;
   }
 

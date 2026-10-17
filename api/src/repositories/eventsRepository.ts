@@ -76,20 +76,29 @@ export interface EventSearchOptions {
   offset: number;
 }
 
-export interface IEventsRepository {
-  // ── Event CRUD ─────────────────────────────────────────────────────
+/** Event aggregate: read side (lookups, search, host listings, categories). */
+export interface IEventReader {
   findById(id: string): Promise<EventRow | null>;
   /** Batch read — one query for many ids. Order NOT guaranteed; callers
    *  that need input order should map by id. */
   findByIds(ids: string[]): Promise<EventRow[]>;
   findBySlug(slug: string): Promise<EventRow | null>;
-  insert(input: EventInsert): Promise<EventRow>;
-  update(id: string, patch: EventPatch): Promise<EventRow | null>;
   search(opts: EventSearchOptions): Promise<EventRow[]>;
   countSearch(opts: EventSearchOptions): Promise<number>;
   listForHost(userId: string, scope: "upcoming" | "past" | "all"): Promise<EventRow[]>;
+  listCategories(workspaceId?: string | null): Promise<EventCategoryRow[]>;
+}
 
-  // ── Attendees ──────────────────────────────────────────────────────
+/** Event aggregate: write side (create/update + atomic denormalised counters). */
+export interface IEventWriter {
+  insert(input: EventInsert): Promise<EventRow>;
+  update(id: string, patch: EventPatch): Promise<EventRow | null>;
+  bumpAttendeeCount(eventId: string, delta: number): Promise<void>;
+  bumpWaitlistCount(eventId: string, delta: number): Promise<void>;
+}
+
+/** Attendees / RSVPs. */
+export interface IEventAttendeeRepository {
   findAttendee(eventId: string, userId: string): Promise<EventAttendeeRow | null>;
   /** One user's attendee row per event, for many events in one query.
    *  Keyed by eventId. */
@@ -103,8 +112,10 @@ export interface IEventsRepository {
    *  with an RSVP since `since`, or null if they share none. Powers the
    *  "you met at an event" connection-acceptance points award. */
   findSharedRecentEvent(userIdA: string, userIdB: string, since: Date): Promise<string | null>;
+}
 
-  // ── Co-hosts ───────────────────────────────────────────────────────
+/** Co-hosts. */
+export interface IEventCoHostRepository {
   findCoHostsByEvent(eventId: string): Promise<EventCoHostRow[]>;
   findCoHostsByEvents(eventIds: string[]): Promise<Map<string, EventCoHostRow[]>>;
   isCoHost(eventId: string, userId: string): Promise<boolean>;
@@ -112,14 +123,18 @@ export interface IEventsRepository {
   /** Multi-row insert (single statement); duplicates ignored. */
   insertCoHosts(inputs: EventCoHostInsert[]): Promise<void>;
   removeCoHost(eventId: string, userId: string): Promise<void>;
+}
 
-  // ── Waitlist ───────────────────────────────────────────────────────
+/** Waitlist. */
+export interface IEventWaitlistRepository {
   insertWaitlist(input: EventWaitlistInsert): Promise<void>;
   findNextWaitlisted(eventId: string): Promise<EventWaitlistRow | null>;
   markWaitlistPromoted(id: string): Promise<void>;
   nextWaitlistPosition(eventId: string): Promise<number>;
+}
 
-  // ── Reminders ──────────────────────────────────────────────────────
+/** Reminder dispatch bookkeeping. */
+export interface IEventReminderRepository {
   reminderAlreadySent(eventId: string, userId: string, key: string): Promise<boolean>;
   recordReminderSent(input: EventReminderSentInsert): Promise<void>;
   /** Already-sent reminder tuples for many events/keys in ONE query, as a
@@ -132,20 +147,24 @@ export interface IEventsRepository {
   /** userIds of approved, going attendees for many events in ONE query,
    *  grouped by eventId (attendee order: rsvpedAt asc). */
   findApprovedGoingAttendeeIds(eventIds: string[]): Promise<Map<string, string[]>>;
+}
 
-  // ── Matchmaking ────────────────────────────────────────────────────
+/** Attendee matchmaking. */
+export interface IEventMatchmakingRepository {
   topMatchesForViewer(eventId: string, viewerUserId: string, limit?: number): Promise<EventMatchmakingRow[]>;
   upsertMatch(input: EventMatchmakingInsert): Promise<void>;
   /** Multi-row upsert (single statement) keyed on (event, viewer, match). */
   upsertMatches(inputs: EventMatchmakingInsert[]): Promise<void>;
-
-  // ── Categories ─────────────────────────────────────────────────────
-  listCategories(workspaceId?: string | null): Promise<EventCategoryRow[]>;
-
-  // ── Denormalised counter helpers (atomic) ──────────────────────────
-  bumpAttendeeCount(eventId: string, delta: number): Promise<void>;
-  bumpWaitlistCount(eventId: string, delta: number): Promise<void>;
 }
+
+export interface IEventsRepository
+  extends IEventReader,
+    IEventWriter,
+    IEventAttendeeRepository,
+    IEventCoHostRepository,
+    IEventWaitlistRepository,
+    IEventReminderRepository,
+    IEventMatchmakingRepository {}
 
 export class EventsRepository implements IEventsRepository {
   constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}

@@ -1,13 +1,17 @@
 /**
- * Cron-driven drip processors (extracted from scheduled.ts):
- *   - processFollowUps          — follow-up nurture drips (#15)
- *   - processRecruiterOutreach  — recruiter outreach sequences (#2015)
+ * Cron-driven sequence processor (extracted from scheduled.ts):
+ *   - processFollowUps — the ONE sequence engine (follow_up_*, migration
+ *     0636): nurture drips (#15) AND recruiter outreach cadences (#2015).
+ *
+ * Per-kind behaviour lives in SEQUENCE_KIND_POLICIES; everything else
+ * (step lookup, {{var}} render, consent gate, AI personalization, send log,
+ * advance) is shared.
  *
  * Batching (neon-http = one HTTP round-trip per query):
  *   - consent is resolved for every due recipient up front via
  *     MarketingConsentService.filterMailable (2 queries total, was 2/row);
- *   - follow-up steps for every due sequence are prefetched in ONE query
- *     (was 2 step SELECTs per enrollment);
+ *   - steps for every due sequence are prefetched in ONE query;
+ *   - candidate recipients are joined into the due query;
  *   - status transitions that do NOT follow a send (no-step → completed,
  *     unsubscribed, undeliverable) are flushed as one `inArray` UPDATE per
  *     status at the end of the tick;
@@ -27,11 +31,80 @@ import { personalizeMessage } from "./personalize.js";
 import {
   DripQueuesRepository,
   type CandidateInteractionInsert,
+  type DueEnrollment,
 } from "../../repositories/dripQueuesRepository.js";
 import { logger } from "../../lib/logger.js";
+import {
+  FOLLOW_UP_SEQUENCE_KINDS,
+  type FollowUpSequenceKind,
+} from "../../../../shared/follow-up-sequences.js";
 
 const DUE_LIMIT = 100;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_SUBJECT = "Following up";
+
+interface SequenceKindPolicy {
+  /** Status set when an email step can't be delivered (no address / opted out). */
+  undeliverableStatus: "unsubscribed" | "completed";
+  /** Advance past a step whose send failed (outreach) vs retry it next tick (nurture). */
+  advanceOnSendFailure: boolean;
+  /** Record each touch on the talent-pool candidate timeline. */
+  recordInteraction: boolean;
+}
+
+const SEQUENCE_KIND_POLICIES: Record<FollowUpSequenceKind, SequenceKindPolicy> = {
+  // CAN-SPAM: an unsubscribed/suppressed nurture recipient is stopped.
+  nurture: { undeliverableStatus: "unsubscribed", advanceOnSendFailure: false, recordInteraction: false },
+  // An undeliverable candidate ends the cadence so it never spins forever.
+  recruiter_outreach: { undeliverableStatus: "completed", advanceOnSendFailure: true, recordInteraction: true },
+};
+
+function isSequenceKind(v: string): v is FollowUpSequenceKind {
+  return (FOLLOW_UP_SEQUENCE_KINDS as readonly string[]).includes(v);
+}
+
+function policyFor(kind: string): SequenceKindPolicy {
+  return SEQUENCE_KIND_POLICIES[isSequenceKind(kind) ? kind : "nurture"];
+}
+
+/** jsonb context → string vars (non-string values are ignored). */
+function stringVars(ctx: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!ctx || typeof ctx !== "object" || Array.isArray(ctx)) return out;
+  for (const [k, v] of Object.entries(ctx)) if (typeof v === "string") out[k] = v;
+  return out;
+}
+
+interface Recipient {
+  email: string | null;
+  name: string | null;
+  vars: Record<string, string>;
+}
+
+/** Candidate recipients (outreach) read contact fields from the joined
+ *  talent-pool row; email recipients (nurture) from the enrollment. */
+function resolveRecipient(row: DueEnrollment): Recipient {
+  const { enrollment } = row;
+  const ctx = stringVars(enrollment.context);
+  if (enrollment.talentPoolCandidateId) {
+    const name = row.candidateName?.trim() || null;
+    return {
+      email: row.candidateEmail,
+      name,
+      vars: { ...ctx, name: name ?? "there", company: row.candidateCompany ?? "" },
+    };
+  }
+  const name = enrollment.recipientName ?? ctx.name ?? null;
+  return {
+    email: enrollment.recipientEmail,
+    name,
+    vars: { ...ctx, name: name ?? "there", company: ctx.company ?? "" },
+  };
+}
+
+function renderTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_m, k: string) => vars[k] ?? vars[k.toLowerCase()] ?? "");
+}
 
 /** Emails (as stored) that may receive a null-category (master switch +
  *  hard suppression) send. */
@@ -44,113 +117,103 @@ async function mailableEmailSet(
   return new Set(allowed.map((r) => r.email));
 }
 
-// ---------------------------------------------------------------------------
-// Follow-up drip processor (#15)
-// ---------------------------------------------------------------------------
-
 /** Returns how many due enrollments were handled (0 = nothing was due). */
 export async function processFollowUps(): Promise<number> {
   const db = getDb();
   const repo = new DripQueuesRepository(db);
   const now = new Date();
 
-  // Load all active enrollments that are due, plus their sequence steps
-  const due = await repo.listDueFollowUps(now, DUE_LIMIT);
+  const due = await repo.listDueEnrollments(now, DUE_LIMIT);
   if (due.length === 0) return 0;
 
   const provider = getEmailProvider();
-  // Nurture drips are marketing — honor the same opt-out gate campaigns use.
-  // 1:1 sequences have no category, so we check the master switch + hard
-  // suppression only (pass null category).
+  const env = (globalThis as any).__ENV ?? {};
+  // Sequences are marketing/outreach — honor the same opt-out gate campaigns
+  // use. 1:1 sequences have no category, so we check the master switch +
+  // hard suppression only (pass null category).
   const consent = new MarketingConsentService(buildRepos(db).emailConsent as any);
+  const recipients = due.map(resolveRecipient);
   const [stepsBySequence, mailable] = await Promise.all([
     repo.findStepsBySequence(due.map((d) => d.enrollment.sequenceId)),
-    mailableEmailSet(consent, due.map((d) => d.enrollment.recipientEmail)),
+    mailableEmailSet(consent, recipients.map((r) => r.email)),
   ]);
 
   const toComplete: string[] = [];
   const toUnsubscribe: string[] = [];
+  const interactions: CandidateInteractionInsert[] = [];
 
   try {
-    for (const { enrollment } of due) {
+    for (const [i, row] of due.entries()) {
+      const { enrollment, sequence } = row;
+      const recipient = recipients[i];
+      const policy = policyFor(sequence.kind);
       try {
-        // Fetch the next step to send (currentStep is 0-indexed offset of next step)
-        const nextStepIndex = enrollment.currentStep;
+        // currentStep = how many steps were sent; step_order is 1-based.
         const steps = stepsBySequence.get(enrollment.sequenceId);
-        const step = steps?.get(nextStepIndex + 1);
-
+        const step = steps?.get(enrollment.currentStep + 1);
         if (!step) {
-          // No more steps — mark enrollment complete
           toComplete.push(enrollment.id);
           continue;
         }
 
-        // Substitute template variables
-        const ctx = (enrollment.context ?? {}) as Record<string, string>;
-        const name = enrollment.recipientName ?? ctx.name ?? "there";
-        let body = step.bodyTemplate
-          .replace(/\{\{name\}\}/gi, name)
-          .replace(/\{\{company\}\}/gi, ctx.company ?? "")
-          .replace(/\{\{(\w+)\}\}/g, (_m, k) => ctx[k] ?? "");
-
-        // AI message personalization (opt-in per step). Runs AFTER deterministic
-        // {{var}} substitution; degrades to the rendered body on any failure so a
-        // model outage never blocks the drip.
-        if (step.aiPersonalize) {
-          const env = (globalThis as any).__ENV ?? {};
-          body = await personalizeMessage(env, undefined, {
-            body,
-            recipientName: enrollment.recipientName ?? ctx.name ?? null,
-            subject: step.subject,
-            context: ctx,
-          });
-        }
-
+        let body = renderTemplate(step.bodyTemplate, recipient.vars);
+        const subject = step.subject || DEFAULT_SUBJECT;
         let sendStatus: "sent" | "failed" = "sent";
-        let errorMessage: string | undefined;
+        let errorMessage: string | null = null;
 
         if (step.channel === "email") {
-          // CAN-SPAM: an unsubscribed/suppressed recipient must not receive
-          // marketing nurture. Stop the enrollment so we don't re-attempt.
-          if (!mailable.has(enrollment.recipientEmail)) {
-            toUnsubscribe.push(enrollment.id);
+          if (!recipient.email || !mailable.has(recipient.email)) {
+            (policy.undeliverableStatus === "unsubscribed" ? toUnsubscribe : toComplete).push(enrollment.id);
             continue;
+          }
+          // AI personalization (opt-in per step) runs AFTER the deterministic
+          // render and degrades to it on any failure.
+          if (step.aiPersonalize) {
+            body = await personalizeMessage(env, undefined, {
+              body,
+              recipientName: recipient.name,
+              subject: step.subject ?? undefined,
+              context: recipient.vars,
+            });
           }
           if (provider) {
             try {
-              await provider.send({
-                to: enrollment.recipientEmail,
-                subject: step.subject,
-                html: `<p>${body.replace(/\n/g, "<br>")}</p>`,
-              });
-            } catch (err: any) {
+              await provider.send({ to: recipient.email, subject, html: `<p>${body.replace(/\n/g, "<br>")}</p>` });
+            } catch (err: unknown) {
               sendStatus = "failed";
-              errorMessage = String(err?.message ?? err);
+              errorMessage = err instanceof Error ? err.message : String(err);
+              logger.error("[scheduled] sequence send failed", { enrollmentId: enrollment.id, error: err });
             }
           } else {
-            logger.warn("[scheduled] No email provider — skipping follow-up", { enrollmentId: enrollment.id });
+            logger.warn("[scheduled] No email provider — skipping sequence step", { enrollmentId: enrollment.id });
             sendStatus = "failed";
             errorMessage = "No email provider configured";
           }
         }
-        // channel === "message" would use in-app messaging; left as a no-op for now
+        // channel "message" / "sms" have no live transport yet — they advance
+        // the sequence (logged) without delivery.
 
-        // Log the send attempt
-        await repo.insertFollowUpLog({
-          enrollmentId: enrollment.id,
-          stepId: step.id,
-          status: sendStatus,
-          errorMessage: errorMessage ?? null,
-        });
+        await repo.insertFollowUpLog({ enrollmentId: enrollment.id, stepId: step.id, status: sendStatus, errorMessage });
 
-        if (sendStatus === "sent") {
-          // Advance to the next step (prefetched — no extra SELECT)
-          const nextStep = steps?.get(nextStepIndex + 2);
+        if (policy.recordInteraction && enrollment.talentPoolCandidateId) {
+          interactions.push({
+            recruiterId: enrollment.userId,
+            candidateId: enrollment.userId, // placeholder until candidate links an account
+            talentPoolId: enrollment.talentPoolCandidateId,
+            type: "outreach_sent",
+            subject: step.subject || `Outreach step ${enrollment.currentStep + 1}`,
+            notes: body.slice(0, 500),
+            metadata: { sequenceId: sequence.id, step: enrollment.currentStep, channel: step.channel },
+          });
+        }
+
+        if (sendStatus === "sent" || policy.advanceOnSendFailure) {
+          const nextStep = steps?.get(enrollment.currentStep + 2);
           await repo.advanceFollowUpEnrollment(
             enrollment.id,
             {
-              currentStep: nextStepIndex + 1,
-              nextSendAt: nextStep ? new Date(now.getTime() + nextStep.delayDays * DAY_MS) : null,
+              currentStep: enrollment.currentStep + 1,
+              nextSendAt: nextStep ? new Date(now.getTime() + (nextStep.delayDays || 0) * DAY_MS) : null,
               completed: !nextStep,
             },
             now,
@@ -164,130 +227,10 @@ export async function processFollowUps(): Promise<number> {
     await Promise.all([
       repo.setFollowUpEnrollmentsStatus(toComplete, "completed", now),
       repo.setFollowUpEnrollmentsStatus(toUnsubscribe, "unsubscribed", now),
-    ]).catch((err) => logger.error("[scheduled] follow-up status flush failed", err));
-  }
-
-  logger.info("[scheduled] Processed follow-up enrollments", { count: due.length });
-  return due.length;
-}
-
-// ---------------------------------------------------------------------------
-// Recruiter outreach sender (#2015)
-// Mirrors processFollowUps but for recruiter_outreach_enrollments, whose steps
-// live as a JSONB array on the sequence. Reuses the shared personalizeMessage
-// helper and the same MarketingConsentService gate as the nurture drip.
-// ---------------------------------------------------------------------------
-
-type OutreachStep = {
-  channel: "email" | "message" | "sms";
-  delayDays: number;
-  subject?: string;
-  body: string;
-  aiPersonalize?: boolean;
-};
-
-/** Returns how many due enrollments were handled (0 = nothing was due). */
-export async function processRecruiterOutreach(): Promise<number> {
-  const db = getDb();
-  const repo = new DripQueuesRepository(db);
-  const now = new Date();
-
-  // Join the candidate in the same query so the per-row loop never N+1s for
-  // recipient email/name/company.
-  const due = await repo.listDueOutreach(now, DUE_LIMIT);
-  if (due.length === 0) return 0;
-
-  const provider = getEmailProvider();
-  const consent = new MarketingConsentService(buildRepos(db).emailConsent as any);
-  const env = (globalThis as any).__ENV ?? {};
-  const mailable = await mailableEmailSet(consent, due.map((r) => r.candidateEmail));
-
-  const toComplete: string[] = [];
-  const interactions: CandidateInteractionInsert[] = [];
-
-  try {
-    for (const row of due) {
-      const { enrollment, sequence } = row;
-      try {
-        const steps = (sequence.steps ?? []) as OutreachStep[];
-        const step = steps[enrollment.currentStep];
-
-        if (!step) {
-          toComplete.push(enrollment.id);
-          continue;
-        }
-
-        const name = row.candidateName?.trim() || "there";
-        const company = row.candidateCompany ?? "";
-        let body = step.body
-          .replace(/\{\{name\}\}/gi, name)
-          .replace(/\{\{company\}\}/gi, company)
-          .replace(/\{\{(\w+)\}\}/g, () => "");
-
-        if (step.channel === "email") {
-          // No address to reach, or recipient suppressed → stop the sequence so it
-          // doesn't spin forever on an undeliverable candidate.
-          if (!row.candidateEmail || !mailable.has(row.candidateEmail)) {
-            toComplete.push(enrollment.id);
-            continue;
-          }
-          if (step.aiPersonalize) {
-            body = await personalizeMessage(env, undefined, {
-              body,
-              recipientName: name,
-              subject: step.subject,
-              context: { company },
-            });
-          }
-          if (provider) {
-            await provider
-              .send({
-                to: row.candidateEmail,
-                subject: step.subject || "Following up",
-                html: `<p>${body.replace(/\n/g, "<br>")}</p>`,
-              })
-              .catch((err: any) =>
-                logger.error("[outreach] send failed", { enrollmentId: enrollment.id, error: err }),
-              );
-          }
-        }
-        // channel "message" / "sms" have no live transport yet — they advance the
-        // sequence (logged as an interaction) without delivery.
-
-        // Record the touch on the candidate timeline (reuses candidate_interactions;
-        // flushed as one multi-row insert at the end of the tick).
-        interactions.push({
-          recruiterId: enrollment.recruiterId,
-          candidateId: enrollment.recruiterId, // placeholder until candidate links an account
-          talentPoolId: enrollment.talentPoolCandidateId,
-          type: "outreach_sent",
-          subject: step.subject || `Outreach step ${enrollment.currentStep + 1}`,
-          notes: body.slice(0, 500),
-          metadata: { sequenceId: sequence.id, step: enrollment.currentStep, channel: step.channel },
-        });
-
-        // Advance to the next step (or complete).
-        const nextStep = steps[enrollment.currentStep + 1];
-        await repo.advanceOutreachEnrollment(
-          enrollment.id,
-          {
-            currentStep: enrollment.currentStep + 1,
-            nextSendAt: nextStep ? new Date(now.getTime() + (nextStep.delayDays || 0) * DAY_MS) : null,
-            completed: !nextStep,
-          },
-          now,
-        );
-      } catch (err) {
-        logger.error("[scheduled] Error processing outreach enrollment", { enrollmentId: enrollment.id, error: err });
-      }
-    }
-  } finally {
-    await Promise.all([
-      repo.completeOutreachEnrollments(toComplete, now),
       repo.insertCandidateInteractions(interactions),
-    ]).catch((err) => logger.error("[scheduled] outreach flush failed", err));
+    ]).catch((err) => logger.error("[scheduled] sequence status flush failed", err));
   }
 
-  logger.info("[scheduled] Processed recruiter outreach enrollments", { count: due.length });
+  logger.info("[scheduled] Processed sequence enrollments", { count: due.length });
   return due.length;
 }

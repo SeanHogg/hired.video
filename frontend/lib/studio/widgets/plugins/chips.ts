@@ -1,7 +1,8 @@
 /** Chips widget plugin — pill labels laid out as wrapping rows or a column.
  *  Pill sizes scale with the font (padding 0.7em × 0.3em, gap 0.4em). */
 import type { ChipsWidgetParams, WidgetParams } from "@/lib/studio/editor-v2/canvas-state";
-import { numberOr, stringOr, type Box } from "../frame";
+import { type Box } from "../frame";
+import { numberOr, stringOr } from "@/lib/numeric";
 import { registerPlugin } from "../plugin";
 import type { DrawEnv, DrawOp } from "../draw-ops";
 import { fontShorthand, type TextStyle } from "../text-layout";

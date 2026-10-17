@@ -34,6 +34,7 @@ export async function insertAutoApplications(
     coverLetter: d.coverLetter,
     status: "applied",
     appliedAt,
+    statusChangedAt: appliedAt,
   });
 
   try {

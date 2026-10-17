@@ -27,6 +27,7 @@ import { getDb } from "../db/index.js";
 import { studioProjects } from "../db/schema/resumes.js";
 import { gamePlayInvites } from "../db/schema/games.js";
 import { canActFor } from "../services/studio/workspace.js";
+import { projectStateAs } from "../repositories/studioProjectsRepository.js";
 import { sendPushToUser } from "../services/push/web-push.js";
 import { randomBase64Url } from "../utils/crypto.js";
 
@@ -63,7 +64,7 @@ async function loadActableProject(projectId: string, actorUserId: string): Promi
     .select({
       userId: studioProjects.userId,
       companyId: studioProjects.companyId,
-      gameState: studioProjects.gameState,
+      gameState: projectStateAs("gameState"),
     })
     .from(studioProjects)
     .where(eq(studioProjects.id, projectId))
@@ -111,7 +112,7 @@ gamesRoutes.post("/:projectId/challenge-complete", async (c) => {
   const [project] = await db
     .select({
       id: studioProjects.id,
-      gameState: studioProjects.gameState,
+      gameState: projectStateAs("gameState"),
     })
     .from(studioProjects)
     .where(eq(studioProjects.id, projectId))
@@ -338,7 +339,7 @@ gamesRoutes.get("/invites/:token", async (c) => {
       // project's identity is the `studio_templates` template that
       // seeded it + the user's local "draft" naming convention. Invite
       // label is the user-facing title on the play landing.
-      gameState: studioProjects.gameState,
+      gameState: projectStateAs("gameState"),
     })
     .from(studioProjects)
     .where(eq(studioProjects.id, invite.projectId))

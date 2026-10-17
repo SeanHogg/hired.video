@@ -1,5 +1,17 @@
+/**
+ * Impersonation session lifecycle — the ONLY routes at /api/admin/impersonate
+ * (mounted by the admin composite, routes/admin/index.ts, which applies the
+ * SA guard). The SuperAdmin console lives at /api/admin/sa.
+ *
+ *   POST /                   — start a session
+ *   POST /:id/end            — end it
+ *   POST /:id/switch-role    — switch the impersonated role
+ *   GET  /active             — the caller's open session
+ *   GET  /sessions[/:id]     — session history
+ */
 import { Hono } from "hono";
-import { z } from "zod";
+import { z } from "zod";
+
 import { UUID_LIKE_REGEX } from "../../../../shared/validation.js";
 import type { Variables, AppEnv } from "../../types/index.js";
 import { ok } from "../../utils/response.js";

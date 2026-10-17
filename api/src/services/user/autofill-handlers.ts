@@ -5,18 +5,22 @@
  * AI provider; those still delegate to the pure service functions.
  *
  * Covers:
- *   • handleSaveSubmission          — writes a form submission, updates
+ *   • saveSubmission                — writes a form submission, updates
  *                                      pipeline status when marked
  *                                      "submitted" and a savedJob is linked.
- *   • handleUpdateCacheEntry        — edit a cached answer (owner-gated).
- *   • handleDeleteCacheEntry        — delete a cached answer.
- *   • handleHistoryList             — paginated form submissions with
+ *   • updateCacheEntry              — edit a cached answer (owner-gated).
+ *   • deleteCacheEntry              — delete a cached answer.
+ *   • listHistory                   — paginated form submissions with
  *                                      batched job enrichment (no N+1).
- *   • handleHistoryDetail           — single submission + job info.
+ *   • getHistoryDetail              — single submission + job info.
+ *
+ * Each use case returns plain data / throws DomainError; the `handle*`
+ * exports at the bottom are their asHandler envelope adapters.
  */
 
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { schema } from "../../db/index.js";
+import { recordApply } from "../../repositories/jobApplicationTrackerRepository.js";
 
 const { applicationFormAnswers, savedJobs, answerCache, jobItems } = schema;
 
@@ -30,10 +34,10 @@ export interface AutofillDeps {
   now: () => Date;
 }
 
-// Result envelope + auth guard live in the shared handler module.
-import { ok, fail, requireAuth, type HandlerResult } from "../../handlers/shared.js";
-export { ok, fail };
-export type { HandlerResult };
+// Use cases return plain data and throw DomainError; the exported
+// `handle*` wrappers (asHandler) map that onto the HTTP envelope.
+import { asHandler } from "../../handlers/shared.js";
+import { DomainError, requireUserId } from "../../domains/errors.js";
 
 // ---------------------------------------------------------------------------
 // Schemas — canonical source is shared/autofill.ts.
@@ -46,16 +50,15 @@ export { SaveSubmissionSchema, UpdateCacheEntrySchema };
 // handleSaveSubmission
 // ═══════════════════════════════════════════════════════════════════════════
 
-export async function handleSaveSubmission(
+export async function saveSubmission(
   deps: AutofillDeps,
   viewerId: string | null,
   body: unknown,
-): Promise<HandlerResult> {
-  const auth = requireAuth(viewerId);
-  if ("status" in auth) return auth;
+) {
+  const auth = { userId: requireUserId(viewerId) };
   const parsed = SaveSubmissionSchema.safeParse(body);
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
+    throw new DomainError(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
   }
 
   const now = deps.now();
@@ -78,44 +81,42 @@ export async function handleSaveSubmission(
     } as any)
     .returning({ id: applicationFormAnswers.id });
 
-  // When submission is finalised and linked to a saved job, advance the
-  // pipeline state. Failure here is non-critical — we still return the
-  // submission id.
+  // When submission is finalised and linked to a saved job, record the
+  // application (job_applications owns the tracker lifecycle, W3-D2).
+  // Failure here is non-critical — we still return the submission id.
   if (d.status === "submitted" && d.savedJobId) {
     try {
-      await deps.db
-        .update(savedJobs)
-        .set({
-          status: "applied",
-          appliedAt: now,
-          statusChangedAt: now,
-          updatedAt: now,
-        } as any)
-        .where(and(eq(savedJobs.id, d.savedJobId), eq(savedJobs.userId, auth.userId)));
+      const [saved] = await deps.db
+        .select({ jobId: savedJobs.jobId })
+        .from(savedJobs)
+        .where(and(eq(savedJobs.id, d.savedJobId), eq(savedJobs.userId, auth.userId)))
+        .limit(1);
+      if (saved?.jobId) {
+        await recordApply(deps.db, { userId: auth.userId, jobId: saved.jobId, resumeId: d.resumeId ?? null, coverLetter: null }, now);
+      }
     } catch {
       // Non-critical — the submission is saved; pipeline promotion is
       // a nice-to-have that callers can retry manually.
     }
   }
 
-  return ok({ id: inserted?.id }, 201);
+  return { id: inserted?.id };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleUpdateCacheEntry / handleDeleteCacheEntry
 // ═══════════════════════════════════════════════════════════════════════════
 
-export async function handleUpdateCacheEntry(
+export async function updateCacheEntry(
   deps: AutofillDeps,
   viewerId: string | null,
   cacheId: string,
   body: unknown,
-): Promise<HandlerResult> {
-  const auth = requireAuth(viewerId);
-  if ("status" in auth) return auth;
+) {
+  const auth = { userId: requireUserId(viewerId) };
   const parsed = UpdateCacheEntrySchema.safeParse(body);
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
+    throw new DomainError(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
   }
 
   const [updated] = await deps.db
@@ -124,36 +125,34 @@ export async function handleUpdateCacheEntry(
     .where(and(eq(answerCache.id, cacheId), eq(answerCache.userId, auth.userId)))
     .returning({ id: answerCache.id });
 
-  if (!updated) return fail(404, "NOT_FOUND", "Cached answer not found");
-  return ok({ id: updated.id });
+  if (!updated) throw new DomainError(404, "NOT_FOUND", "Cached answer not found");
+  return { id: updated.id };
 }
 
-export async function handleDeleteCacheEntry(
+export async function deleteCacheEntry(
   deps: AutofillDeps,
   viewerId: string | null,
   cacheId: string,
-): Promise<HandlerResult> {
-  const auth = requireAuth(viewerId);
-  if ("status" in auth) return auth;
+) {
+  const auth = { userId: requireUserId(viewerId) };
   const [deleted] = await deps.db
     .delete(answerCache)
     .where(and(eq(answerCache.id, cacheId), eq(answerCache.userId, auth.userId)))
     .returning({ id: answerCache.id });
-  if (!deleted) return fail(404, "NOT_FOUND", "Cached answer not found");
-  return ok({ id: deleted.id });
+  if (!deleted) throw new DomainError(404, "NOT_FOUND", "Cached answer not found");
+  return { id: deleted.id };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleHistoryList / handleHistoryDetail
 // ═══════════════════════════════════════════════════════════════════════════
 
-export async function handleHistoryList(
+export async function listHistory(
   deps: AutofillDeps,
   viewerId: string | null,
   opts: { page?: number; limit?: number; jobId?: string },
-): Promise<HandlerResult> {
-  const auth = requireAuth(viewerId);
-  if ("status" in auth) return auth;
+) {
+  const auth = { userId: requireUserId(viewerId) };
 
   const page = Math.max(1, opts.page ?? 1);
   const limit = Math.min(50, Math.max(1, opts.limit ?? 20));
@@ -197,16 +196,15 @@ export async function handleHistoryList(
     return { ...r, jobTitle: job?.title, company: job?.company ?? undefined };
   });
 
-  return ok(enriched);
+  return enriched;
 }
 
-export async function handleHistoryDetail(
+export async function getHistoryDetail(
   deps: AutofillDeps,
   viewerId: string | null,
   submissionId: string,
-): Promise<HandlerResult> {
-  const auth = requireAuth(viewerId);
-  if ("status" in auth) return auth;
+) {
+  const auth = { userId: requireUserId(viewerId) };
 
   const [row] = await deps.db
     .select()
@@ -217,7 +215,7 @@ export async function handleHistoryDetail(
     ))
     .limit(1);
 
-  if (!row) return fail(404, "NOT_FOUND", "Submission not found");
+  if (!row) throw new DomainError(404, "NOT_FOUND", "Submission not found");
 
   let jobTitle: string | undefined;
   let company: string | undefined;
@@ -235,5 +233,15 @@ export async function handleHistoryDetail(
     }
   }
 
-  return ok({ ...row, jobTitle, company });
+  return { ...row, jobTitle, company };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HTTP-envelope adapters (route + tests)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const handleSaveSubmission = asHandler(saveSubmission, 201);
+export const handleUpdateCacheEntry = asHandler(updateCacheEntry);
+export const handleDeleteCacheEntry = asHandler(deleteCacheEntry);
+export const handleHistoryList = asHandler(listHistory);
+export const handleHistoryDetail = asHandler(getHistoryDetail);

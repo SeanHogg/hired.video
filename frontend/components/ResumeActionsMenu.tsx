@@ -62,7 +62,7 @@ interface ResumeActionsMenuProps {
    * primary resume rich" flow the user asked for.
    */
   onCopyToMaster?: () => void;
-  /** Owner-only — `POST /api/resumes/:id/clone`. Backend appends " (copy)"
+  /** Owner-only — `POST /api/resumes { source: "clone" }`. Backend appends " (copy)"
    *  to title and lands the clone as `status: draft`. Distinct from
    *  `onCreateVariation` (which links the new row to this one as a
    *  parent/variant); Clone produces an independent copy. */

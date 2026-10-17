@@ -13,16 +13,6 @@ import { UuidLikeSchema } from "../../../../shared/validation.js";
 import { AD_SUBJECT_TYPES } from "../../../../shared/ad-content-target.js";
 import { AdSetTargetingSchema } from "../../../../shared/ad-targeting.js";
 
-// ─── Boosts ───────────────────────────────────────────────────────────────
-
-export const CreateBoostSchema = z.object({
-  jobId:         UuidLikeSchema,
-  placementType: z.enum(["search_top", "discovery_feed", "both"]),
-  pricingModel:  z.enum(["cpm", "cpc"]),
-  budgetCents:   z.number().int().min(1000), // minimum $10
-  durationDays:  z.number().int().min(1).max(90),
-});
-
 // ─── Campaigns ────────────────────────────────────────────────────────────
 
 const CAMPAIGN_OBJECTIVES = ["AWARENESS", "TRAFFIC", "APPLICATIONS", "EMPLOYER_BRAND"] as const;

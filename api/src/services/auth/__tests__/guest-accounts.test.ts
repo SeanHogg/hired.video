@@ -1,7 +1,7 @@
 import { before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { jwtVerify } from "jose";
-import { issueJwt } from "../AuthService.js";
+import { issueJwt } from "../jwt.js";
 import { guestIdFromToken } from "../guest-accounts.js";
 import { buildRetentionDeleteSql, RETENTION_POLICIES } from "../../maintenance/retention-sweep.js";
 import { guestEmailFor, isGuestEmail } from "../../../../../shared/guest-accounts.js";

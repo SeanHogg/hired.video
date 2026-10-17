@@ -1,25 +1,53 @@
 /**
- * SocialConnectionRepository — pure data access for the two social
- * connection tables (migration 0217):
- *   social_connections — Layer 3, end-user accounts (Lane B)
- *   managed_accounts   — Layer 2, hired.video brand accounts (Lane A)
+ * SocialConnectionRepository — the social-publishing adapter over
+ * provider_connections (W3-C, migration 0600; was social_connections +
+ * managed_accounts, mig 0217):
+ *   purpose "social_publish" — Layer 3, end-user accounts (Lane B), owned by
+ *                              the user (owner user) or a member inside a
+ *                              company workspace (owner workspace)
+ *   purpose "managed_social" — Layer 2, hired.video brand accounts (Lane A),
+ *                              owner platform, one per network
  *
- * No business logic / caching / encryption — that lives in
- * services/social/social-connection-service.ts, which owns the cache,
- * token decryption, and lane-availability resolution.
+ * Maps rows to the shape the social service always used. No business logic /
+ * caching / encryption — that lives in services/social/social-connection-
+ * service.ts, which owns the cache, token decryption (connection-secrets.ts)
+ * and lane-availability resolution.
  */
-import { and, eq, isNull, sql } from "drizzle-orm";
-import { schema } from "../db/index.js";
-import type {
-  SocialConnectionRow,
-  SocialConnectionInsert,
-  ManagedAccountRow,
-  ManagedAccountInsert,
-} from "../db/schema/social.js";
-
-const { socialConnections, managedAccounts } = schema;
+import type { ProviderConnectionStatus } from "../../../shared/provider-connections.js";
+import {
+  ProviderConnectionsRepository,
+  type ProviderConnectionFilter,
+  type ProviderConnectionRow,
+} from "./providerConnectionsRepository.js";
+import type { ConnectionSecretColumn } from "../services/provider-connections/connection-secrets.js";
 
 export type DbLike = any;
+
+interface SocialAccountFields {
+  id: string;
+  platform: string;
+  externalAccountId: string | null;
+  handle: string | null;
+  avatarUrl: string | null;
+  /** Stored secret (canonical or legacy) — open with connection-secrets.ts. */
+  accessTokenEnc: string;
+  refreshTokenEnc: string | null;
+  accessTokenExpiresAt: Date | null;
+  scopes: string;
+  status: string;
+  lastError: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SocialConnectionRow extends SocialAccountFields {
+  userId: string;
+  companyId: string | null;
+}
+
+export interface ManagedAccountRow extends SocialAccountFields {
+  connectedByUserId: string | null;
+}
 
 export interface UpsertSocialConnectionInput {
   userId: string;
@@ -46,177 +74,187 @@ export interface UpsertManagedAccountInput {
   connectedByUserId: string | null;
 }
 
+export type SocialTokenPatch = {
+  accessTokenEnc: string;
+  refreshTokenEnc: string | null;
+  accessTokenExpiresAt: Date | null;
+  status?: ProviderConnectionStatus;
+};
+
 export interface ISocialConnectionRepository {
   // Layer 3 — user connections
   listForOwner(userId: string, companyId: string | null): Promise<SocialConnectionRow[]>;
   findForOwner(userId: string, companyId: string | null, platform: string): Promise<SocialConnectionRow | null>;
   upsertConnection(input: UpsertSocialConnectionInput): Promise<SocialConnectionRow>;
   /** Persist refreshed tokens on an existing row. */
-  updateTokens(id: string, patch: { accessTokenEnc: string; refreshTokenEnc: string | null; accessTokenExpiresAt: Date | null; status?: string }): Promise<void>;
+  updateTokens(id: string, patch: SocialTokenPatch): Promise<void>;
   removeConnection(userId: string, companyId: string | null, platform: string): Promise<boolean>;
 
   // Layer 2 — managed brand accounts (platform-global)
   listManaged(): Promise<ManagedAccountRow[]>;
   findManaged(platform: string): Promise<ManagedAccountRow | null>;
   upsertManaged(input: UpsertManagedAccountInput): Promise<ManagedAccountRow>;
-  updateManagedTokens(id: string, patch: { accessTokenEnc: string; refreshTokenEnc: string | null; accessTokenExpiresAt: Date | null; status?: string }): Promise<void>;
+  updateManagedTokens(id: string, patch: SocialTokenPatch): Promise<void>;
   removeManaged(platform: string): Promise<boolean>;
+
+  /** Lazy re-seal of a legacy-encrypted token (either layer). */
+  resealSecret(id: string, column: ConnectionSecretColumn, expected: string, next: string): Promise<void>;
 }
 
-function ownerWhere(userId: string, companyId: string | null) {
-  return and(
-    eq(socialConnections.userId, userId),
-    companyId == null ? isNull(socialConnections.companyId) : eq(socialConnections.companyId, companyId),
-  );
+const SELF = "social_publish" as const;
+const MANAGED = "managed_social" as const;
+
+function selfOwner(userId: string, companyId: string | null): ProviderConnectionFilter {
+  return companyId == null
+    ? { purpose: SELF, ownerKind: "user", ownerId: userId, userId, companyId: null }
+    : { purpose: SELF, ownerKind: "workspace", ownerId: companyId, userId, companyId };
+}
+
+function accountFields(row: ProviderConnectionRow): SocialAccountFields {
+  return {
+    id: row.id,
+    platform: row.provider,
+    externalAccountId: row.externalAccountId,
+    handle: row.handle,
+    avatarUrl: row.avatarUrl,
+    accessTokenEnc: row.accessTokenEnc ?? "",
+    refreshTokenEnc: row.refreshTokenEnc,
+    accessTokenExpiresAt: row.expiresAt,
+    scopes: row.scopes ?? "",
+    status: row.status,
+    lastError: row.lastError,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function toSelf(row: ProviderConnectionRow): SocialConnectionRow {
+  return { ...accountFields(row), userId: row.userId ?? "", companyId: row.companyId };
+}
+
+function toManaged(row: ProviderConnectionRow): ManagedAccountRow {
+  return { ...accountFields(row), connectedByUserId: row.connectedByUserId };
+}
+
+function tokenPatch(patch: SocialTokenPatch) {
+  return {
+    accessTokenEnc: patch.accessTokenEnc,
+    refreshTokenEnc: patch.refreshTokenEnc,
+    expiresAt: patch.accessTokenExpiresAt,
+    status: patch.status ?? "active",
+  };
 }
 
 export class SocialConnectionRepository implements ISocialConnectionRepository {
-  constructor(
-    private readonly db: DbLike,
-    private readonly now: () => Date = () => new Date(),
-  ) {}
+  private readonly connections: ProviderConnectionsRepository;
+
+  constructor(db: DbLike, now: () => Date = () => new Date()) {
+    this.connections = new ProviderConnectionsRepository(db, now);
+  }
 
   // ── Layer 3 ────────────────────────────────────────────────────────────
   async listForOwner(userId: string, companyId: string | null): Promise<SocialConnectionRow[]> {
-    return this.db.select().from(socialConnections).where(ownerWhere(userId, companyId));
+    return (await this.connections.list(selfOwner(userId, companyId))).map(toSelf);
   }
 
   async findForOwner(userId: string, companyId: string | null, platform: string): Promise<SocialConnectionRow | null> {
-    const [row] = await this.db
-      .select()
-      .from(socialConnections)
-      .where(and(ownerWhere(userId, companyId), eq(socialConnections.platform, platform)))
-      .limit(1);
-    return row ?? null;
+    const row = await this.connections.findOne({ ...selfOwner(userId, companyId), provider: platform });
+    return row ? toSelf(row) : null;
   }
 
   async upsertConnection(input: UpsertSocialConnectionInput): Promise<SocialConnectionRow> {
-    const existing = await this.findForOwner(input.userId, input.companyId, input.platform);
+    const owner = selfOwner(input.userId, input.companyId);
+    const existing = await this.connections.findOne({ ...owner, provider: input.platform });
+    const fields = {
+      externalAccountId: input.externalAccountId,
+      handle: input.handle,
+      avatarUrl: input.avatarUrl,
+      accessTokenEnc: input.accessTokenEnc,
+      expiresAt: input.accessTokenExpiresAt,
+      scopes: input.scopes,
+    };
     if (existing) {
-      const [row] = await this.db
-        .update(socialConnections)
-        .set({
-          externalAccountId: input.externalAccountId,
-          handle: input.handle,
-          avatarUrl: input.avatarUrl,
-          accessTokenEnc: input.accessTokenEnc,
-          refreshTokenEnc: input.refreshTokenEnc ?? existing.refreshTokenEnc,
-          accessTokenExpiresAt: input.accessTokenExpiresAt,
-          scopes: input.scopes,
-          status: "active",
-          lastError: null,
-          updatedAt: this.now(),
-        })
-        .where(eq(socialConnections.id, existing.id))
-        .returning();
-      return row;
+      const row = await this.connections.updateById(existing.id, {
+        ...fields,
+        refreshTokenEnc: input.refreshTokenEnc ?? existing.refreshTokenEnc,
+        status: "active",
+        lastError: null,
+      });
+      return toSelf(row ?? existing);
     }
-    const [row] = await this.db
-      .insert(socialConnections)
-      .values({
-        userId: input.userId,
-        companyId: input.companyId,
-        platform: input.platform,
-        externalAccountId: input.externalAccountId,
-        handle: input.handle,
-        avatarUrl: input.avatarUrl,
-        accessTokenEnc: input.accessTokenEnc,
-        refreshTokenEnc: input.refreshTokenEnc,
-        accessTokenExpiresAt: input.accessTokenExpiresAt,
-        scopes: input.scopes,
-      } as SocialConnectionInsert)
-      .returning();
-    return row;
+    const row = await this.connections.insert({
+      ownerKind: owner.ownerKind!,
+      ownerId: owner.ownerId as string,
+      userId: input.userId,
+      companyId: input.companyId,
+      provider: input.platform,
+      purpose: SELF,
+      ...fields,
+      refreshTokenEnc: input.refreshTokenEnc,
+    });
+    return toSelf(row);
   }
 
-  async updateTokens(id: string, patch: { accessTokenEnc: string; refreshTokenEnc: string | null; accessTokenExpiresAt: Date | null; status?: string }): Promise<void> {
-    await this.db
-      .update(socialConnections)
-      .set({
-        accessTokenEnc: patch.accessTokenEnc,
-        refreshTokenEnc: patch.refreshTokenEnc,
-        accessTokenExpiresAt: patch.accessTokenExpiresAt,
-        status: patch.status ?? "active",
-        updatedAt: this.now(),
-      })
-      .where(eq(socialConnections.id, id));
+  async updateTokens(id: string, patch: SocialTokenPatch): Promise<void> {
+    await this.connections.update({ id, purpose: SELF }, tokenPatch(patch));
   }
 
   async removeConnection(userId: string, companyId: string | null, platform: string): Promise<boolean> {
-    const deleted = await this.db
-      .delete(socialConnections)
-      .where(and(ownerWhere(userId, companyId), eq(socialConnections.platform, platform)))
-      .returning({ id: socialConnections.id });
+    const deleted = await this.connections.delete({ ...selfOwner(userId, companyId), provider: platform });
     return deleted.length > 0;
   }
 
   // ── Layer 2 ────────────────────────────────────────────────────────────
   async listManaged(): Promise<ManagedAccountRow[]> {
-    return this.db.select().from(managedAccounts);
+    return (await this.connections.list({ purpose: MANAGED })).map(toManaged);
   }
 
   async findManaged(platform: string): Promise<ManagedAccountRow | null> {
-    const [row] = await this.db.select().from(managedAccounts).where(eq(managedAccounts.platform, platform)).limit(1);
-    return row ?? null;
+    const row = await this.connections.findOne({ purpose: MANAGED, provider: platform });
+    return row ? toManaged(row) : null;
   }
 
   async upsertManaged(input: UpsertManagedAccountInput): Promise<ManagedAccountRow> {
-    const existing = await this.findManaged(input.platform);
+    const existing = await this.connections.findOne({ purpose: MANAGED, provider: input.platform });
+    const fields = {
+      externalAccountId: input.externalAccountId,
+      handle: input.handle,
+      avatarUrl: input.avatarUrl,
+      accessTokenEnc: input.accessTokenEnc,
+      expiresAt: input.accessTokenExpiresAt,
+      scopes: input.scopes,
+      connectedByUserId: input.connectedByUserId,
+    };
     if (existing) {
-      const [row] = await this.db
-        .update(managedAccounts)
-        .set({
-          externalAccountId: input.externalAccountId,
-          handle: input.handle,
-          avatarUrl: input.avatarUrl,
-          accessTokenEnc: input.accessTokenEnc,
-          refreshTokenEnc: input.refreshTokenEnc ?? existing.refreshTokenEnc,
-          accessTokenExpiresAt: input.accessTokenExpiresAt,
-          scopes: input.scopes,
-          status: "active",
-          lastError: null,
-          connectedByUserId: input.connectedByUserId,
-          updatedAt: this.now(),
-        })
-        .where(eq(managedAccounts.id, existing.id))
-        .returning();
-      return row;
+      const row = await this.connections.updateById(existing.id, {
+        ...fields,
+        refreshTokenEnc: input.refreshTokenEnc ?? existing.refreshTokenEnc,
+        status: "active",
+        lastError: null,
+      });
+      return toManaged(row ?? existing);
     }
-    const [row] = await this.db
-      .insert(managedAccounts)
-      .values({
-        platform: input.platform,
-        externalAccountId: input.externalAccountId,
-        handle: input.handle,
-        avatarUrl: input.avatarUrl,
-        accessTokenEnc: input.accessTokenEnc,
-        refreshTokenEnc: input.refreshTokenEnc,
-        accessTokenExpiresAt: input.accessTokenExpiresAt,
-        scopes: input.scopes,
-        connectedByUserId: input.connectedByUserId,
-      } as ManagedAccountInsert)
-      .returning();
-    return row;
+    const row = await this.connections.insert({
+      ownerKind: "platform",
+      ownerId: null,
+      provider: input.platform,
+      purpose: MANAGED,
+      ...fields,
+      refreshTokenEnc: input.refreshTokenEnc,
+    });
+    return toManaged(row);
   }
 
-  async updateManagedTokens(id: string, patch: { accessTokenEnc: string; refreshTokenEnc: string | null; accessTokenExpiresAt: Date | null; status?: string }): Promise<void> {
-    await this.db
-      .update(managedAccounts)
-      .set({
-        accessTokenEnc: patch.accessTokenEnc,
-        refreshTokenEnc: patch.refreshTokenEnc,
-        accessTokenExpiresAt: patch.accessTokenExpiresAt,
-        status: patch.status ?? "active",
-        updatedAt: this.now(),
-      })
-      .where(eq(managedAccounts.id, id));
+  async updateManagedTokens(id: string, patch: SocialTokenPatch): Promise<void> {
+    await this.connections.update({ id, purpose: MANAGED }, tokenPatch(patch));
   }
 
   async removeManaged(platform: string): Promise<boolean> {
-    const deleted = await this.db
-      .delete(managedAccounts)
-      .where(eq(managedAccounts.platform, platform))
-      .returning({ id: managedAccounts.id });
+    const deleted = await this.connections.delete({ purpose: MANAGED, provider: platform });
     return deleted.length > 0;
+  }
+
+  async resealSecret(id: string, column: ConnectionSecretColumn, expected: string, next: string): Promise<void> {
+    await this.connections.resealSecret(id, column, expected, next);
   }
 }

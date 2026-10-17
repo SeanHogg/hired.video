@@ -32,7 +32,6 @@ export type NextDueTimes = Record<WorkQueue, Date | null>;
 
 const {
   followUpEnrollments: fu,
-  recruiterOutreachEnrollments: ro,
   emailCampaigns: ec,
   queueJobToProcess: qj,
   scheduledEvents: se,
@@ -55,8 +54,6 @@ export class WorkQueueRepository {
       SELECT
         (SELECT min(${fu.nextSendAt}) FROM ${fu}
           WHERE ${fu.status} = 'active' AND ${fu.nextSendAt} IS NOT NULL) AS followups,
-        (SELECT min(${ro.nextSendAt}) FROM ${ro}
-          WHERE ${ro.status} = 'active' AND ${ro.nextSendAt} IS NOT NULL) AS recruiter_outreach,
         CASE WHEN EXISTS (SELECT 1 FROM ${ec} WHERE ${ec.status} = 'sending') THEN now()
              ELSE (SELECT min(${ec.scheduledAt}) FROM ${ec} WHERE ${ec.status} = 'scheduled') END AS campaigns,
         CASE WHEN EXISTS (SELECT 1 FROM ${qj}
@@ -88,7 +85,6 @@ export class WorkQueueRepository {
     const at = (v: unknown): Date | null => (v == null ? null : new Date(v as string));
     return {
       followups: at(row.followups),
-      "recruiter-outreach": at(row.recruiter_outreach),
       campaigns: at(row.campaigns),
       "job-queue": at(row.job_queue),
       "event-reminders": at(row.event_reminders),

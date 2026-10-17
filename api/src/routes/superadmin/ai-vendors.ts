@@ -7,13 +7,12 @@
 //     (gateway `models.list()` — substitution may swap our hint per
 //     SDK 0.4.0 docs).
 //
-// Mounted under /api/admin/impersonate/ai on the SA tree, so the SA
-// middleware is applied at the parent (see superadmin/index.ts).
+// Mounted at /api/admin/sa/ai on the SA console; the SA guard is applied
+// once by the admin composite (routes/admin/index.ts).
 
 import { Hono } from "hono";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { BuilderforceClient } from "@seanhogg/builderforce-sdk";
-import type { Env, Variables, AppEnv } from "../../types/index.js";
+import type { AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
 import {
   USE_CASE_PROFILES,
@@ -22,7 +21,7 @@ import {
   type LLMUseCase,
 } from "../../services/adapters/providers.js";
 import { auditModelCatalog } from "../../services/adapters/model-catalog-audit.js";
-import { getDb, schema } from "../../db/index.js";
+import { schemaRetriesSince, substitutionsSince } from "../../repositories/admin/aiGatewayLedgerRepository.js";
 
 export const aiVendorRoutes = new Hono<AppEnv>();
 
@@ -117,33 +116,7 @@ aiVendorRoutes.get("/usage", async (c) => {
 aiVendorRoutes.get("/substitutions", async (c) => {
   const days = Number(c.req.query("days") ?? "7");
   const since = new Date(Date.now() - (Number.isFinite(days) ? days : 7) * 86_400_000);
-  const db = getDb();
-  const { usageLedger } = schema;
-
-  const substitutedCond = and(
-    eq(usageLedger.eventType, "ai_tokens"),
-    gte(usageLedger.createdAt, since),
-    sql`${usageLedger.metadata}->>'substituted' = 'true'`,
-  );
-
-  // Grouped breach summary: requested hint → resolved model, with count +
-  // last-seen, so the worst SLA offenders (e.g. match → OpenRouter) surface.
-  const summary = await db
-    .select({
-      requestedModel: sql<string>`${usageLedger.metadata}->>'requestedModel'`,
-      resolvedModel: sql<string>`${usageLedger.metadata}->>'resolvedModel'`,
-      featureKey: sql<string>`${usageLedger.metadata}->>'featureKey'`,
-      count: sql<number>`count(*)::int`,
-      lastSeen: sql<string>`max(${usageLedger.createdAt})`,
-    })
-    .from(usageLedger)
-    .where(substitutedCond)
-    .groupBy(
-      sql`${usageLedger.metadata}->>'requestedModel'`,
-      sql`${usageLedger.metadata}->>'resolvedModel'`,
-      sql`${usageLedger.metadata}->>'featureKey'`,
-    )
-    .orderBy(desc(sql`count(*)`));
+  const summary = await substitutionsSince(since);
 
   const totalSubstituted = summary.reduce((acc, r) => acc + Number(r.count), 0);
 
@@ -201,30 +174,7 @@ aiVendorRoutes.get("/schema-retries", async (c) => {
   const days = Number(c.req.query("days") ?? "7");
   const windowDays = Number.isFinite(days) ? days : 7;
   const since = new Date(Date.now() - windowDays * 86_400_000);
-  const db = getDb();
-  const { usageLedger } = schema;
-
-  const retriedCond = and(
-    eq(usageLedger.eventType, "ai_tokens"),
-    gte(usageLedger.createdAt, since),
-    // Stamped only when the gateway actually retried (>0), so presence of the
-    // key is the filter. `::int > 0` belt-and-suspenders against a stray 0.
-    sql`(${usageLedger.metadata}->>'schemaRetries') IS NOT NULL`,
-    sql`(${usageLedger.metadata}->>'schemaRetries')::int > 0`,
-  );
-
-  const grouped = await db
-    .select({
-      featureKey: sql<string>`${usageLedger.metadata}->>'featureKey'`,
-      totalRetries: sql<number>`sum((${usageLedger.metadata}->>'schemaRetries')::int)::int`,
-      calls: sql<number>`count(*)::int`,
-      lastSeen: sql<string>`max(${usageLedger.createdAt})`,
-    })
-    .from(usageLedger)
-    .where(retriedCond)
-    .groupBy(sql`${usageLedger.metadata}->>'featureKey'`)
-    .orderBy(desc(sql`sum((${usageLedger.metadata}->>'schemaRetries')::int)`));
-
+  const grouped = await schemaRetriesSince(since);
   const { totalRetries, byFeature } = shapeSchemaRetries(grouped);
 
   return c.json(

@@ -91,47 +91,77 @@ export async function logTouchpoint(input: {
   } as typeof schema.pipelineTouchpoints.$inferInsert);
 }
 
-export async function listEntriesByStage(jobId: string) {
-  const db = getDb();
-  const raw = await db
+export type PipelineEntryRow = typeof schema.jobPipelineEntries.$inferSelect;
+export type PipelineEntryInsert = typeof schema.jobPipelineEntries.$inferInsert;
+
+/** One entry by id (null when missing). Callers gate on `row.jobId`. */
+export async function getEntry(entryId: string): Promise<PipelineEntryRow | null> {
+  const [row] = await getDb()
     .select()
     .from(schema.jobPipelineEntries)
-    .where(eq(schema.jobPipelineEntries.jobId, jobId))
-    .orderBy(desc(schema.jobPipelineEntries.stageChangedAt));
+    .where(eq(schema.jobPipelineEntries.id, entryId))
+    .limit(1);
+  return (row as PipelineEntryRow) ?? null;
+}
 
-  // Confidential-applicant masking (#1679): a candidate in confidential
-  // search mode stays anonymous to the employer until advanced to the
-  // shortlist stage. Redaction happens HERE at the read boundary, never
-  // in storage, so the underlying identity is preserved for the reveal.
-  const signals = await candidateSignals(
-    raw.map((r: any) => r.candidateUserId).filter(Boolean) as string[],
-  );
-  const rows = raw.map((row: any) => toPipelineCandidateDto(row, signals));
+/** Add a candidate to a job's pipeline and log the "added" touchpoint. */
+export async function addEntry(
+  input: Omit<PipelineEntryInsert, "id" | "ownerId"> & { ownerId: string },
+): Promise<PipelineEntryRow> {
+  const [created] = await getDb()
+    .insert(schema.jobPipelineEntries)
+    .values({ ...input, tags: input.tags ?? [] } as PipelineEntryInsert)
+    .returning();
+  await logTouchpoint({
+    entryId: created.id,
+    type: "added",
+    payload: { stage: created.stage, addedFrom: created.addedFrom },
+    performedByUserId: input.ownerId,
+  });
+  return created as PipelineEntryRow;
+}
 
-  const grouped: Record<PipelineStage, typeof rows> = Object.fromEntries(
-    PIPELINE_STAGES.map((s) => [s, [] as typeof rows]),
-  ) as Record<PipelineStage, typeof rows>;
-  for (const row of rows) {
-    const stage = (row.stage as PipelineStage) ?? "applied";
-    if (grouped[stage]) grouped[stage].push(row);
-  }
-  return { rows, grouped };
+/** Patch the non-stage fields (notes / tags / owner). Stage moves go
+ *  through `moveStage` so its side effects stay in one place. */
+export async function updateEntryFields(
+  entryId: string,
+  fields: { notes?: string | null; tags?: string[]; ownerId?: string | null },
+): Promise<PipelineEntryRow | null> {
+  const [updated] = await getDb()
+    .update(schema.jobPipelineEntries)
+    .set({
+      ...(fields.notes !== undefined ? { notes: fields.notes } : {}),
+      ...(fields.tags !== undefined ? { tags: fields.tags } : {}),
+      ...(fields.ownerId !== undefined ? { ownerId: fields.ownerId } : {}),
+      updatedAt: new Date(),
+    } as Partial<PipelineEntryInsert>)
+    .where(eq(schema.jobPipelineEntries.id, entryId))
+    .returning();
+  return (updated as PipelineEntryRow) ?? null;
+}
+
+/** Remove an entry; returns the removed id or null when missing. */
+export async function deleteEntry(entryId: string): Promise<string | null> {
+  const [removed] = await getDb()
+    .delete(schema.jobPipelineEntries)
+    .where(eq(schema.jobPipelineEntries.id, entryId))
+    .returning({ id: schema.jobPipelineEntries.id });
+  return removed?.id ?? null;
 }
 
 /**
- * Cross-job aggregate read (#405) — every pipeline entry across the jobs the
- * recruiter can manage, grouped by stage, with each entry stamped with its
- * job title so the UI can label "for [Job Name]". Powers the cross-job
- * kanban that Loxo / Bullhorn / Greenhouse expose; the per-job
- * `listEntriesByStage` stays the single-job surface.
+ * The ONE pipeline board read (`GET /api/pipeline`): entries across `jobIds`,
+ * grouped by stage, each stamped with its job title so a card can label
+ * "for [Job Name]". The cross-job kanban (#405) passes the viewer's whole
+ * manageable set; the per-job kanban passes `[jobId]` after the job-owner gate.
  *
  * `jobIds` is the viewer's already-resolved manageable set (see
  * `resolveManageableJobIds`) — the row-level tenancy filter. Optional
  * `stage` / `jobId` narrow the result; `jobId` is intersected with the
  * scope so it can never widen access. The same confidential-applicant
- * masking (#1679) as the per-job read is applied at this boundary.
+ * masking (#1679) is applied at this read boundary, never in storage.
  */
-export async function listCrossJobEntriesByStage(
+export async function listBoardByStage(
   jobIds: string[],
   filters: { stage?: PipelineStage; jobId?: string } = {},
 ) {

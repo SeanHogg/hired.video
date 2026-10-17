@@ -13,7 +13,7 @@
  * modes (basic / bearer / none) cover the three patterns every xAPI
  * 1.0.3-compliant LRS accepts.
  *
- * Wire-up: the courses route's POST /api/courses/xapi/statements calls
+ * Wire-up: xapi-use-cases (POST /api/learning/xapi/statements) calls
  * `forwardStatementForUser(userId, statement)` after the row insert
  * succeeds. Inserted via Promise.allSettled() so any target failing
  * doesn't stop the others.

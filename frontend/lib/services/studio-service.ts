@@ -775,7 +775,7 @@ export const studioService = {
       subjectId: subject.id,
     });
     return apiClient.get(
-      `/api/studio/projects/public?${params.toString()}`,
+      `/api/studio/public?${params.toString()}`,
       z.array(StudioProjectSchema),
     );
   },
@@ -995,7 +995,7 @@ export const studioService = {
    */
   async getPublicVideos(): Promise<ApiSuccessResponse<PublicVideo[]>> {
     return apiClient.get(
-      "/api/studio/videos/public",
+      "/api/studio/public",
       z.array(PublicVideoSchema),
     );
   },
@@ -1030,8 +1030,9 @@ export const studioService = {
     },
   ): Promise<ApiSuccessResponse<{ imageUrl: string; mode?: "img2img" | "text2img" }>> {
     return apiClient.post(
-      "/api/studio/generate-image",
+      "/api/studio/images",
       {
+        mode: "generate",
         prompt,
         ...(opts?.sourceImageUrl ? { sourceImageUrl: opts.sourceImageUrl } : {}),
         ...(opts?.sourceImageDataUrl && !opts?.sourceImageUrl
@@ -1062,8 +1063,9 @@ export const studioService = {
     opts?: { strength?: number },
   ): Promise<ApiSuccessResponse<{ imageUrl: string; mode?: "inpaint" }>> {
     return apiClient.post(
-      "/api/studio/inpaint-image",
+      "/api/studio/images",
       {
+        mode: "inpaint",
         prompt,
         sourceImageDataUrl,
         maskImageDataUrl,
@@ -1091,8 +1093,9 @@ export const studioService = {
     expand: { top: number; right: number; bottom: number; left: number };
   }>> {
     return apiClient.post(
-      "/api/studio/outpaint-image",
+      "/api/studio/images",
       {
+        mode: "outpaint",
         prompt,
         sourceImageDataUrl,
         expandTop: expand.top,
@@ -1159,7 +1162,7 @@ export const studioService = {
     projectId: string,
     status: "draft" | "exported" | "published" | "processing" | "failed",
   ): Promise<ApiSuccessResponse<StudioProject>> {
-    return apiClient.patch(`/api/studio/projects/${projectId}/status`, { status }, StudioProjectSchema);
+    return apiClient.patch(`/api/studio/projects/${projectId}`, { status }, StudioProjectSchema);
   },
 
   /**
@@ -1170,7 +1173,7 @@ export const studioService = {
     isPublic: boolean,
   ): Promise<ApiSuccessResponse<StudioProject>> {
     return apiClient.patch(
-      `/api/studio/projects/${projectId}/visibility`,
+      `/api/studio/projects/${projectId}`,
       { isPublic },
       StudioProjectSchema,
     );

@@ -19,7 +19,7 @@
  *  - errors propagate to the parent's `onError` (global handler + CORS);
  *  - a path the sub-app doesn't match falls through to the next registered
  *    route via `next()`, as merged `app.route` routers did — several prefixes
- *    are mounted more than once (e.g. `/api/resume`, `/api/admin/*`).
+ *    are mounted more than once (e.g. `/api/admin/*`).
  */
 import { Hono } from "hono";
 import type { Context, Env, Next } from "hono";

@@ -17,7 +17,7 @@ import {
 } from "../../services/adapters/email.js";
 import { seedOnboardingTasks } from "../../lib/onboarding.js";
 import { triggerOnboardingDrip } from "../../lib/onboardingDrip.js";
-import type { AuthDeps, CaptchaPort, EmailerPort, OnboardingPort } from "./AuthService.js";
+import type { AuthDeps, CaptchaPort, EmailerPort, OnboardingPort } from "./authPorts.js";
 import { detectCountry } from "./geo.js";
 import { verifyTrustedDeviceCookie } from "./trustedDevice.js";
 import { realMxCheck, realBreachCheck } from "./signupGuard.js";

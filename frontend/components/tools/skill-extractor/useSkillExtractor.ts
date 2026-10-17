@@ -18,6 +18,7 @@ import {
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { apiClient } from "@/lib/api-client";
+import { aiToolPath } from "@shared/ai-tools/tool-ids";
 import { getResumeTextFromFile, isResumeTextFile } from "@/lib/services/resume-text";
 import { resumeService } from "@/lib/services/resume-service";
 import { jobService } from "@/lib/services/job-service";
@@ -43,7 +44,7 @@ import { useUserResumes } from "@/hooks/queries/use-resumes";
 // weaker than the structured JSON the LLM can already read.
 async function runExtraction(payload: SkillExtractionPayload) {
   const response = await apiClient.post<SkillExtractionResult>(
-    "/api/skillextractor/extract",
+    aiToolPath("skill-extract"),
     payload,
   );
   return response.data;

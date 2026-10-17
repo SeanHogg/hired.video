@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 // Every domain service the aggregator touches is mocked so the fanout
 // behaviour is exercised in isolation. Forgetting one means the test
 // will try to hit a real backend on localhost — see the studio mock,
-// which was missed when /videos/public was added to fetchCardFeed.
+// which was missed when the public video feed (/api/studio/public) was added to fetchCardFeed.
 vi.mock("@/lib/services/resume-service", () => ({
   resumeService: { getPublicResumes: vi.fn() },
 }));

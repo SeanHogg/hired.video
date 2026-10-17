@@ -17,7 +17,7 @@
  * card — resume / job / company / profile): the rail lives behind a single
  * toggle and the projects fetch is DEFERRED until the viewer expands it.
  * Mounting one EntityMedia per card on a grid (e.g. the People directory)
- * otherwise fired an N+1 of `/studio/projects/public` requests on page
+ * otherwise fired an N+1 of `/studio/public?subjectKind=` requests on page
  * load, most returning nothing for entities with no public media. The
  * fetch now costs zero until the viewer opts in.
  *
@@ -92,7 +92,7 @@ export default function EntityMedia({
   // closed panel costs zero API calls. This is universal across every
   // entity that mounts EntityMedia (resume / job / company / profile
   // cards): the rail lives behind an expand toggle so a grid of N cards
-  // no longer fires an N+1 of `/studio/projects/public` requests, most of
+  // no longer fires an N+1 of `/studio/public?subjectKind=` requests, most of
   // which return nothing for entities with no public media.
   const [open, setOpen] = useState(false);
 
@@ -111,7 +111,7 @@ export default function EntityMedia({
     setItems(null);
     // Owners hit the auth'd `/projects` endpoint so they see drafts,
     // analytics, and private projects too. Everyone else (incl. anon
-    // viewers on public listing pages — #323) hits `/projects/public`
+    // viewers on public listing pages — #323) hits `/public?subjectKind=…`
     // so they receive the owner's public clips. The owner branch waits
     // for `apiReady` because the auth'd endpoint 401s without a token;
     // the public branch fires immediately since it accepts anonymous.

@@ -1,113 +1,49 @@
 /**
- * /api/admin/templates-review — SuperAdmin template submission queue (#188).
+ * /api/admin/templates-review — template submission queue (#188). Mounted by
+ * the admin composite (routes/admin/index.ts), which applies the admin guard
+ * (Admin or SuperAdmin).
  *
- *   GET  /                       list pending templates (studio + job)
- *   POST /:kind/:id/approve      flip `is_public=true`, email author
- *   POST /:kind/:id/reject       flip `listing_status='rejected'`, store note, email author
+ *   GET  /                       list pending templates
+ *   POST /:kind/:id/approve      listing_status='approved' + review note
+ *   POST /:kind/:id/reject       listing_status='rejected' + review note
  *
- * The `kind` path param resolves into the appropriate table (`studio_templates`
- * for every creator template, résumé ones included; `job_templates` for the job-template
- * marketplace). Both expose `listing_status` + `is_public` columns.
+ * `kind` is "studio" (every creator template, résumé ones included) or the
+ * legacy "job" — both resolve to studio_templates.
  */
-
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { eq, and, sql } from "drizzle-orm";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { adminMiddleware } from "../middleware/superAdmin.js";
+import { TemplateReviewRepository, type TemplateDecision } from "../repositories/admin/templateReviewRepository.js";
 
 export const adminTemplatesReviewRoutes = new Hono<AppEnv>();
 
 type ReviewKind = "studio" | "job";
+const isReviewKind = (k: string): k is ReviewKind => k === "studio" || k === "job";
 
-function tableForKind(kind: string): null | { table: any; kindLabel: ReviewKind } {
-  // Every creator template — résumé ones included — is a studio template.
-  if (kind === "studio") {
-    return { table: (schema as any).studioTemplates, kindLabel: "studio" };
-  }
-  if (kind === "job") {
-    return { table: (schema as any).jobTemplates ?? (schema as any).studioTemplates, kindLabel: "job" };
-  }
-  return null;
-}
-
-adminTemplatesReviewRoutes.get("/", adminMiddleware, async (c) => {
-  const db = getDb();
-  const items: Array<{ kind: ReviewKind; row: Record<string, unknown> }> = [];
-  for (const kind of ["studio", "job"] as ReviewKind[]) {
-    const target = tableForKind(kind);
-    if (!target) continue;
-    try {
-      const rows = await db
-        .select()
-        .from(target.table)
-        .where(sql`${target.table.listingStatus} = 'pending_review'`)
-        .limit(100);
-      items.push(...rows.map((row: any) => ({ kind, row })));
-    } catch {
-      // Table might not yet exist (job_templates is post-#188); skip
-      // gracefully instead of 500-ing the whole queue read.
-    }
-  }
-  return c.json(success({ items }), 200);
+adminTemplatesReviewRoutes.get("/", async (c) => {
+  const rows = await TemplateReviewRepository.create().listPending();
+  return c.json(success({ items: rows.map((row) => ({ kind: "studio" as ReviewKind, row })) }), 200);
 });
 
 const DecisionSchema = z.object({ notes: z.string().max(5_000).optional() });
 
-adminTemplatesReviewRoutes.post("/:kind/:id/approve", adminMiddleware, async (c) => {
-  const target = tableForKind(c.req.param("kind"));
-  if (!target) return c.json(error("VALIDATION_ERROR", "kind must be 'studio' or 'job'"), 400);
-  const parsed = DecisionSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid decision body"), 400);
-  const db = getDb();
-  try {
-    const [row] = await db
-      .update(target.table)
-      .set({
-        listingStatus: "approved",
-        isPublic: true,
-        reviewNotes: parsed.data.notes ?? null,
-        approvedAt: new Date(),
-        updatedAt: new Date(),
-      } as never)
-      .where(eq((target.table as any).id, c.req.param("id")))
-      .returning();
-    if (!row) return c.json(error("NOT_FOUND", "Template not found"), 404);
-    return c.json(success({ kind: target.kindLabel, row }), 200);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Approve failed";
-    return c.json(error("UPDATE_FAILED", msg), 500);
-  }
-});
+function decide(decision: TemplateDecision) {
+  return async (c: Context<AppEnv>) => {
+    const kind = c.req.param("kind");
+    if (!isReviewKind(kind)) return c.json(error("VALIDATION_ERROR", "kind must be 'studio' or 'job'"), 400);
+    const parsed = DecisionSchema.safeParse(await c.req.json().catch(() => ({})));
+    if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid decision body"), 400);
+    try {
+      const row = await TemplateReviewRepository.create().decide(c.req.param("id"), decision, parsed.data.notes ?? null);
+      if (!row) return c.json(error("NOT_FOUND", "Template not found"), 404);
+      return c.json(success({ kind, row }), 200);
+    } catch (err) {
+      const fallback = decision === "approved" ? "Approve failed" : "Reject failed";
+      return c.json(error("UPDATE_FAILED", err instanceof Error ? err.message : fallback), 500);
+    }
+  };
+}
 
-adminTemplatesReviewRoutes.post("/:kind/:id/reject", adminMiddleware, async (c) => {
-  const target = tableForKind(c.req.param("kind"));
-  if (!target) return c.json(error("VALIDATION_ERROR", "kind must be 'studio' or 'job'"), 400);
-  const parsed = DecisionSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid decision body"), 400);
-  const db = getDb();
-  try {
-    const [row] = await db
-      .update(target.table)
-      .set({
-        listingStatus: "rejected",
-        isPublic: false,
-        reviewNotes: parsed.data.notes ?? null,
-        rejectedAt: new Date(),
-        updatedAt: new Date(),
-      } as never)
-      .where(eq((target.table as any).id, c.req.param("id")))
-      .returning();
-    if (!row) return c.json(error("NOT_FOUND", "Template not found"), 404);
-    return c.json(success({ kind: target.kindLabel, row }), 200);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Reject failed";
-    return c.json(error("UPDATE_FAILED", msg), 500);
-  }
-});
-
-adminTemplatesReviewRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Templates review route not found" } }, 404),
-);
+adminTemplatesReviewRoutes.post("/:kind/:id/approve", decide("approved"));
+adminTemplatesReviewRoutes.post("/:kind/:id/reject", decide("rejected"));

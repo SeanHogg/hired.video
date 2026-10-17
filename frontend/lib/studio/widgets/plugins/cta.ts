@@ -6,7 +6,8 @@
  * the readable URL under the button and, room permitting, a QR column.
  */
 import { resolveCtaFontSizes, type CtaWidgetParams, type WidgetParams } from "@/lib/studio/editor-v2/canvas-state";
-import { stringOr, type Box } from "../frame";
+import { type Box } from "../frame";
+import { stringOr } from "@/lib/numeric";
 import { registerPlugin } from "../plugin";
 import type { DrawEnv, DrawOp } from "../draw-ops";
 import { fontShorthand, type TextBlockLayout, type TextStyle } from "../text-layout";

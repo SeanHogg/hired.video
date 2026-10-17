@@ -27,6 +27,7 @@ import {
   type AudioLayer,
   type CanvasAudioMix,
 } from "./canvas-state";
+import { clamp01Finite } from "@/lib/numeric";
 
 /** V1 default music volume when a script names a track but no volume. */
 const V1_DEFAULT_MUSIC_VOLUME = 0.6;
@@ -37,9 +38,6 @@ export interface ScriptAudio {
   audioMix: CanvasAudioMix | null;
 }
 
-function clamp01(n: number): number {
-  return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 1;
-}
 
 function isPlayableTrack(track: string | undefined): track is string {
   return !!track && track !== "none" && track !== "custom";
@@ -68,7 +66,7 @@ function musicLayers(script: VideoScript): AudioLayer[] {
         fadeOutSec: clip.fadeOutSec || lane.fadeOutSec || 0,
         // The hoisted legacy clip copies `audio.volume`, which V2 carries
         // as the lane gain — keep the layer at unity so it isn't applied twice.
-        gain: legacy ? 1 : clamp01(clip.volume ?? 1),
+        gain: legacy ? 1 : clamp01Finite(clip.volume ?? 1, 1),
       });
     });
 }
@@ -140,10 +138,10 @@ function audioMix(script: VideoScript): CanvasAudioMix | null {
   const mix = audio.mix ?? {};
   return {
     ...DEFAULT_AUDIO_MIX,
-    masterGain: clamp01(mix.masterGain ?? 1),
-    musicGain: clamp01((audio.volume ?? V1_DEFAULT_MUSIC_VOLUME) * (mix.music?.gain ?? 1)),
+    masterGain: clamp01Finite(mix.masterGain ?? 1, 1),
+    musicGain: clamp01Finite((audio.volume ?? V1_DEFAULT_MUSIC_VOLUME) * (mix.music?.gain ?? 1), 1),
     musicMuted: mix.music?.muted ?? false,
-    voiceoverGain: clamp01(mix.voiceover?.gain ?? 1),
+    voiceoverGain: clamp01Finite(mix.voiceover?.gain ?? 1, 1),
     voiceoverMuted: mix.voiceover?.muted ?? false,
   };
 }

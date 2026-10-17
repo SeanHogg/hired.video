@@ -1,17 +1,13 @@
+import { aiToolPath } from "./tool-ids.js";
 import type { AIToolDef } from "./types.js";
 
-/** Salary analysis tools.
- *
- * Endpoint paths corrected from the legacy frontend registry:
- *
- *   `/api/SalaryAnalyzer/analyze`           → `/api/salaryanalyzer/analyze`
- *   `/api/SalaryAnalyzer/negotiation-tips`  → `/api/salaryanalyzer/negotiation-tips`
- */
+/** Salary analysis tools — served by the AI tool dispatcher
+ *  (`POST /api/ai/tools/:toolId`); URLs are built with `aiToolPath(id)`. */
 export const salaryAnalyze: AIToolDef = {
   id: "salary-analyze",
   description:
     "Comprehensive salary analysis based on job title, location, and experience. Returns market median + percentile bands + location adjustment.",
-  endpoint: "/api/salaryanalyzer/analyze",
+  endpoint: aiToolPath("salary-analyze"),
   method: "POST",
   requiresAuth: false,
   useCase: "salary_estimate",
@@ -34,7 +30,7 @@ export const salaryAnalyze: AIToolDef = {
 export const salaryNegotiationTips: AIToolDef = {
   id: "salary-negotiation-tips",
   description: "Strategic salary negotiation advice given a current offer + market rate + experience.",
-  endpoint: "/api/salaryanalyzer/negotiation-tips",
+  endpoint: aiToolPath("salary-negotiation-tips"),
   method: "POST",
   requiresAuth: false,
   useCase: "salary_negotiation",

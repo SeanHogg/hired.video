@@ -53,7 +53,7 @@ describe("buildTargetingWhere — SQL predicate", () => {
     assert.match(q.sql, /"open_to_work" = true OR .*"is_open_to_work" = true/);
     assert.match(q.sql, /"activity_logs"/);
     assert.match(q.sql, /NOT IN \(\s*select "job_applications"\."user_id"|NOT IN \(\s*SELECT "job_applications"\."user_id"/i);
-    assert.match(q.sql, /"home_country_id" IS NULL OR .*NOT IN/);
+    assert.match(q.sql, /"content_locations"\."country_id" IS NULL OR .*NOT IN/);
   });
 
   it("binds every list element as its own scalar (no JS array in one slot)", () => {

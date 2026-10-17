@@ -1,7 +1,8 @@
 /**
  * AdvertiseTab — paid distribution surface. Owns:
  *   • KPI overview (spend/impressions/clicks/CPA)
- *   • Sponsored Job Listings table with boost pause/resume/cancel
+ *   • Sponsored Job Listings table with boost pause/resume/cancel and
+ *     "Finish payment" for a boost still awaiting its (paid) checkout
  *   • Featured Company Profile early-access waitlist card
  *
  * Pure presentation; boost actions + dialog trigger come in as props.
@@ -52,6 +53,8 @@ export interface AdvertiseTabProps {
   onPauseBoost: (id: string) => Promise<void>;
   onResumeBoost: (id: string) => Promise<void>;
   onCancelBoost: (id: string) => Promise<void>;
+  /** Pay what's due on a `pending_payment` boost (checkout flow). */
+  onFinishBoostPayment: (id: string) => Promise<void>;
 }
 
 export function AdvertiseTab({
@@ -63,6 +66,7 @@ export function AdvertiseTab({
   onPauseBoost,
   onResumeBoost,
   onCancelBoost,
+  onFinishBoostPayment,
 }: AdvertiseTabProps) {
   const { t } = useTranslation();
   const [busyBoostId, setBusyBoostId] = useState<string | null>(null);
@@ -171,7 +175,9 @@ export function AdvertiseTab({
                         variant={boost.status === "active" ? "default" : "secondary"}
                         className={`text-xs ${boost.status === "active" ? "bg-green-500/10 text-green-600" : ""}`}
                       >
-                        {boost.status}
+                        {boost.status === "pending_payment"
+                          ? t("outreach.jobBoost.status.pendingPayment")
+                          : boost.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -191,6 +197,16 @@ export function AdvertiseTab({
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1 justify-end">
+                        {boost.status === "pending_payment" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busyBoostId === boost.id}
+                            onClick={() => runBoostAction(boost.id, onFinishBoostPayment)}
+                          >
+                            {t("outreach.jobBoost.finishPayment")}
+                          </Button>
+                        )}
                         {boost.status === "active" && (
                           <Button
                             size="sm"

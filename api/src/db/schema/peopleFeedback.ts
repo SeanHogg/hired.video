@@ -18,8 +18,9 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { peopleEmployees } from "./peopleOps.js";
+import { performanceCycles } from "./performance.js";
 import { scoped, stamps } from "./peopleOpsColumns.js";
-import type { PulseQuestionDef } from "../../../../shared/people-ops.js";
+import type { PulseQuestionDef, ReviewGoal } from "../../../../shared/people-ops.js";
 
 // ── Performance Reviews (PO-3) — segment + roster-employee scoped ─────────────
 export const peoplePerformanceReviews = pgTable("people_performance_reviews", {
@@ -35,6 +36,13 @@ export const peoplePerformanceReviews = pgTable("people_performance_reviews", {
   strengths: text("strengths"),
   areasForImprovement: text("areas_for_improvement"),
   comments: text("comments"),
+  // Field-union from the retired user-scoped performance_reviews (0634).
+  cycleId: uuid("cycle_id").references(() => performanceCycles.id, { onDelete: "set null" }),
+  goals: jsonb("goals").$type<ReviewGoal[]>().default([]).notNull(),
+  ratings: jsonb("ratings").$type<Record<string, number>>().default({}).notNull(),
+  revieweeResponse: text("reviewee_response"),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
   ...stamps(),
 }, (t) => ({
   byEmployee: index("idx_people_reviews_employee").on(t.tenantId, t.segmentId, t.employeeId),
@@ -42,6 +50,7 @@ export const peoplePerformanceReviews = pgTable("people_performance_reviews", {
   employeeIdFkIdx: index("idx_people_performance_reviews_employee_id").on(t.employeeId),
   reviewerIdFkIdx: index("idx_people_performance_reviews_reviewer_id").on(t.reviewerId),
   segmentIdFkIdx: index("idx_people_performance_reviews_segment_id").on(t.segmentId),
+  cycleIdFkIdx: index("idx_people_performance_reviews_cycle_id").on(t.cycleId),
 }));
 export type PeoplePerformanceReview = typeof peoplePerformanceReviews.$inferSelect;
 

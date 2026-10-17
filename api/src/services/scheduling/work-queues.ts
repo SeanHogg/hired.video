@@ -18,7 +18,7 @@ import { getDb, schema } from "../../db/index.js";
 import { logger } from "../../lib/logger.js";
 import { REMINDER_OFFSETS_MIN } from "../../../../shared/events.js";
 import { WorkQueueRepository, type NextDueTimes } from "../../repositories/workQueueRepository.js";
-import { processFollowUps, processRecruiterOutreach } from "../outreach/drip-processors.js";
+import { processFollowUps } from "../outreach/drip-processors.js";
 import { processJobQueue } from "../queue/job-queue-processor.js";
 import { CampaignService } from "../campaigns/CampaignService.js";
 import { EventReminderService, EVENT_REMINDER_WINDOW_MIN } from "../event/EventReminderService.js";
@@ -139,7 +139,6 @@ async function processPartnerPayouts(): Promise<number> {
 
 export const TICK_QUEUES: readonly TickQueue[] = [
   { name: "followups", run: processFollowUps },
-  { name: "recruiter-outreach", run: processRecruiterOutreach },
   { name: "campaigns", run: processCampaigns },
   { name: "job-queue", run: processJobQueue },
   { name: "event-reminders", run: processEventReminders, selfBounded: true },

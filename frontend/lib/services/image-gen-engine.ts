@@ -32,8 +32,8 @@
  *      cleanly — engine seam reacts to upstream changes without a
  *      deploy. Closes gap #1112.
  *
- *   2. `server-cf-sdxl-lightning` — the EXISTING `/api/studio/generate-image`
- *      endpoint, which routes through Cloudflare Workers AI's
+ *   2. `server-cf-sdxl-lightning` — the EXISTING `/api/studio/images`
+ *      endpoint (mode "generate"), which routes through Cloudflare Workers AI's
  *      `@cf/bytedance/stable-diffusion-xl-lightning` model. Always
  *      available when the user is authenticated and has token budget.
  *      DRY: we DO NOT fork the endpoint — the new engine wraps the
@@ -411,7 +411,7 @@ registerImageGenEngine({
 
 // ---------------------------------------------------------------------------
 // Engine 2: Server-side Cloudflare SDXL-Lightning via the existing
-// `/api/studio/generate-image` endpoint.
+// `/api/studio/images` endpoint (mode "generate").
 //
 // Wraps `studioService.generateImage` (DRY — single port to the
 // server). The endpoint already meters tokens, persists the PNG to R2,

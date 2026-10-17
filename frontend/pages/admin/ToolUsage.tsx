@@ -1,6 +1,6 @@
 // SuperAdmin — Tool Usage insights. Shows which tools are getting traction
 // across the platform, unique-user counts, average/median score, and
-// top-users drill-down. Powered by /api/admin/impersonate/tool-usage/*.
+// top-users drill-down. Powered by /api/admin/usage/tools/*.
 
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -49,7 +49,7 @@ function useSummary() {
   return useQuery({
     queryKey: ["admin", "tool-usage", "summary"],
     queryFn: async () => {
-      const res = await apiClient.get<SummaryRow[]>("/api/admin/impersonate/tool-usage/summary");
+      const res = await apiClient.get<SummaryRow[]>("/api/admin/usage/tools/summary");
       return res.data;
     },
   });
@@ -59,7 +59,7 @@ function useTopUsers() {
   return useQuery({
     queryKey: ["admin", "tool-usage", "top-users"],
     queryFn: async () => {
-      const res = await apiClient.get<TopUserRow[]>("/api/admin/impersonate/tool-usage/top-users?limit=20");
+      const res = await apiClient.get<TopUserRow[]>("/api/admin/usage/tools/top-users?limit=20");
       return res.data;
     },
   });

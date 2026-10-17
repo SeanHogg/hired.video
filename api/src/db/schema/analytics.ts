@@ -9,18 +9,26 @@ import {
   integer,
   real,
   index,
+  check,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
+import { ARTIFACT_VIEW_EVENT_TYPES } from "../../../../shared/artifact-views.js";
+
+/** `'view', 'listing_view', …` — the CHECK list, from the shared registry. */
+const ARTIFACT_VIEW_EVENT_TYPES_SQL = sql.raw(ARTIFACT_VIEW_EVENT_TYPES.map((v) => `'${v}'`).join(", "));
 
 /**
- * artifact_views — polymorphic view-event table (migration 0107). Backs
- * the unified creator-stats surface (Gap Register #1019). Replaces the
- * scatter of `resume_views` / `profile_views` / `company_views` /
- * `studio_video_heatmap` over time; legacy tables stay readable during
- * the bake window and get dual-written by handlers in this PR.
+ * artifact_views — THE polymorphic view/engagement event table (migration
+ * 0107; W3-A 0580 folded resume_views, company_views, job_view_events,
+ * company_view_events and video_analytics into it — those are archived by
+ * 0585). Backs the unified creator-stats surface (Gap Register #1019),
+ * résumé / company view counts, listing traffic and studio CTA rollups.
  *
  * `artifactKind` is the discriminator (see shared/artifact-views.ts).
+ * `eventType` separates the streams (view | listing_view | player_view |
+ * impression | cta_click | share — ARTIFACT_VIEW_EVENT_TYPES); every reader
+ * filters on it so streams never double-count.
  * `engagement` + `engagementUnit` cover both per-second (video, audio)
  * and per-percent (resume, article, profile, …) shapes in one column.
  */
@@ -49,12 +57,30 @@ export const artifactViews = pgTable(
     totalEngagementSec: integer("total_engagement_sec").notNull().default(0),
     percentConsumed: real("percent_consumed").notNull().default(0),
     dropOffBucket: integer("drop_off_bucket"),
+    eventType: varchar("event_type", { length: 16 }).notNull().default("view"),
+    /** listing_view: acquisition source ("organic", "boost", …). */
+    source: varchar("source", { length: 32 }),
+    /** listing_view: edge region (cf region header). */
+    region: varchar("region", { length: 64 }),
+    /** Studio playback events: ad campaign attribution (write-only). */
+    campaignId: text("campaign_id"),
+    /** Studio playback events: free-form client metadata (write-only). */
+    metadata: jsonb("metadata"),
     viewedAt: timestamp("viewed_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   (t) => [
-    index("artifact_views_kind_id_idx").on(t.artifactKind, t.artifactId),
+    // Every per-artifact read: (kind, id, stream) + newest-first / windowed.
+    // Replaced artifact_views_kind_id_idx (a prefix of it) in 0580.
+    index("idx_artifact_views_kind_id_event_viewed").on(
+      t.artifactKind,
+      t.artifactId,
+      t.eventType,
+      t.viewedAt.desc().nullsFirst(),
+    ),
+    // Retention sweep of the listing_view stream (0580).
+    index("idx_artifact_views_event_viewed").on(t.eventType, t.viewedAt),
     index("artifact_views_owner_idx").on(t.ownerUserId),
     index("artifact_views_viewer_idx").on(t.viewerId),
     index("artifact_views_viewed_at_idx").on(t.viewedAt),
@@ -64,10 +90,10 @@ export const artifactViews = pgTable(
     index("idx_artifact_views_owner_viewed")
       .on(t.ownerUserId, t.viewedAt.desc())
       .where(sql`${t.ownerUserId} IS NOT NULL`),
+    check("artifact_views_event_type_check", sql`${t.eventType} IN (${ARTIFACT_VIEW_EVENT_TYPES_SQL})`),
   ],
 );
 
-export type ArtifactView = typeof artifactViews.$inferSelect;
 export type NewArtifactView = typeof artifactViews.$inferInsert;
 
 
@@ -88,8 +114,6 @@ export const activityLogs = pgTable("activity_logs", {
   index("idx_activity_logs_user_id").on(t.userId),
 ]);
 
-export type ActivityLog = typeof activityLogs.$inferSelect;
-export type NewActivityLog = typeof activityLogs.$inferInsert;
 
 export const requestLogs = pgTable("request_logs", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -122,8 +146,6 @@ export const requestLogs = pgTable("request_logs", {
   index("idx_request_logs_route_created").on(t.route, t.createdAt).where(sql`route IS NOT NULL`),
 ]);
 
-export type RequestLog = typeof requestLogs.$inferSelect;
-export type NewRequestLog = typeof requestLogs.$inferInsert;
 
 
 
@@ -147,7 +169,6 @@ export const notifications = pgTable("notifications", {
 ]);
 
 export type Notification = typeof notifications.$inferSelect;
-export type NewNotification = typeof notifications.$inferInsert;
 
 export const marketingLeads = pgTable("marketing_leads", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -164,44 +185,3 @@ export const marketingLeads = pgTable("marketing_leads", {
 });
 
 export type MarketingLead = typeof marketingLeads.$inferSelect;
-export type NewMarketingLead = typeof marketingLeads.$inferInsert;
-
-export const jobViewEvents = pgTable(
-  "job_view_events",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    jobId: uuid("job_id").notNull(),
-    viewerUserId: uuid("viewer_user_id"),
-    countryCode: varchar("country_code", { length: 2 }),
-    region: varchar("region", { length: 64 }),
-    referrer: text("referrer"),
-    source: varchar("source", { length: 32 }).default("organic"),
-    userAgent: text("user_agent"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [
-    index("idx_job_view_events_job_created").on(t.jobId, t.createdAt.desc()),
-    // Retention sweep age axis (0541).
-    index("idx_job_view_events_created").on(t.createdAt),
-  ],
-);
-
-export const companyViewEvents = pgTable(
-  "company_view_events",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    companyId: uuid("company_id").notNull(),
-    viewerUserId: uuid("viewer_user_id"),
-    countryCode: varchar("country_code", { length: 2 }),
-    region: varchar("region", { length: 64 }),
-    referrer: text("referrer"),
-    source: varchar("source", { length: 32 }).default("organic"),
-    userAgent: text("user_agent"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [
-    index("idx_company_view_events_company_created").on(t.companyId, t.createdAt.desc()),
-    // Retention sweep age axis (0541).
-    index("idx_company_view_events_created").on(t.createdAt),
-  ],
-);

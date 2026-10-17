@@ -1,8 +1,9 @@
 /**
- * Client for the XYZ rewrite endpoints (/api/resumeoptimizer/rewrite-xyz-*)
+ * Client for the XYZ rewrite AI tools (resume-rewrite-xyz-highlights / -text)
  * the whole-résumé XYZ pass calls (#990). Shapes are the shared schemas.
  */
 import { apiClient } from "@/lib/api-client";
+import { aiToolPath } from "@shared/ai-tools/tool-ids";
 import {
   RewriteXyzHighlightsResponseSchema,
   RewriteXyzTextResponseSchema,
@@ -16,7 +17,7 @@ export const xyzRewriteService = {
     context: { role?: string; organization?: string; summary?: string },
   ): Promise<string[]> {
     const { data } = await apiClient.post(
-      "/api/resumeoptimizer/rewrite-xyz-highlights",
+      aiToolPath("resume-rewrite-xyz-highlights"),
       { highlights, context },
       RewriteXyzHighlightsResponseSchema,
     );
@@ -30,7 +31,7 @@ export const xyzRewriteService = {
     context: { role?: string; organization?: string; highlights?: string[] },
   ): Promise<string> {
     const { data } = await apiClient.post(
-      "/api/resumeoptimizer/rewrite-xyz-text",
+      aiToolPath("resume-rewrite-xyz-text"),
       { kind, original, context },
       RewriteXyzTextResponseSchema,
     );

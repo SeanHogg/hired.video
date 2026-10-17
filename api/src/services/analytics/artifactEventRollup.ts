@@ -1,5 +1,6 @@
 /**
- * artifactEventRollup.ts — pure rollup of `video_analytics` event counts
+ * artifactEventRollup.ts — pure rollup of studio playback event counts
+ * (artifact_views cta_click / impression rows; was `video_analytics`)
  * into the CTA / impression metrics on ArtifactMetricsDTO (#1140).
  *
  * `buildArtifactMetrics` fetches the per-event counts in ONE grouped query
@@ -20,7 +21,7 @@
 
 import type { StudioAnalyticsEvent } from "../../../../shared/studio-analytics-events.js";
 
-/** Events the artifact rollup reads from video_analytics. */
+/** Studio events the artifact rollup reads (artifact_views event types). */
 export const ROLLUP_EVENTS = ["cta_click", "impression"] as const satisfies readonly StudioAnalyticsEvent[];
 
 export interface EventCountRow {

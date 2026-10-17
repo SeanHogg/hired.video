@@ -29,7 +29,7 @@
  * HINT not a hard pin — see gap #515 for the latency-contract risk on
  * `match` (Cerebras-only).
  *
- * Visible to SA via `GET /api/admin/impersonate/ai/use-cases`. End
+ * Visible to SA via `GET /api/admin/sa/ai/use-cases`. End
  * users (free or paid) never see these values.
  */
 
@@ -118,12 +118,6 @@ export type LLMUseCase =
   // from natural-language prompts. Needs a model with strong tool-use
   // + reasoning; defaults to Claude Opus 5.5 (CLAUDE_OPUS), strict-pinned.
   | "studio_game_agent"
-  // Sizzle-reel AI highlight engine (#289): scores Whisper transcript
-  // segments for highlight-worthiness. Small strict-JSON array out.
-  | "sizzle_highlights"
-  // Voice-clone calibration (#1997): a read-aloud script + suggested
-  // voice name/description from the profile. Short JSON envelope.
-  | "voice_calibration_script"
   | "default";
 
 /** A leaf inference profile — model + sampling, no further fallbacks. */
@@ -458,8 +452,6 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   // Persuasive but grounded prose in a small JSON envelope (~6 fields).
   value_proposition: { model: "google/gemma-4-31b-it:free", temperature: 0.6, maxTokens: 1500 },
   vendor_extract: { model: "qwen/qwen3-coder:free", temperature: 0.0, maxTokens: 4000 },
-  sizzle_highlights: { model: "qwen/qwen3-coder:free", temperature: 0.1, maxTokens: 1500 },
-  voice_calibration_script: { model: "google/gemma-4-31b-it:free", temperature: 0.6, maxTokens: 900 },
   // Inbox email pipeline (Stage-2 classifier, per-message summary,
   // sync-batch digest). All three lean cheap + fast — Gemma 4 covers
   // the volume profile (full-mailbox sync); the rest of the JSON-strict
@@ -608,11 +600,9 @@ export const FEATURE_KEY_USE_CASE: Record<string, LLMUseCase> = {
   studio_skills_demo_script: "studio_script",
   studio_storyboard: "studio_script",
   studio_thumbnail_score: "studio_misc",
-  sizzle_highlight_score: "sizzle_highlights",
   value_proposition_generate: "value_proposition",
   video_pitch_script: "video_pitch_script",
   visitor_chat: "chat",
-  voice_calibration_script: "voice_calibration_script",
 };
 
 /** The use case a billing feature key rolls up to, or `undefined` for an

@@ -1,6 +1,6 @@
 /**
- * Single resume-analysis engine. Both `/api/resumescorer/score` and
- * `/api/resumeoptimizer/optimize` are thin proxies that call this
+ * Single resume-analysis engine. Both AI tools `resume-score` and
+ * `resume-optimize` are thin proxies that call this
  * service — same prompt, same Zod schema, same fallback shape.
  *
  * Why one engine: the two routes existed historically as a Scorer

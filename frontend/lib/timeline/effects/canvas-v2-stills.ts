@@ -21,7 +21,7 @@
  * nothing for that frame.
  */
 import type { Clip, ClipEffect, Timeline } from "@shared/timeline";
-import { stringOr } from "@/lib/studio/widgets/frame";
+import { stringOr } from "@/lib/numeric";
 import {
   getLinkedContentMeta,
   isLinkedContentKind,

@@ -7,7 +7,7 @@
 
 import { registerEffect } from "./registry";
 import { drawParticleField } from "./particle-field";
-import { stringOr } from "@/lib/studio/widgets/frame";
+import { stringOr } from "@/lib/numeric";
 
 // ───────────────────────────────────────────────────────────────────────────
 // canvas-v2:background — fills the canvas. V1 background clips carry

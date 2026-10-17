@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { lazyRoute, type RouteLoader } from "./lib/lazy-route.js";
+import { registerAdminRoutes } from "./routes/admin/index.js";
 import { cors } from "hono/cors";
 import { TIER_NAME } from "../../shared/tier-copy.js";
 import { PRO_MONTHLY_PRICE } from "../../shared/pricing.js";
@@ -18,6 +19,7 @@ import { getDb, schema } from "./db/index.js";
 import { clickIdCaptureMiddleware } from "./middleware/clickIdCapture.js";
 import { moduleGateByPath } from "./middleware/moduleGate.js";
 import { MODULE_ROUTE_REGISTRY } from "./lib/moduleRouteRegistry.js";
+import { ANONYMOUS_AI_TOOL_IDS } from "../../shared/ai-tools/tool-ids.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "./services/adapters/llm-client.js";
 import {
   buildTokenBudgetExceededResponse,
@@ -90,9 +92,12 @@ export function createApp() {
     // Conformant xAPI 1.0.3 LRS — external tools authenticate with an
     // LRS-specific Basic-auth credential (lrs_credentials), NOT a hired.video
     // JWT, so the whole surface bypasses the platform auth layer. Same posture
-    // as /api/partner. NOTE: the AUTHENTICATED credential-manager lives at
-    // /api/learning/lrs-credentials and is deliberately NOT matched here.
-    "/api/xapi",
+    // as /api/partner. Canonical path is /api/learning/xapi/lrs; /api/xapi is
+    // the external alias kept for already-configured third-party tools.
+    // NOTE: the AUTHENTICATED xAPI routes (/api/learning/xapi/credentials,
+    // /statements, /targets, /portability) are deliberately NOT matched here.
+    "/api/learning/xapi/lrs/",
+    "/api/xapi/",
     // Geo-IP surface for the dynamic Privacy / Terms / Cookie pages
     // and any other surface that needs the visitor's country before
     // they've signed in.
@@ -109,15 +114,19 @@ export function createApp() {
     "/api/retained-search/firms",
     "/api/references/shared/",
     "/api/references/public/",
+    // Hiring-manager pipeline portal (token is the grant; redacted snapshot).
+    "/api/pipeline/public/",
     "/api/jobs/public",
     "/api/companies/public",
-    "/api/resume/public",
-    "/api/studio/videos/public",
     // The theme picker's events (no personal data; signed-out video makers too).
     "/api/theme-calendar/events",
     "/api/studio/videos/resume",
     "/api/studio/videos/user",
     "/api/studio/videos/featured",
+    // The ONE public studio read namespace: the feed (`/public`), a
+    // subject's public projects (`/public?subjectKind=&subjectId=`, #323 —
+    // EntityVideos for non-owners incl. anonymous viewers) and the watch
+    // payload (`/public/:videoId`).
     "/api/studio/public",
     // Page → video embeds (#1860/#1863). <MarketingPageVideo> mounts
     // app-wide in AppShell and fires `/paths` (cached membership set) on
@@ -128,12 +137,6 @@ export function createApp() {
     // so it stays authenticated + SuperAdmin-gated.
     "/api/studio/page-embeds/paths",
     "/api/studio/page-embeds/resolve",
-    // Per-entity public videos rail (#323). EntityVideos on Resume / Job /
-    // Company / Profile / Article cards hits this for non-owners (incl.
-    // anonymous viewers on public listing pages) so public videos linked
-    // to the entity stay watchable. Owners still hit the auth'd `/projects`
-    // endpoint to see their drafts + analytics.
-    "/api/studio/projects/public",
     // Public voice-clone detail (#762). Powers the
     // `/marketplace/voices/:id` share-link landing page for unauthenticated
     // viewers. Returns the SAFE projection only (no sampleAudioUrl).
@@ -146,7 +149,6 @@ export function createApp() {
     "/api/studio/templates/public",
     "/api/studio/templates/listing",
     "/api/users/check-slug",
-    "/api/resume/roast",
     "/api/og",
     "/api/apply-button",
     "/api/ats/webhook",
@@ -192,6 +194,7 @@ export function createApp() {
     // redirect). The platform + lane + owner are inside the signed state; a
     // managed-scope state can only have been minted by the SA-gated auth-url.
     "/api/social/oauth/callback",
+    // Provider-registered managed-lane alias of the same handler (see mount below).
     "/api/admin/social/oauth/callback",
     // Pre-signup security checks. Geo eligibility is the gate that hides
     // the signup form for sanctioned regions / shows the waitlist for
@@ -336,7 +339,7 @@ export function createApp() {
   // the POST/PUT/DELETE verbs stay behind full auth. Negative lookahead
   // excludes known sub-route names so they keep their existing auth behavior.
   const PUBLIC_RESUME_DETAIL_ROUTE =
-    /^\/api\/resumes\/(?!public(?:$|\/)|embedded(?:$|\/)|getresumesownedbyauthuser(?:$|\/)|withownership(?:$|\/)|mastergroups(?:$|\/)|validateslug(?:$|\/)|save(?:$|\/)|parse(?:$|\/)|createfromfile(?:$|\/)|discover(?:$|\/)|tailor(?:$|\/)|embed(?:$|\/)|upload-file(?:$|\/)|track(?:$|\/)|clone(?:$|\/)|merge(?:$|\/)|stats(?:$|\/)|slug(?:$|\/))[^/]+\/?(?:$|\?)/;
+    /^\/api\/resumes\/(?!public(?:$|\/)|embedded(?:$|\/)|validateslug(?:$|\/)|watched(?:$|\/)|parse(?:$|\/)|discover(?:$|\/)|tailor(?:$|\/)|embed(?:$|\/)|upload-file(?:$|\/)|track(?:$|\/)|merge(?:$|\/)|stats(?:$|\/)|slug(?:$|\/))[^/]+\/?(?:$|\?)/;
 
   // /api/locations/* GETs are reference-data (countries / states / cities /
   // sitemap / resolve / search / reverse / entity-tag reads) consumed by
@@ -394,17 +397,11 @@ export function createApp() {
   // via the default branch.
   const REVIEWS_PUBLIC_ROUTE = /^\/api\/reviews(?:\/|$)/;
 
-  // Usage tracking ingestion (#2044) — anon visitors AND authed users both
-  // beacon here; optional-auth attaches the user when a JWT is present so the
-  // session links to user_id, retaining the pre-signup journey.
-  const USAGE_TRACK_ROUTE = /^\/api\/usage\/track$/;
-
-  // Client analytics beacons — feature events, ad impressions, artifact views.
-  // Signed-out viewers must be accepted (the artifact beacon 401'd every
-  // anonymous view while it was missing from the public list), and a JWT, when
-  // present, must attach so the row carries the viewer: these were "public",
-  // which never runs auth, so every beacon row had a null user.
-  const ANALYTICS_BEACON_ROUTE = /^\/api\/analytics\/(?:beacon|ads\/impression|artifacts\/beacon)$/;
+  // The ONE analytics ingestion beacon (usage, activity, ad, artifact/job/
+  // company views). Signed-out visitors must be accepted, and a JWT, when
+  // present, must attach so rows carry the viewer / link the usage session to
+  // user_id — so optional-auth, never "public" (which skips auth entirely).
+  const ANALYTICS_EVENTS_ROUTE = /^\/api\/analytics\/events$/;
 
   // Context-aware help meta reads (#2001) — GET /contexts, /resolve, /search
   // serve mapping + search META only (never content) and the handlers never
@@ -423,16 +420,16 @@ export function createApp() {
   // POST-only path; the full `/api/ai/chat` stays authenticated.
   const AI_HELP_ASSIST_ROUTE = /^\/api\/ai\/help-assist(?:$|\?)/;
 
-  // Anonymous resume parse for the kit workspace — a signed-out visitor
+  // Anonymous résumé AI for the kit workspace — a signed-out visitor
   // uploads/pastes/describes themselves and sees their resume + video preview
-  // before creating an account. Mirrors the /api/resume/roast loss-leader:
-  // nothing is persisted, anon traffic is IP-capped by the route's own
-  // limiter (routes/resumes.ts), and a present JWT still attaches so authed
-  // users keep servicesProcessor metering. POST-only on the canonical
-  // `/api/resumes/parse` path; the legacy `/api/resume/parse` mount stays
-  // authenticated. `/revise` is the same workspace's chat ("make it punchier")
-  // applied to that unsaved draft; `/extract-text` = the résumé tools' file read.
-  const RESUME_PARSE_ROUTE = /^\/api\/resumes\/(?:parse|revise|extract-text)(?:$|\?)/;
+  // before creating an account, and the marketing Resume Roast loss-leader.
+  // Nothing is persisted, anon traffic is IP-capped (middleware/
+  // anon-resume-ai-gate.ts), and a present JWT still attaches so authed users
+  // keep servicesProcessor metering. POST-only. `/extract-text` = the résumé
+  // tools' file read. The kit chat ("make it punchier") is the `resume-revise`
+  // AI tool — every id in ANONYMOUS_AI_TOOL_IDS is optional-auth.
+  const RESUME_PARSE_ROUTE = /^\/api\/resumes\/(?:parse|extract-text|roast)(?:$|\?)/;
+  const AI_TOOLS_ANON_ROUTE = new RegExp(`^/api/ai/tools/(?:${ANONYMOUS_AI_TOOL_IDS.join("|")})(?:$|[?])`);
 
   // Public mailboxes: the Contact form / ContactPanel (POST /contact) and
   // lead-magnet capture such as the Resume Roast (POST /leads). Signed-out
@@ -473,11 +470,11 @@ export function createApp() {
     // The Post dock lists postable networks before anyone signs in.
     if (method === "GET" && path === "/api/social/platforms") return "optional-auth";
     if (method === "POST" && RESUME_PARSE_ROUTE.test(path)) return "optional-auth";
+    if (method === "POST" && AI_TOOLS_ANON_ROUTE.test(path)) return "optional-auth";
     if (method === "POST" && MARKETING_PUBLIC_WRITE_ROUTE.test(path)) return "optional-auth";
     if (STUDIO_PUBLIC_ROUTE.test(path)) return "optional-auth";
     if (SCREENING_PORTAL_ROUTE.test(path)) return "optional-auth";
-    if (USAGE_TRACK_ROUTE.test(path)) return "optional-auth";
-    if (method === "POST" && ANALYTICS_BEACON_ROUTE.test(path)) return "optional-auth";
+    if (method === "POST" && ANALYTICS_EVENTS_ROUTE.test(path)) return "optional-auth";
     if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return "optional-auth";
     if (method === "GET" && RESUME_FEEDBACK_LINK_ROUTE.test(path)) return "optional-auth";
     if (
@@ -584,7 +581,6 @@ export function createApp() {
   mount("/api/auth/guest", () => import("./routes/guest-auth.js").then((m) => m.guestAuthRoutes));
   mount("/api/auth", () => import("./routes/auth.js").then((m) => m.authRoutes));
   mount("/api/security", () => import("./routes/security.js").then((m) => m.securityRoutes));
-  mount("/api/admin/security", () => import("./routes/adminSecurity.js").then((m) => m.adminSecurityRoutes));
   mount("/api/errors", () => import("./routes/errors.js").then((m) => m.errorsRoutes));
   mount("/api/_meta", () => import("./routes/meta.js").then((m) => m.metaRoutes));
   mount("/api/proof", () => import("./routes/proof.js").then((m) => m.proofRoutes));
@@ -592,41 +588,18 @@ export function createApp() {
   mount("/api/account", () => import("./routes/account.js").then((m) => m.accountRoutes));
   mount("/api/workforce", () => import("./routes/workforce.js").then((m) => m.workforceRoutes));
   mount("/api/users", () => import("./routes/users.js").then((m) => m.userRoutes));
-  // Hono sub-router root path workaround: sub-router handlers registered at "/"
-  // are never matched when mounted via app.route(prefix, router). Register explicitly.
-  // Handlers import routes/resumes.js on demand, like mount() (gap #2339).
-  const listResumes = async (c: Context) => (await import("./routes/resumes.js")).listResumesHandler(c);
-  const createResume = async (c: Context) => (await import("./routes/resumes.js")).createResumeHandler(c);
-  app.get("/api/resumes", listResumes);
-  app.get("/api/resumes/", listResumes);
-  app.post("/api/resumes", createResume);
-  app.post("/api/resumes/", createResume);
-  mount("/api/resumes", () => import("./routes/resumes.js").then((m) => m.resumeRoutes));
-  mount("/api/resume-versions", () => import("./routes/resume-versions.js").then((m) => m.resumeVersionRoutes)); // master / version lineage + create-from-a-job (the kit reviews)
+  // ONE résumé router: CRUD, POST {source}, PATCH state, versions/lineage,
+  // merge, watch, parse/roast (routes/resumes/). The /api/resume alias,
+  // /api/resume-versions and /api/resume-analysis mounts are gone.
+  mount("/api/resumes", () => import("./routes/resumes/index.js").then((m) => m.resumeRoutes));
   mount("/api/resume-feedback", () => import("./routes/resume-feedback.js").then((m) => m.resumeFeedbackRoutes)); // career coaching & resume feedback (#1939)
   mount("/api/vendor-sync", () => import("./routes/vendor-sync.js").then((m) => m.vendorSyncRoutes));
-  mount("/api/resume", () => import("./routes/resume-roast.js").then((m) => m.resumeRoastRoutes)); // roast must be before catch-all in resumeRoutes
-  mount("/api/resume", () => import("./routes/resumes.js").then((m) => m.resumeRoutes)); // legacy resume endpoints
-  mount("/api/resumescorer", () => import("./routes/resume-scorer.js").then((m) => m.resumeScorerRoutes));
-  mount("/api/resumeoptimizer", () => import("./routes/resume-optimizer.js").then((m) => m.resumeOptimizerRoutes));
-  // #376 — canonical alias surface. Both routes proxy the same
-  // `services/resume/analyze.ts` engine; mount them under a single
-  // `/api/resume-analysis` namespace so frontend + Chrome extension
-  // can migrate without `?surface=` query gymnastics. Legacy paths
-  // stay live for SEO continuity (different funnel pages) and existing
-  // tool-run history rows until the 410 sweep.
-  mount("/api/resume-analysis/score", () => import("./routes/resume-scorer.js").then((m) => m.resumeScorerRoutes));
-  mount("/api/resume-analysis/optimize", () => import("./routes/resume-optimizer.js").then((m) => m.resumeOptimizerRoutes));
-  mount("/api/skillextractor", () => import("./routes/skill-extractor.js").then((m) => m.skillExtractorRoutes));
   mount("/api/tool-runs", () => import("./routes/tool-runs.js").then((m) => m.toolRunsRoutes));
-  mount("/api/jobs/:jobId/pipeline/share", () => import("./routes/pipeline-share.js").then((m) => m.pipelineShareRoutes));
-  mount("/api/jobs/:jobId/pipeline", () => import("./routes/jobpipeline.js").then((m) => m.jobPipelineRoutes));
-  mount("/api/pipeline/public", () => import("./routes/pipeline-share.js").then((m) => m.pipelinePublicRoutes));
-  // Cross-job kanban (#405). Mounted AFTER /api/pipeline/public so the more
-  // specific public-share router keeps priority for `/api/pipeline/public/*`.
-  mount("/api/pipeline", () => import("./routes/pipeline-all.js").then((m) => m.crossJobPipelineRoutes));
+  // ONE candidate-pipeline resource: board (?jobId= / cross-job), entries,
+  // share links, public portal (/public/:token), submissions board.
+  mount("/api/pipeline", () => import("./routes/pipeline/index.js").then((m) => m.pipelineRoutes));
   mount("/api/recruiter/bulk-score", () => import("./routes/bulk-scoring.js").then((m) => m.bulkScoringRoutes));
-  mount("/api/transcripts/search", () => import("./routes/transcript-search.js").then((m) => m.transcriptSearchRoutes));
+  mount("/api/transcripts", () => import("./routes/transcripts.js").then((m) => m.transcriptRoutes)); // search + :responseId/retranscribe
   mount("/api/jobs/:jobId/sourcing-bids", () => import("./routes/sourcing-bids.js").then((m) => m.sourcingBidsByJobRoutes));
   mount("/api/sourcing", () => import("./routes/sourcing-bids.js").then((m) => m.sourcingBrowseRoutes));
   mount("/api/sourcing-bids", () => import("./routes/sourcing-bids.js").then((m) => m.sourcingBidActionRoutes));
@@ -653,7 +626,6 @@ export function createApp() {
   mount("/api/feed", () => import("./routes/feed.js").then((m) => m.feedRoutes));
   mount("/api/feed-features", () => import("./routes/feed-features.js").then((m) => m.feedFeatureRoutes)); // SA-curated dashboard feed (read)
   mount("/api/role-access", () => import("./routes/role-access.js").then((m) => m.roleAccessRoutes)); // per-role feature/nav manifest (read)
-  mount("/api/usage", () => import("./routes/usage.js").then((m) => m.usageRoutes)); // usage tracking ingestion (optional-auth)
   mount("/api/notifications", () => import("./routes/notifications.js").then((m) => m.notificationRoutes));
   mount("/api/push", () => import("./routes/push.js").then((m) => m.pushRoutes)); // browser Web Push registration
   mount("/api/contacts", () => import("./routes/contacts.js").then((m) => m.contactRoutes)); // native contacts graph (0493)
@@ -668,19 +640,13 @@ export function createApp() {
   mount("/api/affiliate", () => import("./routes/affiliates.js").then((m) => m.affiliateRoutes)); // legacy singular endpoint alias
   mount("/api/payment", () => import("./routes/payment.js").then((m) => m.paymentRoutes));
   mount("/api/payouts", () => import("./routes/payouts.js").then((m) => m.payoutRoutes));
-  mount("/api/admin/payouts", () => import("./routes/admin-payouts.js").then((m) => m.adminPayoutRoutes));
   mount("/api/outplacement", () => import("./routes/outplacement.js").then((m) => m.outplacementRoutes));
   mount("/api/checkout", () => import("./routes/checkout.js").then((m) => m.checkoutRoutes)); // ONE one-off checkout: boost | course | token_pack (shared/checkout.ts)
   mount("/api/admin/tax-reporting", () => import("./routes/tax-reporting.js").then((m) => m.taxReportingRoutes));
   mount("/api/recruiter-bd", () => import("./routes/recruiter-bd.js").then((m) => m.recruiterBdRoutes));
   mount("/api/gigs", () => import("./routes/gigs.js").then((m) => m.gigsRoutes));
-  mount("/api/template-extractor", () => import("./routes/template-extractor.js").then((m) => m.templateExtractorRoutes));
-  mount("/api/admin/templates-review", () => import("./routes/admin-templates-review.js").then((m) => m.adminTemplatesReviewRoutes));
   mount("/api/photoreal-avatar", () => import("./routes/photoreal-avatar.js").then((m) => m.photorealAvatarRoutes));
-  mount("/api/jobs-analytics", () => import("./routes/job-analytics.js").then((m) => m.jobAnalyticsRoutes));
-  mount("/api/admin/ai-cost-reconciliation", () => import("./routes/ai-cost-reconciliation.js").then((m) => m.aiCostReconciliationRoutes));
   mount("/api/featured-creators", () => import("./routes/featured-creators.js").then((m) => m.featuredCreatorsRoutes));
-  mount("/api/artifact-metrics", () => import("./routes/artifact-metrics.js").then((m) => m.artifactMetricsRoutes));
   mount("/api/take-home-invites", () => import("./routes/take-home-invites.js").then((m) => m.takeHomeInvitesRoutes));
   mount("/api/affiliates", () => import("./routes/affiliates.js").then((m) => m.affiliateRoutes));
   mount("/api/campaigns", () => import("./routes/campaigns-public.js").then((m) => m.campaignsPublicRoutes)); // public open-tracking pixel
@@ -696,7 +662,8 @@ export function createApp() {
   // Remote images re-served same-origin for canvas rasterizing (document downloads).
   mount("/api/media", () => import("./routes/media-proxy.js").then((m) => m.mediaProxyRoutes));
   mount("/api/communication", () => import("./routes/communication.js").then((m) => m.communicationRoutes));
-  mount("/api/ai", () => import("./routes/ai.js").then((m) => m.aiRoutes));
+  // /api/ai/tools/:toolId = every AI tool (services/ai-tools/registry.ts).
+  mount("/api/ai", () => import("./routes/ai/index.js").then((m) => m.aiRoutes));
   // MCP tools/call execution (gap #1620) dispatches via Hono's `app.request()`
   // to re-enter the same router without going through fetch / consuming a
   // subrequest. Make the app instance available to the MCP route via c.var.
@@ -707,7 +674,6 @@ export function createApp() {
     return next();
   });
   mount("/api/mcp", () => import("./routes/mcp.js").then((m) => m.mcpRoutes));
-  mount("/api/profile-audit", () => import("./routes/profile-audit.js").then((m) => m.profileAuditRoutes));
   mount("/api/career360", () => import("./routes/career360.js").then((m) => m.career360Routes));
   mount("/api/profile", () => import("./routes/profile.js").then((m) => m.profileRoutes));
   mount("/api/channels", () => import("./routes/channels.js").then((m) => m.channelRoutes));
@@ -723,35 +689,23 @@ export function createApp() {
   mount("/api/partner", () => import("./routes/partner.js").then((m) => m.partnerRoutes));
   mount("/api/partner-consent", () => import("./routes/partner-consent.js").then((m) => m.partnerConsentRoutes));
   mount("/api/partner-account", () => import("./routes/partner-account.js").then((m) => m.partnerAccountRoutes));
-  mount("/api/admin/partners", () => import("./routes/admin-partners.js").then((m) => m.adminPartnerRoutes));
-  // SuperAdmin management portal — impersonation sessions, user management, modules, audit
-  // Must be mounted BEFORE /api/admin to avoid the admin catch-all intercepting these routes.
-  mount("/api/admin/impersonate", () => import("./routes/superadmin/index.js").then((m) => m.superadminRoutes));
-  mount("/api/admin/r2", () => import("./routes/admin-r2.js").then((m) => m.adminR2Routes));
-  mount("/api/admin/workers", () => import("./routes/admin-workers.js").then((m) => m.adminWorkerRoutes));
-  mount("/api/admin/courses", () => import("./routes/admin-courses.js").then((m) => m.adminCourseRoutes));
-  // Same rule as above: every "/api/admin/<sub>" router must be mounted BEFORE
-  // the "/api/admin" catch-all (adminRoutes ends with `.all("*")` returning
-  // "Admin route not found"), or Hono's registration-order matching lets that
-  // catch-all intercept the sub-route. (#1701 — admin article queue 404.)
   mount("/api/admin/job-sources", () => import("./routes/jobscraper.js").then((m) => m.jobScraperAdminRoutes));
-  mount("/api/admin/articles", () => import("./routes/admin-articles.js").then((m) => m.adminArticleRoutes));
-  mount("/api/admin/feed-features", () => import("./routes/admin-feed-features.js").then((m) => m.adminFeedFeatureRoutes)); // SA dashboard-feed curation
-  mount("/api/admin/role-access", () => import("./routes/admin-role-access.js").then((m) => m.adminRoleAccessRoutes)); // SA per-role feature/nav access
-  mount("/api/admin/usage", () => import("./routes/admin-usage.js").then((m) => m.adminUsageRoutes)); // SA presence + usage analytics
-  mount("/api/admin/campaigns", () => import("./routes/admin-campaigns.js").then((m) => m.adminCampaignRoutes)); // SA email-campaign manager
-  mount("/api/admin/reports", () => import("./routes/reports.js").then((m) => m.adminReportRoutes));
   mount("/api/admin/community-resources", () => import("./routes/community-resources.js").then((m) => m.adminCommunityResourceRoutes));
   mount("/api/lms-oauth", () => import("./routes/lms-oauth.js").then((m) => m.lmsOauthRoutes));
-  mount("/api/admin/social", () => import("./routes/admin-social.js").then((m) => m.adminSocialRoutes)); // SA managed brand accounts (Lane A, layer 2)
-  mount("/api/admin/promotions", () => import("./routes/admin-promotions.js").then((m) => m.adminPromotionRoutes)); // SA promotion queue (Lane A, #2046)
-  mount("/api/admin/content-scans", () => import("./routes/admin-content-scans.js").then((m) => m.adminContentScanRoutes)); // SA review of the explicit-scan gate (mig 0505)
-  mount("/api/admin/coupons", () => import("./routes/admin-coupons.js").then((m) => m.adminCouponRoutes)); // SA coupon codes (free month of Pro)
+  // Managed-lane (SA brand account) OAuth callback — an explicit alias of
+  // /api/social/oauth/callback, kept ONLY because it is the redirect URI
+  // registered in each provider's developer console (social-oauth.ts
+  // socialCallbackUrl). Same single handler; the lane rides the signed state.
+  // The managed-lane API itself is /api/social/*?lane=managed. Must stay above
+  // the "/api/admin" catch-all.
+  mount("/api/admin/social/oauth", () => import("./routes/social-oauth-callback.js").then((m) => m.managedOAuthCallbackAliasRoutes));
   mount("/api/admin/theme-calendar", () => import("./routes/theme-calendar.js").then((m) => m.adminThemeCalendarRoutes)); // SA theme calendar (#2350)
-  mount("/api/admin", () => import("./routes/admin.js").then((m) => m.adminRoutes));
-  mount("/api/productdashboard", () => import("./routes/admin.js").then((m) => m.adminRoutes)); // legacy admin stats alias
+  // The /api/admin composite: every admin / SuperAdmin sub-router, lazily
+  // mounted with its guard applied once (routes/admin/index.ts). Registered
+  // after the admin prefixes owned by other routers above.
+  registerAdminRoutes(app);
   mount("/api/studio", () => import("./routes/studio.js").then((m) => m.studioRoutes));
-  mount("/api/studio", () => import("./routes/studio-social-publish.js").then((m) => m.studioSocialPublishRoutes)); // TikTok / Instagram / X / Facebook posts
+  mount("/api/studio", () => import("./routes/studio-social-publish.js").then((m) => m.studioSocialPublishRoutes)); // YouTube / TikTok / Instagram / X / Facebook / LinkedIn posts
   mount("/api/studio", () => import("./routes/studio-render-variants.js").then((m) => m.studioRenderVariantRoutes)); // fitted cuts per network preset (#2045)
   mount("/api/studio", () => import("./routes/studio-home-wall.js").then((m) => m.studioHomeWallRoutes)); // show / hide a video on the home page (#2354)
   mount("/api/studio", () => import("./routes/studio-content-scan.js").then((m) => m.studioContentScanRoutes)); // explicit-scan gate for the home wall: owner status + sampled frames (mig 0505)
@@ -760,14 +714,10 @@ export function createApp() {
   mount("/api/studio/game-agent", () => import("./routes/game-agent.js").then((m) => m.gameAgentRoutes));
   mount("/api/studio", () => import("./routes/studio-templates.js").then((m) => m.studioTemplatesRoutes));
   mount("/api/studio", () => import("./routes/studio-dubbing.js").then((m) => m.studioDubbingRoutes));
-  mount("/api/studio", () => import("./routes/linkedin-post.js").then((m) => m.linkedInPostRoutes));
   mount("/api/nle", () => import("./routes/nle.js").then((m) => m.nleRoutes));
   mount("/api", () => import("./routes/workspaces.js").then((m) => m.workspaceRoutes));
   mount("/api/og", () => import("./routes/og.js").then((m) => m.ogRoutes));
   mount("/api/youtube", () => import("./routes/youtube.js").then((m) => m.youtubeRoutes));
-  mount("/api/salaryanalyzer", () => import("./routes/salary.js").then((m) => m.salaryRoutes));
-  mount("/api/salarycalculator", () => import("./routes/salary.js").then((m) => m.salaryRoutes));
-  mount("/api/valueproposition", () => import("./routes/value-proposition.js").then((m) => m.valuePropositionRoutes));
   mount("/api/hubs", () => import("./routes/hubs.js").then((m) => m.hubsRoutes));
   mount("/api/interview", () => import("./routes/interview.js").then((m) => m.interviewRoutes));
   mount("/api/interview-assignments", () => import("./routes/interview-assignments.js").then((m) => m.interviewAssignmentRoutes));
@@ -793,7 +743,7 @@ export function createApp() {
   mount("/api/map", () => import("./routes/map.js").then((m) => m.mapRoutes));
   mount("/api/boards", () => import("./routes/exclusive-boards.js").then((m) => m.exclusiveBoardRoutes));
   mount("/api/community", () => import("./routes/community.js").then((m) => m.communityRoutes));
-  mount("/api/analytics", () => import("./routes/analytics.js").then((m) => m.analyticsRoutes));
+  mount("/api/analytics", () => import("./routes/analytics/index.js").then((m) => m.analyticsRoutes));
   mount("/api/job-sources", () => import("./routes/jobscraper.js").then((m) => m.jobScraperUserRoutes));
   mount("/api/ats", () => import("./routes/ats.js").then((m) => m.atsRoutes));
   mount("/api/recruit", () => import("./routes/candidates.js").then((m) => m.candidatesRoutes));
@@ -806,7 +756,6 @@ export function createApp() {
   mount("/api/assessments", () => import("./routes/assessments.js").then((m) => m.assessmentRoutes));
   mount("/api/predictive-assessments", () => import("./routes/predictive-assessments.js").then((m) => m.predictiveAssessmentRoutes));
   mount("/api/audit", () => import("./routes/user-audit.js").then((m) => m.userAuditRoutes));
-  mount("/api/recruiter/hiring-insights", () => import("./routes/hiring-insights.js").then((m) => m.hiringInsightsRoutes));
   mount("/api/graph", () => import("./routes/graph.js").then((m) => m.graphRoutes));
   mount("/api/chat/socket", () => import("./routes/chat-socket.js").then((m) => m.chatSocketRoutes));
   mount("/api/games", () => import("./routes/game-socket.js").then((m) => m.gameSocketRoutes));
@@ -824,7 +773,7 @@ export function createApp() {
   mount("/api/creators", () => import("./routes/creators.js").then((m) => m.creatorRoutes));
   mount("/api/bookings", () => import("./routes/bookings.js").then((m) => m.bookingsRoutes));
   mount("/api/articles", () => import("./routes/articles.js").then((m) => m.articleRoutes));
-  mount("/api/reports", () => import("./routes/reports.js").then((m) => m.reportRoutes));
+  mount("/api/moderation", () => import("./routes/moderation-reports.js").then((m) => m.moderationReportRoutes)); // content-abuse reports (user + SA triage)
   mount("/api/community-resources", () => import("./routes/community-resources.js").then((m) => m.communityResourceRoutes));
   mount("/api/courses", () => import("./routes/courses.js").then((m) => m.courseRoutes));
   // Authoring helpers (#162 AI generator, #200 LMS connectors, etc.)
@@ -833,19 +782,16 @@ export function createApp() {
   // free courseRoutes registration above, and the authoring router
   // defines no overlapping literal paths.
   mount("/api/courses", () => import("./routes/course-authoring.js").then((m) => m.courseAuthoringRoutes));
-  mount("/api/learning-paths", () => import("./routes/learning-paths.js").then((m) => m.learningPathRoutes));
-  mount("/api/cohorts", () => import("./routes/cohorts.js").then((m) => m.cohortRoutes));
-  mount("/api/learning-goals", () => import("./routes/learning-goals.js").then((m) => m.learningGoalsRoutes));
-  // LRS credential management + tenant portability are authenticated
-  // (owner-scoped) — register them BEFORE the /api/learning learner router so
-  // their concrete sub-paths win.
-  mount("/api/learning/lrs-credentials", () => import("./routes/lrs-credentials.js").then((m) => m.lrsCredentialRoutes));
-  mount("/api/learning/portability", () => import("./routes/learning-portability.js").then((m) => m.learningPortabilityRoutes));
-  mount("/api/learning", () => import("./routes/learning.js").then((m) => m.learningRoutes));
+  // Learning surface: leaderboard/dashboard + goals, paths, cohorts, xapi
+  // (LRS, statement ingest, credentials, forwarding targets, portability).
+  mount("/api/learning", () => import("./routes/learning/index.js").then((m) => m.learningRoutes));
   mount("/api/verify", () => import("./routes/verify.js").then((m) => m.verifyRoutes));
-  // Conformant xAPI 1.0.3 LRS. In PUBLIC_PREFIXES (below) so the JWT layer
-  // skips it — the surface authenticates with its own LRS Basic-auth credential.
-  mount("/api/xapi", () => import("./routes/xapi-lrs.js").then((m) => m.xapiLrsRoutes));
+  // EXTERNAL ALIAS — conformant xAPI 1.0.3 LRS, same router as
+  // /api/learning/xapi/lrs. Kept because `/api/xapi` was handed out as the LRS
+  // endpoint on issued credentials and is pasted into third-party xAPI tools
+  // (and is the actor homePage IRI in stored statements). In PUBLIC_PREFIXES
+  // — the surface authenticates with its own LRS Basic-auth credential.
+  mount("/api/xapi", () => import("./routes/learning/xapi/lrs.js").then((m) => m.xapiLrsRoutes));
   mount("/api/legal", () => import("./routes/legal.js").then((m) => m.legalRoutes));
   mount("/api/advertising", () => import("./routes/advertising.js").then((m) => m.advertisingRoutes));
   // #169 — Campaign $ redemption store. Read-only balance + tx surface
@@ -854,7 +800,7 @@ export function createApp() {
   mount("/api/paid-media", () => import("./routes/paid-media.js").then((m) => m.paidMediaRoutes));
   mount("/api/social/webhooks", () => import("./routes/social-webhooks.js").then((m) => m.socialWebhookRoutes)); // inbound platform webhooks (#2048) — signature-authenticated, public
   mount("/api/distribution", () => import("./routes/distribution.js").then((m) => m.distributionRoutes)); // scheduled posts + off-platform reach (#2047/#2048)
-  mount("/api/social", () => import("./routes/social.js").then((m) => m.socialRoutes)); // social connection layer + Lane B (PRD §5.0)
+  mount("/api/social", () => import("./routes/social.js").then((m) => m.socialRoutes)); // social connection layer, Lane B (self) + ?lane=managed Lane A (SA) (PRD §5.0)
   mount("/api/promotions", () => import("./routes/promotions.js").then((m) => m.promotionRoutes)); // creator promotion submissions (Lane A, #2046)
   mount("/api/coupons", () => import("./routes/coupons.js").then((m) => m.couponRoutes)); // redeem a SuperAdmin coupon code
   mount("/api/theme-calendar", () => import("./routes/theme-calendar.js").then((m) => m.themeCalendarRoutes)); // public: events the theme picker reads (#2350)
@@ -909,8 +855,6 @@ Keep responses concise (2–4 sentences). Answer questions about features, prici
     return c.json({ success: true, reply }, 200);
   });
 
-  // Some legacy frontend services still call /sentiment/* without /api prefix
-  mount("/sentiment", () => import("./routes/sentiment.js").then((m) => m.sentimentRoutes));
 
   // Wrap globalErrorHandler to ensure CORS headers are present on error responses.
   // Hono's onError creates a fresh response that bypasses middleware-set headers.

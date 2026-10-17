@@ -4,7 +4,7 @@
  *
  * Two public functions:
  *   sendArtifactViewBeacon(beacon)
- *     POST /api/analytics/artifacts/beacon — fire-and-forget, called
+ *     POST /api/analytics/events (kind "artifact_view") — fire-and-forget, called
  *     from the per-artifact trackers (scroll-tracker, video-tracker).
  *
  *   fetchArtifactAnalytics(kind, id)
@@ -17,6 +17,12 @@
 import { apiClient, resolveApiUrl } from "../api-client";
 import type { ArtifactKind, ArtifactViewBeacon } from "@shared/artifact-views";
 import type { ArtifactMetrics } from "@/lib/analytics/artifact-metrics";
+import { ANALYTICS_EVENTS_PATH, type AnalyticsEventInput } from "@shared/analytics-events";
+
+/** Wrap a view beacon in the `artifact_view` analytics-event envelope. */
+function toArtifactViewEvent(beacon: ArtifactViewBeacon): AnalyticsEventInput<"artifact_view"> {
+  return { kind: "artifact_view", ...beacon };
+}
 
 export async function sendArtifactViewBeacon(
   beacon: ArtifactViewBeacon,
@@ -30,8 +36,9 @@ export async function sendArtifactViewBeacon(
   // not own /api/* (that's the api.hired.video Hono worker), so a relative
   // path 405s in prod. resolveApiUrl also de-dupes the `/api` that the
   // localhost base (http://localhost:8787/api) already carries.
-  const body = JSON.stringify(beacon);
-  const url = resolveApiUrl("/api/analytics/artifacts/beacon");
+  const event = toArtifactViewEvent(beacon);
+  const body = JSON.stringify(event);
+  const url = resolveApiUrl(ANALYTICS_EVENTS_PATH);
   if (typeof navigator !== "undefined" && navigator.sendBeacon) {
     try {
       const blob = new Blob([body], { type: "application/json" });
@@ -39,7 +46,7 @@ export async function sendArtifactViewBeacon(
       if (ok) return;
     } catch {}
   }
-  await apiClient.post("/api/analytics/artifacts/beacon", beacon);
+  await apiClient.post(ANALYTICS_EVENTS_PATH, event);
 }
 
 export async function fetchArtifactAnalytics(

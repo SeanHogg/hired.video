@@ -3,7 +3,7 @@
  *  pixels. */
 import type { ChartWidgetParams, WidgetParams } from "@/lib/studio/editor-v2/canvas-state";
 import { drawChart } from "@/lib/studio/chart-canvas";
-import { stringOr } from "../frame";
+import { stringOr } from "@/lib/numeric";
 import { registerPlugin } from "../plugin";
 import { oneOf, optionalString, stringArray, when } from "./shared";
 

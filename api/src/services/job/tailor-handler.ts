@@ -14,7 +14,7 @@
  *
  * `preview: true` (the kit review) persists nothing: the person reviews
  * every change on the page and saves with "Save as version of master"
- * (POST /api/resume-versions/:id/versions). Without it the legacy one-shot
+ * (POST /api/resumes { source: "variation" }). Without it the legacy one-shot
  * behaviour stands (Chrome extension, AI tool runner), returning
  * `variationId`.
  */

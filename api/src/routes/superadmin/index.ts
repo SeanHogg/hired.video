@@ -1,11 +1,8 @@
 import { Hono } from "hono";
-import type { Variables, AppEnv } from "../../types/index.js";
-import { superAdminMiddleware } from "../../middleware/superAdmin.js";
-import { sessionRoutes } from "./sessions.js";
+import type { AppEnv } from "../../types/index.js";
 import { userMgmtRoutes } from "./users.js";
 import { moduleRoutes } from "./modules.js";
 import { auditRoutes } from "./audit.js";
-import { toolUsageRoutes } from "./tool-usage.js";
 import { securityRoutes } from "./security.js";
 import { aiVendorRoutes } from "./ai-vendors.js";
 import { aiSpendRoutes } from "./ai-spend.js";
@@ -14,26 +11,26 @@ import { superadminPointsRoutes } from "./points.js";
 import { superadminCompanyRoutes } from "./companies.js";
 
 /**
- * SuperAdmin management router.
+ * SuperAdmin console router — mounted at /api/admin/sa by the admin
+ * composite (routes/admin/index.ts), which applies superAdminMiddleware once.
+ * Impersonation sessions live separately at /api/admin/impersonate
+ * (sessions.ts); tool-usage insights live under /api/admin/usage/tools.
  *
- * Mounted at /api/admin/impersonate in app.ts. Sub-routers:
- *   /               → session lifecycle  (sessions.ts)
- *   /users          → cross-tenant user management  (users.ts)
- *   /modules        → module CRUD  (modules.ts)
- *   /audit          → audit log viewer  (audit.ts)
- *   /security       → spam / abuse investigation  (security.ts)
- *
- * superAdminMiddleware is applied once here — sub-routers do not repeat it.
+ *   /users       → cross-tenant user management  (users.ts)
+ *   /modules     → module CRUD  (modules.ts)
+ *   /audit       → audit log viewer  (audit.ts)
+ *   /security    → signup spam / abuse investigation  (security.ts)
+ *   /ai          → AI use-case + gateway visibility  (ai-vendors.ts)
+ *   /ai-spend    → AI spend vs revenue + cost reconciliation  (ai-spend.ts)
+ *   /extension   → extension telemetry  (extension.ts)
+ *   /points      → gamification admin  (points.ts)
+ *   /companies   → company management  (companies.ts)
  */
 export const superadminRoutes = new Hono<AppEnv>();
 
-superadminRoutes.use("*", superAdminMiddleware);
-
-superadminRoutes.route("/", sessionRoutes);
 superadminRoutes.route("/users", userMgmtRoutes);
 superadminRoutes.route("/modules", moduleRoutes);
 superadminRoutes.route("/audit", auditRoutes);
-superadminRoutes.route("/tool-usage", toolUsageRoutes);
 superadminRoutes.route("/security", securityRoutes);
 superadminRoutes.route("/ai", aiVendorRoutes);
 superadminRoutes.route("/ai-spend", aiSpendRoutes);

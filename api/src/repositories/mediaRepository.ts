@@ -5,7 +5,6 @@
  *   • studioProjects      — storyboards / generation state
  *   • pitchDecks          — recruiter pitch-deck builder
  *   • pitchDeckCandidates — candidates attached to a deck
- *   • pitchDeckShares     — per-share ACL for decks
  *
  * Grouped because they're all "long-form media the app generates or
  * hosts" with similar storage/visibility semantics.
@@ -22,9 +21,7 @@ const {
   studioProjects,
   pitchDecks,
   pitchDeckCandidates,
-  pitchDeckShares,
   feedPosts,
-  feedPostComments,
 } = schema;
 
 export type DbLike = any;
@@ -38,24 +35,28 @@ export type StudioProjectInsert = typeof studioProjects.$inferInsert;
 export type PitchDeckRow = typeof pitchDecks.$inferSelect;
 export type PitchDeckInsert = typeof pitchDecks.$inferInsert;
 export type PitchDeckCandidateRow = typeof pitchDeckCandidates.$inferSelect;
-export type PitchDeckShareRow = typeof pitchDeckShares.$inferSelect;
 export type FeedPostRow = typeof feedPosts.$inferSelect;
 export type FeedPostInsert = typeof feedPosts.$inferInsert;
-export type FeedPostCommentRow = typeof feedPostComments.$inferSelect;
 
-export interface IMediaRepository {
-  // videos
+/** Uploaded videos. */
+export interface IMediaVideoRepository {
   findVideoById(id: string): Promise<VideoRow | null>;
   findPublicVideosForUser(userId: string): Promise<VideoRow[]>;
   insertVideo(input: VideoInsert): Promise<VideoRow>;
   updateVideoById(id: string, userId: string, patch: Partial<VideoInsert>): Promise<VideoRow | null>;
   deleteVideoById(id: string, userId: string): Promise<boolean>;
-  // voice clones
+}
+
+/** Studio voice clones. */
+export interface IMediaVoiceCloneRepository {
   findVoiceCloneById(id: string): Promise<StudioVoiceCloneRow | null>;
   listPublicVoiceClones(limit?: number): Promise<StudioVoiceCloneRow[]>;
   findVoiceClonesForUser(userId: string): Promise<StudioVoiceCloneRow[]>;
   insertVoiceClone(input: StudioVoiceCloneInsert): Promise<StudioVoiceCloneRow>;
-  // studio projects
+}
+
+/** Studio projects. */
+export interface IMediaStudioProjectRepository {
   findStudioProjectById(id: string): Promise<StudioProjectRow | null>;
   findStudioProjectsForUser(userId: string): Promise<StudioProjectRow[]>;
   insertStudioProject(input: StudioProjectInsert): Promise<StudioProjectRow>;
@@ -69,19 +70,29 @@ export interface IMediaRepository {
     baseSlug: string,
     selfProjectId: string | undefined,
   ): Promise<{ baseTaken: boolean; maxSuffix: number | null }>;
-  // pitch decks
+}
+
+/** Pitch decks. */
+export interface IMediaPitchDeckRepository {
   findPitchDeckById(id: string): Promise<PitchDeckRow | null>;
   findPitchDecksForCompany(companyId: string): Promise<PitchDeckRow[]>;
   insertPitchDeck(input: PitchDeckInsert): Promise<PitchDeckRow>;
   findPitchDeckCandidates(deckId: string): Promise<PitchDeckCandidateRow[]>;
-  findPitchDeckShares(deckId: string): Promise<PitchDeckShareRow[]>;
-  // feed posts (user-authored social-feed content)
+}
+
+/** Feed posts (user-authored social-feed content). */
+export interface IMediaFeedPostRepository {
   findFeedPostsForUser(userId: string, limit?: number): Promise<FeedPostRow[]>;
   insertFeedPost(input: FeedPostInsert): Promise<FeedPostRow>;
   deleteFeedPost(id: string, userId: string): Promise<boolean>;
-  /** Newest-first comments on a feed post, capped at `limit` (default 200, max 500). */
-  findCommentsForFeedPost(postId: string, limit?: number): Promise<FeedPostCommentRow[]>;
 }
+
+export interface IMediaRepository
+  extends IMediaVideoRepository,
+    IMediaVoiceCloneRepository,
+    IMediaStudioProjectRepository,
+    IMediaPitchDeckRepository,
+    IMediaFeedPostRepository {}
 
 export class MediaRepository implements IMediaRepository {
   constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}
@@ -211,13 +222,6 @@ export class MediaRepository implements IMediaRepository {
       .where(eq(pitchDeckCandidates.deckId, deckId))) as PitchDeckCandidateRow[];
   }
 
-  async findPitchDeckShares(deckId: string): Promise<PitchDeckShareRow[]> {
-    return (await this.db
-      .select()
-      .from(pitchDeckShares)
-      .where(eq(pitchDeckShares.deckId, deckId))) as PitchDeckShareRow[];
-  }
-
   async findStudioProjectsWhere(where: SQL | undefined, limit = 500): Promise<StudioProjectRow[]> {
     const rows = (await this.db
       .select()
@@ -262,15 +266,6 @@ export class MediaRepository implements IMediaRepository {
       .where(eq(feedPosts.userId, userId))
       .orderBy(desc(feedPosts.createdAt))
       .limit(Math.min(200, Math.max(1, limit)))) as FeedPostRow[];
-  }
-
-  async findCommentsForFeedPost(postId: string, limit = 200): Promise<FeedPostCommentRow[]> {
-    return (await this.db
-      .select()
-      .from(feedPostComments)
-      .where(eq(feedPostComments.feedPostId, postId))
-      .orderBy(desc(feedPostComments.createdAt))
-      .limit(Math.min(500, Math.max(1, limit)))) as FeedPostCommentRow[];
   }
 
   async insertFeedPost(input: FeedPostInsert): Promise<FeedPostRow> {

@@ -738,7 +738,7 @@ export default function Resumes() {
     return true;
   });
 
-  // The `/api/resumes/withownership` backend never emits ownership: "tracked"
+  // The `GET /api/resumes?owner=me&include=ownership` backend never emits ownership: "tracked"
   // for resumes (only `owned`). The previous "Candidates" tab on /resumes that
   // filtered for tracked rows was permanently empty dead UI — removed in
   // favour of the new Sourced / Available tabs (gap #400 in README).

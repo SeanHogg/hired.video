@@ -3,7 +3,7 @@
  * owner's engagement summary) and the author-triggered AI classify (#175).
  */
 import { Hono } from "hono";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
@@ -12,8 +12,9 @@ import { getDb, schema } from "../../db/index.js";
 import { bumpSearchVersion } from "../../utils/search-cache.js";
 import { toFindings } from "../../services/articles/moderation-classifier.js";
 import { uid, runArticleClassifier } from "./shared.js";
+import { findClapTotal, upsertClapTotal } from "../../repositories/articleClapsRepository.js";
 
-const { articles, articleEngagement, articleClaps, articleShares, users } = schema;
+const { articles, articleEngagement, articleShares, users } = schema;
 
 export const articleEngagementRoutes = new Hono<AppEnv>();
 
@@ -112,23 +113,14 @@ articleEngagementRoutes.post("/:id/clap", async (c) => {
   }
 
   const CLAP_CAP = 50;
-  const [existing] = await db.select({ count: articleClaps.count })
-    .from(articleClaps)
-    .where(and(eq(articleClaps.articleId, id), eq(articleClaps.userId, userId)))
-    .limit(1);
-  const current = existing?.count ?? 0;
+  const current = await findClapTotal(db, id, userId);
   const newTotal = Math.min(CLAP_CAP, current + parsed.data.delta);
   const actualDelta = newTotal - current;
   if (actualDelta <= 0) {
     return c.json(success({ total: current, addedThisCall: 0 }), 200);
   }
 
-  await db.insert(articleClaps)
-    .values({ articleId: id, userId, count: newTotal })
-    .onConflictDoUpdate({
-      target: [articleClaps.userId, articleClaps.articleId],
-      set: { count: newTotal, updatedAt: new Date() },
-    });
+  await upsertClapTotal(db, id, userId, newTotal);
 
   const today = new Date().toISOString().slice(0, 10);
   await db.insert(articleEngagement).values({

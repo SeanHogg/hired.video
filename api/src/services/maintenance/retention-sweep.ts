@@ -125,11 +125,13 @@ export const RETENTION_POLICIES: readonly RetentionPolicy[] = [
   { table: "usage_events",       ageColumns: ["occurred_at"], retentionDays: 95, batchSize: 5000 },
   { table: "usage_sessions",     ageColumns: ["last_seen"],   retentionDays: 95, batchSize: 2000 },
 
-  // Raw job/company view events — every reader windows them to 30 days
-  // (routes/artifact-metrics.ts, routes/job-analytics.ts) and no counter
-  // cache is recomputed from them, so 180 days is pure headroom.
-  { table: "job_view_events",     ageColumns: ["created_at"], retentionDays: 180, batchSize: 5000 },
-  { table: "company_view_events", ageColumns: ["created_at"], retentionDays: 180, batchSize: 5000 },
+  // Raw job/company listing-traffic events (artifact_views event_type
+  // 'listing_view'; were job_view_events / company_view_events until W3-A
+  // 0580) — every reader windows them to 30 days
+  // (repositories/listingViewsRepository.ts) and no counter cache is
+  // recomputed from them, so 180 days is pure headroom. Only that stream is
+  // swept; idx_artifact_views_event_viewed backs the scoped age scan.
+  { table: "artifact_views",     ageColumns: ["viewed_at"], retentionDays: 180, batchSize: 5000, scope: "event_type = 'listing_view'" },
 
   // Security telemetry. bot_block_events backs the 7/30-day admin
   // security charts; login_events backs brute-force / risk windows (hours
@@ -146,11 +148,11 @@ export const RETENTION_POLICIES: readonly RetentionPolicy[] = [
   { table: "password_reset_tokens",     ageColumns: ["expires_at"], retentionDays: 1, batchSize: 5000 },
 
   // Deliberately NOT here (W1-B review, 2026-10-17):
-  //   - artifact_views / video_analytics / resume_views: lifetime counts
+  //   - artifact_views streams other than listing_view: lifetime counts
   //     are computed by COUNT(*) over the raw rows (profile totalViews,
-  //     resume view counts, video CTA counts, and counter-recompute's
-  //     articles.view_count), so pruning would silently shrink them. They
-  //     need a lifetime rollup column first.
+  //     resume / company view counts, studio CTA counts, and
+  //     counter-recompute's articles.view_count), so pruning would silently
+  //     shrink them. They need a lifetime rollup column first.
   //   - article_engagement: already the per-(article, day) rollup that the
   //     partner pool + engagement payout read.
   //   - job_items: the scraper never deactivates or expires the rows it

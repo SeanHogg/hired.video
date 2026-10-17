@@ -6,7 +6,7 @@
 import { eq } from "drizzle-orm";
 import { getDb, type Db } from "../../db/index.js";
 import { userVideoPersonalization } from "../../db/schema/videoPersonalization.js";
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import { isVideoThemeId } from "../../../../shared/video-themes.js";
 import {
   DEFAULT_VIDEO_PERSONALIZATION,
@@ -16,7 +16,8 @@ import {
 
 type Row = typeof userVideoPersonalization.$inferSelect;
 
-const TTL_SECONDS = 3600;
+/** Isolate-local: other warm isolates converge within this TTL after a save. */
+const TTL_SECONDS = 120;
 const keyOf = (userId: string) => `video-personalization:v1:${userId}`;
 
 function monthDay(month: number | null, day: number | null): MonthDay | null {
@@ -61,7 +62,7 @@ function toColumns(p: VideoPersonalization) {
 
 /** The person's personalization, or the defaults when they haven't set any. */
 export function getVideoPersonalization(userId: string, db: Db = getDb()): Promise<VideoPersonalization> {
-  return getOrSetCached({
+  return getOrSetIsolateCached({
     key: keyOf(userId),
     ttlSeconds: TTL_SECONDS,
     loader: async () => {
@@ -82,7 +83,7 @@ export async function saveVideoPersonalization(
     .values({ userId, ...cols })
     .onConflictDoUpdate({ target: userVideoPersonalization.userId, set: cols })
     .returning();
-  invalidateCachedKey(keyOf(userId));
+  invalidateIsolateKey(keyOf(userId));
   return fromRow(row);
 }
 
@@ -90,5 +91,5 @@ export async function saveVideoPersonalization(
  *  never fires), so the person's moments are deleted explicitly. */
 export async function eraseVideoPersonalization(userId: string, db: Db = getDb()): Promise<void> {
   await db.delete(userVideoPersonalization).where(eq(userVideoPersonalization.userId, userId));
-  invalidateCachedKey(keyOf(userId));
+  invalidateIsolateKey(keyOf(userId));
 }

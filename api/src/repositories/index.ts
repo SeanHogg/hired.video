@@ -336,7 +336,6 @@ export type {
   TwoFactorCodeRow, TwoFactorCodeInsert,
   RefreshTokenRow, RefreshTokenInsert,
   PasskeyRow, PasskeyInsert,
-  OauthAccountRow, OauthAccountInsert,
 } from "./authTokensRepository.js";
 export type {
   ModuleRow, ModuleInsert,

@@ -1,6 +1,6 @@
 /**
  * Create a résumé for a job from the master's evidence — the wire contract
- * of POST /api/resume-versions/from-job and the kit "create from a job
+ * of POST /api/resumes { source: "job" } and the kit "create from a job
  * post" review.
  *
  * Every requirement the job states is mapped to the bullets that prove it

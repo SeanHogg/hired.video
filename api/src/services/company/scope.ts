@@ -1,7 +1,7 @@
 // company-scope.ts — Resolves the set of company_ids the requesting user
 // is authorised to read/write on recruiting-platform resources. Used as
 // the row-level filter for candidate_resumes, redaction_profiles,
-// candidate_resume_shares, pitch_decks, and pitch_deck_shares.
+// candidate résumé + pitch-deck share links (share_links), and pitch_decks.
 //
 // MVP rule: a user has access to a company when they are the owner OR
 // they have an active row in user_company_role_associations. Full RBAC

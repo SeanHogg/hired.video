@@ -1,7 +1,7 @@
 /**
  * Unit tests for the consolidated createFromFile payload extractor
- * (roadmap #149 — /CreateFromFile and /createfromfile now share one
- * handler via `extractCreateFromFilePayload`).
+ * (roadmap #149 — POST /api/jobs/createfromfile; the PascalCase
+ * /CreateFromFile twin was removed 2026-10-17).
  *
  * We simulate the minimal Hono context surface the extractor reads so
  * the tests stay DB-free and avoid the ESM/CJS module boundary that
@@ -13,7 +13,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-// Replicate the extractor's logic verbatim from routes/jobs.ts so the
+// Replicate the extractor's logic verbatim from routes/jobs/payload.ts so the
 // tests don't need to load the route module (which chains through the
 // billing service and DB). Keep this in sync with the route file — the
 // tests above will fail if the branching drifts.
@@ -114,7 +114,7 @@ describe("extractCreateFromFilePayload: JSON body", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Multipart path (/CreateFromFile from Chrome extension / JobCreatePage)
+// Multipart path (/createfromfile from Chrome extension / JobCreatePage)
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("extractCreateFromFilePayload: multipart", () => {

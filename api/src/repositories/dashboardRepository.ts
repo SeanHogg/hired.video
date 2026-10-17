@@ -7,7 +7,7 @@
  * count them. The only row lists returned are explicitly capped.
  */
 
-import { and, count, desc, eq, inArray, isNotNull, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 export type DbLike = any;
@@ -91,7 +91,7 @@ export class DashboardRepository {
     const [row] = await this.db
       .select({
         total: count(),
-        paid: sql<string | null>`coalesce(sum(${placements.commissionAmount}) filter (where ${placements.commissionStatus} = 'Paid'), 0)`,
+        paid: sql<string | null>`coalesce(sum(${placements.commissionAmount}) filter (where ${placements.commissionStatus} = 'paid'), 0)`,
         avgDays: sql<string | null>`avg(extract(epoch from (${placements.startDate} - ${placements.createdAt})) / ${DAY_SECONDS}) filter (where ${placements.startDate} is not null)`,
       })
       .from(placements)
@@ -159,8 +159,32 @@ export class DashboardRepository {
     userId: string,
     w: SavedJobAnalyticsWindows,
   ): Promise<SavedJobAnalyticsAggregate> {
-    const s = savedJobs;
-    const inWindow = (col: AnyColumn, win: TimeWindow) =>
+    // Tracker rows = the seeker's saved jobs, each carrying its newest
+    // application's lifecycle (job_applications owns it, W3-D2); a saved job
+    // with no application is "tracked".
+    const latestApp = this.db
+      .selectDistinctOn([jobApplications.jobId], {
+        jobId: jobApplications.jobId,
+        status: jobApplications.status,
+        appliedAt: jobApplications.appliedAt,
+        statusChangedAt: jobApplications.statusChangedAt,
+      })
+      .from(jobApplications)
+      .where(eq(jobApplications.userId, userId))
+      .orderBy(jobApplications.jobId, desc(jobApplications.appliedAt))
+      .as("latest_app");
+    const s = this.db
+      .select({
+        createdAt: savedJobs.createdAt,
+        status: sql<string>`coalesce(${latestApp.status}, 'tracked')`.as("status"),
+        appliedAt: sql<Date | null>`${latestApp.appliedAt}`.as("applied_at"),
+        statusChangedAt: sql<Date | null>`${latestApp.statusChangedAt}`.as("status_changed_at"),
+      })
+      .from(savedJobs)
+      .leftJoin(latestApp, eq(latestApp.jobId, savedJobs.jobId))
+      .where(eq(savedJobs.userId, userId))
+      .as("tracker");
+    const inWindow = (col: SQLWrapper, win: TimeWindow) =>
       sql`${col} >= ${ts(win.start)} and ${col} < ${ts(win.end)}`;
     const countWhere = (cond: SQL): SQL<string> => sql<string>`count(*) filter (where ${cond})`;
 
@@ -170,19 +194,18 @@ export class DashboardRepository {
       weekCols[`a${i}`] = countWhere(inWindow(s.appliedAt, win));
     });
 
-    const dayExpr = (col: AnyColumn) =>
+    const dayExpr = (col: SQLWrapper) =>
       sql<string>`to_char(${col} at time zone 'UTC', 'YYYY-MM-DD')`;
-    const daysFor = (col: AnyColumn) =>
+    const daysFor = (col: SQLWrapper) =>
       this.db
         .selectDistinct({ d: dayExpr(col) })
         .from(s)
-        .where(and(eq(s.userId, userId), sql`${col} >= ${ts(w.streakSince)}`));
+        .where(sql`${col} >= ${ts(w.streakSince)}`);
 
     const [funnelRows, totalsRows, createdDays, appliedDays, changedDays] = await Promise.all([
       this.db
         .select({ status: sql<string>`lower(${s.status})`, n: count() })
         .from(s)
-        .where(eq(s.userId, userId))
         .groupBy(sql`lower(${s.status})`),
       this.db
         .select({
@@ -196,8 +219,7 @@ export class DashboardRepository {
           appliedBeforeGhostCutoff: countWhere(sql`${s.appliedAt} < ${ts(w.ghostCutoff)}`),
           ...weekCols,
         })
-        .from(s)
-        .where(eq(s.userId, userId)),
+        .from(s),
       daysFor(s.createdAt),
       daysFor(s.appliedAt),
       daysFor(s.statusChangedAt),

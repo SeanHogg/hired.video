@@ -12,7 +12,7 @@
  * public marketplace can scope listings.
  *
  * This was duplicated inline in courses.ts (`resolveAuthorEligibility`)
- * and learning-paths.ts (`checkAuthorEligibility`); both now call here
+ * and the learning-paths route (`checkAuthorEligibility`); both now call here
  * (rule: feedback_extract_on_duplication). Cohort authoring reuses it too.
  */
 

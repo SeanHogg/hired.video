@@ -1,5 +1,5 @@
 /**
- * Tests for the Zod schemas in `learning-paths.ts`.
+ * Tests for the Zod schemas in `learning/paths-authoring.ts`.
  *
  * `AttachCourseSchema` is the only public schema today (the rest of the
  * file uses inline `z.object` literals). Same gap #1522 regression
@@ -13,7 +13,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { AttachCourseSchema } from "../learning-paths.js";
+import { AttachCourseSchema } from "../learning/paths-authoring.js";
 import {
   SEED_DERIVED_UUID,
   V4_UUID,

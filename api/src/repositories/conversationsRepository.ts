@@ -46,8 +46,8 @@ export type BusinessPhoneNumberInsert = typeof businessPhoneNumbers.$inferInsert
 export type CallLogRow = typeof callLogs.$inferSelect;
 export type CallLogInsert = typeof callLogs.$inferInsert;
 
-export interface IConversationsRepository {
-  // ── conversations + participants ──────────────────────────────────────────
+/** Conversations + participants. */
+export interface IConversationRepository {
   findConversationById(id: string): Promise<ConversationRow | null>;
   /** Most-recently-updated conversations the user participates in,
    *  ordered `updatedAt DESC`, capped at `limit` (default 200, max 500). */
@@ -65,7 +65,10 @@ export interface IConversationsRepository {
   /** Bump the conversation's `updatedAt` so the inbox sort by most-recent
    *  reflects the latest message without an extra select-then-update. */
   touchConversation(id: string): Promise<void>;
-  // ── messages ──────────────────────────────────────────────────────────────
+}
+
+/** Messages + read receipts. */
+export interface IConversationMessageRepository {
   findMessagesForConversation(conversationId: string, limit?: number): Promise<MessageRow[]>;
   /** Newest-first messages across every conversation `userId` participates
    *  in (optionally narrowed to one conversation), capped at `limit`
@@ -93,15 +96,28 @@ export interface IConversationsRepository {
     viewerId: string,
     conversationIds: string[],
   ): Promise<Map<string, number>>;
-  // ── AI chat (separate channel; same repo for the messaging bounded ctx) ──
+}
+
+/** AI chat (separate channel; same repo for the messaging bounded ctx). */
+export interface IAiChatRepository {
   findAiChatSessionsForUser(userId: string, limit?: number): Promise<AiChatSessionRow[]>;
   insertAiChatSession(input: AiChatSessionInsert): Promise<AiChatSessionRow>;
   findAiChatMessages(sessionId: string): Promise<AiChatMessageRow[]>;
   insertAiChatMessage(input: AiChatMessageInsert): Promise<void>;
+}
+
+/** Business phone numbers + call logs. */
+export interface ITelephonyRepository {
   findBusinessPhoneNumbersForUser(userId: string): Promise<BusinessPhoneNumberRow[]>;
   findCallLogsForUser(userId: string, limit?: number): Promise<CallLogRow[]>;
   insertCallLog(input: CallLogInsert): Promise<void>;
 }
+
+export interface IConversationsRepository
+  extends IConversationRepository,
+    IConversationMessageRepository,
+    IAiChatRepository,
+    ITelephonyRepository {}
 
 export class ConversationsRepository implements IConversationsRepository {
   constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}

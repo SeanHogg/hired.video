@@ -21,7 +21,7 @@
  */
 
 import type { Repos, InboxActionRow, InboxActionRunInsert } from "../../repositories/index.js";
-import type { NotificationInsert } from "../../repositories/notificationsRepository.js";
+import type { EmitNotificationInput } from "../notifications/notificationService.js";
 import type { NormalisedEmail } from "./providers/types.js";
 import type { LLMClient } from "../adapters/llm-client.js";
 import {
@@ -49,7 +49,7 @@ export interface ActionContext {
  *  stamps `run.targetType`/`run.targetId`. */
 export interface ActionEffect {
   run: InboxActionRunInsert;
-  notification?: NotificationInsert;
+  notification?: EmitNotificationInput;
 }
 
 /** Deps a handler may use. Repos is the full container so Phase-4
@@ -105,17 +105,18 @@ const notifyHandler: HandlerFn = async (action, ctx) => {
       detail: message.slice(0, 500),
     }),
     notification: {
-      userId: ctx.userId,
+      recipientIds: [ctx.userId],
       type: "inbox_action",
+      actor: null,
       title,
       message: message.slice(0, 4000),
-      data: {
+      extraData: {
         messageId: ctx.messageId,
         category: ctx.category,
         actionId: action.id,
         extracted: ctx.extracted ?? undefined,
       },
-    } as NotificationInsert,
+    },
   };
 };
 

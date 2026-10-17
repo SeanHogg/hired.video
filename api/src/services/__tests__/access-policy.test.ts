@@ -32,7 +32,8 @@ import {
   type ToolFeature,
 } from "../../domains/billing/access-policy.js";
 import { makeBillingFacadeForTests } from "../../domains/billing/facade.js";
-import { buildScoreResult, shapeScorerPayload } from "../../routes/resume-scorer.js";
+import { shapeScorerPayload } from "../ai-tools/tools/resume-analysis.js";
+import { buildAnalysisFallback as buildScoreResult } from "../resume/analyze.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // isAdminRole

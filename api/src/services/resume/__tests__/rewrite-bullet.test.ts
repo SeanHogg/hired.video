@@ -1,6 +1,6 @@
 /**
  * #375 — the one-bullet wands (`add_bullet_metric`, `strengthen_bullet_verbs`)
- * behind `POST /api/resumeoptimizer/rewrite-bullet`.
+ * behind `POST /api/ai/tools/resume-rewrite-bullet`.
  *   1. `rewriteBullet` sends the lens's prompt under a per-mode feature key,
  *      returns the validated `{ improved }`, and lets a malformed model answer
  *      or a gateway failure surface (the route turns it into aiFailure).
@@ -11,9 +11,6 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { z } from "zod";
 import type {
   LenientIngest,
@@ -26,7 +23,8 @@ import type {
 } from "../../adapters/llm-client.js";
 import { BULLET_REWRITE_PROMPTS, rewriteBullet } from "../rewrite-bullet.js";
 import { RewriteBulletRequestSchema } from "../../../../../shared/tool-schemas.js";
-import { resumeOptimizerRoutes } from "../../../routes/resume-optimizer.js";
+import { AI_TOOL_REGISTRY } from "../../ai-tools/registry.js";
+import { aiToolRoutes } from "../../../routes/ai/tools.js";
 
 const USAGE: LLMUsage = { promptTokens: 212, completionTokens: 38, totalTokens: 250, model: "stub/model" };
 
@@ -113,18 +111,15 @@ describe("RewriteBulletRequestSchema — the route's body check", () => {
   });
 });
 
-describe("POST /rewrite-bullet — paid AI gates", () => {
-  it("is gated by Pro, then the token budget, in that order", () => {
-    const here = dirname(fileURLToPath(import.meta.url));
-    const src = readFileSync(join(here, "..", "..", "..", "routes", "resume-optimizer.ts"), "utf8");
-    assert.match(
-      src,
-      /resumeOptimizerRoutes\.post\("\/rewrite-bullet", requirePro\("Resume wands"\), requireTokenBudget\(\), async/,
-    );
+describe("POST /api/ai/tools/resume-rewrite-bullet — paid AI gates", () => {
+  it("is declared Pro-gated and token-budget-gated in the registry", () => {
+    const tool = AI_TOOL_REGISTRY["resume-rewrite-bullet"];
+    assert.equal(tool.requirePro, "Resume wands");
+    assert.equal(tool.tokenBudget, "gate");
   });
 
   it("refuses an anonymous call with 401 before reading the body", async () => {
-    const res = await resumeOptimizerRoutes.request("/rewrite-bullet", {
+    const res = await aiToolRoutes.request("/tools/resume-rewrite-bullet", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ original: WEAK, mode: "metric" }),

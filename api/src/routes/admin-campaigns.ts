@@ -1,5 +1,6 @@
 /**
- * SuperAdmin email-campaign manager. Mounted at /api/admin/campaigns.
+ * SuperAdmin email-campaign manager. Mounted at /api/admin/campaigns by the
+ * admin composite (routes/admin/index.ts), which applies the SA guard.
  *
  * The full campaign engine for marketing blasts: compose from a template or
  * inline body, pick an audience (platform users by role / marketing leads /
@@ -26,10 +27,8 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { superAdminMiddleware } from "../middleware/superAdmin.js";
-import { CampaignService } from "../services/campaigns/CampaignService.js";
-import { getPlatformCompanyId } from "../services/campaigns/platform-company.js";
+import { adminCampaignService as buildService, createPlatformCampaign } from "../services/admin/adminCampaigns.js";
+import { recordAdminAudit } from "../services/admin/adminAudit.js";
 import { z } from "zod";
 import {
   CreateCampaignSchema,
@@ -41,26 +40,10 @@ import {
 } from "../../../shared/campaigns.js";
 import { MARKETING_CATEGORIES } from "../../../shared/email-consent.js";
 
-const { adminAuditLog } = schema;
-
 export const adminCampaignRoutes = new Hono<AppEnv>();
 
-adminCampaignRoutes.use("*", superAdminMiddleware);
-
-function buildService(): CampaignService {
-  return CampaignService.create(getDb());
-}
-
-async function audit(
-  actorId: string,
-  action: string,
-  targetId: string,
-  metadata: Record<string, unknown>,
-) {
-  await getDb()
-    .insert(adminAuditLog)
-    .values({ actorId, action, targetType: "email_campaign", targetId, metadata } as any)
-    .catch(() => undefined);
+function audit(actorId: string, action: string, targetId: string, metadata: Record<string, unknown>) {
+  return recordAdminAudit({ actorId, action, targetType: "email_campaign", targetId, metadata });
 }
 
 // ── Campaigns ────────────────────────────────────────────────────────────────
@@ -74,13 +57,7 @@ adminCampaignRoutes.post("/", async (c) => {
     return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
   }
   const actorId = c.var.user?.sub as string;
-  const db = getDb();
-  // SuperAdmin marketing campaigns are always sent as the hired.video company.
-  const senderCompanyId = await getPlatformCompanyId(db);
-  const created = await CampaignService.create(db).create(
-    parsed.data,
-    { createdByUserId: actorId, senderCompanyId },
-  );
+  const created = await createPlatformCampaign(parsed.data, actorId);
   await audit(actorId, "campaign.create", created.id, { name: created.name });
   return c.json(success(created), 201);
 });

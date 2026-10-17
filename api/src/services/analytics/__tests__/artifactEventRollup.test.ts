@@ -3,10 +3,12 @@ import { strict as assert } from "node:assert";
 
 import { ROLLUP_EVENTS, rollupArtifactEvents } from "../artifactEventRollup.js";
 
-// Row shapes mirror the grouped query in buildArtifactMetrics:
-//   SELECT event, count(*) AS n FROM video_analytics
-//   WHERE studio_project_id = $1 AND event IN ('cta_click','impression')
-//   GROUP BY event
+// Row shapes mirror countStudioEventRows (videoAnalyticsRepository), which
+// groups artifact_views by event_type for one studio project and maps the
+// stored event types back to studio event names:
+//   SELECT event_type, count(*) AS n FROM artifact_views
+//   WHERE artifact_id = $1 AND event_type IN ('cta_click','impression')
+//   GROUP BY event_type
 describe("rollupArtifactEvents", () => {
   it("computes both CTRs for a promoted video with views, clicks and impressions", () => {
     const rows = [

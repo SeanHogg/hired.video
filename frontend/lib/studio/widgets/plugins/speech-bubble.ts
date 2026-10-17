@@ -4,7 +4,8 @@
  * centred inside the bubble (italic for thought).
  */
 import type { SpeechBubbleWidgetParams, WidgetParams } from "@/lib/studio/editor-v2/canvas-state";
-import { numberOr, stringOr, type Box } from "../frame";
+import { type Box } from "../frame";
+import { numberOr, stringOr } from "@/lib/numeric";
 import { registerPlugin } from "../plugin";
 import type { DrawEnv, DrawOp } from "../draw-ops";
 import type { TextStyle } from "../text-layout";

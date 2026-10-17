@@ -21,6 +21,7 @@ import {
   getWorld,
   updateChallenge,
 } from "@/lib/studio/game/world-3d-edit";
+import { numberOr, stringOr } from "@/lib/numeric";
 
 interface ChallengesPanelProps {
   gameState: GameState;
@@ -195,9 +196,3 @@ function TextInput({ label, value, onChange, placeholder }: { label: string; val
   );
 }
 
-function numberOr(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
-}
-function stringOr(v: unknown, fallback: string): string {
-  return typeof v === "string" ? v : fallback;
-}

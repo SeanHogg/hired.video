@@ -1,7 +1,7 @@
 /**
  * useBulletConsolidate — "AI consolidate" for a merged entry's bullets: the
  * server dedupes near-duplicates and tightens wording without inventing
- * facts (POST /api/resumes/ai/consolidate-bullets). The rewrite is held as
+ * facts (POST /api/ai/tools/resume-consolidate-bullets). The rewrite is held as
  * a PROPOSAL until the person accepts it; nothing changes before that.
  */
 import { useCallback, useState } from "react";

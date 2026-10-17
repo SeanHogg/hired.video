@@ -137,8 +137,7 @@ export async function gateAgentDraftApprove(
 ): Promise<GateResult> {
   const draft = await deps.getAgentDraft(draftId, userId);
   if (!draft || draft.status !== "draft") return { ok: false, reason: "missing" };
-  const settings = draft.postSettings as { postYourself?: boolean } | null;
-  if (settings?.postYourself) return { ok: true };
+  if (draft.postYourself) return { ok: true };
   if (draft.destination === "youtube") {
     const yt = await deps.countAgentJobs({ destination: "youtube", since: localDayStart(now, "UTC") });
     if (yt >= AGENT_YOUTUBE_DAILY_MAX) {

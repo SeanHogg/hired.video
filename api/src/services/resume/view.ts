@@ -14,7 +14,13 @@
  */
 
 import { EMPTY_VIEWER_EXTRAS, type ResumeViewerExtras } from "../../handlers/resume-serializer.js";
-import type { IResumeRepository, ResumeRow } from "../../repositories/index.js";
+import type { ResumeRow } from "../../repositories/index.js";
+import type {
+  IResumeOwnerReader,
+  IResumeViewRepository,
+  IResumeWatchRepository,
+  IResumeWriter,
+} from "../../repositories/resumeRepository.js";
 import { computeDiffPercent } from "../../utils/resume-diff.js";
 
 // ─── Viewer extras ────────────────────────────────────────────────────────────
@@ -23,7 +29,7 @@ import { computeDiffPercent } from "../../utils/resume-diff.js";
  *  the GET /:id handler — for list endpoints prefer the batch variant
  *  which collapses watch + view counts to one repo query each. */
 export async function computeViewerExtras(
-  repo: IResumeRepository,
+  repo: IResumeWatchRepository & IResumeViewRepository,
   row: { id: string; userId: string },
   viewerId: string | null | undefined,
 ): Promise<ResumeViewerExtras> {
@@ -42,7 +48,7 @@ export async function computeViewerExtras(
  *  (watches + views) rather than N lookups. Returns a Map keyed by
  *  resume id so callers can project back onto their row array. */
 export async function computeViewerExtrasBatch(
-  repo: IResumeRepository,
+  repo: IResumeWatchRepository & IResumeViewRepository,
   rows: Array<{ id: string; userId: string }>,
   viewerId: string | null | undefined,
 ): Promise<Map<string, ResumeViewerExtras>> {
@@ -65,15 +71,18 @@ export async function computeViewerExtrasBatch(
   return result;
 }
 
-/** Record a single view event. No-op when the viewer is the owner —
- *  owners refreshing their own resume would otherwise inflate the count. */
+/** Record a single server-side view event (one artifact_views row, kind
+ *  'resume' — it backs both `viewCount` and the creator-stats rollup).
+ *  No-op when the viewer is the owner — owners refreshing their own resume
+ *  would otherwise inflate the count. */
 export async function recordResumeView(
-  repo: IResumeRepository,
+  repo: IResumeViewRepository,
   resumeId: string,
   ownerId: string,
   viewer: {
     userId: string | null;
     ipHash?: string | null;
+    ipCountry?: string | null;
     referrer?: string | null;
     userAgent?: string | null;
   },
@@ -81,8 +90,10 @@ export async function recordResumeView(
   if (viewer.userId && viewer.userId === ownerId) return;
   await repo.insertView({
     resumeId,
+    ownerUserId: ownerId,
     viewerId: viewer.userId,
     ipHash: viewer.ipHash ?? null,
+    ipCountry: viewer.ipCountry ?? null,
     referrer: viewer.referrer ?? null,
     userAgent: viewer.userAgent ?? null,
   });
@@ -99,7 +110,7 @@ export async function recordResumeView(
  *  Called after any create/update that could shift the relationship.
  *  No-op for standalone resumes with no parent and no children. */
 export async function refreshDiffPercentFor(
-  repo: IResumeRepository,
+  repo: IResumeOwnerReader & IResumeWriter,
   userId: string,
   resumeId: string,
 ): Promise<void> {
@@ -136,7 +147,7 @@ export async function refreshDiffPercentFor(
 
 /** Persist the latest sentiment score on the resume row. */
 export async function persistSentimentScore(
-  repo: IResumeRepository,
+  repo: IResumeWriter,
   resumeId: string,
   userId: string,
   score: number,

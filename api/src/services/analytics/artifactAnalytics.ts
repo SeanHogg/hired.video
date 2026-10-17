@@ -12,13 +12,15 @@
  * See Gap Register #1019 L3.
  */
 
-import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import {
   isStudioArtifactKind,
   type ArtifactKind,
 } from "../../../../shared/artifact-views.js";
 import { ROLLUP_EVENTS, rollupArtifactEvents, type ArtifactEventRollup } from "./artifactEventRollup.js";
+import { isArtifactView } from "../../repositories/artifactViewStreams.js";
+import { countStudioEventRows } from "../../repositories/videoAnalyticsRepository.js";
 import { getOrSetCached } from "../../utils/edge-cache.js";
 
 /** Owner-lookup table keyed on artifact kind. One join per kind; the
@@ -127,7 +129,7 @@ export interface ArtifactMetricsDTO {
   ctaClicks?: number;
   /** CTA clicks ÷ in-platform views. */
   ctaClickThroughRate?: number;
-  /** Paid-media impressions (video_analytics event = "impression"). Reads
+  /** Paid-media impressions (artifact_views event_type = "impression"). Reads
    *  0 until impression ingestion exists (#1139 / #1137). */
   impressionCount?: number;
   /** CTA clicks ÷ impressions; 0 when there are no impressions. */
@@ -194,11 +196,12 @@ export async function buildArtifactMetrics(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - (VIEWS_OVER_TIME_DAYS - 1) * DAY_MS,
   );
   const day = sql<string>`to_char(date_trunc('day', ${schema.artifactViews.viewedAt} AT TIME ZONE 'UTC'), 'YYYY-MM-DD')`;
-  // CTA + impression counts live on the videoAnalytics event-counts table
-  // (FK = studio_project_id, kind-agnostic — see migration 0085). Every
-  // studio MediaKind can carry CTA widgets, so read them for every studio
-  // kind via the SSoT predicate. ONE grouped query covers both events and
-  // runs alongside the views read, not after it.
+  // CTA + impression counts are studio playback events in the same
+  // artifact_views table (artifact_id = studio project id, kind-agnostic;
+  // video_analytics folded in by W3-A 0580). Every studio MediaKind can
+  // carry CTA widgets, so read them for every studio kind via the SSoT
+  // predicate. ONE grouped query covers both events and runs alongside the
+  // views read, not after it. View reads are scoped to event_type 'view'.
   const [views, eventRows, dailyRows] = await Promise.all([
     db
       .select()
@@ -207,21 +210,13 @@ export async function buildArtifactMetrics(
         and(
           eq(schema.artifactViews.artifactKind, kind),
           eq(schema.artifactViews.artifactId, artifactId),
+          isArtifactView(),
         ),
       )
       .orderBy(desc(schema.artifactViews.viewedAt))
       .limit(2000),
     isStudioArtifactKind(kind)
-      ? db
-          .select({ event: schema.videoAnalytics.event, n: count() })
-          .from(schema.videoAnalytics)
-          .where(
-            and(
-              eq(schema.videoAnalytics.studioProjectId, artifactId),
-              inArray(schema.videoAnalytics.event, [...ROLLUP_EVENTS]),
-            ),
-          )
-          .groupBy(schema.videoAnalytics.event)
+      ? countStudioEventRows(db, artifactId, ROLLUP_EVENTS)
       : Promise.resolve(null),
     // Views over time — counted in SQL so the series isn't capped by the
     // 2000-row detail read above.
@@ -232,6 +227,7 @@ export async function buildArtifactMetrics(
         and(
           eq(schema.artifactViews.artifactKind, kind),
           eq(schema.artifactViews.artifactId, artifactId),
+          isArtifactView(),
           gte(schema.artifactViews.viewedAt, seriesSince),
         ),
       )

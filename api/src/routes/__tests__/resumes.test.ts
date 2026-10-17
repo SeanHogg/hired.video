@@ -11,7 +11,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { preserveMetaData } from "../resumes.js";
+import { preserveMetaData } from "../../services/resume/content.js";
 
 describe("preserveMetaData", () => {
   const existingMetaData = [

@@ -166,7 +166,7 @@ export default function ResumeCard({
   const { canManageJobs } = usePermissions();
   const canViewStats = isOwner || canManageJobs;
 
-  // Default clone handler — POST /api/resumes/:id/clone via resumeService,
+  // Default clone handler — POST /api/resumes { source: "clone" } via resumeService,
   // then navigate to the clone's edit page. Backend appends " (copy)" to
   // the title and lands the clone as `status: draft`.
   const handleCloneResume = async () => {

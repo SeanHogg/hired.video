@@ -1,6 +1,6 @@
 /**
  * AdminMetricsRepository — time-bucketed aggregate reads for the
- * SuperAdmin product dashboard (`routes/admin.ts`).
+ * SuperAdmin product dashboard (`services/admin/AdminMetricsService.ts`).
  *
  * Every series here is ONE grouped query (neon-http makes each query a
  * full HTTP round-trip, so the previous "one COUNT per bucket" loops cost
@@ -14,13 +14,13 @@
  *             ⇔  ceil((now − createdAt) / size) = k
  */
 
-import { and, eq, gte, lt, lte, sql, type SQL } from "drizzle-orm";
+import { and, count, eq, gte, lt, lte, sql, type SQL } from "drizzle-orm";
 import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 import { schema } from "../db/index.js";
 
 export type DbLike = any;
 
-const { users, jobItems, subscriptions, subscriptionPlans, resumeInformation, systemSettings } = schema;
+const { users, jobItems, subscriptions, subscriptionPlans, resumeInformation, systemSettings, companyProfiles } = schema;
 
 /** Entities the daily time-series endpoint can chart. */
 export type AdminTimeSeriesMetric = "users" | "jobs" | "resumes" | "subscriptions";
@@ -51,6 +51,10 @@ export interface IAdminMetricsRepository {
   activeSubscriptionsAtCutoffs(cutoffs: Date[]): Promise<Array<{ mrr: number; subscribers: number }>>;
   /** Multi-row upsert of system settings (key → value). */
   upsertSystemSettings(entries: Array<[string, string | null]>): Promise<void>;
+  /** Every system setting as a key → value map, ordered by key. */
+  listSystemSettings(): Promise<Record<string, string | null>>;
+  /** Company profile count, optionally only those created on/after `since`. */
+  countCompanies(since?: Date): Promise<number>;
 }
 
 export class AdminMetricsRepository implements IAdminMetricsRepository {
@@ -124,5 +128,21 @@ export class AdminMetricsRepository implements IAdminMetricsRepository {
         target: systemSettings.key,
         set: { value: sql`excluded.value`, updatedAt: sql`excluded.updated_at` },
       });
+  }
+
+  async listSystemSettings(): Promise<Record<string, string | null>> {
+    const rows: Array<{ key: string; value: string | null }> = await this.db
+      .select({ key: systemSettings.key, value: systemSettings.value })
+      .from(systemSettings)
+      .orderBy(systemSettings.key);
+    const settings: Record<string, string | null> = {};
+    for (const row of rows) settings[row.key] = row.value;
+    return settings;
+  }
+
+  async countCompanies(since?: Date): Promise<number> {
+    const base = this.db.select({ n: count() }).from(companyProfiles);
+    const [row] = since ? await base.where(gte(companyProfiles.createdAt, since)) : await base;
+    return Number(row?.n ?? 0);
   }
 }

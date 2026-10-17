@@ -7,14 +7,9 @@ import type { WidgetParams } from "@/lib/studio/editor-v2/canvas-state";
 import { registerPlugin } from "../plugin";
 import { mediaPlaceholderOps } from "./media-placeholder";
 import { optionalNumber, optionalString, when } from "./shared";
+import { clamp01 } from "@/lib/numeric";
 
 type BrandParams = Extract<WidgetParams, { kind: "brand-kit" }>;
-
-function clamp01(n: number): number {
-  if (n < 0) return 0;
-  if (n > 1) return 1;
-  return n;
-}
 
 export const brandKitPlugin = registerPlugin<BrandParams>({
   effectKind: "canvas-v2:brand",

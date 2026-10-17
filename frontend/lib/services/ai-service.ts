@@ -5,6 +5,7 @@
 
 import { logger } from "@/lib/logger";
 import { apiClient } from "@/lib/api-client";
+import { aiToolPath } from "@shared/ai-tools/tool-ids";
 import { billingService } from "@/lib/services/billing-service";
 import { FREE_AI_MONTHLY_LIMIT } from "@shared/pricing";
 import { TIER_COPY } from "@shared/tier-copy";
@@ -228,7 +229,7 @@ class AIService {
     text: string;
     context?: { name?: string; role?: string; company?: string };
   }): Promise<string> {
-    const response = await apiClient.post<{ text: string }>("/api/ai/improve-text", {
+    const response = await apiClient.post<{ text: string }>(aiToolPath("improve-text"), {
       field: input.field,
       text: input.text,
       context: input.context,

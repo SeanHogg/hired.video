@@ -6,7 +6,8 @@
  */
 import type { Widget } from "./canvas-state";
 import { isWidgetMotion } from "./widget-motion";
-import { numberOr, parseContainerStyle, parseEffectStack } from "../widgets/frame";
+import { parseContainerStyle, parseEffectStack } from "../widgets/frame";
+import { numberOr } from "@/lib/numeric";
 import { parseWidgetKeyframes } from "../widgets/evaluate-widget-position";
 import type { RenderContext } from "../widgets/plugin";
 import { PROJECT_FONT_PARAM, pluginForEffectKind, pluginForWidgetKind } from "../widgets/registry";

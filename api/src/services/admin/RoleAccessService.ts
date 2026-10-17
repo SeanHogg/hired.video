@@ -16,6 +16,7 @@ import type {
 } from "../../repositories/roleFeatureAccessRepository.js";
 import type { IAuthzRepository } from "../../repositories/index.js";
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import {
   resolveRoleAccess,
   isManageableRole,
@@ -36,7 +37,7 @@ const userModulesKey = (userId: string) => `user-modules:${CACHE_VERSION}:${user
 /** Drop a user's cached module-assignment slugs — call on grant/revoke so the
  *  per-user feature gate (#2042) reflects the change immediately. */
 export function invalidateUserModulesCache(userId: string): void {
-  invalidateCachedKey(userModulesKey(userId));
+  invalidateIsolateKey(userModulesKey(userId));
 }
 
 /** Admin DTO — one stored override row, ISO-stamped for the wire. */
@@ -116,7 +117,8 @@ export class RoleAccessService {
   private async userModuleSlugs(userId: string): Promise<string[]> {
     if (!this.authz) return [];
     const authz = this.authz;
-    return getOrSetCached<string[]>({
+    // Per-user → isolate-local (no KV write per miss on Workers Free).
+    return getOrSetIsolateCached<string[]>({
       key: userModulesKey(userId),
       ttlSeconds: 120,
       loader: async () => {

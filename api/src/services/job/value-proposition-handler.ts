@@ -1,5 +1,5 @@
 /**
- * Value Proposition use case — POST /api/valueproposition/generate.
+ * Value Proposition use case — AI tool `value-proposition` (POST /api/ai/tools/value-proposition).
  *
  * Resolves the job (tracked id or pasted text) and the résumé (one of the
  * caller's résumé ids, owner-scoped, or pasted text) through the same

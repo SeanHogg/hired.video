@@ -9,7 +9,7 @@
 //   3. Sessions list       — full session timeline with errors, page
 //      views, and navigation chain. Click a row → drawer with events.
 //
-// Wired to /api/admin/impersonate/extension/* (extensionTelemetryRoutes).
+// Wired to /api/admin/sa/extension/* (extensionTelemetryRoutes).
 // Gated behind admin-permissions resource "extensionTelemetry".
 
 import { useState } from "react";
@@ -83,7 +83,7 @@ function useSessions(filters: { extension?: string; hasErrors?: boolean; hasCapt
     queryKey: ["admin", "extension", "sessions", filters],
     queryFn: async () => {
       const res = await apiClient.get<{ sessions: SessionRow[]; total: number }>(
-        `/api/admin/impersonate/extension/sessions?${params.toString()}`,
+        `/api/admin/sa/extension/sessions?${params.toString()}`,
       );
       return res.data;
     },
@@ -100,7 +100,7 @@ function useCaptures(host?: string) {
         captures: CaptureRow[];
         byHost: HostAggregate[];
         total: number;
-      }>(`/api/admin/impersonate/extension/captures?${params.toString()}`);
+      }>(`/api/admin/sa/extension/captures?${params.toString()}`);
       return res.data;
     },
   });
@@ -112,7 +112,7 @@ function useSessionDetail(id: string | null) {
     enabled: !!id,
     queryFn: async () => {
       const res = await apiClient.get<{ session: SessionRow; events: EventRow[] }>(
-        `/api/admin/impersonate/extension/sessions/${id}`,
+        `/api/admin/sa/extension/sessions/${id}`,
       );
       return res.data;
     },

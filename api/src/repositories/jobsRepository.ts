@@ -46,8 +46,8 @@ export interface JobSearchFilters {
   isActive?: boolean;
 }
 
-export interface IJobsRepository {
-  // jobItems reads
+/** jobItems reads. */
+export interface IJobReader {
   findJobById(id: string): Promise<JobRow | null>;
   findJobsByIds(ids: string[]): Promise<JobRow[]>;
   listActiveJobs(limit?: number): Promise<JobRow[]>;
@@ -57,7 +57,10 @@ export interface IJobsRepository {
   countJobsCreatedSince(since: Date): Promise<number>;
   /** Subset of `urls` already present as `job_items.source_url` (one query). */
   findExistingSourceUrls(urls: string[]): Promise<Set<string>>;
-  // jobItems writes
+}
+
+/** jobItems writes. */
+export interface IJobWriter {
   insertJob(input: JobInsert): Promise<JobRow>;
   /** ONE multi-row INSERT (atomic); returns rows written. Throws on
    *  failure — callers chunk (~500 rows) and fall back to `insertJob` for
@@ -66,28 +69,54 @@ export interface IJobsRepository {
   updateJobById(id: string, patch: Partial<JobInsert>): Promise<JobRow | null>;
   updateJobSentimentScore(id: string, sentimentScore: number): Promise<void>;
   deleteJobById(id: string): Promise<boolean>;
-  // job applications
+}
+
+/** job applications. */
+export interface IJobApplicationStore {
   findApplicationById(id: string): Promise<JobApplicationRow | null>;
   findApplicationsForUser(userId: string): Promise<JobApplicationRow[]>;
   insertApplication(input: JobApplicationInsert): Promise<JobApplicationRow>;
   countApplications(): Promise<number>;
   countApplicationsCreatedSince(since: Date): Promise<number>;
-  // saved jobs
+}
+
+/** saved jobs (seeker tracker bookmarks). */
+export interface ISavedJobStore {
   findSavedForUser(userId: string): Promise<SavedJobRow[]>;
+  /** True when `jobId` is in `userId`'s tracker (saved_jobs row exists). */
+  isJobSavedByUser(userId: string, jobId: string): Promise<boolean>;
   removeSaved(userId: string, jobId: string): Promise<void>;
-  // resume↔job match scores (seeker-initiated matching)
+}
+
+/** resume↔job match scores (seeker-initiated matching). */
+export interface IResumeMatchStore {
   findResumeMatchByPair(resumeId: string, jobId: string): Promise<ResumeMatchScoreRow | null>;
   upsertResumeMatch(input: ResumeMatchScoreInsert): Promise<void>;
-  // job-board distribution (syndication of job posts to external boards)
+}
+
+/** job-board distribution (syndication of job posts to external boards). */
+export interface IJobBoardDistributionStore {
   listJobBoardSources(): Promise<JobBoardSourceRow[]>;
   findJobBoardPostingsForJob(jobId: string): Promise<JobBoardPostingRow[]>;
   insertJobBoardPosting(input: JobBoardPostingInsert): Promise<JobBoardPostingRow>;
   findJobBoardSyncLogs(sourceId: string, limit?: number): Promise<JobBoardSyncLogRow[]>;
-  // exclusive (closed) boards + their bids
+}
+
+/** exclusive (closed) boards + their bids. */
+export interface IExclusiveBoardStore {
   listExclusiveBoards(): Promise<ExclusiveBoardRow[]>;
   findBidsForBoard(boardId: string): Promise<BoardBidRow[]>;
   insertBoardBid(input: BoardBidInsert): Promise<BoardBidRow>;
 }
+
+export interface IJobsRepository
+  extends IJobReader,
+    IJobWriter,
+    IJobApplicationStore,
+    ISavedJobStore,
+    IResumeMatchStore,
+    IJobBoardDistributionStore,
+    IExclusiveBoardStore {}
 
 export class JobsRepository implements IJobsRepository {
   constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}
@@ -233,6 +262,15 @@ export class JobsRepository implements IJobsRepository {
 
   async findSavedForUser(userId: string): Promise<SavedJobRow[]> {
     return (await this.db.select().from(savedJobs).where(eq(savedJobs.userId, userId))) as SavedJobRow[];
+  }
+
+  async isJobSavedByUser(userId: string, jobId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ jobId: savedJobs.jobId })
+      .from(savedJobs)
+      .where(and(eq(savedJobs.userId, userId), eq(savedJobs.jobId, jobId)))
+      .limit(1);
+    return Boolean(row);
   }
 
   async removeSaved(userId: string, jobId: string): Promise<void> {

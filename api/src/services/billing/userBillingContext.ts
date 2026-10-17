@@ -1,10 +1,29 @@
 /**
  * The contact basics + saved billing address a payment provider needs to
  * create/link a customer and pre-fill its checkout. Shared by every flow
- * that opens a payment widget (routes/payment.ts, token-pack purchases).
+ * that opens a payment widget (routes/payment.ts, token-pack purchases),
+ * plus the owner read/write behind /api/profile/billing-address.
+ *
+ * Storage: `billing_addresses` (mig 0631) via BillingAddressRepository.
  */
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
+import { BillingAddressRepository } from "../../repositories/billingAddressRepository.js";
+import type { BillingAddress } from "../../../../shared/billing-address.js";
+
+function billingAddressRepo(): BillingAddressRepository {
+  return new BillingAddressRepository(getDb());
+}
+
+/** The user's saved address, or null when not (fully) provided. */
+export async function getBillingAddress(userId: string): Promise<BillingAddress | null> {
+  return billingAddressRepo().findByUserId(userId);
+}
+
+/** Upsert the user's address (already validated by BillingAddressSchema). */
+export async function saveBillingAddress(userId: string, address: BillingAddress): Promise<void> {
+  await billingAddressRepo().upsert(userId, address);
+}
 
 /**
  * Read a user's contact basics + saved billing address. Used by every
@@ -21,44 +40,9 @@ export async function loadUserBillingContext(userId: string) {
     .limit(1);
   if (!user) return null;
 
-  const [profile] = await db
-    .select({
-      billingFullName: schema.userProfiles.billingFullName,
-      billingCompany: schema.userProfiles.billingCompany,
-      billingLine1: schema.userProfiles.billingLine1,
-      billingLine2: schema.userProfiles.billingLine2,
-      billingCity: schema.userProfiles.billingCity,
-      billingState: schema.userProfiles.billingState,
-      billingPostalCode: schema.userProfiles.billingPostalCode,
-      billingCountry: schema.userProfiles.billingCountry,
-      billingPhone: schema.userProfiles.billingPhone,
-    })
-    .from(schema.userProfiles)
-    .where(eq(schema.userProfiles.userId, userId))
-    .limit(1);
-
-  // Reconstruct the BillingAddress shape only when the required fields are
-  // populated — otherwise let the provider fall back to an empty modal.
-  const billingAddress =
-    profile &&
-    profile.billingFullName &&
-    profile.billingLine1 &&
-    profile.billingCity &&
-    profile.billingState &&
-    profile.billingPostalCode &&
-    profile.billingCountry
-      ? {
-          fullName: profile.billingFullName,
-          company: profile.billingCompany,
-          line1: profile.billingLine1,
-          line2: profile.billingLine2,
-          city: profile.billingCity,
-          state: profile.billingState,
-          postalCode: profile.billingPostalCode,
-          country: profile.billingCountry,
-          phone: profile.billingPhone,
-        }
-      : null;
+  // Null when the required fields aren't populated — the provider then
+  // falls back to an empty modal.
+  const billingAddress = await getBillingAddress(userId);
 
   return { user, billingAddress };
 }

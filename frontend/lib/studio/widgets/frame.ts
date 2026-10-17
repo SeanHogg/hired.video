@@ -24,6 +24,7 @@ import {
 } from "@/lib/timeline/effects/animate";
 import { resolveEffectAt } from "@/lib/timeline/effects/keyframes";
 import { BLEND_EFFECT_KIND, resolveBlendMode, type BlendMode } from "@/lib/timeline/effects/blend";
+import { clamp01, numberOr } from "@/lib/numeric";
 
 export interface EffectEntry {
   kind: string;
@@ -79,18 +80,6 @@ export interface ResolvedFrame {
 /** Effect kinds folded into frame state (both renderers) — never re-run
  *  by the pixel pass. */
 const FRAME_STATE_EFFECT_KINDS: ReadonlySet<string> = new Set(["blur", "glow", "opacity", BLEND_EFFECT_KIND]);
-
-export function numberOr(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
-}
-
-export function stringOr(v: unknown, fallback: string): string {
-  return typeof v === "string" ? v : fallback;
-}
-
-function clamp01(v: number): number {
-  return Math.max(0, Math.min(1, v));
-}
 
 /** Sanitised container chrome — keeps only well-typed, non-empty fields;
  *  null when nothing is left. The one reader for saved chrome. */

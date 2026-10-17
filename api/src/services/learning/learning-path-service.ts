@@ -17,7 +17,7 @@
  *   - isPathComplete(userId, pathId) — every required course passed
  *
  * Per the standing DRY rule (`feedback_extract_on_duplication`): every
- * unlock decision in the courses / learning-paths routes calls
+ * unlock decision in the courses / learning paths use cases calls
  * `computeUnlockState` — there is no `canEnroll` boolean threaded
  * through the request handlers.
  */

@@ -1,6 +1,6 @@
 import { jwtVerify } from "jose";
-import type { MiddlewareHandler } from "hono";
-import type { Variables, JwtPayload, AppEnv } from "../types/index.js";
+import type { Context, MiddlewareHandler } from "hono";
+import { error, type JwtPayload, type AppEnv } from "../types/index.js";
 import { getJwtSecret, getJwtSecretOptional } from "../utils/jwt.js";
 import { isSuperAdmin } from "./superAdmin.js";
 import { getDb } from "../db/index.js";
@@ -39,6 +39,12 @@ function parseJwtPayload(payload: Record<string, unknown>): JwtPayload {
  * Emulation tokens (emu=true) skip this check — their lifecycle is
  * managed separately by the SuperAdmin impersonation system.
  */
+/** Attach the verified claims AND the flat `userId` the routes read. */
+function attachUser(c: Context<AppEnv>, user: JwtPayload): void {
+  c.set("user", user);
+  c.set("userId", user.sub);
+}
+
 async function validateSidClaim(payload: JwtPayload): Promise<boolean> {
   if (payload.emu) return true;
   if (!payload.sid) return true; // Legacy token; accept until natural expiry.
@@ -72,7 +78,7 @@ export const optionalAuthMiddleware: MiddlewareHandler<AppEnv> = async (c, next)
       // session row was revoked — caller proceeds anonymously rather
       // than seeing a 401, since the route is meant to be public.
       if (await validateSidClaim(parsed)) {
-        c.set("user", parsed);
+        attachUser(c, parsed);
       }
     } catch {
       // Invalid/expired token — treat as unauthenticated
@@ -89,7 +95,7 @@ export const optionalAuthMiddleware: MiddlewareHandler<AppEnv> = async (c, next)
 export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const authHeader = c.req.header("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
-    return c.json({ error: { code: "UNAUTHORIZED", message: "Missing or malformed Authorization header" } }, 401);
+    return c.json(error("UNAUTHORIZED", "Missing or malformed Authorization header"), 401);
   }
   const token = authHeader.slice(7);
   const secretKey = new TextEncoder().encode(getJwtSecret());
@@ -97,13 +103,13 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
     const { payload } = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
     const parsed = parseJwtPayload(payload);
     if (!(await validateSidClaim(parsed))) {
-      return c.json({ error: { code: "UNAUTHORIZED", message: "Session has been revoked" } }, 401);
+      return c.json(error("UNAUTHORIZED", "Session has been revoked"), 401);
     }
-    c.set("user", parsed);
+    attachUser(c, parsed);
   } catch (err) {
     const message =
       err instanceof Error && err.message.includes("expired") ? "Token has expired" : "Invalid token";
-    return c.json({ error: { code: "UNAUTHORIZED", message } }, 401);
+    return c.json(error("UNAUTHORIZED", message), 401);
   }
 
   // Apply emulation token if present — replaces c.var.user with emulated claims
@@ -129,7 +135,7 @@ async function applyEmulationToken(c: any, secretKey: Uint8Array): Promise<Respo
   // Verify the calling admin's own token is a SuperAdmin
   const callerUser = c.var.user as JwtPayload | undefined;
   if (!isSuperAdmin(callerUser)) {
-    return c.json({ error: { code: "FORBIDDEN", message: "Only SuperAdmins can use emulation tokens" } }, 403) as Response;
+    return c.json(error("FORBIDDEN", "Only SuperAdmins can use emulation tokens"), 403) as Response;
   }
 
   try {
@@ -137,29 +143,24 @@ async function applyEmulationToken(c: any, secretKey: Uint8Array): Promise<Respo
 
     // Validate this is actually an emulation token
     if (!payload["emu"]) {
-      return c.json({ error: { code: "BAD_REQUEST", message: "Invalid emulation token" } }, 400) as Response;
+      return c.json(error("BAD_REQUEST", "Invalid emulation token"), 400) as Response;
     }
 
     const emuUser = parseJwtPayload(payload);
 
     // Block mutating requests if token is read-only
     if (emuUser.emuReadonly && MUTATING_METHODS.has(c.req.method)) {
-      return c.json({
-        error: {
-          code: "FORBIDDEN",
-          message: "Write operations are blocked during impersonation. Exit impersonation to perform this action.",
-        },
-      }, 403) as Response;
+      return c.json(error("FORBIDDEN", "Write operations are blocked during impersonation. Exit impersonation to perform this action."), 403) as Response;
     }
 
     // Override context user with emulated user's claims
-    c.set("user", emuUser);
+    attachUser(c, emuUser);
   } catch (err) {
     const message =
       err instanceof Error && err.message.includes("expired")
         ? "Impersonation session has expired"
         : "Invalid emulation token";
-    return c.json({ error: { code: "UNAUTHORIZED", message } }, 401) as Response;
+    return c.json(error("UNAUTHORIZED", message), 401) as Response;
   }
 
   return undefined;

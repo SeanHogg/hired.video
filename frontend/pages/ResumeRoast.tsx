@@ -123,7 +123,7 @@ export default function ResumeRoast() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await apiClient.post("/api/resume/roast", { resumeText }, RoastResponseSchema);
+      const res = await apiClient.post("/api/resumes/roast", { resumeText }, RoastResponseSchema);
       setResult(res.data);
       gtmEvent("resume_roast_completed", { score: res.data.score });
     } catch {

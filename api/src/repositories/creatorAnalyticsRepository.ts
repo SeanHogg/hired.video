@@ -6,8 +6,9 @@
  * artifact, and metadata is fetched with one inArray read per artifact
  * kind instead of one select per artifact.
  */
-import { count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
+import { isArtifactView } from "./artifactViewStreams.js";
 import type { ArtifactKind } from "../../../shared/artifact-views.js";
 
 export type DbLike = any;
@@ -49,7 +50,7 @@ export class CreatorAnalyticsRepository {
         lastViewedAt: sql<Date | null>`max(${schema.artifactViews.viewedAt})`,
       })
       .from(schema.artifactViews)
-      .where(eq(schema.artifactViews.ownerUserId, ownerUserId))
+      .where(and(eq(schema.artifactViews.ownerUserId, ownerUserId), isArtifactView()))
       .groupBy(schema.artifactViews.artifactKind, schema.artifactViews.artifactId)
       .orderBy(desc(count()))) as Array<Omit<ArtifactTotalsRow, "totalViews" | "uniqueViewers"> & {
       totalViews: number | string;
@@ -67,7 +68,7 @@ export class CreatorAnalyticsRepository {
     const [u] = (await this.db
       .select({ n: sql<number>`count(distinct ${viewerKeyExpr})` })
       .from(schema.artifactViews)
-      .where(eq(schema.artifactViews.ownerUserId, ownerUserId))) as Array<{ n: number | string }>;
+      .where(and(eq(schema.artifactViews.ownerUserId, ownerUserId), isArtifactView()))) as Array<{ n: number | string }>;
     return Number(u?.n ?? 0);
   }
 
@@ -83,26 +84,24 @@ export class CreatorAnalyticsRepository {
     try {
       switch (kind) {
         case "video": {
-          // Studio projects don't have title/thumbnail columns — the
-          // display title is derived from the storyboard JSONB's `_name`
-          // key (see api/src/routes/studio.ts:toProjectDto).
+          // Studio projects have no thumbnail column — the display title
+          // is the saved `name` (see services/studio/project-dto.ts).
           const rows = (await this.db
             .select({
               id: schema.studioProjects.id,
-              storyboard: schema.studioProjects.storyboard,
+              name: schema.studioProjects.name,
               resumeText: schema.studioProjects.resumeText,
             })
             .from(schema.studioProjects)
             .where(inArray(schema.studioProjects.id, list))) as Array<{
             id: string;
-            storyboard: unknown;
+            name: string | null;
             resumeText: string | null;
           }>;
           const byId = new Map(rows.map((r) => [r.id, r]));
           for (const id of list) {
             const r = byId.get(id);
-            const meta = (r?.storyboard ?? null) as Record<string, unknown> | null;
-            const savedName = meta?._name as string | undefined;
+            const savedName = r?.name ?? undefined;
             out.set(id, { title: savedName || r?.resumeText?.slice(0, 80) || "Untitled video", thumbnail: null });
           }
           return out;

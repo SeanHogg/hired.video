@@ -32,8 +32,8 @@ export const LetterGradeSchema = z
   .regex(/^[A-F][+-]?$/, "grade must match /[A-F][+-]?/");
 
 // ────────────────────────────────────────────────────────────────────────
-// Resume Analysis — single engine behind /api/resumescorer/score and
-// /api/resumeoptimizer/optimize. The two routes are different SEO/funnel
+// Resume Analysis — single engine behind the `resume-score` and
+// `resume-optimize` AI tools (POST /api/ai/tools/:toolId). The two routes are different SEO/funnel
 // surfaces of the same diagnostic→prescription flow; both call one
 // service, both return this superset shape, and the frontend's
 // <ResumeAnalysisToolPage> renders whatever fields are present.
@@ -332,7 +332,7 @@ export type SalaryAnalysisResponse = z.infer<typeof SalaryAnalysisResponseSchema
 export type NegotiationTipsResponse = z.infer<typeof NegotiationTipsResponseSchema>;
 
 // ────────────────────────────────────────────────────────────────────────
-// Value Proposition — POST /api/valueproposition/generate
+// Value Proposition — AI tool `value-proposition`
 // ────────────────────────────────────────────────────────────────────────
 
 /** The job is a tracked job id OR pasted text; the résumé is one of the
@@ -364,7 +364,7 @@ export const ValuePropositionResponseSchema = z.object({
 export type ValuePropositionResponse = z.infer<typeof ValuePropositionResponseSchema>;
 
 // ────────────────────────────────────────────────────────────────────────
-// Sentiment — POST /sentiment/sentimentprediction
+// Sentiment — AI tool `sentiment` ({ text } | { resumeId } | { jobId })
 // ────────────────────────────────────────────────────────────────────────
 
 export const SentimentResponseSchema = z.object({

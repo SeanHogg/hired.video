@@ -7,7 +7,7 @@ describe("describeFailure", () => {
     const line = describeFailure({
       id: 1,
       method: "POST",
-      url: "https://api.hired.video/api/resumes/revise",
+      url: "https://api.hired.video/api/ai/tools/resume-revise",
       status: 422,
       responseBody: {
         success: false,
@@ -17,7 +17,7 @@ describe("describeFailure", () => {
       durationMs: 21_340,
     });
     expect(line).toBe(
-      "00:04:45 POST /api/resumes/revise → 422 REVISE_FAILED: The AI reply wasn't a resume. Try rephrasing the change. (21.3s)",
+      "00:04:45 POST /api/ai/tools/resume-revise → 422 REVISE_FAILED: The AI reply wasn't a resume. Try rephrasing the change. (21.3s)",
     );
   });
 

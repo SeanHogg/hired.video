@@ -1,8 +1,10 @@
+/**
+ * SuperAdmin background-worker console — mounted at /api/admin/workers by the
+ * admin composite (routes/admin/index.ts), which applies the SA guard.
+ */
 import { Hono } from "hono";
-import type { Variables, AppEnv } from "../types/index.js";
-import { getDb } from "../db/index.js";
-import { WorkerRunsRepository } from "../repositories/workerRunsRepository.js";
-import { superAdminMiddleware } from "../middleware/superAdmin.js";
+import type { AppEnv } from "../types/index.js";
+import { workerRunsRepository } from "../repositories/admin/index.js";
 import { ok } from "../utils/response.js";
 import { parsePagination } from "../utils/pagination.js";
 import { workers as registeredWorkers, getWorker } from "../workers/registry.js";
@@ -10,15 +12,13 @@ import { runWorker } from "../workers/runner.js";
 
 export const adminWorkerRoutes = new Hono<AppEnv>();
 
-adminWorkerRoutes.use("*", superAdminMiddleware);
-
 // ---------------------------------------------------------------------------
 // GET /api/admin/workers — list every registered worker + its latest run.
 // Drives the Workers admin landing page.
 // ---------------------------------------------------------------------------
 adminWorkerRoutes.get("/", async (c) => {
   // Most recent run per worker in ONE DISTINCT ON query.
-  const latestByName = await new WorkerRunsRepository(getDb()).latestRunPerWorker(
+  const latestByName = await workerRunsRepository().latestRunPerWorker(
     registeredWorkers.map((w) => w.name),
   );
   const items = registeredWorkers.map((worker) => {
@@ -59,7 +59,7 @@ adminWorkerRoutes.get("/:name/runs", async (c) => {
     return c.json({ error: { code: "NOT_FOUND", message: "Worker not found" } }, 404);
   }
 
-  const repo = new WorkerRunsRepository(getDb());
+  const repo = workerRunsRepository();
   const { page, limit } = parsePagination(c, { defaultLimit: 50, maxLimit: 100 });
   const offset = (page - 1) * limit;
 
@@ -95,7 +95,7 @@ adminWorkerRoutes.get("/:name/runs", async (c) => {
 adminWorkerRoutes.get("/:name/runs/:runId", async (c) => {
   const name = c.req.param("name");
   const runId = c.req.param("runId");
-  const run = await new WorkerRunsRepository(getDb()).findRunById(runId);
+  const run = await workerRunsRepository().findRunById(runId);
 
   if (!run || run.workerName !== name) {
     return c.json({ error: { code: "NOT_FOUND", message: "Run not found" } }, 404);

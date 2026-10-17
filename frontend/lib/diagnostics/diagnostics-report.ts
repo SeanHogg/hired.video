@@ -55,7 +55,7 @@ function pathOf(url: string): string {
   }
 }
 
-/** "00:04:45 POST /api/resumes/revise → 422 REVISE_FAILED: The AI reply wasn't a resume… (21.3s)" */
+/** "00:04:45 POST /api/ai/tools/resume-revise → 422 REVISE_FAILED: The AI reply wasn't a resume… (21.3s)" */
 export function describeFailure(e: ApiRequestLogEntry): string {
   const { code, message } = envelopeOf(e.responseBody);
   const time = e.timestamp.slice(11, 19);

@@ -8,6 +8,8 @@ import {
   bigint,
   uniqueIndex,
   index,
+  varchar,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 import { invoices } from "./billing.js";
@@ -38,6 +40,16 @@ export const usageLedger = pgTable(
     quantity: bigint("quantity", { mode: "number" }).notNull().default(1),
     periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
     metadata: jsonb("metadata"),
+    // ── ai_tokens rows only (migration 0612, promoted from `metadata`) ──
+    // The charged feature, and the gateway-observability facts the SA
+    // ai-vendors projections group on (repositories/admin/aiGatewayLedgerRepository.ts):
+    // model hint vs the model that answered (#515) and json_schema
+    // conformance retries (#2159). Written by servicesProcessor.meter({ ai }).
+    featureKey: varchar("feature_key", { length: 100 }),
+    requestedModel: varchar("requested_model", { length: 100 }),
+    resolvedModel: varchar("resolved_model", { length: 100 }),
+    substituted: boolean("substituted").default(false).notNull(),
+    schemaRetries: integer("schema_retries"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({

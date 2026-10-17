@@ -68,23 +68,6 @@ export const RefundReasonsSchema = z.object({
   })),
 });
 
-export const RefundStatsSchema = z.object({
-  totalRequests: z.number(),
-  pendingRequests: z.number(),
-  approvedRequests: z.number(),
-  rejectedRequests: z.number(),
-  totalRefundedAmount: z.number(),
-  averageProcessingTime: z.number(),
-});
-
-export const CancellationStatsSchema = z.object({
-  totalRequests: z.number(),
-  pendingRequests: z.number(),
-  approvedRequests: z.number(),
-  rejectedRequests: z.number(),
-  averageProcessingTime: z.number(),
-});
-
 // TypeScript types derived from schemas
 export type CreateRefundRequest = z.infer<typeof CreateRefundRequestSchema>;
 export type RefundRequest = z.infer<typeof RefundRequestRecordSchema>;
@@ -92,8 +75,6 @@ export type CreateCancellationRequest = z.infer<typeof CreateCancellationRequest
 export type CancellationRequest = z.infer<typeof CancellationRequestSchema>;
 export type RefundPolicy = z.infer<typeof RefundPolicySchema>;
 export type RefundReasons = z.infer<typeof RefundReasonsSchema>;
-export type RefundStats = z.infer<typeof RefundStatsSchema>;
-export type CancellationStats = z.infer<typeof CancellationStatsSchema>;
 
 // The unwrapped payload; throws the typed apiClient error on failure.
 // suppressErrorEvent skips the global "API error" toast — callers
@@ -107,7 +88,6 @@ function call<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<
  */
 export class RefundService {
   private baseUrl = '/api/billing';
-  private adminBaseUrl = '/api/admin';
 
   // User-facing refund methods
   createRefundRequest(request: CreateRefundRequest) {
@@ -138,61 +118,6 @@ export class RefundService {
 
   getRefundReasons() {
     return call<RefundReasons>("GET", `${this.baseUrl}/refund-reasons`);
-  }
-
-  // Admin methods (SuperAdmin only)
-  getAllRefundRequests(status?: string, fromDate?: Date, toDate?: Date) {
-    const params = new URLSearchParams();
-    if (status) params.append('status', status);
-    if (fromDate) params.append('fromDate', fromDate.toISOString());
-    if (toDate) params.append('toDate', toDate.toISOString());
-    return call<RefundRequest[]>("GET", `${this.adminBaseUrl}/refund-requests?${params}`);
-  }
-
-  approveRefundRequest(requestId: string, adminNotes?: string) {
-    return call<RefundRequest>("POST", `${this.adminBaseUrl}/refund-requests/${requestId}/approve`, {
-      approve: true,
-      adminNotes,
-    });
-  }
-
-  rejectRefundRequest(requestId: string, rejectionReason: string, adminNotes?: string) {
-    return call<RefundRequest>("POST", `${this.adminBaseUrl}/refund-requests/${requestId}/reject`, {
-      approve: false,
-      rejectionReason,
-      adminNotes,
-    });
-  }
-
-  getRefundStats() {
-    return call<RefundStats>("GET", `${this.adminBaseUrl}/refund-stats`);
-  }
-
-  getAllCancellationRequests(status?: string, fromDate?: Date, toDate?: Date) {
-    const params = new URLSearchParams();
-    if (status) params.append('status', status);
-    if (fromDate) params.append('fromDate', fromDate.toISOString());
-    if (toDate) params.append('toDate', toDate.toISOString());
-    return call<CancellationRequest[]>("GET", `${this.adminBaseUrl}/cancellation-requests?${params}`);
-  }
-
-  approveCancellationRequest(requestId: string, adminNotes?: string) {
-    return call<CancellationRequest>("POST", `${this.adminBaseUrl}/cancellation-requests/${requestId}/approve`, {
-      approve: true,
-      adminNotes,
-    });
-  }
-
-  rejectCancellationRequest(requestId: string, rejectionReason: string, adminNotes?: string) {
-    return call<CancellationRequest>("POST", `${this.adminBaseUrl}/cancellation-requests/${requestId}/reject`, {
-      approve: false,
-      rejectionReason,
-      adminNotes,
-    });
-  }
-
-  getCancellationStats() {
-    return call<CancellationStats>("GET", `${this.adminBaseUrl}/cancellation-stats`);
   }
 
   // Helper methods

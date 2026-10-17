@@ -1,5 +1,5 @@
 // job-pipeline-service — recruiter kanban for one job's candidate pipeline.
-// Mirrors api/src/routes/jobpipeline.ts. Stages use the canonical enum from
+// Mirrors api/src/routes/pipeline/ (the ONE /api/pipeline resource). Stages use the canonical enum from
 // shared/recruiter-pipeline so the frontend never has to re-state column order.
 
 import { apiClient } from "@/lib/api-client";
@@ -96,11 +96,15 @@ export interface AddPipelineEntryInput {
   tags?: string[];
 }
 
-const base = (jobId: string) => `/api/jobs/${jobId}/pipeline`;
+const BASE = "/api/pipeline";
+const entryPath = (entryId: string) => `${BASE}/${encodeURIComponent(entryId)}`;
 
 export const jobPipelineService = {
+  /** One job's kanban (`GET /api/pipeline?jobId=`). */
   async list(jobId: string): Promise<PipelineSnapshot> {
-    const response = await apiClient.get<PipelineSnapshot>(base(jobId));
+    const response = await apiClient.get<PipelineSnapshot>(
+      `${BASE}?jobId=${encodeURIComponent(jobId)}`,
+    );
     return response.data;
   },
 
@@ -114,24 +118,21 @@ export const jobPipelineService = {
     if (filters?.stage) params.set("stage", filters.stage);
     if (filters?.jobId) params.set("jobId", filters.jobId);
     const qs = params.toString();
-    const response = await apiClient.get<CrossJobPipelineSnapshot>(
-      `/api/pipeline/all${qs ? `?${qs}` : ""}`,
-    );
+    const response = await apiClient.get<CrossJobPipelineSnapshot>(`${BASE}${qs ? `?${qs}` : ""}`);
     return response.data;
   },
 
   async add(jobId: string, input: AddPipelineEntryInput): Promise<PipelineEntry> {
-    const response = await apiClient.post<PipelineEntry>(base(jobId), input);
+    const response = await apiClient.post<PipelineEntry>(BASE, { ...input, jobId });
     return response.data;
   },
 
   async moveStage(
-    jobId: string,
     entryId: string,
     stage: PipelineStage,
     rejectionReason?: string,
   ): Promise<PipelineEntry> {
-    const response = await apiClient.patch<PipelineEntry>(`${base(jobId)}/${entryId}/stage`, {
+    const response = await apiClient.patch<PipelineEntry>(entryPath(entryId), {
       stage,
       ...(rejectionReason ? { rejectionReason } : {}),
     });
@@ -139,34 +140,36 @@ export const jobPipelineService = {
   },
 
   async update(
-    jobId: string,
     entryId: string,
     updates: { notes?: string | null; tags?: string[]; ownerId?: string | null },
   ): Promise<PipelineEntry> {
-    const response = await apiClient.patch<PipelineEntry>(`${base(jobId)}/${entryId}`, updates);
+    const response = await apiClient.patch<PipelineEntry>(entryPath(entryId), updates);
     return response.data;
   },
 
-  async remove(jobId: string, entryId: string): Promise<void> {
-    await apiClient.delete(`${base(jobId)}/${entryId}`);
+  async remove(entryId: string): Promise<void> {
+    await apiClient.delete(entryPath(entryId));
   },
 
   async logTouchpoint(
-    jobId: string,
     entryId: string,
     type: "email" | "sms" | "call" | "note" | "interview_scheduled",
     payload?: Record<string, unknown>,
   ): Promise<void> {
-    await apiClient.post(`${base(jobId)}/${entryId}/touchpoint`, { type, payload });
+    await apiClient.post(`${entryPath(entryId)}/touchpoint`, { type, payload });
   },
 
   async getReport(jobId: string): Promise<PipelineReport> {
-    const response = await apiClient.get<PipelineReport>(`${base(jobId)}/reports`);
+    const response = await apiClient.get<PipelineReport>(
+      `${BASE}/reports?jobId=${encodeURIComponent(jobId)}`,
+    );
     return response.data;
   },
 
   async listShareLinks(jobId: string): Promise<{ links: PipelineShareLink[] }> {
-    const response = await apiClient.get<{ links: PipelineShareLink[] }>(`${base(jobId)}/share`);
+    const response = await apiClient.get<{ links: PipelineShareLink[] }>(
+      `${BASE}/share?jobId=${encodeURIComponent(jobId)}`,
+    );
     return response.data;
   },
 
@@ -174,16 +177,16 @@ export const jobPipelineService = {
     jobId: string,
     input: { label?: string; expiresAt?: string },
   ): Promise<PipelineShareLink> {
-    const response = await apiClient.post<PipelineShareLink>(`${base(jobId)}/share`, input);
+    const response = await apiClient.post<PipelineShareLink>(`${BASE}/share`, { ...input, jobId });
     return response.data;
   },
 
-  async deleteShareLink(jobId: string, linkId: string): Promise<void> {
-    await apiClient.delete(`${base(jobId)}/share/${linkId}`);
+  async deleteShareLink(linkId: string): Promise<void> {
+    await apiClient.delete(`${BASE}/share/${encodeURIComponent(linkId)}`);
   },
 
   async getPublicPipeline(token: string): Promise<PublicPipeline> {
-    const response = await apiClient.get<PublicPipeline>(`/api/pipeline/public/${token}`);
+    const response = await apiClient.get<PublicPipeline>(`${BASE}/public/${encodeURIComponent(token)}`);
     return response.data;
   },
 };

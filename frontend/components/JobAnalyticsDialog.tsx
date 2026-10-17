@@ -1,6 +1,6 @@
 /**
  * #411 — JobAnalyticsDialog. Mounted from JobActionsMenu's Analytics
- * entry; reads from `/api/jobs-analytics/:id` which aggregates view
+ * entry; reads from `/api/analytics/artifacts/job/:id?view=rollup` which aggregates view
  * series + applications-by-source + pipeline funnel + sponsored-vs-
  * organic view split. Self-gates on `isOpen` so the dialog only fires
  * the fetch when actually visible.
@@ -53,7 +53,7 @@ export default function JobAnalyticsDialog({
     setLoading(true);
     setErrorMsg(null);
     apiClient
-      .fetchData<JobAnalyticsResponse | null>(`/api/jobs-analytics/${encodeURIComponent(jobId)}`)
+      .fetchData<JobAnalyticsResponse | null>(`/api/analytics/artifacts/job/${encodeURIComponent(jobId)}?view=rollup`)
       .then((body) => {
         if (cancelled) return;
         setData(body ?? null);

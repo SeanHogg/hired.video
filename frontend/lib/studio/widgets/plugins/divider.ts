@@ -1,6 +1,6 @@
 /** Divider widget plugin — a horizontal rule centred in its box. */
 import type { DividerWidgetParams, WidgetParams } from "@/lib/studio/editor-v2/canvas-state";
-import { numberOr, stringOr } from "../frame";
+import { numberOr, stringOr } from "@/lib/numeric";
 import { registerPlugin } from "../plugin";
 
 type DividerParams = Extract<WidgetParams, { data: DividerWidgetParams }>;

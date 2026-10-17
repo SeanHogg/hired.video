@@ -20,8 +20,8 @@ import {
   PrerequisiteSchema,
   ProgressUpdateSchema,
   ScormCommitSchema,
-  XapiStatementSchema,
 } from "../courses.js";
+import { XapiStatementSchema } from "../learning/xapi/statements.js";
 import {
   SEED_DERIVED_UUID,
   V4_UUID,

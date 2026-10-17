@@ -6,11 +6,12 @@
  * Facebook Page, LinkedIn — resolves its adapter and token here, so the use
  * case (publish-project-video.ts) never names a network or a token store.
  *
- * Token stores: YouTube channels predate `social_connections` and still
- * live in `youtube_accounts` (connected via /api/youtube, Google OAuth
- * client); every other network is a `social_connections` row. The source
- * hides that split: it answers a fresh access token, or null when the user
- * has no usable connection (missing, revoked, refresh failed).
+ * Token stores: every network lives in provider_connections, but YouTube
+ * channels are their own purpose ("youtube", connected via /api/youtube with
+ * the Google OAuth client) while every other network is purpose
+ * "social_publish". The source hides that split: it answers a fresh access
+ * token, or null when the user has no usable connection (missing, revoked,
+ * refresh failed).
  */
 import type { VideoPublishPlatform } from "../../../../shared/social-platforms.js";
 import { getActiveAccount } from "../youtube/youtubeAccountRepository.js";

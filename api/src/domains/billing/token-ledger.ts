@@ -51,8 +51,8 @@ import {
   type CompanyPoolView,
 } from "./company-token-ledger.js";
 
-/** Who a token pool belongs to. The per-user and company pools still live in
- *  separate tables (merge is Wave 3); this module is the one API over both. */
+/** Who a token pool belongs to. Both pools are `ai_tokens` wallets
+ *  (wallet_balances, W3-B); this module is the one API over both. */
 export type TokenOwner =
   | { ownerKind: "user"; ownerId: string }
   | { ownerKind: "company"; ownerId: string };
@@ -186,41 +186,32 @@ export const tokenLedger: TokenLedger = {
       }
     }
 
-    // #515 — silent model-substitution alarm. The gateway treats `model`
-    // as a HINT and may swap vendors on cooldown / outage / plan mismatch.
-    // For latency-pinned use cases (e.g. `match` requires Cerebras sub-200ms)
-    // a swap is a ~50× latency hit / SLA breach. The resolved model lives on
-    // `usage.model`; the hint we asked for is `usage.requestedModel`. When
-    // they differ, stamp the substitution onto the usage-ledger metadata so
-    // SA can query/dashboard it (not just grep the llm-client log). Observability
-    // only — dispatch behaviour is unchanged.
-    const substituted =
-      Boolean(usage.requestedModel) && usage.model !== usage.requestedModel;
-
     // Write-through to the central usage ledger so the Usage Statement panel
     // + monthly close cron can see AI consumption next to every other gated
     // dimension. Best-effort — token accounting still lives in token_usage,
     // this is the audit projection.
+    //
+    // The `ai` facts land in typed usage_ledger columns (migration 0612):
+    // #515 — the gateway treats `model` as a HINT and may swap vendors on
+    // cooldown / outage / plan mismatch; requested vs resolved model lets SA
+    // dashboard silent substitutions. #2159 — json_schema conformance
+    // retries per feature. Observability only — dispatch is unchanged.
     try {
       await servicesProcessor.meter({
         userId,
         eventType: "ai_tokens",
         quantity: usage.totalTokens,
         metadata: {
-          featureKey,
           model: usage.model,
           costUsd: aiCallCostUsd(usage),
           toolRunId,
           sessionId,
-          ...(substituted
-            ? { substituted: true, requestedModel: usage.requestedModel, resolvedModel: usage.model }
-            : {}),
-          // #2159 — stamp the gateway's json_schema conformance-retry count so
-          // SA can dashboard which features burn budget on strict-mode retries.
-          // Only present when the gateway actually retried (>0), so the
-          // /schema-retries projection's `IS NOT NULL` filter selects exactly
-          // the strict-mode calls that cost something.
-          ...(usage.schemaRetries ? { schemaRetries: usage.schemaRetries } : {}),
+        },
+        ai: {
+          featureKey,
+          requestedModel: usage.requestedModel ?? null,
+          resolvedModel: usage.model,
+          schemaRetries: usage.schemaRetries ?? null,
         },
       });
     } catch (err) {

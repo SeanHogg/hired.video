@@ -105,7 +105,7 @@ function makeDeps(seed: {
     company_followers: seed.followers ?? [],
     company_locations: seed.locations ?? [],
     company_team_members: seed.teamMembers ?? [],
-    company_views: [], // event log — writes only
+    artifact_views: [], // view event log (kind company) — writes only
   });
   const state = fake.state as any;
   Object.defineProperty(state, "companies", { get: () => state.company_profiles });

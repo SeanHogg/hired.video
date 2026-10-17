@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ResumeAnalysisToolPage } from "@/components/tools/ResumeAnalysisToolPage";
+import { aiToolPath } from "@shared/ai-tools/tool-ids";
 
 // Scorer surface — same engine as the Resume Optimizer (one
 // `analyzeResume` LLM call); route is kept separate for SEO + tool-run
@@ -49,7 +50,7 @@ export default function AIResumeScorer() {
         loadingLabel: t("tools.aiResumeScorer.submitLoading"),
         icon: Brain,
       }}
-      endpoint="/api/resumescorer/score"
+      endpoint={aiToolPath("resume-score")}
       reportLabel={t("tools.aiResumeScorer.reportHeader")}
       emptyState={{
         title: t("tools.aiResumeScorer.emptyTitle"),

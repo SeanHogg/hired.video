@@ -38,7 +38,7 @@ interface FeatureTree {
 }
 
 const STATUSES = ["all", "active", "suspended", "verified", "unverified"] as const;
-const BASE = "/api/admin/impersonate/companies";
+const BASE = "/api/admin/sa/companies";
 
 export default function CompanyManagement() {
   const { toast } = useToast();

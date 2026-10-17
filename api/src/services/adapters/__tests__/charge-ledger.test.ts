@@ -13,7 +13,8 @@
 
 import { describe, it, beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
-import { chargeLedger, type LLMUsage } from "../llm-client.js";
+import { chargeLedger } from "../llm/metering.js";
+import type { LLMUsage } from "../llm/types.js";
 import { tokenLedger } from "../../../domains/billing/token-ledger.js";
 import type { JwtPayload } from "../../../types/index.js";
 

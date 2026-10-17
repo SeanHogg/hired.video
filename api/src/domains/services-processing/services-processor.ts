@@ -47,6 +47,16 @@ export class EntitlementExceededError extends Error {
   }
 }
 
+export interface MeterAiFacts {
+  featureKey: string;
+  /** The model hint the call asked for (null = no hint). */
+  requestedModel?: string | null;
+  /** The model that actually answered. */
+  resolvedModel: string;
+  /** Gateway json_schema conformance retries (omit / 0 when none). */
+  schemaRetries?: number | null;
+}
+
 export interface MeterArgs {
   userId: string;
   eventType: UsageEventType;
@@ -54,6 +64,8 @@ export interface MeterArgs {
   quantity?: number;
   /** Free-form metadata; persisted to `usage_ledger.metadata`. */
   metadata?: Record<string, unknown>;
+  /** ai_tokens facts persisted to their typed `usage_ledger` columns. */
+  ai?: MeterAiFacts;
   /** Override the plan tier resolution (used by tests + admin replay). */
   plan?: PlanTier;
   /** Override the bucketing timestamp; defaults to startOfMonthUtc(now). */
@@ -302,7 +314,7 @@ export const servicesProcessor: ServicesProcessor = {
     };
   },
 
-  async meter({ userId, eventType, quantity = 1, metadata, plan, periodStart }) {
+  async meter({ userId, eventType, quantity = 1, metadata, ai, plan, periodStart }) {
     // Resolve plan once so the ledger row is stable even if the user upgrades
     // mid-month. (Their *future* writes use the new plan; this write keeps the
     // tier it was on at the moment of consumption.)
@@ -315,6 +327,16 @@ export const servicesProcessor: ServicesProcessor = {
       quantity,
       periodStart: periodStart ?? startOfMonthUtc(),
       metadata: metadata ?? null,
+      ...(ai
+        ? {
+            featureKey: ai.featureKey.slice(0, 100),
+            requestedModel: ai.requestedModel ? ai.requestedModel.slice(0, 100) : null,
+            resolvedModel: ai.resolvedModel.slice(0, 100),
+            // A swap = the gateway answered with a model other than the hint.
+            substituted: Boolean(ai.requestedModel) && ai.resolvedModel !== ai.requestedModel,
+            schemaRetries: ai.schemaRetries && ai.schemaRetries > 0 ? ai.schemaRetries : null,
+          }
+        : {}),
     });
   },
 

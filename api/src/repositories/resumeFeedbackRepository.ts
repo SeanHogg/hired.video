@@ -5,7 +5,8 @@
  *   resume_reviews             — the feedback engagement
  *   resume_review_annotations  — sticky notes / highlights / comments
  *
- * Plus the reviewer-proposal slice of `resume_versions` (rows where
+ * Plus the reviewer-proposal slice of résumé versions (`entity_versions`
+ * rows with subject_type 'resume', W3-E migration 0640, where
  * `proposed_by_user_id IS NOT NULL`) — the proposed-draft lifecycle. Owner
  * snapshots / restore stay in routes/resumes.ts; this repo only touches the
  * proposal columns so the two paths don't collide.
@@ -13,10 +14,16 @@
  * No business logic — the ResumeFeedbackService orchestrates auth + content
  * application. See migration 0200_resume_feedback.sql.
  */
-import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
+import { EntityVersionRepository } from "./entityVersionRepository.js";
+import {
+  toResumeVersionRow,
+  type ResumeVersionInsert,
+  type ResumeVersionRow,
+} from "./resumeVersionRepository.js";
 
-const { resumeReviews, resumeReviewAnnotations, resumeVersions, resumeInformation, users } = schema;
+const { resumeReviews, resumeReviewAnnotations, resumeInformation, users } = schema;
 
 export type DbLike = any;
 
@@ -28,8 +35,7 @@ export type ResumeReviewAnnotationRow = typeof resumeReviewAnnotations.$inferSel
 export type ResumeReviewAnnotationInsert = typeof resumeReviewAnnotations.$inferInsert;
 export type ResumeReviewAnnotationPatch = Partial<ResumeReviewAnnotationInsert>;
 
-export type ResumeVersionRow = typeof resumeVersions.$inferSelect;
-export type ResumeVersionInsert = typeof resumeVersions.$inferInsert;
+export type { ResumeVersionInsert, ResumeVersionRow };
 
 /** The minimal resume slice the feedback flows need (content + owner). */
 export interface ResumeContentSlice {
@@ -52,8 +58,8 @@ export interface UserContact {
   email: string | null;
 }
 
-export interface IResumeFeedbackRepository {
-  // ── reviews ──
+/** Reviews (the feedback-request aggregate). */
+export interface IResumeReviewRepository {
   findReviewById(id: string): Promise<ResumeReviewRow | null>;
   findReviewByToken(token: string): Promise<ResumeReviewRow | null>;
   listReviewsForOwner(ownerId: string): Promise<ResumeReviewRow[]>;
@@ -65,8 +71,10 @@ export interface IResumeFeedbackRepository {
   updateReview(id: string, patch: ResumeReviewPatch): Promise<ResumeReviewRow | null>;
   /** Open + total annotation counts grouped per review id. */
   annotationCountsForReviews(reviewIds: string[]): Promise<AnnotationCounts[]>;
+}
 
-  // ── annotations ──
+/** Annotations on a review. */
+export interface IResumeReviewAnnotationRepository {
   findAnnotationById(id: string): Promise<ResumeReviewAnnotationRow | null>;
   listAnnotations(reviewId: string): Promise<ResumeReviewAnnotationRow[]>;
   insertAnnotation(input: ResumeReviewAnnotationInsert): Promise<ResumeReviewAnnotationRow>;
@@ -75,21 +83,34 @@ export interface IResumeFeedbackRepository {
     patch: ResumeReviewAnnotationPatch,
   ): Promise<ResumeReviewAnnotationRow | null>;
   deleteAnnotation(id: string): Promise<boolean>;
+}
 
-  // ── resume content (read for reviewers, write on accept) ──
+/** Resume content (read for reviewers, write on accept). */
+export interface IResumeReviewContentRepository {
   findResumeContentSlice(resumeId: string): Promise<ResumeContentSlice | null>;
   updateResumeContent(resumeId: string, content: unknown): Promise<void>;
+}
 
-  // ── identity (author attribution + invite email) ──
+/** Identity (author attribution + invite email). */
+export interface IResumeReviewUserDirectory {
   findUserContacts(ids: string[]): Promise<UserContact[]>;
+}
 
-  // ── proposed-draft revisions (resume_versions proposal slice) ──
+/** Proposed-draft revisions (resume_versions proposal slice). */
+export interface IResumeReviewProposalRepository {
   nextVersionNumber(resumeId: string): Promise<number>;
   insertProposedVersion(input: ResumeVersionInsert): Promise<ResumeVersionRow>;
   findVersionById(id: string): Promise<ResumeVersionRow | null>;
   listProposalsForReview(reviewId: string): Promise<ResumeVersionRow[]>;
   setProposalStatus(versionId: string, status: string): Promise<ResumeVersionRow | null>;
 }
+
+export interface IResumeFeedbackRepository
+  extends IResumeReviewRepository,
+    IResumeReviewAnnotationRepository,
+    IResumeReviewContentRepository,
+    IResumeReviewUserDirectory,
+    IResumeReviewProposalRepository {}
 
 export class ResumeFeedbackRepository implements IResumeFeedbackRepository {
   constructor(

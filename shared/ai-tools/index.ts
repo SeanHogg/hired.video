@@ -48,6 +48,7 @@ import {
 
 export type { AIContextType, AIToolDef, HttpMethod } from "./types.js";
 export { buildEndpointUrl } from "./types.js";
+export * from "./tool-ids.js";
 
 /** Every shipped AI tool, keyed by stable id. */
 export const TOOLS: Record<string, AIToolDef> = {

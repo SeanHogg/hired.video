@@ -85,39 +85,8 @@ export const resumeInformation = pgTable("resume_information", {
 export type ResumeInformation = typeof resumeInformation.$inferSelect;
 export type NewResumeInformation = typeof resumeInformation.$inferInsert;
 
-/** Resume version snapshots — mirrors studio_project_versions (#131).
- *  Autosave rows churn fast (50-cap + 30-day retention enforced by the
- *  versions service); user-labeled snapshots are kept until the user
- *  deletes the parent resume. */
-export const resumeVersions = pgTable("resume_versions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  resumeId: uuid("resume_id").notNull().references(() => resumeInformation.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  versionNumber: integer("version_number").notNull(),
-  label: varchar("label", { length: 120 }),
-  resumeData: jsonb("resume_data").notNull(),
-  isAutosave: boolean("is_autosave").default(false).notNull(),
-  // ── Reviewer-proposed draft (resume feedback / coaching) ──
-  // Non-null `proposedByUserId` marks this version as a reviewer-submitted
-  // draft (not an owner snapshot). `reviewId` links it to its review and
-  // `proposalStatus` tracks the owner's decision. All null for normal
-  // owner-authored snapshots. (#1946 — see shared/resume-feedback.ts.)
-  proposedByUserId: uuid("proposed_by_user_id").references(() => users.id, { onDelete: "set null" }),
-  reviewId: uuid("review_id"),
-  proposalStatus: varchar("proposal_status", { length: 16 }), // proposed | accepted | rejected
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [
-  index("idx_resume_versions_resume_created").on(t.resumeId, t.createdAt.desc().nullsFirst()),
-  index("idx_resume_versions_review").on(t.reviewId).where(sql`review_id IS NOT NULL`),
-  // #2305 — legacy UNIQUE (migration 0121_taxonomies_archive_versions.sql); duplicates resolved by 0518_dedupe_unique_indexes.sql.
-  uniqueIndex("uq_resume_versions_resume_version").on(t.resumeId, t.versionNumber),
-  check("resume_versions_proposal_status_check", sql`${t.proposalStatus} IS NULL OR ${t.proposalStatus} IN ('proposed', 'accepted', 'rejected')`),
-  index("idx_resume_versions_proposed_by_user_id").on(t.proposedByUserId),
-  index("idx_resume_versions_user_id").on(t.userId),
-]);
-
-export type ResumeVersion = typeof resumeVersions.$inferSelect;
-export type NewResumeVersion = typeof resumeVersions.$inferInsert;
+// Résumé snapshot history (#155) + reviewer-proposed drafts (#1946) live in
+// `entity_versions` (subject_type 'resume', W3-E migration 0640) — see entityVersions.ts.
 
 export const watchedResumes = pgTable("watched_resumes", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -134,29 +103,8 @@ export const watchedResumes = pgTable("watched_resumes", {
 export type WatchedResume = typeof watchedResumes.$inferSelect;
 export type NewWatchedResume = typeof watchedResumes.$inferInsert;
 
-// Per-view event log for resumes. Each row is a single view by a
-// (possibly anonymous) viewer. The aggregate view count shown on the UI
-// is derived from this table — no denormalized counter on
-// resume_information to avoid drift.
-export const resumeViews = pgTable("resume_views", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  resumeId: uuid("resume_id").notNull().references(() => resumeInformation.id, { onDelete: "cascade" }),
-  // null = anonymous viewer (unauthenticated public view).
-  viewerId: uuid("viewer_id").references(() => users.id, { onDelete: "set null" }),
-  // Hashed IP (sha256 + daily salt) for anonymous dedup. Never stores the
-  // raw IP to stay in line with privacy expectations.
-  ipHash: varchar("ip_hash", { length: 64 }),
-  referrer: text("referrer"),
-  userAgent: text("user_agent"),
-  viewedAt: timestamp("viewed_at", { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [
-  index("resume_views_resume_id_idx").on(table.resumeId),
-  index("resume_views_viewed_at_idx").on(table.viewedAt),
-  index("idx_resume_views_viewer_id").on(table.viewerId),
-]);
-
-export type ResumeView = typeof resumeViews.$inferSelect;
-export type NewResumeView = typeof resumeViews.$inferInsert;
+// Résumé view events live in the polymorphic artifact_views table
+// (artifact_kind='resume'; resume_views folded in by W3-A 0580).
 
 // Studio Projects — kept here since they are tightly coupled to resume workflows
 export const studioProjects = pgTable("studio_projects", {
@@ -189,58 +137,53 @@ export const studioProjects = pgTable("studio_projects", {
   // 16) so the longest value, "interactive_comic" (17 chars), actually fits —
   // a latent bug fixed in migration 0197 alongside adding "document".
   mediaKind: varchar("media_kind", { length: 24 }).default("video").notNull(),
+  // Save-draft meta (`_prompt`, `_jobDescription`, `_metaDescription`,
+  // `_keywords`, `_socialCardImage`, `_slug` mirror) for EVERY kind, plus the
+  // V1 VideoScript keys for kind='scene' rows. Not a runtime-state column —
+  // it coexists with `state` on every row, so it stays its own column.
   storyboard: jsonb("storyboard"),
-  // Frame-accurate Timeline JSON for kind='nle' projects. See
-  // shared/timeline.ts for the shape and isRenderable() for the
-  // precondition the render facade asserts.
-  timelineSpec: jsonb("timeline_spec"),
-  // Game state JSON for mediaKind='game' projects. Parallel to
-  // `timelineSpec` — each canvas runtime owns its own state column
-  // per the canvas-runtime extensibility model in PRD §1.2. Null for
-  // non-game projects (Timeline runtime uses `timelineSpec`). See
-  // `shared/game-state.ts` for the shape. Migration 0101 / #927.
-  gameState: jsonb("game_state"),
-  // Comic state JSON for mediaKind='comic' projects. Same parallel-
-  // column pattern as `gameState`; the comic runtime shape lands in a
-  // future `shared/comic-state.ts` alongside its canvas implementation
-  // (#929). Migration 0101 / #929.
-  comicState: jsonb("comic_state"),
+  // THE canvas-runtime state (migration 0610, W3-D1). Replaces the ten
+  // mutually exclusive per-kind columns below; its shape is decided by
+  // `media_kind` via shared/studio-project-state.ts (Timeline JSON for the
+  // CanvasState-authoring kinds, GameState / ImageState / AnimationState /
+  // CadState / Cad3DState / DocumentState for the self-hosting runtimes).
+  // Read/write only through services/studio/project-state.ts.
+  state: jsonb("state"),
   // Branching CHOICE GRAPH for mediaKind='interactive_comic' (Comic+)
-  // projects (#1960 / #2126). Distinct from `comicState` (linear comic) and
-  // from the per-page CanvasState (authored on the Timeline shell): this is
-  // the `InteractiveComicState` shape (pages + startPageId + per-page choice
-  // branches) in `shared/interactive-comic-state.ts`. Same parallel-column
-  // pattern as the other non-Timeline runtimes. Null for non-Comic+ projects.
-  // Migration 0486.
+  // projects (#1960 / #2126). Kept as its own column because it is a GENUINE
+  // pair: a Comic+ project carries BOTH the per-page CanvasState (Timeline
+  // JSON in `state`) AND this `InteractiveComicState` graph
+  // (shared/interactive-comic-state.ts), written in the same save. Null for
+  // non-Comic+ projects. Migration 0486.
   interactiveComicState: jsonb("interactive_comic_state"),
-  // Image state JSON for mediaKind='image' projects. Parallel column
-  // for the Photoshop-shaped raster editor (#932); shape lives in
-  // `shared/image-state.ts` (layers + dimensions + history). Null for
-  // every non-image project. Migration 0102.
-  imageState: jsonb("image_state"),
-  // Animation state JSON for mediaKind='animation' projects. Same
-  // parallel-column pattern as `gameState` / `imageState`. Shape lives
-  // in `shared/animation-state.ts` (frames + fps + onion-skin depth +
-  // background + loop count). Null for every non-animation project.
-  // Migration 0106 / #1003.
-  animationState: jsonb("animation_state"),
-  // CAD state JSON for mediaKind='cad' projects. Same parallel-column
-  // pattern. Shape lives in `shared/cad-state.ts` (vector shapes +
-  // drawing extents + unit + grid). Null for non-cad projects.
-  // Migration 0107 / #930.
-  cadState: jsonb("cad_state"),
-  // 3D CAD state JSON for mediaKind='cad_3d' projects. Same parallel-column
-  // pattern as cadState. Shape in `shared/cad-3d-state.ts` (primitives +
-  // boolean ops + materials + build-volume). Null for non-cad_3d projects.
-  // Migration 0184 / #930 Phase 2.
-  cad3dState: jsonb("cad_3d_state"),
-  // Document state JSON for mediaKind='document' projects — the paged
-  // WYSIWYG canvas backing resume / job / article / blog (#1912). Same
-  // parallel-column pattern as the other non-Timeline runtimes. Shape lives
-  // in `frontend/lib/studio/editor-v2/document-state.ts` (DocumentState —
-  // pages + flow blocks + Widget overlays + theme + page geometry). Null
-  // for every non-document project. Migration 0197.
-  documentState: jsonb("document_state"),
+  // Content revision for the autosave's optimistic-concurrency check
+  // (#2242). Promoted from `storyboard._rev` in migration 0610; bumped by
+  // every content write (save-draft, NLE timeline PUT).
+  revision: integer("revision").default(0).notNull(),
+  // Project display name (was `storyboard._name`, migration 0610).
+  name: varchar("name", { length: 200 }),
+  // Studio purpose (shared/studio-purposes.ts; was `storyboard._purpose`,
+  // migration 0610). Pitches are `purpose = 'pitch'`.
+  purpose: varchar("purpose", { length: 32 }),
+  // The hosted render's content stamp — mirrors `state._meta.bakedHash`
+  // (which the frontend freshness check still reads) so publish/promotion
+  // compare it without a JSONB extraction. Maintained on every `state`
+  // write by repositories/studioProjectsRepository.ts. Migration 0610.
+  bakedHash: text("baked_hash"),
+  // ── Legacy per-kind state columns — FROZEN since migration 0610 ────────
+  // Backfilled into `state` and snapshotted to
+  // archive.studio_projects_legacy_state (0611). No code reads or writes
+  // them; they stay declared only so `drizzle-kit push --force` (which runs
+  // BEFORE the SQL migrations) cannot drop them ahead of the 0610 backfill.
+  // Remove them from this schema one deploy after 0610/0611 are applied.
+  legacyTimelineSpec: jsonb("timeline_spec"),
+  legacyGameState: jsonb("game_state"),
+  legacyComicState: jsonb("comic_state"),
+  legacyImageState: jsonb("image_state"),
+  legacyAnimationState: jsonb("animation_state"),
+  legacyCadState: jsonb("cad_state"),
+  legacyCad3dState: jsonb("cad_3d_state"),
+  legacyDocumentState: jsonb("document_state"),
   // Public-URL slug. Promoted from `storyboard._slug` to a real column
   // in migration 0141 because the JSONB extraction made the per-save
   // uniqueness check sequentially scan studio_projects and blow the
@@ -258,7 +201,7 @@ export const studioProjects = pgTable("studio_projects", {
   // "THE video resume on my profile" pointer. Per-user singleton — the
   // partial unique index below enforces that at most one project per
   // user has is_profile_primary=true. Flipped atomically by the publish/
-  // unpublish handler in PATCH /api/studio/projects/:id/status (Publish
+  // unpublish handler in PATCH /api/studio/projects/:id ({ status }) (Publish
   // sets this row true + clears any sibling primary in one tx;
   // Unpublish sets it false). All "show the profile video" read paths
   // — /api/channels/:handle, /api/studio/videos/user/:userId,
@@ -267,7 +210,7 @@ export const studioProjects = pgTable("studio_projects", {
   // historical "published" rows exist. See migration 0088.
   isProfilePrimary: boolean("is_profile_primary").default(false).notNull(),
   // "THE video pitch recruiters see" pointer (#1237 / #2133). Only set on
-  // `purpose: "pitch"` projects (storyboard._purpose); per-user singleton
+  // `purpose = 'pitch'` projects (the `purpose` column); per-user singleton
   // via the partial unique index below, flipped by services/pitch/
   // pitchService.setCurrentPitch (clear sibling + set in one tx).
   // Migration 0519 adds it and backfills the legacy users.video_pitch_url.
@@ -308,6 +251,8 @@ export const studioProjects = pgTable("studio_projects", {
   check("studio_projects_media_kind_check", sql`${table.mediaKind} IN ('video', 'podcast', 'voice', 'animation', 'game', 'comic', 'interactive_comic', 'image', 'cad', 'cad_3d', 'document')`),
   index("idx_studio_projects_resume_id").on(table.resumeId),
   index("idx_studio_projects_user_id").on(table.userId),
+  index("idx_studio_projects_purpose").on(table.purpose),
+  check("studio_projects_purpose_check", sql`${table.purpose} IN ('basic', 'resume', 'job_ad', 'company_promo', 'recruiter_brand', 'product_launch', 'personal_brand', 'course_lesson', 'pitch')`),
 ]);
 
 export type StudioProject = typeof studioProjects.$inferSelect;

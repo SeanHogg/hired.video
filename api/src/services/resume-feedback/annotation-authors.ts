@@ -4,7 +4,7 @@
  * edge cache).
  */
 import type {
-  IResumeFeedbackRepository,
+  IResumeReviewUserDirectory,
   ResumeReviewAnnotationRow,
   ResumeReviewRow,
 } from "../../repositories/resumeFeedbackRepository.js";
@@ -22,7 +22,7 @@ function reviewerLabel(review: ResumeReviewRow): string | null {
  *  external guest with no account) falls back to the review's reviewer
  *  name/email so the owner still sees who left it. */
 export async function authorNamesByAnnotation(
-  repo: IResumeFeedbackRepository,
+  repo: IResumeReviewUserDirectory,
   review: ResumeReviewRow,
   rows: ResumeReviewAnnotationRow[],
 ): Promise<Map<string, string | null>> {
@@ -39,7 +39,7 @@ export async function authorNamesByAnnotation(
 
 /** Single-author resolve for mutation responses. */
 export async function nameForAuthor(
-  repo: IResumeFeedbackRepository,
+  repo: IResumeReviewUserDirectory,
   authorId: string | null,
   review: ResumeReviewRow,
 ): Promise<string | null> {

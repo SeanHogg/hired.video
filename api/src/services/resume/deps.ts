@@ -17,7 +17,7 @@ import {
 import { refreshDiffPercentFor } from "../../services/resume/view.js";
 import { buildRepos } from "../../repositories/index.js";
 import { isPromotedWithoutAuth } from "../user/promotionFlags.js";
-import type { ResumeDeps, ResumeParserPort, DiffRecomputePort } from "./ResumeService.js";
+import type { ResumeDeps, ResumeParserPort, DiffRecomputePort } from "./ports.js";
 import { createLLMClient, hasAnyLLMProviderKey, type LLMEnv } from "../adapters/llm-client.js";
 import type { JwtPayload } from "../../types/index.js";
 import type { MergeFromFileDeps } from "./mergeFromFile.js";

@@ -3,7 +3,7 @@
  * publish use case (StudioTemplatesService.publish) stays source-agnostic:
  *
  *   project  a studio project the caller owns. Its media kind is the
- *            template's; a document snapshots its `document_state`, every
+ *            template's; a document snapshots its `state` (DocumentState), every
  *            other kind its storyboard (or the live payload the editor sent).
  *   resume   a résumé the caller owns, published from the career kit as a
  *            résumé template (media kind 'document', document kind
@@ -27,7 +27,7 @@ export interface TemplateSourceRepos {
   media: {
     findStudioProjectById(
       id: string,
-    ): Promise<Pick<StudioProjectRow, "userId" | "mediaKind" | "companyId" | "documentState" | "storyboard"> | null>;
+    ): Promise<Pick<StudioProjectRow, "userId" | "mediaKind" | "companyId" | "state" | "storyboard"> | null>;
   };
   resumes: { findById(id: string): Promise<Pick<ResumeRow, "userId" | "content"> | null> };
 }
@@ -74,9 +74,9 @@ async function resolveProject(
   const mediaKind = project.mediaKind ?? "video";
   const isDocument = mediaKind === "document";
   // `video_script` is the generic payload for EVERY kind: a document's
-  // design lives in `document_state`, everything else in the storyboard.
+  // design is its `state` (DocumentState), everything else the storyboard.
   // V2 editors send the live payload instead of mirroring it on save.
-  const payload = livePayload ?? (isDocument ? project.documentState : project.storyboard);
+  const payload = livePayload ?? (isDocument ? project.state : project.storyboard);
   if (!payload) {
     throw new StudioTemplatesError(
       "VALIDATION_ERROR",

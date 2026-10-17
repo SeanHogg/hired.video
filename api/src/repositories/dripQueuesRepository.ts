@@ -1,8 +1,9 @@
 /**
  * DripQueuesRepository — data access for the /5 cron's queue processors:
- * follow-up nurture drips, recruiter outreach sequences, and the generic
- * `queue_job_to_process` background queue (see services/outreach/
- * drip-processors.ts and services/queue/job-queue-processor.ts).
+ * the ONE sequence engine (follow_up_* — nurture drips AND recruiter
+ * outreach, migration 0636) and the generic `queue_job_to_process`
+ * background queue (see services/outreach/drip-processors.ts and
+ * services/queue/job-queue-processor.ts).
  *
  * Shaped for batching: step lookups are prefetched for every due sequence
  * in one query, and status transitions that don't follow a send are
@@ -17,8 +18,6 @@ const {
   followUpSequences,
   followUpSteps,
   followUpLogs,
-  recruiterOutreachEnrollments,
-  recruiterOutreachSequences,
   talentPoolCandidates,
   candidateInteractions,
   queueJobToProcess,
@@ -30,19 +29,15 @@ export type FollowUpEnrollmentRow = typeof followUpEnrollments.$inferSelect;
 export type FollowUpSequenceRow = typeof followUpSequences.$inferSelect;
 export type FollowUpStepRow = typeof followUpSteps.$inferSelect;
 export type FollowUpLogInsert = typeof followUpLogs.$inferInsert;
-export type RecruiterOutreachEnrollmentRow = typeof recruiterOutreachEnrollments.$inferSelect;
-export type RecruiterOutreachSequenceRow = typeof recruiterOutreachSequences.$inferSelect;
 export type CandidateInteractionInsert = typeof candidateInteractions.$inferInsert;
 export type QueueJobRow = typeof queueJobToProcess.$inferSelect;
 
-export interface DueFollowUp {
+/** A due enrollment with its sequence and — for candidate recipients
+ *  (recruiter outreach) — the talent-pool candidate's contact fields,
+ *  joined in the same query so the send loop never N+1s. */
+export interface DueEnrollment {
   enrollment: FollowUpEnrollmentRow;
   sequence: FollowUpSequenceRow;
-}
-
-export interface DueOutreach {
-  enrollment: RecruiterOutreachEnrollmentRow;
-  sequence: RecruiterOutreachSequenceRow;
   candidateEmail: string | null;
   candidateName: string | null;
   candidateCompany: string | null;
@@ -51,13 +46,20 @@ export interface DueOutreach {
 export class DripQueuesRepository {
   constructor(private readonly db: DbLike) {}
 
-  // ── Follow-up nurture drips ───────────────────────────────────────────────
+  // ── Sequence engine (follow_up_*) ─────────────────────────────────────────
 
-  async listDueFollowUps(now: Date, limit: number): Promise<DueFollowUp[]> {
+  async listDueEnrollments(now: Date, limit: number): Promise<DueEnrollment[]> {
     return this.db
-      .select({ enrollment: followUpEnrollments, sequence: followUpSequences })
+      .select({
+        enrollment: followUpEnrollments,
+        sequence: followUpSequences,
+        candidateEmail: talentPoolCandidates.candidateEmail,
+        candidateName: talentPoolCandidates.candidateName,
+        candidateCompany: talentPoolCandidates.currentCompany,
+      })
       .from(followUpEnrollments)
       .innerJoin(followUpSequences, eq(followUpEnrollments.sequenceId, followUpSequences.id))
+      .leftJoin(talentPoolCandidates, eq(followUpEnrollments.talentPoolCandidateId, talentPoolCandidates.id))
       .where(
         and(
           eq(followUpEnrollments.status, "active"),
@@ -119,60 +121,6 @@ export class DripQueuesRepository {
         updatedAt: now,
       })
       .where(eq(followUpEnrollments.id, id));
-  }
-
-  // ── Recruiter outreach ────────────────────────────────────────────────────
-
-  async listDueOutreach(now: Date, limit: number): Promise<DueOutreach[]> {
-    return this.db
-      .select({
-        enrollment: recruiterOutreachEnrollments,
-        sequence: recruiterOutreachSequences,
-        candidateEmail: talentPoolCandidates.candidateEmail,
-        candidateName: talentPoolCandidates.candidateName,
-        candidateCompany: talentPoolCandidates.currentCompany,
-      })
-      .from(recruiterOutreachEnrollments)
-      .innerJoin(
-        recruiterOutreachSequences,
-        eq(recruiterOutreachEnrollments.sequenceId, recruiterOutreachSequences.id),
-      )
-      .innerJoin(
-        talentPoolCandidates,
-        eq(recruiterOutreachEnrollments.talentPoolCandidateId, talentPoolCandidates.id),
-      )
-      .where(
-        and(
-          eq(recruiterOutreachEnrollments.status, "active"),
-          isNotNull(recruiterOutreachEnrollments.nextSendAt),
-          lte(recruiterOutreachEnrollments.nextSendAt, now),
-        ),
-      )
-      .limit(limit);
-  }
-
-  async completeOutreachEnrollments(ids: string[], now: Date): Promise<void> {
-    if (ids.length === 0) return;
-    await this.db
-      .update(recruiterOutreachEnrollments)
-      .set({ status: "completed", completedAt: now })
-      .where(inArray(recruiterOutreachEnrollments.id, ids));
-  }
-
-  async advanceOutreachEnrollment(
-    id: string,
-    patch: { currentStep: number; nextSendAt: Date | null; completed: boolean },
-    now: Date,
-  ): Promise<void> {
-    await this.db
-      .update(recruiterOutreachEnrollments)
-      .set({
-        currentStep: patch.currentStep,
-        nextSendAt: patch.nextSendAt ?? undefined,
-        status: patch.completed ? "completed" : "active",
-        completedAt: patch.completed ? now : undefined,
-      })
-      .where(eq(recruiterOutreachEnrollments.id, id));
   }
 
   /** Best-effort multi-row insert of timeline interactions; a failed batch

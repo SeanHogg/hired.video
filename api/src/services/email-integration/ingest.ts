@@ -81,7 +81,7 @@ import { resolveAccountProfile } from "./profile-service.js";
 import { dispatchActions, type ActionContext, type ActionEffect } from "./action-engine.js";
 import "./action-handlers.js"; // registers the Phase-4 L2 handlers
 import type { InboxActionRunInsert } from "../../repositories/inboxActionsRepository.js";
-import type { NotificationInsert } from "../../repositories/notificationsRepository.js";
+import { emitNotifications, type EmitNotificationInput } from "../notifications/notificationService.js";
 import { logger } from "../../lib/logger.js";
 
 export interface IngestDeps {
@@ -238,7 +238,7 @@ export async function ingestForAccount(
   // (audit rows + notifications) so the action engine adds O(1) writes
   // per chunk, not O(messages).
   const actionRunInserts: InboxActionRunInsert[] = [];
-  const notificationInserts: NotificationInsert[] = [];
+  const notificationInserts: EmitNotificationInput[] = [];
 
   // ───── PASS A — bulk insert.
   const insertPayloads: ExternalEmailMessageInsert[] = request.messages.map(
@@ -488,7 +488,7 @@ export async function ingestForAccount(
   }
   if (notificationInserts.length > 0) {
     try {
-      await deps.repos.notifications.insertNotifications(notificationInserts);
+      await emitNotifications(deps, notificationInserts);
     } catch (err) {
       logger.error("[email-ingest] action notification insert failed", err);
     }

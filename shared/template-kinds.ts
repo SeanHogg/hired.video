@@ -12,7 +12,7 @@
  * Pure leaf module — only imports the two sibling kind registries.
  */
 
-import { MEDIA_KINDS, type MediaKind } from "./media-kinds.js";
+import { isMediaKind, type MediaKind } from "./media-kinds.js";
 import { isDocumentEntityKind, type DocumentEntityKind } from "./document-entity-kinds.js";
 
 /** Label key per media kind (the output axis). */
@@ -42,9 +42,7 @@ export const DOCUMENT_KIND_LABEL_KEYS: Record<DocumentEntityKind, string> = {
 /** Fallback for a row whose media kind this build doesn't know yet. */
 export const GENERIC_TEMPLATE_KIND_LABEL_KEY = "templateKind.generic";
 
-export function isMediaKind(value: unknown): value is MediaKind {
-  return typeof value === "string" && (MEDIA_KINDS as readonly string[]).includes(value);
-}
+export { isMediaKind };
 
 /** i18n key for a media kind's short label ("Video", "Podcast"…). */
 export function mediaKindLabelKey(mediaKind: MediaKind): string {

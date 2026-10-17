@@ -109,7 +109,7 @@ describe("the new wands stage a pending change", () => {
       bound: { resumeId: RESUME_ID },
       args: { original: "Responsible for vendor management across 12 contracts" },
     });
-    expect(post.mock.calls[0][0]).toBe("/api/resumeoptimizer/rewrite-bullet");
+    expect(post.mock.calls[0][0]).toBe("/api/ai/tools/resume-rewrite-bullet");
     expect(post.mock.calls[0][1]).toEqual({ original: "Responsible for vendor management across 12 contracts", mode: "metric" });
     expect(out.raw).toEqual({
       kind: "apply_resume_rewrite",

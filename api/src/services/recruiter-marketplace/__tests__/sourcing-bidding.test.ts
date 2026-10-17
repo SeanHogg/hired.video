@@ -8,7 +8,6 @@
  * helpers the service delegates to:
  *   • evaluateBidEligibility — the place-bid gate (own-job / not-open /
  *     deadline / duplicate), incl. reason precedence
- *   • selectWinningBid       — lowest-fee-wins auction selection + tiebreak
  *   • rowToConfig            — listing row → SourcingConfig projection
  *
  * Run: node --import tsx --test src/services/recruiter-marketplace/__tests__/sourcing-bidding.test.ts
@@ -19,7 +18,6 @@ import assert from "node:assert/strict";
 
 import {
   evaluateBidEligibility,
-  selectWinningBid,
   rowToConfig,
 } from "../SourcingListingService.js";
 
@@ -156,59 +154,6 @@ describe("evaluateBidEligibility (boundary + precedence)", () => {
       }),
       "NOT_OPEN",
     );
-  });
-});
-
-// ───────────────────────────────────────────────────────────────────────────
-// selectWinningBid — lowest fee wins, earliest breaks ties
-// ───────────────────────────────────────────────────────────────────────────
-
-describe("selectWinningBid", () => {
-  const t = (s: string) => new Date(s);
-
-  it("returns null for an empty bid set", () => {
-    assert.equal(selectWinningBid([]), null);
-  });
-
-  it("returns null when no bid is pending", () => {
-    const bids = [
-      { id: "a", status: "rejected", bidAmount: 1000, createdAt: t("2026-06-01") },
-      { id: "b", status: "withdrawn", bidAmount: 500, createdAt: t("2026-06-02") },
-    ];
-    assert.equal(selectWinningBid(bids), null);
-  });
-
-  it("picks the lowest fee among pending bids", () => {
-    const bids = [
-      { id: "a", status: "pending", bidAmount: 3000, createdAt: t("2026-06-01") },
-      { id: "b", status: "pending", bidAmount: 1500, createdAt: t("2026-06-02") },
-      { id: "c", status: "pending", bidAmount: 2200, createdAt: t("2026-06-03") },
-    ];
-    assert.equal(selectWinningBid(bids)?.id, "b");
-  });
-
-  it("ignores non-pending bids even if they're cheaper", () => {
-    const bids = [
-      { id: "a", status: "rejected", bidAmount: 100, createdAt: t("2026-06-01") },
-      { id: "b", status: "pending", bidAmount: 2000, createdAt: t("2026-06-02") },
-    ];
-    assert.equal(selectWinningBid(bids)?.id, "b");
-  });
-
-  it("breaks ties on equal fee by earliest createdAt (first-come)", () => {
-    const bids = [
-      { id: "late", status: "pending", bidAmount: 1000, createdAt: t("2026-06-05") },
-      { id: "early", status: "pending", bidAmount: 1000, createdAt: t("2026-06-02") },
-    ];
-    assert.equal(selectWinningBid(bids)?.id, "early");
-  });
-
-  it("coerces string fee amounts (numeric columns serialize as strings)", () => {
-    const bids = [
-      { id: "a", status: "pending", bidAmount: "2500.00", createdAt: t("2026-06-01") },
-      { id: "b", status: "pending", bidAmount: "999.50", createdAt: t("2026-06-02") },
-    ];
-    assert.equal(selectWinningBid(bids)?.id, "b");
   });
 });
 

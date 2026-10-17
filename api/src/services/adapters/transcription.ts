@@ -5,7 +5,8 @@
  *   - Delivery coaching (filler word detection, pacing analysis)
  */
 import type { JwtPayload } from "../../types/index.js";
-import { chargeLedger, type LLMUsage } from "./llm-client.js";
+import { chargeLedger } from "./llm/metering.js";
+import type { LLMUsage } from "./llm/types.js";
 
 export interface TranscriptionWord {
   word: string;

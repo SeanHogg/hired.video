@@ -17,13 +17,14 @@
  * couldn't answer yet and nothing was lost.
  *
  * A checkout id is opaque to clients: `<kind>:<key>` (boost → boost id,
- * course → course_checkouts id, token_pack → pack id).
+ * job_boost → job_boosts id, course → course_checkouts id, token_pack →
+ * pack id).
  */
 import { z } from "zod";
 import { UuidLikeSchema } from "./validation.js";
 import type { TokenBudgetDTO } from "./billing.js";
 
-export const CHECKOUT_KINDS = ["boost", "course", "token_pack"] as const;
+export const CHECKOUT_KINDS = ["boost", "job_boost", "course", "token_pack"] as const;
 export type CheckoutKind = (typeof CHECKOUT_KINDS)[number];
 
 export function isCheckoutKind(v: unknown): v is CheckoutKind {
@@ -74,6 +75,25 @@ export const StartBoostCheckoutSchema = z.object({
   maxCampaignDollarsCents: z.number().int().min(0).optional(),
 });
 
+/** Placements / pricing a sponsored job can buy (search + discovery). */
+export const JOB_BOOST_PLACEMENTS = ["search_top", "discovery_feed", "both"] as const;
+export type JobBoostPlacement = (typeof JOB_BOOST_PLACEMENTS)[number];
+export const JOB_BOOST_PRICING_MODELS = ["cpm", "cpc"] as const;
+export type JobBoostPricingModel = (typeof JOB_BOOST_PRICING_MODELS)[number];
+/** Minimum sponsored-job budget: $10. */
+export const JOB_BOOST_MIN_BUDGET_CENTS = 1000;
+
+/** Sponsor one of the caller's posted jobs. The job is sponsored only once
+ *  the payment is confirmed (never on start). */
+export const StartJobBoostCheckoutSchema = z.object({
+  kind: z.literal("job_boost"),
+  jobId: UuidLikeSchema,
+  placementType: z.enum(JOB_BOOST_PLACEMENTS),
+  pricingModel: z.enum(JOB_BOOST_PRICING_MODELS),
+  budgetCents: z.number().int().min(JOB_BOOST_MIN_BUDGET_CENTS).max(1_000_000),
+  durationDays: z.number().int().min(1).max(90),
+});
+
 export const StartCourseCheckoutSchema = z.object({
   kind: z.literal("course"),
   courseId: UuidLikeSchema,
@@ -86,6 +106,7 @@ export const StartTokenPackCheckoutSchema = z.object({
 
 export const StartCheckoutSchema = z.discriminatedUnion("kind", [
   StartBoostCheckoutSchema,
+  StartJobBoostCheckoutSchema,
   StartCourseCheckoutSchema,
   StartTokenPackCheckoutSchema,
 ]);
@@ -121,6 +142,13 @@ export interface BoostCheckoutDetails {
   boost?: Record<string, unknown>;
 }
 
+export interface JobBoostCheckoutDetails {
+  jobBoostId: string;
+  jobId: string;
+  /** The job_boosts row as created (present on start). */
+  boost?: Record<string, unknown>;
+}
+
 export interface CourseCheckoutDetails {
   courseId: string;
   platformFeeCents: number;
@@ -136,6 +164,7 @@ export interface TokenPackCheckoutDetails {
 
 export interface CheckoutDetailsByKind {
   boost: BoostCheckoutDetails;
+  job_boost: JobBoostCheckoutDetails;
   course: CourseCheckoutDetails;
   token_pack: TokenPackCheckoutDetails;
 }
@@ -163,6 +192,7 @@ export interface CheckoutPayDTO<C = unknown> {
 
 export interface CheckoutOutcomeByKind {
   boost: { activated: boolean };
+  job_boost: { activated: boolean };
   course: { enrollmentId: string | null };
   token_pack: { granted: boolean; tokensGranted: number; tokenBudget: TokenBudgetDTO };
 }

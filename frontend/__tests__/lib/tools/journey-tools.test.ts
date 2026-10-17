@@ -118,7 +118,7 @@ describe("read-only journey tools", () => {
     try {
       const out = await getTool("resume-roast")!.run({ bound: { resumeId: RESUME_ID }, args: {} });
       const [url, body] = (apiClient.post as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(url).toBe("/api/resume/roast");
+      expect(url).toBe("/api/resumes/roast");
       expect(body.resumeText).toContain("Cut IT cost 20% ($1.79M).");
       expect(out.overallScore).toBe(62);
       expect(out.recommendations).toEqual([

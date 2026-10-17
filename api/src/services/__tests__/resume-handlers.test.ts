@@ -20,8 +20,6 @@
  *                               variants
  *   • handleWatchResume       — inserts, idempotent on double-watch
  *   • handleUnwatchResume     — deletes the link
- *   • handleSentimentPrediction — persists score when resumeId given,
- *                               skips persistence for legacy callers
  *   • handleListResumes       — batched extras, empty-owner shortcut
  *
  * Run: node --import tsx --test src/routes/__tests__/resume-handlers.test.ts
@@ -33,40 +31,91 @@ import { randomUUID } from "node:crypto";
 
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
 import { ResumeRepository } from "../../repositories/resumeRepository.js";
-import { scoreSentiment } from "../../../../shared/sentiment.js";
-import { resumeContentToText } from "../resume/parse.js";
 
+import { asHandler, toHandlerResult, failFromDomainError } from "../../handlers/shared.js";
+import { DomainError } from "../../domains/errors.js";
 import {
-  handleGetResume,
-  handleUpdateResume,
-  handleCreateResume,
-  handleDeleteResume,
-  handleWatchResume,
-  handleUnwatchResume,
-  handleSentimentPrediction,
-  handleListResumes,
-  handleListOwnedResumes,
-  handleListPublicResumes,
-  handleListMasterGroups,
-  handleValidateSlug,
-  handleSaveResume,
-  handleCloneResume,
-  handlePublishResume,
-  handleSetMaster,
-  handleSetActive,
-  handleSetPrivacy,
-  handlePromote,
-  handleDetach,
-  handleCreateVariation,
-  handleGetMetadata,
-  handleUpdateMetadata,
-  handleGetResumeDiff,
-  handleExportResume,
-  type ResumeDeps,
-  type ResumeRequestContext,
-  type ResumeParserPort,
-  type DiffRecomputePort,
-} from "../resume/ResumeService.js";
+  exportResume,
+  getMetadata,
+  getResume,
+  getResumeDiff,
+  listOwnedResumes,
+  listPublicResumes,
+  validateSlug,
+} from "../resume/queries.js";
+import {
+  deleteResume,
+  patchResumeState,
+  unwatchResume,
+  updateMetadata,
+  updateResume,
+  watchResume,
+} from "../resume/commands.js";
+import { cloneResume, createBlankResume, createVariation } from "../resume/create.js";
+import type {
+  ResumeDeps,
+  ResumeRequestContext,
+  ResumeParserPort,
+  DiffRecomputePort,
+} from "../resume/ports.js";
+
+// The use cases return data / throw DomainError; these adapters map them
+// onto the HTTP envelope exactly as the /api/resumes sub-routers do, so the
+// envelope-level assertions below exercise the real route contract.
+const handleGetResume = asHandler(getResume);
+const handleUpdateResume = asHandler(updateResume);
+const handleCreateResume = asHandler(createBlankResume, 201);
+const handleDeleteResume = (deps: ResumeDeps, ownerId: string, id: string) =>
+  toHandlerResult(deleteResume(deps, ownerId, id).then(() => undefined));
+const handleWatchResume = asHandler(watchResume);
+const handleUnwatchResume = asHandler(unwatchResume);
+const list = (view: "full" | "summary" | "groups", opts: { includeOwnership?: boolean; includeArchived?: boolean } = {}) =>
+  (deps: ResumeDeps, ownerId: string) =>
+    toHandlerResult(
+      listOwnedResumes(deps, ownerId, {
+        view,
+        includeOwnership: opts.includeOwnership ?? false,
+        includeArchived: opts.includeArchived ?? false,
+      }),
+    );
+const handleListResumes = list("full");
+const handleListOwnedResumes = (
+  deps: ResumeDeps,
+  ownerId: string,
+  opts: { includeOwnership?: boolean; includeArchived?: boolean } = {},
+) => list("summary", opts)(deps, ownerId);
+const handleListPublicResumes = asHandler(listPublicResumes);
+const handleListMasterGroups = list("groups");
+const handleValidateSlug = (deps: ResumeDeps, _ownerId: string, opts: { slug: string; resumeId?: string | null }) =>
+  toHandlerResult(validateSlug(deps, opts.slug, opts.resumeId ?? null));
+const handleSaveResume = (deps: ResumeDeps, ownerId: string, content: Record<string, unknown>) =>
+  toHandlerResult(createBlankResume(deps, ownerId, { content }), 201);
+const handleCloneResume = (deps: ResumeDeps, ownerId: string, sourceId: string) =>
+  toHandlerResult(cloneResume(deps, ownerId, { sourceId }), 201);
+const patch = (fields: Parameters<typeof patchResumeState>[3]) => (deps: ResumeDeps, ownerId: string, id: string) =>
+  toHandlerResult(patchResumeState(deps, ownerId, id, fields));
+const handlePublishResume = patch({ status: "published" });
+const handleSetMaster = patch({ isMaster: true });
+const handleSetActive = patch({ isActive: true });
+const handleSetPrivacy = (deps: ResumeDeps, ownerId: string, id: string, privacy: string | undefined) =>
+  toHandlerResult(patchResumeState(deps, ownerId, id, { privacy: privacy as never }));
+const handlePromote = patch({ isMaster: true, parentId: null });
+const handleDetach = patch({ parentId: null });
+const handleCreateVariation = (deps: ResumeDeps, ownerId: string, sourceId: string, body: Record<string, unknown> | null) =>
+  toHandlerResult(createVariation(deps, ownerId, { ...(body ?? {}), sourceId }), 201);
+const handleGetMetadata = asHandler(getMetadata);
+const handleUpdateMetadata = asHandler(updateMetadata);
+const handleGetResumeDiff = asHandler(getResumeDiff);
+/** The export route's two outcomes: a download, or the error envelope. */
+async function handleExportResume(deps: ResumeDeps, ownerId: string, id: string, format: string, _md?: unknown) {
+  try {
+    return { kind: "download" as const, status: 200, ...(await exportResume(deps, ownerId, id, format)) };
+  } catch (err) {
+    if (!(err instanceof DomainError)) throw err;
+    const failed = failFromDomainError(err);
+    return { kind: "error" as const, status: failed.status, body: failed.body };
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Fake DB — supports the query shapes the handlers use. Each test seeds
@@ -93,7 +142,8 @@ interface FakeResume {
   updatedAt: Date;
 }
 interface FakeWatch { id: string; viewerId: string; resumeId: string; watchedAt: Date }
-interface FakeView { id: string; resumeId: string; viewerId: string | null; ipHash: string | null; referrer: string | null; userAgent: string | null; viewedAt: Date }
+/** A résumé view = an artifact_views row (kind 'resume', W3-A 0580). */
+interface FakeView { id: string; artifactKind: "resume"; artifactId: string; eventType: "view"; engagement: null; viewerId: string | null; ipHash: string | null; referrer: string | null; userAgent: string | null; viewedAt: Date }
 
 /**
  * Thin wrapper around the shared buildFakeDb() — the shared fake keys
@@ -118,7 +168,7 @@ function makeFakeDb(seed: {
   const fake = buildFakeDb({
     resume_information: (seed.resumes ?? []) as any,
     watched_resumes: (seed.watches ?? []) as any,
-    resume_views: (seed.views ?? []) as any,
+    artifact_views: (seed.views ?? []) as any,
   });
 
   // Backward-compat aliases: `state.resumes` ⇄ `state.resume_information`,
@@ -133,8 +183,8 @@ function makeFakeDb(seed: {
     set: (v) => { state.watched_resumes = v; },
   });
   Object.defineProperty(state, "views", {
-    get: () => state.resume_views,
-    set: (v) => { state.resume_views = v; },
+    get: () => state.artifact_views,
+    set: (v) => { state.artifact_views = v; },
   });
 
   return { db: fake.db, state, calls: fake.calls };
@@ -639,98 +689,6 @@ describe("handleUnwatchResume", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// handleSentimentPrediction
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("handleSentimentPrediction", () => {
-  // Realistic content blob — the JSON-Resume shape resumeContentToText
-  // walks. Long enough to land in the top scoring bucket so we can tell
-  // it's actually scoring the *content* and not the resumeId.
-  const richContent = {
-    basics: {
-      name: "Sean Hogg",
-      label: "Senior Software Engineer",
-      email: "sean@example.com",
-      summary: "Engineer with 12+ years of experience shipping web platforms, with deep expertise in TypeScript, distributed systems, and developer tooling. Lead of platform infra at three startups; speaker at JSConf 2024.",
-    },
-    skills: [
-      { name: "TypeScript", keywords: ["Node.js", "React", "Hono"] },
-      { name: "Distributed systems", keywords: ["Postgres", "Drizzle", "Cloudflare Workers"] },
-    ],
-    work: [
-      { name: "Acme", position: "Staff Engineer", startDate: "2022", endDate: "Present" },
-    ],
-  };
-
-  it("400s when no resumeId is supplied", async () => {
-    const deps = makeDeps();
-    const res = await handleSentimentPrediction(deps, "owner-1", {});
-    assert.equal(res.status, 400);
-    assert.equal((res.body as any).error.code, "VALIDATION_ERROR");
-  });
-
-  it("400s when the body is a bare string (legacy frontend payload that caused the 2026-05-04 regression)", async () => {
-    const deps = makeDeps();
-    deps._state.resumes.push(makeResume({ userId: "owner-1" }));
-    const res = await handleSentimentPrediction(deps, "owner-1", "11111111-1111-1111-1111-111111111111");
-    assert.equal(res.status, 400);
-    // Critical: the string body must NOT be silently scored as if it
-    // were resume text. That's the bug this test guards against.
-    assert.equal(deps._state.resumes[0].sentimentScore, null);
-  });
-
-  it("404s when the resume does not belong to the caller", async () => {
-    const deps = makeDeps();
-    deps._state.resumes.push(makeResume({ userId: "someone-else" }));
-    const res = await handleSentimentPrediction(deps, "owner-1", {
-      resumeId: "11111111-1111-1111-1111-111111111111",
-    });
-    assert.equal(res.status, 404);
-  });
-
-  it("scores the resume's rendered content (not the resumeId) and persists the score", async () => {
-    const deps = makeDeps();
-    deps._state.resumes.push(makeResume({ userId: "owner-1", content: richContent }));
-
-    const res = await handleSentimentPrediction(deps, "owner-1", {
-      resumeId: "11111111-1111-1111-1111-111111111111",
-    });
-
-    assert.equal(res.status, 200);
-    const score = (res.body as any).data.score;
-    // Cross-check: the score must equal what the *shared* scorer
-    // produces for the resume's *rendered* text. This is the contract
-    // that was silently broken — the old handler scored the resumeId.
-    const expected = scoreSentiment(resumeContentToText(richContent));
-    assert.equal(score, expected);
-    // Top bucket — proves we're not falling through to "score the id".
-    assert.equal(score, 85);
-    assert.equal(deps._state.resumes[0].sentimentScore, score);
-  });
-
-  it("matches /sentiment/sentimentprediction for the same effective text (cross-route contract)", async () => {
-    // Two paths exist that produce a sentiment score: the raw-text
-    // route (api/src/routes/sentiment.ts) and the resume route (this
-    // handler). They MUST agree on identical text or the user sees a
-    // different number depending on which UI affordance they used.
-    // Before the consolidation, the two routes had divergent ladders
-    // (55/70/85 vs 52/64/78); this test pins them together.
-    const deps = makeDeps();
-    deps._state.resumes.push(makeResume({ userId: "owner-1", content: richContent }));
-
-    const res = await handleSentimentPrediction(deps, "owner-1", {
-      resumeId: "11111111-1111-1111-1111-111111111111",
-    });
-    const handlerScore = (res.body as any).data.score;
-
-    const renderedText = resumeContentToText(richContent);
-    const rawTextScore = scoreSentiment(renderedText);
-
-    assert.equal(handlerScore, rawTextScore);
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
 // handleListResumes
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -766,7 +724,7 @@ describe("handleListResumes", () => {
     assert.equal(rB?.isWatched, false);
   });
 
-  it("surfaces aggregated viewCount per resume from the resume_views event log", async () => {
+  it("surfaces aggregated viewCount per resume from the artifact_views event log", async () => {
     const deps = makeDeps();
     deps._state.resumes.push(
       makeResume({ id: "r-a", userId: "owner-1" }),
@@ -775,11 +733,11 @@ describe("handleListResumes", () => {
     // 3 views for r-a, 1 view for r-b.
     for (let i = 0; i < 3; i++) {
       deps._state.views.push({
-        id: `v${i}`, resumeId: "r-a", viewerId: `v${i}`, ipHash: null, referrer: null, userAgent: null, viewedAt: new Date(),
+        id: `v${i}`, artifactKind: "resume", artifactId: "r-a", eventType: "view", engagement: null, viewerId: `v${i}`, ipHash: null, referrer: null, userAgent: null, viewedAt: new Date(),
       });
     }
     deps._state.views.push({
-      id: "v-last", resumeId: "r-b", viewerId: "v-last", ipHash: null, referrer: null, userAgent: null, viewedAt: new Date(),
+      id: "v-last", artifactKind: "resume", artifactId: "r-b", eventType: "view", engagement: null, viewerId: "v-last", ipHash: null, referrer: null, userAgent: null, viewedAt: new Date(),
     });
 
     const res = await handleListResumes(deps, "owner-1");

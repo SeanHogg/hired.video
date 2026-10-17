@@ -24,8 +24,7 @@
 import { getKvNamespace } from "../../utils/edge-cache.js";
 
 export const WORK_QUEUES = [
-  "followups",
-  "recruiter-outreach",
+  "followups", // the ONE sequence engine: nurture drips + recruiter outreach
   "campaigns",
   "job-queue",
   "event-reminders",

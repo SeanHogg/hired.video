@@ -126,6 +126,13 @@ export interface KeyResult {
   unit?: string;
 }
 
+/** A goal discussed inside a performance review (people_performance_reviews.goals). */
+export interface ReviewGoal {
+  goal: string;
+  status: string;
+  notes?: string;
+}
+
 // ── Strategic Objectives & Milestones (PO-5) ─────────────────────────────────
 export const OBJECTIVE_CATEGORIES = [
   "strategic", "operational", "financial", "talent", "customer", "product", "market", "revenue", "team", "fundraising",

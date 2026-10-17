@@ -8,6 +8,7 @@ import { studioProjects } from "../../../db/schema/index.js";
 import { userProfiles, users } from "../../../db/schema/users.js";
 import { videos } from "../../../db/schema/videos.js";
 import type { VideoScanSource } from "./videoScanInputs.js";
+import { projectStateAs } from "../../../repositories/studioProjectsRepository.js";
 
 export interface VideoScanContext extends VideoScanSource {
   videoId: string;
@@ -40,7 +41,7 @@ export async function loadVideoScanContext(videoId: string, db: Db = getDb()): P
   if (!row) return null;
 
   const [project] = await db
-    .select({ timelineSpec: studioProjects.timelineSpec, storyboard: studioProjects.storyboard })
+    .select({ timelineSpec: projectStateAs("timelineSpec"), storyboard: studioProjects.storyboard })
     .from(studioProjects)
     .where(eq(studioProjects.videoId, videoId))
     .orderBy(desc(studioProjects.updatedAt))

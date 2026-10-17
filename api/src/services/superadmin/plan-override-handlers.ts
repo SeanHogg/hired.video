@@ -1,11 +1,11 @@
 /**
  * Pure handlers for SuperAdmin plan overrides.
  *
- * Two operations:
- *   • handleSetPlanOverride   — upsert a per-user override (plan, token
- *                               limit, trial window, reason).
- *   • handleClearPlanOverride — delete the row; user reverts to their
- *                               real subscription.
+ * Two operations (use case → envelope adapter):
+ *   • setPlanOverride   / handleSetPlanOverride   — upsert a per-user
+ *                               override (plan, token limit, trial window, reason).
+ *   • clearPlanOverride / handleClearPlanOverride — delete the row; user
+ *                               reverts to their real subscription.
  *
  * Both handlers are pure with respect to `PlanOverrideDeps` — no calls
  * to `getDb()`, `new Date()`, or `auditLog()` inside. Tests pass fake
@@ -23,7 +23,8 @@ import {
   UNLIMITED_TOKEN_LIMIT,
   type PlanOverrideSnapshot,
 } from "../../domains/planOverride/resolver.js";
-import type { IUsersRepository, ISubscriptionsRepository } from "../../repositories/index.js";
+import type { ISubscriptionsRepository } from "../../repositories/index.js";
+import type { IUserReader } from "../../repositories/usersRepository.js";
 import type { PlanUpgradeEmailParams } from "../adapters/email.js";
 
 // ---------------------------------------------------------------------------
@@ -60,7 +61,7 @@ export interface EmailPort {
 export interface PlanOverrideDeps {
   /** ISP — handlers only need the two repos that touch this aggregate.
    *  No db handle; Drizzle access belongs in the repo layer. */
-  users: IUsersRepository;
+  users: IUserReader;
   subscriptions: ISubscriptionsRepository;
   audit: AuditPort;
   cache: PlanCachePort;
@@ -69,13 +70,12 @@ export interface PlanOverrideDeps {
   now: () => Date;
 }
 
-// Result envelope lives in the shared handler module. This file doesn't
-// use requireAuth because superadmin routes have their own Hono-level
-// role guard upstream of the handler.
-import { ok, fail, type HandlerResult } from "../../handlers/shared.js";
+// Use cases return plain data and throw DomainError; `asHandler` maps that
+// onto the HTTP envelope for the route + tests. No requireAuth here —
+// superadmin routes have their own Hono-level role guard upstream.
+import { asHandler } from "../../handlers/shared.js";
+import { DomainError } from "../../domains/errors.js";
 import { logger } from "../../lib/logger.js";
-export { ok, fail };
-export type { HandlerResult };
 
 // ---------------------------------------------------------------------------
 // Request schema
@@ -125,21 +125,21 @@ export type SetPlanOverrideInput = z.infer<typeof SetPlanOverrideSchema>;
  * values + new values — so the audit log tells the complete story of
  * how this user's plan changed over time.
  */
-export async function handleSetPlanOverride(
+export async function setPlanOverride(
   deps: PlanOverrideDeps,
   adminId: string,
   userId: string,
   body: unknown,
-): Promise<HandlerResult> {
+) {
   const parsed = SetPlanOverrideSchema.safeParse(body);
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() });
+    throw new DomainError(400, "VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() });
   }
 
   // 1. Verify the target user exists.
   const target = await deps.users.findById(userId);
   if (!target) {
-    return fail(404, "NOT_FOUND", "User not found");
+    throw new DomainError(404, "NOT_FOUND", "User not found");
   }
 
   // 2. Load the existing override (may be null) so the audit entry can
@@ -180,7 +180,7 @@ export async function handleSetPlanOverride(
 
   // Guard: expiry in the past is almost certainly an operator error.
   if (storedExpiresAt && storedExpiresAt.getTime() <= deps.now().getTime()) {
-    return fail(400, "VALIDATION_ERROR", "expiresAt must be in the future");
+    throw new DomainError(400, "VALIDATION_ERROR", "expiresAt must be in the future");
   }
 
   const now = deps.now();
@@ -248,7 +248,7 @@ export async function handleSetPlanOverride(
     });
   }
 
-  return ok({
+  return {
     userId,
     planSlug: row.planSlug,
     monthlyTokenLimit: row.monthlyTokenLimit,
@@ -256,8 +256,11 @@ export async function handleSetPlanOverride(
     reason: row.reason,
     grantedBy: row.grantedBy,
     grantedAt: row.grantedAt.toISOString(),
-  });
+  };
 }
+
+/** HTTP-envelope adapter for `setPlanOverride` (route + tests). */
+export const handleSetPlanOverride = asHandler(setPlanOverride);
 
 // ---------------------------------------------------------------------------
 // handleClearPlanOverride
@@ -270,20 +273,20 @@ export async function handleSetPlanOverride(
  * Emits ADMIN_OVERRIDE_CLEARED with the pre-delete snapshot so the audit
  * trail still shows what was active.
  */
-export async function handleClearPlanOverride(
+export async function clearPlanOverride(
   deps: PlanOverrideDeps,
   adminId: string,
   userId: string,
-): Promise<HandlerResult> {
+): Promise<{ userId: string; cleared: boolean }> {
   const target = await deps.users.findById(userId);
   if (!target) {
-    return fail(404, "NOT_FOUND", "User not found");
+    throw new DomainError(404, "NOT_FOUND", "User not found");
   }
 
   const existing = await deps.subscriptions.findOverrideByUserId(userId);
   if (!existing) {
     // Idempotent — clearing an absent override is a no-op, not an error.
-    return ok({ userId, cleared: false });
+    return { userId, cleared: false };
   }
 
   await deps.subscriptions.deleteOverrideByUserId(userId);
@@ -310,5 +313,8 @@ export async function handleClearPlanOverride(
     },
   });
 
-  return ok({ userId, cleared: true });
+  return { userId, cleared: true };
 }
+
+/** HTTP-envelope adapter for `clearPlanOverride` (route + tests). */
+export const handleClearPlanOverride = asHandler(clearPlanOverride);

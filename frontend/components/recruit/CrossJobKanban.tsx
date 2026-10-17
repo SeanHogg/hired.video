@@ -3,7 +3,7 @@
 // recruiter works the whole desk in one place instead of clicking into each
 // job's per-job pipeline. Composes the same KanbanColumn / JobPipelineCard /
 // DnD wiring as the per-job board (JobPipelineKanban) — only the data source
-// (`/api/pipeline/all`) and per-entry job routing differ, both handled by
+// (`GET /api/pipeline` without a jobId) differs, handled by
 // useCrossJobPipeline. Self-gates on `canManageJobs` so the host page never
 // has to prop-drill a permission boolean.
 

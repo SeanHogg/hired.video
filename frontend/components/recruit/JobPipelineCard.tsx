@@ -30,8 +30,8 @@ import AssignActivityButton from "@/components/activities/AssignActivityButton";
 import { PitchSheetButton } from "@/components/pitch/PitchPlayer";
 
 /** Fire-and-forget touchpoint log — never blocks the click handler. */
-function logTouchpointSafe(jobId: string, entryId: string, type: "email" | "sms") {
-  void jobPipelineService.logTouchpoint(jobId, entryId, type).catch(() => {
+function logTouchpointSafe(entryId: string, type: "email" | "sms") {
+  void jobPipelineService.logTouchpoint(entryId, type).catch(() => {
     // Touchpoint capture is best-effort; UI click already happened.
   });
 }
@@ -100,7 +100,7 @@ export default function JobPipelineCard({
           {entry.candidateEmail ? (
             <a
               href={`mailto:${entry.candidateEmail}`}
-              onClick={() => logTouchpointSafe(entry.jobId, entry.id, "email")}
+              onClick={() => logTouchpointSafe(entry.id, "email")}
             >
               <Mail className="w-3.5 h-3.5" />
             </a>
@@ -119,7 +119,7 @@ export default function JobPipelineCard({
           {entry.candidatePhone ? (
             <a
               href={`sms:${entry.candidatePhone}`}
-              onClick={() => logTouchpointSafe(entry.jobId, entry.id, "sms")}
+              onClick={() => logTouchpointSafe(entry.id, "sms")}
             >
               <Phone className="w-3.5 h-3.5" />
             </a>

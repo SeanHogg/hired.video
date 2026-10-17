@@ -1,6 +1,6 @@
 /**
  * Create a résumé for a job from the person's own evidence — the use case
- * behind POST /api/resume-versions/from-job (/build "Create a new one for
+ * behind POST /api/resumes { source: "job" } (/build "Create a new one for
  * it").
  *
  *   1. Source = the master (or the résumé they picked). With
@@ -20,7 +20,7 @@
  * master (lineage.ts). Pure apart from the repo reads and the LLM port.
  */
 import { z } from "zod";
-import type { IResumeRepository } from "../../repositories/index.js";
+import type { IResumeOwnerReader } from "../../repositories/resumeRepository.js";
 import type { LLMClient } from "../adapters/llm-client.js";
 import { defineLenientIngest } from "../adapters/llm-client.js";
 import type { ParsedJob } from "../job/JobService.js";
@@ -227,7 +227,7 @@ export type FromJobOutcome =
 
 /** Run the use case. `source` is resolved by the caller (route). */
 export async function draftResumeFromJob(
-  repo: IResumeRepository,
+  repo: IResumeOwnerReader,
   llm: LLMClient,
   ownerId: string,
   args: { job: ParsedJob; sourceId: string; includeVersions: boolean },

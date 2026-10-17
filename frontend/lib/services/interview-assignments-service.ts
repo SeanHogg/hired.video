@@ -296,11 +296,8 @@ export async function scoreSingleAnswer(
 
 /** #2145 — re-run transcription for a video answer whose job failed.
  *  Resolves once the job is queued (the row is then `pending`). */
-export async function retranscribeAnswer(interviewId: string, responseId: string): Promise<void> {
-  await apiClient.post(
-    `/api/interview-assignments/${interviewId}/responses/${responseId}/retranscribe`,
-    {},
-  );
+export async function retranscribeAnswer(responseId: string): Promise<void> {
+  await apiClient.post(`/api/transcripts/${responseId}/retranscribe`, {});
 }
 
 export async function scoreAllAnswers(

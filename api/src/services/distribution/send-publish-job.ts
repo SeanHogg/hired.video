@@ -16,7 +16,7 @@
  * Also: `producedRecord`, the drainer's "did an earlier attempt already
  * post this?" check.
  */
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb, type Db } from "../../db/index.js";
 import { studioProjects } from "../../db/schema/resumes.js";
 import { videos } from "../../db/schema/videos.js";
@@ -76,7 +76,7 @@ async function loadProject(db: Db, projectId: string): Promise<JobProject> {
       slug: studioProjects.slug,
       isPublic: studioProjects.isPublic,
       videoId: studioProjects.videoId,
-      masterHash: sql<string | null>`${studioProjects.timelineSpec}->'_meta'->>'bakedHash'`,
+      masterHash: studioProjects.bakedHash,
       title: videos.title,
     })
     .from(studioProjects)

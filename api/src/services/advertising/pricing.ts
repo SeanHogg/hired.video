@@ -1,6 +1,6 @@
 /**
  * Boost pricing — the ONE function every boost write prices through
- * (POST /api/checkout {kind:"boost"}, POST /api/advertising/boosts).
+ * (POST /api/checkout {kind:"boost"} and {kind:"job_boost"}).
  *
  * #1764: the bid-auction vs flat-slot decision (D6) is the owner's and is
  * still open, so this ships FLAT pricing: the buyer's budget IS the charge,

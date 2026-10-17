@@ -25,7 +25,7 @@ describe("frontend ai-api-registry (compat shim)", () => {
       const api = getAPIById("resume-optimize");
       expect(api).toBeDefined();
       expect(api?.id).toBe("resume-optimize");
-      expect(api?.endpoint).toBe("/api/resumeoptimizer/optimize");
+      expect(api?.endpoint).toBe("/api/ai/tools/resume-optimize");
       expect(api?.method).toBe("POST");
     });
 
@@ -33,9 +33,9 @@ describe("frontend ai-api-registry (compat shim)", () => {
       expect(getAPIById("not-a-real-tool")).toBeUndefined();
     });
 
-    it("returns the salary-analyze tool with the corrected lowercase endpoint", () => {
+    it("returns the salary-analyze tool on the AI tool dispatcher", () => {
       const api = getAPIById("salary-analyze");
-      expect(api?.endpoint).toBe("/api/salaryanalyzer/analyze");
+      expect(api?.endpoint).toBe("/api/ai/tools/salary-analyze");
     });
 
     it("returns the resume-get tool with :id placeholder", () => {

@@ -99,7 +99,7 @@ export const EMBED_SURFACES: EmbedSurface[] = [
     scope: "people:strategy",
     description: "Company → team → individual OKRs and strategic objectives.",
     status: "planned",
-    note: "#1814 — extend performance_goals; net-new strategic_objectives/milestones.",
+    note: "#1814 — people_goals (performance_goals merged in 0634); net-new strategic_objectives/milestones.",
   },
   {
     key: "performance-reviews",
@@ -107,7 +107,7 @@ export const EMBED_SURFACES: EmbedSurface[] = [
     scope: "people:performance",
     description: "Review cycles, ratings, 360 feedback.",
     status: "planned",
-    note: "#1814 — segment-scope the existing performance_cycles/reviews.",
+    note: "#1814 — people_performance_reviews (performance_reviews merged in 0634); cycles via performance_cycles.",
   },
   {
     key: "check-ins",

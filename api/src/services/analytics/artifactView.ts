@@ -19,12 +19,12 @@
  * metric in the creator dashboard. The shared rule used to be
  * recordResumeView-only; lifting it here applies it uniformly.
  *
- * Dual-write: during the migration 0107 bake window, callers that
- * previously wrote to a per-entity table (resume_views, profile_views,
- * company_views, studio_video_heatmap) keep doing so via their existing
- * code paths. This helper writes to the new polymorphic artifact_views
- * table — the readers cut over first, then the legacy writers get
- * removed in a follow-up gap.
+ * The 0107 bake window is closed (W3-A 0580): resume_views, company_views,
+ * job_view_events, company_view_events and video_analytics were folded into
+ * artifact_views and archived (0585). Rows written here are `event_type`
+ * 'view'; the other streams are written by listingViewsRepository
+ * (listing_view) and videoAnalyticsRepository (studio playback events).
+ * Résumé views are written by ResumeRepository.insertView (same table).
  */
 
 import { getDb, schema } from "../../db/index.js";

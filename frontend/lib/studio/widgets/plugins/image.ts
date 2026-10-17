@@ -3,7 +3,7 @@
  *  `ctx.filter`) and a structured `grade` for the Safari < 18 pixel path. */
 import type { ImageWidgetParams, WidgetParams } from "@/lib/studio/editor-v2/canvas-state";
 import { filtersToCss, type VideoFilters } from "@/lib/studio/video-filters";
-import { stringOr } from "../frame";
+import { stringOr } from "@/lib/numeric";
 import { registerPlugin } from "../plugin";
 import { mediaPlaceholderOps } from "./media-placeholder";
 import { oneOf, optionalString, when } from "./shared";

@@ -93,7 +93,8 @@ export const candidateSubmissions = pgTable("candidate_submissions", {
   recruiterNotes: text("recruiter_notes"),
   proposedSalary: numeric("proposed_salary"),
   availableStartDate: timestamp("available_start_date", { withTimezone: true }),
-  status: varchar("status", { length: 50 }).default("Submitted").notNull(),
+  /** SUBMISSION_STATUSES (shared/statuses.ts); lowercase since migration 0620. */
+  status: varchar("status", { length: 50 }).default("submitted").notNull(),
   statusNotes: text("status_notes"),
   interviewDate: timestamp("interview_date", { withTimezone: true }),
   withdrawalReason: varchar("withdrawal_reason", { length: 255 }),
@@ -107,6 +108,7 @@ export const candidateSubmissions = pgTable("candidate_submissions", {
   index("idx_candidate_submissions_recruiter_submitted").on(t.recruiterId, t.submittedAt.desc().nullsFirst()),
   index("idx_candidate_submissions_job_status_submitted").on(t.jobId, t.status, t.submittedAt.desc().nullsFirst()).where(sql`job_id IS NOT NULL`),
   index("idx_candidate_submissions_candidate_id").on(t.candidateId),
+  check("candidate_submissions_status_check", sql`${t.status} IN ('submitted', 'reviewed', 'screening', 'interviewing', 'offer', 'placed', 'rejected', 'withdrawn')`),
 ]);
 
 export type CandidateSubmission = typeof candidateSubmissions.$inferSelect;
@@ -140,7 +142,8 @@ export const placements = pgTable("placements", {
   feeMode: varchar("fee_mode", { length: 8 }).default("percent").notNull(),
   feeFlatCents: integer("fee_flat_cents"),
   feePercentBps: integer("fee_percent_bps"),
-  commissionStatus: varchar("commission_status", { length: 50 }).default("Pending").notNull(),
+  /** COMMISSION_STATUSES (shared/statuses.ts); lowercase since migration 0620. */
+  commissionStatus: varchar("commission_status", { length: 50 }).default("pending").notNull(),
   commissionPaidDate: timestamp("commission_paid_date", { withTimezone: true }),
   paymentReference: varchar("payment_reference", { length: 255 }),
   guaranteePeriodDays: integer("guarantee_period_days"),
@@ -176,6 +179,7 @@ export const placements = pgTable("placements", {
   index("idx_placements_kind_status").on(t.placementKind, t.status),
   index("idx_placements_recruiter_created").on(t.recruiterId, t.createdAt.desc().nullsFirst()),
   check("placements_fee_mode_chk", sql`${t.feeMode} IN ('flat', 'percent')`),
+  check("placements_commission_status_check", sql`${t.commissionStatus} IN ('pending', 'invoiced', 'paid', 'cancelled')`),
   index("idx_placements_candidate_id").on(t.candidateId),
   index("idx_placements_company_id").on(t.companyId),
   index("idx_placements_submission_id").on(t.submissionId),
@@ -362,30 +366,7 @@ export type RecruiterAgentFollowup = typeof recruiterAgentFollowups.$inferSelect
 export type NewRecruiterAgentFollowup = typeof recruiterAgentFollowups.$inferInsert;
 
 // ─── ATS Integration connections ─────────────────────────────────────────────
-// Stores OAuth tokens / API keys for Greenhouse, Lever, Workday, etc.
-
-export const atsConnections = pgTable("ats_connections", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  companyId: uuid("company_id").notNull().references(() => companyProfiles.id, { onDelete: "cascade" }),
-  provider: varchar("provider", { length: 50 }).notNull(), // "greenhouse" | "lever" | "workday"
-  // API key or OAuth access token. Written encrypted to api_key_enc
-  // (services/crypto/credential-columns.ts); api_key is the legacy plaintext
-  // column, read only for rows not yet backfilled (0548/0549).
-  apiKey: text("api_key"),
-  apiKeyEnc: text("api_key_enc"),
-  webhookSecret: text("webhook_secret"),
-  // Provider-specific config (board token, subdomain, etc.)
-  config: jsonb("config").default({}).$type<Record<string, unknown>>(),
-  isActive: boolean("is_active").default(true).notNull(),
-  lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [
-  index("idx_ats_connections_company_id").on(t.companyId),
-]);
-
-export type AtsConnection = typeof atsConnections.$inferSelect;
-export type NewAtsConnection = typeof atsConnections.$inferInsert;
+// Moved to provider_connections (purpose "ats", W3-C migration 0600).
 
 // ─── Extracted Profiles (recruiter-private candidate extractions) ────────────
 // Stores structured data extracted from candidate profiles (LinkedIn, Indeed, etc.)
@@ -466,57 +447,6 @@ export const recruiterListMembers = pgTable(
 
 export type RecruiterListMember = typeof recruiterListMembers.$inferSelect;
 export type NewRecruiterListMember = typeof recruiterListMembers.$inferInsert;
-
-// ─── Recruiter Outreach Sequences (gap #1357) ────────────────────────────
-// Reusable, recruiter-authored outreach copy organised as ordered steps
-// (channel + delay + body). Candidates can be enrolled directly from the
-// Chrome extension without first running the sourcing agent — distinct
-// from `recruiterAgentFollowups`, which is agent-run-bound.
-
-export const recruiterOutreachSequences = pgTable("recruiter_outreach_sequences", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  recruiterId: uuid("recruiter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
-  steps: jsonb("steps").default([]).notNull().$type<Array<{
-    channel: "email" | "message" | "sms";
-    delayDays: number;
-    subject?: string;
-    body: string;
-    /** Opt this step into AI rewrite of the rendered body at send time
-     *  (services/outreach/personalize.ts). Defaults off. */
-    aiPersonalize?: boolean;
-  }>>(),
-  isActive: boolean("is_active").default(true).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [
-  index("recruiter_outreach_sequences_recruiter_idx").on(t.recruiterId),
-]);
-
-export type RecruiterOutreachSequence = typeof recruiterOutreachSequences.$inferSelect;
-export type NewRecruiterOutreachSequence = typeof recruiterOutreachSequences.$inferInsert;
-
-export const recruiterOutreachEnrollments = pgTable("recruiter_outreach_enrollments", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  sequenceId: uuid("sequence_id").notNull().references(() => recruiterOutreachSequences.id, { onDelete: "cascade" }),
-  recruiterId: uuid("recruiter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  talentPoolCandidateId: uuid("talent_pool_candidate_id").notNull().references(() => talentPoolCandidates.id, { onDelete: "cascade" }),
-  status: varchar("status", { length: 20 }).default("active").notNull(),
-  currentStep: integer("current_step").default(0).notNull(),
-  nextSendAt: timestamp("next_send_at", { withTimezone: true }),
-  enrolledAt: timestamp("enrolled_at", { withTimezone: true }).defaultNow().notNull(),
-  completedAt: timestamp("completed_at", { withTimezone: true }),
-  metadata: jsonb("metadata").default({}).notNull(),
-}, (t) => [
-  index("recruiter_outreach_enrollments_recruiter_idx").on(t.recruiterId),
-  index("recruiter_outreach_enrollments_due_idx").on(t.status, t.nextSendAt).where(sql`status = 'active'`),
-  index("idx_recruiter_outreach_enrollments_sequence_id").on(t.sequenceId),
-  index("idx_recruiter_outreach_enrollments_talent_pool_candidate_id").on(t.talentPoolCandidateId),
-]);
-
-export type RecruiterOutreachEnrollment = typeof recruiterOutreachEnrollments.$inferSelect;
-export type NewRecruiterOutreachEnrollment = typeof recruiterOutreachEnrollments.$inferInsert;
 
 // ─── Recruiter Match Scores (cached job ↔ candidate compatibility scores) ────
 // Stores the result of scoring a talent-pool candidate against a job.

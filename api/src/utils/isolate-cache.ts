@@ -13,7 +13,7 @@
  *     TTLs short (≤ 120s) for anything a user expects to see change.
  *
  * Use utils/edge-cache.ts (L1 + KV) only for low-cardinality, rarely
- * written keys (plan cache, public catalogs).
+ * written keys shared across users (public catalogs, taxonomies).
  */
 
 const MAX_ENTRIES = 5_000;

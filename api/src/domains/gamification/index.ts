@@ -23,7 +23,7 @@ import {
 import { RedemptionEngine, type RedemptionOutcome } from "./redemption-engine.js";
 import { buildTremendousClient } from "../../services/tremendous/client.js";
 import { NotificationService } from "../../services/notifications/notificationService.js";
-import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 import { getPublicBadgeCatalog } from "./badge-catalog.js";
 import { getCachedPointsSummary, invalidatePointsSummary } from "./summary-cache.js";
 
@@ -60,7 +60,8 @@ export class GamificationService {
       // path). Best-effort: any failure → empty signals (heuristics dormant).
       getExtraFraudSignals: async (userId) => {
         try {
-          return await getOrSetCached({
+          // Per-user → isolate-local (no KV write per miss on Workers Free).
+          return await getOrSetIsolateCached({
             key: `fraud-cluster:${userId}`,
             ttlSeconds: 3600,
             loader: async () => ({

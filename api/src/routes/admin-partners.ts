@@ -1,7 +1,8 @@
 /**
  * SuperAdmin partner administration — `/api/admin/partners/*`. This is where a
  * partner platform is provisioned and issued the system-to-system API key it
- * "requests". Gated by superAdminMiddleware (mounted after authMiddleware).
+ * "requests". Mounted by the admin composite (routes/admin/index.ts), which
+ * applies the SA guard.
  *
  *   GET    /                         — list partners
  *   POST   /                         — create a partner
@@ -15,7 +16,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import {
   createPartner,
   listPartners,
@@ -32,24 +32,16 @@ import {
 } from "../services/partner/keys.js";
 import { listConnectionsForPartner } from "../services/partner/connections.js";
 import { notifyOwnerApproved, notifyOwnerRejected } from "../services/partner/emails.js";
-import { getDb, schema } from "../db/index.js";
-import { eq } from "drizzle-orm";
+import { adminRepos } from "../repositories/admin/index.js";
 import { PARTNER_SCOPES, DEFAULT_PARTNER_SCOPES, type PartnerScope } from "../../../shared/partner.js";
 
 export const adminPartnerRoutes = new Hono<AppEnv>();
 
-adminPartnerRoutes.use("*", superAdminMiddleware);
-
 /** Look up a partner owner's email so approval/rejection notices reach them. */
 async function ownerEmail(ownerUserId: string | null): Promise<string | null> {
   if (!ownerUserId) return null;
-  const db = getDb();
-  const [u] = await db
-    .select({ email: schema.users.email })
-    .from(schema.users)
-    .where(eq(schema.users.id, ownerUserId))
-    .limit(1);
-  return u?.email ?? null;
+  const owner = await adminRepos().users.findById(ownerUserId);
+  return owner?.email ?? null;
 }
 
 adminPartnerRoutes.get("/", async (c) => {

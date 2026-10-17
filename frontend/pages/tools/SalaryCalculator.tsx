@@ -1,15 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ApiSuccessResponse } from "@shared/api";
 import { useTranslation } from "react-i18next";
-import {
-  Calculator,
-  Loader2,
-  DollarSign,
-  TrendingUp,
-  MapPin,
-  Briefcase,
-} from "lucide-react";
-import { toast } from "sonner";
+import { Calculator, Loader2, DollarSign } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,99 +13,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { ToolShell } from "@/components/tools/ToolShell";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { apiClient } from "@/lib/api-client";
+import { aiToolPath } from "@shared/ai-tools/tool-ids";
 import { INDUSTRIES, EDUCATION_LEVELS } from "@/lib/constants/industries";
-
-// API response types (matching backend SalaryAnalysisResult)
-interface SalaryRange {
-  min: number;
-  max: number;
-  percentile25: number;
-  percentile50: number;
-  percentile75: number;
-  percentile90: number;
-}
-
-interface LocationAdjustmentData {
-  factor: number;
-  description: string;
-}
-
-interface ExperienceImpact {
-  currentLevel: string;
-  salaryBoost: number;
-  nextMilestone: string;
-}
-
-interface IndustryComparisonData {
-  industryAverage: number;
-  comparison: string;
-  topPayingCompanies: string[];
-}
-
-interface SkillsPremium {
-  skill: string;
-  premium: number;
-  demand: string;
-}
-
-interface CareerGrowth {
-  nextRole: string;
-  timeframe: string;
-  salaryIncrease: number;
-}
-
-interface NegotiationRangeData {
-  conservative: number;
-  target: number;
-  aggressive: number;
-}
-
-interface MarketTrends {
-  trend: string;
-  growthRate: string;
-  outlook: string;
-}
-
-interface SalaryAnalysisResult {
-  averageSalary: number;
-  salaryRange: SalaryRange;
-  locationAdjustment: LocationAdjustmentData;
-  experienceImpact: ExperienceImpact;
-  industryComparison: IndustryComparisonData;
-  skillsPremium: SkillsPremium[];
-  careerGrowth: CareerGrowth;
-  negotiationRange: NegotiationRangeData;
-  marketTrends: MarketTrends;
-}
-
-// Legacy interface for UI display (will be computed from API response)
-interface SalaryData {
-  baseSalary: number;
-  lowRange: number;
-  highRange: number;
-  marketAverage: number;
-  percentile25: number;
-  percentile75: number;
-  totalCompensation: number;
-  locationAdjustment: number;
-  experienceAdjustment: number;
-  industryComparison: {
-    industry: string;
-    averageSalary: number;
-    difference: number;
-  }[];
-  // Extended data from API
-  careerGrowth?: CareerGrowth;
-  negotiationRange?: NegotiationRangeData;
-  marketTrends?: MarketTrends;
-  skillsPremium?: SkillsPremium[];
-}
+import { SalaryResults } from "@/components/tools/salary/SalaryResults";
+import { toSalaryData, type SalaryAnalysisResult, type SalaryData } from "@/components/tools/salary/salary-data";
 
 export default function SalaryCalculator() {
   const { t } = useTranslation();
@@ -175,106 +83,20 @@ export default function SalaryCalculator() {
     setSalaryData(null);
 
     try {
-      // Call the dedicated Salary Calculator API endpoint
-      const response = await apiClient.post("/api/salaryanalyzer/analyze", {
+      // The salary-analyze AI tool
+      const response = await apiClient.post(aiToolPath("salary-analyze"), {
         jobTitle: jobTitle.trim(),
         location: location_.trim(),
         yearsExperience: experience[0],
         industry: industry,
       });
 
-      // apiClient unwraps the shared ApiResponse envelope (@shared/api) and
-      // throws on `success: false`; older API versions nest the result once
-      // more under `data`.
-      const apiResponse = response.data as SalaryAnalysisResult | ApiSuccessResponse<SalaryAnalysisResult>;
-
-      // Get the result data — the raw shape varies between API versions so
-      // we treat it as `any` and pull known fields defensively.
-      const raw: any = 'data' in apiResponse && apiResponse.data
-        ? apiResponse.data
-        : apiResponse;
-
-      // The API may return the "legacy" shape (averageSalary, salaryRange.percentile50, …)
-      // or the current shape (medianSalary, estimatedSalary, percentiles.p25, …).
-      // Normalise both into the values we need.
-      const baseSalary: number =
-        raw.estimatedSalary || raw.medianSalary || raw.averageSalary ||
-        raw.percentiles?.p50 || raw.salaryRange?.percentile50 || 0;
-
-      if (!baseSalary && !raw.salaryRange) {
-        throw new Error(t("errors.invalidSalaryData"));
-      }
-
-      // Location adjustment can be a plain number (1 = no change) or an object { factor }
-      const locationFactor: number =
-        typeof raw.locationAdjustment === "number"
-          ? raw.locationAdjustment
-          : raw.locationAdjustment?.factor ?? 1;
-      const locationAdjustmentPercent = Math.round((locationFactor - 1) * 100);
-
-      const experienceBoost = raw.experienceImpact?.salaryBoost || 0;
-      const experienceAdjustmentPercent = baseSalary > 0
-        ? Math.round((experienceBoost / baseSalary) * 100)
-        : experience[0] * 5;
-
-      // Percentiles — may live in `percentiles` (p25, p50, …) or in `salaryRange`
-      const p25 = raw.percentiles?.p25 ?? raw.salaryRange?.percentile25 ?? Math.round(baseSalary * 0.85);
-      const p75 = raw.percentiles?.p75 ?? raw.salaryRange?.percentile75 ?? Math.round(baseSalary * 1.2);
-
-      // Create industry comparison from API data
-      const industryComparison = [
-        {
-          industry: "Technology",
-          averageSalary: Math.round(baseSalary * 1.1),
-          difference: 10,
-        },
-        {
-          industry: "Finance",
-          averageSalary: Math.round(baseSalary * 1.05),
-          difference: 5,
-        },
-        {
-          industry: "Healthcare",
-          averageSalary: Math.round(baseSalary * 0.95),
-          difference: -5,
-        },
-        {
-          industry: "Education",
-          averageSalary: Math.round(baseSalary * 0.8),
-          difference: -20,
-        },
-      ];
-
-      // If we have industry comparison data from the API, adjust values
-      const industryAvg = raw.industryComparison?.industryAverage;
-      if (industryAvg) {
-        industryComparison.forEach((item) => {
-          if (item.industry === industry) {
-            item.averageSalary = industryAvg;
-            item.difference = baseSalary > 0
-              ? Math.round(((industryAvg - baseSalary) / baseSalary) * 100)
-              : 0;
-          }
-        });
-      }
-
-      const salaryDataResult: SalaryData = {
-        baseSalary,
-        lowRange: raw.salaryRange?.min || Math.round(baseSalary * 0.8),
-        highRange: raw.salaryRange?.max || Math.round(baseSalary * 1.3),
-        marketAverage: baseSalary,
-        percentile25: p25,
-        percentile75: p75,
-        totalCompensation: Math.round(baseSalary * 1.25),
-        locationAdjustment: locationAdjustmentPercent,
-        experienceAdjustment: experienceAdjustmentPercent,
-        industryComparison,
-        // Extended data (may not be present in all API versions)
-        careerGrowth: raw.careerGrowth,
-        negotiationRange: raw.negotiationRange,
-        marketTrends: raw.marketTrends,
-        skillsPremium: raw.skillsPremium,
-      };
+      const salaryDataResult = toSalaryData(
+        response.data as SalaryAnalysisResult | ApiSuccessResponse<SalaryAnalysisResult>,
+        industry,
+        experience[0],
+      );
+      if (!salaryDataResult) throw new Error(t("errors.invalidSalaryData"));
 
       setSalaryData(salaryDataResult);
       clear();
@@ -296,15 +118,6 @@ export default function SalaryCalculator() {
     setCompany("");
     setSalaryData(null);
     setError(null);
-  };
-
-  const formatSalary = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
   };
 
   return (
@@ -475,192 +288,7 @@ export default function SalaryCalculator() {
               {/* Right Column - Results */}
               <div className="space-y-6">
                 {salaryData && (
-                  <>
-                    {/* Main Salary Display */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <DollarSign className="h-5 w-5" />
-                          {t("headings.aiSalaryAnalysis")}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-center p-6 rounded-lg mb-4 bg-accent/50">
-                          <div className="text-4xl font-bold text-brand-green mb-2">
-                            {formatSalary(salaryData.baseSalary)}
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {t("labels.estimatedAnnualSalary")}
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div className="text-center p-3 bg-muted rounded-lg">
-                            <div className="font-semibold">
-                              {formatSalary(salaryData.lowRange)}
-                            </div>
-                            <div className="text-muted-foreground">
-                              {t("labels.lowRange")}
-                            </div>
-                          </div>
-                          <div className="text-center p-3 bg-muted rounded-lg">
-                            <div className="font-semibold">
-                              {formatSalary(salaryData.highRange)}
-                            </div>
-                            <div className="text-muted-foreground">
-                              {t("labels.highRange")}
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Detailed Breakdown */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <TrendingUp className="h-5 w-5" />
-                          {t("headings.salaryBreakdown")}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <span>{t("labels.marketAverage")}</span>
-                          <span className="font-semibold">
-                            {formatSalary(salaryData.marketAverage)}
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between items-center">
-                          <span>{t("labels.percentile25")}</span>
-                          <span className="font-semibold">
-                            {formatSalary(salaryData.percentile25)}
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between items-center">
-                          <span>{t("labels.percentile75")}</span>
-                          <span className="font-semibold">
-                            {formatSalary(salaryData.percentile75)}
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between items-center border-t pt-3">
-                          <span>{t("labels.totalCompensation")}</span>
-                          <span className="font-semibold text-brand-green">
-                            {formatSalary(salaryData.totalCompensation)}
-                          </span>
-                        </div>
-
-                        <div className="text-xs text-muted-foreground">
-                          {t("messages.totalCompensationNote")}
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Adjustments */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <MapPin className="h-5 w-5" />
-                          {t("headings.salaryAdjustments")}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4" />
-                            {t("labels.locationAdjustment")}
-                          </span>
-                          <Badge
-                            variant={
-                              salaryData.locationAdjustment >= 0
-                                ? "default"
-                                : "secondary"
-                            }
-                          >
-                            {salaryData.locationAdjustment >= 0 ? "+" : ""}
-                            {salaryData.locationAdjustment}%
-                          </Badge>
-                        </div>
-
-                        <div className="flex justify-between items-center">
-                          <span className="flex items-center gap-2">
-                            <Briefcase className="h-4 w-4" />
-                            {t("labels.experienceAdjustment")}
-                          </span>
-                          <Badge variant="default">
-                            +{salaryData.experienceAdjustment}%
-                          </Badge>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Industry Comparison */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Briefcase className="h-5 w-5" />
-                          {t("headings.industryComparison")}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        {salaryData.industryComparison.map((comp, index) => (
-                          <div
-                            key={index}
-                            className="flex justify-between items-center"
-                          >
-                            <span>{comp.industry}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold">
-                                {formatSalary(comp.averageSalary)}
-                              </span>
-                              <Badge
-                                variant={
-                                  comp.difference >= 0 ? "default" : "secondary"
-                                }
-                                className={
-                                  comp.difference >= 0
-                                    ? "bg-brand-green/15 text-brand-green-text"
-                                    : "bg-destructive/10 text-destructive"
-                                }
-                              >
-                                {comp.difference >= 0 ? "+" : ""}
-                                {comp.difference}%
-                              </Badge>
-                            </div>
-                          </div>
-                        ))}
-                      </CardContent>
-                    </Card>
-
-                    <div className="flex gap-2">
-                      <Button variant="outline" onClick={resetCalculator}>
-                        {t("actions.calculateAnother")}
-                      </Button>
-                      <Button
-                        onClick={async () => {
-                          const report = t("messages.salary.reportBody", {
-                            jobTitle,
-                            location: location_,
-                            estimated: formatSalary(salaryData.baseSalary),
-                            low: formatSalary(salaryData.lowRange),
-                            high: formatSalary(salaryData.highRange),
-                            total: formatSalary(salaryData.totalCompensation),
-                          });
-                          try {
-                            await navigator.clipboard.writeText(report);
-                            toast.success(t("messages.salary.reportCopied"));
-                          } catch {
-                            toast.error(t("errors.couldNotCopyToClipboard"));
-                          }
-                        }}
-                        variant="outline"
-                      >
-                        {t("actions.copyReport")}
-                      </Button>
-                    </div>
-                  </>
+                  <SalaryResults salaryData={salaryData} jobTitle={jobTitle} location={location_} onReset={resetCalculator} />
                 )}
 
                 {!salaryData && !isCalculating && (

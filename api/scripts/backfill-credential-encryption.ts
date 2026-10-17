@@ -1,5 +1,6 @@
 /**
- * One-off backfill for the credential encryption rollout (migration 0548).
+ * One-off backfill for the credential encryption rollout (migrations 0548 +
+ * 0577).
  *
  * For every legacy plaintext credential column, encrypts each remaining value
  * into its `*_enc` sibling and NULLs the plaintext in the same UPDATE. Rows are
@@ -12,7 +13,8 @@
  *
  * CREDENTIALS_KMS_KEY MUST be the exact value the Worker has (a ciphertext
  * only decrypts under the key that wrote it). After this reports 0 remaining,
- * approve 0549_clear_plaintext_credentials.sql.
+ * approve 0549_clear_plaintext_credentials.sql and
+ * 0578_clear_plaintext_ats_webhook_secret.sql.
  */
 import { neon } from "@neondatabase/serverless";
 import { fileURLToPath } from "node:url";
@@ -20,9 +22,10 @@ import { argv } from "node:process";
 import { sealCredential, CREDENTIALS_KEY_ENV } from "../src/services/crypto/credential-columns.js";
 import { withRetry } from "./run-sql-migrations.mjs";
 
-/** Every (table, plaintext column, encrypted column) pair from 0548. */
+/** Every (table, plaintext column, encrypted column) pair from 0548 + 0577. */
 export const CREDENTIAL_COLUMNS: ReadonlyArray<{ table: string; plain: string; enc: string }> = [
   { table: "ats_connections", plain: "api_key", enc: "api_key_enc" },
+  { table: "ats_connections", plain: "webhook_secret", enc: "webhook_secret_enc" },
   { table: "calendar_connections", plain: "access_token", enc: "access_token_enc" },
   { table: "calendar_connections", plain: "refresh_token", enc: "refresh_token_enc" },
   { table: "lms_connectors", plain: "access_token", enc: "access_token_enc" },

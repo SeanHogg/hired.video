@@ -17,7 +17,7 @@ import assert from "node:assert/strict";
 
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
 import { validateSignupRequest, noopBreachCheck } from "../auth/signupGuard.js";
-import type { CaptchaPort } from "../auth/AuthService.js";
+import type { CaptchaPort } from "../auth/authPorts.js";
 
 function makeDb() {
   return buildFakeDb({ bot_block_events: [] as any });

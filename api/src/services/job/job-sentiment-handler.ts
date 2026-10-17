@@ -1,10 +1,10 @@
 /**
- * Job sentiment scoring handler — mirror of `handleSentimentPrediction`
- * in services/resume/ResumeService.ts, but for job artifacts.
+ * Job sentiment scoring handler — mirror of the résumé branch of the `sentiment` AI tool
+ * (services/ai-tools), for job artifacts.
  *
  * Persistence rule (matches the resume side, see persist-scores.ts):
  *   • Pasted job-description text path: scored upstream by
- *     `/sentiment/sentimentprediction` (raw-text route). No artifact
+ *     the `sentiment` AI tool with `{ text }`. No artifact
  *     row is touched; the score lives only in tool-run history.
  *   • Saved-job path: this handler. Loads the row, renders text via
  *     `jobRowToLLMText` (shared with the matching tools so a job
@@ -19,11 +19,11 @@
 import { DomainError } from "../../domains/errors.js";
 import { scoreSentiment } from "../../../../shared/sentiment.js";
 import { jobRowToLLMText } from "./match-handlers.js";
-import type { IJobsRepository } from "../../repositories/jobsRepository.js";
+import type { IJobReader, IJobWriter } from "../../repositories/jobsRepository.js";
 import { logger } from "../../lib/logger.js";
 
 export interface JobSentimentDeps {
-  jobs: IJobsRepository;
+  jobs: IJobReader & IJobWriter;
 }
 
 export async function handleJobSentimentPrediction(

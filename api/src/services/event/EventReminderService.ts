@@ -15,8 +15,8 @@ import {
   reminderSentKey,
   type EventReminderSentInsert,
 } from "../../repositories/eventsRepository.js";
-import type { NotificationInsert } from "../../repositories/notificationsRepository.js";
 import { chunk } from "../../utils/chunk.js";
+import { emitNotification } from "../notifications/notificationService.js";
 
 export type ReminderDeps = Pick<ApiDeps, "repos" | "now">;
 
@@ -73,10 +73,12 @@ export class EventReminderService {
       eventsRepo.remindersAlreadySent(allEventIds, [...REMINDER_KEYS]),
     ]);
 
-    const notifications: NotificationInsert[] = [];
+    // One emit per (event, key) — every recipient shares the same copy.
+    const emits: Array<{ eventId: string; key: string; title: string; message: string; recipientIds: string[] }> = [];
     const sentRows: EventReminderSentInsert[] = [];
     for (const { key, events } of perKey) {
       for (const ev of events) {
+        const recipientIds: string[] = [];
         for (const userId of attendeesByEvent.get(ev.id) ?? []) {
           const tupleKey = reminderSentKey(ev.id, userId, key);
           if (alreadySent.has(tupleKey)) {
@@ -85,24 +87,38 @@ export class EventReminderService {
           }
           // Guard against the same tuple twice in one run (overlapping windows).
           alreadySent.add(tupleKey);
-          notifications.push({
-            userId,
-            type: `event_reminder_${key}`,
-            title: this.reminderTitle(key, ev.title),
-            message: this.reminderMessage(key, ev.title, ev.startAt),
-            data: { eventId: ev.id, reminderKey: key },
-          } as NotificationInsert);
+          recipientIds.push(userId);
           sentRows.push({ eventId: ev.id, userId, reminderKey: key });
           sent++;
+        }
+        if (recipientIds.length > 0) {
+          emits.push({
+            eventId: ev.id,
+            key,
+            title: this.reminderTitle(key, ev.title),
+            message: this.reminderMessage(key, ev.title, ev.startAt),
+            recipientIds,
+          });
         }
       }
     }
 
-    // 4) Notify, THEN record (same ordering as before: a failed notify
-    //    leaves nothing recorded so the next tick retries). One multi-row
-    //    insert each.
-    for (const part of chunk(notifications, 1000)) {
-      await this.deps.repos.notifications.insertNotifications(part);
+    // 4) Notify through the one dispatcher (bell row + preference-gated
+    //    push), THEN record (same ordering as before: a failed notify
+    //    leaves nothing recorded so the next tick retries).
+    for (const e of emits) {
+      for (const part of chunk(e.recipientIds, 1000)) {
+        await emitNotification(this.deps, {
+          recipientIds: part,
+          type: `event_reminder_${e.key}`,
+          actor: null,
+          title: e.title,
+          message: e.message,
+          target: { id: e.eventId, type: "event" },
+          url: `/events/${e.eventId}`,
+          extraData: { eventId: e.eventId, reminderKey: e.key },
+        });
+      }
     }
     for (const part of chunk(sentRows, 1000)) {
       await eventsRepo.recordRemindersSent(part);

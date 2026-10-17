@@ -92,7 +92,7 @@ describe("applyDrop", () => {
 });
 
 describe("jobTextFromSummary", () => {
-  // Shaped like a real /api/Job/Extract row (optional fields missing).
+  // Shaped like a real /api/jobs/extract row (optional fields missing).
   const job = {
     title: "Chief Information Officer",
     company: "Macomb Community College",

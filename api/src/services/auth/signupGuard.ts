@@ -26,7 +26,7 @@ import { isDisposableEmail } from "./disposableEmail.js";
 import { verifyMxRecord } from "./mxCheck.js";
 import { isBreachedPassword } from "./breachCheck.js";
 import { canCreateAccount, isSanctioned } from "./geo.js";
-import type { CaptchaPort } from "./AuthService.js";
+import type { CaptchaPort } from "./authPorts.js";
 
 // External-call ports — injectable so tests can stub MX/HIBP without
 // hitting DoH or HIBP. Production paths use the real implementations

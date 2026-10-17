@@ -3,9 +3,9 @@
  * added to close the fake-fields bugs:
  *
  *   • computeViewerExtras      — per-resume join against watched_resumes
- *                                 and aggregation over resume_views.
+ *                                 and aggregation over artifact_views.
  *   • computeViewerExtrasBatch — batched variant for list handlers.
- *   • recordResumeView         — inserts into resume_views, no-ops for owner.
+ *   • recordResumeView         — inserts into artifact_views, no-ops for owner.
  *   • persistSentimentScore    — writes the latest score to resume_information.
  *   • hashClientIp             — deterministic per-day hash.
  *
@@ -26,7 +26,7 @@ import {
   recordResumeView,
   persistSentimentScore,
   EMPTY_VIEWER_EXTRAS,
-} from "../resumes.js";
+} from "../../services/resume/view.js";
 import { hashClientIp } from "../../utils/crypto.js";
 import { ResumeRepository } from "../../repositories/resumeRepository.js";
 
@@ -60,7 +60,7 @@ interface StubCall {
 
 function makeFakeDb(opts: {
   watchedRows?: unknown[];
-  viewCountRows?: Array<{ resumeId: string; c: number }> | Array<{ c: number }>;
+  viewCountRows?: Array<{ artifactId: string; c: number }> | Array<{ c: number }>;
 } = {}) {
   const calls: StubCall[] = [];
   const db: any = {
@@ -77,7 +77,7 @@ function makeFakeDb(opts: {
                 limit(n: number) {
                   call.limit = n;
                   // Tables: watched_resumes → opts.watchedRows
-                  // Tables: resume_views → opts.viewCountRows[0]
+                  // Tables: artifact_views → opts.viewCountRows[0]
                   if (isWatchedTable(table)) return Promise.resolve(opts.watchedRows ?? []);
                   if (isViewsTable(table)) return Promise.resolve(opts.viewCountRows ?? [{ c: 0 }]);
                   return Promise.resolve([]);
@@ -169,11 +169,15 @@ describe("recordResumeView", () => {
     const inserts = calls.filter((c) => c.kind === "insert");
     assert.equal(inserts.length, 1);
     assert.deepEqual(inserts[0].values, {
-      resumeId: "resume-1",
+      artifactKind: "resume",
+      artifactId: "resume-1",
+      ownerUserId: "owner-1",
       viewerId: "someone-else",
       ipHash: "abc123",
+      ipCountry: null,
       referrer: "https://example.com",
       userAgent: "TestAgent/1.0",
+      engagementUnit: "%",
     });
   });
 

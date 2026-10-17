@@ -2,8 +2,9 @@
  * ResumeRepository — the ONLY place Drizzle talks to the resume tables.
  *
  * Layering rule: Routes → Services → Repository. Nothing outside this
- * file should import `schema.resumeInformation`, `schema.watchedResumes`,
- * or `schema.resumeViews` for reads/writes. Services call these methods;
+ * file should import `schema.resumeInformation` or `schema.watchedResumes`
+ * for reads/writes (résumé views live in artifact_views — see
+ * artifactViewStreams.ts). Services call these methods;
  * the repo has zero business logic, zero validation — it is a typed
  * Drizzle wrapper and nothing more.
  *
@@ -26,8 +27,9 @@
 import { and, asc, desc, eq, gte, ilike, inArray, lt, ne, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
 import { isUuid } from "../../../shared/value-types.js";
+import { countServerRecordedViews, countServerRecordedViewsBulk } from "./artifactViewStreams.js";
 
-const { resumeInformation, watchedResumes, resumeViews } = schema;
+const { resumeInformation, watchedResumes, artifactViews } = schema;
 
 // Drizzle handle. Typed `any` because the fake-db harness implements a
 // minimal shim, not the full `ReturnType<typeof getDb>` surface; the
@@ -57,6 +59,8 @@ export interface ResumePatch {
   metaResumeId?: string | null;
   /** Written only by services/resume/lineage.ts (see schema). */
   masterSyncedAt?: Date | null;
+  /** Soft-archive (#154) — set by the PATCH state flip. */
+  archivedAt?: Date | null;
 }
 
 export interface PaginationOptions {
@@ -66,29 +70,36 @@ export interface PaginationOptions {
 
 // ─── Repository interface (DIP) ───────────────────────────────────────────────
 
-/** Public surface of `ResumeRepository`. Services depend on this interface,
- *  not the concrete class, so production code can inject the live Drizzle-
- *  backed implementation while tests can pass a hand-rolled mock that
- *  implements only the methods the test exercises (ISP). */
-export interface IResumeRepository {
-  // reads
-  findByIdOrSlug(idOrSlug: string): Promise<ResumeRow | null>;
-  findById(id: string): Promise<ResumeRow | null>;
+/** Owner-scoped lineage reads (master / versions / children). */
+export interface IResumeOwnerReader {
   findByIdForOwner(id: string, ownerId: string): Promise<ResumeRow | null>;
   findAllForOwner(ownerId: string, opts?: { includeArchived?: boolean }): Promise<ResumeRow[]>;
   findChildrenForOwner(parentId: string, ownerId: string): Promise<ResumeRow[]>;
   /** The owner's ★ master (one per owner), or null. */
   findMasterForOwner(ownerId: string): Promise<ResumeRow | null>;
   countChildrenForOwner(parentId: string, ownerId: string): Promise<number>;
+}
+
+/** Unscoped / public reads (by id or slug, public listing + search). */
+export interface IResumePublicReader {
+  findByIdOrSlug(idOrSlug: string): Promise<ResumeRow | null>;
+  findById(id: string): Promise<ResumeRow | null>;
   findBySlug(slug: string, excludeId?: string | null): Promise<ResumeRow | null>;
   findPublicPaginated(opts?: PaginationOptions): Promise<ResumeRow[]>;
   searchPublicByTitle(term: string, limit?: number): Promise<ResumeRow[]>;
+}
+
+/** Aggregate counts (admin metrics, per-owner tallies). */
+export interface IResumeStatsReader {
   countAll(): Promise<number>;
   countCreatedSince(since: Date): Promise<number>;
   countCreatedInRange(from: Date, to: Date): Promise<number>;
   countByOwner(ownerId: string): Promise<number>;
   countByOwnerBulk(userIds: string[]): Promise<Map<string, number>>;
-  // writes
+}
+
+/** Owner-scoped writes. */
+export interface IResumeWriter {
   insertOne(input: ResumeInsert): Promise<ResumeRow>;
   updateByIdForOwner(
     id: string,
@@ -105,22 +116,43 @@ export interface IResumeRepository {
   clearSingletonFlagForOwner(ownerId: string, field: "isMaster" | "isActive"): Promise<void>;
   clearParentIdForChildren(parentId: string, ownerId: string): Promise<void>;
   deleteByIdForOwner(id: string, ownerId: string): Promise<boolean>;
-  // watched
+}
+
+/** Viewer watch-list. */
+export interface IResumeWatchRepository {
   hasWatched(viewerId: string, resumeId: string): Promise<boolean>;
   addWatchIfMissing(viewerId: string, resumeId: string): Promise<void>;
   removeWatch(viewerId: string, resumeId: string): Promise<void>;
   watchedIdsForViewer(viewerId: string, resumeIds: string[]): Promise<Set<string>>;
-  // views
+}
+
+/** View tracking (artifact_views, kind 'resume'). */
+export interface IResumeViewRepository {
   countViews(resumeId: string): Promise<number>;
   countViewsBulk(resumeIds: string[]): Promise<Map<string, number>>;
   insertView(row: {
     resumeId: string;
+    ownerUserId: string | null;
     viewerId: string | null;
     ipHash?: string | null;
+    ipCountry?: string | null;
     referrer?: string | null;
     userAgent?: string | null;
   }): Promise<void>;
 }
+
+/** Public surface of `ResumeRepository`. Services depend on this interface
+ *  (or the narrower role interfaces above), not the concrete class, so
+ *  production code can inject the live Drizzle-backed implementation while
+ *  tests can pass a hand-rolled mock that implements only the methods the
+ *  test exercises (ISP). */
+export interface IResumeRepository
+  extends IResumeOwnerReader,
+    IResumePublicReader,
+    IResumeStatsReader,
+    IResumeWriter,
+    IResumeWatchRepository,
+    IResumeViewRepository {}
 
 // ─── Repository ───────────────────────────────────────────────────────────────
 
@@ -512,45 +544,39 @@ export class ResumeRepository implements IResumeRepository {
 
   // ── Resume views ───────────────────────────────────────────────────────────
 
-  async countViews(resumeId: string): Promise<number> {
-    const [row] = await this.db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(resumeViews)
-      .where(eq(resumeViews.resumeId, resumeId));
-    return Number(row?.c ?? 0);
+  // Résumé views are the server-recorded 'view' rows of artifact_views
+  // (kind 'resume'); resume_views was folded in by W3-A 0580.
+
+  countViews(resumeId: string): Promise<number> {
+    return countServerRecordedViews(this.db, "resume", resumeId);
   }
 
-  async countViewsBulk(resumeIds: string[]): Promise<Map<string, number>> {
-    if (resumeIds.length === 0) return new Map();
-    const rows = await this.db
-      .select({
-        resumeId: resumeViews.resumeId,
-        c: sql<number>`count(*)::int`,
-      })
-      .from(resumeViews)
-      .where(inArray(resumeViews.resumeId, resumeIds))
-      .groupBy(resumeViews.resumeId);
-    return new Map(
-      (rows as Array<{ resumeId: string; c: number }>).map((r) => [r.resumeId, Number(r.c)]),
-    );
+  countViewsBulk(resumeIds: string[]): Promise<Map<string, number>> {
+    return countServerRecordedViewsBulk(this.db, "resume", resumeIds);
   }
 
-  /** Log a single view. Callers must skip owner self-views (see the
-   *  service layer's `recordResumeView`) — the repo writes whatever it's
-   *  told. */
+  /** Log a single server-recorded view (engagement NULL). Callers must skip
+   *  owner self-views (see the service layer's `recordResumeView`) — the
+   *  repo writes whatever it's told. */
   async insertView(row: {
     resumeId: string;
+    ownerUserId: string | null;
     viewerId: string | null;
     ipHash?: string | null;
+    ipCountry?: string | null;
     referrer?: string | null;
     userAgent?: string | null;
   }): Promise<void> {
-    await this.db.insert(resumeViews).values({
-      resumeId: row.resumeId,
+    await this.db.insert(artifactViews).values({
+      artifactKind: "resume",
+      artifactId: row.resumeId,
+      ownerUserId: row.ownerUserId,
       viewerId: row.viewerId,
       ipHash: row.ipHash ?? null,
+      ipCountry: row.ipCountry ?? null,
       referrer: row.referrer ?? null,
       userAgent: row.userAgent ?? null,
-    } as any);
+      engagementUnit: "%",
+    });
   }
 }

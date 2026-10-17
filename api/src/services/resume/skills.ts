@@ -1,5 +1,5 @@
 // skill-extraction.ts — Shared skill extraction logic, consumed by the
-// /api/skillextractor route AND the resume parse pipeline. Produces a
+// `skill-extract` AI tool AND the resume parse pipeline. Produces a
 // deduplicated, categorised skill list from a job description or resume.
 //
 // The 2026-05-02 upgrade asks the LLM for three additional fields on

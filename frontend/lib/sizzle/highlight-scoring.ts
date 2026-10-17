@@ -1,3 +1,4 @@
+import { clamp01 } from "@/lib/numeric";
 /**
  * Highlight scoring — picks the best moments inside source clips so
  * the sizzle builder can favour them when filling the timeline.
@@ -130,6 +131,3 @@ function waitForSeek(video: HTMLVideoElement): Promise<void> {
   });
 }
 
-function clamp01(v: number): number {
-  return Math.max(0, Math.min(1, v));
-}

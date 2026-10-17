@@ -45,6 +45,7 @@ import {
   type WidgetParams,
   type WidgetPosition,
 } from "./canvas-state";
+import { clamp01 } from "@/lib/numeric";
 
 const RESOLUTION_TO_WH: Record<string, { width: number; height: number }> = {
   "720p": { width: 1280, height: 720 },
@@ -619,6 +620,3 @@ function positionFromImagePosition(
   }
 }
 
-function clamp01(v: number): number {
-  return Math.max(0, Math.min(1, v));
-}

@@ -1,6 +1,6 @@
 /**
  * Social publishing connection layer — client. Wraps /api/social/* (Lane B +
- * discovery) and /api/admin/social/* (SuperAdmin managed brand accounts).
+ * discovery) and /api/social/*?lane=managed (SuperAdmin managed brand accounts).
  * Video posting itself goes through studioService.publishToSocial; this
  * covers the three connection layers (PRD §5.0).
  */
@@ -29,7 +29,7 @@ export interface UserConnection {
   accessTokenExpiresAt: string | null;
 }
 
-/** A platform row from GET /api/admin/social/managed (SA status board). */
+/** A platform row from GET /api/social/platforms?lane=managed (SA status board). */
 export interface ManagedPlatformStatus extends SocialPlatformMeta {
   configured: boolean;            // layer 1 — developer app secret present
   managed: ManagedLaneState;      // resolved lane-A state
@@ -63,16 +63,16 @@ export const socialService = {
 
   // ── Lane A (SuperAdmin managed brand accounts) ────────────────────────
   async listManaged(): Promise<ManagedPlatformStatus[]> {
-    const res = await apiClient.get<{ platforms: ManagedPlatformStatus[] }>("/api/admin/social/managed");
+    const res = await apiClient.get<{ platforms: ManagedPlatformStatus[] }>("/api/social/platforms?lane=managed");
     return res.data?.platforms ?? [];
   },
 
   async getManagedAuthUrl(platform: SocialPlatform): Promise<string> {
-    const res = await apiClient.get<{ url: string }>(`/api/admin/social/${platform}/auth-url`);
+    const res = await apiClient.get<{ url: string }>(`/api/social/${platform}/auth-url?lane=managed`);
     return res.data.url;
   },
 
   async disconnectManaged(platform: SocialPlatform): Promise<void> {
-    await apiClient.post(`/api/admin/social/${platform}/disconnect`, {});
+    await apiClient.post(`/api/social/${platform}/disconnect?lane=managed`, {});
   },
 };

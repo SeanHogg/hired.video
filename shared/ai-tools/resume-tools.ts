@@ -1,23 +1,23 @@
+import { aiToolPath } from "./tool-ids.js";
 import type { AIToolDef } from "./types.js";
 
 /** Resume tools — read, optimize, score, save.
  *
- * Endpoint paths corrected from the legacy frontend registry, where
- * they referenced retired PascalCase routes that no longer exist:
+ * AI tools (optimize, score) go through the one dispatcher
+ * `POST /api/ai/tools/:toolId` — the URL is always built with
+ * `aiToolPath(id)`. Résumé CRUD lives on the plural `/api/resumes`
+ * resource (the singular `/api/resume` alias is gone):
  *
- *   `/api/Resume/{id}`           → `/api/resume/:id`
- *   `/api/Resume/user/{userId}`  → `/api/resume/withownership` (the
- *                                  current "list mine" endpoint;
- *                                  see resumes.ts:819)
- *   `/api/Resume/Save`           → `/api/resume/save`
- *   `/api/ResumeOptimizer/...`   → `/api/resumeoptimizer/...`
- *   `/api/ResumeScorer/...`      → `/api/resumescorer/...`
+ *   get       → `GET  /api/resumes/:id`
+ *   list mine → `GET  /api/resumes?owner=me&include=ownership`
+ *   save      → `POST /api/resumes` with `{ source: "blank", content, title? }`
+ *   roast     → `POST /api/resumes/roast`
  */
 export const resumeOptimize: AIToolDef = {
   id: "resume-optimize",
   description:
     "Optimize a resume with comprehensive analysis and ATS recommendations. Returns scored breakdown + prioritized improvements.",
-  endpoint: "/api/resumeoptimizer/optimize",
+  endpoint: aiToolPath("resume-optimize"),
   method: "POST",
   requiresAuth: true,
   useCase: "resume_optimize",
@@ -40,7 +40,7 @@ export const resumeScore: AIToolDef = {
   id: "resume-score",
   description:
     "Comprehensive resume scoring across ATS, content, keyword, format, and impact dimensions. Returns letter grade + strengths + prioritized recommendations.",
-  endpoint: "/api/resumescorer/score",
+  endpoint: aiToolPath("resume-score"),
   method: "POST",
   requiresAuth: false,
   useCase: "resume_score",
@@ -65,7 +65,7 @@ export const resumeRoast: AIToolDef = {
   id: "resume-roast",
   description:
     "Brutally honest but constructive resume roast — JSON with score, strengths, weaknesses, witty roast paragraph, and improved bullet examples.",
-  endpoint: "/api/resume/roast",
+  endpoint: "/api/resumes/roast",
   method: "POST",
   requiresAuth: false,
   useCase: "resume_roast",
@@ -103,7 +103,7 @@ export const resumeGet: AIToolDef = {
 export const resumeListMine: AIToolDef = {
   id: "resume-list-mine",
   description: "List the current user's resumes (auth required).",
-  endpoint: "/api/resume/withownership",
+  endpoint: "/api/resumes?owner=me&include=ownership",
   method: "GET",
   requiresAuth: true,
   supportedActions: ["optimize-content", "ats-score"],
@@ -114,11 +114,15 @@ export const resumeListMine: AIToolDef = {
 export const resumeSave: AIToolDef = {
   id: "resume-save",
   description: "Create or update a resume.",
-  endpoint: "/api/resume/save",
+  endpoint: "/api/resumes",
   method: "POST",
   requiresAuth: true,
   supportedActions: ["optimize-content", "improve-summary", "enhance-experience"],
   contextTypes: ["resume-create", "resume-edit"],
-  requestSchema: { resumeJson: "string (JSON Resume format)" },
+  requestSchema: {
+    source: "\"blank\"",
+    content: "object (JSON Resume format)",
+    title: "string (optional)",
+  },
   responseSchema: { id: "string", success: "boolean" },
 };

@@ -13,7 +13,7 @@
  */
 
 import { and, desc, eq } from "drizzle-orm";
-import type { getDb } from "../../db/index.js";
+import { getDb } from "../../db/index.js";
 import { pageEmbedVideos } from "../../db/schema/pageEmbeds.js";
 import { studioProjects, users, videos } from "../../db/schema/index.js";
 import { cdnUrl } from "../../utils/cdn.js";
@@ -61,6 +61,20 @@ export interface PageEmbedListItem {
   rendered: boolean;
   title: string;
   updatedAt: string;
+}
+
+/** Normalise a route to the canonical key the registry stores: leading
+ *  slash, no trailing slash (except root), no query/hash. */
+export function normalisePathname(raw: string): string {
+  let p = (raw || "").trim().split("?")[0].split("#")[0];
+  if (!p.startsWith("/")) p = `/${p}`;
+  if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);
+  return p.slice(0, 512);
+}
+
+/** The request-scoped service on the shared pooled db (routes never touch getDb). */
+export function pageEmbedService(): PageEmbedService {
+  return new PageEmbedService(getDb());
 }
 
 export class PageEmbedService {

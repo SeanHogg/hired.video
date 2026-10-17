@@ -8,7 +8,7 @@ import type { AvatarWidgetParams, WidgetParams } from "@/lib/studio/editor-v2/ca
 import { estimateVisemesForText, getPresenter, type Viseme } from "@/lib/studio/avatar/presenters";
 import { paintPresenter } from "@/lib/studio/avatar/paint";
 import type { TtsEngineId } from "@/lib/services/tts-engines";
-import { numberOr, stringOr } from "../frame";
+import { numberOr, stringOr } from "@/lib/numeric";
 import { registerPlugin } from "../plugin";
 import { optionalString, when } from "./shared";
 

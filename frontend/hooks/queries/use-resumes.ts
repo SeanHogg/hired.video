@@ -3,7 +3,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { resumeService } from "@/lib/services/resume-service";
 import { REREAD_ON_MOUNT, useViewerId, type ByIdQueryOptions, type ViewerQueryOptions } from "./use-viewer-id";
 
-/** The viewer's own résumés (`GET /api/resumes/getresumesownedbyauthuser`),
+/** The viewer's own résumés (`GET /api/resumes?owner=me&view=summary`),
  *  keyed `["resumes", userId]`. Disabled while signed out. */
 export function useUserResumes(options: ViewerQueryOptions = {}) {
   const userId = useViewerId();

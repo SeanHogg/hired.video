@@ -4,7 +4,7 @@
 // with multiple input modes (existing record vs. text vs. uploaded file).
 // Two payloads are then produced:
 //
-//   1. The /api/ValueProposition request (`buildGenerateInput`)
+//   1. The value-proposition AI tool request (POST /api/ai/tools/value-proposition) (`buildGenerateInput`)
 //   2. The /api/tool-runs record-run args (`buildRecordRunArgs`)
 //
 // These are factored out of `pages/tools/ValueProposition.tsx` so the

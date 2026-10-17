@@ -13,7 +13,8 @@
  * nobody to charge, exactly like a gateway client built with `user = null`.
  */
 import type { JwtPayload } from "../../types/index.js";
-import { chargeLedger, type LLMUsage } from "./llm-client.js";
+import { chargeLedger } from "./llm/metering.js";
+import type { LLMUsage } from "./llm/types.js";
 
 export interface WorkersAiBinding {
   run: (model: string, inputs: Record<string, unknown>) => Promise<unknown>;
@@ -40,6 +41,10 @@ export interface WorkersAiMeter {
   featureKey: string;
   /** Characters sent — the token estimate when the model reports no usage. */
   inputChars?: number;
+  /** Flat charge for models that report no usage (image generation): when
+   *  set, the call is charged exactly this many prompt tokens and the
+   *  reported/estimated usage is ignored. */
+  fixedTokens?: number;
 }
 
 /** ~4 characters per token — the estimate used when Workers AI omits usage. */
@@ -76,7 +81,17 @@ export async function runWorkersAi(
 ): Promise<unknown> {
   const res = await ai.run(model, inputs);
   if (meter) {
-    await chargeLedger(meter.user, meter.featureKey, workersAiUsage(model, res, meter.inputChars ?? 0), {});
+    const usage: LLMUsage =
+      meter.fixedTokens !== undefined
+        ? {
+            promptTokens: meter.fixedTokens,
+            completionTokens: 0,
+            totalTokens: meter.fixedTokens,
+            model,
+            requestedModel: model,
+          }
+        : workersAiUsage(model, res, meter.inputChars ?? 0);
+    await chargeLedger(meter.user, meter.featureKey, usage, {});
   }
   return res;
 }

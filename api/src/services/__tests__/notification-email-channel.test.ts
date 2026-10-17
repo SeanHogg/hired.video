@@ -78,9 +78,6 @@ function fakeDeps(users: Array<{ id: string; email: string | null }>) {
           insertNotifications: async (rows: any[]) => {
             inserted.push(...rows);
           },
-          insertNotification: async (row: any) => {
-            inserted.push(row);
-          },
           findNotificationsForUser: async () => [],
         },
         users: {

@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lt, sql, sum } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, sum } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import type {
   AIUsageMonthDTO,
@@ -12,9 +12,10 @@ import { aiCallCostUsd } from "../../../../shared/ai-model-rates.js";
 import { chooseDebitSource, type TokenDebitSource } from "../../domains/billing/token-debit.js";
 import type { EffectivePlan } from "../../domains/planOverride/resolver.js";
 import { computeIsPro, resolveUserEffectivePlan } from "./effectiveUserPlan.js";
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
+import { TokensRepository } from "../../repositories/tokensRepository.js";
 
 /** Narrow Deps slice. account.ts touches both `users` (via UsersRepository)
  *  and `accountInvitations` (via PlatformRepository) plus assorted
@@ -39,7 +40,6 @@ const {
   paymentMethods,
   invoices,
   aiUsageRecords,
-  userTokenBalance,
   users,
 } = schema;
 
@@ -50,8 +50,8 @@ const {
 // active subscription, any admin override, and the user's role into one
 // resolver-applied snapshot. `getSubscription` and `getTokenBudgetSummary`
 // both project from this so they cannot disagree about the user's plan
-// or token cap. Cached via the shared two-layer edge-cache helper
-// (utils/edge-cache.ts).
+// or token cap. Cached isolate-locally (utils/isolate-cache.ts) — a
+// per-user key must never cost a KV write on Workers Free.
 // ---------------------------------------------------------------------------
 
 interface BillingFields {
@@ -74,32 +74,19 @@ const PLAN_CACHE_TTL_SECONDS = 60;
 // expire harmlessly under their own TTL.
 const planCacheKey = (userId: string) => `plan:${userId}`;
 
-function revivePlan(raw: unknown): EffectiveUserPlan | null {
-  if (!raw || typeof raw !== "object") return null;
-  const v = raw as EffectiveUserPlan;
-  // KV serialises Date → ISO string; coerce back so the resolver-shaped
-  // EffectivePlan has Dates again.
-  const expiresAt = v.effective.overrideExpiresAt;
-  if (expiresAt && typeof expiresAt === "string") {
-    v.effective.overrideExpiresAt = new Date(expiresAt);
-  }
-  return v;
-}
-
 /** Bust the effective-plan cache for one user. Call after any write that
  *  affects the resolver inputs: subscription change, plan-override set or
  *  cleared, or a role flip. */
 export function invalidateSubscriptionCache(userId: string): void {
-  invalidateCachedKey(planCacheKey(userId));
+  invalidateIsolateKey(planCacheKey(userId));
 }
 
 /** Load the user's resolver-applied plan + raw billing fields. Internal —
  *  callers should use `getSubscription` or `getTokenBudgetSummary`. */
 async function loadEffectiveUserPlan(userId: string): Promise<EffectiveUserPlan> {
-  return getOrSetCached<EffectiveUserPlan>({
+  return getOrSetIsolateCached<EffectiveUserPlan>({
     key: planCacheKey(userId),
     ttlSeconds: PLAN_CACHE_TTL_SECONDS,
-    revive: revivePlan,
     loader: async () => {
       const db = getDb();
       const repos = defaultApiDeps().repos;
@@ -218,7 +205,7 @@ export async function getInvoices(userId: string,
 
 /** Sum of `totalTokens` debited from the monthly bucket for the current
  *  calendar month (UTC). Pack-debited tokens are excluded — they're tracked
- *  separately in `userTokenBalance.lifetimeConsumed`. */
+ *  separately in the ai_tokens wallet's `lifetimeConsumed`. */
 async function getMonthlyTokensUsed(userId: string): Promise<number> {
   const db = getDb();
   const now = new Date();
@@ -284,12 +271,7 @@ export async function getTokenBudgetSummary(userId: string): Promise<TokenBudget
   const monthlyLimit = effective.monthlyLimit ?? FREE_AI_MONTHLY_TOKENS;
   const monthlyRemaining = Math.max(0, monthlyLimit - monthlyUsed);
 
-  const db = getDb();
-  const [balanceRow] = await db
-    .select({ balance: userTokenBalance.balance })
-    .from(userTokenBalance)
-    .where(eq(userTokenBalance.userId, userId))
-    .limit(1);
+  const balanceRow = await new TokensRepository(getDb()).findBalanceByUserId(userId);
   const packBalance = balanceRow?.balance ?? 0;
 
   return {
@@ -403,21 +385,8 @@ export async function recordTokenUsage(args: {
 
   // If we billed against the pack, decrement the balance row atomically.
   if (source === "pack") {
-    await (db.insert(userTokenBalance) as any)
-      .values({
-        userId: args.userId,
-        balance: 0,
-        lifetimeGranted: 0,
-        lifetimeConsumed: totalTokens,
-      })
-      .onConflictDoUpdate({
-        target: userTokenBalance.userId,
-        set: {
-          balance: sql`GREATEST(0, ${userTokenBalance.balance} - ${totalTokens})`,
-          lifetimeConsumed: sql`${userTokenBalance.lifetimeConsumed} + ${totalTokens}`,
-          updatedAt: new Date(),
-        },
-      })
+    await new TokensRepository(db)
+      .debitPackBalance(args.userId, totalTokens)
       .catch((err: unknown) => {
         console.warn(`[billing] pack debit failed for ${args.userId}:`, err);
       });

@@ -13,7 +13,7 @@
  *   PATCH /:id/review            approve / reject
  *
  * Flagging a bad/incorrect resource reuses the shared content-report flow
- * (`/api/reports` with entityType "community_resource"); no bespoke flag
+ * (`/api/moderation/reports` with entityType "community_resource"); no bespoke flag
  * endpoint lives here.
  */
 import { Hono } from "hono";

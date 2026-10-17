@@ -1,6 +1,6 @@
 /**
  * Maps API path-prefix → module slug. When the admin toggles a slug off via
- * /api/admin/impersonate/modules, every request to the matching prefix will
+ * /api/admin/sa/modules, every request to the matching prefix will
  * return 403 MODULE_DISABLED (enforced by moduleGateByPath in app.ts).
  *
  * Slugs follow the module's DB slug column. If a slug isn't present in the
@@ -14,6 +14,10 @@ export const MODULE_ROUTE_REGISTRY: Record<string, string> = {
   "/api/advertising": "advertising",
   "/api/affiliates": "affiliates",
   "/api/ai": "ai",
+  // The AI tool dispatcher has its own toggle (per-tool module slugs —
+  // resume-scorer, resume-optimizer, value-proposition, career — are checked
+  // by the dispatcher from services/ai-tools/registry.ts).
+  "/api/ai/tools": "ai-tools",
   "/api/ats": "ats",
   "/api/assessments": "assessments",
   "/api/auto-apply": "auto-apply",
@@ -27,8 +31,5 @@ export const MODULE_ROUTE_REGISTRY: Record<string, string> = {
   "/api/hubs": "hubs",
   "/api/interview": "interview",
   "/api/people": "people-ops",
-  "/api/resumescorer": "resume-scorer",
-  "/api/resumeoptimizer": "resume-optimizer",
   "/api/studio": "video-studio",
-  "/api/valueproposition": "value-proposition",
 };

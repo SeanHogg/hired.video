@@ -1,5 +1,7 @@
 /**
- * SuperAdmin usage / presence (#2045-2046). Mounted at /api/admin/usage.
+ * SuperAdmin usage / presence (#2045-2046) — the ONE usage owner. Mounted at
+ * /api/admin/usage by the admin composite (routes/admin/index.ts), which
+ * applies the SA guard.
  *
  *   GET    /api/admin/usage/active            — "who is active now" (cached)
  *   GET    /api/admin/usage/feature-usage     — per-feature counts for ?role=
@@ -14,27 +16,26 @@
  *                                               file:line, traffic per release,
  *                                               latest config snapshot
  *   DELETE /api/admin/usage/visitor/:visitorId — DSR erase of a visitor
+ *   GET    /api/admin/usage/tools/*            — tool-run insights (admin/tool-usage.ts)
  */
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { buildRepos } from "../repositories/index.js";
-import { superAdminMiddleware } from "../middleware/superAdmin.js";
+import { adminRepos } from "../repositories/admin/index.js";
+import { recordAdminAudit } from "../services/admin/adminAudit.js";
+import { toolUsageRoutes } from "./admin/tool-usage.js";
 import { UsageService } from "../services/usage/UsageService.js";
 import { UsageReportService } from "../services/usage/UsageReportService.js";
 import { isManageableRole } from "../../../shared/role-access.js";
 import { toTrafficWindow } from "../../../shared/usage.js";
 import { getOrSetCached } from "../utils/edge-cache.js";
 
-const { adminAuditLog } = schema;
-
 export const adminUsageRoutes = new Hono<AppEnv>();
 
-adminUsageRoutes.use("*", superAdminMiddleware);
+adminUsageRoutes.route("/tools", toolUsageRoutes);
 
 function buildService() {
-  return new UsageService(buildRepos(getDb()).usageTracking);
+  return new UsageService(adminRepos().usageTracking);
 }
 
 adminUsageRoutes.get("/active", async (c) => {
@@ -52,7 +53,7 @@ adminUsageRoutes.get("/feature-usage", async (c) => {
 });
 
 function buildReports() {
-  return new UsageReportService(buildRepos(getDb()).usageTracking);
+  return new UsageReportService(adminRepos().usageTracking);
 }
 
 adminUsageRoutes.get("/traffic", async (c) => {
@@ -73,7 +74,7 @@ adminUsageRoutes.get("/api-health", async (c) => {
   const report = await getOrSetCached({
     key: `obs:api-health:${route ?? "*"}`,
     ttlSeconds: 60,
-    loader: () => buildRepos(getDb()).observability.apiHealthReport(new Date(), { route }),
+    loader: () => adminRepos().observability.apiHealthReport(new Date(), { route }),
   });
   return c.json(success(report), 200);
 });
@@ -81,16 +82,13 @@ adminUsageRoutes.get("/api-health", async (c) => {
 adminUsageRoutes.delete("/visitor/:visitorId", async (c) => {
   const visitorId = c.req.param("visitorId");
   const removed = await buildService().eraseForVisitor(visitorId);
-  await getDb()
-    .insert(adminAuditLog)
-    .values({
-      actorId: c.var.user?.sub as string,
-      action: "usage.dsr_erase",
-      targetType: "usage_visitor",
-      targetId: visitorId,
-      metadata: { removed },
-    } as any)
-    .catch(() => undefined);
+  await recordAdminAudit({
+    actorId: c.var.user?.sub as string,
+    action: "usage.dsr_erase",
+    targetType: "usage_visitor",
+    targetId: visitorId,
+    metadata: { removed },
+  });
   return c.json(success({ visitorId, removed }), 200);
 });
 

@@ -25,7 +25,6 @@ import {
   applyResumeEdits,
   buildTailorPrompt,
   strengthenPrompt,
-  TailorResponseSchema,
   type TailorEdit,
 } from "../job/tailor-edits.js";
 import type { LLMClient } from "../../services/adapters/llm-client.js";
@@ -592,21 +591,5 @@ describe("applyResumeEdits", () => {
     assert.equal(content.skills[0].name, "Go");
     assert.equal(changes.length, 1);
     assert.equal(changes[0].section, "skills");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Response schema sanity — TailorResponseSchema no longer includes
-// markdownResume. This test pins the contract so any future drift that
-// re-introduces a markdown field blows up loudly.
-// ---------------------------------------------------------------------------
-
-describe("TailorResponseSchema", () => {
-  it("has no markdownResume field", () => {
-    const shape = TailorResponseSchema.shape as Record<string, unknown>;
-    assert.equal("markdownResume" in shape, false, "markdownResume must not be in the schema");
-    for (const required of ["oldScore", "newScore", "tailoredResume", "changes", "summaryRecommendations"]) {
-      assert.equal(required in shape, true, `${required} must be in the schema`);
-    }
   });
 });

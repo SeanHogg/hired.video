@@ -5,10 +5,13 @@
  * and writes rows.
  */
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
-const { jobBoosts, ads, adSets, jobItems } = schema;
+const { jobBoosts, ads, adSets, jobItems, boostCheckouts, tokenPackPurchases, courseCheckouts } = schema;
+
+/** A job boost created by checkout start, awaiting a confirmed payment. */
+export const JOB_BOOST_PENDING_STATUS = "pending_payment";
 
 export type DbLike = any;
 export type JobBoostRow = typeof jobBoosts.$inferSelect;
@@ -40,6 +43,63 @@ export class AdPromotionRepository {
   async insertJobBoost(row: NewJobBoostRow): Promise<JobBoostRow> {
     const [created] = await this.db.insert(jobBoosts).values(row).returning();
     return created;
+  }
+
+  async findJobBoostById(id: string): Promise<JobBoostRow | null> {
+    const [row] = await this.db.select().from(jobBoosts).where(eq(jobBoosts.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  /**
+   * pending_payment → active with this provider payment id and the run
+   * window re-stamped from the payment time, in ONE statement — only when
+   * the id isn't already used by any job boost, boost checkout, token pack
+   * or course checkout (single-use claim). Returns the activated row only
+   * for the call that claimed it.
+   */
+  async claimJobBoostPayment(
+    id: string,
+    providerPaymentId: string,
+    window: { startsAt: Date; endsAt: Date },
+  ): Promise<JobBoostRow | null> {
+    const [row] = await this.db
+      .update(jobBoosts)
+      .set({
+        status: "active",
+        stripePaymentIntentId: providerPaymentId,
+        startsAt: window.startsAt,
+        endsAt: window.endsAt,
+        updatedAt: window.startsAt,
+      })
+      .where(
+        and(
+          eq(jobBoosts.id, id),
+          eq(jobBoosts.status, JOB_BOOST_PENDING_STATUS),
+          sql`NOT EXISTS (SELECT 1 FROM ${jobBoosts} AS used WHERE used.stripe_payment_intent_id = ${providerPaymentId})`,
+          sql`NOT EXISTS (SELECT 1 FROM ${boostCheckouts} WHERE ${boostCheckouts.providerPaymentId} = ${providerPaymentId})`,
+          sql`NOT EXISTS (SELECT 1 FROM ${tokenPackPurchases} WHERE ${tokenPackPurchases.stripePaymentIntentId} = ${providerPaymentId})`,
+          sql`NOT EXISTS (SELECT 1 FROM ${courseCheckouts} WHERE ${courseCheckouts.providerPaymentId} = ${providerPaymentId})`,
+        ),
+      )
+      .returning();
+    return row ?? null;
+  }
+
+  /** Owner-scoped status transition guarded on the current status (pause
+   *  only an active boost, resume only a paused one — a pending_payment
+   *  boost can never be "resumed" into an unpaid active one). */
+  async transitionJobBoostStatus(
+    id: string,
+    userId: string,
+    from: string,
+    to: string,
+  ): Promise<JobBoostRow | null> {
+    const [row] = await this.db
+      .update(jobBoosts)
+      .set({ status: to, updatedAt: new Date() })
+      .where(and(eq(jobBoosts.id, id), eq(jobBoosts.userId, userId), eq(jobBoosts.status, from)))
+      .returning();
+    return row ?? null;
   }
 
   async markJobSponsored(jobId: string, until: Date): Promise<void> {

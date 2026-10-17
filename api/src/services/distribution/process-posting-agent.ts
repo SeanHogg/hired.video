@@ -245,8 +245,8 @@ async function planUser(
         status,
         source: "agent",
         captionSource: aiCaller && captionsThisRun <= MAX_CAPTIONS_PER_CALL ? "ai" : "template",
+        postYourself,
         postSettings: {
-          ...(postYourself ? { postYourself: true } : {}),
           clip: pick.clip,
           variantKey: variantKeyForClip("9x16", clipSec, pick.clip.startSecond),
         },

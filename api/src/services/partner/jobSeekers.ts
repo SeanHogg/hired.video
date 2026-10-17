@@ -3,7 +3,7 @@
  * the live profile payload a partner reads / embeds.
  *
  * Resume creation is intentionally NOT here: the partner route delegates to the
- * canonical `handleCreateResume` (services/resume/ResumeService.ts) with the
+ * canonical `createBlankResume` (services/resume/create.ts) with the
  * connected user's id, so partner uploads go through the exact same heal +
  * validate + auto-promote write path as the first-party UI (DRY).
  */

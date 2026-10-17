@@ -27,6 +27,7 @@ import type {
   CoffeeRequestRow,
 } from "../../repositories/coffeeRequestsRepository.js";
 import { schema } from "../../db/index.js";
+import { emitNotification, resolveActor } from "../notifications/notificationService.js";
 import { and, eq } from "drizzle-orm";
 
 export type CoffeeDeps = Pick<ApiDeps, "repos" | "now"> & {
@@ -73,13 +74,16 @@ export class CoffeeRequestService {
 
     const requester = await this.deps.repos.users.findById(requesterUserId);
     const requesterName = this.displayName(requester) ?? "Someone";
-    await this.deps.repos.notifications.insertNotification({
-      userId: input.recipientUserId,
+    const { actor } = await resolveActor(this.deps, requesterUserId);
+    await emitNotification(this.deps, {
+      recipientIds: [input.recipientUserId],
       type: "coffee_request_received",
+      actor,
       title: `${requesterName} wants to grab coffee`,
       message: input.message?.slice(0, 240) ?? `${requesterName} sent you a coffee invite.`,
-      data: { coffeeRequestId: row.id, requesterUserId } as any,
-    } as any);
+      target: { id: row.id, type: "coffee_request" },
+      extraData: { coffeeRequestId: row.id, requesterUserId },
+    });
 
     return row;
   }
@@ -101,13 +105,16 @@ export class CoffeeRequestService {
         responseMessage: input.responseMessage ?? null,
       });
 
-      await this.deps.repos.notifications.insertNotification({
-        userId: req.requesterUserId,
+      const { actor } = await resolveActor(this.deps, actingUserId);
+      await emitNotification(this.deps, {
+        recipientIds: [req.requesterUserId],
         type: "coffee_request_declined",
+        actor,
         title: "Coffee invite declined",
         message: input.responseMessage?.slice(0, 240) ?? "Your coffee invite was declined.",
-        data: { coffeeRequestId: requestId } as any,
-      } as any);
+        target: { id: requestId, type: "coffee_request" },
+        extraData: { coffeeRequestId: requestId },
+      });
 
       return { request: updated!, eventId: "", taskId: "" };
     }
@@ -203,15 +210,18 @@ export class CoffeeRequestService {
       acceptedEventId: event.id,
     });
 
-    await this.deps.repos.notifications.insertNotification({
-      userId: req.requesterUserId,
+    const { actor: recipientActor } = await resolveActor(this.deps, req.recipientUserId);
+    await emitNotification(this.deps, {
+      recipientIds: [req.requesterUserId],
       type: "coffee_request_accepted",
+      actor: recipientActor,
       title: `${recipientName ?? "Your match"} accepted your coffee invite`,
       message: finalLocation
         ? `${startAt.toLocaleString()} at ${finalLocation}.`
         : startAt.toLocaleString(),
-      data: { coffeeRequestId: requestId, eventId: event.id, taskId: task.id } as any,
-    } as any);
+      target: { id: requestId, type: "coffee_request" },
+      extraData: { coffeeRequestId: requestId, eventId: event.id, taskId: task.id },
+    });
 
     return { request: updated!, eventId: event.id, taskId: task.id };
   }

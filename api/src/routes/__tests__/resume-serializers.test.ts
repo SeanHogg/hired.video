@@ -7,7 +7,7 @@
  *
  * Both are pure: they take a DB row plus precomputed viewer-context extras
  * (isOwner/isWatched/viewCount) and produce the wire shape. The handlers
- * compute extras separately (watched_resumes join + resume_views count)
+ * compute extras separately (watched_resumes join + artifact_views count)
  * and pass them in. This keeps serialization testable without a DB.
  *
  * Run: node --import tsx --test src/routes/__tests__/resume-serializers.test.ts
@@ -21,7 +21,7 @@ import {
   rowToResumeSummary,
   rowToPublicResumeSummary,
   projectUserResumes,
-} from "../resumes.js";
+} from "../../handlers/resume-serializer.js";
 import { ResumeSchema, ResumeSummarySchema } from "../../../../shared/resume.js";
 
 // ---------------------------------------------------------------------------

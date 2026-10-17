@@ -5,12 +5,13 @@
  *   • Side-effecting deps (LLM client, usage recorder) flow in via the
  *     `SalaryDeps` port and can be faked in tests.
  *   • Business logic is testable with node:test (no Hono, no network).
- *   • Routes shrink to a thin adapter that parses the request, resolves
- *     env, and forwards to the handler.
+ *   • Use cases (`analyzeSalary`, `salaryNegotiationTips`) return plain data
+ *     and throw DomainError; the `salary-analyze` / `salary-negotiation-tips`
+ *     AI tools (services/ai-tools/tools/career.ts) map that onto the envelope.
  *
  * Covers:
- *   • handleAnalyze         — POST /api/salarycalculator/analyze
- *   • handleNegotiationTips — POST /api/salarycalculator/negotiation-tips
+ *   • analyzeSalary          — AI tool `salary-analyze`
+ *   • salaryNegotiationTips  — AI tool `salary-negotiation-tips`
  *
  * Both endpoints are AI-first. When the LLM is unavailable (no API key,
  * every fallback model exhausted) we drop to a deterministic stub keyed
@@ -21,7 +22,7 @@
  */
 
 import { z } from "zod";
-import { fail, ok, requireAuth, type HandlerResult } from "../../handlers/shared.js";
+import { DomainError, requireUserId } from "../../domains/errors.js";
 import type { LLMClient } from "../adapters/llm-client.js";
 
 // ---------------------------------------------------------------------------
@@ -279,7 +280,7 @@ function projectLLMResponse(
 }
 
 // ---------------------------------------------------------------------------
-// handleAnalyze — POST /api/salarycalculator/analyze
+// analyzeSalary — AI tool `salary-analyze`
 // ---------------------------------------------------------------------------
 
 const ANALYZE_SYSTEM_PROMPT = `You are a compensation analyst. Given a role, location, industry, and experience level, estimate gross annual USD compensation using current US market data.
@@ -313,22 +314,21 @@ function buildAnalyzeUserMessage(input: SalaryAnalyzeInput): string {
   return parts.join("\n");
 }
 
-export async function handleAnalyze(
+export async function analyzeSalary(
   deps: SalaryDeps,
   viewerId: string | null,
   body: unknown,
-): Promise<HandlerResult> {
-  const auth = requireAuth(viewerId);
-  if ("status" in auth) return auth;
+): Promise<SalaryAnalysisResponse> {
+  requireUserId(viewerId);
 
   const parsed = SalaryAnalyzeInputSchema.safeParse(body ?? {});
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
+    throw new DomainError(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
   }
   const input = parsed.data;
 
   if (!input.jobTitle || !input.location) {
-    return fail(
+    throw new DomainError(
       400,
       "VALIDATION_ERROR",
       "jobTitle and location are required for an accurate estimate.",
@@ -351,14 +351,15 @@ export async function handleAnalyze(
       },
       SalaryAnalysisLLMSchema,
     );
-    return ok(projectLLMResponse(llmResult, input.industry));
+    return projectLLMResponse(llmResult, input.industry);
   }
 
-  return ok(buildSalaryFallback(input));
+  return buildSalaryFallback(input);
 }
 
+
 // ---------------------------------------------------------------------------
-// handleNegotiationTips — POST /api/salarycalculator/negotiation-tips
+// salaryNegotiationTips — AI tool `salary-negotiation-tips`
 // ---------------------------------------------------------------------------
 
 const NEGOTIATION_SYSTEM_PROMPT = `You are a senior compensation coach. Given a role, location, current offer, and market rate, produce concrete negotiation strategies and talking points the candidate can use in their next conversation with the recruiter.
@@ -411,17 +412,16 @@ function buildNegotiationFallback(input: SalaryNegotiationInput) {
   };
 }
 
-export async function handleNegotiationTips(
+export async function salaryNegotiationTips(
   deps: SalaryDeps,
   viewerId: string | null,
   body: unknown,
-): Promise<HandlerResult> {
-  const auth = requireAuth(viewerId);
-  if ("status" in auth) return auth;
+): Promise<z.infer<typeof NegotiationLLMSchema> | ReturnType<typeof buildNegotiationFallback>> {
+  requireUserId(viewerId);
 
   const parsed = SalaryNegotiationInputSchema.safeParse(body ?? {});
   if (!parsed.success) {
-    return fail(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
+    throw new DomainError(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
   }
   const input = parsed.data;
 
@@ -438,8 +438,9 @@ export async function handleNegotiationTips(
       },
       NegotiationLLMSchema,
     );
-    return ok(llmResult);
+    return llmResult;
   }
 
-  return ok(buildNegotiationFallback(input));
+  return buildNegotiationFallback(input);
 }
+

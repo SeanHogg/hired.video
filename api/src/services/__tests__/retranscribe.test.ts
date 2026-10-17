@@ -39,7 +39,7 @@ function seed(responses: Array<Record<string, unknown>>) {
   });
 }
 
-const args = { interviewId: interview.id, responseId: failedVideo.id, userId: "recruiter-1" };
+const args = { responseId: failedVideo.id, userId: "recruiter-1" };
 
 describe("claimRetranscription", () => {
   it("queues a failed video answer and flips it to pending", async () => {
@@ -84,9 +84,15 @@ describe("claimRetranscription", () => {
     assert.equal(out.outcome, "not_video");
   });
 
-  it("a response id from another interview is not found", async () => {
+  it("a response on an interview the caller did not create is not found", async () => {
     const { db } = seed([{ ...failedVideo, interviewId: "33333333-3333-4333-8333-333333333333" }]);
     const out = await claimRetranscription(db, args);
+    assert.equal(out.outcome, "not_found");
+  });
+
+  it("an unknown response id is not found", async () => {
+    const { db } = seed([{ ...failedVideo }]);
+    const out = await claimRetranscription(db, { ...args, responseId: "44444444-4444-4444-8444-444444444444" });
     assert.equal(out.outcome, "not_found");
   });
 });

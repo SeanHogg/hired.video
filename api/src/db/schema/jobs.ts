@@ -155,6 +155,10 @@ export const jobPreferences = pgTable("job_preferences", {
   salaryMin: numeric("salary_min"),
   salaryMax: numeric("salary_max"),
   jobTypes: jsonb("job_types").default([]),
+  /** @deprecated industries / skills — never written by app code; merged
+   *  into user_profiles.industries / .skills (the single store) by mig 0631.
+   *  No reader. Kept declared only because `drizzle-kit push` runs before the
+   *  SQL migrations; the follow-up migration archives + drops them. */
   industries: jsonb("industries").default([]),
   skills: jsonb("skills").default([]),
   isOpenToWork: boolean("is_open_to_work").default(false).notNull(),
@@ -171,13 +175,18 @@ export const jobApplications = pgTable("job_applications", {
   jobId: uuid("job_id").references(() => jobItems.id, { onDelete: "set null" }),
   resumeId: uuid("resume_id"),
   coverLetter: text("cover_letter"),
+  /** The ONE seeker-side application lifecycle — APPLICATION_STATUSES
+   *  (shared/statuses.ts). saved_jobs is the bookmark only (0621/0622). */
   status: varchar("status", { length: 50 }).default("applied").notNull(),
+  statusChangedAt: timestamp("status_changed_at", { withTimezone: true }),
   appliedAt: timestamp("applied_at", { withTimezone: true }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_job_applications_user_applied").on(t.userId, t.appliedAt.desc().nullsFirst()),
   index("idx_job_applications_job_status_applied").on(t.jobId, t.status, t.appliedAt.desc().nullsFirst()).where(sql`job_id IS NOT NULL`),
+  index("idx_job_applications_user_job").on(t.userId, t.jobId),
+  check("job_applications_status_check", sql`${t.status} IN ('applied', 'interviewing', 'offered', 'accepted', 'rejected', 'withdrawn', 'declined', 'cancelled')`),
 ]);
 
 export type JobApplication = typeof jobApplications.$inferSelect;
@@ -189,11 +198,9 @@ export const savedJobs = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     jobId: uuid("job_id").notNull().references(() => jobItems.id, { onDelete: "cascade" }),
-    // Job seeker pipeline: tracked → applied → interviewing → offered → accepted
-    // Also: cancelled (job removed), rejected, withdrawn (user pulled out), declined (offer declined)
-    status: varchar("status", { length: 50 }).default("tracked").notNull(),
-    statusChangedAt: timestamp("status_changed_at", { withTimezone: true }),
-    appliedAt: timestamp("applied_at", { withTimezone: true }),
+    // Bookmark only. The tracker lifecycle (applied → interviewing → …) lives
+    // on job_applications; "tracked" = saved with no application row
+    // (migrations 0621/0622 moved status / applied_at / status_changed_at).
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -203,7 +210,7 @@ export const savedJobs = pgTable(
   // and every Save click on /jobs inserted a duplicate row. See migration
   // 0077_saved_jobs_unique.sql.
   (t) => [uniqueIndex("uq_saved_jobs_user_job").on(t.userId, t.jobId),
-    index("idx_saved_jobs_user_status_created").on(t.userId, t.status, t.createdAt.desc().nullsFirst()),
+    index("idx_saved_jobs_user_created").on(t.userId, t.createdAt.desc().nullsFirst()),
     index("idx_saved_jobs_job").on(t.jobId),
 ],
 );

@@ -218,7 +218,7 @@ export class AffiliateService {
   // Admin methods for SuperAdmin dashboard
   async getAdminStats(): Promise<AffiliateAdminStats> {
     const response: ApiSuccessResponse<AffiliateAdminStats> = await apiClient.get(
-      "/api/admin/affiliate-stats",
+      "/api/admin/metrics/affiliate-stats",
       AffiliateAdminStatsSchema,
     );
     return response.data;

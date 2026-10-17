@@ -1,3 +1,4 @@
+import { aiToolPath } from "./tool-ids.js";
 import type { AIToolDef } from "./types.js";
 
 /**
@@ -5,7 +6,8 @@ import type { AIToolDef } from "./types.js";
  * Each maps to a real backend endpoint (verified against the route
  * mounts in app.ts) and an `LLMUseCase` profile in providers.ts. Adds
  * the agent-callable AI features beyond resume/job/salary/profile/task
- * CRUD (gap #1623 breadth).
+ * CRUD (gap #1623 breadth). Tools served by the AI tool dispatcher
+ * (`POST /api/ai/tools/:toolId`) build their URL with `aiToolPath(id)`.
  */
 
 export const interviewQuestions: AIToolDef = {
@@ -48,13 +50,13 @@ export const videoPitchScript: AIToolDef = {
 export const skillExtract: AIToolDef = {
   id: "skill-extract",
   description: "Extract a normalized skill list from resume or profile text.",
-  endpoint: "/api/skillextractor/extract",
+  endpoint: aiToolPath("skill-extract"),
   method: "POST",
   requiresAuth: true,
   useCase: "skill_extract",
   supportedActions: ["extract-skills", "suggest-skills"],
   contextTypes: ["resume-view", "resume-edit", "profile-view", "profile-edit"],
-  requestSchema: { text: "string" },
+  requestSchema: { content: "string", sourceType: "string (resume | job)" },
   responseSchema: { skills: "array" },
 };
 
@@ -62,7 +64,7 @@ export const careerResilience: AIToolDef = {
   id: "career-resilience",
   description:
     "Assess career resilience + AI-displacement risk for a role and return a resilience score with recommendations.",
-  endpoint: "/api/career/resilience-score",
+  endpoint: aiToolPath("career-resilience"),
   method: "POST",
   requiresAuth: true,
   useCase: "career",
@@ -79,7 +81,7 @@ export const careerResilience: AIToolDef = {
 export const profileAudit: AIToolDef = {
   id: "profile-audit",
   description: "Audit a profile for completeness + impact and return prioritized improvements (Pro).",
-  endpoint: "/api/profile-audit",
+  endpoint: aiToolPath("profile-audit"),
   method: "POST",
   requiresAuth: true,
   useCase: "profile_audit",

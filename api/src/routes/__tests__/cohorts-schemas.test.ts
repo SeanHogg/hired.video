@@ -19,7 +19,7 @@ import {
   AddMemberSchema,
   CreateAssignmentSchema,
   JoinSchema,
-} from "../cohorts.js";
+} from "../learning/cohorts.js";
 import { SEED_DERIVED_UUID, V4_UUID } from "../../../../shared/__tests__/uuid-fixtures.js";
 
 describe("CreateCohortSchema", () => {

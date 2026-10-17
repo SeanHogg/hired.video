@@ -12,7 +12,7 @@
  *              (ask that connection — the "connector" — for an intro).
  *
  * Connections are bidirectional rows in user_connections (from/to,
- * status='Accepted'). The graph is walked in-memory over the caller's
+ * status='accepted'). The graph is walked in-memory over the caller's
  * connection set, which is bounded per user.
  */
 import { Hono } from "hono";
@@ -32,7 +32,7 @@ async function acceptedConnectionIds(db: any, userId: string): Promise<string[]>
     .from(userConnections)
     .where(
       and(
-        eq(userConnections.status, "Accepted"),
+        eq(userConnections.status, "accepted"),
         or(eq(userConnections.fromUserId, userId), eq(userConnections.toUserId, userId)),
       ),
     );
@@ -76,7 +76,7 @@ networkRoutes.get("/warm-intros", async (c) => {
     .from(userConnections)
     .where(
       and(
-        eq(userConnections.status, "Accepted"),
+        eq(userConnections.status, "accepted"),
         or(inArray(userConnections.fromUserId, myConnIds), inArray(userConnections.toUserId, myConnIds)),
       ),
     );

@@ -616,4 +616,11 @@ export class FakePointsRepo implements IPointsRepository {
       (b) => !b.isSuspended && b.lifetimeEarned > threshold && (!set || set.has(b.userId)),
     ).length;
   }
+
+  async listActivePointHolders(limit: number): Promise<string[]> {
+    return [...this.balances.values()]
+      .filter((b) => b.balance > 0 || b.lifetimeRedeemed > 0)
+      .slice(0, limit)
+      .map((b) => b.userId);
+  }
 }

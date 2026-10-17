@@ -96,10 +96,17 @@ export function formatDurationMinutes(minutes: number | null): string | null {
 
 // ── Dates ────────────────────────────────────────────────────────────────
 
-/** Browser-locale medium date, e.g. "Oct 17, 2026". */
-export function formatDateMedium(value: string | Date): string {
+/** Medium date, e.g. "Oct 17, 2026". `locale` undefined = browser default. */
+export function formatDateMedium(value: string | Date, locale?: string): string {
   const d = typeof value === "string" ? new Date(value) : value;
-  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  return d.toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric" });
+}
+
+/** `formatDateMedium` that tolerates a missing / unparseable value ("" then). */
+export function formatDateMediumOrEmpty(value: Date | string | null | undefined, locale?: string): string {
+  if (!value) return "";
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? "" : formatDateMedium(d, locale);
 }
 
 /** Browser-locale medium date + time, e.g. "Oct 17, 2026, 3:04 PM". */

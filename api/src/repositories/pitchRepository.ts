@@ -2,7 +2,7 @@
  * PitchRepository — data access for the "current video pitch" pointer
  * (#1237 / #2133).
  *
- * A pitch is a `studio_projects` row with `storyboard._purpose = 'pitch'`;
+ * A pitch is a `studio_projects` row with `purpose = 'pitch'`;
  * its media is the latest linked `studio_recordings` take (the row the
  * recording upload writes). `studio_projects.is_current_pitch` is the
  * per-user singleton guarded by `uq_studio_projects_current_pitch_per_user`.
@@ -148,7 +148,7 @@ export class PitchRepository implements IPitchRepository {
         id: studioProjects.id,
         userId: studioProjects.userId,
         companyId: studioProjects.companyId,
-        purpose: sql<string | null>`${studioProjects.storyboard}->>'_purpose'`,
+        purpose: studioProjects.purpose,
         isCurrentPitch: studioProjects.isCurrentPitch,
       })
       .from(studioProjects)
@@ -175,7 +175,7 @@ export class PitchRepository implements IPitchRepository {
     // Two statements (the neon-http driver has no interactive transactions):
     // roll off the sibling first so the partial unique index never sees two
     // true rows, then promote. Same ordering as the profile-primary flip in
-    // PATCH /api/studio/projects/:id/status.
+    // PATCH /api/studio/projects/:id ({ status }).
     const at = this.now();
     await this.db
       .update(studioProjects)

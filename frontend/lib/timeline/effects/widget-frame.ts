@@ -4,7 +4,8 @@
  * widget painter — plugin or legacy applier — brackets its draw with these,
  * so frame behaviour is identical across kinds.
  */
-import { frameInputFromParams, numberOr, resolveFrame, type Box, type EffectEntry, type ResolvedFrame } from "@/lib/studio/widgets/frame";
+import { numberOr } from "@/lib/numeric";
+import { frameInputFromParams, resolveFrame, type Box, type EffectEntry, type ResolvedFrame } from "@/lib/studio/widgets/frame";
 import { getEffectDefinition, type EffectContext } from "./registry";
 
 export function resolveClipFrame(

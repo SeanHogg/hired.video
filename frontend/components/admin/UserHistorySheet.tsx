@@ -67,7 +67,7 @@ export function UserHistorySheet({ userId, onOpenChange }: UserHistorySheetProps
       setLoading(true);
       setError(null);
       const res = await apiClient.get<HistoryResponse>(
-        `/api/admin/impersonate/users/${id}/history?limit=200`
+        `/api/admin/sa/users/${id}/history?limit=200`
       );
       setData(res.data);
     } catch (err) {

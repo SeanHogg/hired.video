@@ -402,7 +402,7 @@ export async function setUserStatus(
  * Toggle a user's `is_system` flag — marks them as an editorial / house
  * author whose content renders as first-party "Editorial" rather than
  * community UGC. SuperAdmin-only at the route boundary (the whole
- * /admin/impersonate tree is gated by superAdminMiddleware).
+ * /api/admin/sa tree is gated by superAdminMiddleware).
  */
 export async function setUserSystemFlag(
   adminId: string,

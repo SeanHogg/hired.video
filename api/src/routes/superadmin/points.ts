@@ -1,6 +1,6 @@
 /**
- * SuperAdmin gamification surface. Mounted at /api/admin/impersonate/points
- * (superAdminMiddleware applied once at the parent router).
+ * SuperAdmin gamification surface. Mounted at /api/admin/sa/points on the SA
+ * console (SA guard applied once by the admin composite, routes/admin/index.ts).
  *
  *   GET    /                      — global stats + catalog
  *   GET    /top                   — top earners
@@ -16,8 +16,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
-import { getDb } from "../../db/index.js";
-import { buildRepos } from "../../repositories/index.js";
+import { adminRepos } from "../../repositories/admin/index.js";
 import { gamificationFromContext } from "../../domains/gamification/with-gamification.js";
 import { auditLog, AUDIT_ACTIONS } from "../../utils/audit.js";
 
@@ -31,7 +30,7 @@ function actorId(c: { var: { user: { sub: string } } }): string {
 
 superadminPointsRoutes.get("/", async (c) => {
   const game = gamificationFromContext(c);
-  const stats = await buildRepos(getDb()).points.globalStats();
+  const stats = await adminRepos().points.globalStats();
   return c.json(success({
     stats,
     catalog: game.getCatalog(),
@@ -43,14 +42,14 @@ const TopQuery = z.object({ limit: z.coerce.number().int().min(1).max(200).defau
 superadminPointsRoutes.get("/top", async (c) => {
   const parsed = TopQuery.safeParse(c.req.query());
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
-  const repos = buildRepos(getDb());
+  const repos = adminRepos();
   const top = await repos.points.topEarners(parsed.data.limit);
   return c.json(success({ top }));
 });
 
 superadminPointsRoutes.get("/user/:userId", async (c) => {
   const userId = c.req.param("userId");
-  const repos = buildRepos(getDb());
+  const repos = adminRepos();
   const game = gamificationFromContext(c);
   const [summary, fullActivity, flags] = await Promise.all([
     game.getUserSummary(userId),
@@ -128,7 +127,7 @@ const FraudQueueQuery = z.object({ limit: z.coerce.number().int().min(1).max(500
 superadminPointsRoutes.get("/fraud/queue", async (c) => {
   const parsed = FraudQueueQuery.safeParse(c.req.query());
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
-  const repos = buildRepos(getDb());
+  const repos = adminRepos();
   const flags = await repos.points.findOpenFraudFlags(parsed.data.limit);
   return c.json(success({ flags }));
 });
@@ -176,7 +175,7 @@ const RedemptionsQuery = z.object({
 superadminPointsRoutes.get("/redemptions", async (c) => {
   const parsed = RedemptionsQuery.safeParse(c.req.query());
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
-  const repos = buildRepos(getDb());
+  const repos = adminRepos();
 
   if (parsed.data.status) {
     const rows = await repos.points.findRedemptionsByStatus(parsed.data.status, parsed.data.limit);

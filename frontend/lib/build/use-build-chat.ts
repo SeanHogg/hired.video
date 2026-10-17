@@ -2,7 +2,7 @@
  * useBuildChat — the kit conversation after a résumé exists.
  *
  * A message is a change request ("make it punchier", "fit it on one page"):
- * it goes to POST /api/resumes/revise with the draft on screen, and the
+ * it goes to POST /api/ai/tools/resume-revise with the draft on screen, and the
  * revised content replaces the draft IN PLACE (via `onRevised`), and the turn
  * names what changed. A question ("how did you decide I have a career
  * break?") comes back as an answer and leaves the draft alone. The visitor

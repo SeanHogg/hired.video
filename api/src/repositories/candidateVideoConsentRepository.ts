@@ -60,7 +60,7 @@ export interface ConsentProjectContent {
   videoId: string | null;
   /** The rendered file (a re-render reuses the videos row with a new key). */
   videoR2Key: string | null;
-  /** storyboard `_rev` (save-draft's content revision; 0 before #2242). */
+  /** `studio_projects.revision` (save-draft's content revision; 0 before #2242). */
   revision: number;
 }
 
@@ -242,7 +242,7 @@ export class CandidateVideoConsentRepository implements ICandidateVideoConsentRe
       .select({
         videoId: studioProjects.videoId,
         videoR2Key: videos.r2Key,
-        revision: sql<number>`coalesce((${studioProjects.storyboard}->>'_rev')::int, 0)`,
+        revision: studioProjects.revision,
       })
       .from(studioProjects)
       .leftJoin(videos, eq(videos.id, studioProjects.videoId))

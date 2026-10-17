@@ -4,7 +4,7 @@ import { useUserResumes } from "@/hooks/queries/use-resumes";
  * Returns `true` when the authenticated user has no resumes yet, `false`
  * when they already own at least one, or `undefined` while loading.
  *
- * The backend ([api/src/routes/resumes.ts createResumeHandler]) auto-promotes
+ * The backend (api/src/services/resume/create.ts `insertOwnedResume`) auto-promotes
  * the first uploaded resume to master+active so the Chrome extension always
  * has an active resume. This hook lets the UI mirror that rule by defaulting
  * the "Mark as Master Resume" checkbox accordingly — single source of truth

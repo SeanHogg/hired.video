@@ -21,7 +21,7 @@
  * avoid double-paying a person who is BOTH a workforce employee and an
  * activity worker, the workforce weekly-timesheet aggregation excludes entries
  * pinned to a paid activity — see `isActivityTimeEntryTaskId` + its use in
- * services/workforce/index.ts submitTimesheet.
+ * services/workforce/timesheets.ts submitTimesheet.
  */
 
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -29,7 +29,8 @@ import { getDb, schema } from "../../db/index.js";
 import { ForbiddenError } from "../../middleware/errorHandler.js";
 import { PayoutLedgerService } from "../payout/PayoutLedgerService.js";
 import { NotificationService } from "../notifications/notificationService.js";
-import { resolveEmployerCompanyIds, getActiveTimeEntry } from "../workforce/index.js";
+import { resolveEmployerCompanyIds } from "../workforce/tenancy.js";
+import { getActiveTimeEntry } from "../workforce/time-entries.js";
 import { getOrCreateDefaultBoard } from "../productivity/default-board.js";
 import {
   computeActivityEarnedCents,

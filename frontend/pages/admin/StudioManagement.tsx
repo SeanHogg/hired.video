@@ -279,10 +279,9 @@ const STATUS_COLORS: Record<string, string> = {
   processing: "bg-accent text-accent-foreground",
   exported:   "bg-accent text-accent-foreground",
   published:  "bg-green-100 text-green-800",
-  Completed:  "bg-green-100 text-green-800",
-  Queued:     "bg-muted text-foreground",
+  completed:  "bg-green-100 text-green-800",
+  queued:     "bg-muted text-foreground",
   failed:     "bg-red-100 text-red-800",
-  Failed:     "bg-red-100 text-red-800",
 };
 
 export default function StudioManagement() {

@@ -8,7 +8,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
-const { courses, courseCheckouts, courseEnrollments, boostCheckouts, tokenPackPurchases } = schema;
+const { courses, courseCheckouts, courseEnrollments, boostCheckouts, tokenPackPurchases, jobBoosts } = schema;
 
 export type DbLike = any;
 export type CourseRow = typeof courses.$inferSelect;
@@ -81,8 +81,8 @@ export class CourseCheckoutRepository {
   }
 
   /** pending → paid with this provider payment id, in ONE statement, only
-   *  when the id isn't already used by any course checkout, boost checkout
-   *  or token pack. True only for the call that claimed it. */
+   *  when the id isn't already used by any course checkout, boost checkout,
+   *  job boost or token pack. True only for the call that claimed it. */
   async claimPayment(checkoutId: string, providerPaymentId: string, at: Date): Promise<boolean> {
     const rows = await this.db
       .update(courseCheckouts)
@@ -93,6 +93,7 @@ export class CourseCheckoutRepository {
         sql`NOT EXISTS (SELECT 1 FROM ${courseCheckouts} AS used WHERE used.provider_payment_id = ${providerPaymentId})`,
         sql`NOT EXISTS (SELECT 1 FROM ${boostCheckouts} WHERE ${boostCheckouts.providerPaymentId} = ${providerPaymentId})`,
         sql`NOT EXISTS (SELECT 1 FROM ${tokenPackPurchases} WHERE ${tokenPackPurchases.stripePaymentIntentId} = ${providerPaymentId})`,
+        sql`NOT EXISTS (SELECT 1 FROM ${jobBoosts} WHERE ${jobBoosts.stripePaymentIntentId} = ${providerPaymentId})`,
       ))
       .returning({ id: courseCheckouts.id });
     return rows.length > 0;

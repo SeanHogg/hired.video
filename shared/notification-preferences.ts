@@ -104,6 +104,15 @@ export function notificationPreferenceKey(
 export function categoryForNotificationType(type: string): NotificationCategory | null {
   const t = type.toLowerCase().replace(/[-\s]/g, "_");
   if (t.includes("connection")) return "connectionRequests";
+  // Networking asks (coffee invites) and the post-event "connect with
+  // people you met" prompt are connection-category.
+  if (t.startsWith("coffee_request") || t === "event_post_event_connect") return "connectionRequests";
+  // Host announcements to attendees + inbox-rule notices read as messages.
+  if (t === "event_host_blast" || t === "inbox_action") return "messages";
+  // Interview scorecard nudges belong with the hiring-pipeline updates.
+  if (t.startsWith("scorecard_")) return "applicationUpdates";
+  // Event RSVP / reminder / waitlist notices have no dedicated toggle —
+  // they deliberately fall through to the channel-level gate (null).
   if (t.includes("message") || t === "service_inquiry" || t.includes("review") || t.includes("feedback"))
     return "messages";
   if (

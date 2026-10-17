@@ -1,7 +1,7 @@
 /**
  * SuperAdmin Plan Override client service.
  *
- * Thin, typed wrapper around the /api/admin/impersonate/users/:id/plan-override
+ * Thin, typed wrapper around the /api/admin/sa/users/:id/plan-override
  * endpoints. Validates responses with Zod so UI components never consume
  * unparsed/unexpected payloads.
  *
@@ -55,7 +55,7 @@ export async function setPlanOverride(
   // server's 400 would give us.
   const parsed = SetPlanOverrideRequestSchema.parse(request);
   const res = await apiClient.put<PlanOverrideResponse>(
-    `/api/admin/impersonate/users/${userId}/plan-override`,
+    `/api/admin/sa/users/${userId}/plan-override`,
     parsed,
   );
   return PlanOverrideResponseSchema.parse(res.data);
@@ -66,7 +66,7 @@ export async function clearPlanOverride(
   userId: string,
 ): Promise<{ userId: string; cleared: boolean }> {
   const res = await apiClient.delete<{ userId: string; cleared: boolean }>(
-    `/api/admin/impersonate/users/${userId}/plan-override`,
+    `/api/admin/sa/users/${userId}/plan-override`,
   );
   return res.data;
 }

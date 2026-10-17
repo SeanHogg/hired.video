@@ -12,8 +12,8 @@
  * interfaces the request wires in via DI.
  */
 
+import type { IUserReader, IUserProfileRepository } from "../repositories/usersRepository.js";
 import type {
-  IUsersRepository,
   ISubscriptionsRepository,
   IAuthTokensRepository,
   IAuthzRepository,
@@ -46,7 +46,7 @@ export interface AccountContext {
 // ─── Service deps — injected repo interfaces, not concrete classes ──────────
 
 export interface AccountServiceDeps {
-  users: IUsersRepository;
+  users: IUserReader & IUserProfileRepository;
   subscriptions: ISubscriptionsRepository;
   // Auth is 3 repos post-split — we pull only the slices this service
   // actually needs. `authTokens` for session teardown, `authz` for module

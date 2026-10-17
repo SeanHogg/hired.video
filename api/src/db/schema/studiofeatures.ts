@@ -32,35 +32,6 @@ import { sql } from "drizzle-orm";
 import { studioProjects } from "./resumes.js";
 import { users } from "./users.js";
 
-// ---------------------------------------------------------------------------
-// oauthConnectionColumns — shared lifecycle columns for any per-user OAuth
-// (or API-key) provider connection. Spread into `pgTable` so we get one
-// source of truth for refresh-token / expiry / scope / soft-delete /
-// timestamp columns across providers.
-//
-// `accessToken` is intentionally NOT included here. Providers declare
-// their own `accessToken` column with the appropriate nullability:
-//   - Strict OAuth (`youtube_accounts`): NOT NULL.
-//   - Mixed auth (`calendar_connections` supports OAuth + API-key,
-//     so its access token is nullable).
-//
-// Provider-specific identity columns (linkedinId, googleId, channelId,
-// providerAccountId) also stay in each table since their semantics
-// and uniqueness keys differ.
-// ---------------------------------------------------------------------------
-export const oauthConnectionColumns = {
-  /** Legacy plaintext — new writes go to refresh_token_enc (0548). */
-  refreshToken:   text("refresh_token"),
-  refreshTokenEnc: text("refresh_token_enc"),
-  tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
-  /** Space-separated scope list as returned by the provider. */
-  scopes:         text("scopes"),
-  /** Soft-delete flag — `disconnect` flips this rather than dropping the row
-   *  so we keep the audit trail of historical connections. */
-  isActive:       boolean("is_active").notNull().default(true),
-  createdAt:      timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt:      timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-} as const;
 
 // ---------------------------------------------------------------------------
 // TTS Voiceover — stores generated audio per scene or full video
@@ -214,30 +185,9 @@ export const studioCaptions = pgTable(
 );
 
 // ---------------------------------------------------------------------------
-// YouTube Accounts — Google OAuth tokens for one-click YouTube publishing.
-// Reuses the shared `oauthConnectionColumns`
-// helper for the token / scope / lifecycle fields. Provider-specific
-// identity (googleId / channelId / channelTitle / email) stays inline.
-// One row per (userId, googleId) — a single user may connect multiple
-// channels.
+// YouTube channels connected for one-click publishing live in
+// provider_connections (purpose "youtube", W3-C migration 0600).
 // ---------------------------------------------------------------------------
-export const youtubeAccounts = pgTable(
-  "youtube_accounts",
-  {
-    id:           uuid("id").primaryKey().defaultRandom(),
-    userId:       uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    googleId:     text("google_id").notNull(),
-    channelId:    text("channel_id"),
-    channelTitle: text("channel_title"),
-    displayName:  text("display_name"),
-    email:        text("email"),
-    /** Legacy plaintext (nullable since 0548) — new writes go to access_token_enc. */
-    accessToken:  text("access_token"),
-    accessTokenEnc: text("access_token_enc"),
-    ...oauthConnectionColumns,
-  },
-  (t) => [index("idx_youtube_accounts_user").on(t.userId)],
-);
 
 // ---------------------------------------------------------------------------
 // Webcam Recordings — captured clips from in-browser webcam
@@ -619,28 +569,8 @@ export const userStockMediaUsage = pgTable(
   ],
 );
 
-// ---------------------------------------------------------------------------
-// Project Version History (gap #131) — debounced autosave + restorable
-// snapshots of the storyboard JSONB. 30-day retention, 50 versions per
-// project enforced at write time.
-// ---------------------------------------------------------------------------
-export const studioProjectVersions = pgTable(
-  "studio_project_versions",
-  {
-    id:           uuid("id").primaryKey().defaultRandom(),
-    projectId:    text("project_id").notNull(),
-    userId:       text("user_id").notNull(),
-    versionNumber: integer("version_number").notNull(), // monotonically increasing per project
-    label:        text("label"),                          // optional user label or "autosave"
-    storyboard:   jsonb("storyboard").notNull(),          // full snapshot
-    isAutosave:   boolean("is_autosave").notNull().default(true),
-    createdAt:    timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [
-    index("idx_studio_versions_project").on(t.projectId),
-    index("idx_studio_versions_created").on(t.createdAt),
-  ],
-);
+// Project Version History (gap #131) lives in `entity_versions`
+// (subject_type 'studio_project', W3-E migration 0640) — see entityVersions.ts.
 
 // ---------------------------------------------------------------------------
 // Video Chapters (gap #141) — YouTube-style markers + interactive TOC.
@@ -763,23 +693,8 @@ export const studioReviewComments = pgTable(
   ],
 );
 
-export const studioReviewLinks = pgTable(
-  "studio_review_links",
-  {
-    id:          uuid("id").primaryKey().defaultRandom(),
-    projectId:   text("project_id").notNull(),
-    userId:      text("user_id").notNull(),               // owner of the project
-    shareToken:  text("share_token").notNull(),           // unique URL token
-    name:        text("name"),                             // friendly label e.g. "client review"
-    expiresAt:   timestamp("expires_at", { withTimezone: true }),
-    isActive:    boolean("is_active").notNull().default(true),
-    createdAt:   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [
-    index("idx_review_links_project").on(t.projectId),
-    index("idx_review_links_token").on(t.shareToken),
-  ],
-);
+// Review share links live in share_links (shareLinks.ts, kind studio_review)
+// since W3-A migration 0583.
 
 // ---------------------------------------------------------------------------
 // Video Thumbnails (gap #142) — AI-generated candidates + chosen poster.

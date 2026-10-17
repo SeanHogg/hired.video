@@ -87,7 +87,7 @@ export default function AuditLog() {
       params.set("limit", String(limit));
 
       const res = await apiClient.get<AuditResponse>(
-        `/api/admin/impersonate/audit?${params.toString()}`
+        `/api/admin/sa/audit?${params.toString()}`
       );
       setData(res.data);
     } catch (err) {

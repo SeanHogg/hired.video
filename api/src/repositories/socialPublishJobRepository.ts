@@ -335,15 +335,10 @@ export interface AgentDraftRow {
   needsClip: boolean;
 }
 
-function clipMeta(settings: unknown): { postYourself: boolean; variantKey: string | null } {
-  if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
-    return { postYourself: false, variantKey: null };
-  }
-  const s = settings as { postYourself?: unknown; variantKey?: unknown };
-  return {
-    postYourself: s.postYourself === true,
-    variantKey: typeof s.variantKey === "string" && s.variantKey.length > 0 ? s.variantKey : null,
-  };
+function variantKeyOf(settings: unknown): string | null {
+  if (!settings || typeof settings !== "object" || Array.isArray(settings)) return null;
+  const s = settings as { variantKey?: unknown };
+  return typeof s.variantKey === "string" && s.variantKey.length > 0 ? s.variantKey : null;
 }
 
 /** List agent drafts and recently approved jobs still inside the undo window. */
@@ -367,6 +362,7 @@ export async function listAgentDrafts(userId: string, db: Db = getDb()): Promise
       createdAt: j.createdAt,
       updatedAt: j.updatedAt,
       postSettings: j.postSettings,
+      postYourself: j.postYourself,
       renderVariantId: j.renderVariantId,
     })
     .from(j)
@@ -383,7 +379,7 @@ export async function listAgentDrafts(userId: string, db: Db = getDb()): Promise
             eq(j.status, "scheduled"),
             isNull(j.renderVariantId),
             ne(j.destination, "feed"),
-            sql`coalesce((${j.postSettings}->>'postYourself')::boolean, false) = false`,
+            eq(j.postYourself, false),
           ),
         ),
       ),
@@ -393,12 +389,11 @@ export async function listAgentDrafts(userId: string, db: Db = getDb()): Promise
 
   return rows
     .map((row) => {
-      const meta = clipMeta(row.postSettings);
       const needsClip = agentJobNeedsPreparedClip({
         source: "agent",
         destination: row.destination,
         renderVariantId: row.renderVariantId,
-        postYourself: meta.postYourself,
+        postYourself: row.postYourself,
       });
       return {
         id: row.id,
@@ -415,9 +410,9 @@ export async function listAgentDrafts(userId: string, db: Db = getDb()): Promise
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
         canUndo: canUndoAgentApproval(row.status, row.updatedAt, now),
-        postYourself: meta.postYourself,
+        postYourself: row.postYourself,
         renderVariantId: row.renderVariantId,
-        variantKey: meta.variantKey,
+        variantKey: variantKeyOf(row.postSettings),
         needsClip,
       };
     })
@@ -580,10 +575,9 @@ export async function markAgentDraftPostYourself(
 ): Promise<boolean> {
   const job = await getAgentDraft(id, userId, db);
   if (!job || job.status !== "draft") return false;
-  const settings = (job.postSettings ?? {}) as Record<string, unknown>;
   const result = await db
     .update(socialPublishJobs)
-    .set({ postSettings: { ...settings, postYourself: true }, runAt, updatedAt: now })
+    .set({ postYourself: true, runAt, updatedAt: now })
     .where(
       and(
         eq(socialPublishJobs.id, id),

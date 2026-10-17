@@ -96,17 +96,27 @@ atsRoutes.post("/connections", async (c) => {
   if (!table) return c.json(error("SERVICE_UNAVAILABLE", "ATS connections not available"), 503);
 
   const sealed = await sealCredential(apiKey);
+  const sealedWebhook = await sealCredential(webhookSecret);
   const [row] = (await db.insert(table).values({
     companyId,
     provider,
     apiKey: sealed.plain,
     apiKeyEnc: sealed.enc,
-    webhookSecret: webhookSecret ?? null,
+    webhookSecret: sealedWebhook.plain,
+    webhookSecretEnc: sealedWebhook.enc,
     config: config ?? {},
     isActive: true,
   } as any).onConflictDoUpdate({
     target: [table.companyId, table.provider],
-    set: { apiKey: sealed.plain, apiKeyEnc: sealed.enc, webhookSecret: webhookSecret ?? null, config: config ?? {}, isActive: true, updatedAt: new Date() } as any,
+    set: {
+      apiKey: sealed.plain,
+      apiKeyEnc: sealed.enc,
+      webhookSecret: sealedWebhook.plain,
+      webhookSecretEnc: sealedWebhook.enc,
+      config: config ?? {},
+      isActive: true,
+      updatedAt: new Date(),
+    } as any,
   }).returning({
     id: table.id,
     companyId: table.companyId,
@@ -458,13 +468,16 @@ atsRoutes.post("/webhook/:provider", async (c) => {
   // our connection id, so we use the first connection for the provider — see
   // gap register #2016 for per-connection attribution.
   const [conn] = await db
-    .select({ companyId: table.companyId, webhookSecret: table.webhookSecret })
+    .select({ companyId: table.companyId, webhookSecret: table.webhookSecret, webhookSecretEnc: table.webhookSecretEnc })
     .from(table)
     .where(eq(table.provider, providerName))
     .limit(1);
 
-  if (conn?.webhookSecret && sig) {
-    const valid = await verifyHmacSignature(sig, JSON.stringify(body), conn.webhookSecret);
+  // Encrypted at rest (webhook_secret_enc); plaintext only for rows written
+  // before CREDENTIALS_KMS_KEY existed (0577/0578 rollout).
+  const webhookSecret = conn ? await openCredential(conn.webhookSecretEnc, conn.webhookSecret) : null;
+  if (webhookSecret && sig) {
+    const valid = await verifyHmacSignature(sig, JSON.stringify(body), webhookSecret);
     if (!valid) return c.json(error("UNAUTHORIZED", "Invalid webhook signature"), 401);
   }
 

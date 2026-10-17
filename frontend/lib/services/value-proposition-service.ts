@@ -1,5 +1,6 @@
 import { apiClient } from "../api-client";
 import { streamAiJson } from "./ai-stream";
+import { aiToolPath } from "@shared/ai-tools/tool-ids";
 import {
   ValuePropositionRequestSchema,
   ValuePropositionResponseSchema,
@@ -18,7 +19,7 @@ export class ValuePropositionService {
    *  `resumeContent`; company fields are optional context. */
   async generate(request: ValuePropositionRequest): Promise<ValuePropositionResponse> {
     const response = await apiClient.post<ValuePropositionResponse>(
-      "/api/valueproposition/generate",
+      aiToolPath("value-proposition"),
       request,
       ValuePropositionResponseSchema,
     );
@@ -31,7 +32,7 @@ export class ValuePropositionService {
     request: ValuePropositionRequest,
     onText: (text: string) => void,
   ): Promise<ValuePropositionResponse> {
-    return streamAiJson("/api/valueproposition/generate", request, {
+    return streamAiJson(aiToolPath("value-proposition"), request, {
       schema: ValuePropositionResponseSchema,
       onText,
     });

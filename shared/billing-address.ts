@@ -6,8 +6,8 @@
  *   - Settings → Billing (read/edit)
  *   - Services marketplace contact details (per-product reqs)
  *
- * Storage: JSONB column `user_profiles.billing_address`. Owners read/write
- * via /api/profile/billing-address.
+ * Storage: the `billing_addresses` table (one row per user, mig 0631).
+ * Owners read/write via /api/profile/billing-address.
  */
 
 import { z } from "zod";

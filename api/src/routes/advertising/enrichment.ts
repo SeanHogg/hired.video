@@ -3,11 +3,13 @@
  */
 
 import { Hono } from "hono";
-import { desc, eq } from "drizzle-orm";
 import type { AppEnv } from "../../types/index.js";
-import { getDb, schema } from "../../db/index.js";
 import { enrichAndAudit } from "../../services/enrichment/index.js";
-import { spendEnrichmentCredits } from "../../services/enrichment/credits.js";
+import {
+  getEnrichmentCredits,
+  listEnrichmentTransactions,
+  spendEnrichmentCredits,
+} from "../../services/enrichment/credits.js";
 import { ok, uid } from "./http.js";
 
 export const advertisingEnrichmentRoutes = new Hono<AppEnv>();
@@ -16,25 +18,12 @@ export const advertisingEnrichmentRoutes = new Hono<AppEnv>();
 
 // GET /api/advertising/enrichment/credits
 advertisingEnrichmentRoutes.get("/enrichment/credits", async (c) => {
-  const userId = uid(c);
-  const db = getDb();
-  let [credits] = await db.select().from(schema.enrichmentCredits).where(eq(schema.enrichmentCredits.userId, userId)).limit(1);
-  if (!credits) {
-    // Auto-provision for Pro users: 25 monthly included credits
-    [credits] = await db.insert(schema.enrichmentCredits).values({ userId, balance: 0 } as any).returning();
-  }
-  return c.json(ok(credits));
+  return c.json(ok(await getEnrichmentCredits(uid(c))));
 });
 
 // GET /api/advertising/enrichment/transactions
 advertisingEnrichmentRoutes.get("/enrichment/transactions", async (c) => {
-  const userId = uid(c);
-  const db = getDb();
-  const transactions = await db.select().from(schema.enrichmentTransactions)
-    .where(eq(schema.enrichmentTransactions.userId, userId))
-    .orderBy(desc(schema.enrichmentTransactions.createdAt))
-    .limit(50);
-  return c.json(ok(transactions));
+  return c.json(ok(await listEnrichmentTransactions(uid(c), 50)));
 });
 
 // POST /api/advertising/enrichment/enrich — enrich a contact (deducts 1 credit)

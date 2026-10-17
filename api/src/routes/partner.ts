@@ -42,7 +42,11 @@ import {
   ConnectionRequiredError,
 } from "../services/partner/connections.js";
 import { mintEmbedToken } from "../services/partner/tokens.js";
-import { handleCreateResume } from "../services/resume/ResumeService.js";
+import { createBlankResume } from "../services/resume/create.js";
+import { asHandler } from "../handlers/shared.js";
+
+// The create use case returns the résumé / throws DomainError → envelope.
+const handleCreateResume = asHandler(createBlankResume, 201);
 import { buildResumeParserPort } from "../services/resume/deps.js";
 import { buildRepos } from "../repositories/index.js";
 import { refreshDiffPercentFor } from "../services/resume/view.js";

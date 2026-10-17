@@ -1,7 +1,9 @@
 /**
  * AdTargetingRepository — runs the targeting predicate built by
  * services/advertising/targeting-sql.ts against the audience FROM clause
- * (`users` LEFT JOIN `user_profiles` LEFT JOIN `job_preferences`).
+ * (`users` LEFT JOIN `user_profiles` LEFT JOIN `job_preferences` LEFT JOIN
+ * the user's home `content_locations` origin row — at most one per user,
+ * enforced by content_locations_one_origin_per_entity).
  *
  * #1769: eligibility and reach are both answered by Postgres with ONE query
  * each — no per-user fact loading, no in-memory filtering.
@@ -10,7 +12,7 @@
 import { and, count, eq, inArray, type SQL } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
-const { users, userProfiles, jobPreferences } = schema;
+const { users, userProfiles, jobPreferences, contentLocations } = schema;
 
 export type DbLike = any;
 
@@ -22,7 +24,15 @@ export class AdTargetingRepository {
       .select(columns)
       .from(users)
       .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-      .leftJoin(jobPreferences, eq(jobPreferences.userId, users.id));
+      .leftJoin(jobPreferences, eq(jobPreferences.userId, users.id))
+      .leftJoin(
+        contentLocations,
+        and(
+          eq(contentLocations.entityKind, "user_profile"),
+          eq(contentLocations.entityId, users.id),
+          eq(contentLocations.role, "origin"),
+        ),
+      );
   }
 
   /** How many users the predicate reaches. */

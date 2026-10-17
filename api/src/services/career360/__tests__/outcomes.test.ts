@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import {
   computeOutcomes,
   type FunnelCounts,
-} from "../Career360Service.js";
+} from "../outcomes.js";
 import {
   OUTCOME_SEGMENT_IDS,
   type CareerTargetDoc,

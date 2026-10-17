@@ -29,10 +29,11 @@ import {
 
 
 /** The callback the platform redirects to. One fixed URL per scope (NOT per
- *  platform) so only two redirect URIs need registering in each developer
- *  console; the platform + lane ride the signed `state`. The self flow and
- *  the managed (SuperAdmin/brand) flow use distinct paths so the callback
- *  handler knows which store to write. */
+ *  platform); the platform + lane ride the signed `state`, and ONE handler
+ *  (routes/social-oauth-callback.ts) serves both paths. The managed path is
+ *  kept because it is the redirect URI registered in each provider's
+ *  developer console for the brand-account flow (wrangler.toml notes) —
+ *  the exchange must send back the exact URI the authorize step used. */
 export function socialCallbackUrl(scope: "self" | "managed"): string {
   return scope === "managed"
     ? `${apiBaseUrl()}/api/admin/social/oauth/callback`

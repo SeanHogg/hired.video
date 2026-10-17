@@ -41,6 +41,9 @@ export const socialPublishJobs = pgTable(
     caption: text("caption").notNull().default(""),
     /** The per-network choices the user made (TikTok / YouTube settings). */
     postSettings: jsonb("post_settings").$type<Record<string, unknown> | null>(),
+    /** Agent draft the user must post by hand (TikTok pre-audit, YouTube
+     *  daily cap). Promoted from `post_settings.postYourself` (migration 0614). */
+    postYourself: boolean("post_yourself").notNull().default(false),
     /** Caption source for agent posts: 'ai' or 'template'. */
     captionSource: varchar("caption_source", { length: 8 }),
     /** Job source: user-scheduled vs AI agent. */

@@ -1,5 +1,6 @@
 /**
- * Profile Audit Service — frontend wrapper for /api/profile-audit.
+ * Profile Audit Service — frontend wrapper for the `profile-audit` AI tool
+ * (POST /api/ai/tools/profile-audit).
  *
  * Mirrors the shape returned by api/src/services/profile/ProfileAuditService.ts.
  * Validates the response with Zod so a malformed payload surfaces as a
@@ -8,6 +9,7 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
+import { aiToolPath } from "@shared/ai-tools/tool-ids";
 
 const SnapshotSchema = z.object({
   fullName: z.string(),
@@ -62,7 +64,7 @@ export class ProfileAuditService {
    */
   async run(): Promise<ProfileAuditResult> {
     const response = await apiClient.post<ProfileAuditResult>(
-      "/api/profile-audit",
+      aiToolPath("profile-audit"),
       {},
       AuditResultSchema,
     );

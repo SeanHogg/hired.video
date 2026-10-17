@@ -88,6 +88,4 @@ export function sceneEffectsToCss(
   return parts.join(" ");
 }
 
-export function clamp01(v: number): number {
-  return Math.max(0, Math.min(1, v));
-}
+export { clamp01 } from "@/lib/numeric";

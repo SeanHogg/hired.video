@@ -1,6 +1,7 @@
 import { Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ResumeAnalysisToolPage } from "@/components/tools/ResumeAnalysisToolPage";
+import { aiToolPath } from "@shared/ai-tools/tool-ids";
 
 // Optimizer surface — same engine as the AI Resume Scorer (one
 // `analyzeResume` LLM call, one `ResumeAnalysisSchema`); the route
@@ -24,7 +25,7 @@ export default function ResumeOptimizer() {
         loadingLabel: t("tools.resumeOptimizer.submitLoading"),
         icon: Zap,
       }}
-      endpoint="/api/resumeoptimizer/optimize"
+      endpoint={aiToolPath("resume-optimize")}
       showJobDescription
       reportLabel={t("tools.resumeOptimizer.reportLabel")}
       emptyState={{

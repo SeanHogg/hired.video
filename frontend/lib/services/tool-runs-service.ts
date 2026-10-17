@@ -62,7 +62,7 @@ class ToolRunsService {
   }
 
   /** Admin-scoped fetch: return tool runs for a specific user. Hits the
-   *  SuperAdmin router (/api/admin/impersonate/tool-usage/runs) — caller
+   *  SuperAdmin router (/api/admin/usage/tools/runs) — caller
    *  must have SA permissions or the request 403s. Used by the "Tools
    *  used" slide-out on /admin/users. */
   async listForUser(params: { userId: string; toolId?: string; limit?: number }): Promise<ToolRun[]> {
@@ -72,7 +72,7 @@ class ToolRunsService {
     if (params.limit) search.set("limit", String(params.limit));
 
     const response = await apiClient.get<ToolRun[]>(
-      `/api/admin/impersonate/tool-usage/runs?${search.toString()}`,
+      `/api/admin/usage/tools/runs?${search.toString()}`,
       z.array(ToolRunSchema),
     );
     return response.data;

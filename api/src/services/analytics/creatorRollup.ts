@@ -9,8 +9,9 @@
  * source data so the page can't drift from the per-artifact drawer.
  */
 
-import { count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
+import { isArtifactView } from "../../repositories/artifactViewStreams.js";
 import type { ArtifactKind } from "../../../../shared/artifact-views.js";
 import {
   CreatorAnalyticsRepository,
@@ -104,7 +105,7 @@ export async function buildCreatorRollup(userId: string): Promise<CreatorRollup>
       views: count(),
     })
     .from(schema.artifactViews)
-    .where(eq(schema.artifactViews.ownerUserId, userId))
+    .where(and(eq(schema.artifactViews.ownerUserId, userId), isArtifactView()))
     .groupBy(schema.artifactViews.ipCountry)
     .orderBy(desc(count()))
     .limit(250);
@@ -125,7 +126,7 @@ export async function buildCreatorRollup(userId: string): Promise<CreatorRollup>
       views: count(),
     })
     .from(schema.artifactViews)
-    .where(eq(schema.artifactViews.ownerUserId, userId))
+    .where(and(eq(schema.artifactViews.ownerUserId, userId), isArtifactView()))
     .groupBy(schema.artifactViews.referrer)
     .orderBy(desc(count()))
     .limit(500);

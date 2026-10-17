@@ -13,9 +13,8 @@ export const {
   studioAtsPackages, studioInterviewQuestions, studioInterviewSessions,
   studioSkillsDemos, studioAsyncInterviews, studioAsyncResponses,
   studioVideoHeatmap, stockMediaAssets, userStockMediaUsage,
-  studioProjectVersions, studioChapters,
+  studioChapters,
   studioVideoForms, studioVideoFormSubmissions,
-  studioReviewComments, studioReviewLinks,
   studioThumbnails, marketingLeads,
 } = schema;
 

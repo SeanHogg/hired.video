@@ -14,7 +14,7 @@
 
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { schema, type getDb } from "../../db/index.js";
-import { invalidateCachedKey } from "../../utils/edge-cache.js";
+import { invalidateIsolateKey } from "../../utils/isolate-cache.js";
 
 type Db = ReturnType<typeof getDb>;
 const { courseEnrollments, courses, courseLessons, courseCertificates } = schema;
@@ -46,13 +46,13 @@ export interface LearnerDashboardData {
 
 const SECTION_LIMIT = 8;
 
-/** Read-through cache key for the dashboard aggregate (routes/learning.ts). */
+/** Read-through cache key for the dashboard aggregate (services/learning/learning-surface.ts). */
 export const learnerDashboardCacheKey = (userId: string): string => `learn:dash:${userId}`;
 
 /** Bust the learner's cached dashboard. Call from every write to the
  *  learner's own enrollments / lesson progress / certificates. */
 export function invalidateLearnerDashboard(userId: string): void {
-  invalidateCachedKey(learnerDashboardCacheKey(userId));
+  invalidateIsolateKey(learnerDashboardCacheKey(userId));
 }
 
 export async function getLearnerDashboard(db: Db, userId: string): Promise<LearnerDashboardData> {

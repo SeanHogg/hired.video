@@ -1,6 +1,6 @@
 /**
  * ProfileAuditService — single owner of the "audit + rewrite my candidate
- * profile" flow that powers the /api/profile-audit endpoint and the
+ * profile" flow that powers the `profile-audit` AI tool and the
  * /tools/profile-audit page.
  *
  * Mirrors the structure of resume_optimize: read the user's persisted

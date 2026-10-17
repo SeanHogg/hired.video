@@ -127,7 +127,7 @@ export default function Security() {
         minCount: String(minCount),
       });
       const res = await apiClient.get<RecentResponse>(
-        `/api/admin/impersonate/security/signups/recent?${params.toString()}`
+        `/api/admin/sa/security/signups/recent?${params.toString()}`
       );
       setData(res.data);
     } catch (err) {
@@ -314,7 +314,7 @@ function IpDrillDown({ ip, onBack }: { ip: string; onBack: () => void }) {
       setError(null);
       const params = new URLSearchParams({ ip, hours: String(hours) });
       const res = await apiClient.get<ByIpResponse>(
-        `/api/admin/impersonate/security/signups/by-ip?${params.toString()}`
+        `/api/admin/sa/security/signups/by-ip?${params.toString()}`
       );
       setData(res.data);
     } catch (err) {

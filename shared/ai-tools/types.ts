@@ -36,8 +36,9 @@ export interface AIToolDef {
    *  orchestrator's prompt, and the SuperAdmin tool browser. */
   description: string;
   /** Concrete endpoint path, including `:param` placeholders for path
-   *  segments (`/api/resume/:id`). Use lowercase to match the current
-   *  Hono mounts in [app.ts](../../api/src/app.ts). */
+   *  segments (`/api/resumes/:id`). Use lowercase to match the current
+   *  Hono mounts in [app.ts](../../api/src/app.ts). AI tools served by
+   *  the dispatcher use `aiToolPath(id)` from ./tool-ids.ts. */
   endpoint: string;
   /** HTTP verb. */
   method: HttpMethod;

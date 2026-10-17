@@ -12,7 +12,7 @@
  *   reject    → "rejected"         out of pipeline
  *   null      → "applied"          decision cleared; reset to default
  *
- * Why "interviewing" not a bespoke "screening_passed" state: JOB_PIPELINE_STATUSES
+ * Why "interviewing" not a bespoke "screening_passed" state: APPLICATION_STATUSES (shared/statuses.ts)
  * already enumerates the candidate pipeline, and the recruiter team treats
  * "passed the async screen" + "in live interviews" as the same funnel
  * bucket. Adding a fourth status would fragment dashboards for zero gain.
@@ -20,7 +20,7 @@
 
 export type InterviewDecision = "shortlist" | "maybe" | "reject";
 
-/** Subset of `JOB_PIPELINE_STATUSES` (services/job/JobService.ts) we drive
+/** Subset of `APPLICATION_STATUSES (shared/statuses.ts)` (services/job/JobService.ts) we drive
  *  from a decision. Kept as a literal union here to keep this module +
  *  its unit test free of JobService transitive imports. The route layer
  *  cross-checks against the live enum when it persists, so drift between

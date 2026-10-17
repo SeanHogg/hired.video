@@ -2,8 +2,9 @@
  * #1769 — the ONE translation of an `AdSetTargeting` spec into SQL.
  *
  * `buildTargetingWhere(spec)` returns a WHERE predicate over
- * `users` LEFT JOIN `user_profiles` LEFT JOIN `job_preferences` (the FROM
- * clause AdTargetingRepository builds). Every user-attribute rule is
+ * `users` LEFT JOIN `user_profiles` LEFT JOIN `job_preferences` LEFT JOIN
+ * `content_locations` (the user's home location: kind 'user_profile',
+ * role 'origin' — the FROM clause AdTargetingRepository builds). Every user-attribute rule is
  * evaluated by Postgres — the evaluator never loads users and filters them
  * in memory — so ad-render eligibility (one user id) and reach estimation
  * (COUNT over everyone) run the same predicate.
@@ -25,6 +26,7 @@ const {
   users,
   userProfiles,
   jobPreferences,
+  contentLocations,
   countries,
   stateProvinces,
   activityLogs,
@@ -70,26 +72,26 @@ function geoClauses(spec: AdSetTargeting): SQL[] {
   const out: SQL[] = [];
   const geo = spec.geo;
   if (nonEmpty(geo?.countries)) {
-    out.push(sql`${userProfiles.homeCountryId} IN (SELECT ${countries.id} FROM ${countries} WHERE ${inArray(countries.iso2, geo.countries)})`);
+    out.push(sql`${contentLocations.countryId} IN (SELECT ${countries.id} FROM ${countries} WHERE ${inArray(countries.iso2, geo.countries)})`);
   }
   if (nonEmpty(geo?.regions)) {
-    out.push(sql`${userProfiles.homeStateId} IN (
+    out.push(sql`${contentLocations.stateId} IN (
       SELECT ${stateProvinces.id} FROM ${stateProvinces}
       JOIN ${countries} ON ${countries.id} = ${stateProvinces.countryId}
       WHERE ${inList(sql`(${countries.iso2} || '-' || upper(${stateProvinces.code}))`, geo.regions)}
     )`);
   }
   if (nonEmpty(geo?.cities)) {
-    out.push(inArray(userProfiles.homeCityId, geo.cities));
+    out.push(inArray(contentLocations.cityId, geo.cities));
   }
   if (geo?.radius) {
     const { centerLat, centerLng, radiusKm } = geo.radius;
     // Great-circle distance; least() guards acos against float drift > 1.
-    out.push(sql`${userProfiles.homeLatitude} IS NOT NULL AND ${userProfiles.homeLongitude} IS NOT NULL AND
+    out.push(sql`${contentLocations.latitude} IS NOT NULL AND ${contentLocations.longitude} IS NOT NULL AND
       ${EARTH_RADIUS_KM} * acos(least(1, greatest(-1,
-        cos(radians(${centerLat})) * cos(radians(${userProfiles.homeLatitude})) *
-        cos(radians(${userProfiles.homeLongitude}) - radians(${centerLng})) +
-        sin(radians(${centerLat})) * sin(radians(${userProfiles.homeLatitude}))
+        cos(radians(${centerLat})) * cos(radians(${contentLocations.latitude})) *
+        cos(radians(${contentLocations.longitude}) - radians(${centerLng})) +
+        sin(radians(${centerLat})) * sin(radians(${contentLocations.latitude}))
       ))) <= ${radiusKm}`);
   }
   return out;
@@ -105,12 +107,11 @@ function attributeClauses(spec: AdSetTargeting): SQL[] {
   }
   if (nonEmpty(a.requiredSkills)) {
     // Every required skill must appear (case-insensitive) on the profile
-    // skills or the job-preference skills.
+    // skills — the single store (job_preferences.skills merged in, mig 0631).
     const wanted = [...new Set(a.requiredSkills.map((s) => s.toLowerCase()))];
     out.push(sql`(
       SELECT count(DISTINCT lower(s.skill)) FROM jsonb_array_elements_text(
-        CASE WHEN jsonb_typeof(${userProfiles.skills}) = 'array' THEN ${userProfiles.skills} ELSE '[]'::jsonb END ||
-        CASE WHEN jsonb_typeof(${jobPreferences.skills}) = 'array' THEN ${jobPreferences.skills} ELSE '[]'::jsonb END
+        CASE WHEN jsonb_typeof(${userProfiles.skills}) = 'array' THEN ${userProfiles.skills} ELSE '[]'::jsonb END
       ) AS s(skill) WHERE ${inList(sql`lower(s.skill)`, wanted)}
     ) = ${wanted.length}`);
   }
@@ -141,6 +142,7 @@ function behaviouralClauses(spec: AdSetTargeting, now: Date): SQL[] {
     out.push(sql`${users.id} IN (
       SELECT ${artifactViews.viewerId} FROM ${artifactViews}
       WHERE ${artifactViews.artifactKind} = 'company'
+        AND ${artifactViews.eventType} = 'view'
         AND ${inArray(artifactViews.artifactId, b.viewedCompanyIds)}
         AND ${artifactViews.viewedAt} >= ${since.toISOString()}::timestamptz
         AND ${artifactViews.viewerId} IS NOT NULL
@@ -175,7 +177,7 @@ function exclusionClauses(spec: AdSetTargeting): SQL[] {
   }
   if (nonEmpty(x.excludeCountries)) {
     // Users with no home country are kept (nothing says they're excluded).
-    out.push(sql`(${userProfiles.homeCountryId} IS NULL OR ${userProfiles.homeCountryId} NOT IN (
+    out.push(sql`(${contentLocations.countryId} IS NULL OR ${contentLocations.countryId} NOT IN (
       SELECT ${countries.id} FROM ${countries} WHERE ${inArray(countries.iso2, x.excludeCountries)}
     ))`);
   }

@@ -3,7 +3,6 @@
  *   • companyProfiles             — public company page data
  *   • candidateSubmissions        — resumes submitted to a company
  *   • candidateResumes            — recruiter-managed candidate folder
- *   • candidateResumeShares       — per-share ACL for candidate resumes
  *   • candidateInteractions       — recruiter notes / status changes
  *
  * All company-ownership reads/writes flow through this module so the
@@ -18,7 +17,6 @@ const {
   companyProfiles,
   candidateSubmissions,
   candidateResumes,
-  candidateResumeShares,
   candidateInteractions,
   recruiterMatchScores,
   users,
@@ -33,7 +31,6 @@ export type CandidateSubmissionRow = typeof candidateSubmissions.$inferSelect;
 export type CandidateSubmissionInsert = typeof candidateSubmissions.$inferInsert;
 export type CandidateResumeRow = typeof candidateResumes.$inferSelect;
 export type CandidateResumeInsert = typeof candidateResumes.$inferInsert;
-export type CandidateResumeShareRow = typeof candidateResumeShares.$inferSelect;
 export type CandidateInteractionRow = typeof candidateInteractions.$inferSelect;
 export type RecruiterMatchScoreRow = typeof recruiterMatchScores.$inferSelect;
 export type RecruiterMatchScoreInsert = typeof recruiterMatchScores.$inferInsert;
@@ -58,8 +55,6 @@ export interface ICompaniesRepository {
   findCandidateResumeById(id: string): Promise<CandidateResumeRow | null>;
   findCandidateResumesForCompany(companyId: string): Promise<CandidateResumeRow[]>;
   insertCandidateResume(input: CandidateResumeInsert): Promise<CandidateResumeRow>;
-  // shares
-  findSharesForCandidateResume(candidateResumeId: string): Promise<CandidateResumeShareRow[]>;
   // interactions (keyed by recruiter + candidate user ids)
   findInteractionsByRecruiterCandidate(recruiterId: string, candidateId: string): Promise<CandidateInteractionRow[]>;
   // recruiter-side matching + talent pool (the sourcing side of the pipeline)
@@ -180,13 +175,6 @@ export class CompaniesRepository implements ICompaniesRepository {
     }
     const [row] = await this.db.insert(candidateResumes).values(input as any).returning();
     return row as CandidateResumeRow;
-  }
-
-  async findSharesForCandidateResume(candidateResumeId: string): Promise<CandidateResumeShareRow[]> {
-    return (await this.db
-      .select()
-      .from(candidateResumeShares)
-      .where(eq(candidateResumeShares.candidateResumeId, candidateResumeId))) as CandidateResumeShareRow[];
   }
 
   /** Interactions are keyed by `(recruiterId, candidateId)` — recruiter

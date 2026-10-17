@@ -10,10 +10,11 @@
  */
 import type { ApiDeps } from "../apiDeps.js";
 import { reminderSentKey } from "../../repositories/eventsRepository.js";
-import type { NotificationInsert } from "../../repositories/notificationsRepository.js";
 import { chunk } from "../../utils/chunk.js";
+import { emitNotification, resolveActor } from "../notifications/notificationService.js";
 
-/** Rows per multi-row insert (well under the 65,535 bind-param ceiling). */
+/** Recipients per emit (one multi-row insert each — well under the 65,535
+ *  bind-param ceiling). */
 const NOTIFY_CHUNK = 1000;
 
 export type BlastDeps = Pick<ApiDeps, "repos" | "now">;
@@ -44,20 +45,25 @@ export class EventBlastService {
     if (!event) throw new Error("Not found");
 
     const attendees = await this.deps.repos.events.findAttendeesByEvent(eventId, "going");
-    // One multi-row insert for every approved attendee (was one per attendee).
-    const rows: NotificationInsert[] = attendees
+    // Routed through the one dispatcher (bell row + preference-gated
+    // push/email). One multi-row insert per chunk of approved attendees.
+    const recipientIds = attendees
       .filter((a) => a.userId && a.approvalStatus === "approved")
-      .map((a) => ({
-        userId: a.userId as string,
+      .map((a) => a.userId as string);
+    const { actor } = await resolveActor(this.deps, actingUserId);
+    for (const part of chunk(recipientIds, NOTIFY_CHUNK)) {
+      await emitNotification(this.deps, {
+        recipientIds: part,
         type: "event_host_blast",
+        actor,
         title: `${event.title}: ${subject}`.slice(0, 240),
         message: body.slice(0, 2000),
-        data: { eventId, hostUserId: actingUserId },
-      }) as NotificationInsert);
-    for (const part of chunk(rows, NOTIFY_CHUNK)) {
-      await this.deps.repos.notifications.insertNotifications(part);
+        target: { id: eventId, type: "event" },
+        url: `/events/${eventId}`,
+        extraData: { eventId, hostUserId: actingUserId },
+      });
     }
-    return { sentTo: rows.length };
+    return { sentTo: recipientIds.length };
   }
 
   /**
@@ -86,16 +92,18 @@ export class EventBlastService {
     }
     if (userIds.length === 0) return { sentTo: 0 };
 
-    const notifications = userIds.map((userId) => ({
-        userId,
+    for (const part of chunk(userIds, NOTIFY_CHUNK)) {
+      await emitNotification(this.deps, {
+        recipientIds: part,
         type: "event_post_event_connect",
+        actor: null,
         title: `Connect with the people you met at "${event.title}"`,
         message:
           "Tap to send connection requests to attendees you met. You'll earn points for each accepted connection.",
-        data: { eventId, kind: "post_event_connect" },
-      }) as NotificationInsert);
-    for (const part of chunk(notifications, NOTIFY_CHUNK)) {
-      await this.deps.repos.notifications.insertNotifications(part);
+        target: { id: eventId, type: "event" },
+        url: `/events/${eventId}`,
+        extraData: { eventId, kind: "post_event_connect" },
+      });
     }
     for (const part of chunk(userIds, NOTIFY_CHUNK)) {
       await this.deps.repos.events.recordRemindersSent(

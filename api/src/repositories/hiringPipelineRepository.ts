@@ -6,17 +6,14 @@
  *   • interviewSessions         — scheduled interview sessions
  *   • offerLetters              — offer drafts + signed offers
  *   • availabilitySlots         — candidate availability windows
- *   • calendarConnections       — Google/Outlook calendar links
  *   • scheduledEvents           — calendar events synced out
  *   • skillAssessments          — assessment definitions
  *   • assessmentAttempts        — candidate attempts of an assessment
- *   • performanceReviews        — post-hire review cycles
- *   • performanceGoals          — post-hire goals
  *   • onboardingChecklists      — new-hire onboarding checklists
  *   • onboardingTasks           — individual onboarding tasks
  *
  * Separate from CompaniesRepository because this is the "evaluation →
- * hire → onboard → review" pipeline (post-sourcing), whereas Companies
+ * hire → onboard" pipeline (post-sourcing), whereas Companies
  * is "who owns this company profile + candidate pool + search scores"
  * (pre-interview). Recruiter workflows cleanly straddle both via the
  * CompanyService aggregate module.
@@ -29,12 +26,9 @@ const {
   interviewSessions,
   offerLetters,
   availabilitySlots,
-  calendarConnections,
   scheduledEvents,
   skillAssessments,
   assessmentAttempts,
-  performanceReviews,
-  performanceGoals,
   onboardingChecklists,
   onboardingTasks,
 } = schema;
@@ -47,15 +41,11 @@ export type OfferLetterRow = typeof offerLetters.$inferSelect;
 export type OfferLetterInsert = typeof offerLetters.$inferInsert;
 export type AvailabilitySlotRow = typeof availabilitySlots.$inferSelect;
 export type AvailabilitySlotInsert = typeof availabilitySlots.$inferInsert;
-export type CalendarConnectionRow = typeof calendarConnections.$inferSelect;
-export type CalendarConnectionInsert = typeof calendarConnections.$inferInsert;
 export type ScheduledEventRow = typeof scheduledEvents.$inferSelect;
 export type ScheduledEventInsert = typeof scheduledEvents.$inferInsert;
 export type SkillAssessmentRow = typeof skillAssessments.$inferSelect;
 export type AssessmentAttemptRow = typeof assessmentAttempts.$inferSelect;
 export type AssessmentAttemptInsert = typeof assessmentAttempts.$inferInsert;
-export type PerformanceReviewRow = typeof performanceReviews.$inferSelect;
-export type PerformanceGoalRow = typeof performanceGoals.$inferSelect;
 export type OnboardingChecklistRow = typeof onboardingChecklists.$inferSelect;
 export type OnboardingTaskRow = typeof onboardingTasks.$inferSelect;
 export type OnboardingTaskInsert = typeof onboardingTasks.$inferInsert;
@@ -72,16 +62,11 @@ export interface IHiringPipelineRepository {
   // availability + calendar
   findAvailabilityForUser(userId: string): Promise<AvailabilitySlotRow[]>;
   insertAvailabilitySlot(input: AvailabilitySlotInsert): Promise<void>;
-  findCalendarConnectionsForUser(userId: string): Promise<CalendarConnectionRow[]>;
-  insertCalendarConnection(input: CalendarConnectionInsert): Promise<void>;
   insertScheduledEvent(input: ScheduledEventInsert): Promise<ScheduledEventRow>;
   // assessments
   findAssessmentById(id: string): Promise<SkillAssessmentRow | null>;
   findAttemptsForUser(userId: string): Promise<AssessmentAttemptRow[]>;
   insertAssessmentAttempt(input: AssessmentAttemptInsert): Promise<AssessmentAttemptRow>;
-  // performance
-  findPerformanceReviewsForUser(userId: string): Promise<PerformanceReviewRow[]>;
-  findPerformanceGoalsForUser(userId: string): Promise<PerformanceGoalRow[]>;
   // onboarding
   findOnboardingChecklistsForCandidate(candidateUserId: string): Promise<OnboardingChecklistRow[]>;
   findOnboardingTasksForChecklist(checklistId: string): Promise<OnboardingTaskRow[]>;
@@ -142,17 +127,6 @@ export class HiringPipelineRepository implements IHiringPipelineRepository {
     await this.db.insert(availabilitySlots).values(input as any);
   }
 
-  async findCalendarConnectionsForUser(userId: string): Promise<CalendarConnectionRow[]> {
-    return (await this.db
-      .select()
-      .from(calendarConnections)
-      .where(eq(calendarConnections.userId, userId))) as CalendarConnectionRow[];
-  }
-
-  async insertCalendarConnection(input: CalendarConnectionInsert): Promise<void> {
-    await this.db.insert(calendarConnections).values(input as any);
-  }
-
   async insertScheduledEvent(input: ScheduledEventInsert): Promise<ScheduledEventRow> {
     const [row] = await this.db.insert(scheduledEvents).values(input as any).returning();
     return row as ScheduledEventRow;
@@ -174,23 +148,6 @@ export class HiringPipelineRepository implements IHiringPipelineRepository {
   async insertAssessmentAttempt(input: AssessmentAttemptInsert): Promise<AssessmentAttemptRow> {
     const [row] = await this.db.insert(assessmentAttempts).values(input as any).returning();
     return row as AssessmentAttemptRow;
-  }
-
-  async findPerformanceReviewsForUser(userId: string): Promise<PerformanceReviewRow[]> {
-    // performanceReviews keys by `revieweeUserId` (the person being reviewed)
-    // not `userId`. The same row also has a `reviewerUserId` for the author —
-    // callers that want the latter should add a dedicated finder.
-    return (await this.db
-      .select()
-      .from(performanceReviews)
-      .where(eq(performanceReviews.revieweeUserId, userId))) as PerformanceReviewRow[];
-  }
-
-  async findPerformanceGoalsForUser(userId: string): Promise<PerformanceGoalRow[]> {
-    return (await this.db
-      .select()
-      .from(performanceGoals)
-      .where(eq(performanceGoals.userId, userId))) as PerformanceGoalRow[];
   }
 
   async findOnboardingChecklistsForCandidate(candidateUserId: string): Promise<OnboardingChecklistRow[]> {

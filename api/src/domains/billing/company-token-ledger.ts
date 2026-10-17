@@ -4,7 +4,7 @@
  * employer's SHARED pool instead of a personal allowance:
  *
  *   pool monthly allowance = company seats × WORKFORCE_SEAT_AI_MONTHLY_TOKENS
- *   pool overflow          = company_token_balance (purchased top-ups)
+ *   pool overflow          = the company's ai_tokens wallet (purchased top-ups)
  *   per-member sub-cap     = user_company_role_associations.monthly_token_limit
  *
  * Scope is deliberately narrow: ONLY active `employee` memberships route here
@@ -17,8 +17,8 @@
  */
 
 import { and, eq, gte, inArray, lt, sum } from "drizzle-orm";
-import { sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
+import { companyWallet, WalletRepository } from "../../repositories/walletRepository.js";
 import { hasTokensForAiCall, WORKFORCE_SEAT_AI_MONTHLY_TOKENS } from "../../../../shared/pricing.js";
 import { aiCallCostUsd } from "../../../../shared/ai-model-rates.js";
 import { chooseDebitSource } from "./token-debit.js";
@@ -26,7 +26,7 @@ import { ForbiddenError } from "../../middleware/errorHandler.js";
 import { logger } from "../../lib/logger.js";
 import type { TokenBudgetSummary } from "../../services/billing/BillingService.js";
 
-const { userCompanyRoleAssociations, companySubscriptions, aiUsageRecords, companyTokenBalance, users } = schema;
+const { userCompanyRoleAssociations, companySubscriptions, aiUsageRecords, users } = schema;
 
 export interface EmployeeAiContext {
   companyId: string;
@@ -96,11 +96,7 @@ export async function getCompanyTokenBudget(companyId: string, db = getDb()): Pr
     ));
   const monthlyUsed = Number(usedRow?.used ?? 0);
 
-  const [balRow] = await db
-    .select({ balance: companyTokenBalance.balance })
-    .from(companyTokenBalance)
-    .where(eq(companyTokenBalance.companyId, companyId))
-    .limit(1);
+  const balRow = await new WalletRepository(db).find(companyWallet(companyId), "ai_tokens");
   const packBalance = balRow?.balance ?? 0;
 
   const monthlyRemaining = Math.max(0, monthlyLimit - monthlyUsed);
@@ -222,16 +218,11 @@ export async function recordCompanyTokenUsage(args: {
 
   if (source === "pack") {
     try {
-      await (db.insert(companyTokenBalance) as any)
-        .values({ companyId: args.companyId, balance: 0, lifetimeGranted: 0, lifetimeConsumed: totalTokens })
-        .onConflictDoUpdate({
-          target: companyTokenBalance.companyId,
-          set: {
-            balance: sql`GREATEST(0, ${companyTokenBalance.balance} - ${totalTokens})`,
-            lifetimeConsumed: sql`${companyTokenBalance.lifetimeConsumed} + ${totalTokens}`,
-            updatedAt: new Date(),
-          },
-        });
+      await new WalletRepository(db).applyDelta(companyWallet(args.companyId), "ai_tokens", {
+        delta: -totalTokens,
+        clampAtZero: true,
+        consumedAdd: totalTokens,
+      });
     } catch (err) {
       logger.warn("[company-token-ledger] pack debit failed", { companyId: args.companyId, error: err });
     }

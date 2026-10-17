@@ -35,7 +35,6 @@ describe("<TranscriptionStatus />", () => {
   it("renders nothing for a text answer", () => {
     const { container } = render(
       <TranscriptionStatus
-        interviewId="iv-1"
         response={video({ responseMode: "text", videoUrl: null, transcriptionStatus: "failed" })}
         onRefresh={onRefresh}
         retranscribe={retranscribe}
@@ -47,7 +46,6 @@ describe("<TranscriptionStatus />", () => {
   it("renders nothing when the video has no url", () => {
     const { container } = render(
       <TranscriptionStatus
-        interviewId="iv-1"
         response={video({ videoUrl: null })}
         onRefresh={onRefresh}
         retranscribe={retranscribe}
@@ -59,7 +57,6 @@ describe("<TranscriptionStatus />", () => {
   it("renders nothing when transcription completed", () => {
     const { container } = render(
       <TranscriptionStatus
-        interviewId="iv-1"
         response={video({ transcriptionStatus: "completed" })}
         onRefresh={onRefresh}
         retranscribe={retranscribe}
@@ -71,7 +68,6 @@ describe("<TranscriptionStatus />", () => {
   it("renders nothing when status is unset (legacy row)", () => {
     const { container } = render(
       <TranscriptionStatus
-        interviewId="iv-1"
         response={video({ transcriptionStatus: null })}
         onRefresh={onRefresh}
         retranscribe={retranscribe}
@@ -83,7 +79,6 @@ describe("<TranscriptionStatus />", () => {
   it("shows a retry button when the job failed", () => {
     render(
       <TranscriptionStatus
-        interviewId="iv-1"
         response={video()}
         onRefresh={onRefresh}
         retranscribe={retranscribe}
@@ -100,7 +95,6 @@ describe("<TranscriptionStatus />", () => {
 
     render(
       <TranscriptionStatus
-        interviewId="iv-1"
         response={video()}
         onRefresh={onRefresh}
         retranscribe={retranscribe}
@@ -109,7 +103,7 @@ describe("<TranscriptionStatus />", () => {
     await user.click(screen.getByRole("button", { name: /retry transcription/i }));
 
     await waitFor(() => {
-      expect(retranscribe).toHaveBeenCalledWith("iv-1", "resp-1");
+      expect(retranscribe).toHaveBeenCalledWith("resp-1");
     });
     expect(toast.success).toHaveBeenCalledWith("Transcription restarted.");
     expect(onRefresh).toHaveBeenCalledTimes(1);
@@ -122,7 +116,6 @@ describe("<TranscriptionStatus />", () => {
 
     render(
       <TranscriptionStatus
-        interviewId="iv-1"
         response={video()}
         onRefresh={onRefresh}
         retranscribe={retranscribe}
@@ -142,7 +135,6 @@ describe("<TranscriptionStatus />", () => {
 
     render(
       <TranscriptionStatus
-        interviewId="iv-1"
         response={video()}
         onRefresh={onRefresh}
         retranscribe={retranscribe}
@@ -159,7 +151,6 @@ describe("<TranscriptionStatus />", () => {
     const user = userEvent.setup();
     render(
       <TranscriptionStatus
-        interviewId="iv-1"
         response={video({ transcriptionStatus: "pending" })}
         onRefresh={onRefresh}
         retranscribe={retranscribe}

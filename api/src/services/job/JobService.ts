@@ -8,8 +8,14 @@ import { normalizeSeniority } from "../../../../shared/seniority.js";
 import type { LLMClient } from "../adapters/llm-client.js";
 import { canViewerManageJob } from "../jobs/jobOwnership.js";
 import { bumpSearchVersion } from "../../utils/search-cache.js";
-import { invalidateCachedKey } from "../../utils/edge-cache.js";
+import { invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import { c360FunnelCacheKey } from "../career360/cache-keys.js";
+import type { TrackerStatus } from "../../../../shared/statuses.js";
+import {
+  findLatestApplicationsByJob,
+  recordApply,
+  setTrackerStatus,
+} from "../../repositories/jobApplicationTrackerRepository.js";
 
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
 
@@ -1568,56 +1574,52 @@ export async function getSavedJobs(userId: string): Promise<(JobEntity & { pipel
     .innerJoin(jobItems, eq(savedJobs.jobId, jobItems.id))
     .where(eq(savedJobs.userId, userId))
     .orderBy(desc(savedJobs.createdAt));
-  return rows.map((r) => ({
-    ...rowToJob(r.job),
-    pipelineStatus: (r.saved as any).status ?? 'tracked',
-    appliedAt: (r.saved as any).appliedAt?.toISOString?.() ?? undefined,
-    statusChangedAt: (r.saved as any).statusChangedAt?.toISOString?.() ?? undefined,
-  }));
+  // The tracker stage is the application's (job_applications owns it,
+  // W3-D2); a saved job with no application is "tracked".
+  const apps = await findLatestApplicationsByJob(db, userId, rows.map((r) => r.job.id));
+  return rows.map((r) => {
+    const app = apps.get(r.job.id);
+    return {
+      ...rowToJob(r.job),
+      pipelineStatus: app?.status ?? 'tracked',
+      appliedAt: app?.appliedAt ? new Date(app.appliedAt).toISOString() : undefined,
+      statusChangedAt: app?.statusChangedAt ? new Date(app.statusChangedAt).toISOString() : undefined,
+    };
+  });
 }
 
-/** Valid job seeker pipeline statuses */
-export const JOB_PIPELINE_STATUSES = [
-  'tracked', 'applied', 'interviewing', 'offered',
-  'accepted', 'rejected', 'cancelled', 'withdrawn', 'declined',
-] as const;
-
-export async function updateSavedJobStatus(jobId: string, userId: string, status: string, notes?: string,
+export async function updateSavedJobStatus(jobId: string, userId: string, status: TrackerStatus, notes?: string,
   deps?: Partial<JobServiceDeps>): Promise<boolean> {
   const d = resolveDeps(deps); const db = d.db;
   const now = new Date();
-  const [updated] = await db
+  // The job must be in the seeker's tracker (bookmark row).
+  const [saved] = await db
     .update(savedJobs)
-    .set({
-      status,
-      statusChangedAt: now,
-      updatedAt: now,
-      ...(status === 'applied' ? { appliedAt: now } : {}),
-      ...(notes !== undefined ? { notes } : {}),
-    } as any)
+    .set({ updatedAt: now, ...(notes !== undefined ? { notes } : {}) })
     .where(and(eq(savedJobs.userId, userId), eq(savedJobs.jobId, jobId)))
-    .returning();
-  // Cross-track: a saved-job stage change moves the Career 360 inner-ring
+    .returning({ id: savedJobs.id });
+  if (!saved) return false;
+  await setTrackerStatus(db, userId, jobId, status, now);
+  // Cross-track: a tracker stage change moves the Career 360 inner-ring
   // funnel — drop its cached aggregate so the ring refreshes immediately
   // instead of waiting out the 120s TTL (#2129b).
-  if (updated) invalidateCachedKey(c360FunnelCacheKey(userId));
-  return !!updated;
+  invalidateIsolateKey(c360FunnelCacheKey(userId));
+  return true;
 }
 
 export async function applyToJob(jobId: string, userId: string, application: ApplyJobDTO,
   deps?: Partial<JobServiceDeps>): Promise<{ applicationId: string }> {
   const d = resolveDeps(deps); const db = d.db;
-  const [created] = await db.insert(jobApplications).values({
+  const applicationId = await recordApply(db, {
     userId,
     jobId,
-    resumeId: application.resumeId as any,
-    coverLetter: application.coverLetter,
-    status: "applied",
-  } as any).returning({ id: jobApplications.id });
+    resumeId: typeof application.resumeId === "string" && application.resumeId ? application.resumeId : null,
+    coverLetter: typeof application.coverLetter === "string" && application.coverLetter ? application.coverLetter : null,
+  });
   // Applications fold into the Career 360 funnel's applied denominator — bust
   // its cached aggregate so the inner ring reflects the new apply at once (#2129b).
-  invalidateCachedKey(c360FunnelCacheKey(userId));
-  return { applicationId: created!.id };
+  invalidateIsolateKey(c360FunnelCacheKey(userId));
+  return { applicationId };
 }
 
 export async function getApplications(userId: string) {

@@ -53,7 +53,7 @@ import {
   toggleCompareSelection,
 } from "@/lib/interview-compare-href";
 import { toast } from "sonner";
-import TranscriptionStatusStrip from "@/components/interview-assignments/TranscriptionStatusStrip";
+import { TranscriptionStatus } from "@/components/transcription/TranscriptionStatus";
 
 function StatusBadge({ status }: { status: string }) {
   const { t } = useTranslation();
@@ -470,7 +470,7 @@ function DetailView({ id }: { id: string }) {
                       </p>
                     )}
                     {isCreator && <AnswerAIPanel interviewId={interview.id} response={r} onScored={refresh} />}
-                    {isCreator && <TranscriptionStatusStrip interviewId={interview.id} response={r} onRefresh={refresh} />}
+                    {isCreator && <TranscriptionStatus response={r} onRefresh={refresh} />}
                     {isCreator && <ProctoringStrip response={r} />}
                   </div>
                 ) : (

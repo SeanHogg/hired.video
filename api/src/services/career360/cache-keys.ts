@@ -7,7 +7,9 @@
  * from any track without a cycle.
  */
 
-/** Read-through key for a user's Career 360 inner-ring funnel aggregate. */
+/** Read-through key for a user's Career 360 inner-ring funnel aggregate.
+ *  Isolate-local cache (utils/isolate-cache.ts) — invalidate with
+ *  `invalidateIsolateKey`. */
 export function c360FunnelCacheKey(userId: string): string {
   return `c360:funnel:${userId}`;
 }

@@ -48,7 +48,7 @@ channelRoutes.get("/:handle", async (c) => {
 
   // Only videos whose studio_project is currently published surface on
   // a public channel page. The video.privacy_status mirror is kept in
-  // step by PATCH /api/studio/projects/:id/status (gap #723), but the
+  // step by PATCH /api/studio/projects/:id ({ status }) (gap #723), but the
   // INNER JOIN here is the structural gate so a future writer that
   // forgets to mirror can't leak an unpublished video onto the channel.
   // Profile-primary (the per-user "THE video on my profile" pointer

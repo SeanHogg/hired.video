@@ -1,10 +1,9 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { UuidLikeSchema, UUID_LIKE_REGEX } from "../../../../shared/validation.js";
-import { desc, eq } from "drizzle-orm";
-import type { Variables, AppEnv } from "../../types/index.js";
+import type { AppEnv } from "../../types/index.js";
 import { ok } from "../../utils/response.js";
-import { getDb, schema } from "../../db/index.js";
+import { AdminSecurityRepository } from "../../repositories/admin/adminSecurityRepository.js";
 import {
   handleSetPlanOverride,
   handleClearPlanOverride,
@@ -145,7 +144,7 @@ userMgmtRoutes.put("/:id/status", async (c) => {
 });
 
 // Toggle the editorial / house-author flag (users.is_system). SuperAdmin-only
-// via the superAdminMiddleware applied at the parent /admin/impersonate mount.
+// via the SA guard the admin composite applies to the /api/admin/sa mount.
 userMgmtRoutes.put("/:id/system", async (c) => {
   const body = SetSystemSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
@@ -198,48 +197,11 @@ userMgmtRoutes.get("/:id/history", async (c) => {
   if (!parsed.success) {
     return c.json({ error: { code: "BAD_REQUEST", message: parsed.error.issues[0].message } }, 400);
   }
-  const userId = c.req.param("id");
-  const db = getDb();
-
-  const [account] = await db
-    .select({
-      id: schema.users.id,
-      email: schema.users.email,
-      name: schema.users.name,
-      createdAt: schema.users.createdAt,
-      lastLoginAt: schema.users.lastLoginAt,
-      emailVerified: schema.users.emailVerified,
-      isBanned: schema.users.isBanned,
-      isSuspended: schema.users.isSuspended,
-      isActive: schema.users.isActive,
-      signupIp: schema.users.signupIp,
-      signupUserAgent: schema.users.signupUserAgent,
-    })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
-
-  if (!account) {
+  const history = await AdminSecurityRepository.create().userAuthHistory(c.req.param("id"), parsed.data.limit);
+  if (!history) {
     return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
   }
-
-  const events = await db
-    .select({
-      id: schema.loginEvents.id,
-      kind: schema.loginEvents.kind,
-      provider: schema.loginEvents.provider,
-      success: schema.loginEvents.success,
-      failureReason: schema.loginEvents.failureReason,
-      ipAddress: schema.loginEvents.ipAddress,
-      userAgent: schema.loginEvents.userAgent,
-      createdAt: schema.loginEvents.createdAt,
-    })
-    .from(schema.loginEvents)
-    .where(eq(schema.loginEvents.userId, userId))
-    .orderBy(desc(schema.loginEvents.createdAt))
-    .limit(parsed.data.limit);
-
-  return c.json(ok({ account, events }), 200);
+  return c.json(ok(history), 200);
 });
 
 // Run the heal-and-validate pipe over every resume owned by this user.

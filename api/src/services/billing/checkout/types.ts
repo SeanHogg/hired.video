@@ -1,6 +1,6 @@
 /**
- * Checkout-kind port — every server-priced one-off purchase (boost, course,
- * token pack) implements this ONE shape, and routes/checkout.ts dispatches
+ * Checkout-kind port — every server-priced one-off purchase (boost, job
+ * boost, course, token pack) implements this ONE shape, and routes/checkout.ts dispatches
  * through the registry (registry.ts) instead of a route per product.
  *
  * Every kind takes its money through OneOffPaymentsPort: `pay` opens the

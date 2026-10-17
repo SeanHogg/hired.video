@@ -207,10 +207,7 @@ export default function ProductDashboard() {
       setError(null);
 
       console.log("ProductDashboard: Starting to load dashboard data...");
-      // Include query parameters to ensure we get all data including SaaS metrics and time series
-      const response = await apiClient.get<ProductDashboardData>(
-        "/api/admin?IncludeSaaSMetrics=true&IncludeTimeSeriesData=true"
-      );
+      const response = await apiClient.get<ProductDashboardData>("/api/admin/metrics");
       console.log("ProductDashboard: API response received", response);
 
       // ApiClient returns ApiSuccessResponse<T> with structure: { success, data, timestamp }
@@ -253,7 +250,7 @@ export default function ProductDashboard() {
   const exportData = async (format: "csv") => {
     try {
       await downloadApiFile(
-        `/api/admin/export/${format}`,
+        `/api/admin/metrics/export/${format}`,
         `product-dashboard-${new Date().toISOString().split("T")[0]}.${format}`,
       );
     } catch (err) {

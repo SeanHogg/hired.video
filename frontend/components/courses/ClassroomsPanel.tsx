@@ -7,7 +7,7 @@
  * roll-up. Educator = Creator-program OR employer (#1886); the backend
  * gates creation, so a non-eligible user sees the prompt.
  *
- * Everything routes through /api/cohorts/* (CohortService → canActFor).
+ * Everything routes through /api/learning/cohorts/* (CohortService → canActFor).
  */
 import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";

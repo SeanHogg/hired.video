@@ -40,9 +40,10 @@ export interface INotificationsRepository {
   markAllReadForUser(userId: string): Promise<void>;
   markReadForUser(userId: string, notificationId: string): Promise<void>;
   deleteForUser(userId: string, notificationId: string): Promise<void>;
-  insertNotification(input: NotificationInsert): Promise<void>;
-  /** Bulk insert in one round-trip — used by the inbox action engine so
-   *  a chunk of `notify` effects collapses to a single write (no N+1). */
+  /** Bulk insert in one round-trip. ONLY `services/notifications/
+   *  notificationService.ts` (emitNotification/emitNotifications) may call
+   *  this — every other writer goes through the dispatcher so the
+   *  recipient's preferences + push/email fan-out are honoured. */
   insertNotifications(inputs: NotificationInsert[]): Promise<void>;
 }
 
@@ -105,11 +106,6 @@ export class NotificationsRepository implements INotificationsRepository {
       .delete(notifications)
       .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)));
     bumpInboxFor([userId]);
-  }
-
-  async insertNotification(input: NotificationInsert): Promise<void> {
-    await this.db.insert(notifications).values(input as any);
-    bumpInboxFor([input.userId]);
   }
 
   async insertNotifications(inputs: NotificationInsert[]): Promise<void> {

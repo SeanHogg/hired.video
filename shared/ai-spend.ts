@@ -1,7 +1,7 @@
 /**
  * SuperAdmin AI spend report — what AI consumption costs us, per user and per
  * model family, against what those users pay. Contract shared by
- * GET /api/admin/impersonate/ai-spend and the admin AiSpendPanel.
+ * GET /api/admin/sa/ai-spend and the admin AiSpendPanel.
  *
  * Cost = `ai_usage_records.cost` (priced per call from shared/ai-model-rates.ts).
  * Revenue is an ESTIMATE for the window: the Pro list price pro-rated over the

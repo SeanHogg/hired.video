@@ -23,6 +23,7 @@ import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { deleteProjectWithMedia } from "../services/studio/delete-project-media.js";
 import { bumpPublicWatchCache } from "../services/studio/public-watch-cache.js";
+import { stateWrite } from "../services/studio/project-state.js";
 import {
   assertCanWrite,
   buildOwnershipFilter,
@@ -174,7 +175,10 @@ nleRoutes.post("/projects", async (c) => {
       // there and let toProjectDto pull it back out. Once the migration
       // to nullable resumeText lands, remove this and stop dual-storing.
       resumeText: title,
-      timelineSpec: initialTimeline,
+      name: title,
+      // Timeline JSON is the `state` of every timeline-authoring kind
+      // (shared/studio-project-state.ts); stateWrite keeps baked_hash in step.
+      ...stateWrite(initialTimeline),
       status: "draft",
     } as any)
     .returning();
@@ -252,7 +256,8 @@ nleRoutes.get("/projects/:id", async (c) => {
       id: studioProjects.id,
       title: studioProjects.resumeText,
       kind: studioProjects.kind,
-      timelineSpec: studioProjects.timelineSpec,
+      // kind='nle' rows hold Timeline JSON in `state`.
+      timelineSpec: studioProjects.state,
       status: studioProjects.status,
       videoId: studioProjects.videoId,
       updatedAt: studioProjects.updatedAt,
@@ -319,11 +324,11 @@ nleRoutes.patch("/projects/:id", async (c) => {
   }
 
   const patch: Record<string, any> = {
-    timelineSpec: parsed.data.timelineSpec,
+    ...stateWrite(parsed.data.timelineSpec),
     userId: user.sub, // record the actual editor for attribution
-    // A timeline save is a content change: bump the `_rev` save-draft's
+    // A timeline save is a content change: bump the revision save-draft's
     // stale-write check reads (#2242), so an open studio tab sees it.
-    storyboard: drizzleSql`jsonb_set(coalesce(${studioProjects.storyboard}, '{}'::jsonb), '{_rev}', to_jsonb(coalesce((${studioProjects.storyboard}->>'_rev')::int, 0) + 1))`,
+    revision: drizzleSql`${studioProjects.revision} + 1`,
   };
   if (parsed.data.title !== undefined) patch.resumeText = parsed.data.title;
 
@@ -339,7 +344,7 @@ nleRoutes.patch("/projects/:id", async (c) => {
     ok({
       id: updated.id,
       title: updated.resumeText,
-      timelineSpec: updated.timelineSpec,
+      timelineSpec: updated.state,
       updatedAt: updated.updatedAt,
     }),
   );

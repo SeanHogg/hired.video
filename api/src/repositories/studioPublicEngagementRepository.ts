@@ -9,7 +9,7 @@
  * after the Save/Publish split (#665, #667) the project's own `is_public`
  * flag is authoritative for the in-platform watch page. `publicStudioProjectWhere`
  * is the single SQL predicate every public project read filters on
- * (GET /projects/public, /videos/featured, the sitemap, this module). The
+ * (GET /public?subjectKind=, /videos/featured, the sitemap, this module). The
  * watch payload (GET /public/:videoId) reads the same column off the row it
  * already loaded.
  */

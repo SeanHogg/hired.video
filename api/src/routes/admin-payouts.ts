@@ -1,122 +1,31 @@
 /**
- * /api/admin/payouts — admin-only payout back-office operations.
+ * /api/admin/payouts — admin payout back-office operations. Mounted by the
+ * admin composite (routes/admin/index.ts), which applies the admin guard
+ * (Admin or SuperAdmin — same gate as /api/admin/tax-reporting).
  *
  *   POST /backfill-tax-ids          one-time plaintext → AES-GCM backfill (#775)
  *   GET  /tax-year/:year            1099-NEC settled-payout aggregation (#777)
  *   GET  /tax-year/:year?format=csv same data as a Track1099-compatible CSV
  *
- * Caller must hold the admin / SuperAdmin role (same gate the sibling
- * `/api/admin/tax-reporting` routes use). The aggregation logic lives in
- * TaxReportingService (shipped under #312) — this file only exposes the
- * gap-#777 endpoint shape (`/api/admin/payouts/tax-year/:year` + `?format=csv`)
- * over that single source of truth, so there is no duplicated aggregation.
+ * The aggregation lives in TaxReportingService (#312); this file only exposes
+ * the gap-#777 endpoint shape over that single source of truth.
  */
 
 import { Hono } from "hono";
-import { and, eq, isNull, isNotNull, sql } from "drizzle-orm";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { adminMiddleware } from "../middleware/superAdmin.js";
 import { requestEnv } from "../utils/env.js";
-import { encryptTaxId } from "../services/payout/encryption.js";
+import { backfillTaxIds } from "../services/admin/taxIdBackfill.js";
 import {
   getAnnualReport,
-  invalidateTaxYearReports,
   taxReportingService,
   type TaxYearReport,
 } from "../services/payout/TaxReportingService.js";
 
 export const adminPayoutRoutes = new Hono<AppEnv>();
 
-const { payoutProfiles } = schema;
-
-// ---------------------------------------------------------------------------
-// POST /backfill-tax-ids — one-time plaintext → ciphertext migration (#775)
-//
-// Bridges #772 (write-side moved to ciphertext) and #774 (drop the legacy
-// plaintext column). Reads every row that still has plaintext but no
-// ciphertext, encrypts via the same envelope used by the live PATCH route,
-// writes the three ciphertext columns, then NULLs the plaintext. Idempotent:
-// the WHERE clause excludes already-migrated rows, so re-running is a no-op.
-// One-shot admin route (not a worker) — few rows, manually triggered after
-// deploy.
-// ---------------------------------------------------------------------------
-adminPayoutRoutes.post("/backfill-tax-ids", adminMiddleware, async (c) => {
-  const db = getDb();
-  const env = requestEnv(c);
-
-  // Rows needing migration: plaintext present, ciphertext absent.
-  const pending = await db
-    .select({
-      id: payoutProfiles.id,
-      taxIdEncrypted: payoutProfiles.taxIdEncrypted,
-    })
-    .from(payoutProfiles)
-    .where(
-      and(
-        isNotNull(payoutProfiles.taxIdEncrypted),
-        isNull(payoutProfiles.taxIdCiphertext),
-      ),
-    );
-
-  let migrated = 0;
-  let skipped = 0;
-  const failures: Array<{ id: string; reason: string }> = [];
-
-  for (const row of pending) {
-    const plaintext = (row.taxIdEncrypted ?? "").trim();
-    if (!plaintext) {
-      // Empty/whitespace plaintext — nothing to encrypt; just clear it so
-      // #774's drop-column migration sees no surviving non-NULL values.
-      await db
-        .update(payoutProfiles)
-        .set({ taxIdEncrypted: null } as any)
-        .where(eq(payoutProfiles.id, row.id));
-      skipped += 1;
-      continue;
-    }
-
-    try {
-      const enc = await encryptTaxId(plaintext, env);
-      // Re-assert the no-ciphertext precondition inside the write so two
-      // concurrent runs can't double-encrypt the same row.
-      await db
-        .update(payoutProfiles)
-        .set({
-          taxIdCiphertext: enc.ciphertext,
-          taxIdNonce: enc.nonce,
-          taxIdKmsKeyId: enc.kmsKeyId,
-          taxIdLast4: plaintext.replace(/\D/g, "").slice(-4) || null,
-          taxIdEncrypted: null,
-        } as any)
-        .where(
-          and(
-            eq(payoutProfiles.id, row.id),
-            isNull(payoutProfiles.taxIdCiphertext),
-          ),
-        );
-      migrated += 1;
-    } catch (err) {
-      failures.push({
-        id: row.id,
-        reason: err instanceof Error ? err.message : "encryption failed",
-      });
-    }
-  }
-  // taxIdLast4 is surfaced on the annual report rows.
-  if (pending.length > 0) invalidateTaxYearReports();
-
-  return c.json(
-    success({
-      candidates: pending.length,
-      migrated,
-      skippedEmpty: skipped,
-      failed: failures.length,
-      failures,
-    }),
-    200,
-  );
+adminPayoutRoutes.post("/backfill-tax-ids", async (c) => {
+  return c.json(success(await backfillTaxIds(requestEnv(c))), 200);
 });
 
 // ---------------------------------------------------------------------------
@@ -135,7 +44,7 @@ adminPayoutRoutes.post("/backfill-tax-ids", adminMiddleware, async (c) => {
 // year keeps mutating as payouts settle, so it is NOT cached — only fully
 // past years are. Dates are revived from KV's ISO strings.
 // ---------------------------------------------------------------------------
-adminPayoutRoutes.get("/tax-year/:year", adminMiddleware, async (c) => {
+adminPayoutRoutes.get("/tax-year/:year", async (c) => {
   const year = Number.parseInt(c.req.param("year"), 10);
   if (!Number.isInteger(year)) {
     return c.json(error("VALIDATION_ERROR", "year must be a 4-digit integer"), 400);
@@ -146,7 +55,8 @@ adminPayoutRoutes.get("/tax-year/:year", adminMiddleware, async (c) => {
 
   let report: TaxYearReport;
   try {
-    report = await loadReport(year);
+    // Closed years are cached + invalidated on every payout write.
+    report = await getAnnualReport(year);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to build tax-year report";
     if (format === "csv") return c.text(msg, 500);
@@ -166,13 +76,3 @@ adminPayoutRoutes.get("/tax-year/:year", adminMiddleware, async (c) => {
 
   return c.json(success(report), 200);
 });
-
-/** Annual report via the cached service read (closed years cached,
- *  invalidated on every payout / payout-profile write). */
-function loadReport(year: number): Promise<TaxYearReport> {
-  return getAnnualReport(year);
-}
-
-adminPayoutRoutes.all("*", (c) =>
-  c.json(error("NOT_FOUND", "Admin payouts route not found"), 404),
-);

@@ -37,12 +37,16 @@ export const users = pgTable("users", {
    *  rendered or posted. Email is `guest-<uuid>@guest.invalid`; on sign-up /
    *  sign-in `adopt_guest_user()` moves its rows to the real user. */
   isGuest: boolean("is_guest").default(false).notNull(),
+  /** THE role store — one of USER_ROLES (shared/user-roles.ts), CHECK-
+   *  constrained (mig 0630). The JWT `roles` claim is `[users.role]`. The
+   *  old `roles` / `user_roles` join tables had no reader or writer and were
+   *  archived by 0630. */
   role: varchar("role", { length: 50 }).default("job_seeker").notNull(),
-  /** #104 — Persona axis orthogonal to USER_ROLES. Drives the UI label
-   *  set ("Prospect Pipeline" vs "Talent Pool", "Deal Stages" vs
-   *  "Submission Status", "Target Accounts" vs "Job Postings") + the
-   *  pricing-page section the user sees. Feature-flagged at the UI
-   *  level so the same backend serves both flavours. */
+  /** @deprecated DEAD — no reader or writer anywhere. #104's "sales vs
+   *  recruiting" label-set axis (orthogonal to `role`, not a duplicate) was
+   *  never wired. Kept declared only because `drizzle-kit push` runs before
+   *  the SQL migrations: the follow-up migration archives + drops it, and its
+   *  declaration is removed in that same change. Do not read or write. */
   persona: varchar("persona", { length: 32 }).default("recruiting").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   isSuspended: boolean("is_suspended").default(false).notNull(),
@@ -130,33 +134,15 @@ export const users = pgTable("users", {
     .on(t.providerCustomerId)
     .where(sql`provider_customer_id IS NOT NULL`),
   check("users_profile_mode_check", sql`${t.profileMode} IN ('resume', 'channel', 'auto')`),
+  // Mirrors USER_ROLES in shared/user-roles.ts (mig 0630).
+  check(
+    "users_role_check",
+    sql`${t.role} IN ('job_seeker', 'recruiter', 'employer', 'employee', 'creator', 'affiliate', 'admin', 'super_admin')`,
+  ),
 ]);
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
-
-export const roles = pgTable("roles", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: varchar("name", { length: 100 }).notNull().unique(),
-  description: text("description"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
-
-export type Role = typeof roles.$inferSelect;
-export type NewRole = typeof roles.$inferInsert;
-
-export const userRoles = pgTable("user_roles", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  roleId: uuid("role_id").notNull().references(() => roles.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [
-  index("idx_user_roles_user").on(t.userId),
-  index("idx_user_roles_role_id").on(t.roleId),
-]);
-
-export type UserRole = typeof userRoles.$inferSelect;
-export type NewUserRole = typeof userRoles.$inferInsert;
 
 export const passwordHistory = pgTable("password_history", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -255,6 +241,9 @@ export const userProfiles = pgTable("user_profiles", {
   openToRemote: boolean("open_to_remote").default(false).notNull(),
   salaryCurrency: varchar("salary_currency", { length: 10 }).default("USD"),
   salaryExpectation: integer("salary_expectation"),
+  // THE store for a person's skills / industries (job_preferences.skills /
+  // .industries were merged in by mig 0631 and are deprecated). Workspace
+  // taxonomies (workspace_tags etc.) are recruiter vocabularies, not this.
   skills: jsonb("skills").$type<string[]>().default([]),
   industries: jsonb("industries").$type<string[]>().default([]),
   preferredRoles: jsonb("preferred_roles").$type<string[]>().default([]),
@@ -272,10 +261,11 @@ export const userProfiles = pgTable("user_profiles", {
   featuredUntil: timestamp("featured_until", { withTimezone: true }),
   // Lead-generation / services marketplace
   providesServices: boolean("provides_services").default(false).notNull(),
-  // Mailing / billing address — single source of truth for Checkout,
-  // Settings → Billing, and the Services marketplace. Shape mirrors
-  // BillingAddressSchema in shared/billing-address.ts. Per-field columns
-  // so each can be queried + validated independently (vs. a JSONB blob).
+  /** @deprecated billing_* — copied to `billing_addresses` (mig 0631), the
+   *  canonical store (repositories/billingAddressRepository.ts). No reader;
+   *  only the GDPR purge still NULLs them. Kept declared only because
+   *  `drizzle-kit push` runs before the SQL migrations; the follow-up
+   *  migration archives + drops them and removes these declarations. */
   billingFullName: varchar("billing_full_name", { length: 160 }),
   billingCompany: varchar("billing_company", { length: 160 }),
   billingLine1: varchar("billing_line1", { length: 200 }),
@@ -290,10 +280,12 @@ export const userProfiles = pgTable("user_profiles", {
   // for the document shape. Single document per user (one active target
   // — multi-target comparison is a separate roadmap item).
   careerTarget: jsonb("career_target").$type<Record<string, unknown>>(),
-  // Structured home location — distinct from free-text `location` (legacy)
-  // and `billing_*` (mailing address). Drives "show me content for my
-  // city" personalization across every feed + search surface. See
-  // migration 0108_content_locations.sql.
+  /** @deprecated home_* — the home location lives in `content_locations`
+   *  (entity_kind 'user_profile', entity_id = users.id, role 'origin'),
+   *  written by the LocationPicker; 0631 backfilled any row only present
+   *  here. No reader; only the GDPR purge still NULLs them. Kept declared
+   *  only because `drizzle-kit push` runs before the SQL migrations; the
+   *  follow-up migration archives + drops them (and these indexes). */
   homeCountryId: integer("home_country_id"),
   homeStateId: uuid("home_state_id"),
   homeCityId: uuid("home_city_id"),
@@ -449,7 +441,8 @@ export const userConnections = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     fromUserId: uuid("from_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     toUserId: uuid("to_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    status: varchar("status", { length: 50 }).default("Pending").notNull(), // Pending | Accepted | Rejected
+    // CONNECTION_STATUSES (shared/statuses.ts); lowercase since migration 0620.
+    status: varchar("status", { length: 50 }).default("pending").notNull(),
     requestMessage: text("request_message"),
     responseMessage: text("response_message"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -460,9 +453,9 @@ export const userConnections = pgTable(
     // Rejected rows excluded so a re-request is legal after a prior reject.
     uniqueIndex("uq_user_connections_open_pair")
       .on(t.fromUserId, t.toUserId)
-      .where(sql`${t.status} IN ('Pending', 'Accepted')`),
+      .where(sql`${t.status} IN ('pending', 'accepted')`),
     index("idx_user_connections_to_user").on(t.toUserId),
-    check("user_connections_status_check", sql`${t.status} IN ('Pending', 'Accepted', 'Rejected')`),
+    check("user_connections_status_check", sql`${t.status} IN ('pending', 'accepted', 'rejected')`),
     index("idx_user_connections_from_user_id").on(t.fromUserId),
   ],
 );
@@ -470,33 +463,8 @@ export const userConnections = pgTable(
 export type UserConnection = typeof userConnections.$inferSelect;
 export type NewUserConnection = typeof userConnections.$inferInsert;
 
-export const oauthAccounts = pgTable("oauth_accounts", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  provider: varchar("provider", { length: 50 }).notNull(),
-  providerAccountId: varchar("provider_account_id", { length: 255 }).notNull(),
-  email: varchar("email", { length: 255 }),
-  displayName: varchar("display_name", { length: 255 }),
-  avatarUrl: text("avatar_url"),
-  /** Legacy plaintext — new writes go to the *_enc columns (0548). */
-  accessToken: text("access_token"),
-  refreshToken: text("refresh_token"),
-  accessTokenEnc: text("access_token_enc"),
-  refreshTokenEnc: text("refresh_token_enc"),
-  tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
-  scope: text("scope"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [
-  // OAuth login lookup. The non-unique twin from 0495 was dropped in 0546;
-  // this UNIQUE index serves the lookup.
-  // #2305 — UNIQUE (migration 0518_dedupe_unique_indexes.sql); duplicates resolved by 0518_dedupe_unique_indexes.sql.
-  uniqueIndex("uq_oauth_accounts_provider_account").on(t.provider, t.providerAccountId),
-  index("idx_oauth_accounts_user").on(t.userId),
-]);
-
-export type OAuthAccount = typeof oauthAccounts.$inferSelect;
-export type NewOAuthAccount = typeof oauthAccounts.$inferInsert;
+// OAuth sign-in identities live in provider_connections (purpose "login",
+// W3-C migration 0600).
 
 // Append-only per-event log of authentication attempts (register, login,
 // oauth_login, magic_link). user_id is nullable so failed attempts on a

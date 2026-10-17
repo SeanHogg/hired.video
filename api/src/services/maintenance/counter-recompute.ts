@@ -89,7 +89,7 @@ export const COUNTER_POLICIES: readonly CounterPolicy[] = [
     column: "view_count",
     sourceTable: "artifact_views",
     sourceFk: "artifact_id",
-    sourceWhere: "artifact_kind = 'article'",
+    sourceWhere: "artifact_kind = 'article' AND event_type = 'view'",
   },
 
   // Candidate resume share viewCount.

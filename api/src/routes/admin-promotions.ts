@@ -12,7 +12,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { isPromotionStatus } from "../../../shared/promotions.js";
 import { reachSummary } from "../services/promotions/promotionReach.js";
 import {
@@ -23,8 +22,6 @@ import {
 import { promotionErrorResponse } from "./promotion-errors.js";
 
 export const adminPromotionRoutes = new Hono<AppEnv>();
-
-adminPromotionRoutes.use("*", superAdminMiddleware);
 
 adminPromotionRoutes.get("/", async (c) => {
   const status = c.req.query("status") ?? "pending";

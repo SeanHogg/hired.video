@@ -11,6 +11,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { statusLabelKey } from "@shared/statuses";
 import { Link, useLocation } from "react-router-dom";
 import { Loader2, Plus, Trash2, Users } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -158,7 +159,7 @@ export default function PlacementsList() {
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <span className="text-sm font-mono tabular-nums">{fmtMoney(p.commissionAmount)}</span>
-                  <Badge variant={p.commissionStatus === "Paid" ? "default" : "secondary"}>{p.commissionStatus}</Badge>
+                  <Badge variant={p.commissionStatus === "paid" ? "default" : "secondary"}>{t(statusLabelKey("commission", p.commissionStatus), { defaultValue: p.commissionStatus })}</Badge>
                 </div>
               </Link>
             ))}

@@ -1,8 +1,8 @@
 // Shared shell behind /tools/resume-optimizer and /tools/ai-resume-scorer.
 //
 // Both pages used to be ~800-line copy-paste duplicates that called
-// different endpoints (/api/resumeoptimizer/optimize vs
-// /api/resumescorer/score). Now both endpoints proxy to the same
+// different endpoints. Now both are AI tools on the one dispatcher
+// (aiToolPath("resume-optimize") / aiToolPath("resume-score")) backed by the same
 // services/resume/analyze.ts engine and return the merged
 // `ResumeAnalysisSchema` shape, so this one component renders both —
 // Optimizer adds a Job Description textarea, Scorer leads with the

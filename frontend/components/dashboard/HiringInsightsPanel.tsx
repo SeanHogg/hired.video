@@ -39,7 +39,7 @@ export function HiringInsightsPanel() {
     let cancelled = false;
     setLoading(true);
     apiClient
-      .get<HiringInsights>("/api/recruiter/hiring-insights", null as any)
+      .get<HiringInsights>("/api/analytics/hiring?metric=insights", null as any)
       .then((res) => {
         if (cancelled) return;
         setData(res.data);

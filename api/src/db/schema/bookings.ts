@@ -210,33 +210,6 @@ export type BookingReservation = typeof bookingReservations.$inferSelect;
 export type NewBookingReservation = typeof bookingReservations.$inferInsert;
 
 // ---------------------------------------------------------------------------
-// booking_comments — threaded comments on a reservation
-// ---------------------------------------------------------------------------
-export const bookingComments = pgTable(
-  "booking_comments",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    reservationId: uuid("reservation_id")
-      .notNull()
-      .references(() => bookingReservations.id, { onDelete: "cascade" }),
-    authorKind: varchar("author_kind", { length: 8 }).notNull(),
-    authorUserId: uuid("author_user_id").references(() => users.id, {
-      onDelete: "set null",
-    }),
-    bodyMd: text("body_md").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (t) => [
-    index("idx_booking_comments_reservation").on(t.reservationId, t.createdAt),
-    check("booking_comments_author_kind_check", sql`${t.authorKind} IN ('host', 'booker')`),
-    index("idx_booking_comments_author_user_id").on(t.authorUserId),
-  ],
-);
-
-export type BookingComment = typeof bookingComments.$inferSelect;
-export type NewBookingComment = typeof bookingComments.$inferInsert;
-
-// ---------------------------------------------------------------------------
 // booking_payout_records — per-reservation payout ledger
 // ---------------------------------------------------------------------------
 export const bookingPayoutRecords = pgTable(

@@ -1,6 +1,6 @@
 /**
  * useJobLinkImport — read a job link through the job importer
- * (POST /api/Job/Extract via jobService, the same path the chat's review
+ * (POST /api/jobs/extract via jobService, the same path the chat's review
  * intake uses) into the job post's text, for the kit's "Job you want" slot.
  * Owns only the reading state; the caller puts the text in its draft.
  */

@@ -105,9 +105,13 @@ export interface Env {
   TIKTOK_CONTENT_CLIENT_SECRET?: string;
   X_CLIENT_ID?: string;
   X_CLIENT_SECRET?: string;
-  // Envelope-encryption key for social_connections / managed_accounts token
-  // columns. Falls back to PAID_MEDIA_KMS_KEY when unset (services/social/secrets.ts).
+  // Pre-merge envelope key of social_connections / managed_accounts tokens
+  // (fell back to PAID_MEDIA_KMS_KEY). Read-only since W3-C: opens tokens not
+  // yet re-sealed under CREDENTIALS_KMS_KEY (provider-connections/connection-secrets.ts).
   SOCIAL_KMS_KEY?: string;
+  // The ONE key every provider_connections secret is sealed with
+  // (services/crypto/credential-columns.ts).
+  CREDENTIALS_KMS_KEY?: string;
   // Absolute API origin used to build social OAuth redirect URIs.
   API_URL?: string;
   // Cloudflare `version_metadata` binding — the deployed version id/tag
@@ -120,6 +124,10 @@ import type { Context } from "hono";
 
 export interface Variables {
   user: JwtPayload;
+  /** `user.sub`, set by authMiddleware / optionalAuthMiddleware whenever a
+   *  user is attached. Always present behind authMiddleware; on optional-auth
+   *  routes read it via `requireUser(c)` (401s when anonymous). */
+  userId: string;
   /** Set by partnerAuthMiddleware on `/api/partner/*` — the authenticated
    *  external partner (system-to-system key auth), never a logged-in user. */
   partner?: { partnerId: string; keyId: string; scopes: string[] };

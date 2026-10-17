@@ -53,6 +53,7 @@ vi.mock('@/lib/api-client', async () => {
       get: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
+      patch: vi.fn(),
       delete: vi.fn(),
       request: vi.fn(),
       getRaw: vi.fn(),
@@ -64,6 +65,7 @@ vi.mock('@/lib/api-client', async () => {
 const apiClient = (apiClientModule as any).apiClient as {
   get: ReturnType<typeof vi.fn>;
   post: ReturnType<typeof vi.fn>;
+  patch: ReturnType<typeof vi.fn>;
 };
 
 describe('resumeService.getResumesForDisplay', () => {
@@ -107,6 +109,8 @@ describe('resumeService.getResumesForDisplay', () => {
 
     const result = await resumeService.getResumesForDisplay();
     expect(result).toEqual(owned);
+    expect(apiClient.get).toHaveBeenCalledWith('/api/resumes?owner=me&include=ownership', expect.anything());
+    expect(apiClient.get).toHaveBeenCalledWith('/api/resumes?owner=me&view=groups', expect.anything());
   });
 
   it('falls back to flattening master groups when withOwnership is empty', async () => {
@@ -124,11 +128,11 @@ describe('resumeService.getResumesForDisplay', () => {
 describe('resumeService.setResumePrivacy', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('POSTs to backend and returns true', async () => {
-    apiClient.post.mockResolvedValueOnce({ data: true });
+  it('PATCHes the résumé state and returns true', async () => {
+    apiClient.patch.mockResolvedValueOnce({ data: mkGroup('r1').masterResume });
     const ok = await resumeService.setResumePrivacy('r1', 'public');
     expect(ok).toBe(true);
-    expect(apiClient.post).toHaveBeenCalledWith('/api/resumes/r1/setprivacy', { privacy: 'public' }, expect.anything());
+    expect(apiClient.patch).toHaveBeenCalledWith('/api/resumes/r1', { privacy: 'public' }, expect.anything());
   });
 });
 

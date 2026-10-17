@@ -33,6 +33,8 @@ import { getDb } from "../db/index.js";
 import { studioProjects } from "../db/schema/resumes.js";
 import { gameAgentConversations } from "../db/schema/games.js";
 import { canActFor } from "../services/studio/workspace.js";
+import { projectStateAs } from "../repositories/studioProjectsRepository.js";
+import { stateWrite } from "../services/studio/project-state.js";
 import { createLLMClient, type LLMMessage, type ToolSpec } from "../services/adapters/llm-client.js";
 import {
   GAME_AGENT_TOOLS,
@@ -125,7 +127,8 @@ gameAgentRoutes.post("/:projectId/turn", async (c) => {
       id: studioProjects.id,
       userId: studioProjects.userId,
       companyId: studioProjects.companyId,
-      gameState: studioProjects.gameState,
+      mediaKind: studioProjects.mediaKind,
+      gameState: projectStateAs("gameState"),
     })
     .from(studioProjects)
     .where(eq(studioProjects.id, projectId))
@@ -133,6 +136,10 @@ gameAgentRoutes.post("/:projectId/turn", async (c) => {
   if (!project) return c.json(fail("NOT_FOUND", "Project not found"), 404);
   const allowed = await canActFor(user.sub, project.userId, project.companyId ?? null);
   if (!allowed) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  // The agent edits GameState, which is `state` only on a game project.
+  if (project.mediaKind !== "game") {
+    return c.json(fail("WRONG_KIND", "This project is not a game project"), 400);
+  }
 
   // ─── Load or create the conversation row ─────────────────────────────
   const [existing] = await db
@@ -202,7 +209,7 @@ gameAgentRoutes.post("/:projectId/turn", async (c) => {
   if (appliedToolCalls.some((c) => c.applied)) {
     await db
       .update(studioProjects)
-      .set({ gameState: nextState })
+      .set(stateWrite(nextState))
       .where(eq(studioProjects.id, projectId));
   }
 
@@ -276,6 +283,10 @@ gameAgentRoutes.get("/:projectId/conversation", async (c) => {
   if (!project) return c.json(fail("NOT_FOUND", "Project not found"), 404);
   const allowed = await canActFor(user.sub, project.userId, project.companyId ?? null);
   if (!allowed) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  // The agent edits GameState, which is `state` only on a game project.
+  if (project.mediaKind !== "game") {
+    return c.json(fail("WRONG_KIND", "This project is not a game project"), 400);
+  }
 
   const [row] = await db
     .select()

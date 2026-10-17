@@ -83,7 +83,7 @@ export function useJobPipeline(
     async (entryId: string, stage: PipelineStage) => {
       setSnapshot((prev) => prev && moveEntry(prev, entryId, stage));
       try {
-        await jobPipelineService.moveStage(jobId, entryId, stage);
+        await jobPipelineService.moveStage(entryId, stage);
       } catch (e) {
         toast({
           title: "Move failed",
@@ -93,7 +93,7 @@ export function useJobPipeline(
         await refresh();
       }
     },
-    [jobId, refresh, toast],
+    [refresh, toast],
   );
 
   const bulkMoveStage = useCallback(
@@ -106,7 +106,7 @@ export function useJobPipeline(
         return next;
       });
       try {
-        await Promise.all(entryIds.map((id) => jobPipelineService.moveStage(jobId, id, stage)));
+        await Promise.all(entryIds.map((id) => jobPipelineService.moveStage(id, stage)));
         toast({
           title: "Bulk move complete",
           description: `${entryIds.length} candidate(s) → ${PIPELINE_STAGE_LABELS[stage]}.`,
@@ -120,7 +120,7 @@ export function useJobPipeline(
         await refresh();
       }
     },
-    [jobId, refresh, toast],
+    [refresh, toast],
   );
 
   const addCandidate = useCallback(
@@ -153,7 +153,7 @@ export function useJobPipeline(
     async (entryId: string) => {
       setSnapshot((prev) => prev && removeEntry(prev, entryId));
       try {
-        await jobPipelineService.remove(jobId, entryId);
+        await jobPipelineService.remove(entryId);
       } catch (e) {
         toast({
           title: "Remove failed",
@@ -163,7 +163,7 @@ export function useJobPipeline(
         await refresh();
       }
     },
-    [jobId, refresh, toast],
+    [refresh, toast],
   );
 
   return {

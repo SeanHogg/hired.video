@@ -33,7 +33,7 @@ function makeDb(seed: Record<string, any[]> = {}) {
     user_company_role_associations: [],
     company_subscriptions: [],
     ai_usage_records: [],
-    company_token_balance: [],
+    wallet_balances: [],
     ...seed,
   });
 }
@@ -87,7 +87,7 @@ describe("company-token-ledger — pool budget (SUM-aware)", () => {
         usage({ totalTokens: 300000 }),
         usage({ totalTokens: 200000, userId: "u-emp2" }),
       ],
-      company_token_balance: [{ id: "b1", companyId: COMPANY, balance: 10000 }],
+      wallet_balances: [{ id: "b1", ownerKind: "company", ownerId: COMPANY, currencyKind: "ai_tokens", balance: 10000 }],
     });
     const budget = await getCompanyTokenBudget(COMPANY, db);
     assert.equal(budget.monthlyLimit, 2 * WORKFORCE_SEAT_AI_MONTHLY_TOKENS);
@@ -159,7 +159,7 @@ describe("company-token-ledger — debit", () => {
     const { db, state } = makeDb({
       // seatCount 0 → monthly pool 0 → the call must overflow to the pack.
       company_subscriptions: [{ id: "s1", companyId: COMPANY, seatCount: 0 }],
-      company_token_balance: [{ id: "b1", companyId: COMPANY, balance: 5000, lifetimeConsumed: 0 }],
+      wallet_balances: [{ id: "b1", ownerKind: "company", ownerId: COMPANY, currencyKind: "ai_tokens", balance: 5000, lifetimeConsumed: 0 }],
     });
     await recordCompanyTokenUsage(
       { companyId: COMPANY, userId: "u-emp", model: "gpt", featureKey: "chat", promptTokens: 1000, completionTokens: 0 },
@@ -176,7 +176,7 @@ describe("company-token-ledger — debit", () => {
   it("stays on the monthly source while the pool has room even with a pack balance", async () => {
     const { db, state } = makeDb({
       company_subscriptions: [{ id: "s1", companyId: COMPANY, seatCount: 1 }],
-      company_token_balance: [{ id: "b1", companyId: COMPANY, balance: 5000 }],
+      wallet_balances: [{ id: "b1", ownerKind: "company", ownerId: COMPANY, currencyKind: "ai_tokens", balance: 5000 }],
     });
     await recordCompanyTokenUsage(
       { companyId: COMPANY, userId: "u-emp", model: "gpt", featureKey: "chat", promptTokens: 1000, completionTokens: 0 },

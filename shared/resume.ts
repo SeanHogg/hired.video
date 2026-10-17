@@ -10,14 +10,14 @@
  *   fake placeholders.
  * - Viewer-specific fields (isOwner, isWatched) are computed per-request
  *   on the server so the frontend doesn't re-derive them.
- * - `viewCount` is aggregated from the `resume_views` event table.
+ * - `viewCount` is aggregated from the server-recorded `artifact_views` rows (kind resume).
  * - `sentimentScore` is persisted by the sentiment tool when it runs.
  *
  * ─── REFACTOR PROGRESS (living doc) ──────────────────────────────────────
  *
  * DONE (this PR):
  *   - Contract defined (this file).
- *   - DB: `sentiment_score` column on resume_information; `resume_views`
+ *   - DB: `sentiment_score` column on resume_information; `artifact_views`
  *     event table; unique(viewer_id, resume_id) on watched_resumes.
  *     Migration: api/drizzle/0022_resume_sentiment_and_views.sql.
  *   - Backend serializers: `rowToResume` + `rowToResumeSummary` are pure
@@ -595,7 +595,7 @@ export const ResumeSummarySchema = ResumeSchema.omit({ content: true }).extend({
 });
 export type ResumeSummary = z.infer<typeof ResumeSummarySchema>;
 
-/** List-with-ownership envelope — the `/api/resumes/withownership` endpoint
+/** List-with-ownership envelope — `GET /api/resumes?owner=me&include=ownership`
  *  adds a marker so the Resumes page can separate "my resumes" from
  *  "resumes I track". Kept in shared/ so the frontend can't redefine the
  *  shape and drift from the backend emitter. */

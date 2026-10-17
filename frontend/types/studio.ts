@@ -73,8 +73,8 @@ export interface StudioProjectState {
    *  their profile bio + services, or just the free-form prompt.
    *  `auto` = "use whichever is richest" — the scaffolder picks. */
   comicSourceKind?: "resume" | "profile" | "services" | "auto";
-  /** When set, the scaffolder calls `/api/studio/generate-image` once
-   *  to produce a protagonist headshot, then uses it as the character
+  /** When set, `/api/studio/generate-comic` also runs one Workers AI
+   *  image pass to produce a protagonist headshot, then uses it as the character
    *  image on every page. Off by default (free SVG silhouettes); on
    *  trades tokens for a personalised hero portrait. */
   comicGenerateCharacterPortrait?: boolean;

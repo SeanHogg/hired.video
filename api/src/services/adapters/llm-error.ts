@@ -30,12 +30,12 @@ import {
   LLMDispatchError,
   type LLMDispatchAttempt,
   type LLMFailoverEvent,
-} from "./llm-client.js";
+} from "./llm/dispatch-errors.js";
 import { error } from "../../types/index.js";
 import { logger } from "../../lib/logger.js";
 
-export { LLMDispatchError } from "./llm-client.js";
-export type { LLMDispatchAttempt, LLMFailoverEvent } from "./llm-client.js";
+export { LLMDispatchError } from "./llm/dispatch-errors.js";
+export type { LLMDispatchAttempt, LLMFailoverEvent } from "./llm/dispatch-errors.js";
 
 // Per-attempt message cap surfaced in the support-ticket payload. Wide
 // enough to carry a multi-error Zod validation message (5+ field

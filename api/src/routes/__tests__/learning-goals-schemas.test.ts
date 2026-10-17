@@ -1,11 +1,11 @@
 /**
- * Tests for the Zod schemas in `learning-goals.ts` — schema-test backfill for
+ * Tests for the Zod schemas in `learning/goals.ts` — schema-test backfill for
  * the TK6 slice of gap #1528.
  *
  * Both validators (`CreateGoalSchema`, `UpdateGoalSchema`) are declared
  * un-exported inside the route module. To keep every edit inside `__tests__/`
  * (the route file is intentionally NOT modified to add exports), they are
- * reconstructed here VERBATIM from learning-goals.ts:
+ * reconstructed here VERBATIM from learning/goals.ts:
  *
  *     CreateGoalSchema = z.object({
  *       goalText: z.string().min(2).max(280),
@@ -34,7 +34,7 @@ import { z } from "zod";
 
 import { LEARNING_GOAL_STATUSES } from "../../db/schema/learning.js";
 
-// Verbatim mirrors of the un-exported schemas in `learning-goals.ts`. See the
+// Verbatim mirrors of the un-exported schemas in `learning/goals.ts`. See the
 // file header for why they are reconstructed rather than imported.
 const CreateGoalSchema = z.object({
   goalText: z.string().min(2).max(280),

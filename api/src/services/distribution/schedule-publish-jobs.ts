@@ -13,8 +13,9 @@
  *                   project. A destination already queued for the project is
  *                   skipped, never queued twice.
  *   listPosts       the creator's upcoming / sent / failed jobs — cached
- *                   (getOrSetCached) under a per-creator version token that
- *                   every write and every drained job bumps
+ *                   isolate-locally (getOrSetIsolateCached) under a
+ *                   per-creator key prefix that every write and every
+ *                   drained job drops (other isolates converge in the TTL)
  *   cancelPost      a job that hasn't started
  *   retryPost       a failed or cancelled job, back in the queue
  *
@@ -37,7 +38,7 @@ import {
   type ScheduleProblem,
 } from "../../../../shared/social-publish-jobs.js";
 import { tiktokSettingsProblem } from "../../../../shared/tiktok-post-settings.js";
-import { bumpCacheVersion, getCacheVersion, getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolatePrefix } from "../../utils/isolate-cache.js";
 import * as repo from "../../repositories/socialPublishJobRepository.js";
 import { assertCanWrite, WorkspaceForbiddenError } from "../studio/workspace.js";
 import { resolvePostedVariant } from "../studio/render-variants.js";
@@ -118,11 +119,11 @@ export interface ScheduleDeps {
 }
 
 const LIST_TTL_SECONDS = 60;
-const listVersionNamespace = (userId: string) => `distribution:jobs:${userId}`;
+const listKeyPrefix = (userId: string) => `distribution:jobs:${userId}:`;
 
 /** Every write to a creator's jobs (and every drained job) calls this. */
 export function invalidateJobLists(userId: string): void {
-  bumpCacheVersion(listVersionNamespace(userId));
+  invalidateIsolatePrefix(listKeyPrefix(userId));
 }
 
 function iso(d: Date | null): string | null {
@@ -248,9 +249,8 @@ export async function schedulePosts(
 }
 
 export async function listPosts(userId: string, view: PublishJobView, db: Db = getDb()): Promise<PublishJobDto[]> {
-  const version = await getCacheVersion(listVersionNamespace(userId));
-  return getOrSetCached<PublishJobDto[]>({
-    key: `distribution:jobs:${userId}:${view}:${version}`,
+  return getOrSetIsolateCached<PublishJobDto[]>({
+    key: `${listKeyPrefix(userId)}${view}`,
     ttlSeconds: LIST_TTL_SECONDS,
     loader: async () => (await repo.listForCreator(userId, PUBLISH_JOB_VIEW_STATUSES[view], db)).map(toDto),
   });

@@ -52,3 +52,74 @@ export type IntegrationOAuthProvider = "youtube";
 export function integrationRedirectUri(provider: IntegrationOAuthProvider): string {
   return `${frontendBaseUrl()}/studio/${provider}/callback`;
 }
+
+// ============================================================================
+// TRANSACTIONAL-EMAIL LINKS
+// ============================================================================
+
+/**
+ * Origin embedded in transactional-email links: the first FRONTEND_URL
+ * entry, trimmed, else the production default. Kept byte-compatible with
+ * the pre-split email adapter (it does NOT strip a trailing slash or
+ * require a scheme like `frontendBaseUrl()` does) — converging the two is
+ * a deliberate behaviour change, not part of the structural split.
+ */
+export function emailLinkBaseUrl(): string {
+  const frontendUrl = getEnv("FRONTEND_URL");
+  return frontendUrl.split(",")[0]?.trim() || DEFAULT_FRONTEND_URL;
+}
+
+export function buildVerifyUrl(token: string): string {
+  return `${emailLinkBaseUrl()}/verify-email?token=${encodeURIComponent(token)}`;
+}
+
+export function buildPasswordResetUrl(token: string): string {
+  return `${emailLinkBaseUrl()}/reset-password?token=${encodeURIComponent(token)}`;
+}
+
+export function buildInviteUrl(token: string): string {
+  return `${emailLinkBaseUrl()}/accept-invitation?token=${encodeURIComponent(token)}`;
+}
+
+/** Reviewer share-link target — the unauthenticated feedback surface
+ *  (`/r/:token`) a peer/mentor opens to leave comments on a shared item. */
+export function buildReviewUrl(token: string): string {
+  return `${emailLinkBaseUrl()}/r/${encodeURIComponent(token)}`;
+}
+
+/** One-tap "approve sign-in" link target for the email-2FA step-up
+ *  (gap #2225). Lands on the frontend verifier page, which exchanges the
+ *  signed token for a session via GET /api/auth/verify-2fa-link. */
+export function buildTwoFactorApproveUrl(token: string): string {
+  return `${emailLinkBaseUrl()}/auth/2fa-approve?token=${encodeURIComponent(token)}`;
+}
+
+/** `${FRONTEND_URL}/consent/video/<token>` — the candidate's public consent page. */
+export function buildCandidateVideoConsentUrl(token: string): string {
+  return `${emailLinkBaseUrl()}/consent/video/${encodeURIComponent(token)}`;
+}
+
+export function buildMagicLinkUrl(token: string): string {
+  return `${emailLinkBaseUrl()}/auth/magic-link?token=${encodeURIComponent(token)}`;
+}
+
+/** Email-change step 1: the OLD address confirms the swap. */
+export function buildEmailChangeConfirmCurrentUrl(token: string): string {
+  return `${emailLinkBaseUrl()}/security/email-change/confirm-current?token=${encodeURIComponent(token)}`;
+}
+
+/** Email-change step 2: the NEW address proves ownership. */
+export function buildEmailChangeConfirmNewUrl(token: string): string {
+  return `${emailLinkBaseUrl()}/security/email-change/confirm-new?token=${encodeURIComponent(token)}`;
+}
+
+/** SuperAdmin moderation queue (content-flag heads-up emails). */
+export function buildModerationQueueUrl(): string {
+  return `${emailLinkBaseUrl()}/admin/moderation`;
+}
+
+/** Candidate screening portal. Uses the RAW `FRONTEND_URL` value and the
+ *  raw token, exactly as the pre-split sender did (no comma split/default). */
+export function buildScreeningUrl(token: string): string {
+  return `${getEnv("FRONTEND_URL")}/screening/${token}`;
+}

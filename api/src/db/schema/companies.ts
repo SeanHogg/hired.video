@@ -246,31 +246,8 @@ export const companyTeamMembers = pgTable("company_team_members", {
 export type CompanyTeamMember = typeof companyTeamMembers.$inferSelect;
 export type NewCompanyTeamMember = typeof companyTeamMembers.$inferInsert;
 
-// ---------------------------------------------------------------------------
-// Company view analytics — mirrors resume_views. Non-owner GETs on a
-// company profile log a row here; the view count surfaced on the DTO is
-// derived by aggregation, not a denormalised counter (same reason as the
-// resume events table).
-// ---------------------------------------------------------------------------
-
-export const companyViews = pgTable("company_views", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  companyId: uuid("company_id").notNull().references(() => companyProfiles.id, { onDelete: "cascade" }),
-  viewerId: uuid("viewer_id").references(() => users.id, { onDelete: "set null" }),
-  ipHash: varchar("ip_hash", { length: 64 }),
-  referrer: text("referrer"),
-  userAgent: text("user_agent"),
-  viewedAt: timestamp("viewed_at", { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [
-  index("company_views_viewed_at_idx").on(table.viewedAt),
-  // Dashboard "recent views for company X" feed; the per-column indexes
-  // covered lookups but forced a sort step on read.
-  index("idx_company_views_company_viewed").on(table.companyId, table.viewedAt.desc()),
-  index("idx_company_views_viewer_id").on(table.viewerId),
-]);
-
-export type CompanyView = typeof companyViews.$inferSelect;
-export type NewCompanyView = typeof companyViews.$inferInsert;
+// Company view events live in the polymorphic artifact_views table
+// (artifact_kind='company'; company_views folded in by W3-A 0580).
 
 // ─── Employer Branding Pages ──────────────────────────────────────────────────
 // Paid add-on: dedicated culture/video branding page beyond basic company profile.

@@ -218,7 +218,7 @@ export default function UserManagement() {
       if (referredFilter) params.set("referred", "true");
 
       const res = await apiClient.get<{ users: ApiUser[]; total: number; page: number; limit: number }>(
-        `/api/admin/impersonate/users?${params.toString()}`
+        `/api/admin/sa/users?${params.toString()}`
       );
       setUsers(res.data.users);
       setTotal(res.data.total);
@@ -245,7 +245,7 @@ export default function UserManagement() {
         banned: number;
         admins: number;
         referred: number;
-      }>("/api/admin/impersonate/users/stats");
+      }>("/api/admin/sa/users/stats");
       setStats(res.data);
     } catch {
       // Stats are a nice-to-have; failures here shouldn't block the page.
@@ -280,7 +280,7 @@ export default function UserManagement() {
 
   const handleChangeRole = async (user: ApiUser, newRole: string) => {
     try {
-      await apiClient.put(`/api/admin/impersonate/users/${user.id}/role`, { role: newRole });
+      await apiClient.put(`/api/admin/sa/users/${user.id}/role`, { role: newRole });
       toast({ title: t("messages.changedRole", { name: user.name, role: getRoleDisplayLabel(newRole) }) });
       refresh();
     } catch {
@@ -291,7 +291,7 @@ export default function UserManagement() {
   const handleSendPasswordReset = async (user: ApiUser) => {
     if (!(await confirmDialog({ title: t("dialogs.userManagement.sendPasswordResetTitle"), description: t("messages.confirmPasswordReset", { name: user.name, email: user.email }), confirmText: t("dialogs.userManagement.sendPasswordResetConfirm") }))) return;
     try {
-      await apiClient.post(`/api/admin/impersonate/users/${user.id}/password-reset`, {});
+      await apiClient.post(`/api/admin/sa/users/${user.id}/password-reset`, {});
       toast({ title: t("messages.passwordResetSent", { email: user.email }) });
     } catch {
       toast({ title: t("errors.failedToSendPasswordReset"), variant: "destructive" });
@@ -313,7 +313,7 @@ export default function UserManagement() {
         clean: number;
         failed: number;
         failures: Array<{ resumeId: string; title: string; issues: Array<{ path: string; message: string }> }>;
-      }>(`/api/admin/impersonate/users/${user.id}/resumes/heal`, {});
+      }>(`/api/admin/sa/users/${user.id}/resumes/heal`, {});
       const { total, healed, clean, failed, failures } = res.data;
       toast({
         title: t("messages.healCompleteFor", { name: user.name }),
@@ -338,7 +338,7 @@ export default function UserManagement() {
     if (!(await confirmDialog({ title: t("dialogs.userManagement.resetTokensTitle"), description: t("messages.confirmResetTokens", { name: user.name }), confirmText: t("dialogs.userManagement.resetTokensConfirm") }))) return;
     try {
       const res = await apiClient.post<{ tokensReset: number }>(
-        `/api/admin/impersonate/users/${user.id}/tokens/reset`,
+        `/api/admin/sa/users/${user.id}/tokens/reset`,
         {},
       );
       toast({ title: t("messages.tokensResetCount", { count: res.data.tokensReset.toLocaleString(), name: user.name }) });
@@ -364,7 +364,7 @@ export default function UserManagement() {
     try {
       setGranting(true);
       await apiClient.post(
-        `/api/admin/impersonate/users/${grantTarget.id}/tokens/grant`,
+        `/api/admin/sa/users/${grantTarget.id}/tokens/grant`,
         { tokens, reason: grantReason || undefined },
       );
       toast({ title: t("messages.grantedTokensCount", { count: tokens.toLocaleString(), name: grantTarget.name }) });
@@ -475,7 +475,7 @@ export default function UserManagement() {
     const isCurrentlyActive = user.isActive && !user.isSuspended;
     const newStatus = isCurrentlyActive ? "suspended" : "active";
     try {
-      await apiClient.put(`/api/admin/impersonate/users/${user.id}/status`, { status: newStatus });
+      await apiClient.put(`/api/admin/sa/users/${user.id}/status`, { status: newStatus });
       toast({ title: newStatus === "suspended" ? t("messages.userSuspended", { name: user.name }) : t("messages.userReactivated", { name: user.name }) });
       refresh();
     } catch {
@@ -485,11 +485,11 @@ export default function UserManagement() {
 
   // Toggle the editorial / house-author flag (is_system). SuperAdmin-only —
   // the menu item is hidden for non-SA, and the server re-checks via the
-  // superAdminMiddleware on /admin/impersonate.
+  // superAdminMiddleware on /api/admin/sa.
   const handleToggleSystem = async (user: ApiUser) => {
     const next = !user.isSystem;
     try {
-      await apiClient.put(`/api/admin/impersonate/users/${user.id}/system`, { isSystem: next });
+      await apiClient.put(`/api/admin/sa/users/${user.id}/system`, { isSystem: next });
       toast({
         title: next
           ? t("messages.userMarkedEditorial", { name: user.name })
@@ -514,7 +514,7 @@ export default function UserManagement() {
       const res = await apiClient.post<{
         succeeded: string[];
         skipped: Array<{ userId: string; reason: "not_found" | "self" | "super_admin" }>;
-      }>(`/api/admin/impersonate/users/bulk/${action}`, { userIds: ids });
+      }>(`/api/admin/sa/users/bulk/${action}`, { userIds: ids });
       const { succeeded, skipped } = res.data;
       const verb = action === "delete" ? t("admin.bulkVerbs.deleted") : action === "ban" ? t("admin.bulkVerbs.banned") : t("admin.bulkVerbs.suspended");
       toast({

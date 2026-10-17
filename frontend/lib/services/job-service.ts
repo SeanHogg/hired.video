@@ -342,7 +342,7 @@ export class JobService {
    * Create job from file upload.
    *
    * Validates the response with the permissive JobSummarySchema rather
-   * than the strict JobSchema. Reason: the CreateFromFile backend path
+   * than the strict JobSchema. Reason: the /api/jobs/createfromfile backend path
    * only extracts title + description + location from the upload — the
    * enum fields (employmentType, experienceLevel) and metadata (company,
    * postedDate, createdAt, …) aren't populated synchronously, so strict

@@ -11,7 +11,7 @@ import {
   wallItems,
 } from "../video-wall";
 
-/** Mirrors a real /api/studio/videos/public row (R2-hosted render). */
+/** Mirrors a real /api/studio/public feed row (R2-hosted render). */
 function video(over: Partial<PublicVideo> = {}): PublicVideo {
   return {
     id: "8c1f6a0e-2b7d-4f3e-9a51-0d2c4b6e8f10",

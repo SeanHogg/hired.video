@@ -15,8 +15,7 @@
  * heuristics here — the engine remains the single source.
  */
 
-import { sql } from "drizzle-orm";
-import { schema, type getDb } from "../../db/index.js";
+import type { getDb } from "../../db/index.js";
 import { FraudSignalsRepository } from "../../repositories/fraudSignalsRepository.js";
 import { chunk } from "../../utils/chunk.js";
 import type { Repos } from "../../repositories/index.js";
@@ -47,15 +46,10 @@ export async function runFraudSweep(
 
   // Pull users with any positive balance or any redemption since
   // yesterday — that's the universe at risk for the Phase-4 heuristics.
-  const candidateRows = await db
-    .select({ userId: schema.userPointsBalance.userId })
-    .from(schema.userPointsBalance)
-    .where(sql`${schema.userPointsBalance.balance} > 0 OR ${schema.userPointsBalance.lifetimeRedeemed} > 0`)
-    .limit(userLimit);
+  const userIds = await repos.points.listActivePointHolders(userLimit);
 
   const result: FraudSweepResult = { scanned: 0, flagged: 0, autoSuspended: 0, errors: 0 };
   const signalsRepo = new FraudSignalsRepository(db);
-  const userIds = (candidateRows as Array<{ userId: string }>).map((r) => r.userId);
 
   // Signals are READ in batches (constant queries per SIGNAL_BATCH users,
   // was 4-6 point queries per user). Flag/suspension WRITES stay per user

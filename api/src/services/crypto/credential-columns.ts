@@ -1,6 +1,7 @@
 /**
  * At-rest encryption for third-party credentials stored in plain `text`
- * columns (W1-D, 2026-10-17): ats_connections.api_key, calendar_connections,
+ * columns (W1-D, 2026-10-17): ats_connections.api_key + webhook_secret
+ * (0577), calendar_connections,
  * lms_connectors, oauth_accounts and youtube_accounts access/refresh tokens.
  *
  * Each such column has an `*_enc` sibling. Writers call `sealCredential` and
@@ -13,8 +14,8 @@
  *
  * Reads prefer `enc` and fall back to the plaintext column only for rows
  * written before the key existed; scripts/backfill-credential-encryption.ts
- * moves those rows over, and migration 0549 (owner-gated) clears what is
- * left. Key derivation lives in the shared seam services/crypto/secrets.ts.
+ * moves those rows over, and migrations 0549 / 0578 (owner-gated) clear
+ * what is left. Key derivation lives in the shared seam services/crypto/secrets.ts.
  *
  * The key name is fixed on purpose (no fallback chain): a ciphertext only
  * decrypts under the key that wrote it, so the key a deployment uses must

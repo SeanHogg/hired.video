@@ -1,13 +1,14 @@
 /**
- * Self-serve promotion writes that carry a content target (#176):
- * job boosts and ad creatives. (Company boosts are read-only here — the
+ * Self-serve promotion reads/writes that carry a content target (#176):
+ * job boost listing and ad creatives. Job boosts are CREATED only through
+ * the paid checkout (POST /api/checkout {kind:"job_boost"} —
+ * services/billing/checkout/kinds/jobBoost.ts). (Company boosts are read-only here — the
  * unpaid create/list endpoints were removed 2026-10-17; paid promotion of
  * any subject goes through POST /api/checkout {kind:"boost"}.)
  *
  *   - Every write stamps the polymorphic pair through adSubjectColumns()
  *     (and therefore still writes job_id / company_id for those targets).
  *   - Every read resolves the target through resolveAdContentTarget().
- *   - Every boost prices through computeBoostPricing() (#1764).
  *
  * Routes (routes/advertising.ts) call these; table access lives in
  * AdPromotionRepository.
@@ -17,12 +18,10 @@ import { getDb } from "../../db/index.js";
 import {
   AdPromotionRepository,
   type AdRow,
-  type JobBoostRow,
   type NewAdRow,
 } from "../../repositories/adPromotionRepository.js";
 import type { AdContentTarget } from "../../../../shared/ad-content-target.js";
 import { adSubjectColumns, resolveAdContentTarget } from "./content-target.js";
-import { computeBoostPricing, type BoostPricingModel } from "./pricing.js";
 import { costPerClick, ctr } from "./metrics.js";
 
 export type PromotionResult<T> =
@@ -34,41 +33,6 @@ function repoOf(repo?: AdPromotionRepository): AdPromotionRepository {
 }
 
 // ─── Job boosts ───────────────────────────────────────────────────────────
-
-export interface CreateJobBoostInput {
-  jobId: string;
-  placementType: string;
-  pricingModel: Extract<BoostPricingModel, "cpm" | "cpc">;
-  budgetCents: number;
-  durationDays: number;
-}
-
-export async function createJobBoost(
-  userId: string,
-  input: CreateJobBoostInput,
-  repo?: AdPromotionRepository,
-): Promise<PromotionResult<JobBoostRow>> {
-  const r = repoOf(repo);
-  if (!(await r.isJobPostedBy(input.jobId, userId))) {
-    return { ok: false, code: "NOT_FOUND", message: "Job not found or not owned by you" };
-  }
-  const pricing = computeBoostPricing(input);
-  const target = adSubjectColumns({ subjectType: "job", subjectId: input.jobId });
-  const boost = await r.insertJobBoost({
-    jobId: input.jobId,
-    subjectType: target.subjectType,
-    subjectId: target.subjectId,
-    userId,
-    placementType: input.placementType,
-    pricingModel: input.pricingModel,
-    budgetCents: pricing.totalCents,
-    rateUnitCents: pricing.rateUnitCents,
-    startsAt: pricing.startsAt,
-    endsAt: pricing.endsAt,
-  });
-  await r.markJobSponsored(input.jobId, pricing.endsAt);
-  return { ok: true, value: boost };
-}
 
 export async function listJobBoosts(userId: string, repo?: AdPromotionRepository) {
   const r = repoOf(repo);

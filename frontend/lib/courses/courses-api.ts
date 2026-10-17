@@ -9,8 +9,8 @@
 import { apiClient, type RequestConfig } from "../api-client";
 import { fetchApiBlob } from "../services/download-service";
 
-// Every backend route this client targets (`/courses`, `/learning-paths`,
-// `/learning`, `/verify`, …) is mounted under `/api`; the paths below are
+// Every backend route this client targets (`/courses`, `/learning`,
+// `/verify`, …) is mounted under `/api`; the paths below are
 // written WITHOUT that prefix and `call()` adds it. The transport (base URL,
 // Bearer + X-Emulation-Token, logging, typed errors) is the shared apiClient.
 async function call<T>(
@@ -77,7 +77,7 @@ export interface XapiStatementInput {
 }
 
 export function emitXapi(input: XapiStatementInput) {
-  return call(`/courses/xapi/statements`, {
+  return call(`/learning/xapi/statements`, {
     method: "POST",
     body: JSON.stringify(input),
   });
@@ -133,11 +133,11 @@ export function getPathProgress(pathId: string) {
     passed: string[];
     locked: Array<{ courseId: string; missing: string[] }>;
     complete: boolean;
-  }>(`/learning-paths/${pathId}/progress`);
+  }>(`/learning/paths/${pathId}/progress`);
 }
 
 export function enrollInPath(pathId: string) {
-  return call(`/learning-paths/${pathId}/enroll`, { method: "POST" });
+  return call(`/learning/paths/${pathId}/enroll`, { method: "POST" });
 }
 
 // ── Cohorts / classrooms + assignments (#1887/#1888/#1890) ─────────────
@@ -235,33 +235,33 @@ export interface CohortAnalytics {
 }
 
 // Educator
-export const listManageableCohorts = () => call<Cohort[]>(`/cohorts/me`);
-export const getCohort = (id: string) => call<{ cohort: Cohort; members: CohortMemberRow[] }>(`/cohorts/${id}`);
+export const listManageableCohorts = () => call<Cohort[]>(`/learning/cohorts/me`);
+export const getCohort = (id: string) => call<{ cohort: Cohort; members: CohortMemberRow[] }>(`/learning/cohorts/${id}`);
 export const createCohort = (body: { name: string; description?: string; companyId?: string }) =>
-  call<Cohort>(`/cohorts`, { method: "POST", body: JSON.stringify(body) });
+  call<Cohort>(`/learning/cohorts`, { method: "POST", body: JSON.stringify(body) });
 export const updateCohort = (id: string, body: { name?: string; description?: string | null; rotateJoinCode?: boolean; status?: "active" | "archived" }) =>
-  call<Cohort>(`/cohorts/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+  call<Cohort>(`/learning/cohorts/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 export const addCohortMember = (id: string, body: { userId?: string; invitedEmail?: string; displayName?: string; role?: "student" | "co_educator" }) =>
-  call(`/cohorts/${id}/members`, { method: "POST", body: JSON.stringify(body) });
+  call(`/learning/cohorts/${id}/members`, { method: "POST", body: JSON.stringify(body) });
 export const removeCohortMember = (id: string, memberId: string) =>
-  call(`/cohorts/${id}/members/${memberId}`, { method: "DELETE" });
-export const listCohortAssignments = (id: string) => call<AssignmentRow[]>(`/cohorts/${id}/assignments`);
+  call(`/learning/cohorts/${id}/members/${memberId}`, { method: "DELETE" });
+export const listCohortAssignments = (id: string) => call<AssignmentRow[]>(`/learning/cohorts/${id}/assignments`);
 export const createAssignment = (id: string, body: { subjectType: "course" | "path"; subjectId: string; memberId?: string; required?: boolean; dueAt?: string }) =>
-  call<AssignmentRow>(`/cohorts/${id}/assignments`, { method: "POST", body: JSON.stringify(body) });
+  call<AssignmentRow>(`/learning/cohorts/${id}/assignments`, { method: "POST", body: JSON.stringify(body) });
 export const removeAssignment = (id: string, assignmentId: string) =>
-  call(`/cohorts/${id}/assignments/${assignmentId}`, { method: "DELETE" });
-export const getCohortAnalytics = (id: string) => call<CohortAnalytics>(`/cohorts/${id}/analytics`);
+  call(`/learning/cohorts/${id}/assignments/${assignmentId}`, { method: "DELETE" });
+export const getCohortAnalytics = (id: string) => call<CohortAnalytics>(`/learning/cohorts/${id}/analytics`);
 
 // Learner
-export const listMyAssignments = () => call<LearnerAssignment[]>(`/cohorts/assignments/me`);
+export const listMyAssignments = () => call<LearnerAssignment[]>(`/learning/cohorts/assignments/me`);
 export const listMyCohortMemberships = () =>
-  call<Array<{ cohort: Cohort; member: { id: string; role: string } }>>(`/cohorts/memberships/me`);
+  call<Array<{ cohort: Cohort; member: { id: string; role: string } }>>(`/learning/cohorts/memberships/me`);
 export const joinCohortByCode = (joinCode: string) =>
-  call<{ cohort: Cohort; member: unknown }>(`/cohorts/join`, { method: "POST", body: JSON.stringify({ joinCode }) });
+  call<{ cohort: Cohort; member: unknown }>(`/learning/cohorts/join`, { method: "POST", body: JSON.stringify({ joinCode }) });
 
 /** The educator's own learning paths (for the assignment picker). */
 export const listMyPaths = () =>
-  call<Array<{ id: string; title: string; slug: string }>>(`/learning-paths/me`);
+  call<Array<{ id: string; title: string; slug: string }>>(`/learning/paths/me`);
 
 // ── Learner dashboard + XP leaderboard (#2068 GAP-4 + GAP-5) ─────────────
 
@@ -327,7 +327,7 @@ export const getXpLeaderboard = (
 /** #2068 GAP-3 — materialise a draft learning path from a goal. */
 export const generateGoalPath = (goalId: string) =>
   call<{ path: { id: string; slug: string; title: string }; courseCount: number; generatedByLlm: boolean }>(
-    `/learning-goals/${goalId}/generate-path`,
+    `/learning/goals/${goalId}/generate-path`,
     { method: "POST", body: JSON.stringify({}) },
   );
 
@@ -336,9 +336,9 @@ export const generateGoalPath = (goalId: string) =>
 /** The three export artifacts, keyed by kind → { path, filename }. Single
  *  source so the download button, filename, and endpoint never drift apart. */
 export const LEARNING_EXPORT_KINDS = {
-  manifest: { path: "/learning/portability/export/manifest", filename: "learning-manifest.json" },
-  results: { path: "/learning/portability/export/results.csv", filename: "learning-results.csv" },
-  statements: { path: "/learning/portability/export/statements", filename: "learning-statements.json" },
+  manifest: { path: "/learning/xapi/portability/export/manifest", filename: "learning-manifest.json" },
+  results: { path: "/learning/xapi/portability/export/results.csv", filename: "learning-results.csv" },
+  statements: { path: "/learning/xapi/portability/export/statements", filename: "learning-statements.json" },
 } as const;
 
 export type LearningExportKind = keyof typeof LEARNING_EXPORT_KINDS;
@@ -360,19 +360,19 @@ export interface LrsCredentialView {
 
 /** The owner's LRS credentials — the import target the statements land under. */
 export const listLrsCredentials = () =>
-  call<{ endpoint: string; credentials: LrsCredentialView[] }>("/learning/lrs-credentials");
+  call<{ endpoint: string; credentials: LrsCredentialView[] }>("/learning/xapi/credentials");
 
 /** Issue a new LRS credential. The plaintext `secret` is returned ONCE. */
 export const createLrsCredential = (label: string, permission: "read_write" | "read" | "write" = "read_write") =>
   call<{ credential: LrsCredentialView; secret: string; basicAuth: string; endpoint: string }>(
-    "/learning/lrs-credentials",
+    "/learning/xapi/credentials",
     { method: "POST", body: JSON.stringify({ label, permission }) },
   );
 
 /** Bulk-import an xAPI statement array (or a full export envelope) into one of
  *  the owner's LRS credentials. */
 export const importLearningStatements = (credentialId: string, statements: Record<string, unknown>[]) =>
-  call<{ imported: number }>("/learning/portability/import/statements", {
+  call<{ imported: number }>("/learning/xapi/portability/import/statements", {
     method: "POST",
     body: JSON.stringify({ credentialId, statements }),
   });

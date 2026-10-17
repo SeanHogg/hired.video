@@ -8,7 +8,7 @@
  *   (/api/valueproposition is covered by value-proposition-handler.test.ts)
  *   • /api/resumes/summarize
  *   • /sentiment/sentimentprediction
- *   • /api/job/CreateFromFile   (regression — ValueProposition wizard calls this)
+ *   • /api/jobs/createfromfile   (regression — ValueProposition wizard calls this)
  *
  * tsx cannot resolve the ESM/CJS boundary when route files transitively
  * import ../services/billing.ts → ../../../shared/pricing.js (no "type":
@@ -368,7 +368,7 @@ describe("/sentiment/sentimentprediction — length-bucket scoring", () => {
 // Job CreateFromFile — regression for 2026-04-14 support ticket
 //
 // The ValueProposition wizard uploads a job description file through
-// JobInputStep → jobService.createJobFromFile → POST /api/Job/CreateFromFile.
+// JobInputStep → jobService.createJobFromFile → POST /api/jobs/createfromfile.
 // The frontend validates the response with the strict JobSchema (which
 // requires employmentType/experienceLevel enums, non-optional company,
 // description, title). The backend handler only guarantees id/title/
@@ -382,7 +382,7 @@ describe("/sentiment/sentimentprediction — length-bucket scoring", () => {
 // These tests pin the response contract a fix must honor.
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe("/api/Job/CreateFromFile — ValueProposition regression", () => {
+describe("/api/jobs/createfromfile — ValueProposition regression", () => {
   // Minimum response shape the ValueProposition wizard actually reads.
   // JobInputStep only consumes job.description — anything else is over-
   // validation. The fix is either (a) frontend uses JobSummarySchema
@@ -420,7 +420,7 @@ describe("/api/Job/CreateFromFile — ValueProposition regression", () => {
   });
 
   it("handler defaults title to 'Imported Job' when file name is absent", () => {
-    // Replicates api/src/routes/jobs.ts::/createfromfile lines 244-246.
+    // Replicates the createfromfile title default (api/src/routes/jobs/payload.ts).
     function defaultTitle(body: any) {
       return body?.title ? String(body.title) : "Imported Job";
     }

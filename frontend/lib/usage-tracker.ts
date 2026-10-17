@@ -1,6 +1,6 @@
 /**
  * Usage tracker (#2044) — a tiny client singleton that batches page/intent
- * events and beacons them to /api/usage/track. Used by useUsageTracker (page
+ * events and beacons them (kind "usage") to POST /api/analytics/events. Used by useUsageTracker (page
  * views) and any component that wants to record intent (e.g. search).
  *
  * Privacy: tracking is gated on stored ANALYTICS consent (consent-mode). With
@@ -22,6 +22,7 @@ import type {
   UsageEventType,
   UsageContextInput,
 } from "@shared/usage";
+import { ANALYTICS_EVENTS_PATH, type AnalyticsEventInput } from "@shared/analytics-events";
 
 const VISITOR_KEY = "hv_visitor_id";
 const FLUSH_INTERVAL_MS = 10_000;
@@ -114,16 +115,17 @@ function safePath(): string {
 export function flushUsage(): void {
   const id = visitorId();
   if (!id || queue.length === 0) return;
-  const body: TrackUsageInput = {
+  const batch: TrackUsageInput = {
     visitorId: id,
     consent: true,
     context,
     events: queue.splice(0, MAX_QUEUE),
   };
+  const body: AnalyticsEventInput<"usage"> = { kind: "usage", ...batch };
   const json = JSON.stringify(body);
   // Absolute API origin — the Pages worker on hired.video does NOT own /api/*
   // (that's the api.hired.video Hono worker), so a relative path 405s in prod.
-  const url = resolveApiUrl("/api/usage/track");
+  const url = resolveApiUrl(ANALYTICS_EVENTS_PATH);
   const auth = standardAuthHeaders(url);
   if (typeof fetch === "function") {
     void fetch(url, {

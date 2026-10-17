@@ -1,8 +1,8 @@
 /**
  * SocialConnectionService — owns the three connection layers (PRD §5.0):
  *   Layer 1 (developer app)  → platform-config.isPlatformConfigured (Secrets)
- *   Layer 2 (brand account)  → managed_accounts, SuperAdmin-connected
- *   Layer 3 (user account)   → social_connections, per Pro user
+ *   Layer 2 (brand account)  → provider_connections purpose "managed_social", SuperAdmin-connected
+ *   Layer 3 (user account)   → provider_connections purpose "social_publish", per Pro user
  *
  * Single home for:
  *   - cached lane-availability resolution (`resolveLaneAvailability`) — the
@@ -14,11 +14,16 @@
  * Caching: managed-lane readiness is platform-global and slow-changing, so
  * it's read-through cached (getOrSetCached) and invalidated whenever a brand
  * account is connected/disconnected. Per-user self-connection status is
- * cached per (user, company) and invalidated on connect/disconnect.
+ * cached isolate-locally per (user, company) — no KV write per miss on
+ * Workers Free — and invalidated on connect/disconnect.
  */
 
 import type { Repos } from "../../repositories/index.js";
-import type { SocialConnectionRow, ManagedAccountRow } from "../../db/schema/social.js";
+import type {
+  SocialConnectionRow,
+  ManagedAccountRow,
+  SocialTokenPatch,
+} from "../../repositories/socialConnectionRepository.js";
 import {
   SOCIAL_PLATFORMS,
   SOCIAL_PLATFORM_META,
@@ -38,10 +43,18 @@ import {
   verifyState,
   type SocialOAuthState,
 } from "./social-oauth.js";
-import { encryptSocialSecret, decryptSocialSecret, isSocialEncryptionConfigured } from "./secrets.js";
+import {
+  connectionEncryptionConfigured,
+  openAndResealSecret,
+  sealConnectionSecret,
+} from "../provider-connections/connection-secrets.js";
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 
-export type SocialEnv = { SOCIAL_KMS_KEY?: string; PAID_MEDIA_KMS_KEY?: string };
+/** CREDENTIALS_KMS_KEY seals every connection secret (connection-secrets.ts).
+ *  The pre-merge SOCIAL_KMS_KEY / PAID_MEDIA_KMS_KEY are only read (via
+ *  getEnv) to open tokens not yet re-sealed. */
+export type SocialEnv = { CREDENTIALS_KMS_KEY?: string; SOCIAL_KMS_KEY?: string; PAID_MEDIA_KMS_KEY?: string };
 
 const MANAGED_READY_TTL = 300;       // brand-account presence changes rarely
 const SELF_STATUS_TTL = 120;         // per-user connection set
@@ -89,7 +102,7 @@ export class SocialConnectionService {
 
   /** Which platforms the user has a fresh self-connection for (Layer 3). Cached. */
   private async selfConnectedPlatforms(userId: string, companyId: string | null): Promise<Set<SocialPlatform>> {
-    const ids = await getOrSetCached<string[]>({
+    const ids = await getOrSetIsolateCached<string[]>({
       key: selfStatusKey(userId, companyId),
       ttlSeconds: SELF_STATUS_TTL,
       loader: async () => {
@@ -104,7 +117,11 @@ export class SocialConnectionService {
    *  token store can encrypt — otherwise consent would succeed and the
    *  callback would have nowhere to put the tokens. */
   private canConnect(platform: SocialPlatform): boolean {
-    return isPlatformConfigured(platform) && isSocialEncryptionConfigured(this.env);
+    return isPlatformConfigured(platform) && this.encryptionConfigured();
+  }
+
+  private encryptionConfigured(): boolean {
+    return this.env.CREDENTIALS_KMS_KEY ? true : connectionEncryptionConfigured();
   }
 
   private managedState(platform: SocialPlatform, ready: Set<SocialPlatform>): ManagedLaneState {
@@ -196,7 +213,7 @@ export class SocialConnectionService {
     if (!isPlatformConfigured(opts.platform)) {
       throw new SocialConnectionError("NOT_CONFIGURED", `${opts.platform} developer app is not configured`);
     }
-    if (!isSocialEncryptionConfigured(this.env)) {
+    if (!this.encryptionConfigured()) {
       throw new SocialConnectionError("NOT_CONFIGURED", "social token encryption key is not configured");
     }
     return buildSocialAuthUrl(opts);
@@ -229,8 +246,8 @@ export class SocialConnectionService {
       identity = null; // identity fetch is best-effort; connection still persists
     }
 
-    const accessTokenEnc = await encryptSocialSecret(this.env, tokens.accessToken);
-    const refreshTokenEnc = tokens.refreshToken ? await encryptSocialSecret(this.env, tokens.refreshToken) : null;
+    const accessTokenEnc = (await sealConnectionSecret(tokens.accessToken, this.sealOptions())) ?? "";
+    const refreshTokenEnc = await sealConnectionSecret(tokens.refreshToken, this.sealOptions());
     const expiresAt = tokens.expiresInSec ? new Date(Date.now() + tokens.expiresInSec * 1000) : null;
 
     if (state.scope === "managed") {
@@ -259,7 +276,7 @@ export class SocialConnectionService {
         accessTokenExpiresAt: expiresAt,
         scopes: tokens.scopes ?? "",
       });
-      invalidateCachedKey(selfStatusKey(state.userId, state.companyId));
+      invalidateIsolateKey(selfStatusKey(state.userId, state.companyId));
     }
 
     return { handle: identity?.handle ?? null };
@@ -269,7 +286,7 @@ export class SocialConnectionService {
 
   async disconnectSelf(userId: string, companyId: string | null, platform: SocialPlatform): Promise<boolean> {
     const removed = await this.repos.socialConnections.removeConnection(userId, companyId, platform);
-    invalidateCachedKey(selfStatusKey(userId, companyId));
+    invalidateIsolateKey(selfStatusKey(userId, companyId));
     return removed;
   }
 
@@ -290,7 +307,7 @@ export class SocialConnectionService {
   async getFreshSelfAccessToken(userId: string, companyId: string | null, platform: SocialPlatform): Promise<string | null> {
     const row = await this.repos.socialConnections.findForOwner(userId, companyId, platform);
     if (!row) return null;
-    return this.freshAccessToken(row, (patch) => this.repos.socialConnections.updateTokens(row.id, patch), () => invalidateCachedKey(selfStatusKey(userId, companyId)));
+    return this.freshAccessToken(row, (patch) => this.repos.socialConnections.updateTokens(row.id, patch), () => invalidateIsolateKey(selfStatusKey(userId, companyId)));
   }
 
   /** Decrypted, fresh access token for the brand account (Lane A). */
@@ -300,25 +317,39 @@ export class SocialConnectionService {
     return this.freshAccessToken(row, (patch) => this.repos.socialConnections.updateManagedTokens(row.id, patch), () => invalidateCachedKey(managedReadyKey()));
   }
 
+  private sealOptions() {
+    return this.env.CREDENTIALS_KMS_KEY ? { masterKey: this.env.CREDENTIALS_KMS_KEY } : {};
+  }
+
+  /** Decrypt one stored token, re-sealing a legacy-encrypted value. */
+  private openToken(rowId: string, column: "accessTokenEnc" | "refreshTokenEnc", stored: string | null): Promise<string | null> {
+    return openAndResealSecret(stored, (resealed) =>
+      this.repos.socialConnections.resealSecret(rowId, column, stored as string, resealed),
+    );
+  }
+
   private async freshAccessToken(
     row: SocialConnectionRow | ManagedAccountRow,
-    persist: (patch: { accessTokenEnc: string; refreshTokenEnc: string | null; accessTokenExpiresAt: Date | null; status?: string }) => Promise<void>,
+    persist: (patch: SocialTokenPatch) => Promise<void>,
     invalidate: () => void,
   ): Promise<string | null> {
     if (!isExpired(row)) {
-      return decryptSocialSecret(this.env, row.accessTokenEnc);
+      return this.openToken(row.id, "accessTokenEnc", row.accessTokenEnc);
     }
     // Expired — refresh if we have a refresh token.
     if (!row.refreshTokenEnc) return null;
-    const refreshToken = await decryptSocialSecret(this.env, row.refreshTokenEnc);
+    const refreshToken = await this.openToken(row.id, "refreshTokenEnc", row.refreshTokenEnc);
+    if (!refreshToken) return null;
     const refreshed = await refreshSocialToken(row.platform as SocialPlatform, refreshToken);
     if (!refreshed) {
       await persist({ accessTokenEnc: row.accessTokenEnc, refreshTokenEnc: row.refreshTokenEnc, accessTokenExpiresAt: row.accessTokenExpiresAt, status: "expired" });
       invalidate();
       return null;
     }
-    const accessTokenEnc = await encryptSocialSecret(this.env, refreshed.accessToken);
-    const refreshTokenEnc = refreshed.refreshToken ? await encryptSocialSecret(this.env, refreshed.refreshToken) : row.refreshTokenEnc;
+    const accessTokenEnc = (await sealConnectionSecret(refreshed.accessToken, this.sealOptions())) ?? "";
+    const refreshTokenEnc = refreshed.refreshToken
+      ? await sealConnectionSecret(refreshed.refreshToken, this.sealOptions())
+      : row.refreshTokenEnc;
     const accessTokenExpiresAt = refreshed.expiresInSec ? new Date(Date.now() + refreshed.expiresInSec * 1000) : null;
     await persist({ accessTokenEnc, refreshTokenEnc, accessTokenExpiresAt, status: "active" });
     invalidate();

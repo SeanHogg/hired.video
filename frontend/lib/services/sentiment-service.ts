@@ -1,4 +1,5 @@
 import { apiClient } from "../api-client";
+import { aiToolPath } from "@shared/ai-tools/tool-ids";
 import { getResumeTextFromFile } from "./resume-text";
 import type { Resume } from "@/types/resume";
 import {
@@ -20,8 +21,8 @@ export interface SentimentInterpretation {
 
 export class SentimentService {
   /**
-   * Analyze sentiment of raw text using the Sentiment API controller.
-   * Route: /sentiment/sentimentprediction
+   * Analyze sentiment of raw text — the `sentiment` AI tool with `{ text }`
+   * (nothing persisted).
    *
    * Response shape: `{ success: true, data: { score: number } }`. The
    * server used to return a raw number as `data`, but the envelope
@@ -29,8 +30,8 @@ export class SentimentService {
    */
   async analyzeSentiment(text: string): Promise<number> {
     const response = await apiClient.post<SentimentAnalysisResponse>(
-      "/sentiment/sentimentprediction",
-      JSON.stringify(text),
+      aiToolPath("sentiment"),
+      { text },
       SentimentAnalysisResponseSchema,
     );
     return response.data.score;
@@ -48,8 +49,8 @@ export class SentimentService {
   }
 
   /**
-   * Analyze an existing resume using the dedicated resume sentiment endpoint.
-   * Route: /api/Resume/SentimentPrediction
+   * Analyze an existing resume — the `sentiment` AI tool with `{ resumeId }`
+   * (the score is persisted on the résumé).
    *
    * Body: `{ resumeId }` — the server loads the resume by id and scores
    * its rendered content. Sending a bare string here used to make the
@@ -59,7 +60,7 @@ export class SentimentService {
    */
   async analyzeResumeSentiment(resumeId: string): Promise<number> {
     const response = await apiClient.post<SentimentAnalysisResponse>(
-      "/api/resumes/sentimentprediction",
+      aiToolPath("sentiment"),
       { resumeId },
       SentimentAnalysisResponseSchema,
     );
@@ -67,8 +68,7 @@ export class SentimentService {
   }
 
   /**
-   * Analyze a saved job using the job sentiment endpoint.
-   * Route: /api/jobs/sentimentprediction
+   * Analyze a saved job — the `sentiment` AI tool with `{ jobId }`.
    *
    * Body: `{ jobId }`. The server loads the job and scores its
    * rendered text via the same shared `scoreSentiment` function as the
@@ -79,7 +79,7 @@ export class SentimentService {
    */
   async analyzeJobSentiment(jobId: string): Promise<number> {
     const response = await apiClient.post<SentimentAnalysisResponse>(
-      "/api/jobs/sentimentprediction",
+      aiToolPath("sentiment"),
       { jobId },
       SentimentAnalysisResponseSchema,
     );

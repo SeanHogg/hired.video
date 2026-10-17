@@ -1,7 +1,9 @@
 /**
  * PointsRepository — the gamification aggregate:
- *   • userPointsBalance        — spendable + lifetime counters + suspension
- *   • pointsLedger             — append-only event log
+ *   • points wallet            — spendable + lifetime counters + suspension
+ *                                (wallet_balances, currency 'points')
+ *   • points ledger            — append-only event log
+ *                                (wallet_ledger, currency 'points')
  *   • pointsActivityCounters   — gating counters (100-task threshold)
  *   • pointsStreaks            — daily-streak engine state
  *   • pointsFraudFlags         — open / reviewed fraud signals
@@ -15,16 +17,25 @@
  *
  * Domain (rules, engines, fraud heuristics) lives in
  * `services/gamification/`; this file is just the typed Drizzle wrapper.
+ * Balance + ledger persistence (points and Campaign $) goes through the one
+ * WalletRepository; the row shapes below are the pre-merge ones.
  */
 
 import { and, desc, eq, gte, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
+import { userWallet, WalletRepository } from "./walletRepository.js";
+import {
+  campaignDollarsBalanceView,
+  campaignDollarsTransactionView,
+  pointsBalanceView,
+  pointsLedgerView,
+  type PointsBalanceRow,
+  type PointsLedgerRow,
+} from "./walletViews.js";
 
 const {
   users,
   sessions,
-  userPointsBalance,
-  pointsLedger,
   pointsActivityCounters,
   pointsStreaks,
   pointsTaskStreaks,
@@ -33,16 +44,50 @@ const {
   userBadges,
   pointRedemptions,
   userTaxStatus,
-  campaignDollarsBalance,
-  campaignDollarsTransactions,
 } = schema;
 
  
 export type DbLike = any;
 
-export type PointsBalanceRow = typeof userPointsBalance.$inferSelect;
-export type PointsLedgerRow = typeof pointsLedger.$inferSelect;
-export type PointsLedgerInsert = typeof pointsLedger.$inferInsert;
+export type { PointsBalanceRow, PointsLedgerRow };
+
+/** Insert shape of a points ledger row (the pre-merge points_ledger shape). */
+export interface PointsLedgerInsert {
+  id?: string;
+  userId: string;
+  delta: number;
+  category: string;
+  action: string;
+  source: string;
+  refId?: string | null;
+  refType?: string | null;
+  reversesId?: string | null;
+  metadata?: unknown;
+  createdAt?: Date;
+}
+
+export type PointsCategory = "earn" | "redeem" | "adjust" | "reverse" | "streak_bonus" | "badge_bonus";
+
+const POINTS = "points" as const;
+const CAMPAIGN = "campaign_dollars" as const;
+
+function toLedgerInsert(input: PointsLedgerInsert) {
+  return {
+    ...(input.id ? { id: input.id } : {}),
+    ownerKind: "user" as const,
+    ownerId: input.userId,
+    currencyKind: POINTS,
+    type: input.category,
+    amount: input.delta,
+    action: input.action,
+    source: input.source,
+    referenceId: input.refId ?? null,
+    referenceType: input.refType ?? null,
+    reversesId: input.reversesId ?? null,
+    metadata: input.metadata ?? null,
+    ...(input.createdAt ? { createdAt: input.createdAt } : {}),
+  };
+}
 export type PointsCountersRow = typeof pointsActivityCounters.$inferSelect;
 export type PointsStreakRow = typeof pointsStreaks.$inferSelect;
 export type PointsTaskStreakRow = typeof pointsTaskStreaks.$inferSelect;
@@ -62,11 +107,7 @@ export interface IPointsRepository {
    *  counter (earned for delta>0 on earn, redeemed for delta<0 on
    *  redeem, reversed for delta<0 on reverse). Upserts the row if the
    *  user has no balance record yet. */
-  applyBalanceDelta(
-    userId: string,
-    delta: number,
-    category: "earn" | "redeem" | "adjust" | "reverse" | "streak_bonus" | "badge_bonus",
-  ): Promise<PointsBalanceRow>;
+  applyBalanceDelta(userId: string, delta: number, category: PointsCategory): Promise<PointsBalanceRow>;
   setSuspension(
     userId: string,
     suspend: boolean,
@@ -249,54 +290,39 @@ export interface IPointsRepository {
    *  `threshold` lifetime points (so a viewer's rank = count + 1), scoped to
    *  `userIds` when provided. Powers "Your rank: #N" beyond the visible top. */
   countAheadByLifetimeEarned(threshold: number, userIds?: string[]): Promise<number>;
+  /** Fraud-sweep universe: user ids with a positive points balance or any
+   *  lifetime redemption, up to `limit`. */
+  listActivePointHolders(limit: number): Promise<string[]>;
 }
 
 export class PointsRepository implements IPointsRepository {
-  constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}
+  private readonly wallets: WalletRepository;
+
+  constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {
+    this.wallets = new WalletRepository(db, now);
+  }
 
   // ── balance ──────────────────────────────────────────────────────────
 
   async findBalance(userId: string): Promise<PointsBalanceRow | null> {
-    const [row] = await this.db
-      .select()
-      .from(userPointsBalance)
-      .where(eq(userPointsBalance.userId, userId))
-      .limit(1);
-    return (row as PointsBalanceRow) ?? null;
+    const row = await this.wallets.find(userWallet(userId), POINTS);
+    return row ? pointsBalanceView(row) : null;
   }
 
-  async applyBalanceDelta(
-    userId: string,
-    delta: number,
-    category: "earn" | "redeem" | "adjust" | "reverse" | "streak_bonus" | "badge_bonus",
-  ): Promise<PointsBalanceRow> {
+  async applyBalanceDelta(userId: string, delta: number, category: PointsCategory): Promise<PointsBalanceRow> {
     const earnedAdd = delta > 0 && (category === "earn" || category === "streak_bonus" || category === "badge_bonus")
       ? delta
       : 0;
     const redeemedAdd = delta < 0 && category === "redeem" ? -delta : 0;
     const reversedAdd = delta < 0 && category === "reverse" ? -delta : 0;
-
-    const [row] = await this.db
-      .insert(userPointsBalance)
-      .values({
-        userId,
-        balance: delta > 0 ? delta : 0,
-        lifetimeEarned: earnedAdd,
-        lifetimeRedeemed: redeemedAdd,
-        lifetimeReversed: reversedAdd,
-      })
-      .onConflictDoUpdate({
-        target: userPointsBalance.userId,
-        set: {
-          balance: sql`GREATEST(${userPointsBalance.balance} + ${delta}, 0)`,
-          lifetimeEarned: sql`${userPointsBalance.lifetimeEarned} + ${earnedAdd}`,
-          lifetimeRedeemed: sql`${userPointsBalance.lifetimeRedeemed} + ${redeemedAdd}`,
-          lifetimeReversed: sql`${userPointsBalance.lifetimeReversed} + ${reversedAdd}`,
-          updatedAt: this.now(),
-        },
-      })
-      .returning();
-    return row as PointsBalanceRow;
+    const row = await this.wallets.applyDelta(userWallet(userId), POINTS, {
+      delta,
+      clampAtZero: true,
+      grantedAdd: earnedAdd,
+      consumedAdd: redeemedAdd,
+      reversedAdd,
+    });
+    return pointsBalanceView(row!);
   }
 
   async setSuspension(
@@ -305,57 +331,34 @@ export class PointsRepository implements IPointsRepository {
     reason: string | null,
     actorId: string | null,
   ): Promise<PointsBalanceRow> {
-    const [row] = await this.db
-      .insert(userPointsBalance)
-      .values({
-        userId,
-        isSuspended: suspend,
-        suspendedAt: suspend ? this.now() : null,
-        suspendedReason: suspend ? reason : null,
-        suspendedBy: suspend ? actorId : null,
-      })
-      .onConflictDoUpdate({
-        target: userPointsBalance.userId,
-        set: {
-          isSuspended: suspend,
-          suspendedAt: suspend ? this.now() : null,
-          suspendedReason: suspend ? reason : null,
-          suspendedBy: suspend ? actorId : null,
-          updatedAt: this.now(),
-        },
-      })
-      .returning();
-    return row as PointsBalanceRow;
+    const row = await this.wallets.updateState(userWallet(userId), POINTS, {
+      isSuspended: suspend,
+      suspendedAt: suspend ? this.now() : null,
+      suspendedReason: suspend ? reason : null,
+      suspendedBy: suspend ? actorId : null,
+    });
+    return pointsBalanceView(row);
   }
 
   // ── ledger ────────────────────────────────────────────────────────────
 
   async insertLedger(input: PointsLedgerInsert): Promise<PointsLedgerRow> {
-    const [row] = await this.db.insert(pointsLedger).values(input).returning();
-    return row as PointsLedgerRow;
+    return pointsLedgerView(await this.wallets.insertLedger(toLedgerInsert(input)));
   }
 
   async insertLedgerIdempotent(input: PointsLedgerInsert): Promise<PointsLedgerRow | null> {
-    // Dedup unique index is (user_id, action, ref_id, category) where ref_id
-    // is not null. For null ref_id the conflict path is N/A — those rows
-    // (streak bonuses, admin adjusts) come from callers that already
-    // ensure uniqueness via lastBonusMilestone or a separate guard.
-    const [row] = await this.db
-      .insert(pointsLedger)
-      .values(input)
-      .onConflictDoNothing()
-      .returning();
-    return (row as PointsLedgerRow) ?? null;
+    // Dedup unique index (uq_wallet_ledger_points_dedup) is (owner_id,
+    // action, reference_id, type) for points rows with a reference. For a
+    // null ref the conflict path is N/A — those rows (streak bonuses, admin
+    // adjusts) come from callers that already ensure uniqueness via
+    // lastBonusMilestone or a separate guard.
+    const row = await this.wallets.insertLedgerIdempotent(toLedgerInsert(input));
+    return row ? pointsLedgerView(row) : null;
   }
 
   async findRecentLedger(userId: string, limit: number): Promise<PointsLedgerRow[]> {
-    const rows = await this.db
-      .select()
-      .from(pointsLedger)
-      .where(eq(pointsLedger.userId, userId))
-      .orderBy(desc(pointsLedger.createdAt))
-      .limit(limit);
-    return rows as PointsLedgerRow[];
+    const rows = await this.wallets.listLedger({ owner: userWallet(userId), currency: POINTS, limit });
+    return rows.map(pointsLedgerView);
   }
 
   async findLedgerByAction(
@@ -364,64 +367,38 @@ export class PointsRepository implements IPointsRepository {
     sinceMs: number,
     limit: number,
   ): Promise<PointsLedgerRow[]> {
-    const cutoff = new Date(Date.now() - sinceMs);
-    const rows = await this.db
-      .select()
-      .from(pointsLedger)
-      .where(
-        and(
-          eq(pointsLedger.userId, userId),
-          eq(pointsLedger.action, action),
-          gte(pointsLedger.createdAt, cutoff),
-        ),
-      )
-      .orderBy(desc(pointsLedger.createdAt))
-      .limit(limit);
-    return rows as PointsLedgerRow[];
+    const rows = await this.wallets.listLedger({
+      owner: userWallet(userId),
+      currency: POINTS,
+      action,
+      since: new Date(Date.now() - sinceMs),
+      limit,
+    });
+    return rows.map(pointsLedgerView);
   }
 
   async countEarnedSince(userId: string, sinceMs: number, action?: string): Promise<number> {
-    const cutoff = new Date(Date.now() - sinceMs);
-    const conditions = [
-      eq(pointsLedger.userId, userId),
-      gte(pointsLedger.createdAt, cutoff),
-      eq(pointsLedger.category, "earn"),
-    ];
-    if (action) conditions.push(eq(pointsLedger.action, action));
-    const [row] = await this.db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(pointsLedger)
-      .where(and(...conditions));
-    return row?.c ?? 0;
+    return this.wallets.countLedger({
+      owner: userWallet(userId),
+      currency: POINTS,
+      type: "earn",
+      action,
+      since: new Date(Date.now() - sinceMs),
+    });
   }
 
   async countEarnsByAction(userId: string, action: string): Promise<number> {
-    const [row] = await this.db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(pointsLedger)
-      .where(
-        and(
-          eq(pointsLedger.userId, userId),
-          eq(pointsLedger.action, action),
-          eq(pointsLedger.category, "earn"),
-        ),
-      );
-    return row?.c ?? 0;
+    return this.wallets.countLedger({ owner: userWallet(userId), currency: POINTS, type: "earn", action });
   }
 
   async sumEarnedSince(userId: string, sinceMs: number, action?: string): Promise<number> {
-    const cutoff = new Date(Date.now() - sinceMs);
-    const conditions = [
-      eq(pointsLedger.userId, userId),
-      gte(pointsLedger.createdAt, cutoff),
-      eq(pointsLedger.category, "earn"),
-    ];
-    if (action) conditions.push(eq(pointsLedger.action, action));
-    const [row] = await this.db
-      .select({ s: sql<number>`coalesce(sum(${pointsLedger.delta}), 0)::int` })
-      .from(pointsLedger)
-      .where(and(...conditions));
-    return row?.s ?? 0;
+    return this.wallets.sumLedger({
+      owner: userWallet(userId),
+      currency: POINTS,
+      type: "earn",
+      action,
+      since: new Date(Date.now() - sinceMs),
+    });
   }
 
   // ── counters ──────────────────────────────────────────────────────────
@@ -839,72 +816,42 @@ export class PointsRepository implements IPointsRepository {
   }
 
   /** #169 — Grant Campaign $ into the user's balance. Idempotent on the
-   *  redemption row: re-running the same `redemptionId` is a no-op. */
+   *  redemption row: re-running the same `redemptionId` is a no-op. The
+   *  balance bump and its ledger row commit in ONE statement. */
   async grantCampaignDollars(args: {
     userId: string;
     amountCents: number;
     redemptionId: string;
     description: string;
   }): Promise<void> {
-    // Dedup guard: if a transaction with this reference_id already exists
-    // we're processing a retry — skip both the balance bump and the
-    // transaction insert.
-    const existing = await this.db
-      .select({ id: campaignDollarsTransactions.id })
-      .from(campaignDollarsTransactions)
-      .where(
-        and(
-          eq(campaignDollarsTransactions.referenceId, args.redemptionId),
-          eq(campaignDollarsTransactions.referenceType, "redemption"),
-        ),
-      )
-      .limit(1);
-    if (existing.length > 0) return;
-
-    const [bumped] = await this.db
-      .insert(campaignDollarsBalance)
-      .values({
-        userId: args.userId,
-        balanceCents: args.amountCents,
-        lifetimeGrantedCents: args.amountCents,
-      })
-      .onConflictDoUpdate({
-        target: campaignDollarsBalance.userId,
-        set: {
-          balanceCents: sql`${campaignDollarsBalance.balanceCents} + ${args.amountCents}`,
-          lifetimeGrantedCents: sql`${campaignDollarsBalance.lifetimeGrantedCents} + ${args.amountCents}`,
-          updatedAt: this.now(),
-        },
-      })
-      .returning();
-
-    await this.db.insert(campaignDollarsTransactions).values({
-      userId: args.userId,
-      kind: "grant_redemption",
-      amountCents: args.amountCents,
-      balanceAfterCents: bumped.balanceCents,
-      referenceId: args.redemptionId,
-      referenceType: "redemption",
-      description: args.description,
+    await this.wallets.postEntry({
+      owner: userWallet(args.userId),
+      currency: CAMPAIGN,
+      delta: args.amountCents,
+      grantedAdd: args.amountCents,
+      entry: {
+        type: "grant_redemption",
+        referenceId: args.redemptionId,
+        referenceType: "redemption",
+        description: args.description,
+      },
+      idempotent: true,
     });
   }
 
   /** Read current Campaign $ balance row. Used by /api/campaign-dollars
    *  + by boost checkout. */
   async findCampaignDollarsBalance(userId: string) {
-    const [row] = await this.db
-      .select()
-      .from(campaignDollarsBalance)
-      .where(eq(campaignDollarsBalance.userId, userId))
-      .limit(1);
-    return row ?? null;
+    const row = await this.wallets.find(userWallet(userId), CAMPAIGN);
+    return row ? campaignDollarsBalanceView(row) : null;
   }
 
   /** #177 — Debit Campaign $ to pay (part of) a boost or ad order. Caller
    *  passes the maximum it'd like to draw; returns the amount actually
-   *  spent (≤ requested). Atomicity: a single conditional UPDATE with
-   *  RETURNING means the spend never goes negative even under concurrent
-   *  calls. The transaction row is written only if balance moved. */
+   *  spent (≤ requested). Atomicity: ONE conditional statement moves the
+   *  balance (only while it still covers the spend) and writes the ledger
+   *  row, so the spend never goes negative under concurrent calls and a
+   *  ledger row exists iff the balance moved. */
   async spendCampaignDollars(args: {
     userId: string;
     maxCents: number;
@@ -913,70 +860,38 @@ export class PointsRepository implements IPointsRepository {
     description: string;
   }): Promise<{ spentCents: number; balanceAfterCents: number }> {
     if (args.maxCents <= 0) return { spentCents: 0, balanceAfterCents: 0 };
+    const owner = userWallet(args.userId);
 
-    const existing = await this.db
-      .select({ id: campaignDollarsTransactions.id })
-      .from(campaignDollarsTransactions)
-      .where(
-        and(
-          eq(campaignDollarsTransactions.referenceId, args.referenceId),
-          eq(campaignDollarsTransactions.referenceType, args.referenceType),
-        ),
-      )
-      .limit(1);
-    if (existing.length > 0) {
-      const [bal] = await this.db
-        .select({ balanceCents: campaignDollarsBalance.balanceCents })
-        .from(campaignDollarsBalance)
-        .where(eq(campaignDollarsBalance.userId, args.userId))
-        .limit(1);
-      return { spentCents: 0, balanceAfterCents: bal?.balanceCents ?? 0 };
-    }
+    const current = await this.wallets.find(owner, CAMPAIGN);
+    const have = current?.balance ?? 0;
+    // Replay of an already-paid reference: report the balance, spend nothing.
+    const posted = await this.wallets.findLedgerByReference(CAMPAIGN, args.referenceType, args.referenceId);
+    if (posted) return { spentCents: 0, balanceAfterCents: have };
 
-    const [current] = await this.db
-      .select({ balanceCents: campaignDollarsBalance.balanceCents })
-      .from(campaignDollarsBalance)
-      .where(eq(campaignDollarsBalance.userId, args.userId))
-      .limit(1);
-    const have = current?.balanceCents ?? 0;
     const spend = Math.min(have, args.maxCents);
     if (spend <= 0) return { spentCents: 0, balanceAfterCents: have };
 
-    const [bumped] = await this.db
-      .update(campaignDollarsBalance)
-      .set({
-        balanceCents: sql`${campaignDollarsBalance.balanceCents} - ${spend}`,
-        lifetimeSpentCents: sql`${campaignDollarsBalance.lifetimeSpentCents} + ${spend}`,
-        updatedAt: this.now(),
-      })
-      .where(
-        and(
-          eq(campaignDollarsBalance.userId, args.userId),
-          sql`${campaignDollarsBalance.balanceCents} >= ${spend}`,
-        ),
-      )
-      .returning();
-    if (!bumped) return { spentCents: 0, balanceAfterCents: have };
-
-    await this.db.insert(campaignDollarsTransactions).values({
-      userId: args.userId,
-      kind: args.referenceType === "boost_checkout" ? "boost_spend" : "ad_spend",
-      amountCents: -spend,
-      balanceAfterCents: bumped.balanceCents,
-      referenceId: args.referenceId,
-      referenceType: args.referenceType,
-      description: args.description,
+    const balanceAfter = await this.wallets.postEntry({
+      owner,
+      currency: CAMPAIGN,
+      delta: -spend,
+      consumedAdd: spend,
+      entry: {
+        type: args.referenceType === "boost_checkout" ? "boost_spend" : "ad_spend",
+        referenceId: args.referenceId,
+        referenceType: args.referenceType,
+        description: args.description,
+      },
+      requireSufficient: true,
+      idempotent: true,
     });
-    return { spentCents: spend, balanceAfterCents: bumped.balanceCents };
+    if (balanceAfter == null) return { spentCents: 0, balanceAfterCents: have };
+    return { spentCents: spend, balanceAfterCents: balanceAfter };
   }
 
   async listCampaignDollarsTransactions(userId: string, limit: number) {
-    return await this.db
-      .select()
-      .from(campaignDollarsTransactions)
-      .where(eq(campaignDollarsTransactions.userId, userId))
-      .orderBy(desc(campaignDollarsTransactions.createdAt))
-      .limit(limit);
+    const rows = await this.wallets.listLedger({ owner: userWallet(userId), currency: CAMPAIGN, limit });
+    return rows.map(campaignDollarsTransactionView);
   }
 
   async markW9Collected(
@@ -1009,75 +924,41 @@ export class PointsRepository implements IPointsRepository {
   // ── stats ─────────────────────────────────────────────────────────────
 
   async globalStats() {
-    const [bal] = await this.db
-      .select({
-        totalUsers: sql<number>`count(*)::int`,
-        suspendedUsers: sql<number>`sum(case when ${userPointsBalance.isSuspended} then 1 else 0 end)::int`,
-        totalEarned: sql<number>`coalesce(sum(${userPointsBalance.lifetimeEarned}), 0)::int`,
-        totalRedeemed: sql<number>`coalesce(sum(${userPointsBalance.lifetimeRedeemed}), 0)::int`,
-        totalBalance: sql<number>`coalesce(sum(${userPointsBalance.balance}), 0)::int`,
-      })
-      .from(userPointsBalance);
+    const bal = await this.wallets.totals(POINTS);
     const [fraud] = await this.db
       .select({ c: sql<number>`count(*)::int` })
       .from(pointsFraudFlags)
       .where(eq(pointsFraudFlags.status, "open"));
     return {
-      totalUsers: bal?.totalUsers ?? 0,
-      suspendedUsers: bal?.suspendedUsers ?? 0,
-      totalEarned: bal?.totalEarned ?? 0,
-      totalRedeemed: bal?.totalRedeemed ?? 0,
-      totalBalance: bal?.totalBalance ?? 0,
+      totalUsers: bal.wallets,
+      suspendedUsers: bal.suspended,
+      totalEarned: bal.granted,
+      totalRedeemed: bal.consumed,
+      totalBalance: bal.balance,
       openFraudFlags: fraud?.c ?? 0,
     };
   }
 
   async topEarners(limit: number) {
-    const rows = await this.db
-      .select({
-        userId: userPointsBalance.userId,
-        lifetimeEarned: userPointsBalance.lifetimeEarned,
-        balance: userPointsBalance.balance,
-      })
-      .from(userPointsBalance)
-      .orderBy(desc(userPointsBalance.lifetimeEarned))
-      .limit(limit);
-    return rows as Array<{ userId: string; lifetimeEarned: number; balance: number }>;
+    const rows = await this.wallets.topByLifetimeGranted(POINTS, limit);
+    return rows.map((w) => ({ userId: w.ownerId, lifetimeEarned: w.lifetimeGranted, balance: w.balance }));
   }
 
   async topByLifetimeEarned(limit: number, userIds?: string[]) {
     // Exclude fraud-suspended accounts; scope to userIds when provided
     // (cohort leaderboard). An empty userIds array means "no one" → [].
     if (userIds && userIds.length === 0) return [];
-    const conds = [eq(userPointsBalance.isSuspended, false)];
-    if (userIds && userIds.length > 0) {
-      conds.push(inArray(userPointsBalance.userId, userIds));
-    }
-    const rows = await this.db
-      .select({
-        userId: userPointsBalance.userId,
-        lifetimeEarned: userPointsBalance.lifetimeEarned,
-      })
-      .from(userPointsBalance)
-      .where(and(...conds))
-      .orderBy(desc(userPointsBalance.lifetimeEarned))
-      .limit(limit);
-    return rows as Array<{ userId: string; lifetimeEarned: number }>;
+    const rows = await this.wallets.topByLifetimeGranted(POINTS, limit, { excludeSuspended: true, ownerIds: userIds });
+    return rows.map((w) => ({ userId: w.ownerId, lifetimeEarned: w.lifetimeGranted }));
   }
 
   async countAheadByLifetimeEarned(threshold: number, userIds?: string[]): Promise<number> {
     if (userIds && userIds.length === 0) return 0;
-    const conds = [
-      eq(userPointsBalance.isSuspended, false),
-      sql`${userPointsBalance.lifetimeEarned} > ${threshold}`,
-    ];
-    if (userIds && userIds.length > 0) {
-      conds.push(inArray(userPointsBalance.userId, userIds));
-    }
-    const [row] = await this.db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(userPointsBalance)
-      .where(and(...conds));
-    return (row as { c: number } | undefined)?.c ?? 0;
+    return this.wallets.countAboveLifetimeGranted(POINTS, threshold, { excludeSuspended: true, ownerIds: userIds });
+  }
+
+  /** Fraud-sweep universe: users holding points or with any redemption. */
+  async listActivePointHolders(limit: number): Promise<string[]> {
+    return this.wallets.listActiveOwnerIds(POINTS, limit);
   }
 }

@@ -1,6 +1,6 @@
 /**
  * useJobDraftReview — "Create a new one for this job": a résumé built from
- * the master's own evidence (POST /api/resume-versions/from-job, nothing
+ * the master's own evidence (POST /api/resumes { source: "job" }, nothing
  * saved), reviewed on the page, saved as a VERSION OF THE MASTER.
  *
  *   • every requirement maps to the bullets that prove it (R1…Rn chips);

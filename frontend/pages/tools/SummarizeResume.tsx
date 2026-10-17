@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FileText, Loader2, Upload, Sparkles } from "lucide-react";
+import { Upload, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -16,12 +16,14 @@ import {
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { apiClient } from "@/lib/api-client";
+import { aiToolPath } from "@shared/ai-tools/tool-ids";
 import { RESUME_TEXT_FILE_ACCEPT, getResumeTextFromFile, isResumeTextFile } from "@/lib/services/resume-text";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolShell } from "@/components/tools/ToolShell";
 import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
 import { useUserResumes } from "@/hooks/queries/use-resumes";
+import { SummarizeButton, SummaryResultPanel } from "@/components/tools/summarize-resume/SummaryResultPanel";
 
 export default function SummarizeResume() {
   const { t } = useTranslation();
@@ -115,7 +117,7 @@ export default function SummarizeResume() {
 
     try {
       // Call the summarization API with resume text
-      const response = await apiClient.post("/api/resumes/summarize", {
+      const response = await apiClient.post(aiToolPath("resume-summarize"), {
         resumeText: resumeText,
       });
       handleSummaryResponse(response.data, {});
@@ -165,7 +167,7 @@ export default function SummarizeResume() {
       const resumeContent = parseResult.result || parseResult;
 
       // Now summarize the parsed content
-      const summaryResponse = await apiClient.post("/api/resumes/summarize", {
+      const summaryResponse = await apiClient.post(aiToolPath("resume-summarize"), {
         resumeText: resumeContent,
       });
       handleSummaryResponse(summaryResponse.data, {});
@@ -193,7 +195,7 @@ export default function SummarizeResume() {
 
     try {
       // Pass the resume ID to the API - it will fetch and use the SerializedResume property
-      const response = await apiClient.post("/api/resumes/summarize", {
+      const response = await apiClient.post(aiToolPath("resume-summarize"), {
         resumeId: selectedResumeId,
       });
       handleSummaryResponse(response.data, { resumeId: selectedResumeId });
@@ -279,23 +281,7 @@ export default function SummarizeResume() {
                             className="min-h-[200px]"
                           />
                         </div>
-                        <Button
-                          onClick={handleTextSummarization}
-                          disabled={isAnalyzing || !resumeText.trim()}
-                          className="w-full"
-                        >
-                          {isAnalyzing ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              {t("status.summarizing")}
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="h-4 w-4 mr-2" />
-                              {t("actions.summarizeResume")}
-                            </>
-                          )}
-                        </Button>
+                        <SummarizeButton onClick={handleTextSummarization} disabled={isAnalyzing || !resumeText.trim()} busy={isAnalyzing} />
                       </TabsContent>
 
                       <TabsContent value="upload" className="space-y-4">
@@ -346,23 +332,7 @@ export default function SummarizeResume() {
                           </div>
                         )}
 
-                        <Button
-                          onClick={handleFileSummarization}
-                          disabled={isAnalyzing || !file}
-                          className="w-full"
-                        >
-                          {isAnalyzing ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              {t("status.summarizing")}
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="h-4 w-4 mr-2" />
-                              {t("actions.summarizeResume")}
-                            </>
-                          )}
-                        </Button>
+                        <SummarizeButton onClick={handleFileSummarization} disabled={isAnalyzing || !file} busy={isAnalyzing} />
                       </TabsContent>
 
                       <TabsContent value="existing" className="space-y-4">
@@ -388,23 +358,7 @@ export default function SummarizeResume() {
                           </Select>
                         </div>
 
-                        <Button
-                          onClick={handleResumeSummarization}
-                          disabled={isAnalyzing || !selectedResumeId}
-                          className="w-full"
-                        >
-                          {isAnalyzing ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              {t("status.summarizing")}
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="h-4 w-4 mr-2" />
-                              {t("actions.summarizeResume")}
-                            </>
-                          )}
-                        </Button>
+                        <SummarizeButton onClick={handleResumeSummarization} disabled={isAnalyzing || !selectedResumeId} busy={isAnalyzing} />
                       </TabsContent>
                     </Tabs>
 
@@ -419,47 +373,7 @@ export default function SummarizeResume() {
 
               {/* Right Column - Results */}
               <div className="space-y-6">
-                {summary && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
-                        {t("headings.resumeSummary")}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="prose prose-sm max-w-none">
-                        <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                          {summary}
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2 mt-6">
-                        <Button variant="outline" onClick={resetAnalysis}>
-                          {t("actions.summarizeAnother")}
-                        </Button>
-                        <Button
-                          onClick={() => navigator.clipboard.writeText(summary)}
-                          variant="outline"
-                        >
-                          {t("actions.copySummary")}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {!summary && !isAnalyzing && (
-                  <Card>
-                    <CardContent className="p-8 text-center">
-                      <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="font-semibold mb-2">{t("headings.readyToSummarize")}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {t("messages.readyToSummarizeBody")}
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
+                <SummaryResultPanel summary={summary} busy={isAnalyzing} onReset={resetAnalysis} />
               </div>
             </div>
     </ToolShell>

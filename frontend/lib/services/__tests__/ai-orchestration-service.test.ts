@@ -210,7 +210,7 @@ describe("AIOrchestrationService", () => {
 
       const apiResults = [
         {
-          api: { id: "resume-optimize", endpoint: "/api/resumeoptimizer/optimize" },
+          api: { id: "resume-optimize", endpoint: "/api/ai/tools/resume-optimize" },
           success: true,
           data: {
             result: {
@@ -235,7 +235,7 @@ describe("AIOrchestrationService", () => {
 
       const apiResults = [
         {
-          api: { id: "resume-optimize", endpoint: "/api/resumeoptimizer/optimize" },
+          api: { id: "resume-optimize", endpoint: "/api/ai/tools/resume-optimize" },
           success: false,
           error: "API error",
         },
@@ -253,7 +253,7 @@ describe("AIOrchestrationService", () => {
 
       const apiResults = [
         {
-          api: { id: "resume-optimize", endpoint: "/api/resumeoptimizer/optimize" },
+          api: { id: "resume-optimize", endpoint: "/api/ai/tools/resume-optimize" },
           success: true,
           data: {
             result: {

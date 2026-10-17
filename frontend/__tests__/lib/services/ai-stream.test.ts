@@ -58,7 +58,7 @@ describe("streamAiJson", () => {
     vi.mocked(apiClient.openStream).mockResolvedValue(sseResponse(pieces(stream, 17)));
 
     const seen: string[] = [];
-    const out = await streamAiJson("/api/valueproposition/generate", { jobContent: "x", resumeContent: "y" }, {
+    const out = await streamAiJson("/api/ai/tools/value-proposition", { jobContent: "x", resumeContent: "y" }, {
       schema: ValuePropositionResponseSchema,
       onText: (t) => seen.push(t),
     });
@@ -66,7 +66,7 @@ describe("streamAiJson", () => {
     expect(out).toEqual(PITCH);
     expect(seen).toEqual(['{"valueProp', "", answer.slice(0, 40), answer]);
     const [endpoint, config] = vi.mocked(apiClient.openStream).mock.calls[0];
-    expect(endpoint).toBe("/api/valueproposition/generate");
+    expect(endpoint).toBe("/api/ai/tools/value-proposition");
     expect(config?.headers?.Accept).toBe("text/event-stream");
   });
 
@@ -74,7 +74,7 @@ describe("streamAiJson", () => {
     vi.mocked(apiClient.openStream).mockResolvedValue(
       sseResponse([encodeSseJson({ type: "error", code: "AI_USAGE_LIMIT_REACHED", message: "Upgrade to keep using AI tools.", status: 429 })]),
     );
-    await expect(streamAiJson("/api/resumescorer/score", {})).rejects.toBeInstanceOf(AIUsageLimitError);
+    await expect(streamAiJson("/api/ai/tools/resume-score", {})).rejects.toBeInstanceOf(AIUsageLimitError);
   });
 
   it("rejects a result that fails the schema", async () => {

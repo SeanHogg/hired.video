@@ -1,5 +1,5 @@
 // candidates.ts — Agency-owned candidate resumes, redaction profiles,
-// tokenized shares, and pitch decks. Backs the recruiting-platform MVP
+// and pitch decks (their share links live in share_links). Backs the recruiting-platform MVP
 // (migration 0027). All tables are company-scoped and PRIVATE to the
 // agency that owns them; row-level filtering is enforced in the route
 // layer via the requesting user's `company_id`.
@@ -123,53 +123,8 @@ export const redactionProfiles = pgTable(
 export type RedactionProfile = typeof redactionProfiles.$inferSelect;
 export type NewRedactionProfile = typeof redactionProfiles.$inferInsert;
 
-// ─── candidate_resume_shares ─────────────────────────────────────────────────
-// Tokenized public share link of a redacted + branded candidate resume.
-// `whitelabel_tenant_id` reuses the existing brand-kit table
-// (logo, primaryColor, subdomain). NULL = no branding overlay applied.
-
-export const candidateResumeShares = pgTable(
-  "candidate_resume_shares",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    companyId: uuid("company_id")
-      .notNull()
-      .references(() => companyProfiles.id, { onDelete: "cascade" }),
-    candidateResumeId: uuid("candidate_resume_id")
-      .notNull()
-      .references(() => candidateResumes.id, { onDelete: "cascade" }),
-    redactionProfileId: uuid("redaction_profile_id").references(
-      () => redactionProfiles.id,
-      { onDelete: "set null" },
-    ),
-    whitelabelTenantId: uuid("whitelabel_tenant_id").references(
-      () => whitelabelTenants.id,
-      { onDelete: "set null" },
-    ),
-    sharedByUserId: uuid("shared_by_user_id").references(() => users.id, {
-      onDelete: "set null",
-    }),
-    shareToken: varchar("share_token", { length: 64 }).notNull().unique(),
-    name: varchar("name", { length: 255 }),
-    recipientEmail: varchar("recipient_email", { length: 255 }),
-    expiresAt: timestamp("expires_at", { withTimezone: true }),
-    isActive: boolean("is_active").default(true).notNull(),
-    viewCount: integer("view_count").default(0).notNull(),
-    lastViewedAt: timestamp("last_viewed_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("candidate_resume_shares_company_id_idx").on(table.companyId),
-    index("candidate_resume_shares_candidate_resume_id_idx").on(table.candidateResumeId),
-    index("idx_candidate_resume_shares_redaction_profile_id").on(table.redactionProfileId),
-    index("idx_candidate_resume_shares_shared_by_user_id").on(table.sharedByUserId),
-    index("idx_candidate_resume_shares_whitelabel_tenant_id").on(table.whitelabelTenantId),
-  ],
-);
-
-export type CandidateResumeShare = typeof candidateResumeShares.$inferSelect;
-export type NewCandidateResumeShare = typeof candidateResumeShares.$inferInsert;
+// Candidate résumé share links live in share_links (shareLinks.ts, kind
+// candidate_resume) since W3-A migration 0583.
 
 // ─── pitch_decks ─────────────────────────────────────────────────────────────
 // Recruiter-authored collection of redacted/branded candidates, optionally
@@ -252,36 +207,5 @@ export const pitchDeckCandidates = pgTable(
 export type PitchDeckCandidate = typeof pitchDeckCandidates.$inferSelect;
 export type NewPitchDeckCandidate = typeof pitchDeckCandidates.$inferInsert;
 
-// ─── pitch_deck_shares ───────────────────────────────────────────────────────
-// Tokenized public share link for a pitch deck. Same pattern as
-// candidate_resume_shares. Reviewer feedback capture (comments, narrow-down)
-// is gap #184 (week-2 / roadmap) and does not live on this table yet.
-
-export const pitchDeckShares = pgTable(
-  "pitch_deck_shares",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    deckId: uuid("deck_id")
-      .notNull()
-      .references(() => pitchDecks.id, { onDelete: "cascade" }),
-    sharedByUserId: uuid("shared_by_user_id").references(() => users.id, {
-      onDelete: "set null",
-    }),
-    shareToken: varchar("share_token", { length: 64 }).notNull().unique(),
-    recipientName: varchar("recipient_name", { length: 255 }),
-    recipientEmail: varchar("recipient_email", { length: 255 }),
-    expiresAt: timestamp("expires_at", { withTimezone: true }),
-    isActive: boolean("is_active").default(true).notNull(),
-    viewCount: integer("view_count").default(0).notNull(),
-    lastViewedAt: timestamp("last_viewed_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("pitch_deck_shares_deck_id_idx").on(table.deckId),
-    index("idx_pitch_deck_shares_shared_by_user_id").on(table.sharedByUserId),
-  ],
-);
-
-export type PitchDeckShare = typeof pitchDeckShares.$inferSelect;
-export type NewPitchDeckShare = typeof pitchDeckShares.$inferInsert;
+// Pitch-deck share links live in share_links (shareLinks.ts, kind
+// pitch_deck) since W3-A migration 0583.

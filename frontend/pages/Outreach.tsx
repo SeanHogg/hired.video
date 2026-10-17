@@ -85,6 +85,9 @@ import { communicationService } from "@/lib/services/communication-service";
 import { jobBoardService, JobBoardDTO, JobBoardPostingDTO, JobBoardStatsDTO } from "@/lib/services/job-board-service";
 import { jobService, type JobSummary } from "@/lib/services/job-service";
 import { advertisingService, type JobBoost, type AdvertisingStats } from "@/lib/services/advertising-service";
+import { checkoutService } from "@/lib/services/checkout-service";
+import { useCheckoutPayment } from "@/hooks/use-checkout-payment";
+import { checkoutIdFor } from "@shared/checkout";
 import { studioService, type StudioProject, StudioProjectStatus, type VideoCampaign } from "@/lib/services/studio-service";
 
 import type { CampaignDTO } from "@shared/campaigns";
@@ -226,6 +229,32 @@ export default function Outreach() {
   const [boostBudget, setBoostBudget] = useState("");
   const [boostDuration, setBoostDuration] = useState("");
   const [boostSubmitting, setBoostSubmitting] = useState(false);
+  const { pay: payCheckout } = useCheckoutPayment();
+
+  /** Pay what's due on a job boost (server-priced checkout → widget →
+   *  provider-verified confirm). The job is sponsored only on a confirmed
+   *  payment; a cancelled widget leaves the boost "awaiting payment". */
+  const payJobBoost = useCallback(
+    async (jobBoostId: string) => {
+      const result = await payCheckout(checkoutIdFor("job_boost", jobBoostId));
+      const [boosts, stats] = await Promise.all([
+        advertisingService.getBoosts().catch(() => null),
+        advertisingService.getStats().catch(() => null),
+      ]);
+      if (boosts) setActiveBoosts(boosts);
+      if (stats) setAdStats(stats);
+      if (result.status === "paid") {
+        toast({ title: t("outreach.jobBoost.toast.paidTitle"), description: t("outreach.jobBoost.toast.paidDescription") });
+      } else if (result.status === "verifying") {
+        toast({ title: t("outreach.jobBoost.toast.verifyingTitle"), description: t("outreach.jobBoost.toast.verifyingDescription") });
+      } else if (result.status === "cancelled") {
+        toast({ title: t("outreach.jobBoost.toast.cancelledTitle"), description: t("outreach.jobBoost.toast.cancelledDescription") });
+      } else {
+        toast({ title: t("outreach.jobBoost.toast.errorTitle"), description: t("outreach.jobBoost.toast.errorDescription"), variant: "destructive" });
+      }
+    },
+    [payCheckout, t],
+  );
 
   // Dialog states
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
@@ -919,6 +948,7 @@ export default function Outreach() {
                         await advertisingService.cancelBoost(id);
                         setActiveBoosts((prev) => prev.filter((b) => b.id !== id));
                       }}
+                      onFinishBoostPayment={payJobBoost}
                     />
                   </TabsContent>
 
@@ -1590,23 +1620,26 @@ export default function Outreach() {
                 if (!boostPlacementType || !boostPricingModel) return;
                 setBoostSubmitting(true);
                 try {
-                  const newBoost = await advertisingService.createBoost({
+                  // Server-priced checkout: the boost is created awaiting
+                  // payment and the job is sponsored only once paid.
+                  const checkout = await checkoutService.start<"job_boost">({
+                    kind: "job_boost",
                     jobId: boostJobId,
                     placementType: boostPlacementType as "search_top" | "discovery_feed" | "both",
                     pricingModel: boostPricingModel as "cpm" | "cpc",
                     budgetCents: Math.round(parseFloat(boostBudget) * 100),
                     durationDays: parseInt(boostDuration),
                   });
-                  setActiveBoosts((prev) => [newBoost, ...prev]);
-                  setAdStats((prev) => prev ? { ...prev, activeBoosts: prev.activeBoosts + 1 } : prev);
                   setShowBoostDialog(false);
                   setBoostJobId("");
                   setBoostPlacementType("");
                   setBoostPricingModel("");
                   setBoostBudget("");
                   setBoostDuration("");
+                  await payJobBoost(checkout.details.jobBoostId);
                 } catch (err) {
                   console.error("Failed to create boost:", err);
+                  toast({ title: t("outreach.jobBoost.toast.errorTitle"), description: t("outreach.jobBoost.toast.errorDescription"), variant: "destructive" });
                 } finally {
                   setBoostSubmitting(false);
                 }

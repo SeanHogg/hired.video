@@ -14,7 +14,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import { SCAN_OVERRIDES } from "../../../shared/moderation/explicit.js";
 import { AUDIT_ACTIONS, auditLog } from "../utils/audit.js";
@@ -27,8 +26,6 @@ import {
 } from "../services/moderation/explicit/review.js";
 
 export const adminContentScanRoutes = new Hono<AppEnv>();
-
-adminContentScanRoutes.use("*", superAdminMiddleware);
 
 adminContentScanRoutes.get("/videos", async (c) => {
   const filter = c.req.query("filter") ?? "needs_review";

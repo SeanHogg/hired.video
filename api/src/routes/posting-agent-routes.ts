@@ -63,14 +63,6 @@ const DraftVariantSchema = z.object({
   renderVariantId: UuidLikeSchema.optional(),
 });
 
-function jobPostYourself(settings: unknown): boolean {
-  return Boolean(
-    settings &&
-      typeof settings === "object" &&
-      (settings as { postYourself?: unknown }).postYourself === true,
-  );
-}
-
 const AGENT_SETTINGS_DEFAULTS = {
   enabled: false,
   mode: "approve" as const,
@@ -207,7 +199,7 @@ postingAgentRoutes.post("/posting-agent/drafts/:id/approve", requirePro("AI Post
       source: "agent",
       destination: draft.destination,
       renderVariantId: variantId,
-      postYourself: jobPostYourself(draft.postSettings),
+      postYourself: draft.postYourself,
     })
   ) {
     return c.json(error("VALIDATION_ERROR", "Prepare the clip before approving"), 400);

@@ -1,5 +1,6 @@
 /**
- * ReviewsRepository — aggregate reads over the polymorphic `reviews` table.
+ * ReviewsRepository — the polymorphic `reviews` aggregate: list / lookup /
+ * upsert / edit / delete rows, plus aggregate reads.
  *
  * `aggregateForSubject` computes the overall average, per-axis sub-rating
  * averages and the star distribution entirely in SQL, so a subject with
@@ -7,12 +8,29 @@
  * into the Worker just to average it.
  */
 
-import { and, eq, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, sql, type SQL } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 export type DbLike = any;
 
 const { reviews } = schema;
+
+export type ReviewRow = typeof reviews.$inferSelect;
+export type ReviewInsert = typeof reviews.$inferInsert;
+
+/** The editable content of a review (the descriptor-validated payload). */
+export interface ReviewContent {
+  overallRating: number;
+  title: string;
+  body: string | null;
+  subRatings: Record<string, number>;
+  metadata: Record<string, string | null>;
+}
+
+export interface ReviewVerification {
+  isVerified: boolean;
+  verificationMethod: string | null;
+}
 
 export interface ReviewSubjectAggregate {
   total: number;
@@ -87,5 +105,107 @@ export class ReviewsRepository {
       axisAverages,
       distribution,
     };
+  }
+
+  /** Published reviews on a subject, newest first, plus the total count. */
+  async listPublishedForSubject(
+    subjectType: string,
+    subjectId: string,
+    limit: number,
+    offset: number,
+  ): Promise<{ rows: ReviewRow[]; total: number }> {
+    const where = and(
+      eq(reviews.subjectType, subjectType),
+      eq(reviews.subjectId, subjectId),
+      eq(reviews.status, "published"),
+    );
+    const [rows, [countRow]] = await Promise.all([
+      this.db
+        .select()
+        .from(reviews)
+        .where(where)
+        .orderBy(desc(reviews.createdAt))
+        .limit(limit)
+        .offset(offset),
+      this.db.select({ count: sql<number>`count(*)::int` }).from(reviews).where(where),
+    ]);
+    return { rows, total: countRow?.count ?? 0 };
+  }
+
+  /** The one review a user wrote on a subject (unique per subject/user). */
+  async findForSubjectAndUser(
+    subjectType: string,
+    subjectId: string,
+    userId: string,
+  ): Promise<ReviewRow | undefined> {
+    const [row] = await this.db
+      .select()
+      .from(reviews)
+      .where(
+        and(eq(reviews.subjectType, subjectType), eq(reviews.subjectId, subjectId), eq(reviews.userId, userId)),
+      )
+      .limit(1);
+    return row;
+  }
+
+  async findById(id: string): Promise<ReviewRow | undefined> {
+    const [row] = await this.db.select().from(reviews).where(eq(reviews.id, id)).limit(1);
+    return row;
+  }
+
+  /** Reviews created from one hashed client IP since `since` (anti-spam throttle). */
+  async countCreatedByIpHashSince(ipHash: string, since: Date): Promise<number> {
+    const [recent] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(reviews)
+      .where(
+        and(
+          eq(reviews.submitterIpHash, ipHash),
+          sql`${reviews.createdAt} >= ${since.toISOString()}::timestamptz`,
+        ),
+      );
+    return recent?.count ?? 0;
+  }
+
+  /** Insert, or update the caller's existing review on the same subject. */
+  async upsert(input: {
+    subjectType: string;
+    subjectId: string;
+    userId: string;
+    content: ReviewContent;
+    verification: ReviewVerification;
+    submitterIpHash: string | null;
+  }): Promise<ReviewRow> {
+    const { content, verification } = input;
+    const values: ReviewInsert = {
+      subjectType: input.subjectType,
+      subjectId: input.subjectId,
+      userId: input.userId,
+      ...content,
+      ...verification,
+      submitterIpHash: input.submitterIpHash,
+    };
+    const [row] = await this.db
+      .insert(reviews)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [reviews.subjectType, reviews.subjectId, reviews.userId],
+        set: { ...content, ...verification, updatedAt: new Date() },
+      })
+      .returning();
+    return row;
+  }
+
+  async updateContent(id: string, content: ReviewContent): Promise<ReviewRow> {
+    const [row] = await this.db
+      .update(reviews)
+      .set({ ...content, updatedAt: new Date() })
+      .where(eq(reviews.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteById(id: string): Promise<void> {
+    await this.db.delete(reviews).where(eq(reviews.id, id));
   }
 }

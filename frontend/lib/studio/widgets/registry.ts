@@ -7,7 +7,7 @@
  */
 import type { WidgetKind } from "@/lib/studio/editor-v2/canvas-state";
 import { fontFamilyFor } from "@/lib/studio/font-catalog";
-import { stringOr } from "./frame";
+import { stringOr } from "@/lib/numeric";
 import type { RegisteredWidgetPlugin, RenderContext } from "./plugin";
 import { avatarPlugin } from "./plugins/avatar";
 import { brandKitPlugin } from "./plugins/brand-kit";

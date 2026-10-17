@@ -140,34 +140,8 @@ export const articles = pgTable(
 export type Article = typeof articles.$inferSelect;
 export type NewArticle = typeof articles.$inferInsert;
 
-// ===========================================================================
-// #170 — Article version history. Mirrors studio_project_versions +
-// resume_versions exactly: monotonically increasing version_number per
-// parent, autosave rows churn fast (caps enforced in app code), manual
-// snapshots persist until the parent is deleted.
-// ===========================================================================
-export const articleVersions = pgTable(
-  "article_versions",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    articleId: uuid("article_id").notNull().references(() => articles.id, { onDelete: "cascade" }),
-    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    versionNumber: integer("version_number").notNull(),
-    label: varchar("label", { length: 120 }),
-    title: varchar("title", { length: 255 }).notNull(),
-    bodyMd: text("body_md"),
-    bodyJson: jsonb("body_json"),
-    isAutosave: boolean("is_autosave").default(false).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (t) => [
-    index("idx_article_versions_article").on(t.articleId, t.versionNumber),
-    index("idx_article_versions_user_id").on(t.userId),
-  ],
-);
-
-export type ArticleVersion = typeof articleVersions.$inferSelect;
-export type NewArticleVersion = typeof articleVersions.$inferInsert;
+// #170 — Article version history lives in `entity_versions`
+// (subject_type 'article', W3-E migration 0640) — see entityVersions.ts.
 
 // ===========================================================================
 // #171 — Article engagement rollup. One row per (article, day). The
@@ -197,27 +171,6 @@ export const articleEngagement = pgTable(
 export type ArticleEngagement = typeof articleEngagement.$inferSelect;
 export type NewArticleEngagement = typeof articleEngagement.$inferInsert;
 
-// Per-user-per-article clap count. Medium-style: a user can clap many
-// times for one article, capped at 50 application-side. One row per
-// (user, article); the count column is the running total.
-export const articleClaps = pgTable(
-  "article_claps",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    articleId: uuid("article_id").notNull().references(() => articles.id, { onDelete: "cascade" }),
-    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    count: integer("count").default(0).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (t) => [
-    uniqueIndex("uq_article_claps_user_article").on(t.userId, t.articleId),
-    index("idx_article_claps_article_id").on(t.articleId),
-  ],
-);
-
-export type ArticleClap = typeof articleClaps.$inferSelect;
-export type NewArticleClap = typeof articleClaps.$inferInsert;
 
 // Append-only share event log.
 export const articleShares = pgTable(

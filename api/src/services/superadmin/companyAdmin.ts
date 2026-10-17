@@ -6,7 +6,7 @@
  * employees / resumes / jobs.
  *
  * Reuses the existing per-company foundations (company_subscriptions,
- * company_token_balance, user_company_role_associations, people_segments,
+ * the company ai_tokens wallet, user_company_role_associations, people_segments,
  * people_employees, company_integrations, company_embed_keys, job_items,
  * candidate_resumes) — no new storage. SA auth is enforced upstream by
  * superAdminMiddleware on the route.
@@ -15,13 +15,13 @@
 import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { slugify } from "../../../../shared/slugify.js";
+import { companyWallet, WalletRepository } from "../../repositories/walletRepository.js";
 
 const {
   companyProfiles,
   users,
   userCompanyRoleAssociations,
   companySubscriptions,
-  companyTokenBalance,
   companyIntegrations,
   companyEmbedKeys,
   peopleSegments,
@@ -152,11 +152,7 @@ export async function getCompanyFeatureTree(
     .where(eq(companySubscriptions.companyId, companyId))
     .limit(1);
 
-  const [pool] = await db
-    .select()
-    .from(companyTokenBalance)
-    .where(eq(companyTokenBalance.companyId, companyId))
-    .limit(1);
+  const pool = await new WalletRepository(db).find(companyWallet(companyId), "ai_tokens");
 
   const activeMembers = await count(
     db,

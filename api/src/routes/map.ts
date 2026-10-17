@@ -7,8 +7,9 @@
  *             matching the bbox / radius filter.
  *   • people: users with `openToCoffee` enabled AND a home lat/lng.
  *
- * Geo + radius filter reuses `content_locations` for events (entity_kind
- * = 'event') and `user_profiles.home_latitude/longitude` for people.
+ * Geo + radius filter reuses `content_locations` for both: events
+ * (entity_kind = 'event') and people (entity_kind = 'user_profile',
+ * entity_id = users.id — the home location, mig 0631).
  * Per project_globe_details_owner_only.md, the popover drawer on the
  * frontend uses the existing `useEntityDetailsPermission` seam — this
  * endpoint just returns the pin metadata, not the full detail drawer.
@@ -101,7 +102,8 @@ mapRoutes.get("/", async (c) => {
     )
     .limit(500);
 
-  // People: users with home lat/lng AND profileSections.openToCoffee=true.
+  // People: users whose home location (content_locations origin row for
+  // their user_profile) has lat/lng AND profileSections.openToCoffee=true.
   // We pull the profileSections JSON + role and apply the resolver
   // post-query (small enough cohort that an in-DB JSON path filter isn't
   // worth the index complexity yet — revisit at 100k+ opted-in users).
@@ -112,23 +114,31 @@ mapRoutes.get("/", async (c) => {
       role: users.role,
       avatarUrl: userProfiles.avatarUrl,
       headline: userProfiles.headline,
-      lat: userProfiles.homeLatitude,
-      lng: userProfiles.homeLongitude,
+      lat: contentLocations.latitude,
+      lng: contentLocations.longitude,
       sections: userProfiles.profileSections,
       profileVisibility: userProfiles.profileVisibility,
     })
     .from(users)
     .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .innerJoin(
+      contentLocations,
+      and(
+        eq(contentLocations.entityKind, "user_profile"),
+        eq(contentLocations.entityId, users.id),
+        eq(contentLocations.role, "origin"),
+      ),
+    )
     .where(
       and(
         eq(userProfiles.profileVisibility, "public"),
         eq(users.emailVerified, true),
-        isNotNull(userProfiles.homeLatitude),
-        isNotNull(userProfiles.homeLongitude),
-        gte(userProfiles.homeLatitude, filter.minLat),
-        lte(userProfiles.homeLatitude, filter.maxLat),
-        gte(userProfiles.homeLongitude, filter.minLng),
-        lte(userProfiles.homeLongitude, filter.maxLng),
+        isNotNull(contentLocations.latitude),
+        isNotNull(contentLocations.longitude),
+        gte(contentLocations.latitude, filter.minLat),
+        lte(contentLocations.latitude, filter.maxLat),
+        gte(contentLocations.longitude, filter.minLng),
+        lte(contentLocations.longitude, filter.maxLng),
       ),
     )
     .limit(500);

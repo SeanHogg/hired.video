@@ -8,7 +8,6 @@
  *
  * New tables:
  *   - studioBrandKits    — per-user brand colours/logo/font
- *   - videoAnalytics     — view + CTA click tracking per project (see 0085)
  *   - videoCampaigns     — group projects into ad campaigns with UTM tracking
  */
 
@@ -52,34 +51,9 @@ export const studioBrandKits = pgTable(
   ],
 );
 
-// ---------------------------------------------------------------------------
-// Video analytics — lightweight view + CTA-click tracking. Keyed on
-// studio_projects.id (migration 0085) so saved-public-but-unrendered
-// projects can collect events — every other path was tripping over the
-// videos-table dependency that pre-#665 designs assumed.
-// ---------------------------------------------------------------------------
-export const videoAnalytics = pgTable(
-  "video_analytics",
-  {
-    id:        uuid("id").primaryKey().defaultRandom(),
-    studioProjectId: uuid("studio_project_id").notNull().references(() => studioProjects.id, { onDelete: "cascade" }),
-    userId:    text("user_id"),           // null = anonymous viewer
-    // Event taxonomy. `impression` is for paid-media style counts
-    // posted by off-platform ad networks (Google Display Network, Meta
-    // Ads, etc.) — one row per ad-network-reported impression, distinct
-    // from in-platform `view` events. See `VideoAnalyticsEvent` type in
-    // `frontend/lib/analytics/event-types.ts` for the SSoT enum.
-    event:     text("event").notNull(),   // "view" | "impression" | "cta_click" | "share"
-    referrer:  text("referrer"),
-    campaignId: text("campaign_id"),
-    metadata:  jsonb("metadata"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [
-    index("idx_video_analytics_project").on(t.studioProjectId),
-    index("idx_video_analytics_event").on(t.event),
-  ],
-);
+// Studio playback events (view / CTA click / share / impression) live in the
+// polymorphic artifact_views table (event_type player_view | cta_click | …;
+// video_analytics folded in by W3-A 0580).
 
 // ---------------------------------------------------------------------------
 // Video campaigns — group videos for tracking a specific ad campaign

@@ -12,7 +12,7 @@ import { buildApiUrl } from "../api/base-url";
 import { standardAuthHeaders } from "../api/auth-token";
 import { triggerDownload } from "../resume-exporters";
 
-/** Fetch `endpoint` (e.g. `/api/learning/portability/export/manifest`) as a Blob. */
+/** Fetch `endpoint` (e.g. `/api/learning/xapi/portability/export/manifest`) as a Blob. */
 export async function fetchApiBlob(endpoint: string): Promise<Blob> {
   const url = buildApiUrl(endpoint);
   const res = await fetch(url, { headers: standardAuthHeaders(url), credentials: "include" });

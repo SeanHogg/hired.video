@@ -1,6 +1,6 @@
 /**
- * SuperAdmin company management — /api/admin/impersonate/companies/*.
- * superAdminMiddleware is applied once by the parent router (index.ts).
+ * SuperAdmin company management — /api/admin/sa/companies/*.
+ * The SA guard is applied once by the admin composite (routes/admin/index.ts).
  *
  * Roster of ALL companies, create, suspend/restore (spam control via
  * is_active), verify, toggle embedding, drill into employees/resumes/jobs,

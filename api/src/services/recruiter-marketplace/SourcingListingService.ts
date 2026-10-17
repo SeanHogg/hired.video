@@ -185,28 +185,6 @@ export function evaluateBidEligibility(args: {
   return null;
 }
 
-/**
- * Pick the winning bid from a set of pending bids: the lowest sourcing fee
- * (cheapest to the company) wins; ties break to the earliest-submitted bid
- * (first-come). Ignores any bid that is not `pending`. Returns null when no
- * pending bid exists. Pure — the acceptance side-effects (auto-reject losers,
- * snapshot winner) happen in `acceptBid()`.
- */
-export function selectWinningBid<
-  T extends { status: string; bidAmount: number | string; createdAt: Date | string },
->(bids: readonly T[]): T | null {
-  const pending = bids.filter((b) => b.status === "pending");
-  if (pending.length === 0) return null;
-  return pending.reduce((best, b) => {
-    const a = Number(b.bidAmount);
-    const bestAmt = Number(best.bidAmount);
-    if (a < bestAmt) return b;
-    if (a > bestAmt) return best;
-    // Tie on amount → earlier createdAt wins.
-    return new Date(b.createdAt).getTime() < new Date(best.createdAt).getTime() ? b : best;
-  });
-}
-
 export async function placeBid(input: PlaceBidInput, jobOwnerId: string | null): Promise<PlaceBidResult> {
   const db = getDb();
 

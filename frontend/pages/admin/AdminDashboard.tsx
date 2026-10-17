@@ -66,9 +66,7 @@ export default function AdminDashboard() {
     (async () => {
       try {
         setLoading(true);
-        const res = await apiClient.get<DashboardMetrics>(
-          "/api/admin?IncludeSaaSMetrics=true"
-        );
+        const res = await apiClient.get<DashboardMetrics>("/api/admin/metrics");
         setMetrics(res.data);
       } catch {
         // Silently fail — cards will show fallback

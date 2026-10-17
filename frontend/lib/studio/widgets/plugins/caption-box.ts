@@ -1,7 +1,8 @@
 /** Caption-box plugin (#939) — the rectangular narration block: a filled
  *  box with its border inside, text left-aligned and vertically centred. */
 import type { CaptionBoxWidgetParams, WidgetParams } from "@/lib/studio/editor-v2/canvas-state";
-import { numberOr, stringOr, type Box } from "../frame";
+import { type Box } from "../frame";
+import { numberOr, stringOr } from "@/lib/numeric";
 import { registerPlugin } from "../plugin";
 import { filledBoxOps } from "../draw-ops";
 import { optionalString, textBlockOps, when } from "./shared";
