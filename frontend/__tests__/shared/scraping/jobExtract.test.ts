@@ -325,7 +325,8 @@ describe("detectJobInPage — generic fallback", () => {
       <head><meta property="og:site_name" content="CoolStartup"></head>
       <body>
         <h1>Frontend Engineer</h1>
-        <p>${"Build beautiful UIs. ".repeat(50)}</p>
+        <h2>Responsibilities</h2><p>${"Build beautiful UIs. ".repeat(50)}</p>
+        <h2>Qualifications</h2><p>3+ years of experience with React.</p>
       </body>
     </html>`;
     const got = detectJobInPage(
@@ -338,7 +339,8 @@ describe("detectJobInPage — generic fallback", () => {
   });
 
   it("falls back to cleaned <title> when no h1 matches", () => {
-    const html = `<html><head><title>Backend Engineer - Acme | Careers</title></head><body></body></html>`;
+    const html = `<html><head><title>Backend Engineer - Acme | Careers</title></head>
+      <body><a class="apply-button" href="/apply/backend-engineer">Apply</a></body></html>`;
     const got = detectJobInPage(
       docFromHtml(html) as any,
       "https://careers.acme.com/open-positions",
@@ -365,6 +367,26 @@ describe("detectJobInPage — generic fallback", () => {
       docFromHtml(html) as any,
       "https://www.npmjs.com/package/@seanhogg/builderforce-sdk",
     );
+    expect(got).toBeNull();
+  });
+
+  it("returns null on a GitHub Actions job log (URL has /job/, h1 is the commit title)", () => {
+    // Regression: github.com/<org>/<repo>/actions/runs/<id>/job/<id> showed
+    // "fix(frontend): stop attaching … #1861" as a job to track.
+    const html = `<html><head><title>fix(frontend): stop attaching wasm · SeanHogg/Builderforce.ai@abc</title></head><body>
+      <h1>fix(frontend): stop attaching in-browser inference wasm to every edge function #1861</h1>
+      <h2>Build frontend</h2><pre>${"/settings/members 228 B 108 kB\n".repeat(40)}</pre>
+    </body></html>`;
+    const got = detectJobInPage(
+      docFromHtml(html) as any,
+      "https://github.com/SeanHogg/Builderforce.ai/actions/runs/39059220180/job/117473551016",
+    );
+    expect(got).toBeNull();
+  });
+
+  it("returns null on a careers-looking URL whose page is not a posting", () => {
+    const html = `<html><body><h1>Our culture</h1><p>${"We love building things. ".repeat(30)}</p></body></html>`;
+    const got = detectJobInPage(docFromHtml(html) as any, "https://acme.com/careers/culture");
     expect(got).toBeNull();
   });
 });

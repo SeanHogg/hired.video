@@ -280,6 +280,21 @@ describe("looksLikeJobUrl", () => {
     assert.equal(looksLikeJobUrl("https://hiring.startup.io/open-positions"), true);
   });
 
+  it("matches career WORDS in the path, not substrings", () => {
+    assert.equal(looksLikeJobUrl("https://acme.com/careers/eng-123"), true);
+    assert.equal(looksLikeJobUrl("https://acme.com/join/open_positions"), true);
+    assert.equal(looksLikeJobUrl("https://jobs.acme.com/listing/42"), true, "careers subdomain");
+    assert.equal(looksLikeJobUrl("https://example.com/blog/jobstreet-review-2026"), false);
+    assert.equal(looksLikeJobUrl("https://example.com/positional-encoding"), false);
+  });
+
+  it("never treats code hosts / CI / registries as job pages", () => {
+    assert.equal(looksLikeJobUrl("https://github.com/SeanHogg/Builderforce.ai/actions/runs/39059220180/job/117473551016"), false);
+    assert.equal(looksLikeJobUrl("https://gitlab.com/acme/app/-/jobs/123"), false);
+    assert.equal(looksLikeJobUrl("https://acme.atlassian.net/browse/ROLE-12"), false);
+    assert.equal(looksLikeJobUrl("https://www.npmjs.com/package/job-queue"), false);
+  });
+
   it("accepts Google Jobs searches", () => {
     assert.equal(
       looksLikeJobUrl("https://www.google.com/search?q=software+engineer&ibp=htl;jobs"),

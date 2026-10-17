@@ -222,6 +222,24 @@ export function looksLikeJobUrl(url: string | null | undefined): boolean {
     return false;
   }
 
-  // Generic careers pages on company sites.
-  return /(jobs?|careers?|hiring|opening|position|roles?|vacanc)/i.test(path);
+  // Code hosts, CI and package registries: "job" there is a build job.
+  if (NON_JOB_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) return false;
+
+  // Generic careers pages on company sites: a careers subdomain, or a
+  // careers WORD in the path ("/careers/eng-1", "/open-positions") — not
+  // any substring ("/actions/runs/1/job/2", "/settings/roles").
+  if (CAREER_WORDS.has(host.split(".")[0])) return true;
+  return path.split(/[/_.-]+/).some((token) => CAREER_WORDS.has(token));
 }
+
+/** Path words (and subdomains) that mean a careers page. */
+const CAREER_WORDS = new Set([
+  "job", "jobs", "career", "careers", "hiring", "opening", "openings",
+  "position", "positions", "role", "roles", "vacancy", "vacancies",
+]);
+
+/** Sites that are never job postings even when a URL says "job". */
+const NON_JOB_HOSTS = [
+  "github.com", "gitlab.com", "bitbucket.org", "dev.azure.com", "circleci.com",
+  "travis-ci.com", "npmjs.com", "pypi.org", "stackoverflow.com", "atlassian.net",
+];

@@ -464,6 +464,26 @@ function domExtractApplyUrl(doc: DomDocument, currentUrl: string): string {
 
 // ---- Generic fallback -----------------------------------------------------
 
+/** Words a job posting's body carries (two of them, or an apply link, = a posting). */
+const JOB_CONTENT_TERMS = [
+  "responsibilities", "qualifications", "requirements", "what you'll do", "what you will do",
+  "about the role", "about the job", "job description", "benefits", "apply now",
+  "apply for this job", "full-time", "part-time", "years of experience", "salary",
+];
+
+/**
+ * Does the page READ like a job posting? The generic fallback has only the
+ * URL and an <h1> to go on, so it also needs the body to say so — an h1
+ * on a page whose URL happens to contain "jobs" is not a posting.
+ */
+function hasJobContent(doc: DomDocument, currentUrl: string): boolean {
+  if (domExtractApplyUrl(doc, currentUrl)) return true;
+  const text = (doc.body?.textContent || "").slice(0, 60_000).toLowerCase();
+  let hits = 0;
+  for (const term of JOB_CONTENT_TERMS) if (text.includes(term) && ++hits >= 2) return true;
+  return false;
+}
+
 function genericExtract(doc: DomDocument, currentUrl: string): DetectedJob | null {
   let title = "";
   const h1 = doc.querySelector("h1");
@@ -663,7 +683,10 @@ export function detectJobInPage(doc: DomDocument, currentUrl: string): DetectedJ
   //   - Unknown hosts need a careers/jobs/hiring/role keyword in the URL
   //     so we don't false-positive every <h1> on the web (npm packages,
   //     GitHub repos, blog posts — original npm-bug regression).
+  //   - …and the page itself must read like a posting (hasJobContent):
+  //     a CI log at /actions/runs/1/job/2 has an <h1> and "job" in its URL.
   if (detectJobBoard(currentUrl)) return null;
   if (!looksLikeJobUrl(currentUrl)) return null;
+  if (!hasJobContent(doc, currentUrl)) return null;
   return genericExtract(doc, currentUrl);
 }
