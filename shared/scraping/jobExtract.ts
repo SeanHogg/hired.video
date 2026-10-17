@@ -581,6 +581,10 @@ export function detectJobInPage(doc: DomDocument, currentUrl: string): DetectedJ
       } else {
         company = pickText(focused.el, FOCUSED_COMPANY_SELECTORS[focused.host]) || undefined;
         location = pickText(focused.el, FOCUSED_LOCATION_SELECTORS[focused.host]) || undefined;
+        // Indeed's company block also wraps the address ("Acme407 Main St…").
+        if (company && location && company !== location && company.includes(location)) {
+          company = company.replace(location, "").replace(/[\s·,|-]+$/, "").trim() || undefined;
+        }
       }
       // LinkedIn-only: fill missing company/location from the docTitle parse
       // ("{Company} hiring {Title} in {Location} | LinkedIn"). The unified-

@@ -56,7 +56,7 @@ export const TRACKING_PARAMS = new Set([
 export function normalizeJobUrl(raw?: string | null): string | undefined {
   if (!raw) return undefined;
   try {
-    const u = new URL(raw);
+    const u = new URL(canonicalizeJobUrl(raw));
     const params = new URLSearchParams();
     for (const [key, value] of u.searchParams) {
       if (!TRACKING_PARAMS.has(key.toLowerCase())) {
@@ -74,10 +74,10 @@ export function normalizeJobUrl(raw?: string | null): string | undefined {
 /**
  * Rewrite a job URL into its canonical detail-page form.
  *
- * Currently handles LinkedIn: a collections/search URL with
- * `?currentJobId=12345` is rewritten to
- * `https://www.linkedin.com/jobs/view/12345/`. Returns the input URL
- * unchanged for all other hosts.
+ * LinkedIn: a collections/search URL with `?currentJobId=12345` is
+ * rewritten to `https://www.linkedin.com/jobs/view/12345/`.
+ * Indeed: `/jobs?q=…&vjk=abc` and `/viewjob?jk=abc&…` both become
+ * `https://<host>/viewjob?jk=abc`. Every other URL is returned unchanged.
  *
  * This is the dedup key the extension uses when firing jobDetected —
  * without it, the same job viewed from `/jobs/collections/recommended`
@@ -103,6 +103,13 @@ export function canonicalizeJobUrl(raw: string): string {
     if (viewMatch) {
       return `https://www.linkedin.com/jobs/view/${viewMatch[1]}/`;
     }
+  }
+
+  // Indeed: a search page shows one job at a time as `?vjk=<id>` (the
+  // job's id, not a tracking param); the listing itself is /viewjob?jk=<id>.
+  if (/(^|\.)indeed\.com$/.test(host)) {
+    const jobKey = url.searchParams.get("jk") || url.searchParams.get("vjk");
+    if (jobKey) return `${url.origin}/viewjob?jk=${encodeURIComponent(jobKey)}`;
   }
 
   return raw;

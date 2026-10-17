@@ -110,8 +110,31 @@ describe("canonicalizeJobUrl", () => {
     );
   });
 
-  it("leaves Indeed URLs untouched", () => {
+  it("keeps a clean Indeed /viewjob URL stable", () => {
     const raw = "https://www.indeed.com/viewjob?jk=abc123";
+    assert.equal(canonicalizeJobUrl(raw), raw);
+  });
+
+  it("rewrites an Indeed search page's vjk to the job's /viewjob URL", () => {
+    assert.equal(
+      canonicalizeJobUrl("https://www.indeed.com/jobs?q=cto&l=Detroit%2C+MI&vjk=9f1c2e3d4b5a6978"),
+      "https://www.indeed.com/viewjob?jk=9f1c2e3d4b5a6978",
+    );
+    assert.equal(
+      canonicalizeJobUrl("https://ca.indeed.com/viewjob?jk=abc123&from=serp&tk=xyz"),
+      "https://ca.indeed.com/viewjob?jk=abc123",
+    );
+  });
+
+  it("two jobs on the same Indeed search page normalize to different URLs", () => {
+    const a = normalizeJobUrl("https://www.indeed.com/jobs?q=cto&l=Detroit&vjk=aaa111");
+    const b = normalizeJobUrl("https://www.indeed.com/jobs?q=cto&l=Detroit&vjk=bbb222");
+    assert.notEqual(a, b);
+    assert.equal(a, "https://www.indeed.com/viewjob?jk=aaa111");
+  });
+
+  it("leaves an Indeed search page with no job selected untouched", () => {
+    const raw = "https://www.indeed.com/jobs?q=cto";
     assert.equal(canonicalizeJobUrl(raw), raw);
   });
 
