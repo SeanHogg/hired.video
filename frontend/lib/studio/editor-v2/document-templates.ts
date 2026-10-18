@@ -148,10 +148,11 @@ export function documentTemplatesForEntity(
       return TEMPLATE_PRESETS.map(resumeToOption);
     case "job":
       return JOB_TEMPLATE_PRESETS.map(jobToOption);
+    // No article/blog descriptor model and no company design library yet — the
+    // picker self-gates on an empty list (owned / purchased company templates
+    // still surface).
     case "article":
     case "blog":
-    // No company design library yet — the picker self-gates on an empty list
-    // (owned / purchased company templates still surface).
     case "company":
       return [];
   }

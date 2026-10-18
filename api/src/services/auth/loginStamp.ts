@@ -8,7 +8,6 @@ import { schema } from "../../db/index.js";
  * pass a fake.
  */
 export async function markUserLogin(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- drizzle's update builder; tests pass a fake
   db: { update: (table: any) => any },
   userId: string,
   now: Date = new Date(),

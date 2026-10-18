@@ -13,7 +13,6 @@ import type { Context, Hono } from "hono";
 import { success } from "../types/index.js";
 
 /** The root app — aliases register on it and re-dispatch through its fetch. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type RootApp = Hono<any, any, any>;
 
 interface Rewrite {

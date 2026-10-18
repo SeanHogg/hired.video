@@ -28,7 +28,7 @@ export interface AsyncResponseTranscriptRow {
 
 /** Escape LIKE wildcards so the user's query matches literally. */
 function containsPattern(query: string): string {
-  return `%${query.replace(/%/g, "\%").replace(/_/g, "\_")}%`;
+  return `%${query.replace(/[\\%_]/g, "\\$&")}%`;
 }
 
 export async function searchRecordingTranscripts(query: string, limit: number): Promise<RecordingTranscriptRow[]> {
