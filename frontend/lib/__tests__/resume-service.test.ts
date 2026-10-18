@@ -102,10 +102,10 @@ describe('resumeService.getResumesForDisplay', () => {
       },
     ];
 
-    // withOwnership endpoint
-    apiClient.get.mockResolvedValueOnce({ data: owned });
-    // masterGroups endpoint (unused because owned exists)
-    apiClient.get.mockResolvedValueOnce({ data: [mkGroup('m1')] });
+    // Route by URL — both requests fire concurrently, so call order is not part of the contract.
+    apiClient.get.mockImplementation(async (url: string) =>
+      url.includes('view=groups') ? { data: [mkGroup('m1')] } : { data: owned },
+    );
 
     const result = await resumeService.getResumesForDisplay();
     expect(result).toEqual(owned);
@@ -114,10 +114,10 @@ describe('resumeService.getResumesForDisplay', () => {
   });
 
   it('falls back to flattening master groups when withOwnership is empty', async () => {
-    // withOwnership empty
-    apiClient.get.mockResolvedValueOnce({ data: [] });
-    // masterGroups
-    apiClient.get.mockResolvedValueOnce({ data: [mkGroup('m1')] });
+    // withOwnership empty; masterGroups has one master (routed by URL, order-independent)
+    apiClient.get.mockImplementation(async (url: string) =>
+      url.includes('view=groups') ? { data: [mkGroup('m1')] } : { data: [] },
+    );
 
     const result = await resumeService.getResumesForDisplay();
     expect(result).toHaveLength(1);

@@ -23,7 +23,7 @@ describe("CanvasStatePreview (#2392)", () => {
 
   it("StudioVideoSurface mounts TimelineFramePreview, not CanvasStage", () => {
     const src = readFileSync(
-      join(here, "../../StudioVideoSurface.tsx"),
+      join(here, "../../video-surface/PublicStudioCanvas.tsx"),
       "utf8",
     );
     expect(src).toMatch(
