@@ -1,17 +1,27 @@
 /**
  * Studio features — in-video lead forms. Mounted at /api/studio through the
  * routes/studio-features.ts barrel (split out of that file; paths unchanged).
+ * Use cases live in services/studio/video-forms.ts.
  */
 import { Hono } from "hono";
-import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
-import { UuidLikeSchema, UUID_LIKE_REGEX } from "../../../../shared/validation.js";
+import { UuidLikeSchema } from "../../../../shared/validation.js";
 import type { AppEnv } from "../../types/index.js";
-import { getDb } from "../../db/index.js";
-import { invalidatePublicEngagement, readPublicEngagement, viewerMaySubmitToProject } from "../../services/studio/public-engagement.js";
+import { readPublicEngagement } from "../../services/studio/public-engagement.js";
 import { resolveActableEngagementRow } from "../../services/studio/engagement-row-access.js";
-import { passesGate } from "../../services/learning/scoring.js";
-import { ok, fail, viewerCanActOnProject, studioVideoForms, studioVideoFormSubmissions, marketingLeads } from "./shared.js";
+import {
+  createVideoForm,
+  deleteVideoForm,
+  getVideoForm,
+  listFormSubmissions,
+  listProjectForms,
+  submitVideoForm,
+  updateVideoForm,
+} from "../../services/studio/video-forms.js";
+import { viewerCanActOnProject } from "./shared.js";
+import { success, error } from "../../types/index.js";
+import { validateJson } from "../helpers/validate.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 
 export const formRoutes = new Hono<AppEnv>();
 
@@ -29,18 +39,10 @@ formRoutes.get("/projects/:projectId/forms", async (c) => {
   const projectId = c.req.param("projectId");
   // Same rule as chapters / thumbnails / comments: owner, company member
   // or delegate; unknown / forbidden -> 404.
-  if (!(await viewerCanActOnProject(c.var.user?.sub, projectId))) {
-    return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  if (!(await viewerCanActOnProject(c.var.userId, projectId))) {
+    return c.json(error("NOT_FOUND", "Project not found"), 404);
   }
-  const db = getDb();
-
-  const forms = await db
-    .select()
-    .from(studioVideoForms)
-    .where(eq(studioVideoForms.projectId, projectId))
-    .orderBy(studioVideoForms.positionSeconds);
-
-  return c.json(ok({ forms }));
+  return c.json(success({ forms: await listProjectForms(projectId) }));
 });
 
 // GET /api/studio/projects/:projectId/engagement/public — the ONE public
@@ -50,8 +52,8 @@ formRoutes.get("/projects/:projectId/forms", async (c) => {
 // all answer 404. Cached + invalidated in services/studio/public-engagement.
 formRoutes.get("/projects/:projectId/engagement/public", async (c) => {
   const assets = await readPublicEngagement(c.req.param("projectId"));
-  if (!assets) return c.json(fail("NOT_FOUND", "Project not found"), 404);
-  return c.json(ok(assets));
+  if (!assets) return c.json(error("NOT_FOUND", "Project not found"), 404);
+  return c.json(success(assets));
 });
 
 // #1505 — Knowledge-check fields shared across create + update. Defining
@@ -77,11 +79,7 @@ const KnowledgeCheckFields = {
 } as const;
 
 // POST /api/studio/projects/:projectId/forms — create
-formRoutes.post("/projects/:projectId/forms", async (c) => {
-  const user = c.var.user;
-  const projectId = c.req.param("projectId");
-  const body = await c.req.json().catch(() => null);
-  const parsed = z.object({
+formRoutes.post("/projects/:projectId/forms", validateJson(z.object({
     title: z.string().min(1).max(120),
     description: z.string().max(500).nullable().optional(),
     positionSeconds: z.number().min(0),
@@ -96,43 +94,19 @@ formRoutes.post("/projects/:projectId/forms", async (c) => {
     redirectUrl: z.string().url().nullable().optional(),
     submitButtonText: z.string().max(40).optional(),
     ...KnowledgeCheckFields,
-  }).safeParse(body);
-  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
+  }), (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const projectId = c.req.param("projectId");
   // Active forms are served by the PUBLIC engagement read — only someone
   // who may act on the project may attach one (unknown / forbidden → 404).
-  if (!(await viewerCanActOnProject(user.sub, projectId))) {
-    return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  if (!(await viewerCanActOnProject(userId, projectId))) {
+    return c.json(error("NOT_FOUND", "Project not found"), 404);
   }
-
-  const db = getDb();
-  const [form] = await db.insert(studioVideoForms).values({
-    userId: user.sub,
-    projectId,
-    title: parsed.data.title,
-    description: parsed.data.description ?? null,
-    positionSeconds: parsed.data.positionSeconds,
-    fields: parsed.data.fields,
-    requireToContinue: parsed.data.requireToContinue,
-    redirectUrl: parsed.data.redirectUrl ?? null,
-    submitButtonText: parsed.data.submitButtonText ?? "Continue",
-    formType: parsed.data.formType ?? "lead_capture",
-    answerKey: parsed.data.answerKey ?? null,
-    passingScorePct: parsed.data.passingScorePct ?? null,
-    maxAttempts: parsed.data.maxAttempts ?? null,
-    remediationJumpToSceneId: parsed.data.remediationJumpToSceneId ?? null,
-    courseLessonId: parsed.data.courseLessonId ?? null,
-  } as any).returning();
-
-  invalidatePublicEngagement(projectId);
-  return c.json(ok(form), 201);
+  return c.json(success(await createVideoForm(userId, projectId, c.req.valid("json"))), 201);
 });
 
 // PATCH /api/studio/forms/:id
-formRoutes.patch("/forms/:id", async (c) => {
-  const user = c.var.user;
-  const id = c.req.param("id");
-  const body = await c.req.json().catch(() => null);
-  const parsed = z.object({
+formRoutes.patch("/forms/:id", validateJson(z.object({
     title: z.string().min(1).max(120).optional(),
     description: z.string().max(500).nullable().optional(),
     positionSeconds: z.number().min(0).optional(),
@@ -141,54 +115,40 @@ formRoutes.patch("/forms/:id", async (c) => {
     redirectUrl: z.string().url().nullable().optional(),
     submitButtonText: z.string().max(40).optional(),
     ...KnowledgeCheckFields,
-  }).safeParse(body);
-  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
-  const access = await resolveActableEngagementRow(user.sub, "form", id);
-  if (!access) return c.json(fail("NOT_FOUND", "Form not found"), 404);
+  }), () => error("VALIDATION_ERROR", "Invalid body"), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const id = c.req.param("id");
+  const access = await resolveActableEngagementRow(userId, "form", id);
+  if (!access) return c.json(error("NOT_FOUND", "Form not found"), 404);
 
-  const db = getDb();
-  const [updated] = await db.update(studioVideoForms)
-    .set({ ...parsed.data, updatedAt: new Date() } as any)
-    .where(eq(studioVideoForms.id, id))
-    .returning();
-
-  if (!updated) return c.json(fail("NOT_FOUND", "Form not found"), 404);
-  invalidatePublicEngagement(access.projectId);
-  return c.json(ok(updated));
+  const updated = await updateVideoForm(access.projectId, id, c.req.valid("json"));
+  if (!updated) return c.json(error("NOT_FOUND", "Form not found"), 404);
+  return c.json(success(updated));
 });
 
 // GET /api/studio/forms/:id — owner / company member / delegate. Returns the form with the
 // answer key so authoring surfaces (VideoFormsDialog edit mode, SCORM
 // export #1400) can hydrate without re-fetching the parent project.
 formRoutes.get("/forms/:id", async (c) => {
-  const user = c.var.user;
   const id = c.req.param("id");
   // Whoever may act on the form's project (owner / company / delegate).
-  if (!(await resolveActableEngagementRow(user?.sub, "form", id))) {
-    return c.json(fail("NOT_FOUND", "Form not found"), 404);
+  if (!(await resolveActableEngagementRow(c.var.userId, "form", id))) {
+    return c.json(error("NOT_FOUND", "Form not found"), 404);
   }
-  const db = getDb();
-  const [form] = await db.select()
-    .from(studioVideoForms)
-    .where(eq(studioVideoForms.id, id))
-    .limit(1);
-  if (!form) return c.json(fail("NOT_FOUND", "Form not found"), 404);
-  return c.json(ok(form));
+  const form = await getVideoForm(id);
+  if (!form) return c.json(error("NOT_FOUND", "Form not found"), 404);
+  return c.json(success(form));
 });
 
 // DELETE /api/studio/forms/:id
 formRoutes.delete("/forms/:id", async (c) => {
-  const user = c.var.user;
+  const userId = requireUser(c);
   const id = c.req.param("id");
-  const access = await resolveActableEngagementRow(user.sub, "form", id);
-  if (!access) return c.json(fail("NOT_FOUND", "Form not found"), 404);
-  const db = getDb();
-  const deleted = await db.delete(studioVideoForms)
-    .where(eq(studioVideoForms.id, id))
-    .returning({ id: studioVideoForms.id });
-  if (deleted.length === 0) return c.json(fail("NOT_FOUND", "Form not found"), 404);
-  invalidatePublicEngagement(access.projectId);
-  return c.json(ok({ deleted: deleted[0].id }));
+  const access = await resolveActableEngagementRow(userId, "form", id);
+  if (!access) return c.json(error("NOT_FOUND", "Form not found"), 404);
+  const deleted = await deleteVideoForm(access.projectId, id);
+  if (!deleted) return c.json(error("NOT_FOUND", "Form not found"), 404);
+  return c.json(success({ deleted }));
 });
 
 // Bounded anonymous body: a form has at most a few dozen fields, so the
@@ -208,126 +168,23 @@ export const FormSubmitSchema = z.object({
 // project may submit; on a private project only someone who may act on it
 // (the owner previewing in the editor). Inactive, unknown and malformed ids
 // and forbidden projects all answer 404.
-formRoutes.post("/forms/:id/submit", async (c) => {
-  const id = c.req.param("id");
-  if (!UUID_LIKE_REGEX.test(id)) return c.json(fail("NOT_FOUND", "Form not found"), 404);
-  const viewerId = c.var.user?.sub ?? null;
-  const body = await c.req.json().catch(() => null);
-  const parsed = FormSubmitSchema.safeParse(body);
-  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
-
-  const db = getDb();
-  const [form] = await db.select().from(studioVideoForms).where(eq(studioVideoForms.id, id)).limit(1);
-  if (!form || !form.isActive) return c.json(fail("NOT_FOUND", "Form not found"), 404);
-  if (!(await viewerMaySubmitToProject(viewerId, form.projectId))) {
-    return c.json(fail("NOT_FOUND", "Form not found"), 404);
-  }
-
-  // Validate required fields
-  const fields = (form.fields as Array<{ key: string; required: boolean; type: string }>) || [];
-  for (const f of fields) {
-    if (f.required && !parsed.data.answers[f.key]) {
-      return c.json(fail("VALIDATION_ERROR", `Required field missing: ${f.key}`), 400);
-    }
-  }
-
-  const email = parsed.data.answers["email"] ?? null;
-  const name = parsed.data.answers["name"] ?? null;
-  const company = parsed.data.answers["company"] ?? null;
-
-  const ipCountry = c.req.header("cf-ipcountry") ?? null;
-
-  // #201 — Knowledge-check scoring. When formType === 'knowledge_check',
-  // grade against the stored answer_key and emit cmi.score.raw-style
-  // metadata on the submission. The remediation jump + max-attempts gate
-  // are enforced client-side from the response payload.
-  let scoreRaw: number | null = null;
-  let scoreMax: number | null = null;
-  let passed: boolean | null = null;
-  let remediationJumpToSceneId: string | null = null;
-  if (form.formType === "knowledge_check" && form.answerKey) {
-    const key = form.answerKey as Record<string, {
-      correctAnswer: string;
-      points?: number;
-    }>;
-    let earned = 0;
-    let max = 0;
-    for (const [fieldKey, spec] of Object.entries(key)) {
-      const pts = spec.points ?? 1;
-      max += pts;
-      if (String(parsed.data.answers[fieldKey] ?? "").trim().toLowerCase() ===
-          String(spec.correctAnswer).trim().toLowerCase()) {
-        earned += pts;
-      }
-    }
-    scoreRaw = earned;
-    scoreMax = max;
-    // #1642 — pass-gate check routes through the shared scoring seam
-    // (services/learning/scoring.ts) so the rounding semantics match
-    // every other "did the learner pass?" callsite in the codebase.
-    const threshold = form.passingScorePct ?? 80;
-    passed = passesGate({ scoreRaw, scoreMin: 0, scoreMax }, threshold);
-    if (!passed) remediationJumpToSceneId = form.remediationJumpToSceneId ?? null;
-  }
-
-  const [submission] = await db.insert(studioVideoFormSubmissions).values({
-    formId: id,
-    projectId: form.projectId,
-    videoId: parsed.data.videoId ?? null,
-    viewerEmail: email,
-    viewerName: name,
-    answers: parsed.data.answers,
-    timestampSec: parsed.data.timestampSec ?? null,
-    referrer: parsed.data.referrer ?? null,
-    ipCountry,
-    scoreRaw,
-    scoreMax,
-    passed,
-  } as any).returning();
-
-  // Mirror into global lead inbox (#54 / #38)
-  if (email) {
-    await db.insert(marketingLeads).values({
-      email,
-      name,
-      company,
-      source: "video-form",
-      metadata: {
-        formId: id,
-        projectId: form.projectId,
-        formTitle: form.title,
-        timestampSec: parsed.data.timestampSec ?? null,
-      },
-    } as any).catch(() => { /* ignore duplicate-email FKs */ });
-  }
-
-  return c.json(ok({
-    id: submission.id,
-    redirectUrl: form.redirectUrl,
-    // #201 — knowledge-check fields. Null for lead-capture forms.
-    formType: form.formType,
-    scoreRaw,
-    scoreMax,
-    passed,
-    remediationJumpToSceneId,
-  }), 201);
+formRoutes.post("/forms/:id/submit", validateJson(FormSubmitSchema, () => error("VALIDATION_ERROR", "Invalid body"), { emptyBody: null }), async (c) => {
+  const result = await submitVideoForm(
+    c.req.param("id"),
+    c.var.userId ?? null,
+    c.req.valid("json"),
+    c.req.header("cf-ipcountry") ?? null,
+  );
+  return c.json(success(result), 201);
 });
 
 // GET /api/studio/forms/:id/submissions — owner only
 formRoutes.get("/forms/:id/submissions", async (c) => {
-  const user = c.var.user;
   const id = c.req.param("id");
   // Whoever may act on the form's project (owner / company / delegate).
-  if (!(await resolveActableEngagementRow(user?.sub, "form", id))) {
-    return c.json(fail("NOT_FOUND", "Form not found"), 404);
+  if (!(await resolveActableEngagementRow(c.var.userId, "form", id))) {
+    return c.json(error("NOT_FOUND", "Form not found"), 404);
   }
-  const db = getDb();
-
-  const submissions = await db.select()
-    .from(studioVideoFormSubmissions)
-    .where(eq(studioVideoFormSubmissions.formId, id))
-    .orderBy(desc(studioVideoFormSubmissions.createdAt))
-    .limit(500);
-
-  return c.json(ok({ submissions, total: submissions.length }));
+  const submissions = await listFormSubmissions(id);
+  return c.json(success({ submissions, total: submissions.length }));
 });

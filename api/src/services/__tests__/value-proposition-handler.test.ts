@@ -15,7 +15,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
 import { handleValueProposition as valuePropositionUseCase, buildValuePropositionMessage } from "../job/value-proposition-handler.js";
-import { handleByid as byidUseCase, type MatchDeps } from "../job/match-handlers.js";
+import { handleByid as byidUseCase } from "../job/match-scoring-handlers.js";
+import type { MatchDeps } from "../job/match-deps.js";
 import type { LLMClient, LLMOptions } from "../../services/adapters/llm-client.js";
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
 import { asHandler } from "../../handlers/shared.js";

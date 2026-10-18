@@ -31,13 +31,15 @@ import {
   handleByContent as byContentUseCase,
   handleByid as byidUseCase,
   handleInsights as insightsUseCase,
+} from "../job/match-scoring-handlers.js";
+import {
   keywordScore,
   htmlToPlainText,
   jobRowToLLMText,
   resumeContentToText,
   TEXT_CAP,
-  type MatchDeps,
-} from "../job/match-handlers.js";
+} from "../job/match-text.js";
+import type { MatchDeps } from "../job/match-deps.js";
 import type { LLMClient } from "../../services/adapters/llm-client.js";
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
 import { asHandler } from "../../handlers/shared.js";

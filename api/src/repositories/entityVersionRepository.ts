@@ -110,15 +110,6 @@ export class EntityVersionRepository {
     return (row as EntityVersionRow | undefined) ?? null;
   }
 
-  /** Next version number for the subject (callers that show it before inserting). */
-  async nextVersionNumber(subjectType: EntityVersionSubjectType, subjectId: string): Promise<number> {
-    const [row] = await this.db
-      .select({ maxVersion: sql<number>`COALESCE(MAX(${versions.versionNumber}), 0)` })
-      .from(versions)
-      .where(subjectScope(subjectType, subjectId));
-    return Number(row?.maxVersion ?? 0) + 1;
-  }
-
   /** Insert at the subject's next version number (race-safe, see header). */
   async insertNext(input: NewEntityVersionInput): Promise<EntityVersionRow> {
     const row = await insertWithNextVersion<EntityVersionRow>(async () => {

@@ -3,7 +3,7 @@
  * reviewed content, and the owner's decision on it:
  *   • a suggestedEdit on one annotation, applied through the subject adapter
  *     when the owner accepts it;
- *   • a full proposed draft (a `resume_versions` row), which the owner
+ *   • a full proposed draft (an `entity_versions` résumé row), which the owner
  *     accepts (snapshot, then apply) or rejects.
  */
 import type {
@@ -82,7 +82,7 @@ export class ReviewProposals {
     if (review.status === "completed" || review.status === "cancelled") {
       throw new ResumeFeedbackServiceError("INVALID_STATE", `Review is ${review.status}`);
     }
-    // Proposals ride on resume_versions, so only a résumé takes a full draft.
+    // Proposals ride on résumé versions (entity_versions), so only a résumé takes a full draft.
     const resumeId = this.access.resumeIdOf(review);
     let resumeData;
     try {
@@ -93,11 +93,9 @@ export class ReviewProposals {
       }
       throw e;
     }
-    const versionNumber = await this.deps.repo.nextVersionNumber(resumeId);
     const row = await this.deps.repo.insertProposedVersion({
       resumeId,
       userId: review.ownerId,
-      versionNumber,
       label: input.label ?? "Coach proposal",
       resumeData: resumeData as any,
       isAutosave: false,
@@ -127,11 +125,9 @@ export class ReviewProposals {
     if (!resume) throw new ResumeFeedbackServiceError("NOT_FOUND", "Resume not found");
 
     // Snapshot the pre-acceptance content so the owner can revert.
-    const snapNumber = await this.deps.repo.nextVersionNumber(resumeId);
     await this.deps.repo.insertProposedVersion({
       resumeId,
       userId: ownerId,
-      versionNumber: snapNumber,
       label: "Before coach proposal",
       resumeData: resume.content as any,
       isAutosave: false,

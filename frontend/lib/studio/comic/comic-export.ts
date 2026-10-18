@@ -20,7 +20,7 @@
  * Timeline render facade — not handled here.
  */
 
-import type { OutputProfile } from "@shared/media-kinds";
+import { mediaKindIsComic, type OutputProfile } from "@shared/media-kinds";
 import type { CanvasState } from "@/lib/studio/editor-v2/canvas-state";
 import { canvasStateToTimeline } from "@/lib/studio/editor-v2/timeline-emit";
 import { withExportTarget } from "@/lib/studio/widgets/export-target";
@@ -42,7 +42,7 @@ export async function renderComic(
   state: CanvasState,
   profile: OutputProfile,
 ): Promise<ComicRenderResult> {
-  if (profile.mediaKind !== "comic") {
+  if (!mediaKindIsComic(profile.mediaKind)) {
     throw new Error(`renderComic: profile is not comic-kind: ${profile.id}`);
   }
   // Validate the profile id BEFORE the (expensive) rasterise pass so

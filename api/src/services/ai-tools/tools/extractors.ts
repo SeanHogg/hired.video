@@ -12,7 +12,7 @@ import { buildRepos } from "../../../repositories/index.js";
 import { success } from "../../../types/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../../adapters/llm-client.js";
 import { aiFailure } from "../../adapters/llm-error.js";
-import { parsedJobFromRow } from "../../job/match-handlers.js";
+import { parsedJobFromRow } from "../../job/match-resolvers.js";
 import { extractSkills, mergeExtractedSkillsIntoResume, type ExtractResponse, type SkillExtractInput } from "../../resume/skills.js";
 import { defineAiTool, failTool } from "../types.js";
 

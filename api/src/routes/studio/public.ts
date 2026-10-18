@@ -13,7 +13,7 @@ import { STUDIO_SUBJECT_KINDS } from "../../../../shared/studio-subject.js";
 import { getPublicVideoFeed } from "../../services/studio/public-video-feed.js";
 import { listPublicSubjectProjects } from "../../services/studio/video-catalog.js";
 import { getPublicWatchPayload } from "../../services/studio/public-watch-payload.js";
-import { fail, ok } from "./http.js";
+import { success, error } from "../../types/index.js";
 
 export const studioPublicRoutes = new Hono<AppEnv>();
 
@@ -26,12 +26,12 @@ studioPublicRoutes.get("/public", async (c) => {
   const subjectId = c.req.query("subjectId");
   // No subject filter → the feed (cached until a video changes).
   if (subjectKind === undefined && subjectId === undefined) {
-    return c.json(ok(await getPublicVideoFeed()));
+    return c.json(success(await getPublicVideoFeed()));
   }
   if (!subjectKind || !subjectId || !isSubjectKind(subjectKind)) {
-    return c.json(fail("VALIDATION_ERROR", "subjectKind and subjectId are required"), 400);
+    return c.json(error("VALIDATION_ERROR", "subjectKind and subjectId are required"), 400);
   }
-  return c.json(ok(await listPublicSubjectProjects({ kind: subjectKind, id: subjectId })));
+  return c.json(success(await listPublicSubjectProjects({ kind: subjectKind, id: subjectId })));
 });
 
 studioPublicRoutes.get("/public/:videoId", async (c) => {

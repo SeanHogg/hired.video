@@ -14,17 +14,16 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb } from "../db/index.js";
-import { buildRepos } from "../repositories/index.js";
 import { gamificationFromContext } from "../domains/gamification/with-gamification.js";
-import { getPublicBadgeCatalog } from "../domains/gamification/badge-catalog.js";
+import { listPublicBadges, listUserRedemptions } from "../services/gamification/pointsReads.js";
 import { pickScoringRole } from "../../../shared/user-roles.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const pointsRoutes = new Hono<AppEnv>();
 
 pointsRoutes.get("/me", async (c) => {
-  const userId = c.var.user.sub;
+  const userId = c.var.userId;
   const summary = await gamificationFromContext(c).getUserSummary(userId);
   return c.json(success(summary));
 });
@@ -34,7 +33,7 @@ const ActivityQuery = z.object({
 });
 
 pointsRoutes.get("/activity", async (c) => {
-  const userId = c.var.user.sub;
+  const userId = c.var.userId;
   const parsed = ActivityQuery.safeParse(c.req.query());
   if (!parsed.success) {
     return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
@@ -52,14 +51,13 @@ pointsRoutes.get("/catalog", async (c) => {
  *  full catalog from the `badges` table, ordered by tier then by name.
  *  No auth required (exempted in app.ts). */
 pointsRoutes.get("/badges", async (c) => {
-  const repos = buildRepos(getDb());
-  return c.json(success({ badges: await getPublicBadgeCatalog(repos.points) }));
+  return c.json(success({ badges: await listPublicBadges() }));
 });
 
 /** Daily-session ping. The frontend hits this once per app load; the
  *  engine collapses repeated calls via the `daily:YYYY-MM-DD` refId. */
 pointsRoutes.post("/session/ping", async (c) => {
-  const userId = c.var.user.sub;
+  const userId = c.var.userId;
   const role = pickScoringRole(c.var.user.roles);
   if (!role) return c.json(success({ awarded: false, reason: "role_mismatch" }));
   const out = await gamificationFromContext(c).onDailySession({ userId, role });
@@ -85,18 +83,15 @@ const RedeemBody = z.object({
 // vs "Full cashout + redemption" (Pro); admins/super-admins bypass via
 // requirePro itself. Gating here — not inside RedemptionEngine — keeps it on
 // the same seam every other billable surface uses.
-pointsRoutes.post("/redeem", requirePro("Points Cashout & Redemption"), async (c) => {
-  const userId = c.var.user.sub;
-  const parsed = RedeemBody.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
-  }
+pointsRoutes.post("/redeem", requirePro("Points Cashout & Redemption"), validateJson(RedeemBody, (e) => error("VALIDATION_ERROR", e.issues[0].message)), async (c) => {
+  const userId = c.var.userId;
+  const body = c.req.valid("json");
 
   const out = await gamificationFromContext(c).redeem({
     userId,
-    skuId: parsed.data.skuId,
-    recipientName: parsed.data.recipientName,
-    recipientEmail: parsed.data.recipientEmail,
+    skuId: body.skuId,
+    recipientName: body.recipientName,
+    recipientEmail: body.recipientEmail,
   });
 
   if (out.status === "rejected") {
@@ -117,8 +112,7 @@ pointsRoutes.post("/redeem", requirePro("Points Cashout & Redemption"), async (c
 
 /** Per-user redemption history. */
 pointsRoutes.get("/redemptions", async (c) => {
-  const userId = c.var.user.sub;
-  const repos = buildRepos(getDb());
-  const rows = await repos.points.findRedemptionsForUser(userId, 100);
+  const userId = c.var.userId;
+  const rows = await listUserRedemptions(userId, 100);
   return c.json(success({ redemptions: rows }));
 });

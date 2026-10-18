@@ -7,7 +7,7 @@
  */
 import { useRef, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import type { MediaKind } from "@shared/media-kinds";
+import { mediaKindIsStillImage, mediaKindIsDocument, type MediaKind } from "@shared/media-kinds";
 import type { StudioSubject } from "@shared/studio-subject";
 import { useToast } from "@/hooks/use-toast";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
@@ -122,7 +122,7 @@ export function useStudioSave({
       // (#940 brush dataURL bloat mitigation). The helper is a no-op
       // when nothing needs spilling.
       let imageStateToPersist = imageState;
-      if (currentMediaKind === "image") {
+      if (mediaKindIsStillImage(currentMediaKind)) {
         const spilledLayers = await spillLayersIfNeeded(imageState.layers);
         if (spilledLayers !== imageState.layers) {
           imageStateToPersist = { ...imageState, layers: spilledLayers };
@@ -139,8 +139,8 @@ export function useStudioSave({
       // Unbound (first) saves still create the entity first: save-draft needs its id.
       const revision = silent && !opts?.overwrite ? baseRevision() : undefined;
       const entityAfterDraft =
-        currentMediaKind === "document" && revision !== undefined && !!documentState.entityId;
-      if (currentMediaKind === "document") {
+        mediaKindIsDocument(currentMediaKind) && revision !== undefined && !!documentState.entityId;
+      if (mediaKindIsDocument(currentMediaKind)) {
         // Field-validation gate (#1916): block the save when the content has a
         // genuinely invalid value (bad email/URL, out-of-range number, end-date
         // before start). Same `validateDocumentContent` the inline editor shows
@@ -191,7 +191,7 @@ export function useStudioSave({
       }
       // The entity row this save just created, as the subject to link to.
       const createdEntitySubject =
-        currentMediaKind === "document" && !documentState.entityId
+        mediaKindIsDocument(currentMediaKind) && !documentState.entityId
           ? documentEntitySubject(documentStateForSave.entityKind, documentStateForSave.entityId)
           : null;
       // Defence in depth (#563): every media producer uploads before it

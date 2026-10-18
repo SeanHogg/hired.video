@@ -22,9 +22,8 @@ import {
 export const settingsSecurityRoutes = new Hono<AppEnv>();
 
 settingsSecurityRoutes.get("/security", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await getSecurityOverview(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getSecurityOverview(userId)), 200);
 });
 
 // Echo endpoint: security toggles are not persisted yet.
@@ -35,26 +34,22 @@ settingsSecurityRoutes.put("/security", async (c) => {
 
 /** GET /api/settings/security/sessions: active (non-revoked, non-expired) sessions. */
 settingsSecurityRoutes.get("/security/sessions", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await listSessions(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await listSessions(userId)), 200);
 });
 
 /** DELETE /api/settings/security/sessions/:id: revoke one session. */
 settingsSecurityRoutes.delete("/security/sessions/:id", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return sendHandlerResult(c, await toHandlerResult(revokeUserSession(auth.userId, c.req.param("id"))));
+  const userId = requireUser(c);
+  return sendHandlerResult(c, await toHandlerResult(revokeUserSession(userId, c.req.param("id"))));
 });
 
 settingsSecurityRoutes.post("/security/2fa/enable", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
+  const userId = requireUser(c);
   return c.json(success(startTwoFactorEnrolment()), 200);
 });
 
 settingsSecurityRoutes.post("/security/2fa/disable", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await disableTwoFactor(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await disableTwoFactor(userId)), 200);
 });

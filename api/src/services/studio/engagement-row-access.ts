@@ -12,6 +12,8 @@ import {
   type EngagementRowKind,
   type EngagementRowProject,
 } from "../../repositories/studioEngagementRowRepository.js";
+import { ownsByStudioProject } from "../../repositories/toolRunOwnershipRepository.js";
+import { UUID_LIKE_REGEX } from "../../../../shared/validation.js";
 import { canActFor } from "./workspace.js";
 
 export type { EngagementRowKind } from "../../repositories/studioEngagementRowRepository.js";
@@ -42,4 +44,13 @@ export async function resolveActableEngagementRow(
   if (!row) return null;
   const allowed = await source.canActFor(actor, row.ownerUserId, row.ownerCompanyId);
   return allowed ? { projectId: row.projectId } : null;
+}
+
+/** The per-project engagement reads (review comments, chapters, candidate
+ *  thumbnails, heatmaps) are private to whoever may act on the project: owner,
+ *  company member or delegate (canActFor). Unknown, malformed and forbidden
+ *  ids all answer false, so a project's existence never leaks. */
+export async function viewerCanActOnProject(actor: string | undefined, projectId: string): Promise<boolean> {
+  if (!actor || !UUID_LIKE_REGEX.test(projectId)) return false;
+  return ownsByStudioProject(getDb(), actor, projectId);
 }

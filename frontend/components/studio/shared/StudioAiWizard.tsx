@@ -34,7 +34,7 @@ import {
 } from "@/lib/studio/templates/catalog";
 import { studioService } from "@/lib/services/studio-service";
 import { useCreateStudioDraft } from "@/lib/studio/use-create-studio-draft";
-import { mediaKindUsesCanvasStateAuthoring } from "@shared/media-kinds";
+import { mediaKindUsesCanvasStateAuthoring, mediaKindIsComic } from "@shared/media-kinds";
 
 export interface StudioAiWizardProps {
   open: boolean;
@@ -112,7 +112,7 @@ export default function StudioAiWizard({ open, onOpenChange }: StudioAiWizardPro
     const template = getTemplate(contentTemplate);
     try {
       patchState({ status: "generating" });
-      if (template.mediaKind === "comic") {
+      if (mediaKindIsComic(template.mediaKind)) {
         // Genre id is encoded in the template id (`comic_<genreId>`)
         // but the intake form lets the user override via the picker.
         // ComicIntake writes the override to `state.comicGenreId`; we

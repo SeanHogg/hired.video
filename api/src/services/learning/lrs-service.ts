@@ -22,6 +22,7 @@ import { getDb, schema } from "../../db/index.js";
 import { forwardStatementsForUser } from "./lrs-forwarder.js";
 import type { LrsPermission, LrsDocumentType } from "../../db/schema/learning.js";
 import { randomHex, sha256Hex } from "../../utils/crypto.js";
+import { DomainError } from "../../domains/errors.js";
 
 const { lrsCredentials, lrsStatements, lrsDocuments } = schema;
 
@@ -46,13 +47,13 @@ export function basicAuthValue(keyId: string, secret: string): string {
 }
 
 // ── auth ────────────────────────────────────────────────────────────────────
-export class LrsAuthError extends Error {
-  constructor(
-    public readonly code: "UNAUTHORIZED" | "FORBIDDEN",
-    message: string,
-    public readonly status: 401 | 403 = 401,
-  ) {
-    super(message);
+/** DomainError; the xAPI routes still render it as the raw LRS body. */
+export class LrsAuthError extends DomainError {
+  declare readonly code: "UNAUTHORIZED" | "FORBIDDEN";
+  declare readonly status: 401 | 403;
+  constructor(code: "UNAUTHORIZED" | "FORBIDDEN", message: string, status: 401 | 403 = 401) {
+    super(status, code, message);
+    this.name = "LrsAuthError";
   }
 }
 

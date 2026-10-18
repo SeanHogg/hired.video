@@ -19,16 +19,19 @@ import {
 import { ConflictError, ForbiddenError, NotFoundError } from "../../middleware/errorHandler.js";
 import { splitPersonName } from "../../../../shared/person-name.js";
 import { sendInvitationEmail } from "../adapters/email/senders/team.js";
-import { revokeAllSessionsForUser } from "../auth/sessions.js";
+import { revokeAllSessionsForUser } from "../auth/session-lifecycle.js";
 import { defaultRoleChangeCacheBusters, onUserRoleChanged } from "./roleChangeEffects.js";
 import { UsageService } from "../usage/UsageService.js";
 import { invalidatePublicVideoFeed } from "../studio/public-video-feed.js";
 import { eraseVideoPersonalization } from "../video-personalization/videoPersonalization.js";
+import { eraseArchivedUserData, type ArchiveErasureSubject } from "../privacy/archive-erasure.js";
 
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
 import { logger } from "../../lib/logger.js";
 import { randomHex } from "../../utils/crypto.js";
 import { BillingAddressRepository } from "../../repositories/billingAddressRepository.js";
+import { AuthTokensRepository } from "../../repositories/authTokensRepository.js";
+import { PreferencesRepository } from "../../repositories/preferencesRepository.js";
 import { parseRoleAlias } from "../../../../shared/user-roles.js";
 
 /** Narrow Deps slice. account.ts touches both `users` (via UsersRepository)
@@ -38,6 +41,8 @@ import { parseRoleAlias } from "../../../../shared/user-roles.js";
 export interface AccountDeps {
   repos: ApiDeps["repos"];
   db: ReturnType<typeof getDb>;
+  /** Archived-table erasure (injected so fake-db tests can spy on it). */
+  eraseArchive: (subject: ArchiveErasureSubject, db: ReturnType<typeof getDb>) => Promise<unknown>;
 }
 
 const resolveDeps = (deps?: Partial<AccountDeps>): AccountDeps => {
@@ -45,10 +50,11 @@ const resolveDeps = (deps?: Partial<AccountDeps>): AccountDeps => {
   return {
     repos: deps?.repos ?? api.repos,
     db: deps?.db ?? getDb(),
+    eraseArchive: deps?.eraseArchive ?? eraseArchivedUserData,
   };
 };
 
-const { users, userProfiles, accountPreferences, accountInvitations, userCompanyRoleAssociations, companyProfiles, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes, jobItems, jobApplications, resumeInformation, studioProjects, videos, socialConnections, youtubeAccounts, contentLocations } = schema;
+const { users, userProfiles, accountInvitations, userCompanyRoleAssociations, companyProfiles, refreshTokens, jobItems, jobApplications, resumeInformation, studioProjects, videos, providerConnections, contentLocations } = schema;
 
 /** Days a seat invitation stays valid before accept rejects it (gap #1680). */
 const INVITE_TTL_DAYS = 14;
@@ -675,7 +681,7 @@ export async function listPendingInvitations(currentUserId: string,
 export async function getAccountSettings(userId: string,
   deps?: Partial<AccountDeps>): Promise<AccountSettings> {
   const d = resolveDeps(deps); const db = d.db;
-  const [prefs] = await db.select().from(accountPreferences).where(eq(accountPreferences.userId, userId)).limit(1);
+  const prefs = await new PreferencesRepository(db).findAccountByUserId(userId);
   return {
     locale: undefined,
     timezone: undefined,
@@ -687,13 +693,10 @@ export async function getAccountSettings(userId: string,
 export async function updateAccountSettings(userId: string, settings: AccountSettings,
   deps?: Partial<AccountDeps>): Promise<AccountSettings> {
   const d = resolveDeps(deps); const db = d.db;
-  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  const updates: { emailNotificationsEnabled?: boolean; theme?: string } = {};
   if (settings.emailNotifications !== undefined) updates.emailNotificationsEnabled = settings.emailNotifications;
   if (settings.theme) updates.theme = settings.theme;
-  await db
-    .insert(accountPreferences)
-    .values({ userId, ...updates } as any)
-    .onConflictDoUpdate({ target: accountPreferences.userId, set: updates });
+  await new PreferencesRepository(db).upsertAccount(userId, updates);
   return await getAccountSettings(userId);
 }
 
@@ -948,6 +951,13 @@ export async function deleteAccount(userId: string,
   // sweep trigger; no scheduled job purges these rows.
   const now = new Date();
   const handles = anonymizedHandles(userId);
+  // Read the real email BEFORE it is anonymized: archived rows that hold only
+  // the user's email (e.g. guest review comments) are erased by it below.
+  const [original] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
   await db
     .update(users)
     .set({
@@ -1019,20 +1029,22 @@ export async function deleteAccount(userId: string,
   invalidatePublicVideoFeed();
 
   await db.update(refreshTokens).set({ revoked: true } as any).where(eq(refreshTokens.userId, userId));
-  await db.update(passwordResetTokens).set({ used: true } as any).where(eq(passwordResetTokens.userId, userId));
-  await db.update(emailVerificationTokens).set({ used: true } as any).where(eq(emailVerificationTokens.userId, userId));
-  await db.update(twoFactorCodes).set({ used: true } as any).where(eq(twoFactorCodes.userId, userId));
+  await new AuthTokensRepository(db).retireAllForUser(userId);
 
   // Connected publishing accounts: hard-DELETE the stored OAuth tokens for
-  // every network the user linked (TikTok / Instagram / X / Facebook via
-  // social_connections, plus LinkedIn and YouTube). Platform terms (Meta's
+  // every network the user linked (provider_connections purposes
+  // "social_publish" — TikTok / Instagram / X / Facebook / LinkedIn — and
+  // "youtube"). Platform terms (Meta's
   // data-deletion requirement) bar keeping a departed user's access to their
   // accounts, and the rows carry no audit value. Company-scoped connections
   // the user created are left to the company.
   await db
-    .delete(socialConnections)
-    .where(and(eq(socialConnections.userId, userId), isNull(socialConnections.companyId)));
-  await db.delete(youtubeAccounts).where(eq(youtubeAccounts.userId, userId));
+    .delete(providerConnections)
+    .where(and(
+      eq(providerConnections.userId, userId),
+      isNull(providerConnections.companyId),
+      inArray(providerConnections.purpose, ["social_publish", "youtube"]),
+    ));
 
   // GDPR erasure of usage history (gap #2067). The `usage_sessions.user_id` FK
   // is ON DELETE SET NULL and this path soft-deletes (anonymizes) rather than
@@ -1043,6 +1055,10 @@ export async function deleteAccount(userId: string,
   await new UsageService(d.repos.usageTracking).eraseForUser(userId);
   // Personal moments (birthday, a date kept in memory…) — gap #2350.
   await eraseVideoPersonalization(userId, db);
+  // Archive-first migrations moved legacy tables/columns into the `archive`
+  // schema (plus renamed `public.*_archived` tables); their copies still hold
+  // this user's data. Registry-driven purge (services/privacy/archive-pii-registry.ts).
+  await d.eraseArchive({ userId, email: original?.email ?? null }, db);
 
   return result;
 }

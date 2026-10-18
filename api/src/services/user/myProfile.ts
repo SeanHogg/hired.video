@@ -125,7 +125,10 @@ function buildProfileUpdates(d: UpdateProfileInput): Record<string, unknown> {
   return updates;
 }
 
-async function upsertProfile(userId: string, profileUpdates: Record<string, unknown>) {
+/** Write profile columns through the one path that also invalidates the
+ *  caches they feed (people search, references, partner pitch). Shared with
+ *  Settings › Job preferences (roles / industries / currency). */
+export async function upsertProfile(userId: string, profileUpdates: Record<string, unknown>) {
   const profile = await upsertProfileFields(userId, profileUpdates);
   // Name/headline/skills + profileVisibility all funnel through here and
   // feed the public `people` search bucket — invalidate the search index.

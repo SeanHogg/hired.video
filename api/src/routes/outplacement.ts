@@ -24,12 +24,10 @@ import {
   OUTPLACEMENT_SKUS,
   type OutplacementSku,
 } from "../services/outplacement/OutplacementService.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const outplacementRoutes = new Hono<AppEnv>();
-
-function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
 
 const SkuKeys = ["starter", "standard", "premium"] as const satisfies readonly OutplacementSku[];
 
@@ -40,32 +38,26 @@ const PurchaseSchema = z.object({
 });
 
 outplacementRoutes.get("/packages", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   return c.json(success({ items: await outplacementService.listEmployerPackages(userId) }), 200);
 });
 
-outplacementRoutes.post("/packages", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const parsed = PurchaseSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid purchase payload", parsed.error.flatten()), 400);
-  }
-  const sku = OUTPLACEMENT_SKUS[parsed.data.sku];
+outplacementRoutes.post("/packages", validateJson(PurchaseSchema, (e) => error("VALIDATION_ERROR", "Invalid purchase payload", e.flatten())), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  const sku = OUTPLACEMENT_SKUS[body.sku];
   const row = await outplacementService.purchasePackage({
     employerUserId: userId,
-    employerCompanyId: parsed.data.companyId ?? null,
-    seatCount: parsed.data.seatCount,
+    employerCompanyId: body.companyId ?? null,
+    seatCount: body.seatCount,
     durationDays: sku.durationDays,
     unitPriceCents: sku.unitPriceCents,
   });
-  return c.json(success({ package: row, sku: parsed.data.sku }), 201);
+  return c.json(success({ package: row, sku: body.sku }), 201);
 });
 
 outplacementRoutes.post("/packages/:id/mark-paid", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => ({})) as { providerPaymentId?: string };
   if (!body.providerPaymentId) {
     return c.json(error("VALIDATION_ERROR", "providerPaymentId required"), 400);
@@ -76,24 +68,19 @@ outplacementRoutes.post("/packages/:id/mark-paid", async (c) => {
 });
 
 outplacementRoutes.get("/packages/:id/seats", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   return c.json(success({ items: await outplacementService.listPackageSeats(c.req.param("id")) }), 200);
 });
 
 const AssignSchema = z.object({ candidateEmail: z.string().email() });
 
-outplacementRoutes.post("/packages/:id/seats", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const parsed = AssignSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "candidateEmail required", parsed.error.flatten()), 400);
-  }
+outplacementRoutes.post("/packages/:id/seats", validateJson(AssignSchema, (e) => error("VALIDATION_ERROR", "candidateEmail required", e.flatten())), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
   try {
     const row = await outplacementService.assignSeat({
       packageId: c.req.param("id"),
-      candidateEmail: parsed.data.candidateEmail,
+      candidateEmail: body.candidateEmail,
     });
     return c.json(success({ enrollment: row }), 201);
   } catch (err) {
@@ -103,8 +90,7 @@ outplacementRoutes.post("/packages/:id/seats", async (c) => {
 });
 
 outplacementRoutes.post("/seats/:id/accept", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   try {
     const row = await outplacementService.acceptSeat(c.req.param("id"), userId);
     return c.json(success({ enrollment: row }), 200);
@@ -115,13 +101,8 @@ outplacementRoutes.post("/seats/:id/accept", async (c) => {
 });
 
 outplacementRoutes.post("/seats/:id/revoke", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const row = await outplacementService.revokeSeat(c.req.param("id"));
   if (!row) return c.json(error("NOT_FOUND", "Enrollment not found"), 404);
   return c.json(success({ enrollment: row }), 200);
 });
-
-outplacementRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Outplacement route not found" } }, 404),
-);

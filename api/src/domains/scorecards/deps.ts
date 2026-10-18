@@ -3,8 +3,11 @@
  * company-scope helpers, HM-visibility config reader).
  */
 
-import { eq } from "drizzle-orm";
-import { getDb, schema } from "../../db/index.js";
+import { getDb } from "../../db/index.js";
+import {
+  findCompanyHmVisibilityDefault,
+  findJobHmVisibility,
+} from "../../repositories/scorecardHmVisibilityRepository.js";
 import {
   ScorecardsRepository,
   type IScorecardsRepository,
@@ -24,7 +27,7 @@ export interface ScorecardsServiceDeps {
   canAccessCompany: (userId: string, companyId: string) => Promise<boolean>;
   getCompanyIdsForUser: (userId: string) => Promise<string[]>;
   /** #241 — effective HM scorecard-visibility for a (company, job). Injected
-   *  so tests stay off the DB; the default impl reads + caches the config. */
+   *  so tests stay off the DB; the default impl reads the config (uncached, below). */
   resolveJobHmVisibility?: (companyId: string, jobId: string | null) => Promise<ScorecardHmVisibility>;
   now?: () => Date;
 }
@@ -38,21 +41,11 @@ async function defaultResolveJobHmVisibility(
   jobId: string | null,
 ): Promise<ScorecardHmVisibility> {
   const db = getDb();
-  const [company] = await db
-    .select({ d: schema.companyProfiles.scorecardHmVisibilityDefault })
-    .from(schema.companyProfiles)
-    .where(eq(schema.companyProfiles.id, companyId))
-    .limit(1);
-  let jobOverride: string | null = null;
-  if (jobId) {
-    const [job] = await db
-      .select({ v: schema.jobItems.scorecardHmVisibility })
-      .from(schema.jobItems)
-      .where(eq(schema.jobItems.id, jobId))
-      .limit(1);
-    jobOverride = (job?.v as string | null) ?? null;
-  }
-  return resolveHmVisibility(jobOverride, company?.d ?? null);
+  const [companyDefault, job] = await Promise.all([
+    findCompanyHmVisibilityDefault(db, companyId),
+    jobId ? findJobHmVisibility(db, jobId) : Promise.resolve(null),
+  ]);
+  return resolveHmVisibility(job?.override ?? null, companyDefault);
 }
 
 export function defaultScorecardsServiceDeps(): ScorecardsServiceDeps {

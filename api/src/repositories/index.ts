@@ -40,6 +40,10 @@ import { MarketingRepository, type IMarketingRepository } from "./marketingRepos
 import { PlatformRepository, type IPlatformRepository } from "./platformRepository.js";
 import { StudioTemplatesRepository, type IStudioTemplatesRepository } from "./studioTemplatesRepository.js";
 import {
+  ProviderConnectionsRepository,
+  type IProviderConnectionsRepository,
+} from "./providerConnectionsRepository.js";
+import {
   ExternalEmailAccountsRepository,
   type IExternalEmailAccountsRepository,
 } from "./externalEmailAccountsRepository.js";
@@ -192,9 +196,11 @@ export interface Repos {
   roleFeatureAccess: IRoleFeatureAccessRepository;
   // usage sessions + events for presence/engagement (migration 0215)
   usageTracking: IUsageTrackingRepository;
-  // self-serve encrypted vendor API-key integrations (migration 0463)
+  // every third-party credential: one table, one encryption scheme (W3-C, migration 0600)
+  providerConnections: IProviderConnectionsRepository;
+  // self-serve encrypted vendor API-key integrations (provider_connections purpose "api_key")
   tenantIntegrations: ITenantIntegrationsRepository;
-  // social publishing connection layers: user + brand accounts (migration 0217)
+  // social publishing connection layers: user + brand accounts (provider_connections, W3-C)
   socialConnections: ISocialConnectionRepository;
   // browser Web Push endpoints per user (migration 0002)
   pushSubscriptions: IPushSubscriptionsRepository;
@@ -251,6 +257,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     emailConsent: new EmailConsentRepository(db, now),
     roleFeatureAccess: new RoleFeatureAccessRepository(db, now),
     usageTracking: new UsageTrackingRepository(db, now),
+    providerConnections: new ProviderConnectionsRepository(db, now),
     tenantIntegrations: new TenantIntegrationsRepository(db, now),
     socialConnections: new SocialConnectionRepository(db, now),
     pushSubscriptions: new PushSubscriptionsRepository(db),
@@ -304,6 +311,7 @@ export type {
   IRoleFeatureAccessRepository,
   IUsageTrackingRepository,
   ISocialConnectionRepository,
+  IProviderConnectionsRepository,
   ITenantIntegrationsRepository,
   IPushSubscriptionsRepository,
   IContactsRepository,
@@ -324,7 +332,7 @@ export type { ResumeRow, ResumeInsert, ResumePatch, PaginationOptions } from "./
 export type { UserRow, UserInsert, UserPatch, UserSearchFilters, UserSearchResult, UserProfileRow, UserProfileInsert, UserConnectionRow, UserConnectionInsert, UserActorRow } from "./usersRepository.js";
 export type { AccountPreferencesRow, AccountPreferencesInsert, PrivacyPreferencesRow, PrivacyPreferencesInsert, CookiePreferencesRow, CookiePreferencesInsert, JobPreferencesRow, JobPreferencesInsert } from "./preferencesRepository.js";
 export type { AnswerCacheRow, AnswerCacheInsert, ApplicationFormAnswerRow, ApplicationFormAnswerInsert } from "./autofillRepository.js";
-export type { JobRow, JobInsert, JobApplicationRow, JobApplicationInsert, SavedJobRow, JobSearchFilters, ResumeMatchScoreRow, ResumeMatchScoreInsert } from "./jobsRepository.js";
+export type { JobRow, JobInsert, JobApplicationRow, SavedJobRow, JobSearchFilters, ResumeMatchScoreRow, ResumeMatchScoreInsert } from "./jobsRepository.js";
 export type { CompanyProfileRow, CompanyProfileInsert, CandidateSubmissionRow, CandidateSubmissionInsert, CandidateResumeRow, CandidateResumeInsert, RecruiterMatchScoreRow, RecruiterMatchScoreInsert, TalentPoolCandidateRow, TalentPoolCandidateInsert } from "./companiesRepository.js";
 export type { InterviewSessionRow, InterviewSessionInsert, OfferLetterRow, OfferLetterInsert, OnboardingChecklistRow, OnboardingTaskRow, OnboardingTaskInsert } from "./hiringPipelineRepository.js";
 export type { SubscriptionRow, SubscriptionInsert, SubscriptionPlanRow, PlanOverrideRow, PlanOverrideInsert } from "./subscriptionsRepository.js";

@@ -14,7 +14,10 @@ import {
   scoreAllInterviewResponses,
   scoreInterviewResponse,
 } from "../../services/interview/assignment-review.js";
-import { canAssign, fail, ok, sendFailure } from "./shared.js";
+import { canAssign, sendFailure } from "./shared.js";
+import { success, error } from "../../types/index.js";
+import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 
 const DecisionSchema = z.object({
   decision: z.enum(["shortlist", "maybe", "reject"]).nullable(),
@@ -25,51 +28,47 @@ export const interviewAssignmentReviewRoutes = new Hono<AppEnv>();
 
 interviewAssignmentReviewRoutes.post("/:id/responses/:rid/score", async (c) => {
   const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+  requireUser(c);
   if (!canAssign(user)) {
-    return c.json(fail("FORBIDDEN", "Only recruiters or employers can score answers"), 403);
+    return c.json(error("FORBIDDEN", "Only recruiters or employers can score answers"), 403);
   }
 
   const result = await scoreInterviewResponse(c.env, user, c.req.param("id"), c.req.param("rid"));
-  if (!result.ok) return sendFailure(c, result);
-  return c.json(ok(result.data));
+  if (result.ok === false) return sendFailure(c, result);
+  return c.json(success(result.data));
 });
 
 interviewAssignmentReviewRoutes.post("/:id/score-all", async (c) => {
   const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+  requireUser(c);
   if (!canAssign(user)) {
-    return c.json(fail("FORBIDDEN", "Only recruiters or employers can score answers"), 403);
+    return c.json(error("FORBIDDEN", "Only recruiters or employers can score answers"), 403);
   }
 
   const result = await scoreAllInterviewResponses(c.env, user, c.req.param("id"));
-  if (!result.ok) return sendFailure(c, result);
-  return c.json(ok(result.data));
+  if (result.ok === false) return sendFailure(c, result);
+  return c.json(success(result.data));
 });
 
-interviewAssignmentReviewRoutes.post("/:id/decision", async (c) => {
+interviewAssignmentReviewRoutes.post("/:id/decision", validateJson(DecisionSchema, (e) => error("VALIDATION_ERROR", "Invalid decision payload", e.flatten()), { emptyBody: null }), async (c) => {
   const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+  requireUser(c);
   if (!canAssign(user)) {
-    return c.json(fail("FORBIDDEN", "Only recruiters or employers can decide"), 403);
+    return c.json(error("FORBIDDEN", "Only recruiters or employers can decide"), 403);
   }
 
-  const body = await c.req.json().catch(() => null);
-  const parsed = DecisionSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid decision payload", parsed.error.flatten()), 400);
-  }
+  const body = c.req.valid("json");
 
-  const result = await decideInterview(user.sub, c.req.param("id"), parsed.data);
-  if (!result.ok) return sendFailure(c, result);
-  return c.json(ok(result.data));
+  const result = await decideInterview(user.sub, c.req.param("id"), { decision: body.decision, reason: body.reason });
+  if (result.ok === false) return sendFailure(c, result);
+  return c.json(success(result.data));
 });
 
 interviewAssignmentReviewRoutes.get("/:id/report", async (c) => {
   const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+  requireUser(c);
 
   const result = await getInterviewReport(user.sub, c.req.param("id"));
-  if (!result.ok) return sendFailure(c, result);
-  return c.json(ok(result.data));
+  if (result.ok === false) return sendFailure(c, result);
+  return c.json(success(result.data));
 });

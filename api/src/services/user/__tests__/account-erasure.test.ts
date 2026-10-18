@@ -31,17 +31,19 @@ function makeDb() {
     videos: [],
     studio_projects: [],
     refresh_tokens: [],
-    password_reset_tokens: [],
-    email_verification_tokens: [],
-    two_factor_codes: [],
-    social_connections: [
-      { id: "sc-1", userId: "u-gone", companyId: null, platform: "tiktok" },
-      { id: "sc-2", userId: "u-gone", companyId: "co-1", platform: "facebook" },
-      { id: "sc-3", userId: "u-stays", companyId: null, platform: "x" },
+    auth_tokens: [],
+    provider_connections: [
+      { id: "sc-1", userId: "u-gone", companyId: null, purpose: "social_publish", provider: "tiktok" },
+      { id: "sc-2", userId: "u-gone", companyId: "co-1", purpose: "social_publish", provider: "facebook" },
+      { id: "sc-3", userId: "u-stays", companyId: null, purpose: "social_publish", provider: "x" },
+      { id: "yt-1", userId: "u-gone", companyId: null, purpose: "youtube", provider: "google" },
+      { id: "li-1", userId: "u-gone", companyId: null, purpose: "login", provider: "google" },
     ],
-    youtube_accounts: [{ id: "yt-1", userId: "u-gone" }],
   });
 }
+
+/** The fake db has no `execute`; archive erasure is covered by its own tests. */
+const noArchive = async () => {};
 
 /** Minimal IUsageTrackingRepository spy — only `eraseByUser` is exercised by
  *  `UsageService.eraseForUser`. */
@@ -65,8 +67,21 @@ describe("deleteAccount — usage erasure (#2067)", () => {
     await deleteAccount("u-gone", undefined, {
       db,
       repos: { usageTracking: usage.repo } as any,
+      eraseArchive: noArchive,
     });
     assert.deepEqual(usage.calls, ["u-gone"]);
+  });
+
+  it("purges the leaving user's archive-schema rows (registry-driven)", async () => {
+    const { db } = makeDb();
+    const archived: Array<{ userId: string; email?: string | null }> = [];
+    await deleteAccount("u-gone", undefined, {
+      db,
+      repos: { usageTracking: spyRepo().repo } as any,
+      eraseArchive: async (subject) => { archived.push(subject); },
+    });
+    // The ORIGINAL email (read before anonymization), not deleted-…@deleted.local.
+    assert.deepEqual(archived, [{ userId: "u-gone", email: "gone@acme.com" }]);
   });
 
   it("anonymizes the users row in the same pass (sanity: erase is additive, not a replacement)", async () => {
@@ -75,6 +90,7 @@ describe("deleteAccount — usage erasure (#2067)", () => {
     await deleteAccount("u-gone", undefined, {
       db,
       repos: { usageTracking: usage.repo } as any,
+      eraseArchive: noArchive,
     });
     const row = state.users.find((u: any) => u.id === "u-gone");
     assert.equal(row.isActive, false);
@@ -89,8 +105,8 @@ describe("deleteAccount — connected publishing accounts", () => {
     await deleteAccount("u-gone", undefined, {
       db,
       repos: { usageTracking: spyRepo().repo } as any,
+      eraseArchive: noArchive,
     });
-    assert.deepEqual(state.social_connections.map((r: any) => r.id).sort(), ["sc-2", "sc-3"]);
-    assert.deepEqual(state.youtube_accounts, []);
+    assert.deepEqual(state.provider_connections.map((r: any) => r.id).sort(), ["li-1", "sc-2", "sc-3"]);
   });
 });

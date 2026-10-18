@@ -5,11 +5,12 @@
  * the active creator row. Typed Drizzle wrappers only; rules live in
  * services/user/{myProfile,publicProfile,slugAndAvatar}.ts.
  */
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import { isNotRenderVariant } from "./renderVariantRepository.js";
+import { savedSettingsOf } from "./preferencesRepository.js";
 
-const { users, userProfiles, privacyPreferences, creatorProfiles, videos } = schema;
+const { users, userProfiles, userSettings, creatorProfiles, videos } = schema;
 
 // Explicit column list for userProfiles — avoids SELECT * and protects against
 // schema columns that haven't been migrated to the DB yet.
@@ -160,14 +161,14 @@ export interface ProfilePrivacyRow {
 export async function findPrivacyFlags(userId: string): Promise<ProfilePrivacyRow | null> {
   const [row] = await getDb()
     .select({
-      showEmail: privacyPreferences.showEmail,
-      showPhone: privacyPreferences.showPhone,
-      showLocation: privacyPreferences.showLocation,
-      promoteWithoutAuth: privacyPreferences.promoteWithoutAuth,
-      profileVisibleToPublic: privacyPreferences.profileVisibleToPublic,
+      showEmail: userSettings.showEmail,
+      showPhone: userSettings.showPhone,
+      showLocation: userSettings.showLocation,
+      promoteWithoutAuth: userSettings.promoteWithoutAuth,
+      profileVisibleToPublic: userSettings.profileVisibleToPublic,
     })
-    .from(privacyPreferences)
-    .where(eq(privacyPreferences.userId, userId))
+    .from(userSettings)
+    .where(savedSettingsOf(userId, "privacy"))
     .limit(1);
   return row ?? null;
 }
@@ -220,7 +221,111 @@ export async function findActiveCreator(userId: string): Promise<ActiveCreatorRo
   return (row as ActiveCreatorRow) ?? null;
 }
 
+// ── Services provider flag ──────────────────────────────────────────────────
+
+export async function findProvidesServices(userId: string): Promise<boolean> {
+  const [row] = await getDb()
+    .select({ providesServices: userProfiles.providesServices })
+    .from(userProfiles)
+    .where(eq(userProfiles.userId, userId))
+    .limit(1);
+  return row?.providesServices === true;
+}
+
+export async function setProvidesServices(userId: string, providesServices: boolean): Promise<void> {
+  await getDb()
+    .update(userProfiles)
+    .set({ providesServices, updatedAt: new Date() })
+    .where(eq(userProfiles.userId, userId));
+}
+
+/** Flip providesServices on; a no-op UPDATE when it is already on. */
+export async function enableProvidesServicesIfOff(userId: string): Promise<void> {
+  await getDb()
+    .update(userProfiles)
+    .set({ providesServices: true, updatedAt: new Date() })
+    .where(and(eq(userProfiles.userId, userId), eq(userProfiles.providesServices, false)));
+}
+
+// ── Talent discovery feed ───────────────────────────────────────────────────
+
+/** Public-visibility profiles of verified users, most recently updated first. */
+export function listPublicTalentProfiles(limit: number, offset: number) {
+  return getDb()
+    .select({
+      userId: userProfiles.userId,
+      headline: userProfiles.headline,
+      location: userProfiles.location,
+      avatarUrl: userProfiles.avatarUrl,
+      skills: userProfiles.skills,
+      // No video-resume column since migration 0062 (legacy table dropped).
+      videoResumeUrl: sql<string | null>`null`,
+      updatedAt: userProfiles.updatedAt,
+    })
+    .from(userProfiles)
+    .innerJoin(users, eq(users.id, userProfiles.userId))
+    .where(and(eq(userProfiles.profileVisibility, "public"), eq(users.emailVerified, true)))
+    .orderBy(desc(userProfiles.updatedAt))
+    .limit(limit)
+    .offset(offset);
+}
+
+/** The full profile row plus the owner's verification flag, or null. */
+export async function findProfileWithVerification(userId: string) {
+  const [row] = await getDb()
+    .select({ profile: userProfiles, emailVerified: users.emailVerified })
+    .from(userProfiles)
+    .innerJoin(users, eq(users.id, userProfiles.userId))
+    .where(eq(userProfiles.userId, userId))
+    .limit(1);
+  return row ?? null;
+}
+
+/** The user's role + stored profile-section overrides (null when the user has
+ *  no profile row), or null when the user doesn't exist. Feeds the per-section
+ *  visibility gate (shared/profile-sections.ts). */
+export async function findRoleAndProfileSections(
+  userId: string,
+): Promise<{ role: string; sections: unknown } | null> {
+  const [row] = await getDb()
+    .select({ role: users.role, sections: userProfiles.profileSections })
+    .from(users)
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(eq(users.id, userId))
+    .limit(1);
+  return row ?? null;
+}
+
 /** Hard-delete the user row (FK cascades own the rest). */
 export async function deleteUserRow(userId: string): Promise<void> {
   await getDb().delete(users).where(eq(users.id, userId));
+}
+
+export interface CompanyPersonRow {
+  userId: string;
+  name: string;
+  title: string | null;
+  company: string | null;
+}
+
+/** Of `userIds`, the people whose current company matches `company`
+ *  (case-insensitive substring), capped at `limit` — /api/network/warm-intros. */
+export async function findAtCompanyAmong(userIds: string[], company: string, limit: number): Promise<CompanyPersonRow[]> {
+  return getDb()
+    .select({
+      userId: users.id,
+      name: users.name,
+      title: userProfiles.currentRole,
+      company: userProfiles.currentCompany,
+    })
+    .from(users)
+    .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(and(inArray(users.id, userIds), ilike(userProfiles.currentCompany, `%${company}%`)))
+    .limit(limit);
+}
+
+/** id → display name for each existing user in `userIds`. */
+export async function findNamesByIds(userIds: string[]): Promise<Map<string, string>> {
+  const rows = await getDb().select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, userIds));
+  return new Map(rows.map((r) => [r.id, r.name]));
 }

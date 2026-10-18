@@ -1,7 +1,8 @@
 /**
- * Scorecards domain errors. Thrown as `ServiceError` with a stable `code`
- * so the route layer can map them to HTTP status codes in one place.
+ * Scorecards domain errors. Thrown as `ServiceError` (a DomainError) with a stable `code`;
+ * the status lives on the class, so routes just let it propagate.
  */
+import { DomainError, statusForErrorCode } from "../errors.js";
 
 export type ServiceErrorCode =
   | "NOT_FOUND"
@@ -9,12 +10,11 @@ export type ServiceErrorCode =
   | "CONFLICT"
   | "VALIDATION_ERROR";
 
-export class ServiceError extends Error {
-  constructor(
-    public readonly code: ServiceErrorCode,
-    message: string,
-    public readonly details?: unknown,
-  ) {
-    super(message);
+/** A DomainError the global handler renders with the code's status. */
+export class ServiceError extends DomainError {
+  declare readonly code: ServiceErrorCode;
+  constructor(code: ServiceErrorCode, message: string, details?: unknown) {
+    super(statusForErrorCode(code), code, message, details);
+    this.name = "ServiceError";
   }
 }

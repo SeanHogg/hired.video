@@ -25,9 +25,8 @@ import { sendResult } from "./shared.js";
 export const creatorPortfolioRoutes = new Hono<AppEnv>();
 
 creatorPortfolioRoutes.get("/portfolio", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await getOwnPortfolio(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getOwnPortfolio(userId)), 200);
 });
 
 creatorPortfolioRoutes.get("/portfolio/public/:userId", async (c) =>
@@ -35,27 +34,23 @@ creatorPortfolioRoutes.get("/portfolio/public/:userId", async (c) =>
 );
 
 creatorPortfolioRoutes.post("/portfolio", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => ({})) as CreatePortfolioItemInput;
-  return sendResult(c, await createPortfolioItem(auth.userId, body));
+  return sendResult(c, await createPortfolioItem(userId, body));
 });
 
 creatorPortfolioRoutes.put("/portfolio/:id", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
-  return sendResult(c, await updateOwnPortfolioItem(auth.userId, c.req.param("id"), body));
+  return sendResult(c, await updateOwnPortfolioItem(userId, c.req.param("id"), body));
 });
 
 creatorPortfolioRoutes.delete("/portfolio/:id", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return sendResult(c, await deleteOwnPortfolioItem(auth.userId, c.req.param("id")));
+  const userId = requireUser(c);
+  return sendResult(c, await deleteOwnPortfolioItem(userId, c.req.param("id")));
 });
 
 creatorPortfolioRoutes.post("/portfolio/:id/feature", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return sendResult(c, await featureOwnPortfolioItem(auth.userId, c.req.param("id")));
+  const userId = requireUser(c);
+  return sendResult(c, await featureOwnPortfolioItem(userId, c.req.param("id")));
 });

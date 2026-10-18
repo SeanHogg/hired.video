@@ -9,7 +9,7 @@ import type { ResumeContent } from "../../../../shared/resume.js";
 import { buildRepos } from "../../repositories/index.js";
 import { hasAnyLLMProviderKey, createLLMClient } from "../adapters/llm-client.js";
 import { extractSkills, type SkillExtractInput, type Skill } from "../resume/skills.js";
-import { parsedJobFromRow } from "../job/match-handlers.js";
+import { parsedJobFromRow } from "../job/match-resolvers.js";
 import { generateQuestionsFromSkills, type GeneratedQuestion } from "./question-generator.js";
 import { failWith, succeed, type AssignmentResult } from "./assignment-result.js";
 
@@ -106,7 +106,7 @@ export async function generateInterviewQuestions(
   input: GenerateQuestionsInput,
 ): Promise<AssignmentResult<GenerateQuestionsOutput>> {
   const source = await resolveSource(user.sub, input);
-  if (!source.ok) return source;
+  if (source.ok === false) return source;
 
   const llm = hasAnyLLMProviderKey(env) ? createLLMClient(env, user) : null;
 

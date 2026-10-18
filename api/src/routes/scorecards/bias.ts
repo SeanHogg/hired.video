@@ -12,6 +12,7 @@ import type { AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
 import { requireUser } from "../helpers/routerHelpers.js";
 import { lintScorecardText } from "../../services/scorecards/bias-linter.js";
+import { validateJson } from "../helpers/validate.js";
 
 const BiasCheckSchema = z.object({
   summary: z.string().max(5000).optional(),
@@ -21,15 +22,11 @@ const BiasCheckSchema = z.object({
 
 export const biasRoutes = new Hono<AppEnv>();
 
-biasRoutes.post("/", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const parsed = BiasCheckSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-  }
+biasRoutes.post("/", validateJson(BiasCheckSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
   try {
-    return c.json(success(await lintScorecardText(c, parsed.data)));
+    return c.json(success(await lintScorecardText(c, body)));
   } catch (e: any) {
     return c.json(
       error(e?.code ?? "INTERNAL_ERROR", e?.message ?? "Failed to lint", undefined),

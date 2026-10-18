@@ -5,6 +5,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/index.js";
 import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 import {
   createRedactionProfile,
   deleteRedactionProfile,
@@ -13,40 +14,33 @@ import {
   updateRedactionProfile,
 } from "../../services/recruit/redactionProfilesService.js";
 import { CreateRedactionProfileSchema, UpdateRedactionProfileSchema } from "../../services/recruit/schemas.js";
-import { parseJsonBody, respond } from "./http.js";
+import { invalidPayload, respond } from "./http.js";
 
 export const redactionProfileRoutes = new Hono<AppEnv>();
 
 redactionProfileRoutes.get("/redaction-profiles", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return respond(c, listRedactionProfiles(auth.userId, c.req.query("companyId")));
+  const userId = requireUser(c);
+  return respond(c, listRedactionProfiles(userId, c.req.query("companyId")));
 });
 
 redactionProfileRoutes.get("/redaction-profiles/:id", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return respond(c, getRedactionProfile(auth.userId, c.req.param("id")));
+  const userId = requireUser(c);
+  return respond(c, getRedactionProfile(userId, c.req.param("id")));
 });
 
-redactionProfileRoutes.post("/redaction-profiles", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const body = await parseJsonBody(c, CreateRedactionProfileSchema);
-  if ("response" in body) return body.response;
-  return respond(c, createRedactionProfile(auth.userId, body.data), 201);
+redactionProfileRoutes.post("/redaction-profiles", validateJson(CreateRedactionProfileSchema, invalidPayload(), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  return respond(c, createRedactionProfile(userId, body), 201);
 });
 
-redactionProfileRoutes.patch("/redaction-profiles/:id", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const body = await parseJsonBody(c, UpdateRedactionProfileSchema);
-  if ("response" in body) return body.response;
-  return respond(c, updateRedactionProfile(auth.userId, c.req.param("id"), body.data));
+redactionProfileRoutes.patch("/redaction-profiles/:id", validateJson(UpdateRedactionProfileSchema, invalidPayload(), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  return respond(c, updateRedactionProfile(userId, c.req.param("id"), body));
 });
 
 redactionProfileRoutes.delete("/redaction-profiles/:id", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return respond(c, deleteRedactionProfile(auth.userId, c.req.param("id")));
+  const userId = requireUser(c);
+  return respond(c, deleteRedactionProfile(userId, c.req.param("id")));
 });

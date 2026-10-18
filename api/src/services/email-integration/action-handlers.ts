@@ -14,7 +14,7 @@
  *     association → `contact_job_links`.
  */
 
-import { createJob } from "../job/JobService.js";
+import { createJob } from "../job/job-write.js";
 import {
   INBOX_ACTION_HANDLERS,
   INBOX_ACTION_RUN_STATUSES,

@@ -28,6 +28,7 @@ import { and, asc, desc, eq, gte, ilike, inArray, lt, ne, sql } from "drizzle-or
 import { schema } from "../db/index.js";
 import { isUuid } from "../../../shared/value-types.js";
 import { countServerRecordedViews, countServerRecordedViewsBulk } from "./artifactViewStreams.js";
+import { withVideoMetaColumns } from "./resumeVideoMetaColumns.js";
 
 const { resumeInformation, watchedResumes, artifactViews } = schema;
 
@@ -302,6 +303,17 @@ export class ResumeRepository implements IResumeRepository {
     return Number(row?.n ?? 0);
   }
 
+  /** Résumés the owner has posted — privacyLevel < 10 means visible to
+   *  someone (public / recruiter-only / connections) rather than a private
+   *  draft. Drives the job-readiness gauge (#2073). */
+  async countPublishedByOwner(ownerId: string): Promise<number> {
+    const [row] = await this.db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(resumeInformation)
+      .where(and(eq(resumeInformation.userId, ownerId), lt(resumeInformation.privacyLevel, 10)));
+    return Number(row?.n ?? 0);
+  }
+
   /** Total row count — drives the admin dashboard metric. */
   async countAll(): Promise<number> {
     const [row] = await this.db
@@ -358,7 +370,8 @@ export class ResumeRepository implements IResumeRepository {
   async insertOne(input: ResumeInsert): Promise<ResumeRow> {
     const [created] = await this.db
       .insert(resumeInformation)
-      .values(input as any)
+      // Content writes keep the video-plan columns in step (migration 0615).
+      .values(withVideoMetaColumns(input) as any)
       .returning();
     return created as ResumeRow;
   }
@@ -374,9 +387,10 @@ export class ResumeRepository implements IResumeRepository {
     patch: ResumePatch,
     opts: { touchUpdatedAt?: boolean } = {},
   ): Promise<ResumeRow | null> {
+    // Content writes keep the video-plan columns in step (migration 0615).
     const values = opts.touchUpdatedAt === false
-      ? { ...patch }
-      : { ...patch, updatedAt: this.now() };
+      ? withVideoMetaColumns({ ...patch })
+      : withVideoMetaColumns({ ...patch, updatedAt: this.now() });
     const [updated] = await this.db
       .update(resumeInformation)
       .set(values as any)
@@ -569,6 +583,7 @@ export class ResumeRepository implements IResumeRepository {
   }): Promise<void> {
     await this.db.insert(artifactViews).values({
       artifactKind: "resume",
+      eventType: "view",
       artifactId: row.resumeId,
       ownerUserId: row.ownerUserId,
       viewerId: row.viewerId,

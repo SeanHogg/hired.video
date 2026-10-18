@@ -13,9 +13,9 @@
  * shared accountability (per project_studio_workspaces.md pattern for
  * multi-actor transactional writes).
  *
- * Visibility gating (open-to-coffee profile section) is enforced at the
- * route layer, not here — the service handles the write contract; route
- * decides whether the requester is even allowed to ask.
+ * Visibility gating (open-to-coffee profile section) is enforced in
+ * create(): the CTA is hidden client-side, but the API is the source of
+ * truth.
  */
 import type { ApiDeps } from "../apiDeps.js";
 import type {
@@ -26,17 +26,18 @@ import { defaultCoffeeTaskTitle } from "../../../../shared/coffee.js";
 import type {
   CoffeeRequestRow,
 } from "../../repositories/coffeeRequestsRepository.js";
-import { schema } from "../../db/index.js";
+import { getDb } from "../../db/index.js";
 import { emitNotification, resolveActor } from "../notifications/notificationService.js";
-import { and, eq } from "drizzle-orm";
+import { getOrCreateDefaultBoard } from "../productivity/default-board.js";
+import { resolveProfileSections } from "../../../../shared/profile-sections.js";
 
 export type CoffeeDeps = Pick<ApiDeps, "repos" | "now"> & {
-  /** Direct db handle for the "ensure default board exists" lookup —
-   *  the BoardsRepository hasn't been extracted yet, so we go straight
-   *  to schema. Keep this seam tight; extract a real repo if a second
-   *  caller appears. */
-  db?: any;
+  /** Default-board resolver; defaults to the shared `__default__` board
+   *  convention (services/productivity/default-board.ts). */
+  defaultBoard?: (userId: string) => Promise<string>;
 };
+
+export type CoffeeCreateError = "self" | "duplicate" | "recipient_not_found" | "not_open";
 
 export interface CoffeeAcceptResult {
   request: CoffeeRequestRow;
@@ -47,10 +48,27 @@ export interface CoffeeAcceptResult {
 export class CoffeeRequestService {
   constructor(private readonly deps: CoffeeDeps) {}
 
+  listIncoming(userId: string, status: string): Promise<CoffeeRequestRow[]> {
+    return this.deps.repos.coffeeRequests.findIncomingForUser(userId, status);
+  }
+
+  listOutgoing(userId: string, status?: string): Promise<CoffeeRequestRow[]> {
+    return this.deps.repos.coffeeRequests.findOutgoingForUser(userId, status);
+  }
+
   async create(
     requesterUserId: string,
     input: CreateCoffeeRequestInput,
-  ): Promise<CoffeeRequestRow | { error: "self" | "duplicate" }> {
+  ): Promise<CoffeeRequestRow | { error: CoffeeCreateError }> {
+    // Gate on the recipient's openToCoffee profile section.
+    const recipient = await this.deps.repos.users.findById(input.recipientUserId);
+    if (!recipient) return { error: "recipient_not_found" };
+    const sections = resolveProfileSections(
+      ((recipient as any)?.profile?.profileSections ?? {}),
+      (recipient as any)?.role ?? null,
+    );
+    if (!sections.openToCoffee) return { error: "not_open" };
+
     if (requesterUserId === input.recipientUserId) return { error: "self" };
 
     const existing = await this.deps.repos.coffeeRequests.findPendingBetween(
@@ -180,7 +198,7 @@ export class CoffeeRequestService {
 
     // Shared accountability task owned by the requester, with the
     // recipient added as a participant — both see it on their tab.
-    const boardId = await this.ensureDefaultBoard(req.requesterUserId);
+    const boardId = await (this.deps.defaultBoard ?? ((id) => getOrCreateDefaultBoard(id, getDb())))(req.requesterUserId);
     const task = await this.deps.repos.coffeeRequests.insertTask({
       boardId,
       userId: req.requesterUserId,
@@ -240,31 +258,6 @@ export class CoffeeRequestService {
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────
-
-  /** First-touch board creation. Tasks.tsx + routes/task.ts use the same
-   *  "default board" convention (one per user, lazily created on first
-   *  task). Mirror it here so the coffee-accept task lands on the right
-   *  board even if the user has never opened Tasks. */
-  private async ensureDefaultBoard(userId: string): Promise<string> {
-    const { boards } = schema;
-    const db = this.deps.db;
-    if (!db) {
-      throw new Error(
-        "CoffeeRequestService requires `db` in its deps to ensure a default board. Wire CoffeeService({ ...buildApiDeps(env), db: getDb() }).",
-      );
-    }
-    const [existing] = await db
-      .select({ id: boards.id })
-      .from(boards)
-      .where(and(eq(boards.userId, userId), eq(boards.isArchived, false)))
-      .limit(1);
-    if (existing) return (existing as any).id;
-    const [row] = await db
-      .insert(boards)
-      .values({ userId, name: "Tasks", description: null, isArchived: false } as any)
-      .returning();
-    return (row as any).id;
-  }
 
   private displayName(user: any): string | null {
     if (!user) return null;

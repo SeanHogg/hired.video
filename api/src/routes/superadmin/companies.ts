@@ -22,6 +22,7 @@ import {
   adminUpdateCompanyStatus,
   type CompanyStatus,
 } from "../../services/superadmin/companyAdmin.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const superadminCompanyRoutes = new Hono<AppEnv>();
 
@@ -45,14 +46,11 @@ const CreateSchema = z.object({
   isVerified: z.boolean().optional(),
 });
 
-superadminCompanyRoutes.post("/", async (c) => {
-  const parsed = CreateSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-  }
+superadminCompanyRoutes.post("/", validateJson(CreateSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
   // Default the owner to the acting SuperAdmin if none supplied.
-  const ownerId = parsed.data.ownerId ?? c.var.user!.sub;
-  const row = await adminCreateCompany({ ...parsed.data, ownerId });
+  const ownerId = body.ownerId ?? c.var.userId;
+  const row = await adminCreateCompany({ ...body, ownerId });
   return c.json(success(row), 201);
 });
 
@@ -81,12 +79,9 @@ const StatusSchema = z.object({
   featured: z.boolean().optional(),
 });
 
-superadminCompanyRoutes.patch("/:id", async (c) => {
-  const parsed = StatusSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-  }
-  const row = await adminUpdateCompanyStatus(c.req.param("id"), parsed.data);
+superadminCompanyRoutes.patch("/:id", validateJson(StatusSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  const row = await adminUpdateCompanyStatus(c.req.param("id"), body);
   if (!row) return c.json(error("NOT_FOUND", "Company not found"), 404);
   return c.json(success(row));
 });

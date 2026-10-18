@@ -4,9 +4,6 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
-  ciGet,
-  ciProp,
-  buildMetaResume,
   extractJson,
   isParseComplete,
   parseResumeWithRegex,
@@ -75,125 +72,6 @@ Volunteering
 SCORE Mentors, Certified Business Mentor (12/2022 - Present)
 Mentors in Tech (MinT), Mentor (01/2023 - Present)
 Micromentor, Mentor (12/2022 - Present)`;
-
-// ═══════════════════════════════════════════════════════════════════════════
-// ciGet / ciProp — case-insensitive property lookup
-// ═══════════════════════════════════════════════════════════════════════════
-describe("ciGet / ciProp", () => {
-  it("returns lowercase key when present", () => {
-    assert.equal(ciGet({ basics: "lo" }, "basics"), "lo");
-  });
-
-  it("falls back to PascalCase key", () => {
-    assert.equal(ciGet({ Basics: "hi" }, "basics"), "hi");
-  });
-
-  it("returns undefined when neither case exists", () => {
-    assert.equal(ciGet({}, "basics"), undefined);
-  });
-
-  it("prefers lowercase over PascalCase when both exist", () => {
-    assert.equal(ciGet({ basics: "lo", Basics: "hi" }, "basics"), "lo");
-  });
-
-  it("ciProp works the same way", () => {
-    assert.equal(ciProp({ Name: "Sean" }, "name"), "Sean");
-    assert.equal(ciProp({ name: "Sean" }, "name"), "Sean");
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// buildMetaResume — normalises PascalCase / lowercase content into metaResume
-// ═══════════════════════════════════════════════════════════════════════════
-describe("buildMetaResume", () => {
-  const RID = "aaaa-bbbb";
-
-  it("reads lowercase (AI-parsed) content correctly", () => {
-    const content = {
-      basics: {
-        name: "Jane Doe",
-        email: "jane@example.com",
-        phone: "555-0100",
-        summary: "Engineer",
-        location: { city: "NYC", region: "NY" },
-      },
-      work: [{ name: "Acme", position: "Dev", startDate: "2020", endDate: "2023" }],
-      education: [{ institution: "MIT", area: "CS" }],
-    };
-    const meta = buildMetaResume(content, RID, "Untitled");
-    assert.equal(meta.basics.name, "Jane Doe");
-    assert.equal(meta.basics.email, "jane@example.com");
-    assert.equal(meta.basics.summary, "Engineer");
-    assert.equal(meta.basics.location?.city, "NYC");
-    assert.equal(meta.work.length, 1);
-    assert.equal((meta.work[0] as any).name, "Acme");
-    assert.equal(meta.education.length, 1);
-    assert.equal((meta.education[0] as any).institution, "MIT");
-  });
-
-  it("reads PascalCase (frontend ResumeData) content correctly", () => {
-    const content = {
-      Basics: {
-        Name: "Sean Hogg",
-        Email: "sean@example.com",
-        Phone: "248-555-0000",
-        Summary: "CTO",
-        Location: { City: "Troy", Region: "MI" },
-      },
-      Work: [
-        { Name: "Company A", Position: "CTO", StartDate: "2022", EndDate: "Present" },
-        { Name: "Company B", Position: "VP", StartDate: "2019", EndDate: "2022" },
-      ],
-      Education: [{ Institution: "UW", Area: "Computer Science" }],
-      Volunteer: [{ Organization: "SCORE", Position: "Mentor" }],
-    };
-    const meta = buildMetaResume(content, RID, "Untitled");
-    assert.equal(meta.basics.name, "Sean Hogg");
-    assert.equal(meta.basics.email, "sean@example.com");
-    assert.equal(meta.basics.location?.city, "Troy");
-    assert.equal(meta.basics.location?.region, "MI");
-    assert.equal(meta.work.length, 2);
-    assert.equal((meta.work[0] as any).Name, "Company A");
-    assert.equal(meta.education.length, 1);
-    assert.equal(meta.volunteer.length, 1);
-  });
-
-  it("falls back to rowTitle when basics.name is missing", () => {
-    const meta = buildMetaResume({}, RID, "Fallback Title");
-    assert.equal(meta.basics.name, "Fallback Title");
-  });
-
-  it("assigns default ids when items lack them", () => {
-    const content = {
-      work: [{ name: "NoId Corp", position: "Dev" }],
-    };
-    const meta = buildMetaResume(content, RID, "T");
-    assert.equal((meta.work[0] as any).id, `${RID}-work-0`);
-  });
-
-  it("preserves existing ids", () => {
-    const content = {
-      work: [{ id: "custom-id", name: "HasId Corp" }],
-    };
-    const meta = buildMetaResume(content, RID, "T");
-    assert.equal((meta.work[0] as any).id, "custom-id");
-  });
-
-  it("handles null/missing location gracefully", () => {
-    const content = { basics: { name: "Test" } };
-    const meta = buildMetaResume(content, RID, "T");
-    assert.equal(meta.basics.location, null);
-  });
-
-  it("returns empty arrays for missing sections", () => {
-    const meta = buildMetaResume({}, RID, "T");
-    assert.equal(meta.work.length, 0);
-    assert.equal(meta.education.length, 0);
-    assert.equal(meta.skills.length, 0);
-    assert.equal(meta.volunteer.length, 0);
-    assert.equal(meta.certificates.length, 0);
-  });
-});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // extractJson — strips markdown fences and finds JSON in LLM output
@@ -563,92 +441,6 @@ Dev
 // Integration: simulates the full flow that the user reported as broken
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Integration: full resume create/save round-trip", () => {
-  it("PascalCase content (frontend save) produces correct metaResume", () => {
-    // Simulates what happens when the frontend saves resume data
-    const content = {
-      Basics: {
-        Id: "abc-basics-0",
-        Name: "Sean Hogg",
-        Email: "seanhogg@gmail.com",
-        Phone: "2488250176",
-        Summary: "CTO and Technology Leader with 25 years of experience",
-        Location: { City: "Troy", Region: "MI" },
-      },
-      Work: [
-        {
-          Id: "abc-work-0",
-          Name: "Consulting Fractional VP of Technology/CTO",
-          Position: "Consulting Fractional VP of Technology/CTO",
-          StartDate: "10/2022",
-          EndDate: "Present",
-          Highlights: ["Mentor startups and SMBs", "Specialize in SaaS"],
-        },
-        {
-          Id: "abc-work-1",
-          Name: "VP of Technology/CIO",
-          Position: "VP of Technology/CIO",
-          StartDate: "08/2021",
-          EndDate: "01/2024",
-          Highlights: ["Reduced operating costs by $1.79M"],
-        },
-      ],
-      Education: [
-        { Id: "abc-edu-0", Institution: "University of Windsor", Area: "Computer Science" },
-        { Id: "abc-edu-1", Institution: "University of Windsor", Area: "Psychology" },
-      ],
-      Volunteer: [
-        { Id: "abc-vol-0", Organization: "SCORE Mentors", Position: "Certified Business Mentor" },
-      ],
-    };
-
-    const meta = buildMetaResume(content, "abc", "Sean Hogg");
-
-    // Basics
-    assert.equal(meta.basics.name, "Sean Hogg");
-    assert.equal(meta.basics.email, "seanhogg@gmail.com");
-    assert.equal(meta.basics.phone, "2488250176");
-    assert.ok(meta.basics.summary?.toString().includes("CTO"));
-    assert.equal(meta.basics.location?.city, "Troy");
-    assert.equal(meta.basics.location?.region, "MI");
-
-    // Work — must NOT be empty (this was the original bug)
-    assert.equal(meta.work.length, 2, "Work should have 2 entries");
-    assert.equal((meta.work[0] as any).Name, "Consulting Fractional VP of Technology/CTO");
-    assert.ok(Array.isArray((meta.work[0] as any).Highlights));
-
-    // Education — must NOT be empty
-    assert.equal(meta.education.length, 2, "Education should have 2 entries");
-    assert.equal((meta.education[0] as any).Institution, "University of Windsor");
-
-    // Volunteer
-    assert.equal(meta.volunteer.length, 1);
-  });
-
-  it("lowercase content (AI-parsed) produces correct metaResume", () => {
-    // Simulates what happens when AI parses a resume on create
-    const content = {
-      basics: {
-        name: "Sean Hogg",
-        email: "seanhogg@gmail.com",
-        phone: "2488250176",
-        summary: "CTO and Technology Leader",
-        location: { city: "Troy", region: "MI" },
-      },
-      work: [
-        { name: "HireFractionalTalent.com", position: "CTO", startDate: "10/2022", endDate: "Present" },
-      ],
-      education: [
-        { institution: "University of Windsor", area: "Computer Science" },
-      ],
-    };
-
-    const meta = buildMetaResume(content, "xyz", "Sean Hogg");
-
-    assert.equal(meta.basics.name, "Sean Hogg");
-    assert.equal(meta.work.length, 1);
-    assert.equal(meta.education.length, 1);
-  });
-
   it("regex parser extracts the real user resume correctly", () => {
     // This is the exact flow: rawText -> parseResumeWithRegex -> content stored in DB
     const result = parseResumeWithRegex(SAMPLE_RESUME);
@@ -671,12 +463,6 @@ describe("Integration: full resume create/save round-trip", () => {
 
     // Volunteer must have entries
     assert.ok(volunteer.length >= 2, `Expected at least 2 volunteer entries, got ${volunteer.length}`);
-
-    // Then buildMetaResume must propagate all of this
-    const meta = buildMetaResume(result, "test-id", "Sean Hogg");
-    assert.ok(meta.work.length >= 5, "metaResume.work should have all entries");
-    assert.equal(meta.education.length, 2, "metaResume.education should have 2 entries");
-    assert.ok(meta.volunteer.length >= 2, "metaResume.volunteer should have entries");
   });
 });
 
@@ -819,14 +605,5 @@ describe("parseResumeWithRegex — Sean Hogg 2022-11 PDF", () => {
         `Page footer leaked into parsed output: "${n}"`,
       );
     }
-  });
-
-  it("buildMetaResume round-trip preserves all counts", () => {
-    const meta = buildMetaResume(parsed, "sean-hogg-pdf", "Sean Hogg");
-    assert.equal(meta.work.length, 9);
-    assert.equal(meta.education.length, 2);
-    assert.equal(meta.skills.length, 10);
-    assert.ok(meta.certificates.length >= 12);
-    assert.equal(meta.awards.length, 1);
   });
 });

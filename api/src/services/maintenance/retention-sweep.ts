@@ -19,7 +19,7 @@
  * generic; the configs are data.
  *
  * Tables explicitly NOT in this list (audit-required or user-facing):
- *   - points_ledger / point_redemptions / usage_ledger (financial audit)
+ *   - wallet_ledger / point_redemptions / usage_ledger (financial audit)
  *   - external_email_messages (user inbox; the user expects persistence)
  *
  * Notifications were initially excluded too, but at millions-of-users
@@ -36,6 +36,7 @@
 
 import { sql } from "drizzle-orm";
 import { getDb } from "../../db/index.js";
+import { SHARE_LINK_ORPHAN_SQL } from "../../db/schema/shareLinks.js";
 
 export interface RetentionPolicy {
   /** Postgres table name (NOT the Drizzle TS export name). */
@@ -139,13 +140,20 @@ export const RETENTION_POLICIES: readonly RetentionPolicy[] = [
   { table: "bot_block_events",   ageColumns: ["created_at"], retentionDays: 30,  batchSize: 5000 },
   { table: "login_events",       ageColumns: ["created_at"], retentionDays: 180, batchSize: 5000 },
 
-  // One-time auth tokens/codes — dead the moment they expire (every row
-  // carries an expiry; used rows expire too). One day of grace keeps a
-  // just-expired link explainable in support.
-  { table: "two_factor_codes",          ageColumns: ["expires_at"], retentionDays: 1, batchSize: 5000 },
-  { table: "magic_link_tokens",         ageColumns: ["expires_at"], retentionDays: 1, batchSize: 5000 },
-  { table: "email_verification_tokens", ageColumns: ["expires_at"], retentionDays: 1, batchSize: 5000 },
-  { table: "password_reset_tokens",     ageColumns: ["expires_at"], retentionDays: 1, batchSize: 5000 },
+  // One-time auth tokens/codes of every purpose (auth_tokens, W3-B 0591) —
+  // dead the moment they expire (every row carries an expiry; used rows
+  // expire too). One day of grace keeps a just-expired link explainable in
+  // support. idx_auth_tokens_expires backs the age scan.
+  { table: "auth_tokens",               ageColumns: ["expires_at"], retentionDays: 1, batchSize: 5000 },
+
+  // Share links whose subject is gone (W3-A, mig 0583). share_links is
+  // polymorphic, so the per-kind FK cascades the six old tables had (deck,
+  // résumé, job, project, owner deleted → links deleted) are done
+  // immediately by AFTER DELETE triggers on each subject table (mig 0650);
+  // this policy is only the backstop for anything a trigger missed.
+  // retentionDays 0 = any age; the scope is the whole test. The table is
+  // small (one row per link a person minted) — no created_at index needed.
+  { table: "share_links",       ageColumns: ["created_at"], retentionDays: 0, batchSize: 1000, scope: SHARE_LINK_ORPHAN_SQL },
 
   // Deliberately NOT here (W1-B review, 2026-10-17):
   //   - artifact_views streams other than listing_view: lifetime counts

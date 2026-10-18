@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import type { MediaKind } from "@shared/media-kinds";
+import { mediaKindIsDocument, type MediaKind } from "@shared/media-kinds";
 import type { User } from "@/lib/auth";
 import type { StudioProject } from "@/lib/services/studio-service";
 import { useAuthGateState } from "@/lib/hooks/use-auth-gate-state";
@@ -174,7 +174,7 @@ export function useClaimOnReturn({
     }
     // Document drafts need their runtime hydrated before the save reads it;
     // Timeline kinds seed `state` synchronously so they're always ready.
-    if (currentMediaKind === "document" && !documentStateHydrated) return;
+    if (mediaKindIsDocument(currentMediaKind) && !documentStateHydrated) return;
     claimDoneRef.current = true;
     const reason = peekPendingStudioClaim()?.reason ?? "save";
     void (async () => {

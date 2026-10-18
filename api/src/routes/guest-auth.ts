@@ -13,10 +13,10 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb } from "../db/index.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { createIpRateLimiter, getClientIp } from "../middleware/rateLimiter.js";
 import { adoptGuestAccount, createGuestAccount } from "../services/auth/guest-accounts.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const guestAuthRoutes = new Hono<AppEnv>();
 
@@ -29,7 +29,7 @@ const guestCreateLimiter = createIpRateLimiter({
 });
 
 guestAuthRoutes.post("/", guestCreateLimiter, async (c) => {
-  const account = await createGuestAccount(getDb(), {
+  const account = await createGuestAccount({
     ipAddress: getClientIp(c),
     userAgent: c.req.header("user-agent") ?? null,
   });
@@ -38,15 +38,12 @@ guestAuthRoutes.post("/", guestCreateLimiter, async (c) => {
 
 const AdoptSchema = z.object({ guestToken: z.string().min(20).max(4096) });
 
-guestAuthRoutes.post("/adopt", authMiddleware, async (c) => {
+guestAuthRoutes.post("/adopt", authMiddleware, validateJson(AdoptSchema, () => error("VALIDATION_ERROR", "guestToken is required."), { emptyBody: null }), async (c) => {
   const user = c.var.user;
   if (!user || user.guest) {
     return c.json(error("FORBIDDEN", "Sign in to a full account to claim guest work."), 403);
   }
-  const parsed = AdoptSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "guestToken is required."), 400);
-  }
-  const result = await adoptGuestAccount(getDb(), parsed.data.guestToken, user.sub);
+  const body = c.req.valid("json");
+  const result = await adoptGuestAccount(body.guestToken, user.sub);
   return c.json(success(result));
 });

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
-import { success } from "../types/index.js";
+import { success, error } from "../types/index.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { parsePublicSearchParams } from "../services/search/publicSearchParams.js";
 import { paginatePublicSearch, runPublicSearch } from "../services/search/PublicSearchService.js";
@@ -12,6 +12,8 @@ import {
   listSavedSearches,
   runRecruiterSearch,
 } from "../services/search/RecruiterSearchService.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const searchRoutes = new Hono<AppEnv>();
 
@@ -31,13 +33,11 @@ searchRoutes.get("/public", async (c) => {
 // POST /api/search/recruiter
 // Supports: Boolean operators (AND / OR / NOT), quoted phrases, skill filters,
 // experience level, location, and saved-search CRUD.
-searchRoutes.post("/recruiter", async (c) => {
-  const userId = c.var.user?.sub;
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = RecruiterSearchSchema.safeParse(body);
-  if (!parsed.success) return c.json({ error: { code: "VALIDATION_ERROR" } }, 400);
+searchRoutes.post("/recruiter", validateJson(RecruiterSearchSchema, () => error("VALIDATION_ERROR", "VALIDATION_ERROR")), async (c) => {
+  const userId = c.var.userId;
+  const body = c.req.valid("json");
 
-  const result = await runRecruiterSearch(parsed.data, userId, (c.env ?? {}) as Env);
+  const result = await runRecruiterSearch(body, userId, (c.env ?? {}) as Env);
   return c.json(success(result), 200);
 });
 
@@ -47,25 +47,21 @@ searchRoutes.post("/recruiter", async (c) => {
 // DELETE /api/search/saved/:id — delete
 
 searchRoutes.get("/saved", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json({ error: { code: "UNAUTHORIZED" } }, 401);
+  const userId = requireUser(c);
   const rows = await listSavedSearches(userId);
   return c.json(success(rows), 200);
 });
 
-searchRoutes.post("/saved", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json({ error: { code: "UNAUTHORIZED" } }, 401);
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = SavedSearchSchema.safeParse(body);
-  if (!parsed.success) return c.json({ error: { code: "VALIDATION_ERROR" } }, 400);
+searchRoutes.post("/saved", validateJson(SavedSearchSchema, () => error("VALIDATION_ERROR", "VALIDATION_ERROR")), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
 
   // Closes gap-register #766: enforce Free-tier 3-saved-search cap that was
   // previously marketing-only on the Pricing page.
   const blocked = await servicesProcessor.enforce(c, "saved_search");
   if (blocked) return blocked;
 
-  const row = await createSavedSearch(userId, parsed.data);
+  const row = await createSavedSearch(userId, body);
 
   servicesProcessor.meterEvent(c, "saved_search", { id: row?.id });
 
@@ -81,16 +77,7 @@ searchRoutes.post("/saved", async (c) => {
 });
 
 searchRoutes.delete("/saved/:id", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json({ error: { code: "UNAUTHORIZED" } }, 401);
+  const userId = requireUser(c);
   await deleteSavedSearch(c.req.param("id"), userId);
   return c.json(success(true), 200);
 });
-
-// Fallback for other search routes (not implemented)
-searchRoutes.all("*", (c) =>
-  c.json(
-    { error: { code: "NOT_IMPLEMENTED", message: "Search routes coming soon" } },
-    501,
-  ),
-);

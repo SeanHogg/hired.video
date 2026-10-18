@@ -373,8 +373,6 @@ export const paidMediaConversions = pgTable(
 );
 
 // ─── Type exports ─────────────────────────────────────────────────────────
-export type PaidMediaConnection = typeof paidMediaConnections.$inferSelect;
-export type NewPaidMediaConnection = typeof paidMediaConnections.$inferInsert;
 export type PaidMediaAccount = typeof paidMediaAccounts.$inferSelect;
 export type NewPaidMediaAccount = typeof paidMediaAccounts.$inferInsert;
 export type PaidMediaCampaign = typeof paidMediaCampaigns.$inferSelect;

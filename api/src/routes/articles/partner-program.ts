@@ -2,16 +2,17 @@
  * Writer Partner Program (#173): opt-in, opt-out, status.
  */
 import { Hono } from "hono";
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import type { AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
-import { getDb, schema } from "../../db/index.js";
-import { LegalRepository } from "../../repositories/legalRepository.js";
-import { uid } from "./shared.js";
-
-const { articles, partnerProgramOptIns, partnerProgramBalances } = schema;
+import {
+  getPartnerProgramStatus,
+  optInToPartnerProgram,
+  optOutOfPartnerProgram,
+} from "../../services/articles/partner-program.js";
+import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const articlePartnerProgramRoutes = new Hono<AppEnv>();
 
@@ -26,79 +27,26 @@ export const OptInSchema = z.object({
   proSubscriptionId: UuidLikeSchema.optional(),
 });
 
-articlePartnerProgramRoutes.post("/partner-program/opt-in", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = OptInSchema.safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid opt-in payload"), 400);
-  const db = getDb();
-
-  // Deactivate any existing active row before inserting the new one
-  // (unique partial index guards a second active row at the DB level).
-  await db.update(partnerProgramOptIns)
-    .set({ isActive: false, deactivatedAt: new Date(), deactivatedReason: "superseded" })
-    .where(and(
-      eq(partnerProgramOptIns.userId, userId),
-      eq(partnerProgramOptIns.isActive, true),
-    ));
-
-  const [inserted] = await db.insert(partnerProgramOptIns).values({
-    userId,
-    legalDocsAccepted: parsed.data.legalDocsAccepted as any,
+articlePartnerProgramRoutes.post("/partner-program/opt-in", validateJson(OptInSchema, () => error("VALIDATION_ERROR", "Invalid opt-in payload")), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  const optIn = await optInToPartnerProgram(userId, {
+    legalDocsAccepted: body.legalDocsAccepted,
+    proSubscriptionId: body.proSubscriptionId,
     consentIp: c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? null,
-    consentUa: c.req.header("user-agent") ?? null,
-    proSubscriptionId: parsed.data.proSubscriptionId,
-    isActive: true,
-  } as any).returning();
-
-  // Write a legal_document_acceptances row for every doc id in the
-  // payload so the audit trail mirrors the gift-card / voice-clone
-  // consent flow. Soft-fails on a missing doc — the opt-in row is the
-  // primary record.
-  const ip = c.req.header("cf-connecting-ip") ?? null;
-  const userAgent = c.req.header("user-agent") ?? null;
-  await new LegalRepository(db).insertAcceptancesSoft(
-    parsed.data.legalDocsAccepted.map((docId) => ({
-      userId,
-      documentId: docId,
-      kind: "partner_program_terms",
-      version: "snapshot",
-      ip,
-      userAgent,
-      context: "partner_program_opt_in",
-    })),
-    "articles partner-program opt-in",
-  );
-
-  return c.json(success({ optIn: inserted }), 201);
+    acceptanceIp: c.req.header("cf-connecting-ip") ?? null,
+    userAgent: c.req.header("user-agent") ?? null,
+  });
+  return c.json(success({ optIn }), 201);
 });
 
 articlePartnerProgramRoutes.post("/partner-program/opt-out", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-  await db.update(partnerProgramOptIns)
-    .set({ isActive: false, deactivatedAt: new Date(), deactivatedReason: "user_opted_out" })
-    .where(and(
-      eq(partnerProgramOptIns.userId, userId),
-      eq(partnerProgramOptIns.isActive, true),
-    ));
+  const userId = requireUser(c);
+  await optOutOfPartnerProgram(userId);
   return c.json(success({ deactivated: true }), 200);
 });
 
 articlePartnerProgramRoutes.get("/partner-program/status", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-  const [optIn] = await db.select().from(partnerProgramOptIns)
-    .where(and(
-      eq(partnerProgramOptIns.userId, userId),
-      eq(partnerProgramOptIns.isActive, true),
-    ))
-    .limit(1);
-  const [balance] = await db.select().from(partnerProgramBalances)
-    .where(eq(partnerProgramBalances.userId, userId))
-    .limit(1);
-  return c.json(success({ optIn: optIn ?? null, balance: balance ?? null }), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getPartnerProgramStatus(userId)), 200);
 });

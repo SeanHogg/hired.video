@@ -5,139 +5,48 @@
 // subdomain with custom logo/colours and their own candidate pool + analytics.
 
 import { Hono } from "hono";
-import { and, desc, eq, count, sql } from "drizzle-orm";
-import { z } from "zod";
-import type { Variables, AppEnv } from "../types/index.js";
+import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
+import {
+  TenantSchema,
+  createTenant,
+  getOwnedTenant,
+  getPortalBranding,
+  getTenantAnalytics,
+  listTenants,
+  recordDemoRequest,
+  updateOwnedTenant,
+} from "../services/platform/whitelabelTenants.js";
 
 export const whitelabelRoutes = new Hono<AppEnv>();
-
-function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
-
-function getTenantsTable() {
-  return (schema as any).whitelabelTenants ?? null;
-}
-
-// ─── Schema helpers (runtime checks because table may not exist yet) ──────────
-
-const TenantSchema = z.object({
-  name: z.string().min(1).max(255),
-  subdomain: z.string().min(2).max(63).regex(/^[a-z0-9-]+$/),
-  tenantType: z.enum(["agency", "university", "staffing_firm", "bootcamp"]).default("agency"),
-  // Branding
-  primaryColor: z.string().max(20).optional(),
-  logoUrl: z.string().url().optional().nullable(),
-  heroHeadline: z.string().max(200).optional().nullable(),
-  // Billing
-  planTier: z.enum(["starter", "pro", "enterprise"]).default("starter"),
-  monthlyFeeUsd: z.number().min(0).optional(),
-  // Contact
-  contactEmail: z.string().email().optional(),
-  website: z.string().url().optional().nullable(),
-});
 
 // ─── Tenant management ────────────────────────────────────────────────────────
 
 /** GET /api/whitelabel/tenants — admin: list all tenants */
 whitelabelRoutes.get("/tenants", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
-  const db = getDb();
-  const table = getTenantsTable();
-  if (!table) return c.json(success([]), 200);
-
-  const rows = await db
-    .select({
-      id: table.id,
-      name: table.name,
-      subdomain: table.subdomain,
-      tenantType: table.tenantType,
-      planTier: table.planTier,
-      isActive: table.isActive,
-      createdAt: table.createdAt,
-    })
-    .from(table)
-    .orderBy(desc(table.createdAt))
-    .limit(100);
-
-  return c.json(success(rows), 200);
+  requireUser(c);
+  return c.json(success(await listTenants()), 200);
 });
 
 /** POST /api/whitelabel/tenants — create a white-label tenant */
-whitelabelRoutes.post("/tenants", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
-  const body = await c.req.json().catch(() => null);
-  const parsed = TenantSchema.safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid tenant data", parsed.error.flatten()), 400);
-
-  const db = getDb();
-  const table = getTenantsTable();
-  if (!table) {
-    // Stub: capture as a marketing lead
-    await db.insert(schema.marketingLeads).values({
-      email: parsed.data.contactEmail ?? `admin+${parsed.data.subdomain}@stub`,
-      source: "whitelabel_signup",
-      metadata: parsed.data as any,
-    } as any).onConflictDoNothing().catch(() => undefined);
-    return c.json(success({ id: `stub-${Date.now()}`, ...parsed.data, ownerId: userId, isActive: true }), 201);
-  }
-
-  // Check subdomain uniqueness
-  const [existing] = await db.select({ id: table.id }).from(table).where(eq(table.subdomain, parsed.data.subdomain)).limit(1);
-  if (existing) return c.json(error("CONFLICT", `Subdomain '${parsed.data.subdomain}' is already taken`), 409);
-
-  const [tenant] = (await db.insert(table).values({
-    ownerId: userId,
-    ...parsed.data,
-    isActive: true,
-  } as any).returning()) as any[];
-
+whitelabelRoutes.post("/tenants", validateJson(TenantSchema, (e) => error("VALIDATION_ERROR", "Invalid tenant data", e.flatten()), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const tenant = await createTenant(userId, c.req.valid("json"));
   return c.json(success(tenant), 201);
 });
 
 /** GET /api/whitelabel/tenants/:id — get tenant details */
 whitelabelRoutes.get("/tenants/:id", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
-  const db = getDb();
-  const table = getTenantsTable();
-  if (!table) return c.json(error("NOT_FOUND", "Tenant not found"), 404);
-
-  const [tenant] = await db.select().from(table)
-    .where(and(eq(table.id, c.req.param("id")), eq(table.ownerId, userId)))
-    .limit(1);
-  if (!tenant) return c.json(error("NOT_FOUND", "Tenant not found"), 404);
-  return c.json(success(tenant), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getOwnedTenant(c.req.param("id"), userId)), 200);
 });
 
 /** PATCH /api/whitelabel/tenants/:id — update branding/settings */
-whitelabelRoutes.patch("/tenants/:id", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = TenantSchema.partial().safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid update data", parsed.error.flatten()), 400);
-
-  const db = getDb();
-  const table = getTenantsTable();
-  if (!table) return c.json(error("NOT_FOUND", "Tenant not found"), 404);
-
-  const [existing] = await db.select({ id: table.id })
-    .from(table).where(and(eq(table.id, c.req.param("id")), eq(table.ownerId, userId))).limit(1);
-  if (!existing) return c.json(error("NOT_FOUND", "Tenant not found"), 404);
-
-  const [updated] = await db.update(table)
-    .set({ ...parsed.data, updatedAt: new Date() })
-    .where(eq(table.id, existing.id))
-    .returning();
+whitelabelRoutes.patch("/tenants/:id", validateJson(TenantSchema.partial(), (e) => error("VALIDATION_ERROR", "Invalid update data", e.flatten())), async (c) => {
+  const userId = requireUser(c);
+  const updated = await updateOwnedTenant(c.req.param("id"), userId, c.req.valid("json"));
   return c.json(success(updated), 200);
 });
 
@@ -145,27 +54,7 @@ whitelabelRoutes.patch("/tenants/:id", async (c) => {
 
 /** GET /api/whitelabel/portal/:subdomain — public: get portal branding by subdomain */
 whitelabelRoutes.get("/portal/:subdomain", async (c) => {
-  const db = getDb();
-  const table = getTenantsTable();
-  if (!table) return c.json(error("NOT_FOUND", "Portal not found"), 404);
-
-  const [tenant] = await db
-    .select({
-      id: table.id,
-      name: table.name,
-      subdomain: table.subdomain,
-      tenantType: table.tenantType,
-      primaryColor: table.primaryColor,
-      logoUrl: table.logoUrl,
-      heroHeadline: table.heroHeadline,
-      website: table.website,
-    })
-    .from(table)
-    .where(and(eq(table.subdomain, c.req.param("subdomain")), eq(table.isActive, true)))
-    .limit(1);
-
-  if (!tenant) return c.json(error("NOT_FOUND", "Portal not found"), 404);
-  return c.json(success(tenant), 200);
+  return c.json(success(await getPortalBranding(c.req.param("subdomain"))), 200);
 });
 
 // ─── Placement analytics for university portals (#79) ─────────────────────────
@@ -176,45 +65,15 @@ whitelabelRoutes.get("/portal/:subdomain", async (c) => {
  * Returns: placement rate, avg time-to-hire, top employers, salary outcomes.
  */
 whitelabelRoutes.get("/tenants/:id/analytics", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
-  const db = getDb();
-  const table = getTenantsTable();
-  if (!table) return c.json(success({ placements: 0, note: "Analytics not available" }), 200);
-
-  const [tenant] = await db.select({ id: table.id, ownerId: table.ownerId })
-    .from(table).where(eq(table.id, c.req.param("id"))).limit(1);
-  if (!tenant || tenant.ownerId !== userId) return c.json(error("FORBIDDEN", "Access denied"), 403);
-
-  // Aggregate placements for candidates referred through this tenant
-  const [placementRow] = await db
-    .select({ total: count(), avgSalary: sql<number>`avg(${schema.placements.salary})::numeric` })
-    .from(schema.placements)
-    .catch(() => [{ total: 0, avgSalary: null }]);
-
-  const [activeJobsRow] = await db
-    .select({ total: count() })
-    .from(schema.jobItems)
-    .where(eq(schema.jobItems.isActive, true))
-    .catch(() => [{ total: 0 }]);
-
-  return c.json(success({
-    tenantId: tenant.id,
-    placements: Number(placementRow?.total ?? 0),
-    avgPlacementSalary: placementRow?.avgSalary ? Number(placementRow.avgSalary).toFixed(0) : null,
-    activeJobListings: Number(activeJobsRow?.total ?? 0),
-    // In production: filter by tenantId on job/user join table
-    generatedAt: new Date().toISOString(),
-  }), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getTenantAnalytics(c.req.param("id"), userId)), 200);
 });
 
 // ─── B2B sales motion (#80) ───────────────────────────────────────────────────
 
 /**
  * POST /api/whitelabel/demo-request
- * Prospect fills out "Request a demo" form. Creates a marketing lead + queues
- * a sales notification.
+ * Prospect fills out "Request a demo" form. Creates a marketing lead.
  */
 whitelabelRoutes.post("/demo-request", async (c) => {
   const body = await c.req.json().catch(() => ({}));
@@ -222,21 +81,14 @@ whitelabelRoutes.post("/demo-request", async (c) => {
   const company: string = String(body.company ?? "").trim();
   if (!email.includes("@")) return c.json(error("VALIDATION_ERROR", "Valid email is required"), 400);
 
-  const db = getDb();
-  await db.insert(schema.marketingLeads).values({
+  await recordDemoRequest({
     email,
-    source: "demo_request",
-    metadata: {
-      company,
-      name: body.name ?? null,
-      useCase: body.useCase ?? null,
-      teamSize: body.teamSize ?? null,
-      phone: body.phone ?? null,
-    } as any,
-  } as any).onConflictDoUpdate({
-    target: [(schema.marketingLeads as any).email],
-    set: { source: "demo_request", metadata: { company } } as any,
-  }).catch(() => undefined);
+    company,
+    name: body.name,
+    useCase: body.useCase,
+    teamSize: body.teamSize,
+    phone: body.phone,
+  });
 
   return c.json(success({
     message: "Demo request received. Our team will reach out within 1 business day.",
@@ -278,7 +130,3 @@ whitelabelRoutes.get("/roi-calculator", (c) => {
     ],
   }), 200);
 });
-
-whitelabelRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Whitelabel endpoint not found" } }, 404),
-);

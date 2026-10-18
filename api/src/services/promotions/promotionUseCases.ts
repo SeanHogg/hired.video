@@ -27,6 +27,7 @@ import { screenPromotion } from "./promotionScreening.js";
 import { notifyPromotionOutcome } from "./promotionNotifications.js";
 import { invalidateReach, projectReach } from "./promotionReach.js";
 import * as repo from "./promotionRepository.js";
+import { DomainError } from "../../domains/errors.js";
 
 export type PromotionEnv = SocialEnv & LLMEnv;
 
@@ -41,14 +42,22 @@ export type PromotionErrorKind =
   | "NOT_FOUND"
   | "NOT_REVIEWABLE";
 
-export class PromotionError extends Error {
-  constructor(
-    public readonly kind: PromotionErrorKind,
-    message: string,
-    /** Envelope `details` (CONSENT_REQUIRED carries `{ reason }`). */
-    public readonly details?: unknown,
-  ) {
-    super(message);
+const PROMOTION_ERROR_STATUS: Record<PromotionErrorKind, 403 | 404 | 409 | 422 | 503> = {
+  PROJECT_NOT_FOUND: 404,
+  NOT_FOUND: 404,
+  VIDEO_NOT_READY: 409,
+  VIDEO_UNBRANDED: 409,
+  INVALID_VARIANT: 422,
+  CONSENT_REQUIRED: 403,
+  ALREADY_SUBMITTED: 409,
+  NOT_REVIEWABLE: 409,
+  LANE_NOT_READY: 503,
+};
+
+/** A DomainError; `details` is the envelope's (CONSENT_REQUIRED carries `{ reason }`). */
+export class PromotionError extends DomainError {
+  constructor(public readonly kind: PromotionErrorKind, message: string, details?: unknown) {
+    super(PROMOTION_ERROR_STATUS[kind], kind, message, details);
     this.name = "PromotionError";
   }
 }

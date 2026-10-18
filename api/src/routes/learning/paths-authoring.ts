@@ -34,12 +34,10 @@ import {
   updatePath,
   type SlotResult,
 } from "../../services/learning/learning-path-use-cases.js";
+import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const pathAuthoringRoutes = new Hono<AppEnv>();
-
-function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
 
 function roles(c: any): string[] {
   const r = c.var.user?.roles;
@@ -90,12 +88,10 @@ function slotResponse(c: any, result: SlotResult<unknown>, okStatus: 200 | 201, 
 
 // ── Paths ─────────────────────────────────────────────────────────────────
 
-pathAuthoringRoutes.post("/paths", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const parsed = CreatePathSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return invalid(c, parsed.error.issues);
-  const created = await createPath(userId, roles(c), parsed.data);
+pathAuthoringRoutes.post("/paths", validateJson(CreatePathSchema, (e, c) => invalid(c, e.issues)), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  const created = await createPath(userId, roles(c), body);
   if (!created) {
     return c.json(error(
       "AUTHORING_NOT_ELIGIBLE",
@@ -106,25 +102,21 @@ pathAuthoringRoutes.post("/paths", async (c) => {
 });
 
 pathAuthoringRoutes.get("/paths/me", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   return c.json(success(await listMyPaths(userId)), 200);
 });
 
 pathAuthoringRoutes.get("/paths/:id", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const detail = await getMyPath(userId, c.req.param("id"));
   if (!detail) return c.json(error("NOT_FOUND", "Path not found"), 404);
   return c.json(success(detail), 200);
 });
 
-pathAuthoringRoutes.patch("/paths/:id", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const parsed = UpdatePathSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return invalid(c, parsed.error.issues);
-  const result = await updatePath(userId, c.req.param("id"), parsed.data);
+pathAuthoringRoutes.patch("/paths/:id", validateJson(UpdatePathSchema, (e, c) => invalid(c, e.issues)), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  const result = await updatePath(userId, c.req.param("id"), body);
   if (result.kind === "no_courses") {
     return c.json(error("VALIDATION_ERROR", "Attach at least one course before publishing."), 400);
   }
@@ -133,8 +125,7 @@ pathAuthoringRoutes.patch("/paths/:id", async (c) => {
 });
 
 pathAuthoringRoutes.delete("/paths/:id", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const deleted = await deletePath(userId, c.req.param("id"));
   if (!deleted) return c.json(error("NOT_FOUND", "Path not found"), 404);
   return c.json(success({ deleted }), 200);
@@ -142,23 +133,19 @@ pathAuthoringRoutes.delete("/paths/:id", async (c) => {
 
 // ── Path → courses ────────────────────────────────────────────────────────
 
-pathAuthoringRoutes.post("/paths/:id/courses", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const parsed = AttachCourseSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return invalid(c, parsed.error.issues);
-  const result = await attachCourse(userId, c.req.param("id"), parsed.data);
+pathAuthoringRoutes.post("/paths/:id/courses", validateJson(AttachCourseSchema, (e, c) => invalid(c, e.issues)), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  const result = await attachCourse(userId, c.req.param("id"), body);
   return slotResponse(c, result, 201, (v) => v);
 });
 
-pathAuthoringRoutes.patch("/paths/:id/courses/:courseId", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const parsed = UpdatePathCourseSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return invalid(c, parsed.error.issues);
+pathAuthoringRoutes.patch("/paths/:id/courses/:courseId", validateJson(UpdatePathCourseSchema, (e, c) => invalid(c, e.issues)), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
   const patch: { displayOrder?: number; isRequired?: boolean } = {};
-  if ("displayOrder" in parsed.data) patch.displayOrder = parsed.data.displayOrder;
-  if ("isRequired" in parsed.data) patch.isRequired = parsed.data.isRequired;
+  if ("displayOrder" in body) patch.displayOrder = body.displayOrder;
+  if ("isRequired" in body) patch.isRequired = body.isRequired;
   if (Object.keys(patch).length === 0) {
     return c.json(error("VALIDATION_ERROR", "No fields to update"), 400);
   }
@@ -167,8 +154,7 @@ pathAuthoringRoutes.patch("/paths/:id/courses/:courseId", async (c) => {
 });
 
 pathAuthoringRoutes.delete("/paths/:id/courses/:courseId", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const result = await detachCourse(userId, c.req.param("id"), c.req.param("courseId"));
   return slotResponse(c, result, 200, (v) => ({ deleted: v }));
 });

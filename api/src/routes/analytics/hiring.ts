@@ -16,6 +16,7 @@ import {
   computeHiringMetric,
   isHiringMetric,
 } from "../../services/analytics/hiringAnalytics.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 
 export const analyticsHiringRoutes = new Hono<AppEnv>();
 
@@ -26,14 +27,14 @@ analyticsHiringRoutes.get(
     if (!isHiringMetric(metric)) {
       return c.json(error("VALIDATION_ERROR", `metric must be one of: ${HIRING_METRICS.join(", ")}`), 400);
     }
-    if (!c.var.user?.sub) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+    requireUser(c);
     const proFeature = HIRING_METRIC_PRO_FEATURE[metric];
     return proFeature ? requirePro(proFeature)(c, next) : next();
   },
   async (c) => {
     const metric = c.req.query("metric");
     if (!isHiringMetric(metric)) return c.json(error("VALIDATION_ERROR", "Invalid metric"), 400);
-    const data = await computeHiringMetric(metric, c.var.user.sub, {
+    const data = await computeHiringMetric(metric, c.var.userId, {
       from: c.req.query("from"),
       to: c.req.query("to"),
     });

@@ -8,18 +8,14 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb } from "../db/index.js";
-import { CareerResilienceRepository } from "../repositories/careerResilienceRepository.js";
+import { findSharedResilienceReport, listResilienceReports } from "../services/career/resilienceReports.js";
 
 export const careerRoutes = new Hono<AppEnv>();
 
-const repo = () => new CareerResilienceRepository(getDb());
-
-careerRoutes.get("/resilience-reports", async (c) => c.json(success(await repo().listForUser(c.var.user.sub as string))));
+careerRoutes.get("/resilience-reports", async (c) => c.json(success(await listResilienceReports(c.var.userId))));
 
 careerRoutes.get("/resilience-report/:token", async (c) => {
-  const report = await repo().findByShareToken(c.req.param("token"));
+  const report = await findSharedResilienceReport(c.req.param("token"));
   if (!report) return c.json(error("NOT_FOUND", "Report not found"), 404);
-  const { userId: _uid, ...publicReport } = report;
-  return c.json(success(publicReport));
+  return c.json(success(report));
 });

@@ -17,16 +17,13 @@
  */
 
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import {
   resolveEmbedRequest,
   EmbedAuthError,
 } from "../services/company/embed.js";
-import { getDb } from "../db/index.js";
-import { studioProjects, videos } from "../db/schema/index.js";
-import { cdnUrl } from "../utils/cdn.js";
+import { resolveEmbeddableVideo, type EmbeddableVideo } from "../services/studio/embeddable-video.js";
 import { escapeHtml } from "../../../shared/html-escape.js";
 import {
   PeopleOpsService,
@@ -45,14 +42,6 @@ const EMBED_RATE_WINDOW_SECONDS = 60;
 
 function readKey(c: { req: { header: (n: string) => string | undefined; query: (n: string) => string | undefined } }): string {
   return c.req.header("x-hired-embed-key") || c.req.query("key") || "";
-}
-
-function mapEmbedError(c: any, e: unknown) {
-  if (e instanceof EmbedAuthError) {
-    const status = e.code === "INVALID_KEY" || e.code === "EXPIRED" ? 401 : 403;
-    return c.json(error(e.code, e.message), status as 401 | 403);
-  }
-  return c.json(error("INTERNAL_ERROR", "Embed render failed"), 500);
 }
 
 /** SAFE projection — embeds never expose comp/PII. */
@@ -80,92 +69,88 @@ embedApiRoutes.get("/v1/:view", async (c) => {
   if (!EMBED_VIEW_KEYS.includes(view)) {
     return c.json(error("NOT_FOUND", "Unknown embed view"), 404);
   }
-  try {
-    const embedKey = readKey(c);
-    // Per-key soft rate limit (#1828) — key on the unguessable prefix + view so
-    // one key hammering one surface is throttled without affecting other keys.
-    const rl = await checkRateLimit(
-      `embed:${embedKey.slice(0, 16)}:${view}`,
-      EMBED_RATE_LIMIT,
-      EMBED_RATE_WINDOW_SECONDS,
-    );
-    if (!rl.allowed) {
-      c.header("Retry-After", String(rl.retryAfterSeconds));
-      return c.json(error("RATE_LIMITED", "Too many requests for this embed key"), 429);
-    }
-    const { scope } = await resolveEmbedRequest(embedKey, view, {
-      origin: c.req.header("origin") ?? null,
-    });
-    const svc = buildService();
-    if (view === "roster") {
-      const [employees, hierarchy, metrics] = await Promise.all([
-        svc.listEmployees(scope),
-        svc.getHierarchy(scope),
-        svc.getTeamMetrics(scope),
-      ]);
-      const mapNode = (n: { employee: RosterEmployee; reports: any[] }): unknown => ({
-        employee: safeEmployee(n.employee),
-        reports: n.reports.map(mapNode),
-      });
-      return c.json(
-        success({
-          displayName: scope.displayName,
-          metrics: {
-            totalHeadcount: metrics.totalHeadcount,
-            activeHeadcount: metrics.activeHeadcount,
-            departmentBreakdown: metrics.departmentBreakdown,
-          },
-          employees: employees.map(safeEmployee),
-          hierarchy: hierarchy.map(mapNode),
-        }),
-      );
-    }
-    if (view === "team-health") {
-      const health = await computeTeamHealth(scope);
-      return c.json(success({ displayName: scope.displayName, ...health }));
-    }
-    if (view === "goals") {
-      const [goals, employees] = await Promise.all([svc.listGoals(scope), svc.listEmployees(scope)]);
-      const nameOf = new Map(employees.map((e) => [e.id, `${e.firstName} ${e.lastName}`.trim()]));
-      return c.json(
-        success({
-          displayName: scope.displayName,
-          goals: goals.map((g) => ({
-            id: g.id,
-            title: g.title,
-            ownerName: nameOf.get(g.employeeId) ?? "—",
-            status: g.status,
-            priority: g.priority,
-            progress: g.progress,
-            atRisk: g.atRisk,
-            dueDate: g.dueDate,
-          })),
-        }),
-      );
-    }
-    // one-on-ones
-    const [sessions, employees] = await Promise.all([
-      svc.listOneOnOnes(scope),
+  const embedKey = readKey(c);
+  // Per-key soft rate limit (#1828) — key on the unguessable prefix + view so
+  // one key hammering one surface is throttled without affecting other keys.
+  const rl = await checkRateLimit(
+    `embed:${embedKey.slice(0, 16)}:${view}`,
+    EMBED_RATE_LIMIT,
+    EMBED_RATE_WINDOW_SECONDS,
+  );
+  if (!rl.allowed) {
+    c.header("Retry-After", String(rl.retryAfterSeconds));
+    return c.json(error("RATE_LIMITED", "Too many requests for this embed key"), 429);
+  }
+  const { scope } = await resolveEmbedRequest(embedKey, view, {
+    origin: c.req.header("origin") ?? null,
+  });
+  const svc = buildService();
+  if (view === "roster") {
+    const [employees, hierarchy, metrics] = await Promise.all([
       svc.listEmployees(scope),
+      svc.getHierarchy(scope),
+      svc.getTeamMetrics(scope),
     ]);
+    const mapNode = (n: { employee: RosterEmployee; reports: any[] }): unknown => ({
+      employee: safeEmployee(n.employee),
+      reports: n.reports.map(mapNode),
+    });
+    return c.json(
+      success({
+        displayName: scope.displayName,
+        metrics: {
+          totalHeadcount: metrics.totalHeadcount,
+          activeHeadcount: metrics.activeHeadcount,
+          departmentBreakdown: metrics.departmentBreakdown,
+        },
+        employees: employees.map(safeEmployee),
+        hierarchy: hierarchy.map(mapNode),
+      }),
+    );
+  }
+  if (view === "team-health") {
+    const health = await computeTeamHealth(scope);
+    return c.json(success({ displayName: scope.displayName, ...health }));
+  }
+  if (view === "goals") {
+    const [goals, employees] = await Promise.all([svc.listGoals(scope), svc.listEmployees(scope)]);
     const nameOf = new Map(employees.map((e) => [e.id, `${e.firstName} ${e.lastName}`.trim()]));
     return c.json(
       success({
         displayName: scope.displayName,
-        sessions: sessions.map((s) => ({
-          id: s.id,
-          supervisorName: nameOf.get(s.supervisorId) ?? "—",
-          participantName: nameOf.get(s.participantId) ?? "—",
-          scheduledDate: s.scheduledDate,
-          status: s.status,
-          duration: s.duration,
-          agendaCount: Array.isArray(s.agenda) ? s.agenda.length : 0,
+        goals: goals.map((g) => ({
+          id: g.id,
+          title: g.title,
+          ownerName: nameOf.get(g.employeeId) ?? "—",
+          status: g.status,
+          priority: g.priority,
+          progress: g.progress,
+          atRisk: g.atRisk,
+          dueDate: g.dueDate,
         })),
       }),
     );
-  } catch (e) {
-    return mapEmbedError(c, e);
   }
+  // one-on-ones
+  const [sessions, employees] = await Promise.all([
+    svc.listOneOnOnes(scope),
+    svc.listEmployees(scope),
+  ]);
+  const nameOf = new Map(employees.map((e) => [e.id, `${e.firstName} ${e.lastName}`.trim()]));
+  return c.json(
+    success({
+      displayName: scope.displayName,
+      sessions: sessions.map((s) => ({
+        id: s.id,
+        supervisorName: nameOf.get(s.supervisorId) ?? "—",
+        participantName: nameOf.get(s.participantId) ?? "—",
+        scheduledDate: s.scheduledDate,
+        status: s.status,
+        duration: s.duration,
+        agendaCount: Array.isArray(s.agenda) ? s.agenda.length : 0,
+      })),
+    }),
+  );
 });
 
 // ── Assets (loader + frame) ───────────────────────────────────────────────────
@@ -315,42 +300,6 @@ function FRAME_HTML(view: string, key: string): string {
 //                            markup (no SPA bundle, no second fetch).
 // Unlike the company-data surfaces above, a published video is public
 // marketing content, so no key is required. Private projects are refused.
-
-interface EmbeddableVideo {
-  title: string;
-  videoUrl: string | null;
-  youtubeVideoId: string | null;
-  thumbnailUrl: string | null;
-}
-
-/** Resolve a Studio project id to its rendered, publicly-embeddable
- *  video. Returns null when the project is missing, private, or not yet
- *  rendered (an external iframe can't run the live canvas renderer). */
-async function resolveEmbeddableVideo(id: string): Promise<EmbeddableVideo | null> {
-  const db = getDb();
-  const [row] = await db
-    .select({
-      title: videos.title,
-      r2Key: videos.r2Key,
-      youtubeVideoId: videos.youtubeVideoId,
-      thumbnailUrl: videos.thumbnailUrl,
-      privacyStatus: videos.privacyStatus,
-    })
-    .from(studioProjects)
-    .leftJoin(videos, eq(videos.id, studioProjects.videoId))
-    .where(eq(studioProjects.id, id))
-    .limit(1);
-  if (!row) return null;
-  if (row.privacyStatus === "private") return null;
-  const videoUrl = row.r2Key ? cdnUrl(row.r2Key) : null;
-  if (!videoUrl && !row.youtubeVideoId) return null; // not rendered yet
-  return {
-    title: row.title ?? "Video",
-    videoUrl,
-    youtubeVideoId: row.youtubeVideoId ?? null,
-    thumbnailUrl: row.thumbnailUrl ?? null,
-  };
-}
 
 const VIDEO_LOADER_JS = `(function(){
   var s = document.currentScript;

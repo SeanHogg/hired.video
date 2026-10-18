@@ -22,7 +22,7 @@
  * Per the standing DRY rule (`feedback_extract_on_duplication`),
  * every consumer that "plays a studio project on a page" should mount
  * THIS, not `<StudioVideoSurface>` directly. Adding a new kind is one
- * branch here, and the existing consumers (EntityMedia rail, the /v/
+ * `KIND_PLAYERS` entry here, and the existing consumers (EntityMedia rail, the /v/
  * public watch page, ProfileHeaderVideos, HeroVideoSpotlight,
  * ResumeProfileLayout, etc.) inherit the right surface automatically
  * — that's how we stop showing "Video is being processed" on a
@@ -35,12 +35,14 @@
  * fetch). Non-Timeline kinds ignore eagerReady — they need the
  * parallel-column state which is always on the project object.
  */
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { StudioProject } from "@/lib/services/studio-service";
 import type { GameState } from "@shared/game-state";
 import { firstLayerPixels, type ImageState } from "@shared/image-state";
 import { firstFramePixels, type AnimationState } from "@shared/animation-state";
-import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
+import { mediaKindNotReadyKey, type MediaKind } from "@shared/media-kinds";
 import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 import type { PublicVideoReady } from "@/lib/studio/public-video-schema";
 
@@ -67,15 +69,41 @@ interface ProjectPlayerProps {
   >;
 }
 
-export default function ProjectPlayer({
-  project,
-  gameZoom = 1,
-  eagerReady,
-  videoSurfaceProps,
-}: ProjectPlayerProps) {
-  const mediaKind = (project.mediaKind ?? "video") as MediaKind;
+interface KindPlayerArgs {
+  project: StudioProject;
+  gameZoom: number;
+  t: TFunction;
+}
 
-  if (mediaKind === "game") {
+/** A still-raster play surface (image / animation): the project's pixels
+ *  as an `<img>` whose alt falls back to the kind's localized `labelKey`,
+ *  else the kind-tagged unready placeholder. */
+function rasterKindPlayer(
+  mediaKind: MediaKind,
+  labelKey: string,
+  pixelsOf: (project: StudioProject) => string | null | undefined,
+): (args: KindPlayerArgs) => ReactNode {
+  return function RasterKindPlayer({ project, t }) {
+    const pixels = pixelsOf(project);
+    if (pixels) {
+      return (
+        <img
+          src={pixels}
+          alt={project.title ?? t(labelKey)}
+          className="h-full w-full object-contain bg-muted"
+          draggable={false}
+        />
+      );
+    }
+    return <KindUnreadyPlaceholder mediaKind={mediaKind} />;
+  };
+}
+
+/** Non-Timeline kinds that own a dedicated play surface. Kinds absent here
+ *  (video / podcast / voice / comic / …) fall through to the Timeline
+ *  `<StudioVideoSurface>` path below. Adding a kind = one entry here. */
+const KIND_PLAYERS: Partial<Record<MediaKind, (args: KindPlayerArgs) => ReactNode>> = {
+  game: ({ project, gameZoom }) => {
     const gameState = (project.gameState ?? null) as GameState | null;
     return (
       <Suspense fallback={<KindUnreadyPlaceholder mediaKind="game" />}>
@@ -87,7 +115,7 @@ export default function ProjectPlayer({
         />
       </Suspense>
     );
-  }
+  },
 
   // Image projects (#932) are static rasters — no time axis, no audio,
   // no playback runtime. The consumer-side play surface is a plain
@@ -96,26 +124,17 @@ export default function ProjectPlayer({
   // a future server-side flatten endpoint would render the project to
   // a single PNG at render-time — until then the bottom layer is the
   // honest preview.
-  if (mediaKind === "image") {
-    // Prefer the project's rendered output (the studio's flattened
-    // thumbnail) and fall back to the bottom layer's raw pixels. Projects
-    // imported/generated without per-layer state still carry a render, so
-    // showing it beats a misleading "isn't ready yet" placeholder.
-    const pixels =
+  // Prefer the project's rendered output (the studio's flattened
+  // thumbnail) and fall back to the bottom layer's raw pixels. Projects
+  // imported/generated without per-layer state still carry a render, so
+  // showing it beats a misleading "isn't ready yet" placeholder.
+  image: rasterKindPlayer(
+    "image",
+    "studio.projectPlayer.drawingAlt",
+    (project) =>
       (project.thumbnailUrl ?? null) ||
-      firstLayerPixels(project.imageState as ImageState | null | undefined);
-    if (pixels) {
-      return (
-        <img
-          src={pixels}
-          alt={project.title ?? "Drawing"}
-          className="h-full w-full object-contain bg-muted"
-          draggable={false}
-        />
-      );
-    }
-    return <KindUnreadyPlaceholder mediaKind="image" />;
-  }
+      firstLayerPixels(project.imageState as ImageState | null | undefined),
+  ),
 
   // Animation projects (#1003) — preview the first painted frame as a
   // still raster, mirroring the image-kind path. A full client-side
@@ -123,32 +142,34 @@ export default function ProjectPlayer({
   // own preview overlay is the canonical playback. Falling back to a
   // kind-tagged placeholder keeps the surface coherent before the
   // user has painted anything.
-  if (mediaKind === "animation") {
-    // Same render-first fallback as the image kind — the studio render
-    // (thumbnail) wins over the first painted frame.
-    const pixels =
+  // Same render-first fallback as the image kind — the studio render
+  // (thumbnail) wins over the first painted frame.
+  animation: rasterKindPlayer(
+    "animation",
+    "studio.projectPlayer.animationAlt",
+    (project) =>
       (project.thumbnailUrl ?? null) ||
-      firstFramePixels(project.animationState as AnimationState | null | undefined);
-    if (pixels) {
-      return (
-        <img
-          src={pixels}
-          alt={project.title ?? "Animation"}
-          className="h-full w-full object-contain bg-muted"
-          draggable={false}
-        />
-      );
-    }
-    return <KindUnreadyPlaceholder mediaKind="animation" />;
-  }
+      firstFramePixels(project.animationState as AnimationState | null | undefined),
+  ),
 
   // CAD (#930) — vector drafting kind with no public viewer runtime
   // yet (the live editor IS the canonical surface). Show a kind-
   // tagged placeholder so the watch page doesn't fall through to
   // the video "is being processed" message.
-  if (mediaKind === "cad") {
-    return <KindUnreadyPlaceholder mediaKind="cad" />;
-  }
+  cad: () => <KindUnreadyPlaceholder mediaKind="cad" />,
+};
+
+export default function ProjectPlayer({
+  project,
+  gameZoom = 1,
+  eagerReady,
+  videoSurfaceProps,
+}: ProjectPlayerProps) {
+  const { t } = useTranslation();
+  const mediaKind = (project.mediaKind ?? "video") as MediaKind;
+
+  const renderKind = KIND_PLAYERS[mediaKind];
+  if (renderKind) return renderKind({ project, gameZoom, t });
 
   // Every Timeline-runtime kind (video / podcast / voice / comic)
   // delegates to the existing video surface. The surface already
@@ -181,11 +202,11 @@ export default function ProjectPlayer({
  *  for non-video kinds and (b) implied a render was in flight when
  *  the project may simply have no public surface. */
 function KindUnreadyPlaceholder({ mediaKind }: { mediaKind: MediaKind }) {
-  const label = MEDIA_KIND_UI[mediaKind].badgeLabel;
+  const { t } = useTranslation();
   return (
     <div className="flex h-full w-full items-center justify-center bg-black/5 border border-border rounded-xl">
-      <p className="text-muted-foreground text-sm px-4 text-center">
-        This {label.toLowerCase()} isn't ready to preview yet. Check back soon.
+      <p className="text-muted-foreground text-sm px-4 text-center break-words">
+        {t(mediaKindNotReadyKey(mediaKind))}
       </p>
     </div>
   );

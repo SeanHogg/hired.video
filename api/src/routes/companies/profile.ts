@@ -27,13 +27,13 @@ import { ipCountryFromCtx } from "../../services/analytics/artifactView.js";
 import { hashClientIp } from "../../utils/crypto.js";
 import { toHandlerResult } from "../../handlers/shared.js";
 import { requireUser, sendHandlerResult } from "../helpers/routerHelpers.js";
-import { envRecord, settle, viewerId } from "./shared.js";
+import { envRecord, settle } from "./shared.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const companyProfileRoutes = new Hono<AppEnv>();
 
 companyProfileRoutes.post("/", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => ({}));
   if (!body.name) return c.json(error("BAD_REQUEST", "Company name is required"), 400);
 
@@ -42,7 +42,7 @@ companyProfileRoutes.post("/", async (c) => {
   const blocked = await servicesProcessor.enforce(c, "company_db_write");
   if (blocked) return blocked;
 
-  const { row, meta } = await createCompany(auth.userId, body, envRecord(c));
+  const { row, meta } = await createCompany(userId, body, envRecord(c));
   servicesProcessor.meterEvent(c, "company_db_write", { id: row?.id });
   return c.json(success(meta), 201);
 });
@@ -55,7 +55,7 @@ companyProfileRoutes.get("/:id", async (c) => {
     c,
     await toHandlerResult(
       getCompanyDetail(c.req.param("id"), {
-        userId: viewerId(c),
+        userId: c.var.userId,
         ipHash: hashClientIp(c),
         ipCountry: ipCountryFromCtx(c),
         referrer: c.req.header("referer") ?? c.req.header("referrer") ?? null,
@@ -93,7 +93,7 @@ companyProfileRoutes.post("/:id/clone", async (c) => {
   const blocked = await servicesProcessor.enforce(c, "company_db_write");
   if (blocked) return blocked;
 
-  const { row, meta } = await cloneCompany(original.data, c.var.user!.sub);
+  const { row, meta } = await cloneCompany(original.data, c.var.userId);
   servicesProcessor.meterEvent(c, "company_db_write", { id: row?.id });
   return c.json(success(meta), 201);
 });
@@ -101,15 +101,12 @@ companyProfileRoutes.post("/:id/clone", async (c) => {
 // POST /extract — AI-extract company details from page HTML, deduplicating
 // against existing company_profiles by slug / name and merging blank fields
 // into a match.
-companyProfileRoutes.post("/extract", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
+companyProfileRoutes.post("/extract", validateJson(ExtractCompanySchema, undefined, { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
 
-  const body = await c.req.json().catch(() => null);
-  const parsed = ExtractCompanySchema.safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+  const body = c.req.valid("json");
 
-  const extracted = await settle(c, extractCompanyFromHtml(c.env, c.var.user, parsed.data.html));
+  const extracted = await settle(c, extractCompanyFromHtml(c.env, c.var.user, body.html));
   if ("response" in extracted) return extracted.response;
 
   const { slug, merged } = await mergeIntoExistingCompany(extracted.data);
@@ -120,7 +117,7 @@ companyProfileRoutes.post("/extract", async (c) => {
   const blocked = await servicesProcessor.enforce(c, "company_db_write");
   if (blocked) return blocked;
 
-  const created = await createExtractedCompany(auth.userId, extracted.data, slug);
+  const created = await createExtractedCompany(userId, extracted.data, slug);
   servicesProcessor.meterEvent(c, "company_db_write", { id: created?.id });
   return c.json(success({ company: created, duplicate: false }), 201);
 });

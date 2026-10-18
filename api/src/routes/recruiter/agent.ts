@@ -34,7 +34,7 @@ agentRoutes.post("/agent/source", async (c) => {
 
 /** GET /agent/runs — past sourcing runs for this recruiter */
 agentRoutes.get("/agent/runs", async (c) => {
-  return c.json(responseEnvelope(await listAgentRuns(c.get("user").sub)), 200);
+  return c.json(responseEnvelope(await listAgentRuns(c.var.userId)), 200);
 });
 
 /** GET /agent/runs/:id — one run with full results */
@@ -62,7 +62,7 @@ agentRoutes.post("/agent/followups/schedule", async (c) => {
 });
 
 agentRoutes.get("/agent/followups", async (c) => {
-  const rows = await listFollowups(c.get("user").sub, c.req.query("status") ?? null);
+  const rows = await listFollowups(c.var.userId, c.req.query("status") ?? null);
   return c.json(responseEnvelope(rows), 200);
 });
 

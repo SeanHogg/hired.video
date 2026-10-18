@@ -40,12 +40,14 @@ void randomUUID; // kept for any direct uses below
 function makeDeps(seed: {
   applicationFormAnswers?: any[];
   savedJobs?: any[];
+  jobApplications?: any[];
   answerCache?: any[];
   jobItems?: any[];
 } = {}): AutofillDeps & {
   _state: {
     applicationFormAnswers: any[];
     savedJobs: any[];
+    jobApplications: any[];
     answerCache: any[];
     jobItems: any[];
   };
@@ -53,6 +55,7 @@ function makeDeps(seed: {
   const fake = buildFakeDb({
     application_form_answers: seed.applicationFormAnswers ?? [],
     saved_jobs: seed.savedJobs ?? [],
+    job_applications: seed.jobApplications ?? [],
     answer_cache: seed.answerCache ?? [],
     job_items: seed.jobItems ?? [],
   });
@@ -62,6 +65,9 @@ function makeDeps(seed: {
   });
   Object.defineProperty(state, "savedJobs", {
     get: () => state.saved_jobs,
+  });
+  Object.defineProperty(state, "jobApplications", {
+    get: () => state.job_applications,
   });
   Object.defineProperty(state, "answerCache", {
     get: () => state.answer_cache,
@@ -118,7 +124,9 @@ describe("handleSaveSubmission", () => {
   it("advances the linked saved_jobs pipeline to 'applied' when submitting", async () => {
     const savedJobId = randomUUID();
     const deps = makeDeps({
-      savedJobs: [{ id: savedJobId, userId: "user-1", status: "interested" }],
+      // saved_jobs no longer carries status (W3-D2): the tracker lifecycle
+      // lives on job_applications, which submitting must create as 'applied'.
+      savedJobs: [{ id: savedJobId, userId: "user-1", jobId: "job-1" }],
     });
     await handleSaveSubmission(deps, "user-1", {
       fields: validFields,
@@ -126,15 +134,18 @@ describe("handleSaveSubmission", () => {
       status: "submitted",
       savedJobId,
     });
-    const saved = deps._state.savedJobs[0];
-    assert.equal(saved.status, "applied");
-    assert.ok(saved.appliedAt instanceof Date);
+    assert.equal(deps._state.jobApplications.length, 1);
+    const app = deps._state.jobApplications[0];
+    assert.equal(app.userId, "user-1");
+    assert.equal(app.jobId, "job-1");
+    assert.equal(app.status, "applied");
+    assert.ok(app.appliedAt instanceof Date);
   });
 
   it("does NOT advance saved_jobs when status is 'draft' (even if savedJobId supplied)", async () => {
     const savedJobId = randomUUID();
     const deps = makeDeps({
-      savedJobs: [{ id: savedJobId, userId: "user-1", status: "interested" }],
+      savedJobs: [{ id: savedJobId, userId: "user-1", jobId: "job-1" }],
     });
     await handleSaveSubmission(deps, "user-1", {
       fields: validFields,
@@ -142,7 +153,7 @@ describe("handleSaveSubmission", () => {
       status: "draft",
       savedJobId,
     });
-    assert.equal(deps._state.savedJobs[0].status, "interested", "saved job untouched for drafts");
+    assert.equal(deps._state.jobApplications.length, 0, "no application recorded for drafts");
   });
 
   it("returns 401 for anonymous callers (nothing written)", async () => {

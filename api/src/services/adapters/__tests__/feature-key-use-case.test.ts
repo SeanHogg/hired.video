@@ -14,7 +14,6 @@ import {
   FEATURE_KEY_USE_CASE,
   USE_CASE_PROFILES,
   featureKeysForUseCase,
-  useCaseForFeatureKey,
 } from "../providers.js";
 
 describe("FEATURE_KEY_USE_CASE registry", () => {
@@ -28,9 +27,9 @@ describe("FEATURE_KEY_USE_CASE registry", () => {
   });
 
   it("buckets all three career_360 feature keys under the career_360 profile (#457)", () => {
-    assert.equal(useCaseForFeatureKey("career_360_suggest"), "career_360");
-    assert.equal(useCaseForFeatureKey("career_360_plan"), "career_360");
-    assert.equal(useCaseForFeatureKey("career_360_evaluate"), "career_360");
+    assert.equal(FEATURE_KEY_USE_CASE["career_360_suggest"], "career_360");
+    assert.equal(FEATURE_KEY_USE_CASE["career_360_plan"], "career_360");
+    assert.equal(FEATURE_KEY_USE_CASE["career_360_evaluate"], "career_360");
     assert.deepEqual(featureKeysForUseCase("career_360"), [
       "career_360_evaluate",
       "career_360_plan",
@@ -48,12 +47,12 @@ describe("FEATURE_KEY_USE_CASE registry", () => {
   });
 
   it("returns undefined for an unregistered feature key", () => {
-    assert.equal(useCaseForFeatureKey("not_a_real_feature_key"), undefined);
+    assert.equal(FEATURE_KEY_USE_CASE["not_a_real_feature_key"], undefined);
   });
 
   it("meters posting-agent captions on their own profile, not linkedin_post (#2300)", () => {
-    assert.equal(useCaseForFeatureKey("posting_agent_caption"), "posting_agent");
+    assert.equal(FEATURE_KEY_USE_CASE["posting_agent_caption"], "posting_agent");
     assert.ok("posting_agent" in USE_CASE_PROFILES);
-    assert.equal(useCaseForFeatureKey("linkedin_post_gen"), "linkedin_post");
+    assert.equal(FEATURE_KEY_USE_CASE["linkedin_post_gen"], "linkedin_post");
   });
 });

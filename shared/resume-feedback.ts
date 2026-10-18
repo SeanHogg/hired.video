@@ -20,7 +20,7 @@
  *     owner's design layers. Each annotation may carry an inline
  *     `suggestedEdit` the owner accepts per-item.
  *   • Proposed draft — the reviewer can submit a full edited copy as a
- *     `resume_versions` row flagged `proposalStatus = 'proposed'`; the owner
+ *     `entity_versions` résumé row flagged `proposalStatus = 'proposed'`; the owner
  *     accepts (applies it to `resume_information.content`) or rejects it.
  *
  * Anchoring is by stable section-item `id` (the `ResumeSectionMeta.referenceId`
@@ -96,7 +96,7 @@ export const FEEDBACK_COLORS = [
   "#e9d5ff", // purple
 ] as const;
 
-// ── Proposed-draft status (rides on resume_versions) ─────────────────────────
+// ── Proposed-draft status (rides on entity_versions) ─────────────────────────
 
 export const PROPOSAL_STATUSES = ["proposed", "accepted", "rejected"] as const;
 export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];

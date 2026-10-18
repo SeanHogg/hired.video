@@ -9,7 +9,7 @@
  * [shared/reviews/subject-descriptors.ts](../../../../shared/reviews/subject-descriptors.ts)
  * for the type registry that drives both validation and form rendering.
  *
- * `review_comments` is threaded via `parent_id` so users can carry on
+ * Review comments (`comments`, subject 'review' — comments.ts) are threaded via `parent_id` so users can carry on
  * a discussion under a review (the "feed item" experience). Owners of
  * the underlying subject are flagged with `is_subject_owner` so the UI
  * can highlight their replies.
@@ -27,7 +27,6 @@ import {
   jsonb,
   index,
   uniqueIndex,
-  type AnyPgColumn,
   check,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";

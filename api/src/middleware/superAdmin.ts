@@ -61,16 +61,16 @@ export function pickModelForCaller(
 export const superAdminMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const user = c.var.user;
   if (!user) {
-    return c.json({ error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
+    return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   }
 
   if (!isSuperAdmin(user)) {
-    return c.json({ error: { code: "FORBIDDEN", message: "SuperAdmin access required" } }, 403);
+    return c.json(error("FORBIDDEN", "SuperAdmin access required"), 403);
   }
 
   // Block impersonation tokens from hitting superadmin endpoints
   if (user.emu === true) {
-    return c.json({ error: { code: "FORBIDDEN", message: "Impersonation tokens cannot access SuperAdmin endpoints" } }, 403);
+    return c.json(error("FORBIDDEN", "Impersonation tokens cannot access SuperAdmin endpoints"), 403);
   }
 
   return next();

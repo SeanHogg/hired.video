@@ -14,7 +14,7 @@
  *   phone_cents        prepaid phone-usage balance, in cents
  *
  * The CHECK constraints in the migrations and the Drizzle schema enumerate
- * these same lists — guarded by api/src/repositories/wallet/__tests__/wallet-migration.test.ts.
+ * these same lists — guarded by api/src/repositories/__tests__/wallet-migration.test.ts.
  */
 
 export const WALLET_OWNER_KINDS = ["user", "company"] as const;

@@ -1,13 +1,8 @@
 import type { AIToolDef } from "./types.js";
 
-/** Job tools — read, list public, save, match.
- *
- * Endpoint paths corrected from the legacy frontend registry:
- *
- *   `/api/Job/{id}`            → `/api/jobs/:id`
- *   `/api/Job/GetPublicJobs`   → `/api/jobs/public` (see jobs.ts:208)
- *   `/api/Job/save`            → `/api/jobs/` (POST — see jobs.ts:169)
- */
+/** Job tools — read, list public, save, match. Endpoints are the /api/jobs
+ *  resource (api/src/routes/jobs/: listing.ts serves /public, manage.ts
+ *  serves POST / and GET /:id). */
 export const jobGet: AIToolDef = {
   id: "job-get",
   description: "Get a job posting by id.",

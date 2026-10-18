@@ -26,10 +26,10 @@ import {
 } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { durationMinSecParts } from "@/lib/format";
 
 import StatCard from "./StatCard";
 import EngagementHeatmap from "./EngagementHeatmap";
@@ -38,43 +38,36 @@ import ReferrerBreakdown from "./ReferrerBreakdown";
 import ViewerList from "./ViewerList";
 import type { ArtifactKind, ArtifactMetrics } from "@/lib/analytics/artifact-metrics";
 
-function formatDuration(sec: number, t: TFunction): string {
-  const minutes = Math.floor(sec / 60);
-  const seconds = Math.round(sec % 60);
-  return minutes > 0
-    ? t("analytics.metrics.durationMinSec", { minutes, seconds })
-    : t("analytics.metrics.durationSec", { seconds });
+interface EngagementLabelKeys {
+  watchTimeKey: string;
+  percentKey: string;
 }
+
+const READ_LABELS: EngagementLabelKeys = { watchTimeKey: "analytics.metrics.avgReadTime", percentKey: "analytics.metrics.avgPctRead" };
+const LISTEN_LABELS: EngagementLabelKeys = { watchTimeKey: "analytics.metrics.avgListenTime", percentKey: "analytics.metrics.avgPctListened" };
+const VIEW_LABELS: EngagementLabelKeys = { watchTimeKey: "analytics.metrics.avgViewTime", percentKey: "analytics.metrics.avgPctViewed" };
+const PLAY_LABELS: EngagementLabelKeys = { watchTimeKey: "analytics.metrics.avgPlayTime", percentKey: "analytics.metrics.avgPctPlayed" };
+const WATCH_LABELS: EngagementLabelKeys = { watchTimeKey: "headings.avgWatchTime", percentKey: "headings.avgPctWatched" };
 
 /** Per-kind copy mapping for the engagement StatCards. ONE table feeds
  *  both the "Avg Watch Time" tile and the "Avg % Watched" tile so adding
  *  a new kind needs one edit, not two. Kinds not listed fall through to
- *  the generic "Watch Time" / "% Watched" labels. Returns i18n keys. */
-function engagementLabelKeysFor(kind: ArtifactKind | undefined): {
-  watchTimeKey: string;
-  percentKey: string;
-} {
-  switch (kind) {
-    case "resume":
-    case "article":
-      return { watchTimeKey: "analytics.metrics.avgReadTime", percentKey: "analytics.metrics.avgPctRead" };
-    case "podcast":
-    case "voice":
-      return { watchTimeKey: "analytics.metrics.avgListenTime", percentKey: "analytics.metrics.avgPctListened" };
-    case "image":
-    case "comic":
-    case "cad":
-    case "job":
-    case "profile":
-      return { watchTimeKey: "analytics.metrics.avgViewTime", percentKey: "analytics.metrics.avgPctViewed" };
-    case "game":
-      return { watchTimeKey: "analytics.metrics.avgPlayTime", percentKey: "analytics.metrics.avgPctPlayed" };
-    case "animation":
-    case "video":
-    case "channel":
-    default:
-      return { watchTimeKey: "headings.avgWatchTime", percentKey: "headings.avgPctWatched" };
-  }
+ *  the generic "Watch Time" / "% Watched" labels. Values are i18n keys. */
+const ENGAGEMENT_LABEL_KEYS: Partial<Record<ArtifactKind, EngagementLabelKeys>> = {
+  resume: READ_LABELS,
+  article: READ_LABELS,
+  podcast: LISTEN_LABELS,
+  voice: LISTEN_LABELS,
+  image: VIEW_LABELS,
+  comic: VIEW_LABELS,
+  cad: VIEW_LABELS,
+  job: VIEW_LABELS,
+  profile: VIEW_LABELS,
+  game: PLAY_LABELS,
+};
+
+function engagementLabelKeysFor(kind: ArtifactKind | undefined): EngagementLabelKeys {
+  return (kind && ENGAGEMENT_LABEL_KEYS[kind]) || WATCH_LABELS;
 }
 
 interface Props {
@@ -118,6 +111,12 @@ export default function MetricsPanel({
   // so adding a new kind is one entry — no two-place updates.
   const { watchTimeKey, percentKey } = engagementLabelKeysFor(kind);
   const noValue = t("analytics.metrics.noValue");
+  const watchParts = hasWatchTime ? durationMinSecParts(metrics!.avgWatchSec!) : null;
+  const watchTimeText = watchParts
+    ? watchParts.minutes > 0
+      ? t("analytics.metrics.durationMinSec", watchParts)
+      : t("analytics.metrics.durationSec", { seconds: watchParts.seconds })
+    : noValue;
 
   const duration = durationSec ?? metrics?.heatmap?.length ?? 0;
   const heatmapUnit = metrics?.heatmapUnit ?? "s";
@@ -169,7 +168,7 @@ export default function MetricsPanel({
         )}
         <StatCard
           title={t(watchTimeKey)}
-          value={hasWatchTime ? formatDuration(metrics!.avgWatchSec!, t) : noValue}
+          value={watchTimeText}
           icon={Clock}
           loading={loading}
         />

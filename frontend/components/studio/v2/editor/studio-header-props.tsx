@@ -10,7 +10,7 @@ import { Download } from "lucide-react";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type StudioHeader from "@/components/workspace/studio/StudioHeader";
 import type { HeaderPreview } from "@/components/workspace/WorkspaceHeader";
-import { mediaKindUsesCanvasStateAuthoring, type MediaKind } from "@shared/media-kinds";
+import { mediaKindUsesCanvasStateAuthoring, type MediaKind, mediaKindIsDocument, mediaKindIsStillImage, mediaKindIsPrimaryVideo } from "@shared/media-kinds";
 import type { StudioPublication } from "@/lib/services/studio-service";
 import { uploadImage } from "@/lib/services/upload-service";
 import { isSuperAdminFromToken } from "@/lib/auth-claims";
@@ -99,7 +99,7 @@ export function studioHeaderProps({
     getVideoScript: () =>
       // The publish payload is the kind's reusable snapshot: the
       // content-stripped DocumentState for documents, else a VideoScript.
-      currentMediaKind === "document" ? stripDocumentContent(documentState) : canvasStateToScript(state),
+      mediaKindIsDocument(currentMediaKind) ? stripDocumentContent(documentState) : canvasStateToScript(state),
     // Template thumbnail (#854) — CanvasState-authoring kinds only.
     captureCurrentFrame: mediaKindUsesCanvasStateAuthoring(currentMediaKind)
       ? async () => {
@@ -125,7 +125,7 @@ export function studioHeaderProps({
       publishHandlers: {
         ...publisher.menu,
         // Image → asset library (#933); unbound rows self-disable.
-        ...(currentMediaKind === "image" && !savingImageToLibrary && !!imageCanvas
+        ...(mediaKindIsStillImage(currentMediaKind) && !savingImageToLibrary && !!imageCanvas
           ? { "asset-library": handleSaveImageToLibrary }
           : {}),
         // Course lesson (#160) needs a real project id.
@@ -147,7 +147,7 @@ export function studioHeaderProps({
     onInvite: world3d ? () => dialogs.setGameInviteOpen(true) : null,
     post: canPostKind(currentMediaKind)
       ? {
-          label: currentMediaKind === "video" ? t("studio.focus.postVideo") : t("studio.focus.post"),
+          label: mediaKindIsPrimaryVideo(currentMediaKind) ? t("studio.focus.postVideo") : t("studio.focus.post"),
           onClick: () => setShareOpen((o) => !o),
           expanded: shareOpen,
         }

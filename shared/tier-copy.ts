@@ -79,7 +79,6 @@ export interface PersonalizeResponse {
 // tier that may USE them. Free callers see Pro templates marked locked.
 // Reuses the shared `TIER_ID` so renaming a tier touches one place.
 
-export const AD_TEMPLATE_TIER = TIER_ID;
 export type AdTemplateTier = TierId;
 
 /** Standard upgrade CTA URL — single source so badge links + 402 envelope

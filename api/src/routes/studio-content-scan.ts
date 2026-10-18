@@ -8,14 +8,13 @@
  *          it just uploaded; scanned in one vision call, then the video is
  *          re-evaluated → { scan }
  */
-import { Hono, type Context } from "hono";
+import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { UuidLikeSchema } from "../../../shared/validation.js";
-import { WorkspaceForbiddenError } from "../services/studio/workspace.js";
 import { createExplicitScanDeps } from "../services/moderation/explicit/deps.js";
 import { MAX_FRAMES } from "../services/moderation/explicit/videoScan.js";
-import { ProjectScanError, getProjectScanStatus, submitProjectFrames } from "../services/moderation/explicit/projectScan.js";
+import { getProjectScanStatus, submitProjectFrames } from "../services/moderation/explicit/projectScan.js";
 import type { ImageInput } from "../services/moderation/explicit/imageClassifier.js";
 import { readFormFiles } from "../utils/multipart.js";
 
@@ -24,19 +23,9 @@ export const studioContentScanRoutes = new Hono<AppEnv>();
 /** A sampled frame is a small JPEG (≤ 640px wide); anything bigger is not one. */
 const MAX_FRAME_BYTES = 600_000;
 
-function fail(c: Context, err: unknown): Response {
-  if (err instanceof ProjectScanError) return c.json(error(err.code, err.message), err.code === "NOT_FOUND" ? 404 : 409);
-  if (err instanceof WorkspaceForbiddenError) return c.json(error("FORBIDDEN", err.message), 403);
-  throw err;
-}
-
 studioContentScanRoutes.get("/projects/:id/public-scan", async (c) => {
   if (!UuidLikeSchema.safeParse(c.req.param("id")).success) return c.json(error("NOT_FOUND", "Project not found"), 404);
-  try {
-    return c.json(success({ scan: await getProjectScanStatus(c.var.user.sub, c.req.param("id")) }));
-  } catch (err) {
-    return fail(c, err);
-  }
+  return c.json(success({ scan: await getProjectScanStatus(c.var.userId, c.req.param("id")) }));
 });
 
 studioContentScanRoutes.post("/projects/:id/public-scan", async (c) => {
@@ -50,13 +39,9 @@ studioContentScanRoutes.post("/projects/:id/public-scan", async (c) => {
   const frames: ImageInput[] = await Promise.all(
     parts.map(async (p) => ({ bytes: new Uint8Array(await p.arrayBuffer()), mime: "image/jpeg" })),
   );
-  try {
-    const scan = await submitProjectFrames(
-      { actorId: c.var.user.sub, projectId: c.req.param("id"), frames },
-      createExplicitScanDeps(c.env),
-    );
-    return c.json(success({ scan }));
-  } catch (err) {
-    return fail(c, err);
-  }
+  const scan = await submitProjectFrames(
+    { actorId: c.var.userId, projectId: c.req.param("id"), frames },
+    createExplicitScanDeps(c.env),
+  );
+  return c.json(success({ scan }));
 });

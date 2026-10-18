@@ -47,10 +47,6 @@ export const SCREENING_ITEM_TYPES = [
 
 export type ScreeningItemType = (typeof SCREENING_ITEM_TYPES)[number];
 
-export function isScreeningItemType(v: unknown): v is ScreeningItemType {
-  return typeof v === "string" && (SCREENING_ITEM_TYPES as readonly string[]).includes(v);
-}
-
 /**
  * Items the candidate must always supply before a request can complete, no
  * matter what the template author selected. Enforced server-side at request

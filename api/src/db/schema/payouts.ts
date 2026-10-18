@@ -138,7 +138,8 @@ export const payoutLedgerEntries = pgTable(
     uniqueIndex("uq_payout_ledger_accrual_source")
       .on(t.sourceKind, t.sourceId)
       .where(sql`${t.kind} = 'accrual' AND ${t.sourceId} IS NOT NULL`),
-    check("payout_ledger_entries_source_kind_check", sql`${t.sourceKind} IS NULL OR ${t.sourceKind} IN ('service_order', 'voice_clone_license', 'gift_card', 'platform_fee', 'creator_payout', 'manual_adjustment', 'commission', 'partner_program')`),
+    // = shared/creator-earnings.ts PAYOUT_LEDGER_SOURCE_KINDS (migration 0593).
+    check("payout_ledger_entries_source_kind_check", sql`${t.sourceKind} IS NULL OR ${t.sourceKind} IN ('service_order', 'voice_clone_license', 'gift_card', 'platform_fee', 'creator_payout', 'manual_adjustment', 'commission', 'partner_program', 'promo_project', 'promo_extra_revision', 'template_license', 'course_enrollment', 'article_pool_distribution', 'article', 'timesheet', 'task')`),
     check("payout_ledger_entries_kind_check", sql`${t.kind} IN ('accrual', 'payout', 'reversal', 'adjustment')`),
     index("idx_payout_ledger_entries_created_by_user_id").on(t.createdByUserId),
   ],

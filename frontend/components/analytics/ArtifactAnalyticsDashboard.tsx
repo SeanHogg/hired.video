@@ -37,31 +37,36 @@ interface Props {
 
 /** Map the polymorphic kind onto the <MetricsPanel> kind enum. Both
  *  share the same string surface for the studio + scroll-text kinds;
- *  company / studio_template / service collapse to "channel" so the
- *  panel uses generic copy. The exhaustive switch is load-bearing —
- *  adding a kind to ARTIFACT_KINDS without a branch here is a compile
- *  error rather than a silent runtime fallback. */
+ *  company / studio_template / service / post collapse to "channel" so the
+ *  panel uses generic copy. The total `Record` is load-bearing — adding a
+ *  kind to ARTIFACT_KINDS without an entry here is a compile error rather
+ *  than a silent runtime fallback. */
+const METRICS_PANEL_KIND: Record<ArtifactKindKey, ArtifactKind> = {
+  video: "video",
+  podcast: "podcast",
+  voice: "voice",
+  animation: "animation",
+  image: "image",
+  comic: "comic",
+  // Interactive variants share their base kind's percent-viewed copy.
+  interactive_comic: "comic",
+  game: "game",
+  cad: "cad",
+  cad_3d: "cad",
+  resume: "resume",
+  article: "article",
+  // A studio document is scrollable text — same "read time" copy as an article.
+  document: "article",
+  job: "job",
+  profile: "profile",
+  company: "channel",
+  studio_template: "channel",
+  service: "channel",
+  post: "channel",
+};
+
 function metricsPanelKind(kind: ArtifactKindKey): ArtifactKind {
-  switch (kind) {
-    case "video":
-    case "podcast":
-    case "voice":
-    case "animation":
-    case "image":
-    case "comic":
-    case "game":
-    case "cad":
-    case "resume":
-    case "article":
-    case "job":
-    case "profile":
-      return kind;
-    case "company":
-    case "studio_template":
-    case "service":
-    case "post":
-      return "channel";
-  }
+  return METRICS_PANEL_KIND[kind];
 }
 
 export default function ArtifactAnalyticsDashboard({

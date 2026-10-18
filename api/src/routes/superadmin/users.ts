@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { UuidLikeSchema, UUID_LIKE_REGEX } from "../../../../shared/validation.js";
 import type { AppEnv } from "../../types/index.js";
-import { ok } from "../../utils/response.js";
 import { AdminSecurityRepository } from "../../repositories/admin/adminSecurityRepository.js";
 import {
   handleSetPlanOverride,
@@ -27,6 +26,8 @@ import {
 import { getReferredUsersGrouped } from "../../services/adminReferrals.js";
 import { assignModuleToUser, removeModuleFromUser } from "../../services/auth/adminModules.js";
 import { pausePostingAgent } from "../../services/distribution/pause-posting-agent.js";
+import { success, error } from "../../types/index.js";
+import { validateJson } from "../helpers/validate.js";
 
 const HistoryQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).default(100),
@@ -81,112 +82,104 @@ export const userMgmtRoutes = new Hono<AppEnv>();
 // ── Bulk actions ──────────────────────────────────────────────────────────────
 // Mounted above the /:id routes so `/bulk/…` can't be captured by `/:id`.
 
-userMgmtRoutes.post("/bulk/ban", async (c) => {
-  const body = BulkUserActionSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
-  const result = await bulkBanUsers(c.var.user.sub, body.data.userIds);
-  return c.json(ok(result), 200);
+userMgmtRoutes.post("/bulk/ban", validateJson(BulkUserActionSchema, (e) => error("BAD_REQUEST", e.issues[0].message)), async (c) => {
+  const body = c.req.valid("json");
+  const result = await bulkBanUsers(c.var.userId, body.userIds);
+  return c.json(success(result), 200);
 });
 
-userMgmtRoutes.post("/bulk/suspend", async (c) => {
-  const body = BulkUserActionSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
-  const result = await bulkSuspendUsers(c.var.user.sub, body.data.userIds);
-  return c.json(ok(result), 200);
+userMgmtRoutes.post("/bulk/suspend", validateJson(BulkUserActionSchema, (e) => error("BAD_REQUEST", e.issues[0].message)), async (c) => {
+  const body = c.req.valid("json");
+  const result = await bulkSuspendUsers(c.var.userId, body.userIds);
+  return c.json(success(result), 200);
 });
 
-userMgmtRoutes.post("/bulk/delete", async (c) => {
-  const body = BulkUserActionSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
-  const result = await bulkDeleteUsers(c.var.user.sub, body.data.userIds);
-  return c.json(ok(result), 200);
+userMgmtRoutes.post("/bulk/delete", validateJson(BulkUserActionSchema, (e) => error("BAD_REQUEST", e.issues[0].message)), async (c) => {
+  const body = c.req.valid("json");
+  const result = await bulkDeleteUsers(c.var.userId, body.userIds);
+  return c.json(success(result), 200);
 });
 
 userMgmtRoutes.get("/", async (c) => {
   const query = UserSearchSchema.safeParse(c.req.query());
-  if (!query.success) return c.json({ error: { code: "BAD_REQUEST", message: query.error.issues[0].message } }, 400);
-  return c.json(ok(await searchUsers(query.data)), 200);
+  if (!query.success) return c.json(error("BAD_REQUEST", query.error.issues[0].message), 400);
+  return c.json(success(await searchUsers(query.data)), 200);
 });
 
 // /stats — aggregate counts for the /admin/users summary cards. Mounted
 // before /:id so the literal segment wins the route match.
 userMgmtRoutes.get("/stats", async (c) => {
-  return c.json(ok(await getAdminUsersStats()), 200);
+  return c.json(success(await getAdminUsersStats()), 200);
 });
 
 // /referrals — referred users grouped under the affiliate who referred them
 // ("group by referrer" view). Literal segment, mounted before /:id.
 userMgmtRoutes.get("/referrals", async (c) => {
-  return c.json(ok(await getReferredUsersGrouped()), 200);
+  return c.json(success(await getReferredUsersGrouped()), 200);
 });
 
 userMgmtRoutes.get("/:id", async (c) => {
   const detail = await getUserDetail(c.req.param("id"));
-  if (!detail) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
-  return c.json(ok(detail), 200);
+  if (!detail) return c.json(error("NOT_FOUND", "User not found"), 404);
+  return c.json(success(detail), 200);
 });
 
-userMgmtRoutes.put("/:id/role", async (c) => {
-  const body = AssignRoleSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
+userMgmtRoutes.put("/:id/role", validateJson(AssignRoleSchema, (e) => error("BAD_REQUEST", e.issues[0].message)), async (c) => {
+  const body = c.req.valid("json");
 
-  const result = await assignUserRole(c.var.user.sub, c.req.param("id"), body.data.role);
-  if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
-  return c.json(ok({ userId: c.req.param("id"), role: body.data.role }), 200);
+  const result = await assignUserRole(c.var.userId, c.req.param("id"), body.role);
+  if (!result.ok) return c.json(error("NOT_FOUND", "User not found"), 404);
+  return c.json(success({ userId: c.req.param("id"), role: body.role }), 200);
 });
 
-userMgmtRoutes.put("/:id/status", async (c) => {
-  const body = SetStatusSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
+userMgmtRoutes.put("/:id/status", validateJson(SetStatusSchema, (e) => error("BAD_REQUEST", e.issues[0].message)), async (c) => {
+  const body = c.req.valid("json");
 
-  await setUserStatus(c.var.user.sub, c.req.param("id"), body.data.status);
-  return c.json(ok({ userId: c.req.param("id"), status: body.data.status }), 200);
+  await setUserStatus(c.var.userId, c.req.param("id"), body.status);
+  return c.json(success({ userId: c.req.param("id"), status: body.status }), 200);
 });
 
 // Toggle the editorial / house-author flag (users.is_system). SuperAdmin-only
 // via the SA guard the admin composite applies to the /api/admin/sa mount.
-userMgmtRoutes.put("/:id/system", async (c) => {
-  const body = SetSystemSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
+userMgmtRoutes.put("/:id/system", validateJson(SetSystemSchema, (e) => error("BAD_REQUEST", e.issues[0].message)), async (c) => {
+  const body = c.req.valid("json");
 
-  const result = await setUserSystemFlag(c.var.user.sub, c.req.param("id"), body.data.isSystem);
-  if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
-  return c.json(ok({ userId: c.req.param("id"), isSystem: body.data.isSystem }), 200);
+  const result = await setUserSystemFlag(c.var.userId, c.req.param("id"), body.isSystem);
+  if (!result.ok) return c.json(error("NOT_FOUND", "User not found"), 404);
+  return c.json(success({ userId: c.req.param("id"), isSystem: body.isSystem }), 200);
 });
 
-userMgmtRoutes.post("/:id/modules", async (c) => {
-  const body = AssignModuleSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
+userMgmtRoutes.post("/:id/modules", validateJson(AssignModuleSchema, (e) => error("BAD_REQUEST", e.issues[0].message)), async (c) => {
+  const body = c.req.valid("json");
 
-  const result = await assignModuleToUser(c.var.user.sub, c.req.param("id"), body.data.moduleId);
-  if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "Module not found" } }, 404);
-  return c.json(ok({ userId: c.req.param("id"), moduleId: body.data.moduleId, moduleName: result.moduleName }), 201);
+  const result = await assignModuleToUser(c.var.userId, c.req.param("id"), body.moduleId);
+  if (!result.ok) return c.json(error("NOT_FOUND", "Module not found"), 404);
+  return c.json(success({ userId: c.req.param("id"), moduleId: body.moduleId, moduleName: result.moduleName }), 201);
 });
 
 userMgmtRoutes.delete("/:id/modules/:moduleId", async (c) => {
-  await removeModuleFromUser(c.var.user.sub, c.req.param("id"), c.req.param("moduleId"));
-  return c.json(ok({ userId: c.req.param("id"), moduleId: c.req.param("moduleId") }), 200);
+  await removeModuleFromUser(c.var.userId, c.req.param("id"), c.req.param("moduleId"));
+  return c.json(success({ userId: c.req.param("id"), moduleId: c.req.param("moduleId") }), 200);
 });
 
 userMgmtRoutes.post("/:id/tokens/reset", async (c) => {
-  const result = await resetUserMonthlyTokens(c.var.user.sub, c.req.param("id"));
-  if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
-  return c.json(ok({ userId: c.req.param("id"), tokensReset: result.tokensReset }), 200);
+  const result = await resetUserMonthlyTokens(c.var.userId, c.req.param("id"));
+  if (!result.ok) return c.json(error("NOT_FOUND", "User not found"), 404);
+  return c.json(success({ userId: c.req.param("id"), tokensReset: result.tokensReset }), 200);
 });
 
 userMgmtRoutes.post("/:id/password-reset", async (c) => {
-  const result = await sendUserPasswordReset(c.var.user.sub, c.req.param("id"));
-  if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
-  return c.json(ok({ userId: c.req.param("id"), email: result.email }), 200);
+  const result = await sendUserPasswordReset(c.var.userId, c.req.param("id"));
+  if (!result.ok) return c.json(error("NOT_FOUND", "User not found"), 404);
+  return c.json(success({ userId: c.req.param("id"), email: result.email }), 200);
 });
 
-userMgmtRoutes.post("/:id/tokens/grant", async (c) => {
-  const body = GrantTokensSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
+userMgmtRoutes.post("/:id/tokens/grant", validateJson(GrantTokensSchema, (e) => error("BAD_REQUEST", e.issues[0].message)), async (c) => {
+  const body = c.req.valid("json");
 
-  const result = await grantUserTokens(c.var.user.sub, c.req.param("id"), body.data.tokens, body.data.reason);
-  if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
-  return c.json(ok({ userId: c.req.param("id"), tokensGranted: body.data.tokens }), 200);
+  const result = await grantUserTokens(c.var.userId, c.req.param("id"), body.tokens, body.reason);
+  if (!result.ok) return c.json(error("NOT_FOUND", "User not found"), 404);
+  return c.json(success({ userId: c.req.param("id"), tokensGranted: body.tokens }), 200);
 });
 
 // GET /:id/history — auth event timeline for a single user, plus the
@@ -195,13 +188,13 @@ userMgmtRoutes.post("/:id/tokens/grant", async (c) => {
 userMgmtRoutes.get("/:id/history", async (c) => {
   const parsed = HistoryQuerySchema.safeParse(c.req.query());
   if (!parsed.success) {
-    return c.json({ error: { code: "BAD_REQUEST", message: parsed.error.issues[0].message } }, 400);
+    return c.json(error("BAD_REQUEST", parsed.error.issues[0].message), 400);
   }
   const history = await AdminSecurityRepository.create().userAuthHistory(c.req.param("id"), parsed.data.limit);
   if (!history) {
-    return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
+    return c.json(error("NOT_FOUND", "User not found"), 404);
   }
-  return c.json(ok(history), 200);
+  return c.json(success(history), 200);
 });
 
 // Run the heal-and-validate pipe over every resume owned by this user.
@@ -210,9 +203,9 @@ userMgmtRoutes.get("/:id/history", async (c) => {
 // bad data is the write-boundary guard (healAndValidateContent called by
 // the resume write handlers), not this endpoint.
 userMgmtRoutes.post("/:id/resumes/heal", async (c) => {
-  const result = await healUserResumes(c.var.user.sub, c.req.param("id"));
-  if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
-  return c.json(ok({ userId: c.req.param("id"), ...result.report }), 200);
+  const result = await healUserResumes(c.var.userId, c.req.param("id"));
+  if (!result.ok) return c.json(error("NOT_FOUND", "User not found"), 404);
+  return c.json(success({ userId: c.req.param("id"), ...result.report }), 200);
 });
 
 // ── Plan override (SuperAdmin comp / trial / custom token limit) ─────────────
@@ -223,7 +216,7 @@ userMgmtRoutes.put("/:id/plan-override", async (c) => {
   const body = await c.req.json().catch(() => null);
   const result = await handleSetPlanOverride(
     buildPlanOverrideDeps(),
-    c.var.user.sub,
+    c.var.userId,
     c.req.param("id"),
     body,
   );
@@ -233,7 +226,7 @@ userMgmtRoutes.put("/:id/plan-override", async (c) => {
 userMgmtRoutes.delete("/:id/plan-override", async (c) => {
   const result = await handleClearPlanOverride(
     buildPlanOverrideDeps(),
-    c.var.user.sub,
+    c.var.userId,
     c.req.param("id"),
   );
   return c.json(result.body as any, result.status as any);
@@ -243,5 +236,5 @@ userMgmtRoutes.delete("/:id/plan-override", async (c) => {
 userMgmtRoutes.post("/:id/posting-agent/pause", async (c) => {
   const userId = c.req.param("id");
   const settings = await pausePostingAgent(userId, "admin");
-  return c.json(ok({ settings }), 200);
+  return c.json(success({ settings }), 200);
 });

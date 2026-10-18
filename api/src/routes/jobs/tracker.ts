@@ -13,26 +13,24 @@ import * as jobService from "../../services/job/JobService.js";
 import { startApplyScreening, type ApplyScreening } from "../../services/jobs/jobScreening.js";
 import { logger } from "../../lib/logger.js";
 import { TRACKER_STATUSES, isStatus } from "../../../../shared/statuses.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 
 export const jobTrackerRoutes = new Hono<AppEnv>();
 
 jobTrackerRoutes.post("/:id/save", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   await jobService.saveJob(c.req.param("id"), userId);
   return c.json(success({ success: true }));
 });
 
 jobTrackerRoutes.delete("/:id/save", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   await jobService.unsaveJob(c.req.param("id"), userId);
   return c.json(success({ success: true }));
 });
 
 jobTrackerRoutes.patch("/:id/status", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => null);
   const status = body?.status;
   if (!isStatus(TRACKER_STATUSES, status)) {
@@ -55,8 +53,7 @@ jobTrackerRoutes.patch("/:id/status", async (c) => {
  */
 jobTrackerRoutes.post("/:id/apply", async (c) => {
   const user = c.var.user;
-  const userId = user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => null);
   const jobId = c.req.param("id");
   const { applicationId } = await jobService.applyToJob(jobId, userId, body ?? { resumeId: "" });

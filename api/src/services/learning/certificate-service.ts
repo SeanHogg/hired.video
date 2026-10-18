@@ -15,8 +15,8 @@
  */
 
 import { and, eq } from "drizzle-orm";
-import type { getDb } from "../../db/index.js";
-import { schema } from "../../db/index.js";
+import { getDb, schema } from "../../db/index.js";
+import { getJwtSecret } from "../../utils/jwt.js";
 import { NotificationService } from "../notifications/notificationService.js";
 import { invalidateLearnerDashboard } from "./learner-dashboard.js";
 import {
@@ -70,6 +70,11 @@ export class CertificateService {
   ) {
     this.edPrivateKeyB64 = opts.ed25519?.privateKeyPkcs8B64 ?? readCertEnv("CERT_ED25519_PRIVATE_KEY");
     this.edPublicKeyB64 = opts.ed25519?.publicKeyRawB64 ?? readCertEnv("CERT_ED25519_PUBLIC_KEY");
+  }
+
+  /** Bound to the live request DB + the platform JWT secret. */
+  static live(): CertificateService {
+    return new CertificateService(getDb(), getJwtSecret());
   }
 
   /** Issue (or return the existing) certificate for a passed enrollment.

@@ -13,7 +13,6 @@
  */
 import { Hono, type Context } from "hono";
 import type { AppEnv } from "../types/index.js";
-import { fail } from "../utils/response.js";
 import { createIpRateLimiter, getClientIp } from "../middleware/rateLimiter.js";
 import {
   MAX_PROXY_IMAGE_BYTES,
@@ -22,6 +21,8 @@ import {
   parseProxyTarget,
   readCapped,
 } from "../utils/image-proxy.js";
+import { error } from "../types/index.js";
+import { requireUser } from "./helpers/routerHelpers.js";
 
 const CACHE_SECONDS = 86_400;
 const FETCH_TIMEOUT_MS = 10_000;
@@ -46,9 +47,9 @@ function edgeCache(): Cache | null {
 }
 
 mediaProxyRoutes.get("/image", mediaProxyRateLimiter, async (c) => {
-  if (!c.var.user) return c.json(fail("UNAUTHORIZED", "Sign in to load images"), 401);
+  requireUser(c);
   const target = parseProxyTarget(c.req.query("url"));
-  if (!target) return c.json(fail("VALIDATION_ERROR", "Not a public http(s) image URL"), 400);
+  if (!target) return c.json(error("VALIDATION_ERROR", "Not a public http(s) image URL"), 400);
 
   const cache = edgeCache();
   const cacheKey = new Request(`https://media-proxy.cache/${encodeURIComponent(target.toString())}`);
@@ -70,14 +71,14 @@ mediaProxyRoutes.get("/image", mediaProxyRateLimiter, async (c) => {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
   } catch {
-    return c.json(fail("UPSTREAM_ERROR", "Could not fetch the image"), 502);
+    return c.json(error("UPSTREAM_ERROR", "Could not fetch the image"), 502);
   }
-  if (!upstream) return c.json(fail("VALIDATION_ERROR", "Redirected off a public host"), 400);
-  if (!upstream.ok) return c.json(fail("UPSTREAM_ERROR", `Image host answered ${upstream.status}`), 502);
+  if (!upstream) return c.json(error("VALIDATION_ERROR", "Redirected off a public host"), 400);
+  if (!upstream.ok) return c.json(error("UPSTREAM_ERROR", `Image host answered ${upstream.status}`), 502);
   const type = upstream.headers.get("content-type");
-  if (!isImageContentType(type)) return c.json(fail("UNSUPPORTED_MEDIA_TYPE", "Not an image"), 415);
+  if (!isImageContentType(type)) return c.json(error("UNSUPPORTED_MEDIA_TYPE", "Not an image"), 415);
   const body = await readCapped(upstream, MAX_PROXY_IMAGE_BYTES);
-  if (!body) return c.json(fail("PAYLOAD_TOO_LARGE", "Image too large"), 413);
+  if (!body) return c.json(error("PAYLOAD_TOO_LARGE", "Image too large"), 413);
 
   const headers = {
     "Content-Type": type ?? "application/octet-stream",

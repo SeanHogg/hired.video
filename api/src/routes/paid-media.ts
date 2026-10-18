@@ -15,8 +15,6 @@ import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { and, eq, gte, lte, desc, sql, inArray, isNull, or } from "drizzle-orm";
 import { listAdapters, getAdapter, assertPlatform, type PaidMediaEnv } from "../services/paid-media/ports/registry.js";
 import {
   completeOAuth,
@@ -51,21 +49,27 @@ import {
   syncAdToAccount,
   pullInsightsFromAccount,
 } from "../services/paid-media/sync.js";
-import { recordConversion } from "../services/paid-media/conversions/capi.js";
-import { getHousePixelConfig, getPublicPixelConfig, invalidateHousePixelConfig } from "../services/paid-media/conversions/pixel-config.js";
-import { encryptSecret } from "../services/paid-media/secrets.js";
+import {
+  getPixelSettings,
+  getPublicPixels,
+  recordWorkspaceConversion,
+  savePixelSettings,
+} from "../services/paid-media/tracking.js";
+import {
+  assertAdAccountWritable,
+  deleteAdConnection,
+  listAdAccounts,
+  listAdConnections,
+  listInsights,
+} from "../services/paid-media/accounts.js";
+import { getHouseWorkspaceConfig } from "../services/paid-media/house-workspace.js";
 import { readClickIds } from "../middleware/clickIdCapture.js";
 import { WorkspaceForbiddenError } from "../services/studio/workspace.js";
-import { listAccessibleWorkspaces } from "../services/studio/workspace.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
 import { frontendBaseUrl } from "../utils/public-urls.js";
 import { logger } from "../lib/logger.js";
 
 export const paidMediaRoutes = new Hono<AppEnv>();
-
-function uid(c: any): string {
-  return c.var.user?.sub as string;
-}
 
 function env(c: any): PaidMediaEnv & { JWT_SECRET?: string; BASE_URL?: string; HOUSE_USER_ID?: string } {
   return (c.env ?? process.env) as any;
@@ -81,7 +85,7 @@ function withinErrorHandling<T>(c: any, fn: () => Promise<T>): Promise<Response>
     .then((data) => c.json(success(data)))
     .catch((err: unknown) => {
       if (err instanceof WorkspaceForbiddenError) {
-        return c.json(error("WORKSPACE_FORBIDDEN", err.message), 403);
+        return c.json(error("FORBIDDEN", err.message), 403);
       }
       const msg = err instanceof Error ? err.message : String(err);
       logger.error("[paid-media] request failed", err);
@@ -105,70 +109,13 @@ paidMediaRoutes.get("/platforms", (c) => {
 // paid-media write. The seed script does the same on first boot; this guards
 // the case where a NEW SA visits the page before the seed re-runs. We reuse
 // the existing `delegated` kind + canActFor SSoT — no 4th workspace kind.
-paidMediaRoutes.get("/house-config", async (c) => withinErrorHandling(c, async () => {
-  const actorUserId = uid(c);
-  if (!isSuperAdmin(c.var.user)) {
-    throw new WorkspaceForbiddenError("House workspace is SuperAdmin-only.");
-  }
-  const houseUserId = env(c).HOUSE_USER_ID ?? null;
-  if (!houseUserId) {
-    // Not configured — the page falls back to its personal-workspace
-    // behaviour. Surfacing null (not an error) keeps the SA ads page usable
-    // in environments where the house account hasn't been seeded yet.
-    return { houseUserId: null as string | null, granted: false };
-  }
-  const d = getDb();
-  // Confirm the reserved user actually exists before granting against it.
-  const [house] = await d
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(eq(schema.users.id, houseUserId))
-    .limit(1);
-  if (!house) {
-    return { houseUserId: null as string | null, granted: false };
-  }
-  // Idempotently ensure an active grant (subject=house, contributor=SA,
-  // scope='studio'). The unique partial index uq_workspace_grants_active
-  // makes the insert a no-op when the active grant already exists.
-  const granted = await ensureHouseGrant(d, houseUserId, actorUserId);
-  return { houseUserId, granted };
-}));
-
-/** Ensures the given contributor (a SuperAdmin) holds an active studio-scope
- *  grant against the house subject. Idempotent: returns true without writing
- *  when an active grant already exists. */
-async function ensureHouseGrant(
-  d: ReturnType<typeof getDb>,
-  houseUserId: string,
-  contributorUserId: string,
-): Promise<boolean> {
-  if (houseUserId === contributorUserId) return true; // SA is the house user — self-act.
-  const [existing] = await d
-    .select({ id: schema.workspaceGrants.id })
-    .from(schema.workspaceGrants)
-    .where(
-      and(
-        eq(schema.workspaceGrants.subjectUserId, houseUserId),
-        eq(schema.workspaceGrants.contributorUserId, contributorUserId),
-        eq(schema.workspaceGrants.scope, "studio"),
-        eq(schema.workspaceGrants.isActive, true),
-      ),
-    )
-    .limit(1);
-  if (existing) return true;
-  await d
-    .insert(schema.workspaceGrants)
-    .values({
-      subjectUserId: houseUserId,
-      contributorUserId,
-      grantedByUserId: contributorUserId,
-      role: "editor",
-      scope: "studio",
-      isActive: true,
-    })
-    .onConflictDoNothing();
-  return true;
-}
+paidMediaRoutes.get("/house-config", async (c) => withinErrorHandling(c, () =>
+  getHouseWorkspaceConfig({
+    actorUserId:       c.var.userId,
+    actorIsSuperAdmin: isSuperAdmin(c.var.user),
+    houseUserId:       env(c).HOUSE_USER_ID ?? null,
+  }),
+));
 
 // ─── OAuth ────────────────────────────────────────────────────────────────
 // POST /oauth/start — auth-required. SPA calls with workspace + platform,
@@ -182,7 +129,7 @@ const OAuthStartSchema = z.object({
 });
 
 paidMediaRoutes.post("/oauth/start", async (c) => withinErrorHandling(c, async () => {
-  const userId = uid(c);
+  const userId = c.var.userId;
   const body = OAuthStartSchema.parse(await c.req.json());
   assertPlatform(body.platform);
   const adapter = getAdapter(env(c), body.platform);
@@ -223,56 +170,17 @@ paidMediaRoutes.get("/oauth/callback", async (c) => {
 });
 
 // ─── Connections / Accounts ───────────────────────────────────────────────
-paidMediaRoutes.get("/connections", async (c) => withinErrorHandling(c, async () => {
-  const actorUserId = uid(c);
-  const d = getDb();
-  const ws = await listAccessibleWorkspaces(actorUserId, { db: d });
-  const allowedUserIds = [actorUserId, ...ws.delegatedSubjectUserIds];
-  const ownership = or(
-    and(inArray(schema.paidMediaConnections.userId, allowedUserIds), isNull(schema.paidMediaConnections.companyId)),
-    ws.companyIds.length ? inArray(schema.paidMediaConnections.companyId, ws.companyIds) : undefined,
-  );
-  const conns = await d.select({
-    id: schema.paidMediaConnections.id,
-    userId: schema.paidMediaConnections.userId,
-    companyId: schema.paidMediaConnections.companyId,
-    platform: schema.paidMediaConnections.platform,
-    externalUserId: schema.paidMediaConnections.externalUserId,
-    externalUserHandle: schema.paidMediaConnections.externalUserHandle,
-    scopes: schema.paidMediaConnections.scopes,
-    status: schema.paidMediaConnections.status,
-    lastSyncedAt: schema.paidMediaConnections.lastSyncedAt,
-    lastError: schema.paidMediaConnections.lastError,
-    accessTokenExpiresAt: schema.paidMediaConnections.accessTokenExpiresAt,
-    createdAt: schema.paidMediaConnections.createdAt,
-  }).from(schema.paidMediaConnections).where(ownership);
-  return conns;
-}));
+paidMediaRoutes.get("/connections", async (c) => withinErrorHandling(c, () =>
+  listAdConnections(c.var.userId),
+));
 
-paidMediaRoutes.delete("/connections/:id", async (c) => withinErrorHandling(c, async () => {
-  const actorUserId = uid(c);
-  const id = c.req.param("id");
-  const d = getDb();
-  const [row] = await d.select().from(schema.paidMediaConnections).where(eq(schema.paidMediaConnections.id, id)).limit(1);
-  if (!row) return { deleted: false };
-  // Ownership: re-use canActFor via campaign-service style — connections are workspace-owned.
-  const { assertCanWrite } = await import("../services/studio/workspace.js");
-  await assertCanWrite(actorUserId, row.userId, row.companyId, { db: d });
-  await d.delete(schema.paidMediaConnections).where(eq(schema.paidMediaConnections.id, id));
-  return { deleted: true };
-}));
+paidMediaRoutes.delete("/connections/:id", async (c) => withinErrorHandling(c, () =>
+  deleteAdConnection(c.var.userId, c.req.param("id")),
+));
 
-paidMediaRoutes.get("/accounts", async (c) => withinErrorHandling(c, async () => {
-  const actorUserId = uid(c);
-  const d = getDb();
-  const ws = await listAccessibleWorkspaces(actorUserId, { db: d });
-  const userIds = [actorUserId, ...ws.delegatedSubjectUserIds];
-  const ownership = or(
-    and(inArray(schema.paidMediaAccounts.userId, userIds), isNull(schema.paidMediaAccounts.companyId)),
-    ws.companyIds.length ? inArray(schema.paidMediaAccounts.companyId, ws.companyIds) : undefined,
-  );
-  return d.select().from(schema.paidMediaAccounts).where(ownership);
-}));
+paidMediaRoutes.get("/accounts", async (c) => withinErrorHandling(c, () =>
+  listAdAccounts(c.var.userId),
+));
 
 // ─── Campaigns ────────────────────────────────────────────────────────────
 const CampaignCreateSchema = z.object({
@@ -291,12 +199,12 @@ const CampaignCreateSchema = z.object({
 });
 
 paidMediaRoutes.get("/campaigns", async (c) => withinErrorHandling(c, () =>
-  listCampaigns(uid(c), workspaceFromQuery(c)),
+  listCampaigns(c.var.userId, workspaceFromQuery(c)),
 ));
 
 paidMediaRoutes.post("/campaigns", async (c) => withinErrorHandling(c, async () => {
   const body = CampaignCreateSchema.parse(await c.req.json());
-  return createCampaign(uid(c), workspaceFromQuery(c), {
+  return createCampaign(c.var.userId, workspaceFromQuery(c), {
     ...body,
     startAt: body.startAt ? new Date(body.startAt) : null,
     endAt:   body.endAt   ? new Date(body.endAt)   : null,
@@ -304,12 +212,12 @@ paidMediaRoutes.post("/campaigns", async (c) => withinErrorHandling(c, async () 
 }));
 
 paidMediaRoutes.get("/campaigns/:id", async (c) => withinErrorHandling(c, () =>
-  getCampaign(uid(c), c.req.param("id")),
+  getCampaign(c.var.userId, c.req.param("id")),
 ));
 
 paidMediaRoutes.patch("/campaigns/:id", async (c) => withinErrorHandling(c, async () => {
   const body = CampaignCreateSchema.partial().parse(await c.req.json());
-  return updateCampaign(uid(c), c.req.param("id"), {
+  return updateCampaign(c.var.userId, c.req.param("id"), {
     ...body,
     startAt: body.startAt ? new Date(body.startAt) : undefined,
     endAt:   body.endAt   ? new Date(body.endAt)   : undefined,
@@ -317,7 +225,7 @@ paidMediaRoutes.patch("/campaigns/:id", async (c) => withinErrorHandling(c, asyn
 }));
 
 paidMediaRoutes.delete("/campaigns/:id", async (c) => withinErrorHandling(c, async () => {
-  await deleteCampaign(uid(c), c.req.param("id"));
+  await deleteCampaign(c.var.userId, c.req.param("id"));
   return { deleted: true };
 }));
 
@@ -338,12 +246,12 @@ const AdSetCreateSchema = z.object({
 });
 
 paidMediaRoutes.get("/campaigns/:id/ad-sets", async (c) => withinErrorHandling(c, () =>
-  listAdSets(uid(c), c.req.param("id")),
+  listAdSets(c.var.userId, c.req.param("id")),
 ));
 
 paidMediaRoutes.post("/campaigns/:id/ad-sets", async (c) => withinErrorHandling(c, async () => {
   const body = AdSetCreateSchema.parse(await c.req.json());
-  return createAdSet(uid(c), c.req.param("id"), {
+  return createAdSet(c.var.userId, c.req.param("id"), {
     ...body,
     startAt: body.startAt ? new Date(body.startAt) : null,
     endAt:   body.endAt   ? new Date(body.endAt)   : null,
@@ -352,7 +260,7 @@ paidMediaRoutes.post("/campaigns/:id/ad-sets", async (c) => withinErrorHandling(
 
 paidMediaRoutes.patch("/ad-sets/:id", async (c) => withinErrorHandling(c, async () => {
   const body = AdSetCreateSchema.partial().parse(await c.req.json());
-  return updateAdSet(uid(c), c.req.param("id"), {
+  return updateAdSet(c.var.userId, c.req.param("id"), {
     ...body,
     startAt: body.startAt ? new Date(body.startAt) : undefined,
     endAt:   body.endAt   ? new Date(body.endAt)   : undefined,
@@ -360,7 +268,7 @@ paidMediaRoutes.patch("/ad-sets/:id", async (c) => withinErrorHandling(c, async 
 }));
 
 paidMediaRoutes.delete("/ad-sets/:id", async (c) => withinErrorHandling(c, async () => {
-  await deleteAdSet(uid(c), c.req.param("id"));
+  await deleteAdSet(c.var.userId, c.req.param("id"));
   return { deleted: true };
 }));
 
@@ -379,21 +287,21 @@ const AdCreateSchema = z.object({
 });
 
 paidMediaRoutes.get("/ad-sets/:id/ads", async (c) => withinErrorHandling(c, () =>
-  listAds(uid(c), c.req.param("id")),
+  listAds(c.var.userId, c.req.param("id")),
 ));
 
 paidMediaRoutes.post("/ad-sets/:id/ads", async (c) => withinErrorHandling(c, async () => {
   const body = AdCreateSchema.parse(await c.req.json());
-  return createAd(uid(c), c.req.param("id"), body as any);
+  return createAd(c.var.userId, c.req.param("id"), body as any);
 }));
 
 paidMediaRoutes.patch("/ads/:id", async (c) => withinErrorHandling(c, async () => {
   const body = AdCreateSchema.partial().parse(await c.req.json());
-  return updateAd(uid(c), c.req.param("id"), body as any);
+  return updateAd(c.var.userId, c.req.param("id"), body as any);
 }));
 
 paidMediaRoutes.delete("/ads/:id", async (c) => withinErrorHandling(c, async () => {
-  await deleteAd(uid(c), c.req.param("id"));
+  await deleteAd(c.var.userId, c.req.param("id"));
   return { deleted: true };
 }));
 
@@ -413,21 +321,21 @@ const CreativeCreateSchema = z.object({
 });
 
 paidMediaRoutes.get("/creatives", async (c) => withinErrorHandling(c, () =>
-  listCreatives(uid(c), workspaceFromQuery(c)),
+  listCreatives(c.var.userId, workspaceFromQuery(c)),
 ));
 
 paidMediaRoutes.post("/creatives", async (c) => withinErrorHandling(c, async () => {
   const body = CreativeCreateSchema.parse(await c.req.json());
-  return createCreative(uid(c), workspaceFromQuery(c), body as any);
+  return createCreative(c.var.userId, workspaceFromQuery(c), body as any);
 }));
 
 paidMediaRoutes.patch("/creatives/:id", async (c) => withinErrorHandling(c, async () => {
   const body = CreativeCreateSchema.partial().parse(await c.req.json());
-  return updateCreative(uid(c), c.req.param("id"), body as any);
+  return updateCreative(c.var.userId, c.req.param("id"), body as any);
 }));
 
 paidMediaRoutes.delete("/creatives/:id", async (c) => withinErrorHandling(c, async () => {
-  await deleteCreative(uid(c), c.req.param("id"));
+  await deleteCreative(c.var.userId, c.req.param("id"));
   return { deleted: true };
 }));
 
@@ -437,22 +345,26 @@ const SyncCampaignSchema = z.object({ accountId: UuidLikeSchema });
 paidMediaRoutes.post("/campaigns/:id/sync", async (c) => withinErrorHandling(c, async () => {
   const { accountId } = SyncCampaignSchema.parse(await c.req.json());
   // Ensure actor owns the campaign — loads + asserts.
-  await getCampaign(uid(c), c.req.param("id"));
+  await getCampaign(c.var.userId, c.req.param("id"));
+  await assertAdAccountWritable(c.var.userId, accountId);
   return syncCampaignToAccount({ env: env(c) }, c.req.param("id"), accountId);
 }));
 
 paidMediaRoutes.post("/ad-sets/:id/sync", async (c) => withinErrorHandling(c, async () => {
   const { accountId } = SyncCampaignSchema.parse(await c.req.json());
+  await assertAdAccountWritable(c.var.userId, accountId);
   return syncAdSetToAccount({ env: env(c) }, c.req.param("id"), accountId);
 }));
 
 paidMediaRoutes.post("/creatives/:id/sync", async (c) => withinErrorHandling(c, async () => {
   const { accountId } = SyncCampaignSchema.parse(await c.req.json());
+  await assertAdAccountWritable(c.var.userId, accountId);
   return syncCreativeToAccount({ env: env(c) }, c.req.param("id"), accountId);
 }));
 
 paidMediaRoutes.post("/ads/:id/sync", async (c) => withinErrorHandling(c, async () => {
   const { accountId } = SyncCampaignSchema.parse(await c.req.json());
+  await assertAdAccountWritable(c.var.userId, accountId);
   return syncAdToAccount({ env: env(c) }, c.req.param("id"), accountId);
 }));
 
@@ -467,20 +379,17 @@ const PullInsightsSchema = z.object({
 
 paidMediaRoutes.post("/insights/pull", async (c) => withinErrorHandling(c, async () => {
   const body = PullInsightsSchema.parse(await c.req.json());
+  await assertAdAccountWritable(c.var.userId, body.accountId);
   return pullInsightsFromAccount({ env: env(c) }, body);
 }));
 
-paidMediaRoutes.get("/insights", async (c) => withinErrorHandling(c, async () => {
-  const since = c.req.query("since");
-  const until = c.req.query("until");
-  const internalId = c.req.query("internalId");
-  const d = getDb();
-  const conds = [];
-  if (since) conds.push(gte(schema.paidMediaInsights.date, since));
-  if (until) conds.push(lte(schema.paidMediaInsights.date, until));
-  if (internalId) conds.push(eq(schema.paidMediaInsights.internalId, internalId));
-  return d.select().from(schema.paidMediaInsights).where(conds.length ? and(...conds) : undefined).orderBy(desc(schema.paidMediaInsights.date));
-}));
+paidMediaRoutes.get("/insights", async (c) => withinErrorHandling(c, () =>
+  listInsights(c.var.userId, {
+    since:      c.req.query("since") || undefined,
+    until:      c.req.query("until") || undefined,
+    internalId: c.req.query("internalId") || undefined,
+  }),
+));
 
 // ─── Pixels ───────────────────────────────────────────────────────────────
 const PixelUpdateSchema = z.object({
@@ -499,81 +408,26 @@ const PixelUpdateSchema = z.object({
   ga4ApiSecret:               z.string().nullable().optional(),
 });
 
-paidMediaRoutes.get("/pixels", async (c) => withinErrorHandling(c, async () => {
-  const actorUserId = uid(c);
-  const ws = workspaceFromQuery(c);
-  const { resolveWorkspaceForWrite } = await import("../services/studio/workspace.js");
-  const ctx = await resolveWorkspaceForWrite(actorUserId, ws);
-  const d = getDb();
-  const [row] = await d.select().from(schema.paidMediaPixels)
-    .where(
-      and(
-        eq(schema.paidMediaPixels.userId, ctx.ownerUserId),
-        ctx.ownerCompanyId ? eq(schema.paidMediaPixels.companyId, ctx.ownerCompanyId) : isNull(schema.paidMediaPixels.companyId),
-      ),
-    )
-    .limit(1);
-  if (!row) return { configured: false };
-  // Strip encrypted fields before returning.
-  const { metaCapiTokenEnc, tiktokAccessTokenEnc, linkedInCapiTokenEnc, bingUetApiTokenEnc, ga4ApiSecretEnc, ...safe } = row;
-  return {
-    configured: true,
-    ...safe,
-    metaCapiTokenSet:      Boolean(metaCapiTokenEnc),
-    tiktokAccessTokenSet:  Boolean(tiktokAccessTokenEnc),
-    linkedInCapiTokenSet:  Boolean(linkedInCapiTokenEnc),
-    bingUetApiTokenSet:    Boolean(bingUetApiTokenEnc),
-    ga4ApiSecretSet:       Boolean(ga4ApiSecretEnc),
-  };
-}));
+paidMediaRoutes.get("/pixels", async (c) => withinErrorHandling(c, async () =>
+  getPixelSettings(c.var.userId, workspaceFromQuery(c)),
+));
 
 paidMediaRoutes.put("/pixels", async (c) => withinErrorHandling(c, async () => {
-  const actorUserId = uid(c);
   const ws = workspaceFromQuery(c);
   const body = PixelUpdateSchema.parse(await c.req.json());
-  const { resolveWorkspaceForWrite } = await import("../services/studio/workspace.js");
-  const ctx = await resolveWorkspaceForWrite(actorUserId, ws);
-  const d = getDb();
-  const e = env(c);
-  const valuesBase: Record<string, unknown> = {
-    userId:                   ctx.ownerUserId,
-    companyId:                ctx.ownerCompanyId,
-    metaPixelId:              body.metaPixelId ?? null,
-    googleAdsConversionId:    body.googleAdsConversionId ?? null,
-    googleAdsConversionLabel: body.googleAdsConversionLabel ?? null,
-    ga4MeasurementId:         body.ga4MeasurementId ?? null,
-    linkedInPartnerId:        body.linkedInPartnerId ?? null,
-    tiktokPixelId:            body.tiktokPixelId ?? null,
-    bingUetTagId:             body.bingUetTagId ?? null,
-    updatedAt:                new Date(),
-  };
-  // Encrypt secret tokens only when supplied (empty string = clear).
-  if (body.metaCapiToken !== undefined)     valuesBase.metaCapiTokenEnc    = body.metaCapiToken    ? await encryptSecret(e, body.metaCapiToken)    : null;
-  if (body.tiktokAccessToken !== undefined) valuesBase.tiktokAccessTokenEnc = body.tiktokAccessToken ? await encryptSecret(e, body.tiktokAccessToken) : null;
-  if (body.linkedInCapiToken !== undefined) valuesBase.linkedInCapiTokenEnc = body.linkedInCapiToken ? await encryptSecret(e, body.linkedInCapiToken) : null;
-  if (body.bingUetApiToken !== undefined)   valuesBase.bingUetApiTokenEnc  = body.bingUetApiToken  ? await encryptSecret(e, body.bingUetApiToken)  : null;
-  if (body.ga4ApiSecret !== undefined)      valuesBase.ga4ApiSecretEnc     = body.ga4ApiSecret     ? await encryptSecret(e, body.ga4ApiSecret)     : null;
-  await d.insert(schema.paidMediaPixels).values(valuesBase as any).onConflictDoUpdate({
-    target: [schema.paidMediaPixels.userId, schema.paidMediaPixels.companyId],
-    set: valuesBase as any,
-  });
-  invalidateHousePixelConfig();
-  return { saved: true };
+  return savePixelSettings(env(c), c.var.userId, ws, body);
 }));
 
 /** Public pixel config — the frontend reads this from app shell to
  *  inject pixel snippets at runtime. The route is public when no
  *  workspace param is given (returns the house workspace's config). */
-paidMediaRoutes.get("/pixels/public", async (c) => withinErrorHandling(c, async () => {
-  const workspaceUserId = c.req.query("workspaceUserId") ?? null;
-  const workspaceCompanyId = c.req.query("workspaceCompanyId") ?? null;
-  if (!workspaceUserId) {
-    // House config (app shell, every page load) — cached in the service.
-    return getHousePixelConfig(getDb(), env(c).HOUSE_USER_ID ?? null);
-  }
-  const d = getDb();
-  return getPublicPixelConfig(d, workspaceUserId, workspaceCompanyId);
-}));
+paidMediaRoutes.get("/pixels/public", async (c) => withinErrorHandling(c, async () =>
+  getPublicPixels({
+    houseUserId:        env(c).HOUSE_USER_ID ?? null,
+    workspaceUserId:    c.req.query("workspaceUserId") ?? null,
+    workspaceCompanyId: c.req.query("workspaceCompanyId") ?? null,
+  }),
+));
 
 // ─── Conversions ──────────────────────────────────────────────────────────
 const ConversionSchema = z.object({
@@ -597,10 +451,10 @@ paidMediaRoutes.post("/conversions", async (c) => withinErrorHandling(c, async (
   const clickIds = readClickIds(c);
   const ipAddress = c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For")?.split(",")[0]?.trim() ?? null;
   const userAgent = c.req.header("User-Agent") ?? null;
-  return recordConversion({ db: getDb(), env: env(c) }, {
+  return recordWorkspaceConversion(env(c), {
     workspaceUserId:    body.workspaceUserId,
     workspaceCompanyId: body.workspaceCompanyId ?? null,
-    userId:             uid(c),
+    userId:             c.var.userId,
     eventName:          body.eventName,
     eventTime:          body.eventTime ? new Date(body.eventTime) : new Date(),
     valueCents:         body.valueCents,

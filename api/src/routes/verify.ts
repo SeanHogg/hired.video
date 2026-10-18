@@ -12,10 +12,8 @@
  */
 import { Hono } from "hono";
 import type { Variables, AppEnv } from "../types/index.js";
-import { success, error } from "../types/index.js";
-import { getDb } from "../db/index.js";
+import { success } from "../types/index.js";
 import { CertificateService } from "../services/learning/certificate-service.js";
-import { getJwtSecret } from "../utils/jwt.js";
 
 export const verifyRoutes = new Hono<{ Variables: Variables } & AppEnv>();
 
@@ -25,13 +23,13 @@ export const verifyRoutes = new Hono<{ Variables: Variables } & AppEnv>();
  *  Registered before `/:certNumber`; the 2-segment path can't collide with
  *  the single-segment cert-number route. */
 verifyRoutes.get("/.well-known/jwks.json", async (c) => {
-  const certService = new CertificateService(getDb(), getJwtSecret());
+  const certService = CertificateService.live();
   const jwk = await certService.publicJwk();
   return c.json({ keys: jwk ? [jwk] : [] }, 200);
 });
 
 verifyRoutes.get("/:certNumber", async (c) => {
-  const certService = new CertificateService(getDb(), getJwtSecret());
+  const certService = CertificateService.live();
   const result = await certService.verify(c.req.param("certNumber"));
   if (result.valid === false) {
     return c.json(success({ valid: false, reason: result.reason }), 200);

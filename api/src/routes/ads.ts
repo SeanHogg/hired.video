@@ -38,7 +38,7 @@ function getAdConfig(env: Record<string, string | undefined>) {
 // Unauthenticated or free-tier users receive the full slot config.
 // ---------------------------------------------------------------------------
 adsRoutes.get("/config", async (c) => {
-  const userId = c.var.user?.sub; // set by optionalAuthMiddleware in app.ts
+  const userId = c.var.userId; // set by optionalAuthMiddleware in app.ts
   const env = (c.env ?? {}) as Record<string, string | undefined>;
   const config = getAdConfig(env);
 

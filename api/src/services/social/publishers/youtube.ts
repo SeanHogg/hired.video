@@ -16,11 +16,9 @@ import { buildMultipartBody } from "../../youtube/youtubeUpload.js";
 import { bearer, clip, readJson, type FetchLike } from "./http.js";
 import {
   SocialPublishError,
-  viewsOf,
   type PostMetrics,
   type SocialMetricsReader,
   type SocialVideoPublisher,
-  type SocialViewReader,
 } from "./types.js";
 
 const UPLOAD_ENDPOINT = "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=multipart&part=snippet,status";
@@ -114,8 +112,4 @@ export function createYouTubeMetricsReader(deps: { fetch?: FetchLike } = {}): So
     }
     return metrics;
   };
-}
-
-export function createYouTubeViewReader(deps: { fetch?: FetchLike } = {}): SocialViewReader {
-  return viewsOf(createYouTubeMetricsReader(deps));
 }

@@ -19,20 +19,24 @@
  */
 
 import { Hono } from "hono";
-import { eq, and, desc, sql } from "drizzle-orm";
-import type { Variables, AppEnv } from "../types/index.js";
+import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { LegalRepository } from "../repositories/legalRepository.js";
+import {
+  acceptLegalDoc,
+  createLegalDocDraft,
+  deleteLegalDocDraft,
+  getCurrentLegalDoc,
+  getMyLegalStatus,
+  listAllLegalDocs,
+  listCurrentLegalDocs,
+  listMyLegalAcceptances,
+  publishLegalDoc,
+  updateLegalDocDraft,
+} from "../services/legal/legalDocuments.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
-
-const { legalDocuments, legalDocumentAcceptances } = schema;
+import { requireUser } from "./helpers/routerHelpers.js";
 
 export const legalRoutes = new Hono<AppEnv>();
-
-function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
 
 // ---------------------------------------------------------------------------
 // Public reads
@@ -40,32 +44,14 @@ function uid(c: any): string | null {
 
 // GET /current/:kind?locale=en
 legalRoutes.get("/current/:kind", async (c) => {
-  const kind = c.req.param("kind");
   const locale = c.req.query("locale") ?? "en";
-  const db = getDb();
-  const [row] = await db
-    .select()
-    .from(legalDocuments)
-    .where(and(
-      eq(legalDocuments.kind, kind),
-      eq(legalDocuments.locale, locale),
-      eq(legalDocuments.isCurrent, true),
-    ))
-    .limit(1);
-  if (!row) return c.json(error("NOT_FOUND", `No current document for kind=${kind} locale=${locale}`), 404);
-  return c.json(success(row), 200);
+  return c.json(success(await getCurrentLegalDoc(c.req.param("kind"), locale)), 200);
 });
 
 // GET /list?locale=en — current version of every kind
 legalRoutes.get("/list", async (c) => {
   const locale = c.req.query("locale") ?? "en";
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(legalDocuments)
-    .where(and(eq(legalDocuments.locale, locale), eq(legalDocuments.isCurrent, true)))
-    .orderBy(legalDocuments.kind);
-  return c.json(success(rows), 200);
+  return c.json(success(await listCurrentLegalDocs(locale)), 200);
 });
 
 // ---------------------------------------------------------------------------
@@ -74,80 +60,30 @@ legalRoutes.get("/list", async (c) => {
 
 // POST /accept — body: { documentId, context? }
 legalRoutes.post("/accept", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => ({})) as { documentId?: string; context?: string };
   if (!body.documentId) return c.json(error("VALIDATION_ERROR", "documentId is required"), 400);
-
-  const db = getDb();
-  const [doc] = await db
-    .select()
-    .from(legalDocuments)
-    .where(eq(legalDocuments.id, body.documentId))
-    .limit(1);
-  if (!doc) return c.json(error("NOT_FOUND", "Document not found"), 404);
-  if (!doc.isCurrent) {
-    return c.json(error("STALE_DOCUMENT", "Cannot accept a non-current document version"), 400);
-  }
-
-  const ip = c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For") ?? null;
-  const ua = c.req.header("User-Agent") ?? null;
-
-  const [row] = await db
-    .insert(legalDocumentAcceptances)
-    .values({
-      userId,
-      documentId: doc.id,
-      kind: doc.kind,
-      version: doc.version,
-      locale: doc.locale,
-      ip,
-      userAgent: ua,
-      context: body.context ?? null,
-    } as any)
-    .returning();
+  const row = await acceptLegalDoc({
+    userId,
+    documentId: body.documentId,
+    context: body.context ?? null,
+    ip: c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For") ?? null,
+    userAgent: c.req.header("User-Agent") ?? null,
+  });
   return c.json(success(row), 201);
 });
 
 // GET /me — full acceptance history
 legalRoutes.get("/me", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(legalDocumentAcceptances)
-    .where(eq(legalDocumentAcceptances.userId, userId))
-    .orderBy(desc(legalDocumentAcceptances.acceptedAt));
-  return c.json(success(rows), 200);
+  const userId = requireUser(c);
+  return c.json(success(await listMyLegalAcceptances(userId)), 200);
 });
 
 // GET /me/status — { creator_terms: {hasAcceptedCurrent, ...}, general_terms: {...}, ... }
 legalRoutes.get("/me/status", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const locale = c.req.query("locale") ?? "en";
-  const db = getDb();
-
-  const legal = new LegalRepository(db);
-  const currents = await legal.findCurrentDocs(locale);
-  // One DISTINCT ON (kind) read for every current kind (was one per doc).
-  const latestByKind = await legal.findLatestAcceptancesByKind(
-    userId,
-    Array.from(new Set(currents.map((d) => d.kind))),
-  );
-
-  const result: Record<string, { documentId: string; version: string; hasAcceptedCurrent: boolean; acceptedAt: string | null }> = {};
-  for (const doc of currents) {
-    const latest = latestByKind.get(doc.kind);
-    result[doc.kind] = {
-      documentId: doc.id,
-      version: doc.version,
-      hasAcceptedCurrent: !!latest && latest.version === doc.version,
-      acceptedAt: latest?.acceptedAt ? new Date(latest.acceptedAt).toISOString() : null,
-    };
-  }
-  return c.json(success(result), 200);
+  return c.json(success(await getMyLegalStatus(userId, locale)), 200);
 });
 
 // ---------------------------------------------------------------------------
@@ -158,12 +94,7 @@ legalRoutes.use("/admin/*", superAdminMiddleware);
 
 // GET /admin/documents — list all (every version of every kind)
 legalRoutes.get("/admin/documents", async (c) => {
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(legalDocuments)
-    .orderBy(legalDocuments.kind, desc(legalDocuments.publishedAt), desc(legalDocuments.createdAt));
-  return c.json(success(rows), 200);
+  return c.json(success(await listAllLegalDocs()), 200);
 });
 
 // POST /admin/documents — create draft
@@ -179,99 +110,30 @@ legalRoutes.post("/admin/documents", async (c) => {
   if (!body.kind || !body.version || !body.title || !body.body) {
     return c.json(error("VALIDATION_ERROR", "kind, version, title, body are required"), 400);
   }
-  const db = getDb();
-  const [row] = await db
-    .insert(legalDocuments)
-    .values({
-      kind: body.kind,
-      version: body.version,
-      title: body.title,
-      summary: body.summary ?? null,
-      body: body.body,
-      locale: body.locale ?? "en",
-      isCurrent: false,
-    } as any)
-    .returning();
+  const row = await createLegalDocDraft({
+    kind: body.kind,
+    version: body.version,
+    title: body.title,
+    summary: body.summary ?? null,
+    body: body.body,
+    locale: body.locale ?? "en",
+  });
   return c.json(success(row), 201);
 });
 
 // PATCH /admin/documents/:id — edit a draft (cannot edit a published doc)
 legalRoutes.patch("/admin/documents/:id", async (c) => {
   const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
-  const db = getDb();
-  const [existing] = await db
-    .select()
-    .from(legalDocuments)
-    .where(eq(legalDocuments.id, c.req.param("id")))
-    .limit(1);
-  if (!existing) return c.json(error("NOT_FOUND", "Document not found"), 404);
-  if (existing.publishedAt) {
-    return c.json(error("ALREADY_PUBLISHED", "Published documents are immutable. Create a new version."), 400);
-  }
-  const patch: Record<string, unknown> = { updatedAt: new Date() };
-  for (const k of ["title", "summary", "body", "version"] as const) {
-    if (k in body) patch[k] = (body as any)[k];
-  }
-  const [updated] = await db
-    .update(legalDocuments)
-    .set(patch as any)
-    .where(eq(legalDocuments.id, c.req.param("id")))
-    .returning();
-  return c.json(success(updated), 200);
+  return c.json(success(await updateLegalDocDraft(c.req.param("id"), body)), 200);
 });
 
 // POST /admin/documents/:id/publish — publish + un-current the previous current doc
 legalRoutes.post("/admin/documents/:id/publish", async (c) => {
-  const publisherId = c.var.user!.sub;
-  const db = getDb();
-  const [doc] = await db
-    .select()
-    .from(legalDocuments)
-    .where(eq(legalDocuments.id, c.req.param("id")))
-    .limit(1);
-  if (!doc) return c.json(error("NOT_FOUND", "Document not found"), 404);
-
-  // Un-current any prior current doc of the same (kind, locale) BEFORE flipping
-  // this one — partial unique index requires no overlap.
-  await db
-    .update(legalDocuments)
-    .set({ isCurrent: false, updatedAt: new Date() } as any)
-    .where(and(
-      eq(legalDocuments.kind, doc.kind),
-      eq(legalDocuments.locale, doc.locale),
-      eq(legalDocuments.isCurrent, true),
-    ));
-
-  const [updated] = await db
-    .update(legalDocuments)
-    .set({
-      isCurrent: true,
-      publishedAt: doc.publishedAt ?? new Date(),
-      publishedBy: publisherId,
-      updatedAt: new Date(),
-    } as any)
-    .where(eq(legalDocuments.id, doc.id))
-    .returning();
-
-  return c.json(success(updated), 200);
+  return c.json(success(await publishLegalDoc(c.req.param("id"), c.var.userId)), 200);
 });
 
 // DELETE /admin/documents/:id — drafts only
 legalRoutes.delete("/admin/documents/:id", async (c) => {
-  const db = getDb();
-  const [doc] = await db
-    .select({ id: legalDocuments.id, publishedAt: legalDocuments.publishedAt })
-    .from(legalDocuments)
-    .where(eq(legalDocuments.id, c.req.param("id")))
-    .limit(1);
-  if (!doc) return c.json(error("NOT_FOUND", "Document not found"), 404);
-  if (doc.publishedAt) {
-    return c.json(error("ALREADY_PUBLISHED", "Cannot delete a published document"), 400);
-  }
-  await db.delete(legalDocuments).where(eq(legalDocuments.id, doc.id));
+  await deleteLegalDocDraft(c.req.param("id"));
   return c.json(success({ deleted: true }), 200);
 });
-
-legalRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Legal route not found" } }, 404),
-);

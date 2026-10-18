@@ -13,9 +13,10 @@ import {
   CreateTemplateSchema,
   UpdateTemplateSchema,
 } from "../../domains/scorecards/schemas.js";
-import { mapServiceError, requireUser } from "../helpers/routerHelpers.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 import type { ScorecardsService } from "../../domains/scorecards/scorecardsService.js";
 import { error } from "../../types/index.js";
+import { validateJson } from "../helpers/validate.js";
 
 export function templateRoutes(
   service: () => ScorecardsService,
@@ -23,73 +24,39 @@ export function templateRoutes(
   const r = new Hono<AppEnv>();
 
   r.get("/", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
+    const userId = requireUser(c);
     const onlyCompanyId = c.req.query("companyId") || undefined;
-    try {
-      return c.json(success(await service().listTemplates(auth.userId, onlyCompanyId)));
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    return c.json(success(await service().listTemplates(userId, onlyCompanyId)));
   });
 
   r.get("/:id", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    try {
-      return c.json(success(await service().getTemplate(auth.userId, c.req.param("id"))));
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    const userId = requireUser(c);
+    return c.json(success(await service().getTemplate(userId, c.req.param("id"))));
   });
 
-  r.post("/", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = CreateTemplateSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(success(await service().createTemplate(auth.userId, parsed.data)), 201);
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+  r.post("/", validateJson(CreateTemplateSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(success(await service().createTemplate(userId, body)), 201);
   });
 
-  r.patch("/:id", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = UpdateTemplateSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(
-        success(await service().updateTemplate(auth.userId, c.req.param("id"), parsed.data)),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+  r.patch("/:id", validateJson(UpdateTemplateSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(
+      success(await service().updateTemplate(userId, c.req.param("id"), body)),
+    );
   });
 
-  r.post("/:id/attributes", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = AttributeInputSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(
-        success(
-          await service().addAttribute(auth.userId, c.req.param("id"), parsed.data),
-        ),
-        201,
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+  r.post("/:id/attributes", validateJson(AttributeInputSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(
+      success(
+        await service().addAttribute(userId, c.req.param("id"), body),
+      ),
+      201,
+    );
   });
 
   return r;
@@ -100,35 +67,20 @@ export function attributeRoutes(
 ): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
 
-  r.patch("/:id", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = AttributeInputSchema.partial().safeParse(
-      await c.req.json().catch(() => ({})),
+  r.patch("/:id", validateJson(AttributeInputSchema.partial(), (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten())), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(
+      success(
+        await service().updateAttribute(userId, c.req.param("id"), body),
+      ),
     );
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(
-        success(
-          await service().updateAttribute(auth.userId, c.req.param("id"), parsed.data),
-        ),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
   });
 
   r.delete("/:id", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    try {
-      await service().deleteAttribute(auth.userId, c.req.param("id"));
-      return c.json(success({ id: c.req.param("id") }));
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    const userId = requireUser(c);
+    await service().deleteAttribute(userId, c.req.param("id"));
+    return c.json(success({ id: c.req.param("id") }));
   });
 
   return r;

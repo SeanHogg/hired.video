@@ -1,7 +1,7 @@
 /**
  * NLE (power-user video editor) Drizzle schema.
  *
- * The Timeline JSON itself lives on `studio_projects.timeline_spec` —
+ * The Timeline JSON itself lives on `studio_projects.state` (migration 0610) —
  * that schema (and the `kind` discriminator) is in resumes.ts because
  * studio_projects is defined there. This file owns the supporting tables
  * that don't belong on a project row, starting with `nle_media_sources`.

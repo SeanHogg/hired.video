@@ -19,11 +19,11 @@ import { SCAN_OVERRIDES } from "../../../shared/moderation/explicit.js";
 import { AUDIT_ACTIONS, auditLog } from "../utils/audit.js";
 import { createExplicitScanDeps } from "../services/moderation/explicit/deps.js";
 import {
-  ScanReviewError,
   backfillVideoScans,
   listVideoScanQueue,
   overrideVideoScan,
 } from "../services/moderation/explicit/review.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const adminContentScanRoutes = new Hono<AppEnv>();
 
@@ -35,31 +35,24 @@ adminContentScanRoutes.get("/videos", async (c) => {
 
 const OverrideSchema = z.object({ override: z.enum(SCAN_OVERRIDES) }).strict();
 
-adminContentScanRoutes.post("/videos/:id/override", async (c) => {
+adminContentScanRoutes.post("/videos/:id/override", validateJson(OverrideSchema, () => error("VALIDATION_ERROR", "override must be \"pass\" or \"block\""), { emptyBody: null }), async (c) => {
   const videoId = c.req.param("id");
   if (!UuidLikeSchema.safeParse(videoId).success) return c.json(error("NOT_FOUND", "Video not found"), 404);
-  const parsed = OverrideSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "override must be \"pass\" or \"block\""), 400);
-  try {
-    const scan = await overrideVideoScan({ videoId, override: parsed.data.override, reviewerId: c.var.user.sub });
-    await auditLog({
-      actorId: c.var.user.sub,
-      action: parsed.data.override === "pass" ? AUDIT_ACTIONS.CONTENT_SCAN_APPROVED : AUDIT_ACTIONS.CONTENT_SCAN_KEPT_BLOCKED,
-      targetType: "video",
-      targetId: videoId,
-      metadata: { verdict: scan.verdict, categories: scan.categories },
-    });
-    return c.json(success({ videoId, overrideVerdict: scan.overrideVerdict }));
-  } catch (err) {
-    if (err instanceof ScanReviewError) return c.json(error(err.code, err.message), 404);
-    throw err;
-  }
+  const body = c.req.valid("json");
+  const scan = await overrideVideoScan({ videoId, override: body.override, reviewerId: c.var.userId });
+  await auditLog({
+    actorId: c.var.userId,
+    action: body.override === "pass" ? AUDIT_ACTIONS.CONTENT_SCAN_APPROVED : AUDIT_ACTIONS.CONTENT_SCAN_KEPT_BLOCKED,
+    targetType: "video",
+    targetId: videoId,
+    metadata: { verdict: scan.verdict, categories: scan.categories },
+  });
+  return c.json(success({ videoId, overrideVerdict: scan.overrideVerdict }));
 });
 
-const BackfillSchema = z.object({ limit: z.number().int().min(1).max(25).optional() }).strict();
+// A literal `null` body reads as `{}` (no limit), like an empty one.
+const BackfillSchema = z.preprocess((v) => v ?? {}, z.object({ limit: z.number().int().min(1).max(25).optional() }).strict());
 
-adminContentScanRoutes.post("/videos/backfill", async (c) => {
-  const parsed = BackfillSchema.safeParse((await c.req.json().catch(() => ({}))) ?? {});
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "limit must be 1–25"), 400);
-  return c.json(success(await backfillVideoScans(createExplicitScanDeps(c.env), parsed.data.limit)));
+adminContentScanRoutes.post("/videos/backfill", validateJson(BackfillSchema, () => error("VALIDATION_ERROR", "limit must be 1–25")), async (c) => {
+  return c.json(success(await backfillVideoScans(createExplicitScanDeps(c.env), c.req.valid("json").limit)));
 });

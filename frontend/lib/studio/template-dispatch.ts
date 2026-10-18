@@ -21,14 +21,15 @@
  * `studioService.saveDraft`. No `if (template.mediaKind === "game")`
  * branches at the call site.
  *
- * The TypeScript exhaustiveness check (`assertNever` on the switch
- * default) is load-bearing — adding a new mediaKind to MEDIA_KINDS
+ * The TypeScript exhaustiveness check (`Record<MediaKind, …>` on the
+ * seed registry) is load-bearing — adding a new mediaKind to MEDIA_KINDS
  * without a matching branch here is a compile error, which prevented
  * the "select image template → crash with 'Cannot read properties of
  * undefined (reading name)'" bug from sneaking past a future kind add.
  */
 
 import type { TemplateDef } from "@/lib/studio/templates/catalog";
+import type { MediaKind } from "@shared/media-kinds";
 import { seedCanvasFromTemplate } from "./editor-v2/template-seeds";
 import { canvasStateToTimeline } from "./editor-v2/timeline-emit";
 import { seedGameFromTemplate } from "./game/game-seeds";
@@ -77,77 +78,72 @@ export interface TemplateSeedPayload {
   documentState?: DocumentState;
 }
 
+/** Shared seed for the CanvasState-authoring kinds: the canvas seed registry
+ *  emitted as Timeline JSON. */
+function timelineSeed(template: TemplateDef): unknown {
+  return canvasStateToTimeline(seedCanvasFromTemplate(template.id));
+}
+
+type TemplateSeeder = (template: TemplateDef, name: string) => TemplateSeedPayload;
+
+/** Per-kind seed registry. `Record<MediaKind, …>` is load-bearing — adding a
+ *  new MediaKind to `MEDIA_KINDS` without an entry here is a compile error. */
+const TEMPLATE_SEEDERS: Record<MediaKind, TemplateSeeder> = {
+  game: (template, name) => ({ name, gameState: seedGameFromTemplate(template.id) }),
+  image: (template, name) => ({ name, imageState: seedImageFromTemplate(template.id) }),
+  // Animation mediaKind (#1003) mounts the frame-by-frame
+  // <AnimationStage> runtime; its seed registry lives in
+  // `animation/animation-seeds.ts`. No timelineSpec emitted —
+  // export goes through the GIF/APNG/WebP encoder strategies.
+  animation: (template, name) => ({ name, animationState: seedAnimationFromTemplate(template.id) }),
+  // CAD mediaKind (#930) — 2D vector drafting. No template seed
+  // registry yet; every CAD project lands as a blank drawing.
+  cad: (template, name) => ({ name, cadState: seedCadFromTemplate(template.id) }),
+  // 3D CAD runtime stub (#930 follow-on). Blank scene; the editor's
+  // primitive palette is the entry path.
+  cad_3d: (_template, name) => ({ name, cad3dState: createBlankCad3DState() }),
+  // Interactive comic (#929) — branching graph. Ride the existing
+  // linear-comic canvas seed for the pages, and seed a blank branch
+  // graph on top.
+  interactive_comic: (template, name) => ({
+    name,
+    timelineSpec: timelineSeed(template),
+    interactiveComicState: createBlankInteractiveComicState(),
+  }),
+  // Timeline-runtime kinds (and comic which authors via CanvasState
+  // today per the user's enum addition) share the same canvas seed
+  // registry. Animation was MOVED OUT of this group in #1003 —
+  // animation now has its own canvas runtime.
+  video: (template, name) => ({ name, timelineSpec: timelineSeed(template) }),
+  podcast: (template, name) => ({ name, timelineSpec: timelineSeed(template) }),
+  voice: (template, name) => ({ name, timelineSpec: timelineSeed(template) }),
+  comic: (template, name) => ({ name, timelineSpec: timelineSeed(template) }),
+  // Document runtime (#1912) — seed a blank DocumentState. The entity axis
+  // (resume / job / article / blog) comes from the catalog's
+  // `documentEntityKind` (#1917); fall back to resume for older document
+  // templates that predate the field.
+  document: (template, name) => {
+    const entityKind: DocumentEntityKind = template.documentEntityKind ?? "resume";
+    return {
+      name,
+      documentState: createBlankDocumentState(entityKind, () => newId("page")),
+    };
+  },
+};
+
 /**
  * Resolve the seed payload for a template. Dispatches by mediaKind into
  * the per-kind seed registry, then packages the result in the shape
  * `saveDraft` accepts on the wire.
  */
 export function seedTemplate(template: TemplateDef): TemplateSeedPayload {
-  const name = template.defaultName;
-  switch (template.mediaKind) {
-    case "game":
-      return { name, gameState: seedGameFromTemplate(template.id) };
-    case "image":
-      return { name, imageState: seedImageFromTemplate(template.id) };
-    case "animation":
-      // Animation mediaKind (#1003) mounts the frame-by-frame
-      // <AnimationStage> runtime; its seed registry lives in
-      // `animation/animation-seeds.ts`. No timelineSpec emitted —
-      // export goes through the GIF/APNG/WebP encoder strategies.
-      return { name, animationState: seedAnimationFromTemplate(template.id) };
-    case "cad":
-      // CAD mediaKind (#930) — 2D vector drafting. No template seed
-      // registry yet; every CAD project lands as a blank drawing.
-      return { name, cadState: seedCadFromTemplate(template.id) };
-    case "cad_3d": {
-      // 3D CAD runtime stub (#930 follow-on). Blank scene; the editor's
-      // primitive palette is the entry path.
-      return { name, cad3dState: createBlankCad3DState() };
-    }
-    case "interactive_comic": {
-      // Interactive comic (#929) — branching graph. Ride the existing
-      // linear-comic canvas seed for the pages, and seed a blank branch
-      // graph on top.
-      return {
-        name,
-        timelineSpec: canvasStateToTimeline(seedCanvasFromTemplate(template.id)),
-        interactiveComicState: createBlankInteractiveComicState(),
-      };
-    }
-    case "video":
-    case "podcast":
-    case "voice":
-    case "comic":
-      // Timeline-runtime kinds (and comic which authors via CanvasState
-      // today per the user's enum addition) share the same canvas seed
-      // registry. Animation was MOVED OUT of this branch in #1003 —
-      // animation now has its own canvas runtime.
-      return {
-        name,
-        timelineSpec: canvasStateToTimeline(seedCanvasFromTemplate(template.id)),
-      };
-    case "document": {
-      // Document runtime (#1912) — seed a blank DocumentState. The entity axis
-      // (resume / job / article / blog) comes from the catalog's
-      // `documentEntityKind` (#1917); fall back to resume for older document
-      // templates that predate the field.
-      const entityKind: DocumentEntityKind = template.documentEntityKind ?? "resume";
-      return {
-        name,
-        documentState: createBlankDocumentState(entityKind, () => newId("page")),
-      };
-    }
-    default:
-      // Exhaustiveness guard — TS errors here if a new MediaKind is
-      // added to `MEDIA_KINDS` without a matching branch above. Runtime
-      // throw is the safety net: a future "scene" / "3d_model" added by
-      // someone in a hurry would otherwise return `undefined`, crash at
-      // `seed.name`, and surface as the same opaque toast that prompted
-      // the image-kind fix.
-      return assertNever(template.mediaKind, `Unhandled mediaKind in seedTemplate(): ${String(template.mediaKind)}`);
+  const seeder: TemplateSeeder | undefined = TEMPLATE_SEEDERS[template.mediaKind];
+  // Runtime safety net: a kind that reaches here without a registry entry
+  // (bad persisted data) would otherwise return `undefined`, crash at
+  // `seed.name`, and surface as the same opaque toast that prompted the
+  // image-kind fix.
+  if (!seeder) {
+    throw new Error(`Unhandled mediaKind in seedTemplate(): ${String(template.mediaKind)}`);
   }
-}
-
-function assertNever(_x: never, msg: string): never {
-  throw new Error(msg);
+  return seeder(template, template.defaultName);
 }

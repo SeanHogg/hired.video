@@ -7,8 +7,9 @@
 
 import { desc, eq, ilike, inArray, sql, type SQL } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
+import { syncFeedPostHashtags } from "./feedPostTagsRepository.js";
 
-const { feedPosts } = schema;
+const { feedPosts, feedPostTags } = schema;
 
 export type FeedDb = ReturnType<typeof getDb>;
 export type FeedPostRecord = typeof feedPosts.$inferSelect;
@@ -45,7 +46,7 @@ export async function listVisiblePosts(
 ): Promise<{ total: number; rows: FeedPostRecord[] }> {
   const visibility = feedVisibilityCondition(viewer.userId, viewer.isRecruiter);
   const tagFilter = opts.tag
-    ? sql`EXISTS (SELECT 1 FROM jsonb_array_elements(${feedPosts.tags}) t WHERE lower(t->>'tagValue') = ${opts.tag} AND t->>'tagType' = 'Hashtag')`
+    ? sql`EXISTS (SELECT 1 FROM ${feedPostTags} WHERE ${feedPostTags.postId} = ${feedPosts.id} AND ${feedPostTags.tag} = ${opts.tag.toLowerCase()})`
     : null;
   const whereClause = tagFilter ? sql`${visibility} AND ${tagFilter}` : visibility;
 
@@ -111,6 +112,7 @@ export async function findPostsByIds(db: FeedDb, ids: string[]): Promise<FeedPos
 
 export async function insertPost(db: FeedDb, values: FeedPostValues): Promise<FeedPostRecord> {
   const [post] = await db.insert(feedPosts).values(values).returning();
+  if (values.tags !== undefined) await syncFeedPostHashtags(db, post, post.tags);
   return post;
 }
 
@@ -120,11 +122,31 @@ export async function updatePost(
   patch: Partial<FeedPostValues>,
 ): Promise<FeedPostRecord> {
   const [updated] = await db.update(feedPosts).set(patch).where(eq(feedPosts.id, postId)).returning();
+  if (updated && patch.tags !== undefined) await syncFeedPostHashtags(db, updated, updated.tags);
   return updated;
 }
 
 export async function deletePost(db: FeedDb, postId: string): Promise<void> {
   await db.delete(feedPosts).where(eq(feedPosts.id, postId));
+}
+
+/**
+ * Employee Community channel posts (Pro): `Private` posts carrying the raw
+ * string tag `company:<companyId>:<channel>`, newest first. The tag match is
+ * a jsonb containment in SQL so other companies' private posts can't crowd
+ * a channel out of the page.
+ */
+export async function listCommunityChannelPosts(
+  db: FeedDb,
+  channelTag: string,
+  limit: number,
+): Promise<FeedPostRecord[]> {
+  return db
+    .select()
+    .from(feedPosts)
+    .where(sql`${feedPosts.privacy} = 'Private' AND ${feedPosts.tags} @> ${JSON.stringify([channelTag])}::jsonb`)
+    .orderBy(desc(feedPosts.createdAt))
+    .limit(limit);
 }
 
 /** Reshare counts keyed by original post id. */
@@ -146,19 +168,19 @@ export interface TrendingTagRow {
   post_count: number;
 }
 
-/** Top hashtags by post frequency over the last 30 days. */
+/** Top hashtags by the number of posts carrying them over the last 30 days
+ *  (feed_post_tags, migration 0616). */
 export async function selectTrendingTags(db: FeedDb, limit: number): Promise<TrendingTagRow[]> {
   const rows = await db.execute(sql`
     SELECT
-      lower(tag->>'tagValue') AS tag,
-      count(*)::int           AS post_count
-    FROM feed_posts,
-         jsonb_array_elements(tags) AS tag
-    WHERE tag->>'tagType' = 'Hashtag'
-      AND created_at > now() - interval '30 days'
-      AND privacy = 'Public'
-      AND NOT (tags::text LIKE '%"company:%')
-    GROUP BY lower(tag->>'tagValue')
+      t.tag           AS tag,
+      count(*)::int   AS post_count
+    FROM feed_post_tags t
+    JOIN feed_posts p ON p.id = t.post_id
+    WHERE t.created_at > now() - interval '30 days'
+      AND p.privacy = 'Public'
+      AND NOT (p.tags::text LIKE '%"company:%')
+    GROUP BY t.tag
     ORDER BY post_count DESC
     LIMIT ${limit}
   `);
@@ -222,4 +244,14 @@ export async function selectTrendingPosts(
     LIMIT ${limit}
   `);
   return rows.rows as Array<Record<string, unknown>>;
+}
+
+/** Users with the most feed posts (creator leaderboard), most first. */
+export function selectTopPosters(db: FeedDb, limit: number): Promise<Array<{ userId: string; postCount: number }>> {
+  return db
+    .select({ userId: feedPosts.userId, postCount: sql<number>`count(*)::int` })
+    .from(feedPosts)
+    .groupBy(feedPosts.userId)
+    .orderBy(desc(sql`count(*)`))
+    .limit(limit);
 }

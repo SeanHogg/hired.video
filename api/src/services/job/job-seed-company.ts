@@ -12,7 +12,7 @@ export const HIRED_VIDEO_SEED_COMPANY = "hired.video Community";
  *  `platform:hired-video-company-id`) so there is a single cache for the id.
  *  Returns null if the seed hasn't run yet — callers should treat that as
  *  "no first-party templates exist" rather than blocking. Dynamic imports
- *  avoid a JobService <-> platform-company import cycle. */
+ *  avoid a job-seed-company <-> platform-company import cycle. */
 export async function getHiredVideoCommunityCompanyId(): Promise<string | null> {
   const { getDb } = await import("../../db/index.js");
   const { getPlatformCompanyId } = await import("../campaigns/platform-company.js");

@@ -294,7 +294,7 @@ export class RedemptionEngine {
   }
 
   /** #169 — Campaign $ fulfillment. Grants `amountCents` into the user's
-   *  campaign_dollars_balance row + writes an audit transaction. The
+   *  campaign_dollars wallet + writes its ledger row (one statement). The
    *  boosts checkout flow (`api/src/routes/boosts.ts`) reads this
    *  balance before charging Stripe. No YTD bump — Campaign $ is
    *  platform-internal credit, not 1099 income. */

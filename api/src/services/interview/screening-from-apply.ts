@@ -15,7 +15,7 @@
  * The recruiter can hand-send a link from MyInterviewAssignments later.
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import { schema } from "../../db/index.js";
 import { randomHex } from "../../utils/crypto.js";
@@ -98,10 +98,13 @@ export async function createScreeningInterviewFromApply(
     } as any)
     .returning({ id: studioAsyncInterviews.id });
 
-  // 3. Bump set.useCount — cheap usage analytics for the library UI.
+  // 3. Bump set.useCount — cheap usage analytics for the library UI. Atomic
+  // increment (a read-modify-write lost concurrent applies); the daily
+  // counter-recompute policy (maintenance/counter-recompute.ts) is the
+  // source of truth and corrects any drift.
   await db
     .update(interviewQuestionSets)
-    .set({ useCount: (set.useCount ?? 0) + 1, updatedAt: new Date() } as any)
+    .set({ useCount: sql`${interviewQuestionSets.useCount} + 1`, updatedAt: new Date() })
     .where(eq(interviewQuestionSets.id, set.id));
 
   return {

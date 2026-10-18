@@ -1,5 +1,5 @@
 /**
- * Tool-run entity ownership lookups (routes/tool-runs.ts).
+ * Tool-run entity ownership lookups (services/ai-tools/tool-runs.ts).
  *
  * job_items has no `userId` column — owners are tracked via three paths:
  *   1. The recruiter/employer who posted it (`posted_by_user_id`)
@@ -17,6 +17,28 @@
 import { and, eq, exists, or } from "drizzle-orm";
 import { schema, type Db } from "../db/index.js";
 import { canActFor } from "../services/studio/workspace.js";
+
+/** The résumé row belongs to the user. */
+export async function ownsByResume(db: Db, userId: string, resumeId: string): Promise<boolean> {
+  const { resumeInformation } = schema;
+  const rows = await db
+    .select({ id: resumeInformation.id })
+    .from(resumeInformation)
+    .where(and(eq(resumeInformation.id, resumeId), eq(resumeInformation.userId, userId)))
+    .limit(1);
+  return rows.length > 0;
+}
+
+/** The video row belongs to the user. */
+export async function ownsByVideo(db: Db, userId: string, videoId: string): Promise<boolean> {
+  const { videos } = schema;
+  const rows = await db
+    .select({ id: videos.id })
+    .from(videos)
+    .where(and(eq(videos.id, videoId), eq(videos.userId, userId)))
+    .limit(1);
+  return rows.length > 0;
+}
 
 /** ONE query: the job row qualifies when posted by the user OR an EXISTS over
  *  saved_jobs / job_applications matches (was up to 3 sequential round-trips).

@@ -20,7 +20,3 @@ export const affiliateRoutes = new Hono<AppEnv>();
 
 affiliateRoutes.route("/", affiliateProgramRoutes);
 affiliateRoutes.route("/", affiliateAdminRoutes);
-
-affiliateRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Affiliate route not found" } }, 404),
-);

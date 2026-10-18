@@ -15,7 +15,8 @@
  * The DB CHECK constraint `share_links_subject_type_check` is built from
  * this list (api/src/db/schema/shareLinks.ts); adding a kind here is the
  * only registry edit needed, plus its subject table in
- * SHARE_LINK_SUBJECT_TABLES (same schema file).
+ * SHARE_LINK_SUBJECT_TABLES (same schema file) and an AFTER DELETE trigger
+ * on that table in a new migration (pattern: 0650_share_links_delete_triggers).
  */
 export const SHARE_LINK_SUBJECT_TYPES = [
   "candidate_resume",

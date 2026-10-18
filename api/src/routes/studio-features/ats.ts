@@ -3,16 +3,16 @@
  * routes/studio-features.ts barrel (split out of that file; paths unchanged).
  */
 import { Hono } from "hono";
-import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import { publicAtsPath } from "../../../../shared/public-paths.js";
 import { slugify } from "../../../../shared/slugify.js";
 import { tryExtractJson } from "../../../../shared/extract-json.js";
 import type { AppEnv } from "../../types/index.js";
-import { getDb } from "../../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../../services/adapters/llm-client.js";
-import { ok, fail, studioAtsPackages } from "./shared.js";
+import { saveAtsPackage, viewAtsPackage } from "../../services/studio/ats-packages.js";
+import { success, error } from "../../types/index.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const atsRoutes = new Hono<AppEnv>();
 
@@ -21,10 +21,7 @@ export const atsRoutes = new Hono<AppEnv>();
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // POST /api/studio/ats/generate — generate an ATS-compatible package
-atsRoutes.post("/ats/generate", async (c) => {
-  const user = c.var.user;
-  const body = await c.req.json().catch(() => null);
-  const parsed = z.object({
+atsRoutes.post("/ats/generate", validateJson(z.object({
     projectId: UuidLikeSchema,
     candidateName: z.string().min(1).max(200),
     headline: z.string().max(200).optional(),
@@ -32,12 +29,13 @@ atsRoutes.post("/ats/generate", async (c) => {
     videoUrl: z.string().optional(),
     thumbnailUrl: z.string().optional(),
     scriptText: z.string().min(10),  // full script text to generate summary
-  }).safeParse(body);
+  }), () => error("VALIDATION_ERROR", "Invalid request"), { emptyBody: null }), async (c) => {
+  const user = c.var.user;
+  const body = c.req.valid("json");
 
-  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request"), 400);
 
   // Generate ATS-parseable text summary using AI
-  let textSummary = parsed.data.scriptText.slice(0, 1000);
+  let textSummary = body.scriptText.slice(0, 1000);
   let emailTemplate = "";
   if (hasAnyLLMProviderKey(c.env)) {
     try {
@@ -49,10 +47,10 @@ atsRoutes.post("/ats/generate", async (c) => {
 2. "email" — a brief professional email template a candidate can use to send this video resume to a recruiter
 
 Return ONLY valid JSON: {"summary": "...", "email": "..."}`,
-        userMessage: `Candidate name: ${parsed.data.candidateName}
-Headline: ${parsed.data.headline ?? "Professional"}
+        userMessage: `Candidate name: ${body.candidateName}
+Headline: ${body.headline ?? "Professional"}
 Video script:
-${parsed.data.scriptText.slice(0, 3000)}`,
+${body.scriptText.slice(0, 3000)}`,
       });
       const result = tryExtractJson<{ summary?: string; email?: string }>(content);
       if (result) {
@@ -65,25 +63,24 @@ ${parsed.data.scriptText.slice(0, 3000)}`,
   }
 
   // Generate unique slug
-  const slug = `${slugify(parsed.data.candidateName, { fallback: "candidate", maxLen: 40 })}-${Date.now().toString(36)}`;
+  const slug = `${slugify(body.candidateName, { fallback: "candidate", maxLen: 40 })}-${Date.now().toString(36)}`;
 
-  const db = getDb();
-  const [atsPackage] = await db.insert(studioAtsPackages).values({
+  const atsPackage = await saveAtsPackage({
     userId: user.sub,
-    projectId: parsed.data.projectId,
+    projectId: body.projectId,
     slug,
-    videoUrl: parsed.data.videoUrl ?? null,
-    thumbnailUrl: parsed.data.thumbnailUrl ?? null,
-    candidateName: parsed.data.candidateName,
-    headline: parsed.data.headline ?? null,
+    videoUrl: body.videoUrl ?? null,
+    thumbnailUrl: body.thumbnailUrl ?? null,
+    candidateName: body.candidateName,
+    headline: body.headline ?? null,
     textSummary,
     emailTemplate,
-    linkedinUrl: parsed.data.linkedinUrl ?? null,
-  } as any).returning();
+    linkedinUrl: body.linkedinUrl ?? null,
+  });
 
   const pageUrl = `https://hired.video${publicAtsPath(slug)}`;
 
-  return c.json(ok({
+  return c.json(success({
     id: atsPackage.id,
     slug,
     pageUrl,
@@ -95,27 +92,17 @@ ${parsed.data.scriptText.slice(0, 3000)}`,
 // GET /api/studio/ats/:slug — public landing page data (no auth)
 atsRoutes.get("/ats/:slug", async (c) => {
   const slug = c.req.param("slug");
-  const db = getDb();
+  // Counts this view; the returned viewCount already includes it.
+  const pkg = await viewAtsPackage(slug);
 
-  const [pkg] = await db.select().from(studioAtsPackages)
-    .where(and(eq(studioAtsPackages.slug, slug), eq(studioAtsPackages.isActive, true)))
-    .limit(1);
-
-  if (!pkg) return c.json(fail("NOT_FOUND", "Package not found"), 404);
-
-  // Increment view count
-  await db.update(studioAtsPackages)
-    .set({ viewCount: sql`${studioAtsPackages.viewCount} + 1` } as any)
-    .where(eq(studioAtsPackages.id, pkg.id));
-
-  return c.json(ok({
+  return c.json(success({
     candidateName: pkg.candidateName,
     headline: pkg.headline,
     videoUrl: pkg.videoUrl,
     thumbnailUrl: pkg.thumbnailUrl,
     textSummary: pkg.textSummary,
     linkedinUrl: pkg.linkedinUrl,
-    viewCount: (pkg.viewCount ?? 0) + 1,
+    viewCount: pkg.viewCount,
     // Project id powers the engagement tracker on the public landing page.
     // Slug is for routing; events still need to land on the analytics
     // aggregation unit (project), not the slug.

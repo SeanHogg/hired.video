@@ -21,11 +21,12 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Variables, AppEnv } from "../types/index.js";
-import { ok } from "../utils/response.js";
 import { sendGenericEmail } from "../services/adapters/email.js";
 import { createIpRateLimiter, getClientIp } from "../middleware/rateLimiter.js";
 import { logger } from "../lib/logger.js";
 import { escapeHtml } from "../../../shared/html-escape.js";
+import { success, error } from "../types/index.js";
+import { validateJson } from "./helpers/validate.js";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -131,22 +132,15 @@ const MAX_CONTEXT_RENDER_CHARS = 128_000;
 
 export const errorsRoutes = new Hono<AppEnv>();
 
-errorsRoutes.post("/report", reportRateLimiter, async (c) => {
+errorsRoutes.post("/report", reportRateLimiter, validateJson(ErrorReportSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid report"), { emptyBody: null }), async (c) => {
   // Reject oversized bodies before even parsing. See MAX_REPORT_BYTES.
   const lengthHeader = c.req.header("content-length");
   if (lengthHeader && Number(lengthHeader) > MAX_REPORT_BYTES) {
-    return c.json({ error: { code: "PAYLOAD_TOO_LARGE", message: "Report payload too large." } }, 413);
+    return c.json(error("PAYLOAD_TOO_LARGE", "Report payload too large."), 413);
   }
 
-  const raw = await c.req.json().catch(() => null);
-  const parsed = ErrorReportSchema.safeParse(raw);
-  if (!parsed.success) {
-    return c.json(
-      { error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "Invalid report" } },
-      400,
-    );
-  }
-  const report = parsed.data;
+  const body = c.req.valid("json");
+  const report = body;
   const clientIp = getClientIp(c);
 
   // Email is best-effort: a failure is logged but does not fail the
@@ -161,7 +155,7 @@ errorsRoutes.post("/report", reportRateLimiter, async (c) => {
     });
 
   return c.json(
-    ok({
+    success({
       received: true,
       delivered: { email: emailOk },
     }),

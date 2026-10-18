@@ -6,65 +6,41 @@
 import type { CardFeedType } from "@/lib/card-feed";
 import type { SearchFilters } from "@/lib/services/search-service";
 
-export const categoryToTypes = (category: string): CardFeedType[] => {
-  switch (category) {
-    case "resumes":
-      return ["resume"];
-    case "jobs":
-      return ["job"];
-    case "companies":
-      return ["company"];
-    case "people":
-      return ["people"];
-    case "creators":
-      // Creators are a filter on People — same fetch, viewer-side filter on isCreator
-      return ["people"];
-    case "services":
-      // Services have a dedicated fetch path handled below; no card-feed type
-      return [];
-    case "courses":
-      // Courses also bypass the card-feed pipeline (separate /api/courses/public)
-      return [];
-    case "templates":
-      // Templates = the actual template catalog only: resume presets +
-      // studio built-ins + creator-published studio templates, ALL of which
-      // the "template" fetcher already surfaces through the unified registry
-      // (card-feed `fetchTemplates`). Public USER resumes are NOT templates —
-      // they previously rode along here (the #1613 conflation) but, carrying
-      // real recent dates, out-ranked and crowded out the actual templates
-      // under the "recent" sort. They live under the "resumes" category.
-      // Future kinds (job_templates, learning_path_templates) get added here.
-      return ["template"];
-    case "articles":
-      return ["article"];
-    case "guides":
-      return ["guide"];
-    case "tools":
-      return ["tool"];
-    case "faqs":
-      return ["faq"];
-    case "media":
-      return ["video"];
-    case "events":
-      return ["event"];
-    case "all":
-      return [
-        "resume",
-        "job",
-        "company",
-        "people",
-        "video",
-        "template",
-        "article",
-        "guide",
-        "tool",
-        "faq",
-        "event",
-      ];
-    default:
-      return [];
-  }
+/** Search category → card-feed types it fetches (open/closed: a new
+ *  category is one entry). Unlisted categories fetch nothing. */
+const CATEGORY_CARD_TYPES: Readonly<Record<string, readonly CardFeedType[]>> = {
+  resumes: ["resume"],
+  jobs: ["job"],
+  companies: ["company"],
+  people: ["people"],
+  // Creators are a filter on People — same fetch, viewer-side filter on isCreator
+  creators: ["people"],
+  // Services have a dedicated fetch path; no card-feed type
+  services: [],
+  // Courses also bypass the card-feed pipeline (separate /api/courses/public)
+  courses: [],
+  // Templates = the actual template catalog only: resume presets +
+  // studio built-ins + creator-published studio templates, ALL of which
+  // the "template" fetcher already surfaces through the unified registry
+  // (card-feed `fetchTemplates`). Public USER resumes are NOT templates —
+  // they previously rode along here (the #1613 conflation) but, carrying
+  // real recent dates, out-ranked and crowded out the actual templates
+  // under the "recent" sort. They live under the "resumes" category.
+  // Future kinds (job_templates, learning_path_templates) get added here.
+  templates: ["template"],
+  articles: ["article"],
+  guides: ["guide"],
+  tools: ["tool"],
+  faqs: ["faq"],
+  media: ["video"],
+  events: ["event"],
+  all: ["resume", "job", "company", "people", "video", "template", "article", "guide", "tool", "faq", "event"],
 };
+
+export const categoryToTypes = (category: string): CardFeedType[] =>
+  Object.prototype.hasOwnProperty.call(CATEGORY_CARD_TYPES, category)
+    ? [...CATEGORY_CARD_TYPES[category]]
+    : [];
 
 // Search fields are heterogeneous across entity kinds: `keywords`, `tags`,
 // and `category` can arrive as a plain string OR an array of strings

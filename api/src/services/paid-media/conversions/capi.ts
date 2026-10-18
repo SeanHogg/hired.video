@@ -17,9 +17,9 @@
  * trimmed). Phone normalisation strips non-digits.
  */
 
-import { and, eq } from "drizzle-orm";
 import type { getDb } from "../../../db/index.js";
 import { schema } from "../../../db/index.js";
+import { PaidMediaPixelsRepository } from "../../../repositories/paidMediaPixelsRepository.js";
 import { decryptSecret } from "../secrets.js";
 import { linkedInApiVersion } from "../../../utils/linkedin-version.js";
 import { sha256Hex } from "../../../utils/crypto.js";
@@ -259,20 +259,11 @@ export interface RecordConversionDeps {
  *  populated. Never throws — failures are recorded in delivery_results
  *  so the calling route never breaks because of a pixel outage. */
 export async function recordConversion(deps: RecordConversionDeps, ev: ConversionEvent): Promise<{ id: string; delivery: DeliveryResults }> {
-  const pixels = await deps.db
-    .select()
-    .from(schema.paidMediaPixels)
-    .where(
-      and(
-        eq(schema.paidMediaPixels.userId, ev.workspaceUserId),
-        ev.workspaceCompanyId
-          ? eq(schema.paidMediaPixels.companyId, ev.workspaceCompanyId)
-          : eq(schema.paidMediaPixels.userId, ev.workspaceUserId), // null-companyId comparison
-      ),
-    )
-    .limit(1);
-
-  const pixel = pixels[0];
+  // Personal workspaces match companyId IS NULL — the old predicate repeated
+  // the userId test, so a personal conversion could fan out through one of
+  // the user's company pixel rows.
+  const pixel = await new PaidMediaPixelsRepository(deps.db)
+    .findForOwner(ev.workspaceUserId, ev.workspaceCompanyId ?? null);
   const delivery: DeliveryResults = {};
 
   if (pixel) {

@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "./db/index.js";
-import { HIRED_VIDEO_SEED_COMPANY } from "./services/job/JobService.js";
+import { HIRED_VIDEO_SEED_COMPANY } from "./services/job/job-seed-company.js";
 import { USER_ROLES } from "../../shared/user-roles.js";
 import { slugify } from "../../shared/slugify.js";
 import { allSectorArticleDrafts } from "../../shared/sector-article-templates.js";

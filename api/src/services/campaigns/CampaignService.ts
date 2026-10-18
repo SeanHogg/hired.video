@@ -10,7 +10,7 @@
  * (they don't mutate those aggregates, so they don't warrant owning repos).
  */
 import { and, eq, inArray, isNotNull, like } from "drizzle-orm";
-import { schema } from "../../db/index.js";
+import { getDb, schema } from "../../db/index.js";
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
 import { getEmailProvider } from "../adapters/email/transport.js";
 import { MarketingConsentService } from "../email/MarketingConsentService.js";
@@ -93,6 +93,12 @@ export class CampaignService {
       db,
       new MarketingConsentService(repos.emailConsent as any),
     );
+  }
+
+  /** The engine bound to the live request DB — for callers (routes, crons)
+   *  that should not reach for `getDb()` themselves. */
+  static live(): CampaignService {
+    return CampaignService.create(getDb());
   }
 
   // ── Mapping ───────────────────────────────────────────────────────────────

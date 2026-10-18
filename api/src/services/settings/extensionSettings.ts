@@ -1,7 +1,7 @@
 /**
  * Extension preferences — settings shared by the Chrome extension sidepanels
  * (jobseeker + recruiter) and the web /settings?tab=extensions page. Stored as
- * one jsonb blob on account_preferences so the shape can evolve without a new
+ * one jsonb blob on user_settings (account section) so the shape can evolve without a new
  * column per toggle.
  */
 

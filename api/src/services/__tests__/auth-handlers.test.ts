@@ -74,6 +74,44 @@ interface Fake2fa {
   used: boolean;
 }
 
+/** A legacy-shaped fixture token → an auth_tokens row of `purpose`. */
+function toAuthTokenRow(purpose: string, t: FakeToken | Fake2fa) {
+  return {
+    id: t.id,
+    purpose,
+    userId: t.userId,
+    email: null,
+    token: "code" in t ? t.code : t.token,
+    expiresAt: t.expiresAt,
+    usedAt: t.used ? new Date(0) : null,
+    attempts: 0,
+    redirect: null,
+    createdAt: new Date(),
+  };
+}
+
+/** The auth_tokens rows of one purpose, in the legacy per-table shape
+ *  (`used` boolean). `push` seeds a legacy-shaped fixture. */
+function authTokenView(state: any, purpose: string): any[] {
+  const rows = () =>
+    (state.auth_tokens as any[])
+      .filter((r) => r.purpose === purpose)
+      .map((r) => ({ ...r, used: r.usedAt != null }));
+  return new Proxy([] as any[], {
+    get(_target, prop) {
+      if (prop === "push") {
+        return (...items: Array<FakeToken | Fake2fa>) => {
+          for (const it of items) state.auth_tokens.push(toAuthTokenRow(purpose, it));
+          return rows().length;
+        };
+      }
+      const view = rows();
+      const value = (view as any)[prop];
+      return typeof value === "function" ? value.bind(view) : value;
+    },
+  });
+}
+
 /** Build an in-memory db that covers the query shapes the handlers use.
  *  Every call is recorded on the `calls` array so tests can assert on the
  *  exact writes the handler performed. */
@@ -94,21 +132,24 @@ function makeFakeDb(seed: {
 } = {}) {
   const fake = buildFakeDb({
     users: (seed.users ?? []) as any,
-    password_reset_tokens: (seed.passwordResetTokens ?? []) as any,
-    email_verification_tokens: (seed.emailVerificationTokens ?? []) as any,
-    two_factor_codes: (seed.twoFactorCodes ?? []) as any,
+    // One-time tokens of every purpose live in auth_tokens (W3-B, mig 0591).
+    auth_tokens: [
+      ...(seed.passwordResetTokens ?? []).map((t) => toAuthTokenRow("password_reset", t)),
+      ...(seed.emailVerificationTokens ?? []).map((t) => toAuthTokenRow("email_verification", t)),
+      ...(seed.twoFactorCodes ?? []).map((t) => toAuthTokenRow("two_factor", t)),
+    ] as any,
     affiliate_profiles: (seed.affiliateProfiles ?? []) as any,
     affiliate_referrals: [] as any,
   });
   const state = fake.state as any;
   Object.defineProperty(state, "passwordResetTokens", {
-    get: () => state.password_reset_tokens,
+    get: () => authTokenView(state, "password_reset"),
   });
   Object.defineProperty(state, "emailVerificationTokens", {
-    get: () => state.email_verification_tokens,
+    get: () => authTokenView(state, "email_verification"),
   });
   Object.defineProperty(state, "twoFactorCodes", {
-    get: () => state.two_factor_codes,
+    get: () => authTokenView(state, "two_factor"),
   });
   Object.defineProperty(state, "affiliateProfiles", {
     get: () => state.affiliate_profiles,

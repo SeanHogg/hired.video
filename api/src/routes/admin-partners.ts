@@ -34,6 +34,7 @@ import { listConnectionsForPartner } from "../services/partner/connections.js";
 import { notifyOwnerApproved, notifyOwnerRejected } from "../services/partner/emails.js";
 import { adminRepos } from "../repositories/admin/index.js";
 import { PARTNER_SCOPES, DEFAULT_PARTNER_SCOPES, type PartnerScope } from "../../../shared/partner.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const adminPartnerRoutes = new Hono<AppEnv>();
 
@@ -52,7 +53,7 @@ adminPartnerRoutes.get("/", async (c) => {
 
 // POST /:id/approve — approve a pending request + email the owner.
 adminPartnerRoutes.post("/:id/approve", async (c) => {
-  const partner = await approvePartner(c.req.param("id"), c.var.user?.sub ?? "");
+  const partner = await approvePartner(c.req.param("id"), c.var.userId ?? "");
   if (!partner) return c.json(error("NOT_FOUND", "Partner not found"), 404);
   const email = await ownerEmail(partner.ownerUserId);
   if (email) await notifyOwnerApproved(partner, { email }).catch(() => undefined);
@@ -76,13 +77,9 @@ const CreatePartnerBody = z.object({
   logoUrl: z.string().url().max(2000).optional(),
 });
 
-adminPartnerRoutes.post("/", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = CreatePartnerBody.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
-  }
-  const partner = await createPartner({ ...parsed.data, createdBy: c.var.user?.sub ?? null });
+adminPartnerRoutes.post("/", validateJson(CreatePartnerBody, (e) => error("VALIDATION_ERROR", "Invalid request body", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  const partner = await createPartner({ ...body, createdBy: c.var.userId ?? null });
   return c.json(success({ partner }), 201);
 });
 
@@ -111,21 +108,17 @@ const CreateKeyBody = z.object({
   expiresInDays: z.number().int().min(1).max(3650).optional(),
 });
 
-adminPartnerRoutes.post("/:id/keys", async (c) => {
+adminPartnerRoutes.post("/:id/keys", validateJson(CreateKeyBody, (e) => error("VALIDATION_ERROR", "Invalid request body", e.flatten()), { emptyBody: null }), async (c) => {
   const partner = await getPartner(c.req.param("id"));
   if (!partner) return c.json(error("NOT_FOUND", "Partner not found"), 404);
-  const body = await c.req.json().catch(() => null);
-  const parsed = CreateKeyBody.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
-  }
+  const body = c.req.valid("json");
   const { key, view } = await createPartnerApiKey({
     partnerId: partner.id,
-    label: parsed.data.label,
-    scopes: (parsed.data.scopes as PartnerScope[]) ?? DEFAULT_PARTNER_SCOPES,
-    allowedOrigins: parsed.data.allowedOrigins,
-    expiresInDays: parsed.data.expiresInDays ?? null,
-    createdBy: c.var.user?.sub ?? null,
+    label: body.label,
+    scopes: (body.scopes as PartnerScope[]) ?? DEFAULT_PARTNER_SCOPES,
+    allowedOrigins: body.allowedOrigins,
+    expiresInDays: body.expiresInDays ?? null,
+    createdBy: c.var.userId ?? null,
   });
   return c.json(
     success({

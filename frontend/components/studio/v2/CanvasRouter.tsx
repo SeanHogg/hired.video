@@ -80,32 +80,26 @@ interface CanvasRouterProps {
   surfaces: CanvasRuntimeSurfaces;
 }
 
+/** Kinds that own a distinct authoring surface → the `surfaces` slot that
+ *  mounts for them. Kinds absent here (video / podcast / voice / comic)
+ *  render the `timeline` surface. */
+const SURFACE_SLOT_BY_KIND: Partial<Record<MediaKind, Exclude<keyof CanvasRuntimeSurfaces, "timeline">>> = {
+  game: "game",
+  image: "image",
+  animation: "animation",
+  cad: "cad",
+  cad_3d: "cad_3d",
+  interactive_comic: "interactive_comic",
+  document: "document",
+};
+
 /** Single dispatch point — replaces the inline `if mediaKind === "X"`
  *  branch the editor used to host. Per #931 + the PRD §1.2 model. */
 export default function CanvasRouter({
   mediaKind,
   surfaces,
 }: CanvasRouterProps): ReactNode {
-  if (mediaKind === "game" && surfaces.game !== undefined) {
-    return surfaces.game;
-  }
-  if (mediaKind === "image" && surfaces.image !== undefined) {
-    return surfaces.image;
-  }
-  if (mediaKind === "animation" && surfaces.animation !== undefined) {
-    return surfaces.animation;
-  }
-  if (mediaKind === "cad" && surfaces.cad !== undefined) {
-    return surfaces.cad;
-  }
-  if (mediaKind === "cad_3d" && surfaces.cad_3d !== undefined) {
-    return surfaces.cad_3d;
-  }
-  if (mediaKind === "interactive_comic" && surfaces.interactive_comic !== undefined) {
-    return surfaces.interactive_comic;
-  }
-  if (mediaKind === "document" && surfaces.document !== undefined) {
-    return surfaces.document;
-  }
-  return surfaces.timeline;
+  const slot = SURFACE_SLOT_BY_KIND[mediaKind];
+  const surface = slot === undefined ? undefined : surfaces[slot];
+  return surface !== undefined ? surface : surfaces.timeline;
 }

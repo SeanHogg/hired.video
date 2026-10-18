@@ -73,7 +73,7 @@ export const EMBED_SURFACES: EmbedSurface[] = [
     scope: "people:calendar",
     description: "Scheduling + calendar — reuses hired.video's existing calendar.",
     status: "reuse-existing",
-    note: "calendar_connections / scheduled_events (routes/calendar.ts) — 1:1s, check-ins, syncs surface here too.",
+    note: "calendar provider_connections / scheduled_events (routes/calendar.ts) — 1:1s, check-ins, syncs surface here too.",
   },
   {
     key: "bookings",

@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
 import { handleCoverLetter as coverLetterUseCase, toCoverLetter } from "../job/cover-letter-handler.js";
-import type { MatchDeps } from "../job/match-handlers.js";
+import type { MatchDeps } from "../job/match-deps.js";
 import type { LLMClient, LLMOptions } from "../../services/adapters/llm-client.js";
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
 import { asHandler } from "../../handlers/shared.js";

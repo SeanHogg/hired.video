@@ -17,8 +17,10 @@
  * `revoked_at` replaces the old `is_active` flag (is_active = revoked_at IS NULL).
  *
  * A polymorphic subject has no FK, so a deleted subject's links are removed
- * by the daily retention sweep (SHARE_LINK_ORPHAN_SQL below); until then a
- * token lookup still 404s because every resolver loads its subject.
+ * immediately by statement-level AFTER DELETE triggers on each subject table
+ * (migration 0650, one per entry in SHARE_LINK_SUBJECT_TABLES — add a trigger
+ * in a new migration when adding a kind). The daily retention sweep
+ * (SHARE_LINK_ORPHAN_SQL below) remains as a backstop.
  */
 import {
   pgTable,

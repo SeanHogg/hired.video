@@ -10,7 +10,7 @@ import {
   listEnrichmentTransactions,
   spendEnrichmentCredits,
 } from "../../services/enrichment/credits.js";
-import { ok, uid } from "./http.js";
+import { success, error } from "../../types/index.js";
 
 export const advertisingEnrichmentRoutes = new Hono<AppEnv>();
 
@@ -18,24 +18,24 @@ export const advertisingEnrichmentRoutes = new Hono<AppEnv>();
 
 // GET /api/advertising/enrichment/credits
 advertisingEnrichmentRoutes.get("/enrichment/credits", async (c) => {
-  return c.json(ok(await getEnrichmentCredits(uid(c))));
+  return c.json(success(await getEnrichmentCredits(c.var.userId)));
 });
 
 // GET /api/advertising/enrichment/transactions
 advertisingEnrichmentRoutes.get("/enrichment/transactions", async (c) => {
-  return c.json(ok(await listEnrichmentTransactions(uid(c), 50)));
+  return c.json(success(await listEnrichmentTransactions(c.var.userId, 50)));
 });
 
 // POST /api/advertising/enrichment/enrich — enrich a contact (deducts 1 credit)
 advertisingEnrichmentRoutes.post("/enrichment/enrich", async (c) => {
-  const userId = uid(c);
+  const userId = c.var.userId;
   const body = await c.req.json().catch(() => ({}));
   const { email, name, company } = body as { email?: string; name?: string; company?: string };
-  if (!email && !name) return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "email or name is required" } }, 400);
+  if (!email && !name) return c.json(error("VALIDATION_ERROR", "email or name is required"), 400);
 
   const spend = await spendEnrichmentCredits(userId, 1, `Contact enrichment: ${email ?? name}`);
   if (!spend.ok) {
-    return c.json({ success: false, error: { code: "INSUFFICIENT_CREDITS", message: "No enrichment credits remaining. Purchase a pack to continue." } }, 402);
+    return c.json(error("INSUFFICIENT_CREDITS", "No enrichment credits remaining. Purchase a pack to continue."), 402);
   }
   const newBalance = spend.balanceAfter;
 
@@ -50,7 +50,7 @@ advertisingEnrichmentRoutes.post("/enrichment/enrich", async (c) => {
     company,
     domain: company,
   }, 1);
-  return c.json(ok({
+  return c.json(success({
     ...enrichedResult,
     creditsRemaining: newBalance,
     message: enrichedResult.enriched

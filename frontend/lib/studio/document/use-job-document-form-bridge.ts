@@ -7,7 +7,7 @@
  */
 import { useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import type { MediaKind } from "@shared/media-kinds";
+import { mediaKindIsDocument, type MediaKind } from "@shared/media-kinds";
 import { useActiveFormBridge } from "@/lib/hooks/use-active-form-bridge";
 import { useAIFormSnapshot } from "@/hooks/use-ai-form-snapshot";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -53,7 +53,7 @@ export function useJobDocumentFormBridge(
   const { canPostJobs } = usePermissions();
   const enabled =
     canPostJobs &&
-    currentMediaKind === "document" &&
+    mediaKindIsDocument(currentMediaKind) &&
     documentStateHydrated &&
     documentState.entityKind === "job";
   // The coach reads the LIVE content; a ref keeps the handle stable.

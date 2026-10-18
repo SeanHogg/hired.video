@@ -96,32 +96,35 @@ async function uploadOne(pkgId: string, path: string, blob: Blob, contentType: s
 /** Guess a content type from filename extension. The SCORM player needs
  *  HTML / JS / CSS / image MIME-types correct or the iframe fails to
  *  execute embedded scripts. */
+const MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
+  html: "text/html",
+  htm: "text/html",
+  js: "application/javascript",
+  css: "text/css",
+  xml: "application/xml",
+  json: "application/json",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  svg: "image/svg+xml",
+  webp: "image/webp",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mp3: "audio/mpeg",
+  ogg: "audio/ogg",
+  wav: "audio/wav",
+  woff: "font/woff",
+  woff2: "font/woff2",
+  ttf: "font/ttf",
+  swf: "application/x-shockwave-flash",
+};
+
 export function contentTypeFor(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
-  switch (ext) {
-    case "html":
-    case "htm":      return "text/html";
-    case "js":       return "application/javascript";
-    case "css":      return "text/css";
-    case "xml":      return "application/xml";
-    case "json":     return "application/json";
-    case "png":      return "image/png";
-    case "jpg":
-    case "jpeg":     return "image/jpeg";
-    case "gif":      return "image/gif";
-    case "svg":      return "image/svg+xml";
-    case "webp":     return "image/webp";
-    case "mp4":      return "video/mp4";
-    case "webm":     return "video/webm";
-    case "mp3":      return "audio/mpeg";
-    case "ogg":      return "audio/ogg";
-    case "wav":      return "audio/wav";
-    case "woff":     return "font/woff";
-    case "woff2":    return "font/woff2";
-    case "ttf":      return "font/ttf";
-    case "swf":      return "application/x-shockwave-flash";
-    default:         return "application/octet-stream";
-  }
+  return Object.prototype.hasOwnProperty.call(MIME_BY_EXTENSION, ext)
+    ? MIME_BY_EXTENSION[ext]
+    : "application/octet-stream";
 }
 
 /** Extract SCORM version + entry resource href from imsmanifest.xml. */

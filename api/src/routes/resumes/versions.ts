@@ -17,28 +17,22 @@ import { z } from "zod";
 import type { AppEnv } from "../../types/index.js";
 import { ConfirmedFactSchema } from "../../../../shared/resume-tailor.js";
 import { DomainError } from "../../domains/errors.js";
-import { getDb } from "../../db/index.js";
-import { buildRepos } from "../../repositories/index.js";
-import { ResumeVersionRepository } from "../../repositories/resumeVersionRepository.js";
-import { invalidResumeBody, invalidResumeContent, resumeNotFound } from "../../services/resume/errors.js";
-import { createSnapshot, listSnapshots, restoreSnapshot } from "../../services/resume/history.js";
+import { invalidResumeContent, resumeNotFound } from "../../services/resume/errors.js";
+import { liveResumes } from "../../services/resume/deps.js";
+import { createSnapshot, listSnapshots, liveResumeVersions, restoreSnapshot } from "../../services/resume/history.js";
 import { describeLineage, markVersionSynced, writeFactsToMaster } from "../../services/resume/lineage.js";
 import { refreshDiffPercentFor } from "../../services/resume/view.js";
-import { ownerId, respond, type ResumeCtx } from "./shared.js";
+import { invalidResumeBodyHook, respond, type ResumeCtx } from "./shared.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const resumeVersionRoutes = new Hono<AppEnv>();
 
-const versionsRepo = () => new ResumeVersionRepository(getDb());
-const resumesRepo = () => buildRepos(getDb()).resumes;
-
 const FactsSchema = z.object({ facts: z.array(ConfirmedFactSchema).min(1).max(20) });
 
-async function writeFacts(c: ResumeCtx) {
-  const parsed = FactsSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) throw invalidResumeBody(parsed.error.flatten());
-  const repo = resumesRepo();
-  const userId = ownerId(c);
-  const outcome = await writeFactsToMaster(repo, userId, parsed.data.facts);
+async function writeFacts(c: ResumeCtx, facts: z.output<typeof FactsSchema>["facts"]) {
+  const repo = liveResumes();
+  const userId = c.var.userId;
+  const outcome = await writeFactsToMaster(repo, userId, facts);
   // `in` narrowing — the API compiles with `strict: false`.
   if ("code" in outcome) {
     if (outcome.code === "NO_MASTER") throw new DomainError(404, "NO_MASTER", "You don't have a master résumé yet");
@@ -48,12 +42,14 @@ async function writeFacts(c: ResumeCtx) {
   return { masterId: outcome.masterId, changed: outcome.changed };
 }
 
-resumeVersionRoutes.post("/master/facts", (c) => respond(c, writeFacts(c)));
+resumeVersionRoutes.post("/master/facts", validateJson(FactsSchema, invalidResumeBodyHook, { emptyBody: null }), (c) =>
+  respond(c, writeFacts(c, c.req.valid("json").facts)),
+);
 
 resumeVersionRoutes.get("/:id/versions/lineage", (c) =>
   respond(
     c,
-    describeLineage(resumesRepo(), ownerId(c), c.req.param("id")).then((lineage) => {
+    describeLineage(liveResumes(), c.var.userId, c.req.param("id")).then((lineage) => {
       if (!lineage) throw resumeNotFound();
       return lineage;
     }),
@@ -63,19 +59,19 @@ resumeVersionRoutes.get("/:id/versions/lineage", (c) =>
 resumeVersionRoutes.post("/:id/versions/synced", (c) =>
   respond(
     c,
-    markVersionSynced(resumesRepo(), ownerId(c), c.req.param("id")).then((done) => {
+    markVersionSynced(liveResumes(), c.var.userId, c.req.param("id")).then((done) => {
       if (!done) throw resumeNotFound("Version not found");
       return { synced: true };
     }),
   ),
 );
 
-resumeVersionRoutes.get("/:id/versions", (c) => respond(c, listSnapshots(versionsRepo(), ownerId(c), c.req.param("id"))));
+resumeVersionRoutes.get("/:id/versions", (c) => respond(c, listSnapshots(liveResumeVersions(), c.var.userId, c.req.param("id"))));
 
 resumeVersionRoutes.post("/:id/versions", async (c) =>
-  respond(c, createSnapshot(versionsRepo(), ownerId(c), c.req.param("id"), await c.req.json().catch(() => ({}))), 201),
+  respond(c, createSnapshot(liveResumeVersions(), c.var.userId, c.req.param("id"), await c.req.json().catch(() => ({}))), 201),
 );
 
 resumeVersionRoutes.post("/:id/versions/:vid/restore", (c) =>
-  respond(c, restoreSnapshot(versionsRepo(), resumesRepo(), ownerId(c), c.req.param("id"), c.req.param("vid"))),
+  respond(c, restoreSnapshot(liveResumeVersions(), liveResumes(), c.var.userId, c.req.param("id"), c.req.param("vid"))),
 );

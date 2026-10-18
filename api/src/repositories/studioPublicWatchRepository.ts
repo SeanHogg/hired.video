@@ -106,3 +106,22 @@ export async function findProjectTimeline(
   if (!proj) return null;
   return { id: proj.id, timelineSpec: stateToFields(proj.mediaKind, proj.state).timelineSpec };
 }
+
+/** The rendered video behind a studio project, for the keyless video embed
+ *  (`/embed/video/frame`). Null when the project is missing; video columns are
+ *  null when no video is linked yet. */
+export async function findEmbedVideoByProjectId(db: Db, projectId: string) {
+  const [row] = await db
+    .select({
+      title: videos.title,
+      r2Key: videos.r2Key,
+      youtubeVideoId: videos.youtubeVideoId,
+      thumbnailUrl: videos.thumbnailUrl,
+      privacyStatus: videos.privacyStatus,
+    })
+    .from(studioProjects)
+    .leftJoin(videos, eq(videos.id, studioProjects.videoId))
+    .where(eq(studioProjects.id, projectId))
+    .limit(1);
+  return row ?? null;
+}

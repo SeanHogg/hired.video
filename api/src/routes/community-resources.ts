@@ -20,9 +20,13 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb } from "../db/index.js";
-import { buildRepos } from "../repositories/index.js";
-import { resolveGeoSlugs } from "../services/location/resolve-geo-slugs.js";
+import {
+  listMyResources,
+  listResourceDirectory,
+  listResourcesByStatus,
+  reviewResource,
+  submitResource,
+} from "../services/community/communityResources.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
 import { withGamification } from "../domains/gamification/with-gamification.js";
 import {
@@ -30,16 +34,11 @@ import {
   RESOURCE_CATEGORIES,
   resourceHasContact,
 } from "../../../shared/community-resources.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const communityResourceRoutes = new Hono<AppEnv>();
 export const adminCommunityResourceRoutes = new Hono<AppEnv>();
-
-function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
-
-/** Geo slugs are lowercased so /in/us/tx and ?country=US&state=Tx collapse. */
-const slug = (s: string) => s.trim().toLowerCase();
 
 export const SubmitSchema = z
   .object({
@@ -61,65 +60,19 @@ export const SubmitSchema = z
 communityResourceRoutes.get("/", async (c) => {
   const country = c.req.query("country");
   if (!country) return c.json(error("VALIDATION_ERROR", "country is required"), 400);
-  const db = getDb();
-  const repos = buildRepos(db);
-  // Resolve the request slugs to canonical geo ids so the directory matches on
-  // identity, not slug form (#1833) — falls back to slug matching when the geo
-  // doesn't resolve (e.g. a country/state not in the reference tables).
-  const resolved = await resolveGeoSlugs(db, {
+  const rows = await listResourceDirectory({
     country,
     state: c.req.query("state"),
     city: c.req.query("city"),
-  });
-  const geo = resolved.geo;
-  const rows = await repos.communityResources.listApproved({
-    countryCode: slug(country),
-    stateCode: c.req.query("state") ? slug(c.req.query("state")!) : null,
-    citySlug: c.req.query("city") ? slug(c.req.query("city")!) : null,
-    countryGeoId: geo?.country.id ?? null,
-    stateGeoId: geo?.state?.id ?? null,
-    cityGeoId: geo?.city?.id ?? null,
-    audience: c.req.query("audience") ?? null,
-    category: c.req.query("category") ?? null,
+    audience: c.req.query("audience"),
+    category: c.req.query("category"),
   });
   return c.json(success({ items: rows }), 200);
 });
 
-communityResourceRoutes.post("/", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const parsed = SubmitSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
-  const d = parsed.data;
-  const db = getDb();
-  const repos = buildRepos(db);
-  // Resolve the submitted geo to canonical ids (#1833) so this row matches the
-  // /in directory query regardless of whether the submitter typed "tx" or
-  // "texas". Best-effort: an un-resolvable geo stores null ids + keeps slugs.
-  const resolved = await resolveGeoSlugs(db, {
-    country: d.countryCode,
-    state: d.stateCode,
-    city: d.citySlug,
-  });
-  const geo = resolved.geo;
-  const row = await repos.communityResources.insert({
-    submittedBy: userId,
-    title: d.title,
-    description: d.description,
-    url: d.url ? d.url : null,
-    phone: d.phone ? d.phone : null,
-    category: d.category,
-    audience: d.audience,
-    countryCode: slug(d.countryCode),
-    stateCode: d.stateCode ? slug(d.stateCode) : null,
-    citySlug: d.citySlug ? slug(d.citySlug) : null,
-    countryGeoId: geo?.country.id ?? null,
-    stateGeoId: geo?.state?.id ?? null,
-    cityGeoId: geo?.city?.id ?? null,
-    status: "pending",
-  });
+communityResourceRoutes.post("/", validateJson(SubmitSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const userId = requireUser(c);
+  const row = await submitResource(userId, c.req.valid("json"));
 
   // Award points + (first/10th) badge. Fire-and-forget — a gamification
   // glitch must not fail the submission.
@@ -131,10 +84,8 @@ communityResourceRoutes.post("/", async (c) => {
 });
 
 communityResourceRoutes.get("/mine", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const repos = buildRepos(getDb());
-  const rows = await repos.communityResources.listBySubmitter(userId);
+  const userId = requireUser(c);
+  const rows = await listMyResources(userId);
   return c.json(success({ items: rows }), 200);
 });
 
@@ -149,25 +100,14 @@ adminCommunityResourceRoutes.get("/", async (c) => {
   const statusQ = c.req.query("status");
   const status =
     statusQ === "approved" || statusQ === "rejected" ? statusQ : "pending";
-  const repos = buildRepos(getDb());
-  const rows = await repos.communityResources.listByStatus(status);
+  const rows = await listResourcesByStatus(status);
   return c.json(success({ items: rows }), 200);
 });
 
-adminCommunityResourceRoutes.patch("/:id/review", async (c) => {
+adminCommunityResourceRoutes.patch("/:id/review", validateJson(ReviewSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
   if (!isSuperAdmin(c.var.user)) return c.json(error("FORBIDDEN", "SuperAdmin only"), 403);
-  const reviewerId = uid(c);
-  if (!reviewerId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const parsed = ReviewSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
-  const repos = buildRepos(getDb());
-  const row = await repos.communityResources.review(c.req.param("id"), {
-    status: parsed.data.status,
-    reviewedBy: reviewerId,
-    rejectionReason: parsed.data.status === "rejected" ? parsed.data.rejectionReason ?? null : null,
-  });
+  const reviewerId = requireUser(c);
+  const row = await reviewResource(c.req.param("id"), reviewerId, c.req.valid("json"));
   if (!row) return c.json(error("NOT_FOUND", "Resource not found"), 404);
   return c.json(success({ resource: row }), 200);
 });

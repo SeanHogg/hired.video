@@ -8,7 +8,6 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Context } from "hono";
 import { success, error } from "../types/index.js";
 import { EMPLOYMENT_TYPES } from "../../../shared/employment-types.js";
 import {
@@ -21,7 +20,6 @@ import {
 import { peopleOpsContext, type PeopleEnv } from "../middleware/peopleOps.js";
 import {
   PeopleOpsService,
-  PeopleOpsServiceError,
   defaultPeopleOpsServiceDeps,
   type RosterEmployee,
 } from "../domains/people-ops/peopleOpsService.js";
@@ -38,23 +36,9 @@ import {
   workflowsRouter,
 } from "./people-cadence.js";
 import { tcoRouter, rolesRouter, headcountPlansRouter, ptoRouter } from "./people-cost.js";
+import { validateJson } from "./helpers/validate.js";
 
 const buildService = () => new PeopleOpsService(defaultPeopleOpsServiceDeps());
-
-function mapError(c: Context, e: unknown) {
-  if (e instanceof PeopleOpsServiceError) {
-    const status =
-      e.code === "NOT_FOUND"
-        ? 404
-        : e.code === "FORBIDDEN"
-          ? 403
-          : e.code === "CONFLICT"
-            ? 409
-            : 400;
-    return c.json(error(e.code, e.message), status as 400 | 403 | 404 | 409);
-  }
-  return c.json(error("INTERNAL_ERROR", "Unexpected error"), 500);
-}
 
 /** Serialize an employee row for the wire: expose salary in dollars
  *  alongside the stored cents so the frontend never does cents math. */
@@ -158,95 +142,61 @@ peopleRoutes.use("*", peopleOpsContext);
 
 // ── Employees (PO-1) ──────────────────────────────────────────────────────
 peopleRoutes.get("/employees/hierarchy", async (c) => {
-  try {
-    const tree = await buildService().getHierarchy(c.var.peopleCtx);
-    return c.json(
-      success(
-        tree.map(function map(n): unknown {
-          return { employee: serializeEmployee(n.employee), reports: n.reports.map(map) };
-        }),
-      ),
-    );
-  } catch (e) {
-    return mapError(c, e);
-  }
+  const tree = await buildService().getHierarchy(c.var.peopleCtx);
+  return c.json(
+    success(
+      tree.map(function map(n): unknown {
+        return { employee: serializeEmployee(n.employee), reports: n.reports.map(map) };
+      }),
+    ),
+  );
 });
 
 peopleRoutes.get("/analytics/team-metrics", async (c) => {
-  try {
-    return c.json(success(await buildService().getTeamMetrics(c.var.peopleCtx)));
-  } catch (e) {
-    return mapError(c, e);
-  }
+  return c.json(success(await buildService().getTeamMetrics(c.var.peopleCtx)));
 });
 
 peopleRoutes.get("/employees", async (c) => {
-  try {
-    const rows = await buildService().listEmployees(c.var.peopleCtx, {
-      department: c.req.query("department") || undefined,
-      status: (c.req.query("status") as any) || undefined,
-      employmentType: c.req.query("employmentType") || undefined,
-      managerId: c.req.query("managerId") || undefined,
-      q: c.req.query("q") || undefined,
-    });
-    return c.json(success(rows.map(serializeEmployee)));
-  } catch (e) {
-    return mapError(c, e);
-  }
+  const rows = await buildService().listEmployees(c.var.peopleCtx, {
+    department: c.req.query("department") || undefined,
+    status: (c.req.query("status") as any) || undefined,
+    employmentType: c.req.query("employmentType") || undefined,
+    managerId: c.req.query("managerId") || undefined,
+    q: c.req.query("q") || undefined,
+  });
+  return c.json(success(rows.map(serializeEmployee)));
 });
 
-peopleRoutes.post("/employees", async (c) => {
-  const parsed = EmployeeWriteSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-  }
-  const { salary, ...rest } = parsed.data;
-  try {
-    const row = await buildService().createEmployee(
-      c.var.peopleCtx,
-      { ...rest, salaryCents: salaryToCents(salary) },
-      c.var.user.sub,
-    );
-    return c.json(success(serializeEmployee(row)), 201);
-  } catch (e) {
-    return mapError(c, e);
-  }
+peopleRoutes.post("/employees", validateJson(EmployeeWriteSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  const { salary, ...rest } = body;
+  const row = await buildService().createEmployee(
+    c.var.peopleCtx,
+    { ...rest, salaryCents: salaryToCents(salary) },
+    c.var.userId,
+  );
+  return c.json(success(serializeEmployee(row)), 201);
 });
 
 peopleRoutes.get("/employees/:id", async (c) => {
-  try {
-    return c.json(success(serializeEmployee(await buildService().getEmployee(c.var.peopleCtx, c.req.param("id")))));
-  } catch (e) {
-    return mapError(c, e);
-  }
+  return c.json(success(serializeEmployee(await buildService().getEmployee(c.var.peopleCtx, c.req.param("id")))));
 });
 
-peopleRoutes.put("/employees/:id", async (c) => {
-  const parsed = EmployeeUpdateSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-  }
-  const { salary, ...rest } = parsed.data;
-  try {
-    const row = await buildService().updateEmployee(
-      c.var.peopleCtx,
-      c.req.param("id"),
-      { ...rest, salaryCents: salaryToCents(salary) },
-      c.var.user.sub,
-    );
-    return c.json(success(serializeEmployee(row)));
-  } catch (e) {
-    return mapError(c, e);
-  }
+peopleRoutes.put("/employees/:id", validateJson(EmployeeUpdateSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  const { salary, ...rest } = body;
+  const row = await buildService().updateEmployee(
+    c.var.peopleCtx,
+    c.req.param("id"),
+    { ...rest, salaryCents: salaryToCents(salary) },
+    c.var.userId,
+  );
+  return c.json(success(serializeEmployee(row)));
 });
 
 peopleRoutes.delete("/employees/:id", async (c) => {
-  try {
-    await buildService().deleteEmployee(c.var.peopleCtx, c.req.param("id"), c.var.user.sub);
-    return c.json(success({ deleted: true }));
-  } catch (e) {
-    return mapError(c, e);
-  }
+  await buildService().deleteEmployee(c.var.peopleCtx, c.req.param("id"), c.var.userId);
+  return c.json(success({ deleted: true }));
 });
 
 // ── 1:1s (PO-2) ─────────────────────────────────────────────────────────────
@@ -255,98 +205,58 @@ peopleRoutes.get("/one-on-ones/templates", (c) =>
 );
 
 peopleRoutes.get("/one-on-ones", async (c) => {
-  try {
-    const rows = await buildService().listOneOnOnes(c.var.peopleCtx, {
-      supervisorId: c.req.query("supervisorId") || undefined,
-      participantId: c.req.query("participantId") || undefined,
-      status: (c.req.query("status") as any) || undefined,
-      employeeId: c.req.query("employeeId") || undefined,
-    });
-    return c.json(success(rows));
-  } catch (e) {
-    return mapError(c, e);
-  }
+  const rows = await buildService().listOneOnOnes(c.var.peopleCtx, {
+    supervisorId: c.req.query("supervisorId") || undefined,
+    participantId: c.req.query("participantId") || undefined,
+    status: (c.req.query("status") as any) || undefined,
+    employeeId: c.req.query("employeeId") || undefined,
+  });
+  return c.json(success(rows));
 });
 
-peopleRoutes.post("/one-on-ones", async (c) => {
-  const parsed = OneOnOneWriteSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-  }
-  try {
-    return c.json(
-      success(await buildService().createOneOnOne(c.var.peopleCtx, parsed.data, c.var.user.sub)),
-      201,
-    );
-  } catch (e) {
-    return mapError(c, e);
-  }
+peopleRoutes.post("/one-on-ones", validateJson(OneOnOneWriteSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  return c.json(
+    success(await buildService().createOneOnOne(c.var.peopleCtx, body, c.var.userId)),
+    201,
+  );
 });
 
 peopleRoutes.get("/one-on-ones/:id", async (c) => {
-  try {
-    return c.json(success(await buildService().getOneOnOne(c.var.peopleCtx, c.req.param("id"))));
-  } catch (e) {
-    return mapError(c, e);
-  }
+  return c.json(success(await buildService().getOneOnOne(c.var.peopleCtx, c.req.param("id"))));
 });
 
-peopleRoutes.patch("/one-on-ones/:id", async (c) => {
-  const parsed = OneOnOneUpdateSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-  }
-  try {
-    return c.json(
-      success(await buildService().updateOneOnOne(c.var.peopleCtx, c.req.param("id"), parsed.data)),
-    );
-  } catch (e) {
-    return mapError(c, e);
-  }
+peopleRoutes.patch("/one-on-ones/:id", validateJson(OneOnOneUpdateSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  return c.json(
+    success(await buildService().updateOneOnOne(c.var.peopleCtx, c.req.param("id"), body)),
+  );
 });
 
 peopleRoutes.delete("/one-on-ones/:id", async (c) => {
-  try {
-    await buildService().deleteOneOnOne(c.var.peopleCtx, c.req.param("id"));
-    return c.json(success({ deleted: true }));
-  } catch (e) {
-    return mapError(c, e);
-  }
+  await buildService().deleteOneOnOne(c.var.peopleCtx, c.req.param("id"));
+  return c.json(success({ deleted: true }));
 });
 
-peopleRoutes.post("/one-on-ones/:id/agenda-items", async (c) => {
-  const parsed = AgendaItemSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-  }
-  try {
-    return c.json(
-      success(await buildService().addAgendaItem(c.var.peopleCtx, c.req.param("id"), parsed.data)),
-      201,
-    );
-  } catch (e) {
-    return mapError(c, e);
-  }
+peopleRoutes.post("/one-on-ones/:id/agenda-items", validateJson(AgendaItemSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  return c.json(
+    success(await buildService().addAgendaItem(c.var.peopleCtx, c.req.param("id"), body)),
+    201,
+  );
 });
 
-peopleRoutes.patch("/one-on-ones/:id/agenda-items/:index", async (c) => {
+peopleRoutes.patch("/one-on-ones/:id/agenda-items/:index", validateJson(AgendaItemPatchSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
   const index = Number.parseInt(c.req.param("index"), 10);
   if (!Number.isInteger(index) || index < 0) {
     return c.json(error("VALIDATION_ERROR", "Invalid agenda index"), 400);
   }
-  const parsed = AgendaItemPatchSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-  }
-  try {
-    return c.json(
-      success(
-        await buildService().updateAgendaItem(c.var.peopleCtx, c.req.param("id"), index, parsed.data),
-      ),
-    );
-  } catch (e) {
-    return mapError(c, e);
-  }
+  const body = c.req.valid("json");
+  return c.json(
+    success(
+      await buildService().updateAgendaItem(c.var.peopleCtx, c.req.param("id"), index, body),
+    ),
+  );
 });
 
 peopleRoutes.delete("/one-on-ones/:id/agenda-items/:index", async (c) => {
@@ -354,101 +264,60 @@ peopleRoutes.delete("/one-on-ones/:id/agenda-items/:index", async (c) => {
   if (!Number.isInteger(index) || index < 0) {
     return c.json(error("VALIDATION_ERROR", "Invalid agenda index"), 400);
   }
-  try {
-    return c.json(
-      success(await buildService().deleteAgendaItem(c.var.peopleCtx, c.req.param("id"), index)),
-    );
-  } catch (e) {
-    return mapError(c, e);
-  }
+  return c.json(
+    success(await buildService().deleteAgendaItem(c.var.peopleCtx, c.req.param("id"), index)),
+  );
 });
 
-peopleRoutes.post("/one-on-ones/:id/action-items", async (c) => {
-  const parsed = ActionItemsSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-  }
-  try {
-    const rows = await buildService().addOneOnOneActionItems(
-      c.var.peopleCtx,
-      c.req.param("id"),
-      c.var.user.sub,
-      parsed.data.items,
-    );
-    return c.json(success(rows), 201);
-  } catch (e) {
-    return mapError(c, e);
-  }
+peopleRoutes.post("/one-on-ones/:id/action-items", validateJson(ActionItemsSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  const rows = await buildService().addOneOnOneActionItems(
+    c.var.peopleCtx,
+    c.req.param("id"),
+    c.var.userId,
+    body.items,
+  );
+  return c.json(success(rows), 201);
 });
 
 // ── Goals / OKRs (PO-4) ──────────────────────────────────────────────────────
 peopleRoutes.get("/goals", async (c) => {
-  try {
-    const rows = await buildService().listGoals(c.var.peopleCtx, {
-      employeeId: c.req.query("employeeId") || undefined,
-      status: (c.req.query("status") as any) || undefined,
-      category: c.req.query("category") || undefined,
-    });
-    return c.json(success(rows));
-  } catch (e) {
-    return mapError(c, e);
-  }
+  const rows = await buildService().listGoals(c.var.peopleCtx, {
+    employeeId: c.req.query("employeeId") || undefined,
+    status: (c.req.query("status") as any) || undefined,
+    category: c.req.query("category") || undefined,
+  });
+  return c.json(success(rows));
 });
 
-peopleRoutes.post("/goals", async (c) => {
-  const parsed = GoalWriteSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-  }
-  try {
-    return c.json(success(await buildService().createGoal(c.var.peopleCtx, parsed.data)), 201);
-  } catch (e) {
-    return mapError(c, e);
-  }
+peopleRoutes.post("/goals", validateJson(GoalWriteSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  return c.json(success(await buildService().createGoal(c.var.peopleCtx, body)), 201);
 });
 
 peopleRoutes.get("/goals/:id", async (c) => {
-  try {
-    return c.json(success(await buildService().getGoal(c.var.peopleCtx, c.req.param("id"))));
-  } catch (e) {
-    return mapError(c, e);
-  }
+  return c.json(success(await buildService().getGoal(c.var.peopleCtx, c.req.param("id"))));
 });
 
-peopleRoutes.put("/goals/:id", async (c) => {
-  const parsed = GoalUpdateSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-  }
-  try {
-    return c.json(success(await buildService().updateGoal(c.var.peopleCtx, c.req.param("id"), parsed.data)));
-  } catch (e) {
-    return mapError(c, e);
-  }
+peopleRoutes.put("/goals/:id", validateJson(GoalUpdateSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  return c.json(success(await buildService().updateGoal(c.var.peopleCtx, c.req.param("id"), body)));
 });
 
 peopleRoutes.delete("/goals/:id", async (c) => {
-  try {
-    await buildService().deleteGoal(c.var.peopleCtx, c.req.param("id"));
-    return c.json(success({ deleted: true }));
-  } catch (e) {
-    return mapError(c, e);
-  }
+  await buildService().deleteGoal(c.var.peopleCtx, c.req.param("id"));
+  return c.json(success({ deleted: true }));
 });
 
 // ── Action items ─────────────────────────────────────────────────────────────
 peopleRoutes.get("/action-items", async (c) => {
-  try {
-    const rows = await buildService().listActionItems(c.var.peopleCtx, {
-      status: (c.req.query("status") as any) || undefined,
-      sourceType: (c.req.query("sourceType") as any) || undefined,
-      oneOnOneId: c.req.query("oneOnOneId") || undefined,
-      assigneeEmployeeId: c.req.query("assigneeEmployeeId") || undefined,
-    });
-    return c.json(success(rows));
-  } catch (e) {
-    return mapError(c, e);
-  }
+  const rows = await buildService().listActionItems(c.var.peopleCtx, {
+    status: (c.req.query("status") as any) || undefined,
+    sourceType: (c.req.query("sourceType") as any) || undefined,
+    oneOnOneId: c.req.query("oneOnOneId") || undefined,
+    assigneeEmployeeId: c.req.query("assigneeEmployeeId") || undefined,
+  });
+  return c.json(success(rows));
 });
 
 // ── Cluster sub-routers (PO-3, PO-5..PO-11, TA-4..6) ─────────────────────────

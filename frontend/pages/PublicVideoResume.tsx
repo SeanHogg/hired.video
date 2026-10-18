@@ -17,7 +17,7 @@ import ProjectPlayer from "@/components/studio/shared/ProjectPlayer";
 import { publicReadyToProject } from "@/lib/studio/public-payload";
 import { recordProjectView } from "@/lib/services/studio-features-service";
 import { useUgcSeo } from "@/lib/seo-ugc";
-import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
+import { MEDIA_KIND_UI, type MediaKind, mediaKindHasFramedPreview, mediaKindIsPrimaryVideo } from "@shared/media-kinds";
 import { SeoFinalCta } from "@/components/landing/SeoFinalCta";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -163,7 +163,7 @@ export default function PublicVideoResume() {
   if (!isReady(video)) return null;
   const ready = video;
   const mediaKind = (ready.mediaKind ?? "video") as MediaKind;
-  const framed = mediaKind === "image" || mediaKind === "animation" || mediaKind === "cad";
+  const framed = mediaKindHasFramedPreview(mediaKind);
 
   return (
     <AppShell bgClassName="bg-background">
@@ -214,7 +214,7 @@ export default function PublicVideoResume() {
         title={t("seoLanding.publicVideo.ctaTitle", { kind: MEDIA_KIND_UI[mediaKind].badgeLabel.toLowerCase() })}
         body={t("seoLanding.publicVideo.ctaBody")}
         primary={{
-          to: mediaKind === "video" ? "/studio/new?contentTemplate=resume" : "/studio/new",
+          to: mediaKindIsPrimaryVideo(mediaKind) ? "/studio/new?contentTemplate=resume" : "/studio/new",
           label: t("seoLanding.publicVideo.ctaButton"),
         }}
       />

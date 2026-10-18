@@ -8,9 +8,8 @@
  * id is present.
  */
 
-import { and, asc, eq, isNull } from "drizzle-orm";
 import type { getDb } from "../../../db/index.js";
-import { schema } from "../../../db/index.js";
+import { PaidMediaPixelsRepository } from "../../../repositories/paidMediaPixelsRepository.js";
 import { getOrSetCached, invalidateCachedKey } from "../../../utils/edge-cache.js";
 
 type DbHandle = ReturnType<typeof getDb>;
@@ -43,18 +42,7 @@ export async function getPublicPixelConfig(
   workspaceUserId: string,
   workspaceCompanyId: string | null,
 ): Promise<PublicPixelConfig> {
-  const [row] = await db
-    .select()
-    .from(schema.paidMediaPixels)
-    .where(
-      and(
-        eq(schema.paidMediaPixels.userId, workspaceUserId),
-        workspaceCompanyId
-          ? eq(schema.paidMediaPixels.companyId, workspaceCompanyId)
-          : isNull(schema.paidMediaPixels.companyId),
-      ),
-    )
-    .limit(1);
+  const row = await new PaidMediaPixelsRepository(db).findForOwner(workspaceUserId, workspaceCompanyId);
   if (!row) return EMPTY;
   return {
     metaPixelId:              row.metaPixelId,
@@ -93,14 +81,9 @@ export function getHousePixelConfig(
     ttlSeconds: HOUSE_CACHE_TTL_SECONDS,
     loader: async () => {
       if (houseUserId) return getPublicPixelConfig(db, houseUserId, null);
-      const [row] = await db
-        .select({ userId: schema.paidMediaPixels.userId })
-        .from(schema.paidMediaPixels)
-        .where(isNull(schema.paidMediaPixels.companyId))
-        .orderBy(asc(schema.paidMediaPixels.createdAt))
-        .limit(1);
-      if (!row) return { configured: false };
-      return getPublicPixelConfig(db, row.userId, null);
+      const oldestUserId = await new PaidMediaPixelsRepository(db).findOldestPersonalOwnerUserId();
+      if (!oldestUserId) return { configured: false };
+      return getPublicPixelConfig(db, oldestUserId, null);
     },
   });
 }

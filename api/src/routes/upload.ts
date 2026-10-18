@@ -8,6 +8,7 @@ import { getVideoBucket, putObject } from "../services/storage/object-store.js";
 import { clampAssetLimit, getAssetPage, kindsForQuery } from "../services/storage/media-library.js";
 import { resolveUploadSourceProjectId } from "../services/studio/recordingProjectAccess.js";
 import { parseUpload, isUploadRejected } from "../utils/multipart.js";
+import { success, error } from "../types/index.js";
 
 // 32MB matches the frontend `MAX_IMAGE_SIZE` cap raised per #949 —
 // flattened 4K PNGs from DrawingStage routinely exceed 16MB and the
@@ -30,13 +31,7 @@ const UploadSchema = z.object({
 
 export const uploadRoutes = new Hono<AppEnv>();
 
-function ok<T>(data: T) {
-  return { success: true as const, data, timestamp: new Date().toISOString() };
-}
 
-function fail(code: string, message: string, details?: unknown) {
-  return { success: false as const, error: { code, message, ...(details !== undefined ? { details } : {}) }, timestamp: new Date().toISOString() };
-}
 
 /**
  * Optional `projectId` form field: the studio project an upload belongs to.
@@ -68,12 +63,12 @@ uploadRoutes.post("/", async (c) => {
 
   const parsed = UploadSchema.safeParse({ filename, contentType });
   if (!parsed.success) {
-    return c.json(fail("VALIDATION_ERROR", "Missing required headers: X-Filename, Content-Type"), 400);
+    return c.json(error("VALIDATION_ERROR", "Missing required headers: X-Filename, Content-Type"), 400);
   }
 
   if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
     return c.json(
-      fail("VALIDATION_ERROR", `Content type '${contentType}' is not allowed`, { allowed: [...ALLOWED_CONTENT_TYPES] }),
+      error("VALIDATION_ERROR", `Content type '${contentType}' is not allowed`, { allowed: [...ALLOWED_CONTENT_TYPES] }),
       415,
     );
   }
@@ -82,7 +77,7 @@ uploadRoutes.post("/", async (c) => {
 
   if (body.byteLength > MAX_FILE_SIZE_BYTES) {
     return c.json(
-      fail("PAYLOAD_TOO_LARGE", `File size exceeds the ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB limit`),
+      error("PAYLOAD_TOO_LARGE", `File size exceeds the ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB limit`),
       413,
     );
   }
@@ -91,7 +86,7 @@ uploadRoutes.post("/", async (c) => {
   const key = `uploads/${user.sub}/${crypto.randomUUID()}${extension ? `.${extension}` : ""}`;
 
   if (!(await putObject(key, body, contentType))) {
-    return c.json(fail("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
+    return c.json(error("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
   }
 
   // Explicit-content gate: a blocked image is deleted again (throws 422).
@@ -103,7 +98,7 @@ uploadRoutes.post("/", async (c) => {
   }
 
   return c.json(
-    ok({ key, url: cdnUrl(key), contentType, size: body.byteLength }),
+    success({ key, url: cdnUrl(key), contentType, size: body.byteLength }),
     201,
   );
 });
@@ -131,7 +126,7 @@ uploadRoutes.get("/images", async (c) => {
     limit: clampAssetLimit(c.req.query("limit")),
     cursor: c.req.query("cursor") ?? null,
   });
-  return c.json(ok({ ...page, truncated: page.nextCursor !== null }));
+  return c.json(success({ ...page, truncated: page.nextCursor !== null }));
 });
 
 /** POST /api/upload/image — multipart image upload used by company/profile UIs */
@@ -143,13 +138,13 @@ uploadRoutes.post("/image", async (c) => {
     messages: { missing: "Missing uploaded image file", type: "Only image uploads are allowed on this endpoint" },
   });
   // 400 missing / 415 wrong type — both keep this endpoint's VALIDATION_ERROR code.
-  if (isUploadRejected(up)) return c.json(fail("VALIDATION_ERROR", up.message), up.status);
+  if (isUploadRejected(up)) return c.json(error("VALIDATION_ERROR", up.message), up.status);
   const { form, file: part, bytes, contentType } = up;
   const ext = fileExt(part.name || "image");
   const key = `uploads/${user.sub}/images/${crypto.randomUUID()}${ext ? `.${ext}` : ""}`;
 
   if (!(await putObject(key, bytes, contentType, undefined, { sourceProjectId: await projectIdField(user.sub, form) }))) {
-    return c.json(fail("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
+    return c.json(error("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
   }
 
   // Explicit-content gate: a blocked image is deleted again (throws 422).
@@ -159,14 +154,14 @@ uploadRoutes.post("/image", async (c) => {
     c.env,
   );
 
-  return c.json(ok({ url: cdnUrl(key) }), 201);
+  return c.json(success({ url: cdnUrl(key) }), 201);
 });
 
 /** POST /api/upload/single — generic multipart file upload */
 uploadRoutes.post("/single", async (c) => {
   const user = c.var.user;
   const up = await parseUpload(c, { messages: { missing: "Missing uploaded file" } });
-  if (isUploadRejected(up)) return c.json(fail("VALIDATION_ERROR", up.message), 400);
+  if (isUploadRejected(up)) return c.json(error("VALIDATION_ERROR", up.message), 400);
   const { form, file: part, bytes } = up;
   const ext = fileExt(part.name || "file");
   const key = `uploads/${user.sub}/files/${crypto.randomUUID()}${ext ? `.${ext}` : ""}`;
@@ -174,9 +169,9 @@ uploadRoutes.post("/single", async (c) => {
   const stored = await putObject(key, bytes, part.type || "application/octet-stream", undefined, {
     sourceProjectId: await projectIdField(user.sub, form),
   });
-  if (!stored) return c.json(fail("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
+  if (!stored) return c.json(error("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
 
-  return c.json(ok({ url: cdnUrl(key) }), 201);
+  return c.json(success({ url: cdnUrl(key) }), 201);
 });
 
 /**
@@ -207,7 +202,7 @@ uploadRoutes.post("/single", async (c) => {
 uploadRoutes.post("/scorm-file", async (c) => {
   const user = c.var.user;
   const up = await parseUpload(c, { messages: { missing: "Missing uploaded file" } });
-  if (isUploadRejected(up)) return c.json(fail("VALIDATION_ERROR", up.message), 400);
+  if (isUploadRejected(up)) return c.json(error("VALIDATION_ERROR", up.message), 400);
   const { form, file: part, bytes } = up;
   const pkgId = (form.get("pkgId") as string | null)?.trim() ?? "";
   const path = (form.get("path") as string | null)?.trim() ?? "";
@@ -216,7 +211,7 @@ uploadRoutes.post("/scorm-file", async (c) => {
   // user's package and lets a caller scribble into arbitrary R2 prefixes
   // by passing "../somebody-elses-package".
   if (!/^[0-9a-f-]{36}$/i.test(pkgId)) {
-    return c.json(fail("VALIDATION_ERROR", "pkgId must be a uuid v4"), 400);
+    return c.json(error("VALIDATION_ERROR", "pkgId must be a uuid v4"), 400);
   }
   // path validation — reject empty, absolute, dotdot, backslash, and
   // anything that decodes to a different shape after stripping. The
@@ -226,13 +221,13 @@ uploadRoutes.post("/scorm-file", async (c) => {
       || path.startsWith("/")
       || path.includes("\\")
       || path.split("/").some((seg) => seg === "" || seg === ".." || seg === ".")) {
-    return c.json(fail("VALIDATION_ERROR", "path must be a non-empty, relative, traversal-free POSIX path"), 400);
+    return c.json(error("VALIDATION_ERROR", "path must be a non-empty, relative, traversal-free POSIX path"), 400);
   }
 
   const key = `uploads/${user.sub}/scorm/${pkgId}/${path}`;
 
   if (!(await putObject(key, bytes, part.type || "application/octet-stream"))) {
-    return c.json(fail("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
+    return c.json(error("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
   }
 
   // #1460 — SCORM iframe needs same-origin URLs so the SCO can call
@@ -241,7 +236,7 @@ uploadRoutes.post("/scorm-file", async (c) => {
   // The R2 key is preserved on the response for any future
   // admin / cleanup tooling.
   const url = `/api/courses/scorm-asset/${user.sub}/${pkgId}/${path}`;
-  return c.json(ok({ url, key }), 201);
+  return c.json(success({ url, key }), 201);
 });
 
 /** POST /api/upload/video — multipart video upload used by resume/video flows */
@@ -252,17 +247,17 @@ uploadRoutes.post("/video", async (c) => {
     messages: { missing: "Missing uploaded video file", type: "Only video uploads are allowed on this endpoint" },
   });
   // 400 missing / 415 wrong type — both keep this endpoint's VALIDATION_ERROR code.
-  if (isUploadRejected(up)) return c.json(fail("VALIDATION_ERROR", up.message), up.status);
+  if (isUploadRejected(up)) return c.json(error("VALIDATION_ERROR", up.message), up.status);
   const { form, file: part, bytes, contentType } = up;
   const ext = fileExt(part.name || "video");
   const key = `uploads/${user.sub}/videos/${crypto.randomUUID()}${ext ? `.${ext}` : ".webm"}`;
 
   if (!(await putObject(key, bytes, contentType, undefined, { sourceProjectId: await projectIdField(user.sub, form) }))) {
-    return c.json(fail("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
+    return c.json(error("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
   }
 
   return c.json(
-    ok({
+    success({
       url: cdnUrl(key),
       fileName: part.name || key.split("/").at(-1) || "video.webm",
       size: bytes.byteLength,
@@ -283,16 +278,16 @@ uploadRoutes.delete("/:key{.+}", async (c) => {
   const key = c.req.param("key");
 
   if (!key.startsWith(`uploads/${user.sub}/`)) {
-    return c.json(fail("FORBIDDEN", "You do not have permission to delete this file"), 403);
+    return c.json(error("FORBIDDEN", "You do not have permission to delete this file"), 403);
   }
 
   const bucket: R2Bucket | undefined = getVideoBucket();
-  if (!bucket) return c.json(fail("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
+  if (!bucket) return c.json(error("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
 
   const existing = await bucket.head(key);
-  if (!existing) return c.json(fail("NOT_FOUND", "File not found"), 404);
+  if (!existing) return c.json(error("NOT_FOUND", "File not found"), 404);
 
   await deleteUserObjects(user.sub, [key]);
 
-  return c.json(ok(null));
+  return c.json(success(null));
 });

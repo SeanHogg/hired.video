@@ -2,7 +2,8 @@
  * external_email — synced inbox sources (Gmail, Outlook, …).
  *
  * Two tables make up this aggregate:
- *   • externalEmailAccounts  — one row per connected mailbox per user
+ *   • connected mailboxes    — provider_connections purpose "email_inbox"
+ *                              (W3-C; adapter repositories/externalEmailAccountsRepository.ts)
  *   • externalEmailMessages  — synced messages, classified, scored, optionally linked to jobs
  *
  * The read-side aggregator (services/messaging/inboxService.ts) merges the

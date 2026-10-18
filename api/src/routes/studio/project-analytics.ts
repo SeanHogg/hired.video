@@ -13,15 +13,16 @@ import {
   trackProjectEvent,
   type TrackedProjectEvent,
 } from "../../services/studio/project-analytics.js";
-import { fail, ok, studioErrorResponse } from "./http.js";
+import { success } from "../../types/index.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 
 export const studioProjectAnalyticsRoutes = new Hono<AppEnv>();
 
 async function track(c: Context<AppEnv>, event: TrackedProjectEvent): Promise<Response> {
   const body: unknown = await c.req.json().catch(() => ({}));
   const fields = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
-  await trackProjectEvent(c.req.param("projectId"), event, c.var.user?.sub ?? null, fields);
-  return c.json(ok({ tracked: true }), 202);
+  await trackProjectEvent(c.req.param("projectId"), event, c.var.userId ?? null, fields);
+  return c.json(success({ tracked: true }), 202);
 }
 
 studioProjectAnalyticsRoutes.post("/projects/:projectId/view", (c) => track(c, "view"));
@@ -30,11 +31,6 @@ studioProjectAnalyticsRoutes.post("/projects/:projectId/cta-click", (c) => track
 // Pro-gated (paired with studio-features.ts /analytics/projects/:projectId):
 // CTA clicks + shares + CTR. Free users get view counts via GET /projects.
 studioProjectAnalyticsRoutes.get("/projects/:projectId/analytics", requireVideoAnalytics, async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
-  try {
-    return c.json(ok(await getProjectAnalytics(userId, c.req.param("projectId"))));
-  } catch (e) {
-    return studioErrorResponse(c, e);
-  }
+  const userId = requireUser(c);
+  return c.json(success(await getProjectAnalytics(userId, c.req.param("projectId"))));
 });

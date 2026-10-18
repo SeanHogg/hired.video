@@ -8,7 +8,7 @@ import { CampaignService } from "../campaigns/CampaignService.js";
 import { getPlatformCompanyId } from "../campaigns/platform-company.js";
 
 export function adminCampaignService(): CampaignService {
-  return CampaignService.create(getDb());
+  return CampaignService.live();
 }
 
 /** SuperAdmin marketing campaigns are always sent as the hired.video company. */

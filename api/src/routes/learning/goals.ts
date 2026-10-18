@@ -18,9 +18,9 @@ import type { Context } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
-import { LEARNING_GOAL_STATUSES } from "../../db/schema/learning.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../../services/adapters/llm-client.js";
 import {
+  LEARNING_GOAL_STATUSES,
   createGoal,
   deleteGoal,
   generatePathFromGoal,
@@ -28,6 +28,8 @@ import {
   recommendForGoal,
   updateGoal,
 } from "../../services/learning/learning-goals-service.js";
+import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const goalRoutes = new Hono<AppEnv>();
 
@@ -47,52 +49,40 @@ function goalLlm(c: Context<AppEnv>) {
 }
 
 goalRoutes.get("/goals/me", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   return c.json(success(await listGoals(userId)), 200);
 });
 
-goalRoutes.post("/goals", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const parsed = CreateGoalSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  }
-  return c.json(success(await createGoal(userId, parsed.data.goalText, parsed.data.source)), 201);
+goalRoutes.post("/goals", validateJson(CreateGoalSchema, undefined, { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  return c.json(success(await createGoal(userId, body.goalText, body.source)), 201);
 });
 
-goalRoutes.patch("/goals/:id", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const parsed = UpdateGoalSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  }
-  const updated = await updateGoal(userId, c.req.param("id"), parsed.data);
+goalRoutes.patch("/goals/:id", validateJson(UpdateGoalSchema, undefined, { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  const updated = await updateGoal(userId, c.req.param("id"), body);
   if (!updated) return c.json(error("NOT_FOUND", "Goal not found"), 404);
   return c.json(success(updated), 200);
 });
 
 goalRoutes.delete("/goals/:id", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const deleted = await deleteGoal(userId, c.req.param("id"));
   if (!deleted) return c.json(error("NOT_FOUND", "Goal not found"), 404);
   return c.json(success({ deleted: true }), 200);
 });
 
 goalRoutes.get("/goals/:id/recommendations", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const items = await recommendForGoal(userId, c.req.param("id"), goalLlm(c));
   if (!items) return c.json(error("NOT_FOUND", "Goal not found"), 404);
   return c.json(success(items), 200);
 });
 
 goalRoutes.post("/goals/:id/generate-path", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const result = await generatePathFromGoal(userId, c.req.param("id"), goalLlm(c));
   if (result.kind === "not_found") return c.json(error("NOT_FOUND", "Goal not found"), 404);
   if (result.kind === "no_courses") {

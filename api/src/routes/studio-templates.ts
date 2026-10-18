@@ -4,7 +4,8 @@
  * stays focused on:
  *   • Hono routing + auth middleware (Variables.user is set upstream)
  *   • Request parsing + zod validation
- *   • Mapping service errors to HTTP status codes
+ * Service errors (StudioTemplatesError) are DomainErrors carrying their own
+ * status; the global error handler renders them.
  *
  * All business rules (creator gate, consent, slug, fee snapshot) live in
  * StudioTemplatesService; license grants in StudioTemplateLicensesService.
@@ -32,18 +33,16 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
-import type { Variables, AppEnv } from "../types/index.js";
+import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
+import { StudioTemplatesService, MAX_PRICE_CENTS } from "../services/studio/StudioTemplatesService.js";
 import {
-  StudioTemplatesService,
-  StudioTemplatesError,
-  type StudioTemplatesErrorCode,
-  MAX_PRICE_CENTS,
-} from "../services/studio/StudioTemplatesService.js";
-import { StudioTemplateLicensesService } from "../services/studio/StudioTemplateLicensesService.js";
-import { GRANTABLE_TEMPLATE_KINDS } from "../db/schema/studiotemplates.js";
+  StudioTemplateLicensesService,
+  GRANTABLE_TEMPLATE_KINDS,
+} from "../services/studio/StudioTemplateLicensesService.js";
 import { clampLimit } from "../utils/pagination.js";
 import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 /** `?limit` for the public listings: absent → service default; else clamp 1..200 (default 100). */
 function optionalTemplateLimit(raw: string | undefined): number | undefined {
@@ -54,33 +53,7 @@ export const studioTemplatesRoutes = new Hono<AppEnv>();
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function statusForCode(code: StudioTemplatesErrorCode): number {
-  switch (code) {
-    case "NOT_FOUND":
-      return 404;
-    case "FORBIDDEN":
-      return 403;
-    case "NOT_A_CREATOR":
-    case "PROGRAM_NOT_ACTIVE":
-      return 403;
-    case "CONSENT_REQUIRED":
-    case "VALIDATION_ERROR":
-    case "INVALID_PRICE":
-      return 400;
-    default:
-      return 500;
-  }
-}
-
-function mapServiceError(c: any, err: unknown) {
-  if (err instanceof StudioTemplatesError) {
-    return c.json(error(err.code, err.message), statusForCode(err.code) as any);
-  }
-  const message = err instanceof Error ? err.message : "Internal error";
-  return c.json(error("INTERNAL_ERROR", message), 500);
-}
-
-function readClientHeaders(c: any) {
+function readClientHeaders(c: Context<AppEnv>) {
   return {
     consentIp: (c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? null) as string | null,
     consentUa: (c.req.header("user-agent") ?? null) as string | null,
@@ -157,46 +130,33 @@ async function publishFrom(
   source: { sourceProjectId: string } | { sourceResumeId: string },
   fields: z.infer<typeof PublishFieldsSchema>,
 ) {
-  try {
-    const row = await svc().publish({ ...fields, ...source, creatorUserId: userId, ...readClientHeaders(c) });
-    return c.json(success(row), 201);
-  } catch (err) {
-    return mapServiceError(c, err);
-  }
+  const row = await svc().publish({ ...fields, ...source, creatorUserId: userId, ...readClientHeaders(c) });
+  return c.json(success(row), 201);
 }
 
 function invalidBody(c: Context<AppEnv>, flattened: unknown) {
   return c.json(error("VALIDATION_ERROR", "Invalid request body", flattened), 400);
 }
 
-studioTemplatesRoutes.post("/templates", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
-  const parsed = PublishSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return invalidBody(c, parsed.error.flatten());
-  const { sourceProjectId, ...fields } = parsed.data;
+studioTemplatesRoutes.post("/templates", validateJson(PublishSchema, (e, c) => invalidBody(c, e.flatten()), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  const { sourceProjectId, ...fields } = body;
   return publishFrom(c, userId, { sourceProjectId }, fields);
 });
 
 // The career kit's "Save design as template": the caller's résumé design
 // (the live one in `videoScript`, else the résumé's stored design) becomes a
 // résumé template — same rules as any publish; owner-only, content stripped.
-studioTemplatesRoutes.post("/templates/from-resume/:resumeId", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
+studioTemplatesRoutes.post("/templates/from-resume/:resumeId", validateJson(PublishFieldsSchema, (e, c) => invalidBody(c, e.flatten()), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
   const resumeId = UuidLikeSchema.safeParse(c.req.param("resumeId"));
-  const parsed = PublishFieldsSchema.safeParse(await c.req.json().catch(() => null));
   if (!resumeId.success) return invalidBody(c, resumeId.error.flatten());
-  if (!parsed.success) return invalidBody(c, parsed.error.flatten());
-  return publishFrom(c, userId, { sourceResumeId: resumeId.data }, parsed.data);
+  return publishFrom(c, userId, { sourceResumeId: resumeId.data }, c.req.valid("json"));
 });
 
 studioTemplatesRoutes.get("/templates/me", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
+  const userId = requireUser(c);
   const rows = await svc().listForCreator(userId);
   return c.json(success(rows));
 });
@@ -207,9 +167,7 @@ studioTemplatesRoutes.get("/templates/me", async (c) => {
 // `/templates/me/earnings` rather than `/templates/earnings/me` so the
 // `/templates/me` prefix scopes both reads under one mental model.
 studioTemplatesRoutes.get("/templates/me/earnings", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
+  const userId = requireUser(c);
   const data = await svc().earningsForCreator(userId);
   return c.json(success(data));
 });
@@ -221,9 +179,7 @@ studioTemplatesRoutes.get("/templates/me/earnings", async (c) => {
 // `owner` licenses are excluded — those mirror `/templates/me` and the
 // consumer wants Created and Purchased rendered as distinct lists.
 studioTemplatesRoutes.get("/templates/me/licensed", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
+  const userId = requireUser(c);
   const rows = await licenses().listLicensedStudioTemplatesForUser(userId);
   return c.json(success(rows));
 });
@@ -260,16 +216,14 @@ studioTemplatesRoutes.get("/templates/listing/:slug", async (c) => {
 });
 
 studioTemplatesRoutes.get("/templates/licenses/me", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
+  const userId = requireUser(c);
   const rows = await licenses().listLicensesForUser(userId);
   return c.json(success(rows));
 });
 
 studioTemplatesRoutes.get("/templates/:id", async (c) => {
   const id = c.req.param("id");
-  const userId = c.var.user?.sub as string | undefined;
+  const userId = c.var.userId;
   const row = await svc().getById(id);
   if (!row) return c.json(error("NOT_FOUND", "Template not found"), 404);
   // Private + unlisted templates only visible to the creator.
@@ -279,46 +233,30 @@ studioTemplatesRoutes.get("/templates/:id", async (c) => {
   return c.json(success(row));
 });
 
-studioTemplatesRoutes.patch("/templates/:id", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
+studioTemplatesRoutes.patch("/templates/:id", validateJson(UpdateSchema, (e) => error("VALIDATION_ERROR", "Invalid request body", e.flatten()), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
 
   const id = c.req.param("id");
-  const body = await c.req.json().catch(() => null);
-  const parsed = UpdateSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
-  }
+  const body = c.req.valid("json");
 
   const headers = readClientHeaders(c);
-  try {
-    const row = await svc().update({
-      templateId: id,
-      creatorUserId: userId,
-      patch: {
-        ...parsed.data,
-        consentIp: headers.consentIp,
-        consentUa: headers.consentUa,
-      },
-    });
-    return c.json(success(row));
-  } catch (err) {
-    return mapServiceError(c, err);
-  }
+  const row = await svc().update({
+    templateId: id,
+    creatorUserId: userId,
+    patch: {
+      ...body,
+      consentIp: headers.consentIp,
+      consentUa: headers.consentUa,
+    },
+  });
+  return c.json(success(row));
 });
 
 studioTemplatesRoutes.delete("/templates/:id", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
+  const userId = requireUser(c);
   const id = c.req.param("id");
-  try {
-    await svc().deleteById(id, userId);
-    return c.json(success({ deleted: true }));
-  } catch (err) {
-    return mapServiceError(c, err);
-  }
+  await svc().deleteById(id, userId);
+  return c.json(success({ deleted: true }));
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -326,16 +264,10 @@ studioTemplatesRoutes.delete("/templates/:id", async (c) => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 studioTemplatesRoutes.post("/templates/:id/claim", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
+  const userId = requireUser(c);
   const id = c.req.param("id");
-  try {
-    const license = await licenses().claimFree(userId, id);
-    return c.json(success(license), 201);
-  } catch (err) {
-    return mapServiceError(c, err);
-  }
+  const license = await licenses().claimFree(userId, id);
+  return c.json(success(license), 201);
 });
 
 // Trusted-frontend post-purchase fulfilment. The frontend cart already
@@ -343,25 +275,15 @@ studioTemplatesRoutes.post("/templates/:id/claim", async (c) => {
 // the server-truth license ledger so a logged-in user retains access on
 // other devices. The Stripe / Helcim webhook can also POST here — both
 // paths are idempotent thanks to uq_template_licenses_grant.
-studioTemplatesRoutes.post("/templates/license", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
-  const body = await c.req.json().catch(() => null);
-  const parsed = LicensePurchaseSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
-  }
-  try {
-    const license = await licenses().grantPurchase({
-      userId,
-      kind: parsed.data.templateKind,
-      templateId: parsed.data.templateId,
-      pricePaidCents: parsed.data.pricePaidCents,
-      paymentRef: parsed.data.paymentRef,
-    });
-    return c.json(success(license), 201);
-  } catch (err) {
-    return mapServiceError(c, err);
-  }
+studioTemplatesRoutes.post("/templates/license", validateJson(LicensePurchaseSchema, (e) => error("VALIDATION_ERROR", "Invalid request body", e.flatten()), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  const license = await licenses().grantPurchase({
+    userId,
+    kind: body.templateKind,
+    templateId: body.templateId,
+    pricePaidCents: body.pricePaidCents,
+    paymentRef: body.paymentRef,
+  });
+  return c.json(success(license), 201);
 });

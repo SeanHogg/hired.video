@@ -18,7 +18,7 @@
 
 import { DomainError } from "../../domains/errors.js";
 import { scoreSentiment } from "../../../../shared/sentiment.js";
-import { jobRowToLLMText } from "./match-handlers.js";
+import { jobRowToLLMText } from "./match-text.js";
 import type { IJobReader, IJobWriter } from "../../repositories/jobsRepository.js";
 import { logger } from "../../lib/logger.js";
 

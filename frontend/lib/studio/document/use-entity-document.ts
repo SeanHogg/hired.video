@@ -18,6 +18,7 @@ import { studioService, type StudioProject } from "@/lib/services/studio-service
 import type { DocumentEntityContent, DocumentState } from "@/lib/studio/editor-v2/document-state";
 import { loadDocumentEntity } from "./document-entity";
 import { validateDocumentContent } from "./field-validation";
+import { mediaKindIsDocument } from "@shared/media-kinds";
 
 export interface EntityDocument {
   project: StudioProject;
@@ -44,7 +45,7 @@ async function findVisibleProject(
 ): Promise<StudioProject | null> {
   if (isOwner) return studioService.findDocumentProject(subject);
   const res = await studioService.getPublicProjects(subject);
-  const docs = (res.data ?? []).filter((p) => p.mediaKind === "document" && authorIds.includes(p.userId));
+  const docs = (res.data ?? []).filter((p) => mediaKindIsDocument(p.mediaKind) && authorIds.includes(p.userId));
   docs.sort((a, b) => b.updateDateTime.localeCompare(a.updateDateTime));
   return docs[0] ?? null;
 }

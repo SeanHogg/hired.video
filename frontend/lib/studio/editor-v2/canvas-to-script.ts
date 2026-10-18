@@ -32,13 +32,6 @@ import type {
   SceneElement,
   ElementBox,
   ElementStyle,
-  TextElement,
-  ImageElement,
-  VideoElement,
-  ChipsElement,
-  ChartElement,
-  WebcamElement,
-  ImageAnimation,
   AudioElement,
 } from "@/types/video-script";
 import {
@@ -49,6 +42,7 @@ import {
   type Scene,
   type Widget,
 } from "./canvas-state";
+import { widgetParamsToScriptElement } from "./widget-kinds/registry";
 
 export interface CanvasToScriptOptions {
   /** Total composition duration override (seconds). Defaults to the sum
@@ -189,173 +183,15 @@ function widgetToElement(widget: Widget): SceneElement | null {
 function widgetToElementBody(widget: Widget): SceneElement | null {
   const box = positionToBox(widget.position);
   const style = containerStyleToElementStyle(widget.containerStyle);
-  const z = widget.position.z;
-  const rotation = widget.position.rotation;
-  switch (widget.params.kind) {
-    case "text":
-    case "heading": {
-      const t: TextElement = {
-        id: widget.id,
-        kind: "text",
-        text: widget.params.data.text,
-        box,
-        fontSize: widget.params.data.fontPx,
-        fontWeight: widget.params.data.fontWeight,
-        color: widget.params.data.color,
-        align: widget.params.data.align,
-        style,
-        z,
-        rotation,
-      };
-      return t;
-    }
-    case "image": {
-      const im: ImageElement = {
-        id: widget.id,
-        kind: "image",
-        url:
-          widget.params.data.source.kind === "url"
-            ? widget.params.data.source.url
-            : "",
-        box,
-        fit: widget.params.data.fit === "stretch" ? "fill" : widget.params.data.fit,
-        animation: effectsToImageAnimation(widget.effects),
-        style,
-        z,
-        rotation,
-      };
-      return im;
-    }
-    case "video": {
-      const v: VideoElement = {
-        id: widget.id,
-        kind: "video",
-        url:
-          widget.params.data.source.kind === "url"
-            ? widget.params.data.source.url
-            : "",
-        box,
-        muted: widget.params.data.muted,
-        style,
-        z,
-        rotation,
-      };
-      return v;
-    }
-    case "chart": {
-      const c: ChartElement = {
-        id: widget.id,
-        kind: "chart",
-        chartType: widget.params.data.chartType,
-        data: widget.params.data.data,
-        format: widget.params.data.format,
-        title: widget.params.data.title,
-        takeaway: widget.params.data.takeaway,
-        colors: widget.params.data.colors,
-        box,
-        style,
-        z,
-        rotation,
-      };
-      return c;
-    }
-    case "webcam": {
-      const w: WebcamElement = {
-        id: widget.id,
-        kind: "webcam",
-        recordingUrl: widget.params.data.recordingUrl ?? null,
-        mirror: widget.params.data.mirror,
-        muted: widget.params.data.muted,
-        box,
-        style,
-        z,
-        rotation,
-      };
-      return w;
-    }
-    case "chips": {
-      const c: ChipsElement = {
-        id: widget.id,
-        kind: "chips",
-        chips: widget.params.data.chips,
-        fontSize: widget.params.data.fontPx,
-        fontFamily: widget.params.data.fontFamily,
-        chipColor: widget.params.data.chipColor,
-        textColor: widget.params.data.textColor,
-        direction: widget.params.data.direction,
-        box,
-        style,
-        z,
-        rotation,
-      };
-      return c;
-    }
-    case "cta":
-      // The CTA widget's data already rides on the scene envelope
-      // (ctaText + ctaUrl + the "cta" scene type) via `sceneToSceneScript`.
-      // No matching SceneElement kind, so don't double-emit here — v1's
-      // render path picks the CTA up from the scene-level fields.
-      return null;
-    case "linked-content":
-      // v1's SceneElement union has no entity-card equivalent. Drop the
-      // widget from the v1-emit path — the canvas + render-side v2
-      // applier (once it lands; gap-registered) is the source of truth
-      // for how linked content paints.
-      return null;
-    case "speech-bubble":
-    case "caption-box":
-    case "sfx-burst":
-      // Comic-native widgets — V1 has no SceneElement equivalent for
-      // bubbles / captions / SFX bursts. The v1 emit path is video-only
-      // and the comic kind never compiles down to V1. Dropping is
-      // correct here; the V2 timeline-emit path carries them.
-      return null;
-    case "avatar":
-      // AI presenter avatar (#1557) is V2-native — V1 has no equivalent.
-      // The V2 timeline-emit path renders it via canvas-v2:avatar.
-      return null;
-    case "brand-kit":
-      // Brand kit (#577) is V2-native (`canvas-v2:brand`) — V1 has no
-      // watermark SceneElement. The V2 timeline-emit path carries it.
-      return null;
-    case "engagement-asset":
-      return null;
-    case "shape-rect":
-    case "shape-circle":
-    case "divider":
-      // v1's SceneElement union doesn't have shape primitives — encode
-      // them as a styled text element with no text. Keeps the box +
-      // bg/border + radius visible in v1's render path. Gap-registered.
-      return {
-        id: widget.id,
-        kind: "text",
-        text: "",
-        box,
-        style: {
-          ...style,
-          backgroundColor:
-            widget.params.kind === "divider"
-              ? widget.params.data.color
-              : widget.params.data.fill,
-          borderColor:
-            widget.params.kind !== "divider" && widget.params.data.strokeColor
-              ? widget.params.data.strokeColor
-              : style?.borderColor,
-          borderWidth:
-            widget.params.kind !== "divider" && widget.params.data.strokeWidth
-              ? widget.params.data.strokeWidth
-              : style?.borderWidth,
-          borderRadius:
-            widget.params.kind === "shape-circle"
-              ? Math.max(box.w, box.h) * 5
-              : widget.params.kind === "shape-rect"
-                ? widget.params.data.cornerRadius
-                : style?.borderRadius,
-        },
-        z,
-        rotation,
-      } as TextElement;
-  }
+  // The per-kind v1 element (or null when v1 has no equivalent) is
+  // `toScriptElement` on the widget-kind registry — one entry per kind.
+  return widgetParamsToScriptElement(widget.params, {
+    widget,
+    box,
+    style,
+    z: widget.position.z,
+    rotation: widget.position.rotation,
+  });
 }
 
 function positionToBox(p: Widget["position"]): ElementBox {
@@ -378,30 +214,6 @@ function containerStyleToElementStyle(
   if (cs.borderRadius !== undefined) out.borderRadius = cs.borderRadius;
   if (cs.padding !== undefined) out.padding = cs.padding;
   return Object.keys(out).length === 0 ? undefined : out;
-}
-
-/** Reverse of `ken_burnsToEffects` in `script-to-canvas.ts`: when a V2
- *  widget carries a V1-compatible `animate-zoom-*` / `animate-pan-*`
- *  effect, surface it back as the V1 `imageAnimation` field. Other
- *  modern animate kinds (fade, pulse, shake) have no V1 equivalent so
- *  they're written only on the effects array — V1 ignores them.
- *  Round-trip is lossless for the four kinds V1 knows about. */
-function effectsToImageAnimation(
-  effects: Widget["effects"],
-): ImageAnimation | undefined {
-  if (!effects) return "none";
-  const known: ReadonlySet<string> = new Set([
-    "animate-zoom-in",
-    "animate-zoom-out",
-    "animate-pan-left",
-    "animate-pan-right",
-  ]);
-  for (const e of effects) {
-    if (known.has(e.kind)) {
-      return e.kind.slice("animate-".length) as ImageAnimation;
-    }
-  }
-  return "none";
 }
 
 function canvasFiltersToScript(

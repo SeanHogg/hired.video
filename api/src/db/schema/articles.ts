@@ -277,18 +277,8 @@ export const partnerPayouts = pgTable(
 export type PartnerPayout = typeof partnerPayouts.$inferSelect;
 export type NewPartnerPayout = typeof partnerPayouts.$inferInsert;
 
-/** Running per-user balance for the partner program. Accrues until it
- *  crosses the $50 threshold (#172) then rolls into a payable row. */
-export const partnerProgramBalances = pgTable("partner_program_balances", {
-  userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
-  pendingCents: integer("pending_cents").default(0).notNull(),
-  paidCents: integer("paid_cents").default(0).notNull(),
-  lastPeriodId: uuid("last_period_id"),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
-
-export type PartnerProgramBalance = typeof partnerProgramBalances.$inferSelect;
-export type NewPartnerProgramBalance = typeof partnerProgramBalances.$inferInsert;
+// The running per-user Partner Program balance is the `partner_pool` wallet
+// (wallets.ts; pending = balance, paid = lifetime_consumed — W3-B, 0590).
 
 // ---------------------------------------------------------------------------
 // #896 — article engagement payout periods + per-article entries

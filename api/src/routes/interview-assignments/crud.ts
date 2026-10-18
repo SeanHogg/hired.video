@@ -19,7 +19,10 @@ import {
   resendInterviewInvite,
   submitInterview,
 } from "../../services/interview/assignment-lifecycle.js";
-import { canAssign, fail, ok, sendFailure } from "./shared.js";
+import { canAssign, sendFailure } from "./shared.js";
+import { success, error } from "../../types/index.js";
+import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 
 const QuestionInputSchema = z.object({
   id: z.string(),
@@ -82,75 +85,67 @@ const RespondRequestSchema = z.object({
 
 export const interviewAssignmentCrudRoutes = new Hono<AppEnv>();
 
-interviewAssignmentCrudRoutes.post("/assign", async (c) => {
+interviewAssignmentCrudRoutes.post("/assign", validateJson(AssignRequestSchema, undefined, { emptyBody: null }), async (c) => {
   const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in to assign"), 401);
+  requireUser(c);
   if (!canAssign(user)) {
-    return c.json(fail("FORBIDDEN", "Only recruiters or employers can assign interviews to candidates"), 403);
+    return c.json(error("FORBIDDEN", "Only recruiters or employers can assign interviews to candidates"), 403);
   }
 
-  const body = await c.req.json().catch(() => null);
-  const parsed = AssignRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  }
+  const body = c.req.valid("json");
 
-  const result = await assignInterview(user.sub, parsed.data);
-  if (!result.ok) return sendFailure(c, result);
-  return c.json(ok(result.data), 201);
+  const result = await assignInterview(user.sub, body);
+  if (result.ok === false) return sendFailure(c, result);
+  return c.json(success(result.data), 201);
 });
 
 interviewAssignmentCrudRoutes.post("/:id/resend", async (c) => {
   const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in to resend"), 401);
+  requireUser(c);
 
   const result = await resendInterviewInvite(user.sub, c.req.param("id"));
-  if (!result.ok) return sendFailure(c, result);
-  return c.json(ok(result.data));
+  if (result.ok === false) return sendFailure(c, result);
+  return c.json(success(result.data));
 });
 
 interviewAssignmentCrudRoutes.get("/mine", async (c) => {
   const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in to list"), 401);
+  requireUser(c);
   const mine = await listMyInterviews(user.sub, user.email);
-  return c.json(ok(mine));
+  return c.json(success(mine));
 });
 
 interviewAssignmentCrudRoutes.get("/:id", async (c) => {
   const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+  requireUser(c);
 
   const result = await getInterviewDetail(user.sub, c.req.param("id"));
-  if (!result.ok) return sendFailure(c, result);
-  return c.json(ok(result.data));
+  if (result.ok === false) return sendFailure(c, result);
+  return c.json(success(result.data));
 });
 
-interviewAssignmentCrudRoutes.post("/:id/respond", async (c) => {
+interviewAssignmentCrudRoutes.post("/:id/respond", validateJson(RespondRequestSchema, (e) => error("VALIDATION_ERROR", "Invalid response payload", e.flatten()), { emptyBody: null }), async (c) => {
   const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in to answer"), 401);
+  requireUser(c);
 
-  const body = await c.req.json().catch(() => null);
-  const parsed = RespondRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid response payload", parsed.error.flatten()), 400);
-  }
+  const body = c.req.valid("json");
 
   const result = await recordInterviewAnswer(
     c.env,
     user.sub,
     c.req.param("id"),
-    parsed.data,
+    body,
     c.executionCtx?.waitUntil?.bind(c.executionCtx),
   );
-  if (!result.ok) return sendFailure(c, result);
-  return c.json(ok(result.data), 201);
+  if (result.ok === false) return sendFailure(c, result);
+  return c.json(success(result.data), 201);
 });
 
 interviewAssignmentCrudRoutes.post("/:id/submit", async (c) => {
   const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+  requireUser(c);
 
   const result = await submitInterview(user.sub, c.req.param("id"));
-  if (!result.ok) return sendFailure(c, result);
-  return c.json(ok(result.data));
+  if (result.ok === false) return sendFailure(c, result);
+  return c.json(success(result.data));
 });

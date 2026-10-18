@@ -13,11 +13,11 @@
  * the configs are data.
  *
  * NOT in this list (and deliberately so):
- *   - Append-only ledgers (points_ledger, payout_ledger_entries,
+ *   - Append-only ledgers (wallet_ledger, payout_ledger_entries,
  *     usage_ledger) — totals roll up via SUM, not by counter cache.
  *   - Counters that are already covered by a Postgres trigger.
- *   - `gamification.user_points_balance` — money-equivalent state;
- *     reconstructed from points_ledger via SUM, not by re-counting.
+ *   - `wallet_balances` — money-equivalent state; reconstructed from the
+ *     ledger via SUM, not by re-counting.
  *
  * Adding a counter here is load-bearing: review the (table, column,
  * source) tuple before extending.
@@ -90,14 +90,6 @@ export const COUNTER_POLICIES: readonly CounterPolicy[] = [
     sourceTable: "artifact_views",
     sourceFk: "artifact_id",
     sourceWhere: "artifact_kind = 'article' AND event_type = 'view'",
-  },
-
-  // Candidate resume share viewCount.
-  {
-    table: "candidate_resume_shares",
-    column: "view_count",
-    sourceTable: "candidate_resume_share_views",
-    sourceFk: "share_id",
   },
 
   // Recruiter sourcing-bid candidate submissions counter.

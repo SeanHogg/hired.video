@@ -5,7 +5,8 @@
  * Pure data access: no visibility/permission decisions live here (those are
  * in services/lists/listAccess.ts). Every function returns plain rows.
  */
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, notInArray, or, sql } from "drizzle-orm";
+import { RECRUITER_LIST_KINDS } from "../../../shared/lists.js";
 import { getDb, schema } from "../db/index.js";
 import type { List, ListItem, NewList, NewListItem } from "../db/schema/lists.js";
 
@@ -61,7 +62,9 @@ export async function findCompanyNamesByIds(companyIds: string[]): Promise<Array
 
 // ─── Lists ──────────────────────────────────────────────────────────────────
 
-/** Own lists + team-shared lists of any of `companyIds`, newest first. */
+/** Own lists + team-shared lists of any of `companyIds`, newest first.
+ *  Recruiter CRM lists (RECRUITER_LIST_KINDS) are served by
+ *  /api/recruiter/lists, not the generic overview. */
 export async function findVisibleLists(userId: string, companyIds: string[]): Promise<ListRow[]> {
   const own = eq(lists.ownerUserId, userId);
   const team =
@@ -69,7 +72,7 @@ export async function findVisibleLists(userId: string, companyIds: string[]): Pr
   return getDb()
     .select()
     .from(lists)
-    .where(team ? or(own, team) : own)
+    .where(and(team ? or(own, team) : own, notInArray(lists.kind, [...RECRUITER_LIST_KINDS])))
     .orderBy(desc(lists.updatedAt));
 }
 

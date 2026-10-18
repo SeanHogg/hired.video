@@ -2,7 +2,7 @@
  * Notification-preference resolution for the dispatcher.
  *
  * The Settings handlers OWN the write path (persist the granular blob on
- * `account_preferences`); this module owns the READ path the dispatcher
+ * `user_settings`); this module owns the READ path the dispatcher
  * hits on every notification. Reads are served through the canonical
  * isolate-local read-through cache (getOrSetIsolateCached — no KV write
  * per miss on Workers Free) and
@@ -10,7 +10,7 @@
  * are read on every fan-out (gap #254; perf hook: no per-notification DB
  * round-trip).
  *
- * The coarse `*_enabled` booleans on `account_preferences` predate the
+ * The coarse `*_enabled` booleans on `user_settings` predate the
  * granular matrix and are still read by legacy callers
  * (services/user/account.ts). `granularToLegacy` / `legacyToGranularBase`
  * are the single projection seam between the two representations so the
@@ -18,8 +18,8 @@
  * matrix from a pre-migration row.
  */
 
-import { eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
+import { savedSettingsOf } from "../../repositories/preferencesRepository.js";
 import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
@@ -27,7 +27,7 @@ import {
   type NotificationPreferences,
 } from "../../../../shared/notification-preferences.js";
 
-const { accountPreferences } = schema;
+const { userSettings } = schema;
 
 /** Isolate-local: other warm isolates converge within this TTL after a write. */
 const PREFS_TTL_SECONDS = 120;
@@ -98,7 +98,7 @@ export function resolvePreferencesFromRow(row: PrefsRow): NotificationPreference
 
 /**
  * The dispatcher's read path: a user's full notification matrix, cached.
- * A user with no `account_preferences` row gets the defaults.
+ * A user who never saved account settings gets the defaults.
  */
 export async function loadNotificationPreferences(
   userId: string,
@@ -110,12 +110,12 @@ export async function loadNotificationPreferences(
       const db = getDb();
       const [row] = await db
         .select({
-          notificationPreferences: accountPreferences.notificationPreferences,
-          emailNotificationsEnabled: accountPreferences.emailNotificationsEnabled,
-          weeklyDigestEnabled: accountPreferences.weeklyDigestEnabled,
+          notificationPreferences: userSettings.notificationPreferences,
+          emailNotificationsEnabled: userSettings.emailNotificationsEnabled,
+          weeklyDigestEnabled: userSettings.weeklyDigestEnabled,
         })
-        .from(accountPreferences)
-        .where(eq(accountPreferences.userId, userId))
+        .from(userSettings)
+        .where(savedSettingsOf(userId, "account"))
         .limit(1);
       return row ? resolvePreferencesFromRow(row) : { ...DEFAULT_NOTIFICATION_PREFERENCES };
     },

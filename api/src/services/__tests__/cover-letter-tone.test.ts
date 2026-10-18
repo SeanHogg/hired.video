@@ -32,7 +32,7 @@ import { asHandler } from "../../handlers/shared.js";
 const handleCoverLetterTone = asHandler(coverLetterToneUseCase);
 import { COVER_LETTER_TONES, type CoverLetter } from "../../../../shared/cover-letter.js";
 import type { LLMCallOpts, LLMClient, LLMOptions } from "../../services/adapters/llm-client.js";
-import { useCaseForFeatureKey } from "../../services/adapters/providers.js";
+import { FEATURE_KEY_USE_CASE } from "../../services/adapters/providers.js";
 
 const USER_ID = randomUUID();
 
@@ -180,7 +180,7 @@ describe("handleCoverLetterTone", () => {
     assert.equal(calls.length, 1);
     assert.equal(calls[0].featureKey, COVER_LETTER_TONE_FEATURE_KEY);
     assert.deepEqual(calls[0].opts, { exempt: true });
-    assert.equal(useCaseForFeatureKey(COVER_LETTER_TONE_FEATURE_KEY), "cover_letter");
+    assert.equal(FEATURE_KEY_USE_CASE[COVER_LETTER_TONE_FEATURE_KEY], "cover_letter");
   });
 
   it("401 signed out, 400 on bad input — before any AI call", async () => {

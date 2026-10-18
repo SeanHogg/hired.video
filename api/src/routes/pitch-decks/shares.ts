@@ -7,6 +7,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/index.js";
 import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 import {
   createPitchDeckShare,
   listPitchDeckShares,
@@ -15,36 +16,30 @@ import {
   viewSharedPitchDeck,
 } from "../../services/recruit/pitchDeckSharesService.js";
 import { CreateDeckShareSchema, UpdateDeckShareSchema } from "../../services/recruit/schemas.js";
-import { parseJsonBody, respond } from "../candidates/http.js";
+import { invalidPayload, respond } from "../candidates/http.js";
 
 export const pitchDeckShareRoutes = new Hono<AppEnv>();
 
 pitchDeckShareRoutes.get("/:id/shares", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return respond(c, listPitchDeckShares(auth.userId, c.req.param("id")));
+  const userId = requireUser(c);
+  return respond(c, listPitchDeckShares(userId, c.req.param("id")));
 });
 
-pitchDeckShareRoutes.post("/:id/shares", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const body = await parseJsonBody(c, CreateDeckShareSchema);
-  if ("response" in body) return body.response;
-  return respond(c, createPitchDeckShare(auth.userId, c.req.param("id"), body.data), 201);
+pitchDeckShareRoutes.post("/:id/shares", validateJson(CreateDeckShareSchema, invalidPayload(), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  return respond(c, createPitchDeckShare(userId, c.req.param("id"), body), 201);
 });
 
-pitchDeckShareRoutes.patch("/shares/:shareId", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const body = await parseJsonBody(c, UpdateDeckShareSchema);
-  if ("response" in body) return body.response;
-  return respond(c, updatePitchDeckShare(auth.userId, c.req.param("shareId"), body.data));
+pitchDeckShareRoutes.patch("/shares/:shareId", validateJson(UpdateDeckShareSchema, invalidPayload(), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  return respond(c, updatePitchDeckShare(userId, c.req.param("shareId"), body));
 });
 
 pitchDeckShareRoutes.delete("/shares/:shareId", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return respond(c, revokePitchDeckShare(auth.userId, c.req.param("shareId")));
+  const userId = requireUser(c);
+  return respond(c, revokePitchDeckShare(userId, c.req.param("shareId")));
 });
 
 /** Public (no auth) — mounted at /api/public/pitch-deck. */

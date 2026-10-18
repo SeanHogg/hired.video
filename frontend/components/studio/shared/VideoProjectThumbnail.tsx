@@ -38,12 +38,15 @@
  * this directly. Never reach for `<img src={project.thumbnailUrl}>`
  * inline; that's how the stale-thumbnail bug class returns.
  */
+import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Sparkles } from "lucide-react";
 import { timelineToCanvasState } from "@/lib/studio/editor-v2/timeline-emit";
 import type { StudioProject } from "@/lib/services/studio-service";
 import SceneThumbnail from "./SceneThumbnail";
 import WaveformThumbnail from "./WaveformThumbnail";
-import { mediaKindHasAudio, mediaKindHasVideo } from "@shared/media-kinds";
+import { mediaKindHasAudio, mediaKindHasVideo, type MediaKind } from "@shared/media-kinds";
 import { firstLayerPixels, type ImageState } from "@shared/image-state";
 import type { GameState } from "@shared/game-state";
 import { firstFramePixels, type AnimationState } from "@shared/animation-state";
@@ -60,32 +63,60 @@ export interface VideoProjectThumbnailProps {
   className?: string;
 }
 
-export default function VideoProjectThumbnail({
-  project,
-  className,
-}: VideoProjectThumbnailProps) {
-  const mediaKind = project.mediaKind ?? "video";
+interface KindThumbnailArgs {
+  project: StudioProject;
+  className?: string;
+  t: TFunction;
+}
 
+/** i18n keys for the tile labels the kind map renders (never literals). */
+const KIND_THUMBNAIL_LABEL_KEYS = {
+  animation: "studio.projectThumbnail.animationLabel",
+} as const satisfies Partial<Record<MediaKind, string>>;
+
+type KindThumbnail = (args: KindThumbnailArgs) => ReactNode;
+
+// CAD projects (#930) render a drafting-grid preview. 2D drawings read off
+// `cadState` sheet dims; 3D models show an isometric cube. Also previously
+// mis-rendered as an audio waveform.
+function cadThumbnail(variant: "2d" | "3d"): KindThumbnail {
+  return function CadKindThumbnail({ project, className }) {
+    const cadState = (project.cadState as CadState | null | undefined) ?? null;
+    return (
+      <div className={cn("h-full w-full", className)}>
+        <CadPlaceholderThumbnail
+          variant={variant}
+          widthMm={cadState?.widthMm ?? null}
+          heightMm={cadState?.heightMm ?? null}
+        />
+      </div>
+    );
+  };
+}
+
+/** Kinds that own a dedicated preview shape. Kinds absent here fall through
+ *  to the audio-waveform / first-scene / sparkle fallbacks below. */
+const KIND_THUMBNAILS: Partial<Record<MediaKind, KindThumbnail>> = {
   // Game projects render a state-driven preview — the start level's
   // background colour + sprite positions, faithfully matching what the
   // user sees inside the editor's `<GameStage>`. Replaces the prior
   // audio-waveform placeholder that visually mismatched the template
   // card the user clicked to create the project.
-  if (mediaKind === "game") {
+  game: ({ project, className }) => {
     const gameState = (project.gameState ?? null) as GameState | null;
     return (
       <div className={cn("relative h-full w-full overflow-hidden", className)}>
         <GameStateThumbnail gameState={gameState} />
       </div>
     );
-  }
+  },
 
   // Image projects (#932) render the FIRST non-empty layer's
   // pixelsDataUrl as a flat `<img>` preview when the user has drawn
   // something; otherwise fall through to the shared Photoshop-shaped
   // placeholder so a fresh drawing tile reads the same as the template
   // card that created it (DRY anchor with `DRAWING_TEMPLATE_PRESETS`).
-  if (mediaKind === "image") {
+  image: ({ project, className }) => {
     const imageState = (project.imageState as ImageState | null | undefined) ?? null;
     const pixels = firstLayerPixels(imageState);
     if (pixels) {
@@ -107,7 +138,7 @@ export default function VideoProjectThumbnail({
         <DrawingPlaceholderThumbnail width={width} height={height} />
       </div>
     );
-  }
+  },
 
   // Animation projects (#1003) render the first painted frame as the
   // tile preview — mirrors the image-kind path so the "My videos" grid
@@ -116,7 +147,7 @@ export default function VideoProjectThumbnail({
   // frame yet fall through to the kind-aware gradient placeholder
   // below (the chip on top + the kind badge cue the user to keep
   // drawing).
-  if (mediaKind === "animation") {
+  animation: ({ project, className, t }) => {
     const animationState = (project.animationState as AnimationState | null | undefined) ?? null;
     const pixels = firstFramePixels(animationState);
     if (pixels) {
@@ -140,43 +171,41 @@ export default function VideoProjectThumbnail({
       >
         <div className="text-center text-[10px] font-semibold uppercase tracking-widest opacity-80">
           <Sparkles className="mx-auto mb-1 h-4 w-4" />
-          Animation
+          {t(KIND_THUMBNAIL_LABEL_KEYS.animation)}
         </div>
       </div>
     );
-  }
+  },
 
   // Document projects (#1912) render a paper-sheet preview keyed off the
   // live DocumentState's section blocks — never the audio waveform the kind
-  // used to fall through to (the bug this branch fixes).
-  if (mediaKind === "document") {
+  // used to fall through to (the bug this entry fixes).
+  document: ({ project, className }) => {
     const documentState = (project.documentState as DocumentState | null | undefined) ?? null;
     return (
       <div className={cn("h-full w-full", className)}>
         <DocumentPlaceholderThumbnail documentState={documentState} />
       </div>
     );
-  }
+  },
 
-  // CAD projects (#930) render a drafting-grid preview. 2D drawings read off
-  // `cadState` sheet dims; 3D models show an isometric cube. Also previously
-  // mis-rendered as an audio waveform.
-  if (mediaKind === "cad" || mediaKind === "cad_3d") {
-    const cadState = (project.cadState as CadState | null | undefined) ?? null;
-    return (
-      <div className={cn("h-full w-full", className)}>
-        <CadPlaceholderThumbnail
-          variant={mediaKind === "cad_3d" ? "3d" : "2d"}
-          widthMm={cadState?.widthMm ?? null}
-          heightMm={cadState?.heightMm ?? null}
-        />
-      </div>
-    );
-  }
+  cad: cadThumbnail("2d"),
+  cad_3d: cadThumbnail("3d"),
+};
+
+export default function VideoProjectThumbnail({
+  project,
+  className,
+}: VideoProjectThumbnailProps) {
+  const { t } = useTranslation();
+  const mediaKind = project.mediaKind ?? "video";
+
+  const renderKind = KIND_THUMBNAILS[mediaKind];
+  if (renderKind) return renderKind({ project, className, t });
 
   // Audio-only kinds (podcast, voice) — the waveform is the right cue ONLY
   // for kinds that produce audio but no visible frames. Static visual kinds
-  // (document / cad) are handled above; gating on `hasAudio && !hasVideo`
+  // (document / cad) are handled by `KIND_THUMBNAILS`; gating on `hasAudio && !hasVideo`
   // (not just `!hasVideo`) keeps them out of this branch.
   if (mediaKindHasAudio(mediaKind) && !mediaKindHasVideo(mediaKind)) {
     return (

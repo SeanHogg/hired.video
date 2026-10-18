@@ -25,13 +25,9 @@
 
 import { Hono } from "hono";
 import { jwtVerify } from "jose";
-import { eq } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { getJwtSecret } from "../utils/jwt.js";
-import { getDb, schema } from "../db/index.js";
-import { canActFor } from "../services/studio/workspace.js";
-
-const { studioProjects } = schema;
+import { resolveCollabRoomAccess } from "../services/studio/collab-access.js";
 
 export const studioSocketRoutes = new Hono<{ Variables: Variables; Bindings: any }>();
 
@@ -62,15 +58,9 @@ studioSocketRoutes.get("/:projectId/collab-socket", async (c) => {
   }
 
   // ── Authorize against the project's real owner (private-project gate) ──
-  const db = getDb();
-  const [project] = await db
-    .select({ userId: studioProjects.userId, companyId: studioProjects.companyId })
-    .from(studioProjects)
-    .where(eq(studioProjects.id, projectId))
-    .limit(1);
-  if (!project) return c.text("Project not found", 404);
-  const allowed = await canActFor(userId, project.userId, project.companyId ?? null);
-  if (!allowed) return c.text("Forbidden", 403);
+  const access = await resolveCollabRoomAccess(userId, projectId);
+  if (access === "not_found") return c.text("Project not found", 404);
+  if (access === "forbidden") return c.text("Forbidden", 403);
 
   const env = (c.env as any) ?? {};
   const binding = env.STUDIO_ROOM as DurableObjectNamespace | undefined;

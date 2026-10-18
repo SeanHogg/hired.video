@@ -18,8 +18,10 @@ describe("declaredTableNames", () => {
   const names = declaredTableNames();
 
   it("lists the schema's tables", () => {
-    assert.ok(names.length > 400, `expected the full schema, got ${names.length}`);
-    for (const t of ["users", "magic_link_tokens", "studio_projects", "uploaded_assets", "help_mappings"]) {
+    // ~375 after the Wave 3 table merges (2026-10-17). The floor only catches
+    // a broken glob that would load a fraction of the schema.
+    assert.ok(names.length > 300, `expected the full schema, got ${names.length}`);
+    for (const t of ["users", "auth_tokens", "studio_projects", "uploaded_assets", "help_mappings"]) {
       assert.ok(names.includes(t), `missing ${t}`);
     }
   });
@@ -35,8 +37,8 @@ describe("declaredUniqueConstraints", () => {
   const constraints = declaredUniqueConstraints();
 
   it("includes column-level .unique() under drizzle's default name", () => {
-    const c = constraints.find((x) => x.name === "magic_link_tokens_token_unique");
-    assert.deepEqual(c, { table: "magic_link_tokens", name: "magic_link_tokens_token_unique", columns: ["token"], nullsNotDistinct: false });
+    const c = constraints.find((x) => x.name === "users_email_unique");
+    assert.deepEqual(c, { table: "users", name: "users_email_unique", columns: ["email"], nullsNotDistinct: false });
   });
 
   // drizzle-kit 0.31 introspects every unique as nullsNotDistinct=false, so a

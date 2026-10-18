@@ -6,7 +6,7 @@
  * Email is a custom HTML digest — gated by posting_agent_settings.email_digest
  * and the weekly-digest notification preference — not the bell dispatcher.
  */
-import { isInQuietHours, localDayStart } from "../../../../shared/posting-agent.js";
+import { localDayStart, shouldSendAgentPush } from "../../../../shared/posting-agent.js";
 import { isChannelAllowed, type NotificationPreferences } from "../../../../shared/notification-preferences.js";
 import { escapeHtml } from "../../../../shared/html-escape.js";
 
@@ -61,12 +61,9 @@ export async function sendAgentDigest(
   } catch {
     prefs = null;
   }
-  const quiet = isInQuietHours(
-    localMinuteOfDay(now, args.timezone),
-    args.quietStartMinute,
-    args.quietEndMinute,
-  );
-  const push = !quiet && channelAllowed(prefs, "push");
+  const push =
+    shouldSendAgentPush(localMinuteOfDay(now, args.timezone), args.quietStartMinute, args.quietEndMinute) &&
+    channelAllowed(prefs, "push");
   const n = args.drafts.length;
   const title = n === 1 ? "1 draft waiting" : `${n} drafts waiting`;
   const message =

@@ -27,6 +27,8 @@ import {
   hasAnyLLMProviderKey,
 } from "../services/adapters/llm-client.js";
 import { transcribeAudio } from "../services/adapters/transcription.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const studioDubbingRoutes = new Hono<AppEnv>();
 
@@ -98,17 +100,14 @@ const TranscribeRequestSchema = z.object({
   context: z.string().max(500).optional(),
 });
 
-studioDubbingRoutes.post("/dubbing/transcribe", async (c) => {
-  if (!c.var.user) return c.json(error("AUTH_REQUIRED", "Auth required"), 401);
+studioDubbingRoutes.post("/dubbing/transcribe", validateJson(TranscribeRequestSchema, (e) => error("INVALID_REQUEST", "Invalid request", e.issues)), async (c) => {
+  requireUser(c);
   const apiKey = c.env.OPENAI_API_KEY;
   if (!apiKey) {
     return c.json(error("PROVIDER_UNAVAILABLE", "Whisper transcription not configured (OPENAI_API_KEY)"), 503);
   }
-  const parsed = TranscribeRequestSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("INVALID_REQUEST", "Invalid request", parsed.error.issues), 400);
-  }
-  const { audioUrl, targetLanguage, sourceLanguage, chunkLengthSec, context } = parsed.data;
+  const body = c.req.valid("json");
+  const { audioUrl, targetLanguage, sourceLanguage, chunkLengthSec, context } = body;
 
   let transcription;
   try {
@@ -179,18 +178,14 @@ studioDubbingRoutes.post("/dubbing/transcribe", async (c) => {
   });
 });
 
-studioDubbingRoutes.post("/dubbing/translate", async (c) => {
-  if (!c.var.user) return c.json(error("AUTH_REQUIRED", "Auth required"), 401);
+studioDubbingRoutes.post("/dubbing/translate", validateJson(TranslateRequestSchema, (e) => error("INVALID_REQUEST", "Invalid request", e.issues), { emptyBody: null }), async (c) => {
+  requireUser(c);
   if (!hasAnyLLMProviderKey(c.env as any)) {
     return c.json(error("PROVIDER_UNAVAILABLE", "Translation provider not configured"), 503);
   }
 
-  const body = await c.req.json().catch(() => null);
-  const parsed = TranslateRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("INVALID_REQUEST", "Invalid request", parsed.error.issues), 400);
-  }
-  const { targetLanguage, sourceLanguage, cues, context } = parsed.data;
+  const body = c.req.valid("json");
+  const { targetLanguage, sourceLanguage, cues, context } = body;
 
   const targetLabel =
     SUPPORTED_DUBBING_LANGUAGES.find((l) => l.code === targetLanguage)?.label ??

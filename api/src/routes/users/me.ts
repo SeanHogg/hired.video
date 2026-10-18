@@ -19,6 +19,7 @@ import {
   uploadMyAvatar,
 } from "../../services/user/accountSelfService.js";
 import { respond, validationError, waitUntilOf } from "./http.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const meRoutes = new Hono<AppEnv>();
 
@@ -31,21 +32,19 @@ meRoutes.get("/public", async (c) => {
 });
 
 /** GET /api/users/me — frontend compatibility endpoint */
-meRoutes.get("/me", (c) => respond(c, getMyProfile(c.var.user.sub)));
+meRoutes.get("/me", (c) => respond(c, getMyProfile(c.var.userId)));
 
 /** PUT /api/users/me — update authenticated user's profile. Role + email
  *  guards live in the use case (services/user/myProfile.ts). */
-meRoutes.put("/me", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = UpdateProfileSchema.safeParse(body);
-  if (!parsed.success) return validationError(c, "Invalid request body", parsed.error.flatten());
+meRoutes.put("/me", validateJson(UpdateProfileSchema, (e, c) => validationError(c, "Invalid request body", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
   const user = c.var.user;
   return respond(
     c,
     updateMyProfile({
       userId: user.sub,
       sessionEmail: user.email,
-      input: parsed.data,
+      input: body,
       env: c.env,
       waitUntil: waitUntilOf(c),
     }),
@@ -77,7 +76,7 @@ meRoutes.post("/me/avatar", async (c) => {
   return respond(
     c,
     uploadMyAvatar({
-      userId: c.var.user.sub,
+      userId: c.var.userId,
       fileName: up.file.name,
       bytes: up.bytes,
       contentType: up.contentType,
@@ -87,17 +86,15 @@ meRoutes.post("/me/avatar", async (c) => {
 });
 
 /** PATCH /api/users/slug — update the authenticated user's custom URL slug */
-meRoutes.patch("/slug", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = UpdateSlugSchema.safeParse(body);
-  if (!parsed.success) return validationError(c, "Invalid slug", parsed.error.flatten());
-  return respond(c, updateMySlug(c.var.user.sub, parsed.data.slug));
+meRoutes.patch("/slug", validateJson(UpdateSlugSchema, (e, c) => validationError(c, "Invalid slug", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  return respond(c, updateMySlug(c.var.userId, body.slug));
 });
 
 /** GET /api/users/check-slug/:slug — check if a slug is available (no auth required) */
 meRoutes.get("/check-slug/:slug", (c) =>
-  respond(c, checkSlugAvailability(c.req.param("slug"), c.var.user?.sub)),
+  respond(c, checkSlugAvailability(c.req.param("slug"), c.var.userId)),
 );
 
 /** DELETE /api/users/account — permanently delete the authenticated user's account */
-meRoutes.delete("/account", (c) => respond(c, deleteMyAccount(c.var.user.sub)));
+meRoutes.delete("/account", (c) => respond(c, deleteMyAccount(c.var.userId)));

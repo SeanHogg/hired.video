@@ -5,6 +5,7 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
+import { JobPreferencesSchema, type JobPreferences, type JobPreferencesPatch } from "@shared/settings";
 
 // ============================================================================
 // SCHEMAS
@@ -71,32 +72,9 @@ export const PrivacySettingsSchema = z.object({
   showActivity: z.boolean().optional(),
 });
 
-export const JobPreferencesSchema = z.object({
-  // Job search settings
-  autoApplyEnabled: z.boolean().optional(),
-  preferredJobTypes: z.array(z.string()).optional(),
-  preferredIndustries: z.array(z.string()).optional(),
-  preferredLocations: z.array(z.string()).optional(),
-  remoteOnly: z.boolean().optional(),
-  willingToRelocate: z.boolean().optional(),
-
-  // Salary preferences
-  minSalaryExpectation: z.number().nullish().optional(),
-  maxSalaryExpectation: z.number().nullish().optional(),
-  salaryCurrency: z.string().optional(),
-  salaryPeriod: z.string().optional(), // yearly, monthly, hourly
-
-  // Availability
-  availableFrom: z.string().nullish().optional(), // ISO date string
-  noticePeriodDays: z.number().nullish().optional(),
-
-  // Advanced preferences
-  preferredWorkingHours: z.array(z.string()).optional(),
-  jobMatchThreshold: z.number().nullish().optional(),
-  onlyExactMatches: z.boolean().optional(),
-  excludedCompanies: z.array(z.string()).optional(),
-  excludedKeywords: z.array(z.string()).optional(),
-});
+// Job preferences — the contract (and each field's home) lives in
+// shared/settings.ts so the API validates and answers with the same schema.
+export { JobPreferencesSchema, type JobPreferences, type JobPreferencesPatch } from "@shared/settings";
 
 export const AccountSettingsSchema = z.object({
   theme: z.enum(["light", "dark", "system"]).optional(),
@@ -173,7 +151,6 @@ export const ExtensionSettingsSchema = z.object({
 
 export type NotificationSettings = z.infer<typeof NotificationSettingsSchema>;
 export type PrivacySettings = z.infer<typeof PrivacySettingsSchema>;
-export type JobPreferences = z.infer<typeof JobPreferencesSchema>;
 export type AccountSettings = z.infer<typeof AccountSettingsSchema>;
 export type SecuritySettings = z.infer<typeof SecuritySettingsSchema>;
 export type AllSettings = z.infer<typeof AllSettingsSchema>;
@@ -365,7 +342,7 @@ export class SettingsService {
    * Update job preferences
    */
   async updateJobPreferences(
-    preferences: Partial<JobPreferences>,
+    preferences: JobPreferencesPatch,
   ): Promise<JobPreferences> {
     const response = await apiClient.put<JobPreferences>(
       "/api/settings/job-preferences",

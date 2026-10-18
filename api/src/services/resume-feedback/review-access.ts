@@ -127,7 +127,7 @@ export class ReviewAccessPolicy {
   }
 
   /** The résumé a résumé review is about — for the résumé-only paths
-   *  (proposed drafts live in resume_versions). */
+   *  (proposed drafts live in entity_versions). */
   resumeIdOf(review: ResumeReviewRow): string {
     const subject = subjectOf(review);
     if (subject.type !== "resume" || !subject.id) {

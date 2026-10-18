@@ -20,37 +20,31 @@ import { getDoNotShare, updateDoNotShare } from "../../services/settings/securit
 export const settingsPrivacyRoutes = new Hono<AppEnv>();
 
 settingsPrivacyRoutes.get("/privacy", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await getPrivacy(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getPrivacy(userId)), 200);
 });
 
 settingsPrivacyRoutes.put("/privacy", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await updatePrivacy(auth.userId, await readJsonBody(c))), 200);
+  const userId = requireUser(c);
+  return c.json(success(await updatePrivacy(userId, await readJsonBody(c))), 200);
 });
 
 settingsPrivacyRoutes.get("/cookies", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await getCookiePreferences(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getCookiePreferences(userId)), 200);
 });
 
 settingsPrivacyRoutes.put("/cookies", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await updateCookiePreferences(auth.userId, await readJsonBody(c))), 200);
+  const userId = requireUser(c);
+  return c.json(success(await updateCookiePreferences(userId, await readJsonBody(c))), 200);
 });
 
 settingsPrivacyRoutes.get("/privacy/do-not-share", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await getDoNotShare(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getDoNotShare(userId)), 200);
 });
 
 settingsPrivacyRoutes.put("/privacy/do-not-share", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await updateDoNotShare(auth.userId, await readJsonBody(c))), 200);
+  const userId = requireUser(c);
+  return c.json(success(await updateDoNotShare(userId, await readJsonBody(c))), 200);
 });

@@ -127,6 +127,23 @@ export class CompaniesRepository implements ICompaniesRepository {
     return (updated as CompanyProfileRow) ?? null;
   }
 
+  /** Embed-settings projection (slug + embed toggle) for the company embed UI. */
+  async findEmbedSettings(id: string): Promise<{ slug: string | null; embedEnabled: boolean } | null> {
+    const [row] = await this.db
+      .select({ slug: companyProfiles.slug, embedEnabled: companyProfiles.embedEnabled })
+      .from(companyProfiles)
+      .where(eq(companyProfiles.id, id))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async setEmbedEnabled(id: string, enabled: boolean): Promise<void> {
+    await this.db
+      .update(companyProfiles)
+      .set({ embedEnabled: enabled, updatedAt: this.now() })
+      .where(eq(companyProfiles.id, id));
+  }
+
   async deleteCompanyById(id: string): Promise<boolean> {
     const existing = await this.findCompanyById(id);
     if (!existing) return false;

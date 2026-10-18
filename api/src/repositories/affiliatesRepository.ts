@@ -4,7 +4,7 @@
  * affiliate_payouts and affiliate_link_clicks. Plain rows only; tiering,
  * payout thresholds and response shaping live in services/affiliates/.
  */
-import { and, count, desc, eq, inArray, sql, sum } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, sql, sum } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import type {
   AffiliateConversion,
@@ -202,4 +202,70 @@ export async function findPayoutStatus(payoutId: string): Promise<string | null>
     .where(eq(affiliatePayouts.id, payoutId))
     .limit(1);
   return row?.status ?? null;
+}
+
+/** Provider payout webhook (`payout.paid` / `payout.failed`) — stamp every
+ *  affiliate payout carrying that provider transaction id. */
+export async function setPayoutStatusByTransactionId(
+  transactionId: string,
+  status: "paid" | "failed",
+  db = getDb(),
+): Promise<void> {
+  const now = new Date();
+  await db
+    .update(affiliatePayouts)
+    .set({ status, transactionId, ...(status === "paid" ? { processedAt: now } : {}), updatedAt: now } as any)
+    .where(eq(affiliatePayouts.transactionId, transactionId));
+}
+
+// ─── Conversion recording (payment webhook) ─────────────────────────────────
+// `db` is injectable so the webhook path can run against the fake-db harness.
+
+export async function findReferralByReferredUserId(userId: string, db = getDb()) {
+  const [row] = await db
+    .select({
+      id: affiliateReferrals.id,
+      affiliateId: affiliateReferrals.affiliateId,
+      landingSector: affiliateReferrals.landingSector,
+      convertedAt: affiliateReferrals.convertedAt,
+    })
+    .from(affiliateReferrals)
+    .where(eq(affiliateReferrals.referredUserId, userId))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function findProfileCommissionTerms(profileId: string, db = getDb()) {
+  const [row] = await db
+    .select({
+      commissionRate: affiliateProfiles.commissionRate,
+      specialtySectors: affiliateProfiles.specialtySectors,
+      totalEarned: affiliateProfiles.totalEarned,
+    })
+    .from(affiliateProfiles)
+    .where(eq(affiliateProfiles.id, profileId))
+    .limit(1);
+  return row ?? null;
+}
+
+/** Atomic single-UPDATE claim on `convertedAt IS NULL` (#1684): true only for
+ *  the one caller that stamped it. */
+export async function claimReferralConversion(referralId: string, db = getDb()): Promise<boolean> {
+  const claimed = await db
+    .update(affiliateReferrals)
+    .set({ convertedAt: new Date() } as any)
+    .where(and(eq(affiliateReferrals.id, referralId), isNull(affiliateReferrals.convertedAt)))
+    .returning({ id: affiliateReferrals.id });
+  return claimed.length > 0;
+}
+
+export async function insertConversion(values: typeof affiliateConversions.$inferInsert, db = getDb()): Promise<void> {
+  await (db.insert(affiliateConversions) as any).values(values);
+}
+
+export async function setProfileTotalEarned(profileId: string, totalEarned: string, db = getDb()): Promise<void> {
+  await db
+    .update(affiliateProfiles)
+    .set({ totalEarned, updatedAt: new Date() } as any)
+    .where(eq(affiliateProfiles.id, profileId));
 }

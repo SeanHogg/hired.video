@@ -59,9 +59,10 @@ const PUBLIC_VIDEO_SELECT = {
   ownerHeadline: sql<string | null>`CASE WHEN ${profileScans.id} IS NULL OR ${effective(profileScans)} = 'pass' THEN ${userProfiles.headline} ELSE NULL END`,
   resumeId: videos.resumeId,
   // The theme the video wore when posted and its goal live on the résumé's
-  // video plan (posting freezes the theme there) — read, not copied.
-  themeId: sql<string | null>`${resumeInformation.content} -> 'meta' -> 'video' ->> 'themeId'`,
-  goal: sql<string | null>`${resumeInformation.content} -> 'meta' -> 'video' -> 'targeting' ->> 'goal'`,
+  // video plan (posting freezes the theme there) — read from its typed
+  // mirror columns (migration 0615), not copied onto the video.
+  themeId: resumeInformation.videoThemeId,
+  goal: resumeInformation.videoGoal,
 } as const;
 
 interface PublicVideoRow {

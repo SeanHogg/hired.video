@@ -6,6 +6,9 @@ export const phoneDirectionEnum = pgEnum("phone_direction", ["inbound", "outboun
 export const callStatusEnum = pgEnum("call_status", ["answered", "missed", "voicemail", "busy", "failed"]);
 export const smsStatusEnum = pgEnum("sms_status", ["received", "sent", "failed", "unread"]);
 export const phoneNumberStatusEnum = pgEnum("phone_number_status", ["active", "suspended", "released"]);
+// Kept declared although no live table uses it: the archived
+// archive.phone_balance_transactions.type column (0595) still depends on the
+// type, and an undeclared enum would make drizzle-kit push try to DROP it.
 export const phoneBalanceTxTypeEnum = pgEnum("phone_balance_tx_type", ["purchase", "call_charge", "sms_charge", "refund", "monthly_grant"]);
 
 // Provisioned Business Phone numbers per user
@@ -73,30 +76,5 @@ export const smsMessages = pgTable("sms_messages", {
     .where(sql`${t.signalwireSmsSid} IS NOT NULL`),
 ]);
 
-// Per-user prepaid balance for phone usage overage
-export const phoneBalances = pgTable("phone_balances", {
-  id:                       uuid("id").defaultRandom().primaryKey(),
-  userId:                   text("user_id").notNull(),
-  balanceCents:             integer("balance_cents").default(0).notNull(),
-  autoTopUpEnabled:         boolean("auto_top_up_enabled").default(false).notNull(),
-  autoTopUpThresholdCents:  integer("auto_top_up_threshold_cents").default(500).notNull(),  // top-up when balance < $5
-  autoTopUpAmountCents:     integer("auto_top_up_amount_cents").default(2000).notNull(),    // top-up by $20
-  updatedAt:                timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [
-  unique("pb_user_unique").on(t.userId),
-]);
-
-// Transaction ledger for phone balance
-export const phoneBalanceTransactions = pgTable("phone_balance_transactions", {
-  id:                   uuid("id").defaultRandom().primaryKey(),
-  userId:               uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  type:                 phoneBalanceTxTypeEnum("type").notNull(),
-  amountCents:          integer("amount_cents").notNull(),   // positive = credit, negative = debit
-  balanceCentsAfter:    integer("balance_cents_after").notNull(),
-  description:          text("description"),
-  referenceId:          text("reference_id"),                // call/sms id or Stripe payment intent
-  createdAt:            timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [
-  index("pbt_user_idx").on(t.userId),
-  index("pbt_created_idx").on(t.createdAt),
-]);
+// The per-user prepaid phone balance and its transaction ledger are the
+// `phone_cents` wallet (wallets.ts — W3-B, migration 0590).

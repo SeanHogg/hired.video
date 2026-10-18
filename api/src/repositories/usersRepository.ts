@@ -17,8 +17,10 @@
 
 import { and, asc, count, desc, eq, gte, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { schema } from "../db/index.js";
+import { savedSettingsOf } from "./preferencesRepository.js";
+import { USER_ROLES } from "../../../shared/user-roles.js";
 
-const { users, userProfiles, userConnections, accountPreferences } = schema;
+const { users, userProfiles, userConnections, userSettings } = schema;
 
 export type DbLike = any;
 
@@ -67,6 +69,8 @@ export interface UserPatch {
   emailVerified?: boolean;
   mustChangePassword?: boolean;
   lastLoginAt?: Date;
+  /** Channel vs résumé profile setting ("resume" | "channel" | "auto"). */
+  profileMode?: string;
   updatedAt?: Date;
 }
 
@@ -78,8 +82,8 @@ export interface IUserReader {
   findByEmail(email: string): Promise<UserRow | null>;
   findManyByIds(ids: string[]): Promise<UserRow[]>;
   search(filters: UserSearchFilters, page?: number, limit?: number): Promise<UserSearchResult>;
-  /** IANA timezone for a user, read from `account_preferences.timezone`.
-   *  Returns null when the user has no preferences row yet (signup before
+  /** IANA timezone for a user, read from `user_settings.timezone`.
+   *  Returns null when the user never saved account settings (signup before
    *  the preferences seed lands). Source of truth, not `users.*` — the
    *  `users` table does NOT carry a timezone column. */
   findTimezone(userId: string): Promise<string | null>;
@@ -129,6 +133,9 @@ export interface IUserActorReader {
    *  abuse reports per #641). Returns ids only — callers that need
    *  display names should pair this with `findActorsByIds`. */
   findSuperAdminIds(): Promise<string[]>;
+  /** Ids of every user who is a super admin by primary role OR by the
+   *  `is_super_admin` flag (active or not) — the contact-inquiry fan-out. */
+  findSuperAdminRoleOrFlagIds(): Promise<string[]>;
 }
 
 /** Connections (social graph). */
@@ -178,13 +185,33 @@ export class UsersRepository implements IUsersRepository {
     return (await this.db.select().from(users).where(inArray(users.id, ids))) as UserRow[];
   }
 
+  /** The superadmin per-creator platform fee override (bps), or null when
+   *  unset / unknown user. */
+  async findCreatorPlatformFeeBpsOverride(id: string): Promise<number | null> {
+    const [row] = await this.db
+      .select({ override: users.creatorPlatformFeeBpsOverride })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+    return (row?.override as number | null | undefined) ?? null;
+  }
+
   async findTimezone(userId: string): Promise<string | null> {
     const [row] = await this.db
-      .select({ tz: accountPreferences.timezone })
-      .from(accountPreferences)
-      .where(eq(accountPreferences.userId, userId))
+      .select({ tz: userSettings.timezone })
+      .from(userSettings)
+      .where(savedSettingsOf(userId, "account"))
       .limit(1);
     return (row?.tz as string | null | undefined) ?? null;
+  }
+
+  /** Ids of every user whose primary `role` is `role` (e.g. super_admin reviewers). */
+  async findIdsByRole(role: string): Promise<string[]> {
+    const rows = (await this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.role, role))) as Array<{ id: string }>;
+    return rows.map((r) => r.id);
   }
 
   async findSuperAdminIds(): Promise<string[]> {
@@ -192,6 +219,14 @@ export class UsersRepository implements IUsersRepository {
       .select({ id: users.id })
       .from(users)
       .where(and(eq(users.isSuperAdmin, true), eq(users.isActive, true)))) as Array<{ id: string }>;
+    return rows.map((r) => r.id);
+  }
+
+  async findSuperAdminRoleOrFlagIds(): Promise<string[]> {
+    const rows = (await this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(or(eq(users.role, USER_ROLES.SUPER_ADMIN), eq(users.isSuperAdmin, true)))) as Array<{ id: string }>;
     return rows.map((r) => r.id);
   }
 

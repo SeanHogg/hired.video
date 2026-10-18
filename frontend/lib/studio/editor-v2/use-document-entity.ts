@@ -9,7 +9,7 @@
  * résumé document never stays open in the studio.
  */
 import { useEffect } from "react";
-import type { MediaKind } from "@shared/media-kinds";
+import { mediaKindIsDocument, type MediaKind } from "@shared/media-kinds";
 import { useRedirectResumeDocument } from "@/lib/studio/resume-editor-link";
 import { loadDocumentEntity, seedDocumentContent } from "@/lib/studio/document/document-entity";
 import { useAuth } from "@/lib/auth";
@@ -25,7 +25,7 @@ export function useDocumentEntity(currentMediaKind: MediaKind, documentRuntime: 
   useJobDocumentFormBridge(currentMediaKind, documentRuntime);
   // A NEW job posting is for recruiters / employers only (#1915).
   useJobPostGuard(
-    currentMediaKind === "document" &&
+    mediaKindIsDocument(currentMediaKind) &&
       documentStateHydrated &&
       documentState.entityKind === "job" &&
       !documentState.entityId,
@@ -33,7 +33,7 @@ export function useDocumentEntity(currentMediaKind: MediaKind, documentRuntime: 
 
   // A document bound to a résumé is edited in the kit workspace, not here.
   useRedirectResumeDocument(
-    currentMediaKind === "document" && documentStateHydrated ? documentState.entityKind : null,
+    mediaKindIsDocument(currentMediaKind) && documentStateHydrated ? documentState.entityKind : null,
     documentState.entityId,
   );
 
@@ -41,7 +41,7 @@ export function useDocumentEntity(currentMediaKind: MediaKind, documentRuntime: 
   // section blocks render real data), or seed a blank record for a fresh
   // draft with no entity row yet (lib/studio/document/document-entity).
   useEffect(() => {
-    if (currentMediaKind !== "document" || !documentStateHydrated) return;
+    if (!mediaKindIsDocument(currentMediaKind) || !documentStateHydrated) return;
     let cancelled = false;
     void loadDocumentEntity(documentState).then(async (loaded) => {
       if (cancelled) return;

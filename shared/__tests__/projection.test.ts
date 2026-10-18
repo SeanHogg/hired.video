@@ -23,7 +23,7 @@ import {
  */
 
 // Representative public-user card DTO — keys + value types match
-// api/src/routes/users.ts `toPublicUserCardDto`.
+// api/src/services/user/userDtos.ts `toPublicUserCardDto`.
 const cardDto = {
   id: "5ab37629-7d20-42fb-8a3d-1dc82ad7b592",
   type: "people" as const,

@@ -19,14 +19,30 @@ import type {
 } from "../../../../../shared/checkout.js";
 import type { OneOffPaymentsPort } from "../payment/oneOffPayments.js";
 import type { CollectPaymentMethodResult } from "../payment/types.js";
+import { DomainError } from "../../../domains/errors.js";
 
 /** Typed refusal; routes/checkout.ts maps `kind` to the HTTP status. */
-export class CheckoutError extends Error {
+const CHECKOUT_ERROR_STATUS: Record<CheckoutErrorKind, 402 | 403 | 404 | 409 | 503> = {
+  NOT_FOUND: 404,
+  FORBIDDEN: 403,
+  NOTHING_DUE: 409,
+  PAYMENTS_UNAVAILABLE: 503,
+  PAYMENT_NOT_VERIFIED: 402,
+  PAYMENT_ALREADY_USED: 409,
+  UNKNOWN_PACK: 404,
+  PRO_REQUIRED: 403,
+  FREE_COURSE: 409,
+  ALREADY_ENROLLED: 409,
+  CHECKOUT_REFUNDED: 409,
+};
+
+/** Typed refusal — a DomainError, so its status comes with it. */
+export class CheckoutError extends DomainError {
   constructor(
     public readonly kind: CheckoutErrorKind,
     message: string,
   ) {
-    super(message);
+    super(CHECKOUT_ERROR_STATUS[kind], kind, message);
     this.name = "CheckoutError";
   }
 }

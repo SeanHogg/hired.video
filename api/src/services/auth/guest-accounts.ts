@@ -16,12 +16,12 @@
  */
 import { sql } from "drizzle-orm";
 import { jwtVerify } from "jose";
-import type { Db } from "../../db/index.js";
+import { getDb, type Db } from "../../db/index.js";
 import { users } from "../../db/schema/index.js";
 import { getJwtSecret } from "../../utils/jwt.js";
 import { guestEmailFor } from "../../../../shared/guest-accounts.js";
 import { issueJwt } from "./jwt.js";
-import { createSession } from "./sessions.js";
+import { createSession } from "./session-lifecycle.js";
 
 const GUEST_ROLE = "job_seeker";
 
@@ -42,7 +42,7 @@ export interface GuestAccount {
   };
 }
 
-export async function createGuestAccount(db: Db, meta: GuestRequestMeta): Promise<GuestAccount> {
+export async function createGuestAccount(meta: GuestRequestMeta, db: Db = getDb()): Promise<GuestAccount> {
   const id = crypto.randomUUID();
   const email = guestEmailFor(id);
   const name = "Guest";
@@ -102,7 +102,7 @@ export interface AdoptResult {
 
 /** Move the guest behind `guestToken` onto `targetUserId`. Idempotent: a
  *  guest already adopted (row gone) or a non-guest id reports adopted=false. */
-export async function adoptGuestAccount(db: Db, guestToken: string, targetUserId: string): Promise<AdoptResult> {
+export async function adoptGuestAccount(guestToken: string, targetUserId: string, db: Db = getDb()): Promise<AdoptResult> {
   const guestId = await guestIdFromToken(guestToken);
   if (!guestId || guestId === targetUserId) return { adopted: false, moved: 0 };
   const result = await db.execute(

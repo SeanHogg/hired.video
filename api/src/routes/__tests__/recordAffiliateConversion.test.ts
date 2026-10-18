@@ -1,5 +1,5 @@
 /**
- * Tests for `recordAffiliateConversion` in routes/payment.ts.
+ * Tests for `recordAffiliateConversion` in services/affiliates/affiliateConversionService.ts.
  *
  * Closes #1196 (re-credit guard) and #1197 (totalEarned accumulator)
  * regression coverage. Before the fix:
@@ -18,7 +18,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { recordAffiliateConversion } from "../payment.js";
+import { recordAffiliateConversion } from "../../services/affiliates/affiliateConversionService.js";
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
 
 function makeDb() {

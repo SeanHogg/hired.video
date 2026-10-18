@@ -12,8 +12,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
-import { getDb } from "../db/index.js";
-import { buildRepos } from "../repositories/index.js";
+import { liveRepos } from "../repositories/live.js";
 import { FeedFeatureService } from "../services/feed/FeedFeatureService.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
 import { resolveFeedRole, FEED_FEATURE_ROLES } from "../../../shared/feed-features.js";
@@ -33,7 +32,7 @@ feedFeatureRoutes.get("/", async (c) => {
       ? requested
       : viewerRole;
 
-  const service = new FeedFeatureService(buildRepos(getDb()).feedFeatures);
+  const service = new FeedFeatureService(liveRepos().feedFeatures);
   const cards = await service.getCardsForRole(role);
   return c.json(success({ role, cards }), 200);
 });

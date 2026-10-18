@@ -12,7 +12,8 @@ import { escapeXml, genericCard, renderStars, truncate } from "./svg-primitives.
 const svg = (body: string, longCache: boolean): OgImageResult => ({ type: "svg", svg: body, longCache });
 
 /** Company profile — surfaces the cached review_avg_overall + review_count
- *  (kept in sync by recomputeAggregateCache) without re-scanning reviews. */
+ *  (kept in sync by recomputeAggregateCache in services/reviews/reviewProjections.ts)
+ *  without re-scanning reviews. */
 export function renderCompanyCard(row: OgCompanyRow): OgImageResult {
   const name = row?.name ?? "Company";
   const tagline = row?.tagline ?? "";

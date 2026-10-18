@@ -1,8 +1,9 @@
 import { eq, and, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import { STUDIO_NEW_COMPANY_PATH } from "../../../shared/studio-paths.js";
+import { getOrCreateDefaultBoard } from "../services/productivity/default-board.js";
 
-const { boards, tasks } = schema;
+const { tasks } = schema;
 
 interface OnboardingTaskDef {
   title: string;
@@ -127,23 +128,6 @@ function getOnboardingTasksForRole(role: string): OnboardingTaskDef[] {
   }
 
   return ordered.map((t, i) => ({ ...t, position: i }));
-}
-
-async function getOrCreateDefaultBoard(userId: string, db: ReturnType<typeof getDb>): Promise<string> {
-  const [existing] = await db
-    .select({ id: boards.id })
-    .from(boards)
-    .where(and(eq(boards.userId, userId), eq(boards.name, "__default__")))
-    .limit(1);
-
-  if (existing) return existing.id;
-
-  const [created] = await db
-    .insert(boards)
-    .values({ userId, name: "__default__", description: "Default task board" } as any)
-    .returning({ id: boards.id });
-
-  return created.id;
 }
 
 /**

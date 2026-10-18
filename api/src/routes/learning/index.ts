@@ -36,7 +36,7 @@ const LeaderboardQuery = z.object({
 });
 
 learningRoutes.get("/leaderboard", async (c) => {
-  const userId = c.var.user.sub;
+  const userId = c.var.userId;
   const parsed = LeaderboardQuery.safeParse(c.req.query());
   if (!parsed.success) {
     return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid query"), 400);
@@ -52,7 +52,7 @@ learningRoutes.get("/leaderboard", async (c) => {
 });
 
 learningRoutes.get("/dashboard", async (c) => {
-  const userId = c.var.user.sub;
+  const userId = c.var.userId;
   const [{ base, assigned }, summary] = await Promise.all([
     getLearnerDashboardParts(userId),
     gamificationFromContext(c).getUserSummary(userId).catch(() => null),

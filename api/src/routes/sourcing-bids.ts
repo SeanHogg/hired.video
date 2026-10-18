@@ -16,13 +16,13 @@
  */
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables, AppEnv } from "../types/index.js";
+import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { eq } from "drizzle-orm";
 import { requireJobOwner } from "../services/jobs/jobOwnership.js";
 import * as listings from "../services/recruiter-marketplace/SourcingListingService.js";
 import { logger } from "../lib/logger.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const sourcingBrowseRoutes = new Hono<AppEnv>();
 export const sourcingBidsByJobRoutes = new Hono<AppEnv>();
@@ -45,24 +45,18 @@ const RejectSchema = z.object({
   rejectionReason: z.string().max(1000).optional(),
 });
 
-function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
-
 // ===========================================================================
 // Browse + recruiter-self
 // ===========================================================================
 
 sourcingBrowseRoutes.get("/jobs", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const jobs = await listings.listOpenSourcingJobs();
   return c.json(success({ jobs, count: jobs.length }), 200);
 });
 
 sourcingBrowseRoutes.get("/my-bids", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const bids = await listings.listMyBids(userId);
   return c.json(success({ bids, count: bids.length }), 200);
 });
@@ -79,51 +73,19 @@ sourcingBidsByJobRoutes.get("/", async (c) => {
   return c.json(success({ bids, count: bids.length }), 200);
 });
 
-sourcingBidsByJobRoutes.post("/", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+sourcingBidsByJobRoutes.post("/", validateJson(PlaceSourcingBidSchema, (e) => error("VALIDATION_ERROR", "Invalid bid", e.flatten()), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
   const jobId = c.req.param("jobId");
 
-  // Look up the job's owner so SourcingListingService can validate "no
-  // self-bids" without re-querying.
-  const db = getDb();
-  const [job] = await db
-    .select({ ownerId: schema.jobItems.postedByUserId })
-    .from(schema.jobItems)
-    .where(eq(schema.jobItems.id, jobId))
-    .limit(1);
-  if (!job) return c.json(error("NOT_FOUND", "Job not found"), 404);
-
-  const body = await c.req.json().catch(() => null);
-  const parsed = PlaceSourcingBidSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid bid", parsed.error.flatten()), 400);
-  }
-
-  const result = await listings.placeBid(
-    {
-      jobId,
-      bidderId: userId,
-      bidAmount: parsed.data.bidAmount,
-      proposalText: parsed.data.proposalText,
-      durationDays: parsed.data.durationDays,
-    },
-    job.ownerId,
-  );
-
-  if ("reason" in result) {
-    type BidFailure = "NOT_OPEN" | "DEADLINE_PASSED" | "OWN_JOB" | "BID_EXISTS";
-    const messages: Record<BidFailure, [string, number]> = {
-      NOT_OPEN: ["This job is not currently accepting sourcing bids", 400],
-      DEADLINE_PASSED: ["The sourcing deadline has passed", 400],
-      OWN_JOB: ["You cannot bid on your own job", 400],
-      BID_EXISTS: ["You already have a pending bid on this job", 409],
-    };
-    const reason = result.reason;
-    const [msg, status] = messages[reason];
-    return c.json(error(reason, msg), status as 400 | 409);
-  }
-  return c.json(success(result.bid), 201);
+  const body = c.req.valid("json");
+  const bid = await listings.placeBidOnJob({
+    jobId,
+    bidderId: userId,
+    bidAmount: body.bidAmount,
+    proposalText: body.proposalText,
+    durationDays: body.durationDays,
+  });
+  return c.json(success(bid), 201);
 });
 
 sourcingBidsByJobRoutes.get("/config", async (c) => {
@@ -133,24 +95,19 @@ sourcingBidsByJobRoutes.get("/config", async (c) => {
   return c.json(success(await listings.getConfig(jobId)), 200);
 });
 
-sourcingBidsByJobRoutes.patch("/config", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+sourcingBidsByJobRoutes.patch("/config", validateJson(SourcingConfigSchema, (e) => error("VALIDATION_ERROR", "Invalid sourcing config", e.flatten()), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
   const jobId = c.req.param("jobId");
   const { denied } = await requireJobOwner(c, jobId);
   if (denied) return denied;
 
-  const body = await c.req.json().catch(() => null);
-  const parsed = SourcingConfigSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid sourcing config", parsed.error.flatten()), 400);
-  }
+  const body = c.req.valid("json");
   const updated = await listings.upsertConfig({
     jobId,
-    acceptsBids: parsed.data.acceptsBids,
-    feeCents: parsed.data.feeCents ?? null,
-    deadline: parsed.data.deadline ?? null,
-    terms: parsed.data.terms ?? null,
+    acceptsBids: body.acceptsBids,
+    feeCents: body.feeCents ?? null,
+    deadline: body.deadline ?? null,
+    terms: body.terms ?? null,
     actorUserId: userId,
   });
   return c.json(success(updated), 200);
@@ -161,8 +118,7 @@ sourcingBidsByJobRoutes.patch("/config", async (c) => {
 // ===========================================================================
 
 sourcingBidActionRoutes.patch("/:bidId/accept", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const bidId = c.req.param("bidId");
   const bid = await listings.getBid(bidId);
   if (!bid) return c.json(error("NOT_FOUND", "Bid not found"), 404);
@@ -197,9 +153,8 @@ sourcingBidActionRoutes.patch("/:bidId/accept", async (c) => {
   return c.json(success(accepted), 200);
 });
 
-sourcingBidActionRoutes.patch("/:bidId/reject", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+sourcingBidActionRoutes.patch("/:bidId/reject", validateJson(RejectSchema, (e) => error("VALIDATION_ERROR", "Invalid reject", e.flatten())), async (c) => {
+  const userId = requireUser(c);
   const bidId = c.req.param("bidId");
   const bid = await listings.getBid(bidId);
   if (!bid) return c.json(error("NOT_FOUND", "Bid not found"), 404);
@@ -208,17 +163,12 @@ sourcingBidActionRoutes.patch("/:bidId/reject", async (c) => {
   const { denied } = await requireJobOwner(c, bid.jobId);
   if (denied) return denied;
 
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = RejectSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid reject", parsed.error.flatten()), 400);
-  }
-  return c.json(success(await listings.rejectBid(bidId, parsed.data.rejectionReason ?? null)), 200);
+  const body = c.req.valid("json");
+  return c.json(success(await listings.rejectBid(bidId, body.rejectionReason ?? null)), 200);
 });
 
 sourcingBidActionRoutes.patch("/:bidId/withdraw", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const bidId = c.req.param("bidId");
   const bid = await listings.getBid(bidId);
   if (!bid) return c.json(error("NOT_FOUND", "Bid not found"), 404);

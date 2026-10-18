@@ -25,41 +25,35 @@ import { sendResult } from "./shared.js";
 export const creatorMeRoutes = new Hono<AppEnv>();
 
 creatorMeRoutes.get("/me", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await getOwnCreatorProfile(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getOwnCreatorProfile(userId)), 200);
 });
 
 creatorMeRoutes.patch("/me", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
-  return sendResult(c, await updateOwnCreatorProfile(auth.userId, body));
+  return sendResult(c, await updateOwnCreatorProfile(userId, body));
 });
 
 creatorMeRoutes.get("/me/earnings-rollup", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const rollup = await payoutLedgerService.getEarningsRollup(auth.userId);
+  const userId = requireUser(c);
+  const rollup = await payoutLedgerService.getEarningsRollup(userId);
   return c.json(success(rollup), 200);
 });
 
 creatorMeRoutes.get("/me/payout-profile", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await getOwnPayoutProfile(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getOwnPayoutProfile(userId)), 200);
 });
 
 creatorMeRoutes.patch("/me/payout-profile", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => ({})) as PayoutProfileUpdateInput;
-  return sendResult(c, await updateOwnPayoutProfile(auth.userId, body, requestEnv(c)));
+  return sendResult(c, await updateOwnPayoutProfile(userId, body, requestEnv(c)));
 });
 
 creatorMeRoutes.post("/me/payout-profile/tax-form-envelope", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
+  const userId = requireUser(c);
   const body = (await c.req.json().catch(() => ({}))) as { recipientEmail?: string; recipientName?: string };
-  return sendResult(c, await requestTaxFormEnvelope(auth.userId, body, requestEnv(c)));
+  return sendResult(c, await requestTaxFormEnvelope(userId, body, requestEnv(c)));
 });

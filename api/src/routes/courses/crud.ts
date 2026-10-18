@@ -24,16 +24,16 @@ import {
 } from "../../services/courses/courseAuthoringService.js";
 import { withGamification } from "../../domains/gamification/with-gamification.js";
 import { CreateCourseSchema, UpdateCourseSchema } from "./schemas.js";
-import { courseActor, handle, readBody, respond, unauthorized, validationError } from "./shared.js";
+import { courseActor, invalidBody, respond, unauthorized } from "./shared.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const courseCrudRoutes = new Hono<AppEnv>();
 
-courseCrudRoutes.post("/", async (c) => {
+courseCrudRoutes.post("/", validateJson(CreateCourseSchema, invalidBody), async (c) => {
   const actor = courseActor(c);
   if (!actor) return unauthorized(c);
-  const parsed = CreateCourseSchema.safeParse(await readBody(c));
-  if (!parsed.success) return validationError(c, parsed.error);
-  return respond(c, () => createCourse(actor, parsed.data), 201);
+  const body = c.req.valid("json");
+  return respond(c, () => createCourse(actor, body), 201);
 });
 
 // Static `/me` before `/:id`.
@@ -49,32 +49,29 @@ courseCrudRoutes.get("/:id", (c) => {
   return respond(c, () => getCourseForEditor(actor, c.req.param("id")));
 });
 
-courseCrudRoutes.patch("/:id", async (c) => {
+courseCrudRoutes.patch("/:id", validateJson(UpdateCourseSchema, invalidBody), async (c) => {
   const actor = courseActor(c);
   if (!actor) return unauthorized(c);
-  const parsed = UpdateCourseSchema.safeParse(await readBody(c));
-  if (!parsed.success) return validationError(c, parsed.error);
-  return respond(c, () => updateCourse(actor, c.req.param("id"), parsed.data));
+  const body = c.req.valid("json");
+  return respond(c, () => updateCourse(actor, c.req.param("id"), body));
 });
 
-courseCrudRoutes.post("/:id/publish", (c) => {
+courseCrudRoutes.post("/:id/publish", async (c) => {
   const actor = courseActor(c);
   if (!actor) return unauthorized(c);
-  return handle(c, async () => {
-    const { course, previous, firstPublish } = await publishCourse(actor, c.req.param("id"));
-    // Only the never-published → published edge earns COURSE_PUBLISHED.
-    if (firstPublish) {
-      await withGamification(c, "course-published", (game, role, uid2) =>
-        game.onCoursePublished({
-          userId: uid2,
-          role,
-          courseId: previous.id,
-          metadata: { title: previous.title, isEmployerAuthored: previous.isEmployerAuthored },
-        }),
-      );
-    }
-    return c.json(success(course), 200);
-  });
+  const { course, previous, firstPublish } = await publishCourse(actor, c.req.param("id"));
+  // Only the never-published → published edge earns COURSE_PUBLISHED.
+  if (firstPublish) {
+    await withGamification(c, "course-published", (game, role, uid2) =>
+      game.onCoursePublished({
+        userId: uid2,
+        role,
+        courseId: previous.id,
+        metadata: { title: previous.title, isEmployerAuthored: previous.isEmployerAuthored },
+      }),
+    );
+  }
+  return c.json(success(course), 200);
 });
 
 courseCrudRoutes.post("/:id/unpublish", (c) => {

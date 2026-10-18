@@ -13,7 +13,7 @@
  * subscription state) and from Conversations (direct user messaging).
  */
 
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, like, type SQL } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 const {
@@ -54,7 +54,13 @@ export interface IMarketingRepository {
   findActiveCompanyBoost(companyId: string): Promise<CompanyBoostRow | null>;
   // marketing leads (signup funnel)
   insertMarketingLead(input: MarketingLeadInsert): Promise<MarketingLeadRow>;
+  /** Insert a lead, ignoring a conflict (lead already captured). */
+  captureMarketingLead(input: MarketingLeadInsert): Promise<void>;
   findMarketingLeadByEmail(email: string): Promise<MarketingLeadRow | null>;
+  /** Newest 200 leads, optionally `source LIKE '<prefix>%'` and/or by status. */
+  listMarketingLeads(filters: { sourcePrefix?: string | null; status?: string | null }): Promise<MarketingLeadRow[]>;
+  /** Set a lead's triage status (stamps convertedAt on "converted"); null when not found. */
+  updateMarketingLeadStatus(id: string, status: string): Promise<MarketingLeadRow | null>;
   // affiliates
   findAffiliateProfileByUserId(userId: string): Promise<AffiliateProfileRow | null>;
   findAffiliateReferralsForAffiliate(affiliateId: string): Promise<AffiliateReferralRow[]>;
@@ -95,12 +101,35 @@ export class MarketingRepository implements IMarketingRepository {
     return row as MarketingLeadRow;
   }
 
+  async captureMarketingLead(input: MarketingLeadInsert): Promise<void> {
+    await this.db.insert(marketingLeads).values(input as any).onConflictDoNothing();
+  }
+
   async findMarketingLeadByEmail(email: string): Promise<MarketingLeadRow | null> {
     const [row] = await this.db
       .select()
       .from(marketingLeads)
       .where(eq(marketingLeads.email, email))
       .limit(1);
+    return (row as MarketingLeadRow) ?? null;
+  }
+
+  async listMarketingLeads(filters: { sourcePrefix?: string | null; status?: string | null }): Promise<MarketingLeadRow[]> {
+    const conditions: SQL[] = [];
+    if (filters.sourcePrefix) conditions.push(like(marketingLeads.source, `${filters.sourcePrefix}%`));
+    if (filters.status) conditions.push(eq(marketingLeads.status, filters.status));
+    const baseQuery = this.db.select().from(marketingLeads);
+    const filtered = conditions.length > 0
+      ? baseQuery.where(conditions.length === 1 ? conditions[0] : and(...conditions))
+      : baseQuery;
+    return (await filtered.orderBy(desc(marketingLeads.createdAt)).limit(200)) as MarketingLeadRow[];
+  }
+
+  async updateMarketingLeadStatus(id: string, status: string): Promise<MarketingLeadRow | null> {
+    const at = this.now();
+    const updates: Partial<MarketingLeadInsert> = { status, updatedAt: at };
+    if (status === "converted") updates.convertedAt = at;
+    const [row] = await this.db.update(marketingLeads).set(updates).where(eq(marketingLeads.id, id)).returning();
     return (row as MarketingLeadRow) ?? null;
   }
 

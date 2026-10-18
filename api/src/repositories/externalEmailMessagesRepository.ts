@@ -3,14 +3,17 @@
  *
  * The inbox aggregator (services/messaging/inboxService.ts) reads recent
  * non-archived messages here for its fourth source. The dedicated repo joins
- * `external_email_accounts` so each row carries the user-chosen `accountLabel`
- * and provider for badge rendering without an extra round-trip.
+ * the mailbox (provider_connections purpose "email_inbox", via the
+ * externalEmailAccountsRepository adapter's `mailboxJoin`) so each row carries
+ * the user-chosen `accountLabel` and provider for badge rendering without an
+ * extra round-trip.
  */
 
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
+import { mailboxJoin } from "./externalEmailAccountsRepository.js";
 
-const { externalEmailMessages, externalEmailAccounts, jobItems } = schema;
+const { externalEmailMessages, jobItems } = schema;
 
 export type DbLike = any;
 
@@ -116,8 +119,8 @@ interface InboxJoinRow {
 function inboxRowSelect() {
   return {
     message: externalEmailMessages,
-    accountLabel: externalEmailAccounts.accountLabel,
-    accountEmail: externalEmailAccounts.accountEmail,
+    accountLabel: mailboxJoin.accountLabel,
+    accountEmail: sql<string>`coalesce(${mailboxJoin.accountEmail}, '')`,
     linkedJobTitle: jobItems.title,
     linkedJobCompany: jobItems.company,
   };
@@ -168,7 +171,7 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
         // Per-account confidence floor, applied LIVE so the Settings slider
         // keeps re-filtering already-synced mail; the hard floor below
         // catches a misconfigured 0.
-        sql`${externalEmailMessages.score} >= ${externalEmailAccounts.minRelevanceScore}`,
+        sql`${externalEmailMessages.score} >= coalesce(${mailboxJoin.minRelevanceScore}, 0.5)`,
         sql`${externalEmailMessages.score} >= ${JOB_INBOX_HARD_FLOOR}::numeric`,
       );
     }
@@ -199,8 +202,8 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
       .select(inboxRowSelect())
       .from(externalEmailMessages)
       .innerJoin(
-        externalEmailAccounts,
-        eq(externalEmailAccounts.id, externalEmailMessages.accountId),
+        mailboxJoin.table,
+        mailboxJoin.on(externalEmailMessages.accountId),
       )
       .leftJoin(
         jobItems,
@@ -244,8 +247,8 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
       .select(inboxRowSelect())
       .from(externalEmailMessages)
       .innerJoin(
-        externalEmailAccounts,
-        eq(externalEmailAccounts.id, externalEmailMessages.accountId),
+        mailboxJoin.table,
+        mailboxJoin.on(externalEmailMessages.accountId),
       )
       .leftJoin(
         jobItems,

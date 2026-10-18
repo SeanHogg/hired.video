@@ -18,6 +18,7 @@ export type JobBoostRow = typeof jobBoosts.$inferSelect;
 export type AdRow = typeof ads.$inferSelect;
 export type NewJobBoostRow = typeof jobBoosts.$inferInsert;
 export type NewAdRow = typeof ads.$inferInsert;
+export type ServableAd = Pick<AdRow, "id" | "headline" | "description" | "imageUrl" | "ctaText" | "ctaUrl" | "destinationUrl">;
 
 export class AdPromotionRepository {
   constructor(private readonly db: DbLike) {}
@@ -148,5 +149,58 @@ export class AdPromotionRepository {
       .where(eq(ads.adSetId, adSetId))
       .orderBy(desc(ads.createdAt))
       .limit(500);
+  }
+
+  async findJobBoostForOwner(id: string, userId: string): Promise<JobBoostRow | null> {
+    const [row] = await this.db.select().from(jobBoosts)
+      .where(and(eq(jobBoosts.id, id), eq(jobBoosts.userId, userId)))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async setJobBoostStatus(id: string, status: string): Promise<void> {
+    await this.db.update(jobBoosts).set({ status, updatedAt: new Date() }).where(eq(jobBoosts.id, id));
+  }
+
+  /** Clear the job's sponsorship (boost cancelled). */
+  async unsponsorJob(jobId: string): Promise<void> {
+    await this.db
+      .update(jobItems)
+      .set({ sponsored: false, sponsoredUntil: null, sponsoredRankBoost: 0 })
+      .where(eq(jobItems.id, jobId));
+  }
+
+  /** Delete the owner's ad; false when not found / not theirs. */
+  async deleteAdForOwner(adId: string, userId: string): Promise<boolean> {
+    const deleted = await this.db.delete(ads)
+      .where(and(eq(ads.id, adId), eq(ads.userId, userId)))
+      .returning({ id: ads.id });
+    return deleted.length > 0;
+  }
+
+  /** One active creative in an active ad set whose placement is one of `placements`. */
+  async findServableAd(placements: string[]): Promise<ServableAd | null> {
+    const [row] = await this.db
+      .select({
+        id: ads.id,
+        headline: ads.headline,
+        description: ads.description,
+        imageUrl: ads.imageUrl,
+        ctaText: ads.ctaText,
+        ctaUrl: ads.ctaUrl,
+        destinationUrl: ads.destinationUrl,
+      })
+      .from(ads)
+      .innerJoin(adSets, eq(ads.adSetId, adSets.id))
+      .where(and(eq(ads.status, "active"), eq(adSets.status, "active"), inArray(adSets.placementType, placements)))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async incrementAdImpressions(adId: string): Promise<void> {
+    await this.db
+      .update(ads)
+      .set({ impressions: sql`${ads.impressions} + 1`, updatedAt: new Date() })
+      .where(eq(ads.id, adId));
   }
 }

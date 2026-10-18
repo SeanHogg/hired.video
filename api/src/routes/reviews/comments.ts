@@ -16,7 +16,7 @@ import {
   deleteReviewComment,
   listReviewComments,
 } from "../../services/reviews/reviewComments.js";
-import { handleReviews, readJsonBody, viewerId } from "./http.js";
+import { handleReviews, readJsonBody } from "./http.js";
 
 const CommentBodySchema = z.object({
   body: z.string().trim().min(1).max(4000),
@@ -36,7 +36,7 @@ reviewCommentRoutes.post("/:reviewId/comments", (c) =>
   handleReviews(c, async () => {
     const raw = await readJsonBody(c);
     const data = await addReviewComment({
-      viewerId: viewerId(c),
+      viewerId: c.var.userId,
       reviewId: c.req.param("reviewId"),
       parseBody: () => {
         const parsed = CommentBodySchema.safeParse(raw);
@@ -52,7 +52,7 @@ reviewCommentRoutes.post("/:reviewId/comments", (c) =>
 
 reviewCommentRoutes.delete("/comments/:commentId", (c) =>
   handleReviews(c, async () => {
-    await deleteReviewComment({ viewerId: viewerId(c), commentId: c.req.param("commentId") });
+    await deleteReviewComment({ viewerId: c.var.userId, commentId: c.req.param("commentId") });
     return c.json(success({ deleted: true }), 200);
   }),
 );

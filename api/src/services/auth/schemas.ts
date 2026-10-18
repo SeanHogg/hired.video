@@ -62,7 +62,7 @@ export const RegisterSchema = z.object({
   // the signup composer rejects when length > 0.
   website: z.string().optional(),
   // Pre-auth UI locale the visitor selected before submitting. Seeded
-  // onto `account_preferences.language` so the first authed render in
+  // onto the `user_settings.language` column so the first authed render in
   // LocaleSync resolves to their pick instead of the DB default ("en").
   // Validated downstream via `canPickLocale` so anything outside the
   // PUBLIC_LOCALES whitelist is silently dropped (matches the existing

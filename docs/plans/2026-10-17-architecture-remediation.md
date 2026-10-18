@@ -32,6 +32,7 @@ Gap rows: #2410–#2417 (ROADMAP.md, TK1 OTHER section).
 | W3-D1 Studio state + JSONB promotions | 0610–0619 |
 | W3-D2 Status/role/application/identity/lists/sequences/perf | 0620–0639 |
 | W3-E Versions | 0640–0649 |
+| W3 follow-ups | 0650–0659 |
 
 ## Wave 3 data-migration rules
 - New canonical table → `INSERT … SELECT` backfill from every old table in the SAME migration (idempotent: `ON CONFLICT DO NOTHING` on a natural key or a carried-over id) → switch ALL code to the new table → archive old tables with `ALTER TABLE … SET SCHEMA archive` in a LATER migration file of your block (never DROP).
@@ -44,3 +45,33 @@ Gap rows: #2410–#2417 (ROADMAP.md, TK1 OTHER section).
 - **Wave 1 (parallel, disjoint):** A Billing & checkout · B Neon & persistence · C Frontend client · D Data-model hygiene · E Shared primitives & RBAC/notifications/LLM.
 - **Wave 2:** API surface consolidation (aliases, AI tools dispatcher, analytics events, résumé PATCH, admin composite, middleware userId/zod-validator/DomainError/envelope/notFound) + god route splits.
 - **Wave 3:** polymorphic table merges (views, shares, auth tokens, wallets/ledgers, provider connections, versions, comments, reactions), `studio_projects` single state column, status vocab, frontend god-module splits.
+
+## Status — 2026-10-17 (end of day)
+
+Live status per finding: https://claude.ai/artifact/LcUEeCR7DWuJ56Xqu5zueD (§09 register, filterable by status).
+
+Of the 48 findings: **31 done** (Wave 1, typecheck and tests green), **11 landed** (in the tree, full verify pending), **2 in progress**, **3 open**, **1 blocked**.
+
+- **Waves 1–3 landed:**
+  - Billing and checkout; Neon idle (cron gating, sampled `request_logs`, SSE).
+  - Indexes and orphan tables archived; shared helpers; RBAC; notifications; LLM metering.
+  - API consolidation and the route sweep (`requireUser`, `validateJson`, one envelope, `app.notFound`, `DomainError`).
+  - Every table merge: views, comments, reactions, shares, reports, provider connections, wallets, ledgers, auth tokens, settings, versions, lists, sequences, performance, studio state, status vocabulary, roles, applications.
+  - God-module splits (frontend and backend) and the account-deletion purge of archived data.
+- **In progress:**
+  - Route → repository extraction. Four groups are running; about 30 files are already at 0 DB calls.
+  - The last ~50 hand-rolled body validations.
+- **Open (not assigned):**
+  - Wide `select()` without a column list.
+  - The `/api/people/:id/view` aggregate.
+  - The kit 3-hop chain re-check.
+- **Blocked:** credential re-seal needs the production keys, `scripts/backfill-credential-encryption.ts`, then approval of 0602.
+- **Owner decisions:**
+  1. Drop the frozen legacy columns (studio state, `persona`, billing/home).
+  2. Wire or delete the 12 orphaned production paths.
+  3. Check production for orphaned performance rows (0635).
+- **Deploy steps:**
+  1. Run `verify-wallet-merge.ts --preflight` before deploy.
+  2. Approve 0595 after the post-deploy verify passes.
+  3. Retired 0549 and 0578 are no-ops; 0602 supersedes them.
+- **Not yet run:** full typecheck, tests and migration checks after Waves 2–3. These run once the route groups report.

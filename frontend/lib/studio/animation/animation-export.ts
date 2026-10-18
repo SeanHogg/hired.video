@@ -38,7 +38,7 @@ import {
   type AnimationState,
   totalDurationSec,
 } from "@shared/animation-state";
-import type { OutputProfile } from "@shared/media-kinds";
+import { mediaKindIsFrameAnimation, type OutputProfile } from "@shared/media-kinds";
 import { encodeGif, type GifFrameInput } from "./gif89a-encoder";
 import { encodeApng, type ApngFrame } from "./apng-encoder";
 import { toBlobPart } from "../bytes/to-blob-part";
@@ -145,7 +145,7 @@ export async function renderAnimation(
   state: AnimationState,
   profile: OutputProfile,
 ): Promise<AnimationRenderResult> {
-  if (profile.mediaKind !== "animation") {
+  if (!mediaKindIsFrameAnimation(profile.mediaKind)) {
     throw new Error(`renderAnimation: profile is not animation-kind: ${profile.id}`);
   }
 

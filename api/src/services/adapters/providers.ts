@@ -556,7 +556,6 @@ export const FEATURE_KEY_USE_CASE: Record<string, LLMUseCase> = {
   interview_answer_score: "interview_answer_score",
   interview_questions: "interview_questions",
   linkedin_post_gen: "linkedin_post",
-  linkedin_post_share: "linkedin_post",
   posting_agent_caption: "posting_agent",
   profile_headline_improve: "profile_text_improve",
   profile_about_improve: "profile_text_improve",
@@ -604,12 +603,6 @@ export const FEATURE_KEY_USE_CASE: Record<string, LLMUseCase> = {
   video_pitch_script: "video_pitch_script",
   visitor_chat: "chat",
 };
-
-/** The use case a billing feature key rolls up to, or `undefined` for an
- *  unregistered key (a new AI call not yet added to the registry). */
-export function useCaseForFeatureKey(featureKey: string): LLMUseCase | undefined {
-  return FEATURE_KEY_USE_CASE[featureKey];
-}
 
 /** All registered feature keys that roll up to `useCase`, sorted. Empty when
  *  none map to it. Drives the SA `/use-cases` per-row feature-key list. */

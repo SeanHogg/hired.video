@@ -67,3 +67,30 @@ export const feedPosts = pgTable(
 export type FeedPost = typeof feedPosts.$inferSelect;
 export type NewFeedPost = typeof feedPosts.$inferInsert;
 
+/**
+ * Hashtags of a feed post, one row per distinct lowercased hashtag (migration
+ * 0616). Promoted out of `feed_posts.tags` (whose Hashtag entries the tag
+ * filter + trending read used to unnest with jsonb_array_elements on every
+ * call). Workspace taxonomies (`workspace_tags`) do not fit: those are
+ * per-workspace, colored recruiter labels; hashtags are global free text.
+ * Maintained by repositories/feedPostTagsRepository.ts on every post write
+ * that sets `tags`; `created_at` copies the post's so the trending window
+ * reads this table alone.
+ */
+export const feedPostTags = pgTable(
+  "feed_post_tags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    postId: uuid("post_id").notNull().references(() => feedPosts.id, { onDelete: "cascade" }),
+    tag: varchar("tag", { length: 100 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("uq_feed_post_tags_post_tag").on(t.postId, t.tag),
+    index("idx_feed_post_tags_tag_created").on(t.tag, t.createdAt.desc().nullsFirst()),
+    index("idx_feed_post_tags_created").on(t.createdAt.desc().nullsFirst()),
+  ],
+);
+
+export type FeedPostTag = typeof feedPostTags.$inferSelect;
+

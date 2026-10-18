@@ -1,8 +1,9 @@
 /**
  * HiringAnalyticsRepository — read-only rows behind
  * `GET /api/analytics/hiring?metric=` (time-to-hire, conversion funnel,
- * org-level insights). Aggregation math lives in
- * services/analytics/hiringAnalytics.ts; this file only fetches.
+ * org-level insights) and `GET /api/services/team/leaderboard`. Aggregation
+ * math lives in services/analytics/{hiringAnalytics,teamLeaderboard}.ts;
+ * this file only fetches.
  */
 import { and, eq, gte, inArray, lt } from "drizzle-orm";
 import { schema } from "../db/index.js";
@@ -30,6 +31,25 @@ export interface PipelineEntryRow {
   addedFrom: string | null;
   createdAt: Date | string | null;
   stageChangedAt: Date | string | null;
+}
+
+export interface TeamMemberRow {
+  userId: string;
+  role: string;
+  name: string | null;
+  email: string | null;
+}
+
+export interface PipelineOwnershipRow {
+  ownerId: string | null;
+  stage: string;
+  stageChangedAt: Date | string;
+}
+
+export interface TouchpointRow {
+  performedByUserId: string | null;
+  type: string;
+  createdAt: Date | string;
 }
 
 export class HiringAnalyticsRepository {
@@ -96,5 +116,36 @@ export class HiringAnalyticsRepository {
       .from(pipeline)
       .where(inArray(pipeline.jobId, jobIds))
       .catch(() => [])) as PipelineEntryRow[];
+  }
+
+  /** Active members of a company (owner included) with identity. */
+  async activeCompanyMembers(companyId: string): Promise<TeamMemberRow[]> {
+    const m = schema.userCompanyRoleAssociations;
+    return (await this.db
+      .select({ userId: m.userId, role: m.role, name: schema.users.name, email: schema.users.email })
+      .from(m)
+      .innerJoin(schema.users, eq(schema.users.id, m.userId))
+      .where(and(eq(m.companyId, companyId), eq(m.isActive, true)))) as TeamMemberRow[];
+  }
+
+  /** Pipeline ownership rows on every job posted by any of `posterIds`. */
+  async pipelineOwnershipForPosters(posterIds: string[]): Promise<PipelineOwnershipRow[]> {
+    if (posterIds.length === 0) return [];
+    const pe = schema.jobPipelineEntries;
+    return (await this.db
+      .select({ ownerId: pe.ownerId, stage: pe.stage, stageChangedAt: pe.stageChangedAt })
+      .from(pe)
+      .innerJoin(schema.jobItems, eq(schema.jobItems.id, pe.jobId))
+      .where(inArray(schema.jobItems.postedByUserId, posterIds))) as PipelineOwnershipRow[];
+  }
+
+  /** Touchpoints performed by any of `performerIds` since `since`. */
+  async touchpointsSince(performerIds: string[], since: Date): Promise<TouchpointRow[]> {
+    if (performerIds.length === 0) return [];
+    const tp = schema.pipelineTouchpoints;
+    return (await this.db
+      .select({ performedByUserId: tp.performedByUserId, type: tp.type, createdAt: tp.createdAt })
+      .from(tp)
+      .where(and(gte(tp.createdAt, since), inArray(tp.performedByUserId, performerIds)))) as TouchpointRow[];
   }
 }

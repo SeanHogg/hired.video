@@ -27,7 +27,7 @@ import { SeoFinalCta } from "@/components/landing/SeoFinalCta";
 import { NumberedSteps, IconCards } from "@/components/landing/SeoSections";
 import { useProMonthlyPriceLabel } from "@/hooks/use-pro-price-label";
 import { AudienceHiringCTA } from "@/components/landing/AudienceHiringCTA";
-import { MEDIA_KIND_UI, MEDIA_KINDS } from "@shared/media-kinds";
+import { MEDIA_KIND_UI, MEDIA_KINDS, mediaKindIsPrimaryVideo } from "@shared/media-kinds";
 import { StudioTemplateLinkCard } from "@/components/studio/templates/StudioTemplateLinkCard";
 import { AudienceQuickLinks } from "@/components/studio/templates/AudienceQuickLinks";
 import type { AudienceDef } from "@/lib/studio/templates/audiences";
@@ -84,7 +84,7 @@ export function ProfessionLandingPage({
   // Hero line + the start every CTA on the page shares — both from the
   // audience registry (#922 / #2364). A video start opens on the audience's
   // own first video template.
-  const videoTemplate = templates.find((tpl) => tpl.mediaKind === "video")?.id;
+  const videoTemplate = templates.find((tpl) => mediaKindIsPrimaryVideo(tpl.mediaKind))?.id;
   const startCta = useIntentCta(audience.createIntent, { videoTemplate });
 
   const benefits = [

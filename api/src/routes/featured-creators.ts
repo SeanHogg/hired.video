@@ -45,7 +45,3 @@ featuredCreatorsRoutes.get("/by-category/:slug", async (c) => {
     c.env as any,
   );
 });
-
-featuredCreatorsRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Featured creators route not found" } }, 404),
-);

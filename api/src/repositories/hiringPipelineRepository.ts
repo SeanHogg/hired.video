@@ -19,7 +19,7 @@
  * CompanyService aggregate module.
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 const {
@@ -50,29 +50,61 @@ export type OnboardingChecklistRow = typeof onboardingChecklists.$inferSelect;
 export type OnboardingTaskRow = typeof onboardingTasks.$inferSelect;
 export type OnboardingTaskInsert = typeof onboardingTasks.$inferInsert;
 
-export interface IHiringPipelineRepository {
-  // interviews
+/** Interview sessions. */
+export interface IInterviewSessionRepository {
   findInterviewById(id: string): Promise<InterviewSessionRow | null>;
   findInterviewsForCandidate(candidateUserId: string): Promise<InterviewSessionRow[]>;
   insertInterview(input: InterviewSessionInsert): Promise<InterviewSessionRow>;
-  // offers
+}
+
+/** Offer letters. */
+export interface IOfferLetterRepository {
   findOfferById(id: string): Promise<OfferLetterRow | null>;
   findOffersForCandidate(candidateUserId: string): Promise<OfferLetterRow[]>;
   insertOffer(input: OfferLetterInsert): Promise<OfferLetterRow>;
-  // availability + calendar
+}
+
+/** Availability + calendar. */
+export interface IAvailabilityRepository {
   findAvailabilityForUser(userId: string): Promise<AvailabilitySlotRow[]>;
   insertAvailabilitySlot(input: AvailabilitySlotInsert): Promise<void>;
   insertScheduledEvent(input: ScheduledEventInsert): Promise<ScheduledEventRow>;
-  // assessments
+  /** Insert one availability window and return the stored row. */
+  createAvailabilitySlot(input: AvailabilitySlotInsert): Promise<AvailabilitySlotRow>;
+  /** Delete a window the user owns; false when no such row is theirs. */
+  deleteAvailabilitySlotForUser(id: string, userId: string): Promise<boolean>;
+  /** The user's events starting in [from, to], soonest first, capped at `limit`. */
+  findScheduledEventsForUser(userId: string, range: { from: Date; to: Date; limit: number }): Promise<ScheduledEventRow[]>;
+  findScheduledEventForUser(id: string, userId: string): Promise<ScheduledEventRow | null>;
+  /** Patch an event the user owns (one UPDATE … RETURNING); null when not theirs. */
+  updateScheduledEventForUser(id: string, userId: string, patch: Partial<ScheduledEventInsert>): Promise<ScheduledEventRow | null>;
+  /** Delete an event the user owns; false when no such row is theirs. */
+  deleteScheduledEventForUser(id: string, userId: string): Promise<boolean>;
+  /** Events not yet pushed to an external calendar (sync push batch). */
+  findUnsyncedScheduledEventsForUser(userId: string, limit: number): Promise<ScheduledEventRow[]>;
+}
+
+/** Skill assessments + attempts. */
+export interface IAssessmentAttemptRepository {
   findAssessmentById(id: string): Promise<SkillAssessmentRow | null>;
   findAttemptsForUser(userId: string): Promise<AssessmentAttemptRow[]>;
   insertAssessmentAttempt(input: AssessmentAttemptInsert): Promise<AssessmentAttemptRow>;
-  // onboarding
+}
+
+/** Onboarding checklists + tasks. */
+export interface IOnboardingRepository {
   findOnboardingChecklistsForCandidate(candidateUserId: string): Promise<OnboardingChecklistRow[]>;
   findOnboardingTasksForChecklist(checklistId: string): Promise<OnboardingTaskRow[]>;
   insertOnboardingTask(input: OnboardingTaskInsert): Promise<void>;
   markOnboardingTaskComplete(id: string, completedByUserId: string): Promise<void>;
 }
+
+export interface IHiringPipelineRepository
+  extends IInterviewSessionRepository,
+    IOfferLetterRepository,
+    IAvailabilityRepository,
+    IAssessmentAttemptRepository,
+    IOnboardingRepository {}
 
 export class HiringPipelineRepository implements IHiringPipelineRepository {
   constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}
@@ -96,6 +128,19 @@ export class HiringPipelineRepository implements IHiringPipelineRepository {
   async insertInterview(input: InterviewSessionInsert): Promise<InterviewSessionRow> {
     const [row] = await this.db.insert(interviewSessions).values(input as any).returning();
     return row as InterviewSessionRow;
+  }
+
+  /** The user's most recent completed interview (practice) sessions. */
+  async findRecentCompletedInterviewsForUser(
+    userId: string,
+    limit: number,
+  ): Promise<Array<{ id: string; overallScore: string | null; createdAt: Date }>> {
+    return (await this.db
+      .select({ id: interviewSessions.id, overallScore: interviewSessions.overallScore, createdAt: interviewSessions.createdAt })
+      .from(interviewSessions)
+      .where(and(eq(interviewSessions.userId, userId), eq(interviewSessions.status, "completed")))
+      .orderBy(desc(interviewSessions.createdAt))
+      .limit(limit)) as Array<{ id: string; overallScore: string | null; createdAt: Date }>;
   }
 
   async findOfferById(id: string): Promise<OfferLetterRow | null> {
@@ -130,6 +175,73 @@ export class HiringPipelineRepository implements IHiringPipelineRepository {
   async insertScheduledEvent(input: ScheduledEventInsert): Promise<ScheduledEventRow> {
     const [row] = await this.db.insert(scheduledEvents).values(input as any).returning();
     return row as ScheduledEventRow;
+  }
+
+  async createAvailabilitySlot(input: AvailabilitySlotInsert): Promise<AvailabilitySlotRow> {
+    const [row] = await this.db.insert(availabilitySlots).values(input).returning();
+    return row as AvailabilitySlotRow;
+  }
+
+  async deleteAvailabilitySlotForUser(id: string, userId: string): Promise<boolean> {
+    const rows = await this.db
+      .delete(availabilitySlots)
+      .where(and(eq(availabilitySlots.id, id), eq(availabilitySlots.userId, userId)))
+      .returning({ id: availabilitySlots.id });
+    return rows.length > 0;
+  }
+
+  async findScheduledEventsForUser(
+    userId: string,
+    range: { from: Date; to: Date; limit: number },
+  ): Promise<ScheduledEventRow[]> {
+    return (await this.db
+      .select()
+      .from(scheduledEvents)
+      .where(and(
+        eq(scheduledEvents.userId, userId),
+        gte(scheduledEvents.startAt, range.from),
+        lte(scheduledEvents.startAt, range.to),
+      ))
+      .orderBy(scheduledEvents.startAt)
+      .limit(range.limit)) as ScheduledEventRow[];
+  }
+
+  async findScheduledEventForUser(id: string, userId: string): Promise<ScheduledEventRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(scheduledEvents)
+      .where(and(eq(scheduledEvents.id, id), eq(scheduledEvents.userId, userId)))
+      .limit(1);
+    return (row as ScheduledEventRow) ?? null;
+  }
+
+  async updateScheduledEventForUser(
+    id: string,
+    userId: string,
+    patch: Partial<ScheduledEventInsert>,
+  ): Promise<ScheduledEventRow | null> {
+    const [row] = await this.db
+      .update(scheduledEvents)
+      .set(patch)
+      .where(and(eq(scheduledEvents.id, id), eq(scheduledEvents.userId, userId)))
+      .returning();
+    return (row as ScheduledEventRow) ?? null;
+  }
+
+  async deleteScheduledEventForUser(id: string, userId: string): Promise<boolean> {
+    const rows = await this.db
+      .delete(scheduledEvents)
+      .where(and(eq(scheduledEvents.id, id), eq(scheduledEvents.userId, userId)))
+      .returning({ id: scheduledEvents.id });
+    return rows.length > 0;
+  }
+
+  async findUnsyncedScheduledEventsForUser(userId: string, limit: number): Promise<ScheduledEventRow[]> {
+    return (await this.db
+      .select()
+      .from(scheduledEvents)
+      .where(and(eq(scheduledEvents.userId, userId), eq(scheduledEvents.syncedToCalendar, false)))
+      .limit(limit)) as ScheduledEventRow[];
   }
 
   async findAssessmentById(id: string): Promise<SkillAssessmentRow | null> {

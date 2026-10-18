@@ -6,6 +6,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/index.js";
 import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 import { getRecruitScope } from "../../services/recruit/access.js";
 import {
   activateCandidateResume,
@@ -21,25 +22,23 @@ import {
   CreateCandidateResumeSchema,
   UpdateCandidateResumeSchema,
 } from "../../services/recruit/schemas.js";
-import { parseJsonBody, respond } from "./http.js";
+import { invalidPayload, respond } from "./http.js";
 
 export const candidateResumeRoutes = new Hono<AppEnv>();
 
 /** GET /api/recruit/my-scope — companies the caller recruits for + brand kits
  *  + redaction profiles; the recruiter UI picks its default company from it. */
 candidateResumeRoutes.get("/my-scope", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return respond(c, getRecruitScope(auth.userId));
+  const userId = requireUser(c);
+  return respond(c, getRecruitScope(userId));
 });
 
 /** GET /api/recruit/candidates — candidate résumés in the caller's scope. */
 candidateResumeRoutes.get("/candidates", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
+  const userId = requireUser(c);
   return respond(
     c,
-    listCandidateResumes(auth.userId, {
+    listCandidateResumes(userId, {
       companyId: c.req.query("companyId"),
       talentPoolCandidateId: c.req.query("talentPoolCandidateId"),
       activeOnly: c.req.query("activeOnly") === "true",
@@ -48,46 +47,37 @@ candidateResumeRoutes.get("/candidates", async (c) => {
 });
 
 candidateResumeRoutes.get("/candidates/:id", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return respond(c, getCandidateResume(auth.userId, c.req.param("id")));
+  const userId = requireUser(c);
+  return respond(c, getCandidateResume(userId, c.req.param("id")));
 });
 
 /** POST /api/recruit/candidates — create a root résumé or a variant (`parentId`). */
-candidateResumeRoutes.post("/candidates", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const body = await parseJsonBody(c, CreateCandidateResumeSchema);
-  if ("response" in body) return body.response;
-  return respond(c, createCandidateResume(auth.userId, body.data), 201);
+candidateResumeRoutes.post("/candidates", validateJson(CreateCandidateResumeSchema, invalidPayload(), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  return respond(c, createCandidateResume(userId, body), 201);
 });
 
 /** POST /api/recruit/candidates/bulk-csv — bulk-create from a parsed CSV upload. */
-candidateResumeRoutes.post("/candidates/bulk-csv", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const body = await parseJsonBody(c, BulkCsvSchema, "Invalid CSV payload");
-  if ("response" in body) return body.response;
-  return respond(c, bulkImportCandidateResumes(auth.userId, body.data), 201);
+candidateResumeRoutes.post("/candidates/bulk-csv", validateJson(BulkCsvSchema, invalidPayload("Invalid CSV payload"), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  return respond(c, bulkImportCandidateResumes(userId, body), 201);
 });
 
-candidateResumeRoutes.patch("/candidates/:id", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const body = await parseJsonBody(c, UpdateCandidateResumeSchema);
-  if ("response" in body) return body.response;
-  return respond(c, updateCandidateResume(auth.userId, c.req.param("id"), body.data));
+candidateResumeRoutes.patch("/candidates/:id", validateJson(UpdateCandidateResumeSchema, invalidPayload(), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  return respond(c, updateCandidateResume(userId, c.req.param("id"), body));
 });
 
 candidateResumeRoutes.delete("/candidates/:id", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return respond(c, deleteCandidateResume(auth.userId, c.req.param("id")));
+  const userId = requireUser(c);
+  return respond(c, deleteCandidateResume(userId, c.req.param("id")));
 });
 
 /** POST /api/recruit/candidates/:id/activate — make this variant the active one. */
 candidateResumeRoutes.post("/candidates/:id/activate", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return respond(c, activateCandidateResume(auth.userId, c.req.param("id")));
+  const userId = requireUser(c);
+  return respond(c, activateCandidateResume(userId, c.req.param("id")));
 });

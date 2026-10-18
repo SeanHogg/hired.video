@@ -14,21 +14,18 @@ import {
   resendTwoFactorChallenge,
 } from "../../services/auth/twoFactorChallenge.js";
 import { runUseCase, clientContext, deferTask } from "./http.js";
+import { validateJson } from "../helpers/validate.js";
 
 const TRUSTED_DEVICE_MAX_AGE_S = 30 * 24 * 60 * 60;
 
 export const twoFactorRoutes = new Hono<AppEnv>();
 
 /** POST /api/auth/verify-2fa */
-twoFactorRoutes.post("/verify-2fa", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = VerifyTwoFactorSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
-  }
+twoFactorRoutes.post("/verify-2fa", validateJson(VerifyTwoFactorSchema, (e) => error("VALIDATION_ERROR", "Invalid request body", { issues: e.flatten() }), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
 
   return runUseCase(c, async () => {
-    const { payload, trustedDeviceCookie } = await verifyTwoFactorChallenge(parsed.data, clientContext(c));
+    const { payload, trustedDeviceCookie } = await verifyTwoFactorChallenge(body, clientContext(c));
     if (trustedDeviceCookie !== null) {
       c.header(
         "Set-Cookie",
@@ -53,14 +50,10 @@ twoFactorRoutes.get("/verify-2fa-link", async (c) => {
 });
 
 /** POST /api/auth/resend-2fa */
-twoFactorRoutes.post("/resend-2fa", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = ResendTwoFactorSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
-  }
+twoFactorRoutes.post("/resend-2fa", validateJson(ResendTwoFactorSchema, (e) => error("VALIDATION_ERROR", "Invalid request body", { issues: e.flatten() }), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
 
   return runUseCase(c, async () =>
-    c.json(success(await resendTwoFactorChallenge(parsed.data.tempAuthToken, deferTask(c))), 200),
+    c.json(success(await resendTwoFactorChallenge(body.tempAuthToken, deferTask(c))), 200),
   );
 });

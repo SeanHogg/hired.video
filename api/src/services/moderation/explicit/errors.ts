@@ -10,7 +10,7 @@ export class ExplicitContentError extends AppError {
   readonly categories: ExplicitCategory[];
   /** Sent as `error.details` — the client renders localized category names
    *  from these ids instead of this English message. */
-  readonly details: { categories: ExplicitCategory[]; subject: "text" | "image" };
+  declare readonly details: { categories: ExplicitCategory[]; subject: "text" | "image" };
   constructor(categories: ExplicitCategory[], what: "text" | "image" = "text") {
     const list = categories.length ? categories.join(", ") : "explicit content";
     super(
@@ -19,9 +19,9 @@ export class ExplicitContentError extends AppError {
         ? `This image can't be uploaded because it looks like it contains ${list}. Please choose another image.`
         : `This can't be saved because it looks like it contains ${list}. Please remove it and try again.`,
       422,
+      { categories, subject: what },
     );
     this.name = "ExplicitContentError";
     this.categories = categories;
-    this.details = { categories, subject: what };
   }
 }

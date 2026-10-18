@@ -1,22 +1,19 @@
 /**
  * Authenticated file downloads from the API.
  *
- * `apiClient` validates the JSON `{ success, data }` envelope, so endpoints
- * that stream a raw file (CSV / JSON exports) come through here instead. URL
- * and auth headers resolve through the same SSoT primitives as apiClient
- * (`buildApiUrl` + `standardAuthHeaders`: Bearer + X-Emulation-Token), so a
- * download can never drift onto the static frontend origin or lose the token.
+ * `apiClient.request` validates the JSON `{ success, data }` envelope, so
+ * endpoints that stream a raw file (CSV / JSON exports) open the response
+ * through `apiClient.openStream` instead — same URL resolution, auth headers
+ * (Bearer + X-Emulation-Token), request log and typed error mapping as every
+ * other API call; the body is read here as a Blob.
  */
 
-import { buildApiUrl } from "../api/base-url";
-import { standardAuthHeaders } from "../api/auth-token";
+import { apiClient } from "../api-client";
 import { triggerDownload } from "../resume-exporters";
 
 /** Fetch `endpoint` (e.g. `/api/learning/xapi/portability/export/manifest`) as a Blob. */
 export async function fetchApiBlob(endpoint: string): Promise<Blob> {
-  const url = buildApiUrl(endpoint);
-  const res = await fetch(url, { headers: standardAuthHeaders(url), credentials: "include" });
-  if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+  const res = await apiClient.openStream(endpoint);
   return res.blob();
 }
 

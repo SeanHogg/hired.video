@@ -22,10 +22,12 @@ import {
   SkillSchema,
   ExtractResponseSchema,
   buildFallbackExtraction,
-  SKILL_EXTRACTOR_PROMPT,
+  buildSkillExtractorPrompt,
 } from "../resume/skills.js";
 
-describe("SKILL_EXTRACTOR_PROMPT contract", () => {
+describe("buildSkillExtractorPrompt contract", () => {
+  const SKILL_EXTRACTOR_PROMPT = buildSkillExtractorPrompt();
+
   it("does NOT ask the LLM to emit sourceType (caller owns that value)", () => {
     // If someone re-introduces `sourceType` to the prompt template, the
     // LLM will again return the literal string "job" | "resume" and

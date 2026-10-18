@@ -23,6 +23,8 @@ import {
   type GoalLlm,
 } from "./goal-course-matcher.js";
 
+export { LEARNING_GOAL_STATUSES } from "../../db/schema/learning.js";
+
 function recsCacheKey(goalId: string): string {
   return `learning-goal:recs:${goalId}`;
 }

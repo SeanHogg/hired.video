@@ -30,7 +30,7 @@ analyticsEventsRoutes.post("/events", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Body must be an event or { events: [...] }"), 400);
   }
   const ctx: AnalyticsRequestContext = {
-    userId: c.var.user?.sub ?? null,
+    userId: c.var.userId ?? null,
     roles: c.var.user?.roles ?? null,
     ipAddress: c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? null,
     ipHash: hashClientIp(c),

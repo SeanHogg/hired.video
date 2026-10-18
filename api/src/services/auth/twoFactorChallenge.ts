@@ -1,6 +1,6 @@
 /**
  * Login two-factor challenge use cases (the email-OTP challenge row minted
- * by login, identified by its `tempAuthToken` = twoFactorCodes.id):
+ * by login, identified by its `tempAuthToken` = the auth_tokens row id):
  *   • verifyTwoFactorChallenge — POST /api/auth/verify-2fa (code / TOTP / backup code)
  *   • approveTwoFactorLink     — GET  /api/auth/verify-2fa-link (one-tap email approve, gap #2225)
  *   • resendTwoFactorChallenge — POST /api/auth/resend-2fa
@@ -14,15 +14,10 @@ import { getDb } from "../../db/index.js";
 import { DomainError } from "../../domains/errors.js";
 import { UsersRepository } from "../../repositories/usersRepository.js";
 import { AuthTokensRepository } from "../../repositories/authTokensRepository.js";
-import {
-  findTwoFactorChallenge,
-  findUserContactById,
-  reissueTwoFactorChallenge,
-  setTwoFactorAttempts,
-} from "../../repositories/authFlowRepository.js";
+import { findUserContactById } from "../../repositories/authFlowRepository.js";
 import { sendTwoFactorEmail } from "../adapters/email/senders/auth.js";
 import { issueJwt } from "./jwt.js";
-import { createSession } from "./sessions.js";
+import { createSession } from "./session-lifecycle.js";
 import { verifyTotp } from "./totp.js";
 import { consumeBackupCode } from "./backupCodes.js";
 import { mintTrustedDeviceCookie } from "./trustedDevice.js";
@@ -126,7 +121,7 @@ export async function verifyTwoFactorChallenge(
   // The tempAuthToken row tells us *which user* the challenge is for; it
   // must exist and be unused/unexpired even when the user verifies via
   // TOTP / backup code (the parallel email OTP is still invalidated).
-  const pending = await findTwoFactorChallenge(db, input.tempAuthToken);
+  const pending = await tokens.findTwoFactorChallenge(input.tempAuthToken);
   if (!pending || !isOpen(pending)) {
     throw new DomainError(400, "INVALID_TOKEN", "Invalid or expired two-factor token");
   }
@@ -154,7 +149,7 @@ export async function verifyTwoFactorChallenge(
   }
   if (!accepted) {
     // Single source of truth for the 5-strike rule above.
-    await setTwoFactorAttempts(db, pending.id, (pending.attempts ?? 0) + 1);
+    await tokens.setTwoFactorAttempts(pending.id, (pending.attempts ?? 0) + 1);
     throw new DomainError(400, "INVALID_CODE", "Invalid verification code");
   }
 
@@ -175,7 +170,8 @@ export async function approveTwoFactorLink(token: string, client: ClientContext)
   }
 
   const db = getDb();
-  const pending = await findTwoFactorChallenge(db, verified.challengeId);
+  const tokens = new AuthTokensRepository(db);
+  const pending = await tokens.findTwoFactorChallenge(verified.challengeId);
   if (!pending || !isOpen(pending)) {
     throw new DomainError(401, "UNAUTHORIZED", "Invalid or expired sign-in link");
   }
@@ -185,7 +181,7 @@ export async function approveTwoFactorLink(token: string, client: ClientContext)
   if (!user.isActive) throw new DomainError(401, "UNAUTHORIZED", "Account is disabled");
 
   // Consume the challenge — same single-use guarantee as code entry.
-  await new AuthTokensRepository(db).markTwoFactorCodeUsed(pending.id);
+  await tokens.markTwoFactorCodeUsed(pending.id);
 
   const { payload } = await completeTwoFactorSession(db, user, client, { trusted: false });
   return payload;
@@ -198,7 +194,8 @@ export async function resendTwoFactorChallenge(
   defer: DeferTask,
 ): Promise<{ resent: true; tempAuthToken: string; verificationCode?: string }> {
   const db = getDb();
-  const existing = await findTwoFactorChallenge(db, tempAuthToken);
+  const tokens = new AuthTokensRepository(db);
+  const existing = await tokens.findTwoFactorChallenge(tempAuthToken);
 
   // Resend must succeed even when the prior code is expired or used — see
   // canResendTwoFactor. Reject only a token id that maps to no challenge.
@@ -207,7 +204,7 @@ export async function resendTwoFactorChallenge(
   }
 
   // Re-issuing retires every pending code for this user (incl. `existing`).
-  const entry = await reissueTwoFactorChallenge(db, {
+  const entry = await tokens.reissueTwoFactorChallenge({
     userId: existing.userId,
     code: generateVerificationCode(),
     expiresAt: new Date(Date.now() + CHALLENGE_TTL_MINUTES * 60 * 1000),

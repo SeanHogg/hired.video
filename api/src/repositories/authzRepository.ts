@@ -12,7 +12,7 @@
  * authz operation, not a session-bearer token like refreshTokens.
  */
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 const { modules, userModuleAssignments, userPermissionOverrides, apiKeys } = schema;
@@ -44,9 +44,13 @@ export interface IAuthzRepository {
   upsertPermissionOverride(input: UserPermissionOverrideInsert): Promise<void>;
   // api keys
   findApiKeyByHash(keyHash: string): Promise<ApiKeyRow | null>;
+  /** Newest first. Rows carry `keyHash` — project before returning to a client. */
   findApiKeysForUser(userId: string): Promise<ApiKeyRow[]>;
   insertApiKey(input: ApiKeyInsert): Promise<ApiKeyRow>;
+  /** Deactivate (is_active = false) a key the user owns; false when no such key. */
   revokeApiKey(id: string, userId: string): Promise<boolean>;
+  /** Rename a key the user owns; null when no such key. */
+  renameApiKey(id: string, userId: string, name: string): Promise<{ id: string; name: string } | null>;
 }
 
 export class AuthzRepository implements IAuthzRepository {
@@ -152,7 +156,11 @@ export class AuthzRepository implements IAuthzRepository {
   }
 
   async findApiKeysForUser(userId: string): Promise<ApiKeyRow[]> {
-    return (await this.db.select().from(apiKeys).where(eq(apiKeys.userId, userId))) as ApiKeyRow[];
+    return (await this.db
+      .select()
+      .from(apiKeys)
+      .where(eq(apiKeys.userId, userId))
+      .orderBy(desc(apiKeys.createdAt))) as ApiKeyRow[];
   }
 
   async insertApiKey(input: ApiKeyInsert): Promise<ApiKeyRow> {
@@ -167,10 +175,21 @@ export class AuthzRepository implements IAuthzRepository {
       .where(and(eq(apiKeys.id, id), eq(apiKeys.userId, userId)))
       .limit(1);
     if (!row) return false;
+    // api_keys has no revoked_at column (the old `revokedAt` set was a no-op
+    // column) — revocation is `is_active = false`, what GET /api/apikeys reads.
     await this.db
       .update(apiKeys)
-      .set({ revokedAt: this.now() } as any)
+      .set({ isActive: false })
       .where(and(eq(apiKeys.id, id), eq(apiKeys.userId, userId)));
     return true;
+  }
+
+  async renameApiKey(id: string, userId: string, name: string): Promise<{ id: string; name: string } | null> {
+    const [row] = await this.db
+      .update(apiKeys)
+      .set({ name })
+      .where(and(eq(apiKeys.id, id), eq(apiKeys.userId, userId)))
+      .returning({ id: apiKeys.id, name: apiKeys.name });
+    return row ?? null;
   }
 }

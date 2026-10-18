@@ -23,7 +23,7 @@ sequenceRoutes.post("/sequences", async (c) => {
 });
 
 sequenceRoutes.get("/sequences", async (c) => {
-  return c.json(success(await getOutreachSequences(c.get("user").sub)));
+  return c.json(success(await getOutreachSequences(c.var.userId)));
 });
 
 sequenceRoutes.delete("/sequences/:id", async (c) => {

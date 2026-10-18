@@ -20,32 +20,27 @@ import { cloneJob, setJobArchived } from "../../services/jobs/jobLifecycle.js";
 import { requireJobPoster } from "../../middleware/job-poster-gate.js";
 import { isSuperAdmin } from "../../middleware/superAdmin.js";
 import { CreateJobSchema, UpdateJobSchema } from "./schemas.js";
-import { jobViewerOf, withDomainErrors } from "./http.js";
+import { jobViewerOf } from "./http.js";
+import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const jobManageRoutes = new Hono<AppEnv>();
 
 /** Archive hides from default listings, preserves slug + analytics history. */
 jobManageRoutes.post("/:id/archive", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  return withDomainErrors(c, async () => c.json(success(await setJobArchived(userId, c.req.param("id"), true)), 200));
+  const userId = requireUser(c);
+  return c.json(success(await setJobArchived(userId, c.req.param("id"), true)), 200);
 });
 
 jobManageRoutes.post("/:id/unarchive", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  return withDomainErrors(c, async () => c.json(success(await setJobArchived(userId, c.req.param("id"), false)), 200));
+  const userId = requireUser(c);
+  return c.json(success(await setJobArchived(userId, c.req.param("id"), false)), 200);
 });
 
-jobManageRoutes.post("/", requireJobPoster, async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = CreateJobSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
-  }
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const created = await jobService.createJob(parsed.data, userId);
+jobManageRoutes.post("/", requireJobPoster, validateJson(CreateJobSchema, (e) => error("VALIDATION_ERROR", "Invalid request body", { issues: e.flatten() }), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  const userId = requireUser(c);
+  const created = await jobService.createJob(body, userId);
 
   // Gamification: credit the employer author for posting a job. The caller
   // IS the author here, so withGamification (JWT role + userId) is correct.
@@ -86,16 +81,11 @@ jobManageRoutes.get("/:id", async (c) => {
   return c.json(success(job));
 });
 
-jobManageRoutes.put("/:id", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const body = await c.req.json().catch(() => null);
-  const parsed = UpdateJobSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
-  }
+jobManageRoutes.put("/:id", validateJson(UpdateJobSchema, (e) => error("VALIDATION_ERROR", "Invalid request body", { issues: e.flatten() }), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
 
-  const updated = await jobService.updateJob(c.req.param("id"), parsed.data, userId);
+  const updated = await jobService.updateJob(c.req.param("id"), body, userId);
   if (!updated) {
     return c.json(error("NOT_FOUND", "Job not found"), 404);
   }
@@ -104,8 +94,7 @@ jobManageRoutes.put("/:id", async (c) => {
 });
 
 jobManageRoutes.delete("/:id", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const isAdmin = isSuperAdmin(c.var.user);
   const deleted = await jobService.deleteJob(c.req.param("id"), userId, isAdmin);
   if (!deleted) return c.json(error("NOT_FOUND", "Job not found or not owned by you"), 404);
@@ -115,7 +104,6 @@ jobManageRoutes.delete("/:id", async (c) => {
 /** Mirrors the resume + studio-project clone pattern so every owner-created
  *  entity supports the universal Clone action. */
 jobManageRoutes.post("/:id/clone", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  return withDomainErrors(c, async () => c.json(success(await cloneJob(userId, c.req.param("id"))), 201));
+  const userId = requireUser(c);
+  return c.json(success(await cloneJob(userId, c.req.param("id"))), 201);
 });

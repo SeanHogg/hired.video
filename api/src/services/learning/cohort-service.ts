@@ -27,6 +27,7 @@ import {
   WorkspaceForbiddenError,
 } from "../studio/workspace.js";
 import { invalidateCohortAnalyticsCache } from "./cohort-analytics.js";
+import { DomainError } from "../../domains/errors.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -34,10 +35,10 @@ const { learningCohorts, cohortMembers, users } = schema;
 
 export { WorkspaceForbiddenError };
 
-export class CohortNotFoundError extends Error {
-  readonly code = "COHORT_NOT_FOUND" as const;
+/** Renders as 404 NOT_FOUND. */
+export class CohortNotFoundError extends DomainError {
   constructor(message = "Cohort not found.") {
-    super(message);
+    super(404, "NOT_FOUND", message);
     this.name = "CohortNotFoundError";
   }
 }

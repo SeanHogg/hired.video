@@ -5,10 +5,10 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
 import { workerRunsRepository } from "../repositories/admin/index.js";
-import { ok } from "../utils/response.js";
 import { parsePagination } from "../utils/pagination.js";
 import { workers as registeredWorkers, getWorker } from "../workers/registry.js";
 import { runWorker } from "../workers/runner.js";
+import { success, error } from "../types/index.js";
 
 export const adminWorkerRoutes = new Hono<AppEnv>();
 
@@ -46,7 +46,7 @@ adminWorkerRoutes.get("/", async (c) => {
       };
     });
 
-  return c.json(ok({ workers: items }), 200);
+  return c.json(success({ workers: items }), 200);
 });
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ adminWorkerRoutes.get("/:name/runs", async (c) => {
   const name = c.req.param("name");
   const worker = getWorker(name);
   if (!worker) {
-    return c.json({ error: { code: "NOT_FOUND", message: "Worker not found" } }, 404);
+    return c.json(error("NOT_FOUND", "Worker not found"), 404);
   }
 
   const repo = workerRunsRepository();
@@ -74,7 +74,7 @@ adminWorkerRoutes.get("/:name/runs", async (c) => {
   const runs = rows.map(({ details: _details, ...rest }) => rest);
 
   return c.json(
-    ok({
+    success({
       runs,
       total,
       page,
@@ -98,10 +98,10 @@ adminWorkerRoutes.get("/:name/runs/:runId", async (c) => {
   const run = await workerRunsRepository().findRunById(runId);
 
   if (!run || run.workerName !== name) {
-    return c.json({ error: { code: "NOT_FOUND", message: "Run not found" } }, 404);
+    return c.json(error("NOT_FOUND", "Run not found"), 404);
   }
 
-  return c.json(ok({ run }), 200);
+  return c.json(success({ run }), 200);
 });
 
 // ---------------------------------------------------------------------------
@@ -114,10 +114,10 @@ adminWorkerRoutes.post("/:name/run", async (c) => {
   const name = c.req.param("name");
   const worker = getWorker(name);
   if (!worker) {
-    return c.json({ error: { code: "NOT_FOUND", message: "Worker not found" } }, 404);
+    return c.json(error("NOT_FOUND", "Worker not found"), 404);
   }
 
-  const triggeredBy = c.var.user?.sub ?? null;
+  const triggeredBy = c.var.userId ?? null;
   const summary = await runWorker(worker, "manual", triggeredBy);
-  return c.json(ok({ run: summary }), 200);
+  return c.json(success({ run: summary }), 200);
 });

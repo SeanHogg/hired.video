@@ -15,6 +15,7 @@
 import { is } from "drizzle-orm";
 import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
 import * as schema from "./schema/index.js";
+import { quoteIdent } from "./sql-ident.js";
 
 export interface DeclaredUniqueConstraint {
   table: string;
@@ -101,7 +102,6 @@ export function declaredIndexes(): Map<string, string> {
   return out;
 }
 
-const quoteIdent =(id: string): string => `"${id.replaceAll('"', '""')}"`;
 
 /** The exact DDL drizzle-kit would run for this constraint. */
 export function addUniqueConstraintSql(c: DeclaredUniqueConstraint): string {

@@ -18,7 +18,7 @@
  *      if/when we want per-period tweaks.)
  *   6. user_share_cents = floor(pool_total * user_score / sum_scores).
  *   7. Write one partner_payouts row per user_id ≥ $0; roll into
- *      partner_program_balances. Once balance crosses $50 → status='paid'
+ *      the partner_pool wallet. Once balance crosses $50 → status='paid'
  *      + Tremendous push; otherwise status='held_until_threshold'.
  *
  * The 60-day hold is enforced via `hold_until` on partner_payouts; the
@@ -200,7 +200,8 @@ export async function dispatchDuePartnerPayouts(args: {
   // READ batching only: recipients for every due row in one query (was a
   // SELECT per row). The Tremendous call + payout/balance writes stay
   // strictly per row with their own error isolation.
-  const recipients = await new PartnerProgramRepository(db).findRecipients(due.map((r) => r.userId));
+  const partnerRepo = new PartnerProgramRepository(db);
+  const recipients = await partnerRepo.findRecipients(due.map((r) => r.userId));
   for (const row of due) {
     const user = recipients.get(row.userId);
     if (!user?.email) {
@@ -228,14 +229,7 @@ export async function dispatchDuePartnerPayouts(args: {
           updatedAt: now,
         })
         .where(eq(schema.partnerPayouts.id, row.id));
-      await db
-        .update(schema.partnerProgramBalances)
-        .set({
-          pendingCents: sql`${schema.partnerProgramBalances.pendingCents} - ${row.userShareCents}`,
-          paidCents: sql`${schema.partnerProgramBalances.paidCents} + ${row.userShareCents}`,
-          updatedAt: now,
-        })
-        .where(eq(schema.partnerProgramBalances.userId, row.userId));
+      await partnerRepo.markShareDispatched(row.userId, row.userShareCents);
       dispatched++;
     } catch (e) {
       await db

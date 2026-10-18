@@ -14,7 +14,7 @@ import {
   submitCourseForReview,
 } from "../../services/courses/courseAuthoringService.js";
 import { SubmitForReviewSchema } from "./schemas.js";
-import { courseActor, handle, readBody, respond, unauthorized, validationError } from "./shared.js";
+import { courseActor, invalidBody, respond, unauthorized } from "./shared.js";
 import { success } from "../../types/index.js";
 
 export const courseReviewRoutes = new Hono<AppEnv>();
@@ -25,15 +25,14 @@ courseReviewRoutes.get("/review-queue", (c) => {
   return respond(c, () => listReviewQueue(actor));
 });
 
-courseReviewRoutes.post("/:id/submit-for-review", (c) => {
+courseReviewRoutes.post("/:id/submit-for-review", async (c) => {
   const actor = courseActor(c);
   if (!actor) return unauthorized(c);
   const courseId = c.req.param("id");
-  return handle(c, async () => {
-    // Authorise before validating the body (historical order).
-    await ensureCourseEditable(actor, courseId);
-    const parsed = SubmitForReviewSchema.safeParse(await readBody(c));
-    if (!parsed.success) return validationError(c, parsed.error);
-    return c.json(success(await submitCourseForReview(courseId, parsed.data)), 200);
-  });
+  // Authorise before validating the body (historical order).
+  await ensureCourseEditable(actor, courseId);
+  // Not validateJson: authorisation must run before body validation.
+  const parsed = SubmitForReviewSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json(invalidBody(parsed.error), 400);
+  return c.json(success(await submitCourseForReview(courseId, parsed.data)), 200);
 });

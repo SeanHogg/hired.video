@@ -13,10 +13,6 @@ import { error, type AppEnv } from "../../types/index.js";
 
 export type ReviewsContext = Context<AppEnv>;
 
-export function viewerId(c: ReviewsContext): string | null {
-  return c.var.user?.sub ?? null;
-}
-
 /** The `:subjectType` param, or a 400 DomainError for an unknown type. */
 export function subjectTypeParam(c: ReviewsContext): SubjectType {
   const raw = c.req.param("subjectType");

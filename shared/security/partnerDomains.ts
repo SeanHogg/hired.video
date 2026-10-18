@@ -45,15 +45,3 @@ export function expandPartnerOrigins(): string[] {
   }
   return out;
 }
-
-/**
- * Lower-case bare hostname check used by surfaces that work in
- * hostnames rather than full origins (e.g. cookie domain decisions,
- * email-link safety checks). Returns true for both the bare and `www.`
- * forms.
- */
-export function isPartnerDomain(hostname: string | null | undefined): boolean {
-  if (!hostname) return false;
-  const h = hostname.toLowerCase().replace(/^www\./, "");
-  return PARTNER_DOMAINS.includes(h as (typeof PARTNER_DOMAINS)[number]);
-}

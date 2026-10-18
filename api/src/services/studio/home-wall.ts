@@ -9,10 +9,14 @@ import { studioProjects } from "../../db/schema/index.js";
 import { videos } from "../../db/schema/videos.js";
 import { assertCanWrite } from "./workspace.js";
 import { invalidatePublicVideoFeed } from "./public-video-feed.js";
+import { DomainError } from "../../domains/errors.js";
 
-export class HomeWallError extends Error {
-  constructor(readonly code: "NOT_FOUND" | "NO_VIDEO") {
-    super(code === "NOT_FOUND" ? "Project not found" : "This project has no posted video yet");
+/** NOT_FOUND → 404, NO_VIDEO → 409. */
+export class HomeWallError extends DomainError {
+  declare readonly code: "NOT_FOUND" | "NO_VIDEO";
+  constructor(code: "NOT_FOUND" | "NO_VIDEO") {
+    super(code === "NOT_FOUND" ? 404 : 409, code, code === "NOT_FOUND" ? "Project not found" : "This project has no posted video yet");
+    this.name = "HomeWallError";
   }
 }
 

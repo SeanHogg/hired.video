@@ -19,6 +19,16 @@ export interface ReviewAggregateRow {
   avg: number | null;
 }
 
+/** The ONE rating-cache shape every subject projection writes (W3-D2):
+ *  published-review count + mean rounded to 2dp (null until first review).
+ *  Company, creator and course caches used to round three different ways. */
+export function toRatingCache(agg: ReviewAggregateRow | undefined): { count: number; average: number | null } {
+  return {
+    count: agg?.cnt ?? 0,
+    average: agg?.avg != null ? Math.round(agg.avg * 100) / 100 : null,
+  };
+}
+
 function reviewFeedPostWhere(reviewId: string) {
   return and(eq(feedPosts.subjectType, "review"), eq(feedPosts.subjectId, reviewId));
 }
@@ -88,8 +98,8 @@ export class ReviewProjectionsRepository {
     await this.db
       .update(companyProfiles)
       .set({
-        reviewCount: agg?.cnt ?? 0,
-        reviewAvgOverall: agg?.avg != null ? agg.avg.toFixed(2) : null,
+        reviewCount: toRatingCache(agg).count,
+        reviewAvgOverall: toRatingCache(agg).average?.toFixed(2) ?? null,
         updatedAt: new Date(),
       })
       .where(eq(companyProfiles.id, companyId));
@@ -127,9 +137,8 @@ export class ReviewProjectionsRepository {
     await this.db
       .update(creatorProfiles)
       .set({
-        // Rounded to 2dp, as the cache has always stored it.
-        averageRating: agg?.avg != null ? Number(agg.avg.toFixed(2)) : null,
-        ratingCount: agg?.cnt ?? 0,
+        averageRating: toRatingCache(agg).average,
+        ratingCount: toRatingCache(agg).count,
         updatedAt: new Date(),
       })
       .where(eq(creatorProfiles.userId, creatorId));
@@ -139,8 +148,8 @@ export class ReviewProjectionsRepository {
     await this.db
       .update(courses)
       .set({
-        averageRating: agg?.avg ?? null,
-        ratingCount: agg?.cnt ?? 0,
+        averageRating: toRatingCache(agg).average,
+        ratingCount: toRatingCache(agg).count,
         updatedAt: new Date(),
       })
       .where(eq(courses.id, courseId));

@@ -6,27 +6,21 @@
  */
 
 import { Hono } from "hono";
-import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables, AppEnv } from "../types/index.js";
+import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
 import { requireUser } from "./helpers/routerHelpers.js";
 import { classifySignupEligibility, detectCountry } from "../services/auth/geo.js";
-import { recordBotBlock } from "../services/auth/botBlock.js";
+import { joinRegionWaitlist } from "../services/auth/regionWaitlist.js";
 import {
-  beginTotpSetup,
-  confirmTotpSetup,
-  disableTotp,
-  verifyTotp,
-} from "../services/auth/totp.js";
-import {
-  generateBackupCodes,
-  countUnusedBackupCodes,
-} from "../services/auth/backupCodes.js";
+  countBackupCodes,
+  enableTotp,
+  regenerateBackupCodes,
+  startTotpSetup,
+  turnOffTotp,
+} from "../services/auth/twoFactorSettings.js";
 import { mintTrustedDeviceCookie } from "../services/auth/trustedDevice.js";
-
-const { users, regionWaitlist } = schema;
+import { validateJson } from "./helpers/validate.js";
 
 export const securityRoutes = new Hono<AppEnv>();
 
@@ -53,43 +47,13 @@ const RegionWaitlistSchema = z.object({
   reason: z.string().max(500).optional(),
 });
 
-securityRoutes.post("/region-waitlist", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = RegionWaitlistSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body"), 400);
-  }
+securityRoutes.post("/region-waitlist", validateJson(RegionWaitlistSchema, () => error("VALIDATION_ERROR", "Invalid request body"), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
   const country = detectCountry({
     get: (name: string) => (c.req.header(name) as string | null) ?? null,
   });
-  if (!country) {
-    return c.json(error("UNKNOWN_COUNTRY", "Could not determine country"), 400);
-  }
-  const eligibility = classifySignupEligibility(country);
-  if (eligibility === "allowed") {
-    return c.json(error("CONFLICT", "Your country is already supported. Please sign up directly."), 409);
-  }
-  const db = getDb();
-  // Insert; on duplicate (same email+pending) the unique index will
-  // throw — we catch and return 200 since the user-visible outcome is
-  // the same: "you're on the list".
-  try {
-    await db.insert(regionWaitlist).values({
-      email: parsed.data.email,
-      countryCode: country,
-      reason: parsed.data.reason ?? null,
-    } as any);
-  } catch {
-    // Already on list — same response.
-  }
-  // Telemetry: this user wanted to sign up but couldn't.
-  await recordBotBlock({
-    db,
-    endpoint: "region-waitlist",
-    reason: eligibility === "sanctioned" ? "OFAC_BLOCKED" : "GEO_BLOCKED",
-    countryCode: country,
-    email: parsed.data.email,
-  });
+  // 400 UNKNOWN_COUNTRY / 409 CONFLICT (already supported) are DomainErrors.
+  await joinRegionWaitlist({ email: body.email, reason: body.reason ?? null, country });
   return c.json(success({ recorded: true }), 200);
 });
 
@@ -98,43 +62,22 @@ securityRoutes.post("/region-waitlist", async (c) => {
 // ---------------------------------------------------------------------
 
 securityRoutes.post("/totp/setup", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
-  const db = getDb();
-  const [user] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
-  if (!user) return c.json(error("NOT_FOUND", "User not found"), 404);
-  const setup = await beginTotpSetup(db, userId, user.email);
-  return c.json(success(setup));
+  const userId = requireUser(c);
+  return c.json(success(await startTotpSetup(userId)));
 });
 
 const ConfirmTotpSchema = z.object({ code: z.string().regex(/^\d{6}$/) });
 
-securityRoutes.post("/totp/confirm", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
-  const body = await c.req.json().catch(() => null);
-  const parsed = ConfirmTotpSchema.safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request body"), 400);
-  const db = getDb();
-  const ok = await confirmTotpSetup(db, userId, parsed.data.code);
-  if (!ok) return c.json(error("INVALID_CODE", "Invalid TOTP code"), 400);
+securityRoutes.post("/totp/confirm", validateJson(ConfirmTotpSchema, () => error("VALIDATION_ERROR", "Invalid request body"), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
   // First-time enable also seeds backup codes — show plaintext once.
-  const codes = await generateBackupCodes(db, userId);
+  const codes = await enableTotp(userId, c.req.valid("json").code);
   return c.json(success({ enabled: true, backupCodes: codes }));
 });
 
-securityRoutes.post("/totp/disable", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
-  const body = await c.req.json().catch(() => null);
-  const parsed = ConfirmTotpSchema.safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request body"), 400);
-  const db = getDb();
-  const ok = await disableTotp(db, userId, parsed.data.code);
-  if (!ok) return c.json(error("INVALID_CODE", "Invalid TOTP code"), 400);
+securityRoutes.post("/totp/disable", validateJson(ConfirmTotpSchema, () => error("VALIDATION_ERROR", "Invalid request body"), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  await turnOffTotp(userId, c.req.valid("json").code);
   return c.json(success({ disabled: true }));
 });
 
@@ -143,21 +86,13 @@ securityRoutes.post("/totp/disable", async (c) => {
 // ---------------------------------------------------------------------
 
 securityRoutes.get("/backup-codes/count", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
-  const db = getDb();
-  const remaining = await countUnusedBackupCodes(db, userId);
-  return c.json(success({ remaining }));
+  const userId = requireUser(c);
+  return c.json(success({ remaining: await countBackupCodes(userId) }));
 });
 
 securityRoutes.post("/backup-codes/regenerate", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
-  const db = getDb();
-  const codes = await generateBackupCodes(db, userId);
-  return c.json(success({ codes }));
+  const userId = requireUser(c);
+  return c.json(success({ codes: await regenerateBackupCodes(userId) }));
 });
 
 // ---------------------------------------------------------------------
@@ -165,9 +100,7 @@ securityRoutes.post("/backup-codes/regenerate", async (c) => {
 // successful 2FA verify when the user ticked "trust this device".
 // ---------------------------------------------------------------------
 securityRoutes.post("/trust-device", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
+  const userId = requireUser(c);
   const cookie = await mintTrustedDeviceCookie(userId);
   c.header(
     "Set-Cookie",

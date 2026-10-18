@@ -34,7 +34,6 @@ import {
 } from "../../../shared/social-platforms.js";
 import {
   SocialConnectionService,
-  SocialConnectionError,
 } from "../services/social/social-connection-service.js";
 import { parseWorkspaceParam } from "../services/paid-media/oauth.js";
 import { resolveWorkspaceForWrite, WorkspaceForbiddenError } from "../services/studio/workspace.js";
@@ -58,7 +57,7 @@ function isManagedLane(c: Ctx): boolean {
 /** Resolve the workspace owner the connection belongs to, via the canActFor
  *  SSoT (personal / company / delegated). Throws WorkspaceForbiddenError. */
 async function resolveOwner(c: Ctx): Promise<{ ownerUserId: string; ownerCompanyId: string | null }> {
-  const userId = c.var.user.sub as string;
+  const userId = c.var.userId;
   const selection = parseWorkspaceParam(c.req.query("workspace") ?? "personal");
   const ctx = await resolveWorkspaceForWrite(userId, selection);
   return { ownerUserId: ctx.ownerUserId, ownerCompanyId: ctx.ownerCompanyId };
@@ -79,7 +78,7 @@ function safeRedirectTo(requested: string | undefined): string {
 }
 
 function workspaceForbidden(c: Ctx, err: WorkspaceForbiddenError) {
-  return c.json(error("WORKSPACE_FORBIDDEN", err.message), 403);
+  return c.json(error("FORBIDDEN", err.message), 403);
 }
 
 // ─── OAuth callback (public — browser navigation) ────────────────────────────
@@ -149,7 +148,7 @@ socialRoutes.get("/:platform/auth-url", async (c) => {
           platform: platform as SocialPlatform,
           lane: "managed",
           scope: "managed",
-          userId: c.var.user.sub as string, // the SuperAdmin connecting the brand account
+          userId: c.var.userId, // the SuperAdmin connecting the brand account
           companyId: null,
           redirectTo: `${frontendBaseUrl()}${SOCIAL_CALLBACK_FALLBACK_PATH.managed}`,
         })
@@ -167,7 +166,6 @@ socialRoutes.get("/:platform/auth-url", async (c) => {
     return c.json(success({ url }));
   } catch (err) {
     if (err instanceof WorkspaceForbiddenError) return workspaceForbidden(c, err);
-    if (err instanceof SocialConnectionError) return c.json(error(err.code, err.message), err.code === "NOT_CONFIGURED" ? 503 : 400);
     throw err;
   }
 });
@@ -178,7 +176,7 @@ socialRoutes.post("/:platform/disconnect", async (c) => {
   if (!isSocialPlatform(platform)) return c.json(error("NOT_FOUND", `Unknown platform: ${platform}`), 404);
   if (isManagedLane(c)) {
     const removed = await buildService(c).disconnectManaged(platform as SocialPlatform);
-    await recordManagedAccountAudit(c.var.user.sub as string, "managed_account.disconnect", platform);
+    await recordManagedAccountAudit(c.var.userId, "managed_account.disconnect", platform);
     if (!removed) return c.json(error("NOT_FOUND", `No ${platform} brand account connected`), 404);
     return c.json(success(null, `${platform} brand account disconnected`));
   }

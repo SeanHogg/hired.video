@@ -7,7 +7,7 @@ import { buildRepos } from "../../repositories/index.js";
 import type { JobRow } from "../../repositories/jobsRepository.js";
 import { DomainError } from "../../domains/errors.js";
 import { bumpSearchVersion } from "../../utils/search-cache.js";
-import * as jobService from "../job/JobService.js";
+import { getJobById } from "../job/job-queries.js";
 
 /** Soft-delete (archived=true) or restore a job. Poster only. Hides from
  *  default listings, preserves slug + analytics history. */
@@ -23,7 +23,7 @@ export async function setJobArchived(userId: string, jobId: string, archived: bo
 
 /** Duplicate a job the caller posted. Title gets " (Copy)" appended; the
  *  clone lands as inactive so the owner reviews + republishes intentionally. */
-export async function cloneJob(userId: string, jobId: string): Promise<Awaited<ReturnType<typeof jobService.getJobById>>> {
+export async function cloneJob(userId: string, jobId: string): Promise<Awaited<ReturnType<typeof getJobById>>> {
   const jobs = buildRepos(getDb()).jobs;
   const original = await jobs.findJobById(jobId);
   if (!original || original.postedByUserId !== userId) {
@@ -49,5 +49,5 @@ export async function cloneJob(userId: string, jobId: string): Promise<Awaited<R
     title: `${original.title} (Copy)`,
     isActive: false,
   });
-  return jobService.getJobById(clone.id);
+  return getJobById(clone.id);
 }

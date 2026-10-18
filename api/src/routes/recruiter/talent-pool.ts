@@ -47,13 +47,13 @@ talentPoolRoutes.post("/talent-pool", async (c) => {
 
 // GET /talent-pool — list, with `?fields=` projection (gap #1370 / #1446)
 talentPoolRoutes.get("/talent-pool", async (c) => {
-  const items = await listTalentPool(c.get("user").sub, c.req.query("fields"));
+  const items = await listTalentPool(c.var.userId, c.req.query("fields"));
   return c.json(success(items));
 });
 
 // GET /talent-pool/export — download pool as CSV (must be before /:id)
 talentPoolRoutes.get("/talent-pool/export", async (c) => {
-  const { csv, filename } = await exportTalentPoolCsv(c.get("user").sub);
+  const { csv, filename } = await exportTalentPoolCsv(c.var.userId);
   return new Response(csv, {
     status: 200,
     headers: {
@@ -65,12 +65,12 @@ talentPoolRoutes.get("/talent-pool/export", async (c) => {
 
 // GET /talent-pool/check/:candidateUserId — is candidate in pool (static before /:id)
 talentPoolRoutes.get("/talent-pool/check/:candidateUserId", async (c) => {
-  return c.json(success(await isInTalentPool(c.get("user").sub, c.req.param("candidateUserId"))));
+  return c.json(success(await isInTalentPool(c.var.userId, c.req.param("candidateUserId"))));
 });
 
 // GET /talent-pool/:id — get single entry
 talentPoolRoutes.get("/talent-pool/:id", async (c) => {
-  const entry = await getTalentPoolEntry(c.get("user").sub, c.req.param("id"));
+  const entry = await getTalentPoolEntry(c.var.userId, c.req.param("id"));
   if (!entry) return c.json(entryNotFound, 404);
   return c.json(success(entry));
 });
@@ -87,7 +87,7 @@ talentPoolRoutes.put("/talent-pool/:id", async (c) => {
 
 // DELETE /talent-pool/:id — remove from pool
 talentPoolRoutes.delete("/talent-pool/:id", async (c) => {
-  await removeTalentPoolEntry(c.get("user").sub, c.req.param("id"));
+  await removeTalentPoolEntry(c.var.userId, c.req.param("id"));
   return c.json(success({ success: true }));
 });
 
@@ -102,7 +102,7 @@ talentPoolRoutes.post("/interactions", async (c) => {
 
 // GET /interactions/:talentPoolId — interactions for a talent pool entry
 talentPoolRoutes.get("/interactions/:talentPoolId", async (c) => {
-  return c.json(success(await listInteractions(c.get("user").sub, c.req.param("talentPoolId"))));
+  return c.json(success(await listInteractions(c.var.userId, c.req.param("talentPoolId"))));
 });
 
 // ─── Bulk Operations ──────────────────────────────────────────────────────────

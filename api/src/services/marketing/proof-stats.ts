@@ -9,13 +9,19 @@
  */
 
 import { getOrSetCached } from "../../utils/edge-cache.js";
-import type { IMarketingProofRepository } from "../../repositories/marketingProofRepository.js";
+import { getDb } from "../../db/index.js";
+import {
+  MarketingProofRepository,
+  type IMarketingProofRepository,
+} from "../../repositories/marketingProofRepository.js";
 import type { MarketingProofStats } from "../../../../shared/marketing-proof.js";
 
 const PROOF_CACHE_KEY = "marketing:proof:v1";
 const PROOF_TTL_SECONDS = 3600;
 
-export function getMarketingProofStats(repo: IMarketingProofRepository): Promise<MarketingProofStats> {
+export function getMarketingProofStats(
+  repo: IMarketingProofRepository = new MarketingProofRepository(getDb()),
+): Promise<MarketingProofStats> {
   return getOrSetCached<MarketingProofStats>({
     key: PROOF_CACHE_KEY,
     ttlSeconds: PROOF_TTL_SECONDS,

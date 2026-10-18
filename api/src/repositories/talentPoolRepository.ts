@@ -8,7 +8,7 @@
  * untyped JSON (numeric columns arrive as numbers); drizzle serialises
  * them as before.
  */
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 
 const { talentPoolCandidates, candidateInteractions, users } = schema;
@@ -40,6 +40,15 @@ export async function listTalentPoolForRecruiter(recruiterId: string): Promise<T
     .from(talentPoolCandidates)
     .where(eq(talentPoolCandidates.recruiterId, recruiterId))
     .orderBy(desc(talentPoolCandidates.addedAt));
+}
+
+/** Number of entries in the recruiter's talent pool (dashboard tile). */
+export async function countTalentPoolForRecruiter(recruiterId: string): Promise<number> {
+  const [row] = await getDb()
+    .select({ n: count() })
+    .from(talentPoolCandidates)
+    .where(eq(talentPoolCandidates.recruiterId, recruiterId));
+  return Number(row?.n ?? 0);
 }
 
 export async function isCandidateInPool(recruiterId: string, candidateUserId: string): Promise<boolean> {
@@ -108,6 +117,30 @@ export async function listActiveEntryIds(recruiterId: string): Promise<Array<{ i
 }
 
 // ── Bulk operations ─────────────────────────────────────────────────────────
+
+/** The recruiter's entries whose email is in `emails` (one batched query —
+ *  the email-dedup lookup for ATS imports). */
+export async function findEntriesByEmails(
+  recruiterId: string,
+  emails: string[],
+): Promise<Array<{ id: string; email: string | null }>> {
+  if (emails.length === 0) return [];
+  return getDb()
+    .select({ id: talentPoolCandidates.id, email: talentPoolCandidates.candidateEmail })
+    .from(talentPoolCandidates)
+    .where(and(eq(talentPoolCandidates.recruiterId, recruiterId), inArray(talentPoolCandidates.candidateEmail, emails)));
+}
+
+/** Multi-row insert in one statement; returns each new entry's id + email. */
+export async function insertTalentPoolEntries(
+  values: TalentPoolInsert[],
+): Promise<Array<{ id: string; email: string | null }>> {
+  if (values.length === 0) return [];
+  return getDb()
+    .insert(talentPoolCandidates)
+    .values(values)
+    .returning({ id: talentPoolCandidates.id, email: talentPoolCandidates.candidateEmail });
+}
 
 export async function findOwnedEntryTags(
   recruiterId: string,

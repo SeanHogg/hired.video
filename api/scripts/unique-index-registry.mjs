@@ -27,6 +27,17 @@
  *   uq_email_marketing_prefs_token  — duplicates the schema's `.unique()` on token
  *   uq_live_screening_invites_token — duplicates uniq_live_screening_invites_token
  *   uq_users_provider_customer_id   — column no longer exists in the schema
+ *   uq_resume_versions_resume_version — table archived by 0641 (W3-E); its
+ *                                     successor uq_entity_versions_subject_version
+ *                                     was created on an empty table (0640)
+ *   uq_oauth_accounts_provider_account,
+ *   uniq_tenant_integrations_{company,personal}_provider_slug
+ *                                   — tables archived by 0601 (W3-C); their rows
+ *                                     moved to provider_connections (0600), whose
+ *                                     uq_provider_connections_login /
+ *                                     uq_provider_connections_identity were
+ *                                     created on an empty table with the copy
+ *                                     de-duplicated
  */
 
 /** `col` → `left(col, maxLen-9) || '-' || <8 hex chars of id>`: unique per row. */
@@ -150,18 +161,6 @@ export const LEGACY_UNIQUE_INDEXES = Object.freeze([
     resolve: "UPDATE live_screening_invites SET candidate_id = NULL, updated_at = now() WHERE id IN ({losers})",
   },
   {
-    // One provider identity → one link. Login resolves by this key, so a
-    // duplicate is a dead row; keep the first link (the account that has
-    // been signing in with it).
-    name: "uq_oauth_accounts_provider_account",
-    table: "oauth_accounts",
-    columns: "provider, provider_account_id",
-    where: null,
-    keyNotNull: ["provider", "provider_account_id"],
-    keep: "created_at ASC",
-    resolve: "DELETE FROM oauth_accounts WHERE id IN ({losers})",
-  },
-  {
     name: "uq_partner_program_opt_ins_active_per_user",
     table: "partner_program_opt_ins",
     columns: "user_id",
@@ -188,15 +187,6 @@ export const LEGACY_UNIQUE_INDEXES = Object.freeze([
     keyNotNull: ["email"],
     keep: "created_at ASC",
     resolve: "UPDATE region_waitlist SET status = 'duplicate' WHERE id IN ({losers})",
-  },
-  {
-    name: "uq_resume_versions_resume_version",
-    table: "resume_versions",
-    columns: "resume_id, version_number",
-    where: null,
-    keyNotNull: ["resume_id", "version_number"],
-    keep: "created_at ASC",
-    resolve: renumber("resume_versions", "version_number", ["resume_id"]),
   },
   {
     name: "uq_scheduled_events_slug",
@@ -233,26 +223,6 @@ export const LEGACY_UNIQUE_INDEXES = Object.freeze([
     keyNotNull: ["gig_milestone_id"],
     keep: "created_at ASC",
     resolve: "UPDATE tasks SET gig_milestone_id = NULL, updated_at = now() WHERE id IN ({losers})",
-  },
-  {
-    // Credentials rows: keep the most recently updated connection active;
-    // older duplicates are deactivated and renamed, never deleted.
-    name: "uniq_tenant_integrations_company_provider_slug",
-    table: "tenant_integrations",
-    columns: "user_id, company_id, provider, slug",
-    where: "company_id IS NOT NULL",
-    keyNotNull: ["user_id", "company_id", "provider", "slug"],
-    keep: "updated_at DESC NULLS LAST",
-    resolve: `UPDATE tenant_integrations SET ${suffixWithId("slug", 64)}, is_active = false, updated_at = now() WHERE id IN ({losers})`,
-  },
-  {
-    name: "uniq_tenant_integrations_personal_provider_slug",
-    table: "tenant_integrations",
-    columns: "user_id, provider, slug",
-    where: "company_id IS NULL",
-    keyNotNull: ["user_id", "provider", "slug"],
-    keep: "updated_at DESC NULLS LAST",
-    resolve: `UPDATE tenant_integrations SET ${suffixWithId("slug", 64)}, is_active = false, updated_at = now() WHERE id IN ({losers})`,
   },
   {
     // An inbound mail-forwarding address: a renamed slug would silently route

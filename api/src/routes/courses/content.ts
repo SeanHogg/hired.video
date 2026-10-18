@@ -23,7 +23,8 @@ import {
   UpdateLessonSchema,
   UpdateModuleSchema,
 } from "./schemas.js";
-import { courseActor, readBody, respond, unauthorized, validationError } from "./shared.js";
+import { courseActor, invalidBody, respond, unauthorized } from "./shared.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const courseContentRoutes = new Hono<AppEnv>();
 
@@ -31,20 +32,18 @@ export const courseContentRoutes = new Hono<AppEnv>();
 // Modules
 // ---------------------------------------------------------------------------
 
-courseContentRoutes.post("/:id/modules", async (c) => {
+courseContentRoutes.post("/:id/modules", validateJson(CreateModuleSchema, invalidBody), async (c) => {
   const actor = courseActor(c);
   if (!actor) return unauthorized(c);
-  const parsed = CreateModuleSchema.safeParse(await readBody(c));
-  if (!parsed.success) return validationError(c, parsed.error);
-  return respond(c, () => addModule(actor, c.req.param("id"), parsed.data), 201);
+  const body = c.req.valid("json");
+  return respond(c, () => addModule(actor, c.req.param("id"), body), 201);
 });
 
-courseContentRoutes.patch("/modules/:moduleId", async (c) => {
+courseContentRoutes.patch("/modules/:moduleId", validateJson(UpdateModuleSchema, invalidBody), async (c) => {
   const actor = courseActor(c);
   if (!actor) return unauthorized(c);
-  const parsed = UpdateModuleSchema.safeParse(await readBody(c));
-  if (!parsed.success) return validationError(c, parsed.error);
-  return respond(c, () => updateModule(actor, c.req.param("moduleId"), parsed.data));
+  const body = c.req.valid("json");
+  return respond(c, () => updateModule(actor, c.req.param("moduleId"), body));
 });
 
 courseContentRoutes.delete("/modules/:moduleId", (c) => {
@@ -61,20 +60,18 @@ courseContentRoutes.delete("/modules/:moduleId", (c) => {
 // Lessons
 // ---------------------------------------------------------------------------
 
-courseContentRoutes.post("/:id/lessons", async (c) => {
+courseContentRoutes.post("/:id/lessons", validateJson(CreateLessonSchema, invalidBody), async (c) => {
   const actor = courseActor(c);
   if (!actor) return unauthorized(c);
-  const parsed = CreateLessonSchema.safeParse(await readBody(c));
-  if (!parsed.success) return validationError(c, parsed.error);
-  return respond(c, () => addLesson(actor, c.req.param("id"), parsed.data), 201);
+  const body = c.req.valid("json");
+  return respond(c, () => addLesson(actor, c.req.param("id"), body), 201);
 });
 
-courseContentRoutes.patch("/lessons/:lessonId", async (c) => {
+courseContentRoutes.patch("/lessons/:lessonId", validateJson(UpdateLessonSchema, invalidBody), async (c) => {
   const actor = courseActor(c);
   if (!actor) return unauthorized(c);
-  const parsed = UpdateLessonSchema.safeParse(await readBody(c));
-  if (!parsed.success) return validationError(c, parsed.error);
-  return respond(c, () => updateLesson(actor, c.req.param("lessonId"), parsed.data));
+  const body = c.req.valid("json");
+  return respond(c, () => updateLesson(actor, c.req.param("lessonId"), body));
 });
 
 courseContentRoutes.delete("/lessons/:lessonId", (c) => {

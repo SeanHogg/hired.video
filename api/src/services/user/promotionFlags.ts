@@ -17,7 +17,7 @@
  * contract to maintain.
  */
 
-import { inArray } from "drizzle-orm";
+import { and, inArray, isNotNull } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { logger } from "../../lib/logger.js";
 
@@ -37,11 +37,11 @@ export async function loadPromoteWithoutAuth(
   try {
     const rows = await (db ?? getDb())
       .select({
-        userId: schema.privacyPreferences.userId,
-        promoteWithoutAuth: schema.privacyPreferences.promoteWithoutAuth,
+        userId: schema.userSettings.userId,
+        promoteWithoutAuth: schema.userSettings.promoteWithoutAuth,
       })
-      .from(schema.privacyPreferences)
-      .where(inArray(schema.privacyPreferences.userId, ids));
+      .from(schema.userSettings)
+      .where(and(inArray(schema.userSettings.userId, ids), isNotNull(schema.userSettings.privacySavedAt)));
     for (const row of rows) result.set(row.userId, row.promoteWithoutAuth === true);
   } catch (err) {
     logger.warn("[promotionFlags] lookup failed; defaulting to gated", err);

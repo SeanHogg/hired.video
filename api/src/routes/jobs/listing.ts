@@ -18,6 +18,7 @@ import * as jobService from "../../services/job/JobService.js";
 import { publicJobsFromQuery } from "../../services/jobs/publicJobsQuery.js";
 import { JOB_LIST_FIELDS, parseFields, projectRows } from "../../../../shared/projection.js";
 import { jobViewerOf } from "./http.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 
 export const jobListingRoutes = new Hono<AppEnv>();
 
@@ -32,8 +33,7 @@ async function publicListing(c: AppContext): Promise<Response> {
 
 /** The caller's posted jobs — `/getsummaryitems` and its `/user-jobs` alias. */
 async function userJobs(c: AppContext): Promise<Response> {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const items = await jobService.getUserJobs(userId);
   return c.json(success(items));
 }
@@ -43,8 +43,7 @@ jobListingRoutes.get("/getsummaryitems", userJobs);
 jobListingRoutes.get("/user-jobs", userJobs);
 
 jobListingRoutes.get("/saved", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const items = await jobService.getSavedJobs(userId);
   return c.json(success(items));
 });
@@ -58,8 +57,7 @@ jobListingRoutes.get("/slug/:slug", async (c) => {
 });
 
 jobListingRoutes.get("/applications", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const apps = await jobService.getApplications(userId);
   return c.json(success(apps));
 });

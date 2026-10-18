@@ -19,8 +19,7 @@
  *
  * Comic is the canary: TRUE for authoring (pages = scenes via
  * CanvasState), FALSE for export (PNG strip / PDF / CBZ pipeline, not
- * ffmpeg.wasm). The deprecated `mediaKindUsesTimelineRuntime` is kept
- * as an alias to `mediaKindUsesTimelineExport`.
+ * ffmpeg.wasm).
  *
  * Run: vitest run lib/studio/__tests__/media-kinds-predicates.test.ts
  */
@@ -30,7 +29,6 @@ import {
   MEDIA_KINDS,
   mediaKindUsesTimelineExport,
   mediaKindUsesCanvasStateAuthoring,
-  mediaKindUsesTimelineRuntime,
 } from "@shared/media-kinds";
 
 describe("mediaKindUsesTimelineExport", () => {
@@ -89,18 +87,6 @@ describe("mediaKindUsesCanvasStateAuthoring", () => {
   it("covers every MediaKind without throwing — exhaustiveness regression guard", () => {
     for (const k of MEDIA_KINDS) {
       expect(typeof mediaKindUsesCanvasStateAuthoring(k)).toBe("boolean");
-    }
-  });
-});
-
-describe("mediaKindUsesTimelineRuntime — deprecated alias", () => {
-  // Kept as a thin alias to `mediaKindUsesTimelineExport` so existing
-  // call sites keep working while we migrate them off. Pinned to that
-  // semantic — adding new behavior to the deprecated function instead
-  // of migrating would defeat the split.
-  it("returns the same value as mediaKindUsesTimelineExport for every kind", () => {
-    for (const k of MEDIA_KINDS) {
-      expect(mediaKindUsesTimelineRuntime(k)).toBe(mediaKindUsesTimelineExport(k));
     }
   });
 });

@@ -3,14 +3,14 @@
  * routes/studio-features.ts barrel (split out of that file; paths unchanged).
  */
 import { Hono } from "hono";
-import { and, eq, desc } from "drizzle-orm";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import type { AppEnv } from "../../types/index.js";
-import { getDb } from "../../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../../services/adapters/llm-client.js";
 import { analyzeDelivery, generateSuggestions } from "../../services/adapters/transcription.js";
-import { ok, fail, studioDeliveryCoaching } from "./shared.js";
+import { getLatestDeliveryCoaching, saveDeliveryCoaching } from "../../services/studio/recordings.js";
+import { success, error } from "../../types/index.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const coachingRoutes = new Hono<AppEnv>();
 
@@ -19,10 +19,7 @@ export const coachingRoutes = new Hono<AppEnv>();
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // POST /api/studio/coaching/analyze — analyze a recording for delivery quality
-coachingRoutes.post("/coaching/analyze", async (c) => {
-  const user = c.var.user;
-  const body = await c.req.json().catch(() => null);
-  const parsed = z.object({
+coachingRoutes.post("/coaching/analyze", validateJson(z.object({
     recordingId: UuidLikeSchema,
     projectId: UuidLikeSchema.optional(),
     words: z.array(z.object({
@@ -34,24 +31,25 @@ coachingRoutes.post("/coaching/analyze", async (c) => {
     // Optional: AI analysis of message clarity
     scriptText: z.string().optional(),
     transcribedText: z.string().optional(),
-  }).safeParse(body);
+  }), () => error("VALIDATION_ERROR", "Invalid request"), { emptyBody: null }), async (c) => {
+  const user = c.var.user;
+  const body = c.req.valid("json");
 
-  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request"), 400);
 
-  const metrics = analyzeDelivery(parsed.data.words, parsed.data.totalDurationSec);
+  const metrics = analyzeDelivery(body.words, body.totalDurationSec);
   const suggestions = generateSuggestions(metrics);
 
   // AI clarity analysis if both script and transcription are provided
   let clarityScore = 70; // default
-  if (hasAnyLLMProviderKey(c.env) && parsed.data.scriptText && parsed.data.transcribedText) {
+  if (hasAnyLLMProviderKey(c.env) && body.scriptText && body.transcribedText) {
     try {
       const clarityPrompt = `Compare the intended script with the actual transcription. Score how well the speaker communicated the intended message on a scale of 0-100.
 
 Intended script:
-${parsed.data.scriptText.slice(0, 2000)}
+${body.scriptText.slice(0, 2000)}
 
 Actual transcription:
-${parsed.data.transcribedText.slice(0, 2000)}
+${body.transcribedText.slice(0, 2000)}
 
 Return ONLY a JSON object: {"score": <number>, "feedback": "<one sentence>"}`;
 
@@ -79,11 +77,10 @@ Return ONLY a JSON object: {"score": <number>, "feedback": "<one sentence>"}`;
     clarityScore * 0.25,
   );
 
-  const db = getDb();
-  const [coaching] = await db.insert(studioDeliveryCoaching).values({
+  const coaching = await saveDeliveryCoaching({
     userId: user.sub,
-    recordingId: parsed.data.recordingId,
-    projectId: parsed.data.projectId ?? null,
+    recordingId: body.recordingId,
+    projectId: body.projectId ?? null,
     overallScore,
     pacingWpm: metrics.wpm,
     pacingScore: metrics.pacingScore,
@@ -94,9 +91,9 @@ Return ONLY a JSON object: {"score": <number>, "feedback": "<one sentence>"}`;
     energyScore: metrics.energyScore,
     clarityScore,
     suggestions,
-  } as any).returning();
+  });
 
-  return c.json(ok({
+  return c.json(success({
     id: coaching.id,
     overallScore,
     pacingWpm: metrics.wpm,
@@ -113,13 +110,5 @@ Return ONLY a JSON object: {"score": <number>, "feedback": "<one sentence>"}`;
 coachingRoutes.get("/coaching/:recordingId", async (c) => {
   const user = c.var.user;
   const recordingId = c.req.param("recordingId");
-  const db = getDb();
-
-  const results = await db.select().from(studioDeliveryCoaching)
-    .where(and(eq(studioDeliveryCoaching.recordingId, recordingId), eq(studioDeliveryCoaching.userId, user.sub)))
-    .orderBy(desc(studioDeliveryCoaching.createdAt))
-    .limit(1);
-
-  if (!results.length) return c.json(ok(null));
-  return c.json(ok(results[0]));
+  return c.json(success(await getLatestDeliveryCoaching(user.sub, recordingId)));
 });

@@ -40,6 +40,7 @@ import {
 } from "@/lib/services/tts-engines";
 import { studioService } from "@/lib/services/studio-service";
 import { toast } from "sonner";
+import { formatDuration } from "@/lib/format";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -110,14 +111,6 @@ async function speakWithToast(
       opts.onError?.(msg);
     },
   });
-}
-
-/** Format milliseconds as mm:ss. */
-function formatDuration(ms: number): string {
-  const totalSec = Math.round(ms / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -377,7 +370,7 @@ export default function VoiceoverPanel({
           {results.size > 0 && (
             <Badge variant="secondary" className="text-xs">
               {results.size}/{scenes.length} scenes &middot;{" "}
-              {formatDuration(totalDurationMs)}
+              {formatDuration(totalDurationMs, { unit: "ms", style: "clock" })}
             </Badge>
           )}
         </div>
@@ -581,7 +574,7 @@ export default function VoiceoverPanel({
                   <div className="flex items-center gap-1 shrink-0">
                     {result && (
                       <span className="text-xs text-muted-foreground tabular-nums mr-1">
-                        {formatDuration(result.durationMs)}
+                        {formatDuration(result.durationMs, { unit: "ms", style: "clock" })}
                       </span>
                     )}
 

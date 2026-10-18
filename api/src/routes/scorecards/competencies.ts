@@ -14,8 +14,9 @@ import {
   UpdateCompetencySchema,
   CompetencyLevelInputSchema,
 } from "../../domains/scorecards/schemas.js";
-import { mapServiceError, requireUser } from "../helpers/routerHelpers.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 import type { ScorecardsService } from "../../domains/scorecards/scorecardsService.js";
+import { validateJson } from "../helpers/validate.js";
 
 // PATCH accepts optional replace-all `levels[]` alongside the meta patch.
 const UpdateCompetencyWithLevelsSchema = UpdateCompetencySchema.extend({
@@ -28,61 +29,33 @@ export function competencyRoutes(
   const r = new Hono<AppEnv>();
 
   r.get("/", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
+    const userId = requireUser(c);
     const onlyCompanyId = c.req.query("companyId") || undefined;
-    try {
-      return c.json(success(await service().listCompetencies(auth.userId, onlyCompanyId)));
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    return c.json(success(await service().listCompetencies(userId, onlyCompanyId)));
   });
 
   r.get("/:id", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    try {
-      return c.json(success(await service().getCompetency(auth.userId, c.req.param("id"))));
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    const userId = requireUser(c);
+    return c.json(success(await service().getCompetency(userId, c.req.param("id"))));
   });
 
-  r.post("/", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = CreateCompetencySchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(
-        success(await service().createCompetency(auth.userId, parsed.data)),
-        201,
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
-  });
-
-  r.patch("/:id", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = UpdateCompetencyWithLevelsSchema.safeParse(
-      await c.req.json().catch(() => null),
+  r.post("/", validateJson(CreateCompetencySchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(
+      success(await service().createCompetency(userId, body)),
+      201,
     );
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(
-        success(
-          await service().updateCompetency(auth.userId, c.req.param("id"), parsed.data),
-        ),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+  });
+
+  r.patch("/:id", validateJson(UpdateCompetencyWithLevelsSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(
+      success(
+        await service().updateCompetency(userId, c.req.param("id"), body),
+      ),
+    );
   });
 
   return r;

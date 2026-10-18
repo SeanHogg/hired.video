@@ -15,6 +15,7 @@ import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { AdminArticleReviewService } from "../services/admin/AdminArticleReviewService.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const adminArticleRoutes = new Hono<AppEnv>();
 
@@ -47,21 +48,18 @@ adminArticleRoutes.get("/queue", async (c) => {
   return c.json(success(await AdminArticleReviewService.create().queue(status, kind, limit)), 200);
 });
 
-adminArticleRoutes.post("/scan", async (c) => {
-  const parsed = IdsSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(invalid(parsed.error.issues, "Invalid body"), 400);
-  return c.json(success(await AdminArticleReviewService.create().scan(parsed.data.ids, c.var.user)), 200);
+adminArticleRoutes.post("/scan", validateJson(IdsSchema, (e) => invalid(e.issues, "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
+  return c.json(success(await AdminArticleReviewService.create().scan(body.ids, c.var.user)), 200);
 });
 
-adminArticleRoutes.post("/approve", async (c) => {
-  const parsed = IdsSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(invalid(parsed.error.issues, "Invalid body"), 400);
-  return c.json(success(await AdminArticleReviewService.create().approve(parsed.data.ids, c.var.user.sub)), 200);
+adminArticleRoutes.post("/approve", validateJson(IdsSchema, (e) => invalid(e.issues, "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
+  return c.json(success(await AdminArticleReviewService.create().approve(body.ids, c.var.userId)), 200);
 });
 
-adminArticleRoutes.post("/reject", async (c) => {
-  const parsed = RejectSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(invalid(parsed.error.issues, "Invalid body"), 400);
-  const { ids, reason } = parsed.data;
-  return c.json(success(await AdminArticleReviewService.create().reject(ids, c.var.user.sub, reason)), 200);
+adminArticleRoutes.post("/reject", validateJson(RejectSchema, (e) => invalid(e.issues, "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
+  const { ids, reason } = body;
+  return c.json(success(await AdminArticleReviewService.create().reject(ids, c.var.userId, reason)), 200);
 });

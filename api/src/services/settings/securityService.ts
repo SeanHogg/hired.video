@@ -10,15 +10,15 @@ import {
   findDoNotShare,
   findUserSecurityFlags,
   listActiveSessions,
-  listLinkedAccounts,
   revokeSession,
   setDoNotShare,
 } from "../../repositories/userSettingsRepository.js";
+import { LoginIdentities } from "../provider-connections/login-identities.js";
 import { randomHex } from "../../utils/crypto.js";
 
 export async function getSecurityOverview(userId: string) {
   const user = await findUserSecurityFlags(userId);
-  const linkedAccounts = await listLinkedAccounts(userId);
+  const linkedAccounts = await new LoginIdentities().listForUser(userId);
   return {
     twoFactorEnabled: user?.mfaEnabled ?? false,
     hasPassword: !!(user?.passwordHash),

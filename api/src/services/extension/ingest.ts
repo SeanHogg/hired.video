@@ -11,8 +11,7 @@
  */
 
 import { eq, sql } from "drizzle-orm";
-import type { getDb } from "../../db/index.js";
-import { schema } from "../../db/index.js";
+import { getDb, schema } from "../../db/index.js";
 
 export const EVENT_KINDS = [
   "page_view",
@@ -53,6 +52,11 @@ export interface IngestMeta {
 
 export interface IngestDeps {
   db: ReturnType<typeof getDb>;
+}
+
+/** Production deps — the live request DB. Tests pass a fake `{ db }`. */
+export function liveIngestDeps(): IngestDeps {
+  return { db: getDb() };
 }
 
 export interface IngestResult {

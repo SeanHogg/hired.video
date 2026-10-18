@@ -33,8 +33,8 @@ export interface RecipientStatCounts {
   pending: number;
 }
 
-export interface ICampaignRepository {
-  // Campaigns
+/** Email campaigns (CRUD + scheduler claims). */
+export interface IEmailCampaignRepository {
   listCampaigns(): Promise<CampaignRow[]>;
   /** Campaigns created by one user — the user-facing Outreach surface (#1970).
    *  Same shape + ordering as `listCampaigns`, scoped to `createdByUserId`. */
@@ -46,8 +46,10 @@ export interface ICampaignRepository {
    *  claimed rows (so two overlapping cron ticks can't double-claim). */
   promoteDueScheduled(now: Date): Promise<CampaignRow[]>;
   listSending(limit: number): Promise<CampaignRow[]>;
+}
 
-  // Recipients
+/** Campaign recipients + delivery stats. */
+export interface ICampaignRecipientRepository {
   insertRecipients(rows: RecipientInsert[]): Promise<number>;
   listPendingRecipients(campaignId: string, limit: number): Promise<RecipientRow[]>;
   markRecipient(id: string, patch: Partial<RecipientInsert>): Promise<void>;
@@ -58,14 +60,21 @@ export interface ICampaignRepository {
   statsByCampaign(): Promise<Map<string, RecipientStatCounts>>;
   countPending(campaignId: string): Promise<number>;
   findRecipient(id: string): Promise<RecipientRow | null>;
+}
 
-  // Templates
+/** Email templates. */
+export interface IEmailTemplateRepository {
   listTemplates(): Promise<TemplateRow[]>;
   findTemplate(id: string): Promise<TemplateRow | null>;
   createTemplate(values: TemplateInsert): Promise<TemplateRow>;
   updateTemplate(id: string, patch: Partial<TemplateInsert>): Promise<TemplateRow | null>;
   deleteTemplate(id: string): Promise<boolean>;
 }
+
+export interface ICampaignRepository
+  extends IEmailCampaignRepository,
+    ICampaignRecipientRepository,
+    IEmailTemplateRepository {}
 
 export class CampaignRepository implements ICampaignRepository {
   constructor(

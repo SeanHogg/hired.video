@@ -15,6 +15,7 @@ import type { AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
 import { requireJobOwner } from "../../services/jobs/jobOwnership.js";
 import * as shareService from "../../services/pipeline/PipelineShareService.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const pipelineShareRoutes = new Hono<AppEnv>();
 
@@ -33,19 +34,16 @@ pipelineShareRoutes.get("/", async (c) => {
   return c.json(success({ links: await shareService.listShareLinks(jobId) }), 200);
 });
 
-pipelineShareRoutes.post("/", async (c) => {
-  const parsed = CreateShareSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid share link", parsed.error.flatten()), 400);
-  }
-  const { denied } = await requireJobOwner(c, parsed.data.jobId);
+pipelineShareRoutes.post("/", validateJson(CreateShareSchema, (e) => error("VALIDATION_ERROR", "Invalid share link", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  const { denied } = await requireJobOwner(c, body.jobId);
   if (denied) return denied;
 
   const link = await shareService.createShareLink({
-    jobId: parsed.data.jobId,
-    label: parsed.data.label ? parsed.data.label.slice(0, 200) : null,
-    expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
-    createdByUserId: c.var.user?.sub as string,
+    jobId: body.jobId,
+    label: body.label ? body.label.slice(0, 200) : null,
+    expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+    createdByUserId: c.var.userId,
   });
   return c.json(success(link), 201);
 });

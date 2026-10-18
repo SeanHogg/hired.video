@@ -26,7 +26,7 @@ matchRoutes.post("/match/score-jobs", async (c) => {
 
 // GET /match/scores — cached match scores (?jobId= / ?candidateId=)
 matchRoutes.get("/match/scores", async (c) => {
-  const scores = await getMatchScores(c.get("user").sub, {
+  const scores = await getMatchScores(c.var.userId, {
     jobId: c.req.query("jobId"),
     candidateId: c.req.query("candidateId"),
   });

@@ -21,6 +21,7 @@ import { CohortService } from "./cohort-service.js";
 import { invalidateCohortAnalyticsCache } from "./cohort-analytics.js";
 import { invalidateLearnerDashboard } from "./learner-dashboard.js";
 import { NotificationService } from "../notifications/notificationService.js";
+import { DomainError } from "../../domains/errors.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -35,10 +36,10 @@ const {
   learningPathCourses,
 } = schema;
 
-export class AssignmentSubjectNotFoundError extends Error {
-  readonly code = "ASSIGNMENT_SUBJECT_NOT_FOUND" as const;
+/** Renders as 400 VALIDATION_ERROR (the assignment input is invalid). */
+export class AssignmentSubjectNotFoundError extends DomainError {
   constructor(message = "The assigned course or path does not exist.") {
-    super(message);
+    super(400, "VALIDATION_ERROR", message);
     this.name = "AssignmentSubjectNotFoundError";
   }
 }

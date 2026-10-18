@@ -16,8 +16,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
-import { getDb } from "../db/index.js";
-import { buildRepos } from "../repositories/index.js";
+import { liveRepos } from "../repositories/live.js";
 import { RoleAccessService } from "../services/admin/RoleAccessService.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
 import { resolveAccessRole, isManageableRole } from "../../../shared/role-access.js";
@@ -35,7 +34,7 @@ roleAccessRoutes.get("/me", async (c) => {
       ? requested
       : viewerRole;
 
-  const service = new RoleAccessService(buildRepos(getDb()).roleFeatureAccess);
+  const service = new RoleAccessService(liveRepos().roleFeatureAccess);
   const overrides = await service.getOverridesForRole(role);
   return c.json(success({ role, overrides }), 200);
 });

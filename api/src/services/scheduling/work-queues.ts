@@ -59,7 +59,7 @@ interface TickQueue {
 // ---------------------------------------------------------------------------
 
 async function processCampaigns(): Promise<number> {
-  const result = await CampaignService.create(getDb()).processDue(new Date());
+  const result = await CampaignService.live().processDue(new Date());
   if (result.promoted > 0 || result.processed > 0) {
     logger.info("[scheduled] campaigns", result);
   }

@@ -31,7 +31,7 @@ const notFound = () => responseEnvelope(null);
 
 // GET /placements/summary/commission — must be before /:id
 placementRoutes.get("/placements/summary/commission", async (c) => {
-  return c.json(responseEnvelope(await getCommissionSummary(c.get("user").sub)));
+  return c.json(responseEnvelope(await getCommissionSummary(c.var.userId)));
 });
 
 // POST /placements — record a placement
@@ -68,19 +68,19 @@ placementRoutes.post("/placements/bulk", async (c) => {
 
 // GET /placements — list all placements for current recruiter
 placementRoutes.get("/placements", async (c) => {
-  return c.json(responseEnvelope(await listPlacements(c.get("user").sub)));
+  return c.json(responseEnvelope(await listPlacements(c.var.userId)));
 });
 
 // GET /placements/:id — single placement
 placementRoutes.get("/placements/:id", async (c) => {
-  const row = await getPlacement(c.get("user").sub, c.req.param("id"));
+  const row = await getPlacement(c.var.userId, c.req.param("id"));
   if (!row) return c.json(notFound(), 404);
   return c.json(responseEnvelope(row));
 });
 
 // GET /placements/:id/splits — the split rows (owner only)
 placementRoutes.get("/placements/:id/splits", async (c) => {
-  const rows = await getPlacementSplits(c.get("user").sub, c.req.param("id"));
+  const rows = await getPlacementSplits(c.var.userId, c.req.param("id"));
   if (!rows) return c.json(notFound(), 404);
   return c.json(responseEnvelope(rows));
 });

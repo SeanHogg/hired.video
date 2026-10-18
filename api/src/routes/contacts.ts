@@ -18,22 +18,32 @@
  * Not cached: every response is the caller's private, frequently-written
  * CRM data (each write would invalidate it), and lists are bounded by limit.
  */
-import { Hono, type Context } from "hono";
+import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb } from "../db/index.js";
-import { buildRepos } from "../repositories/index.js";
-import { upsertContact, updateContact } from "../services/contacts/upsert.js";
-import { decideMerge, resolveMergePolicy } from "../services/contacts/merge.js";
-import { canManageJob, linkContactToJob, listContactJobs, unlinkContactFromJob } from "../services/contacts/pipeline.js";
-import { enrichContact } from "../services/contacts/enrich.js";
+import {
+  createContact,
+  decideMergeRequest,
+  deleteContact,
+  editContact,
+  enrichOwnedContact,
+  getContact,
+  getMergePolicy,
+  linkJob,
+  listContacts,
+  listMergeQueue,
+  setMergePolicy,
+  unlinkJob,
+} from "../services/contacts/contactsService.js";
 import {
   CONTACT_JOB_STAGES,
   CONTACT_LIFECYCLES,
   MERGE_POLICY_MODES,
   MIN_DUPLICATE_CONFIDENCE_BPS,
 } from "../../../shared/contacts.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const contactRoutes = new Hono<AppEnv>();
 
@@ -71,137 +81,72 @@ const PolicySchema = z.object({
   autoThresholdBps: z.number().int().min(MIN_DUPLICATE_CONFIDENCE_BPS).max(10000),
 });
 
-function ownerId(c: Context<AppEnv>): string | null {
-  return c.var.user?.sub ?? null;
-}
-
-function repos() {
-  return buildRepos(getDb());
-}
-
-const unauthorized = (c: Context<AppEnv>) => c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-const notFound = (c: Context<AppEnv>) => c.json(error("NOT_FOUND", "Contact not found"), 404);
-
 contactRoutes.get("/", async (c) => {
-  const owner = ownerId(c);
-  if (!owner) return unauthorized(c);
+  const owner = requireUser(c);
   const parsed = ListSchema.safeParse(c.req.query());
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid query", parsed.error.flatten()), 400);
-  const rows = await repos().contacts.list(owner, parsed.data);
-  return c.json(success(rows), 200);
+  return c.json(success(await listContacts(owner, parsed.data)), 200);
 });
 
-contactRoutes.post("/", async (c) => {
-  const owner = ownerId(c);
-  if (!owner) return unauthorized(c);
-  const parsed = CreateSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid contact", parsed.error.flatten()), 400);
-  const result = await upsertContact(repos(), owner, { ...parsed.data, source: "manual" });
+contactRoutes.post("/", validateJson(CreateSchema, (e) => error("VALIDATION_ERROR", "Invalid contact", e.flatten()), { emptyBody: null }), async (c) => {
+  const owner = requireUser(c);
+  const result = await createContact(owner, c.req.valid("json"));
   return c.json(success(result), result.created ? 201 : 200);
 });
 
 contactRoutes.get("/merge-queue", async (c) => {
-  const owner = ownerId(c);
-  if (!owner) return unauthorized(c);
-  return c.json(success(await repos().personMerge.listPending(owner)), 200);
+  const owner = requireUser(c);
+  return c.json(success(await listMergeQueue(owner)), 200);
 });
 
 for (const [action, approve] of [["approve", true], ["reject", false]] as const) {
   contactRoutes.post(`/merge-queue/:id/${action}`, async (c) => {
-    const owner = ownerId(c);
-    if (!owner) return unauthorized(c);
-    const outcome = await decideMerge(repos(), owner, c.req.param("id"), approve);
-    if (outcome === "not_found") return c.json(error("NOT_FOUND", "Merge request not found"), 404);
-    if (outcome === "stale") return c.json(error("CONFLICT", "Merge request is no longer pending"), 409);
+    const owner = requireUser(c);
+    const outcome = await decideMergeRequest(owner, c.req.param("id"), approve);
     return c.json(success({ outcome }), 200);
   });
 }
 
 contactRoutes.get("/merge-policy", async (c) => {
-  const owner = ownerId(c);
-  if (!owner) return unauthorized(c);
-  const { mode, autoThresholdBps } = await resolveMergePolicy(repos(), owner);
-  return c.json(success({ mode, autoThresholdBps }), 200);
+  const owner = requireUser(c);
+  return c.json(success(await getMergePolicy(owner)), 200);
 });
 
-contactRoutes.put("/merge-policy", async (c) => {
-  const owner = ownerId(c);
-  if (!owner) return unauthorized(c);
-  const parsed = PolicySchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid policy", parsed.error.flatten()), 400);
-  const r = repos();
-  const workspaceId = await r.personMerge.ensurePersonalWorkspaceId(owner);
-  const row = await r.personMerge.upsertPolicy(workspaceId, parsed.data.mode, parsed.data.autoThresholdBps);
-  return c.json(success({ mode: row.mode, autoThresholdBps: row.autoThresholdBps }), 200);
+contactRoutes.put("/merge-policy", validateJson(PolicySchema, (e) => error("VALIDATION_ERROR", "Invalid policy", e.flatten()), { emptyBody: null }), async (c) => {
+  const owner = requireUser(c);
+  const body = c.req.valid("json");
+  return c.json(success(await setMergePolicy(owner, body.mode, body.autoThresholdBps)), 200);
 });
 
 contactRoutes.get("/:id", async (c) => {
-  const owner = ownerId(c);
-  if (!owner) return unauthorized(c);
-  const r = repos();
-  const contact = await r.contacts.findById(owner, c.req.param("id"));
-  if (!contact) return notFound(c);
-  const jobs = await listContactJobs(r, owner, contact.id);
-  return c.json(success({ ...contact, jobs: jobs ?? [] }), 200);
+  const owner = requireUser(c);
+  return c.json(success(await getContact(owner, c.req.param("id"))), 200);
 });
 
-contactRoutes.patch("/:id", async (c) => {
-  const owner = ownerId(c);
-  if (!owner) return unauthorized(c);
-  const parsed = FieldsSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid contact", parsed.error.flatten()), 400);
-  try {
-    const row = await updateContact(repos(), owner, c.req.param("id"), parsed.data);
-    return row ? c.json(success(row), 200) : notFound(c);
-  } catch (err) {
-    // Unique (owner, lower(email)) — another contact already has this email.
-    if (err instanceof Error && /uq_contacts_owner_email|duplicate key/i.test(err.message)) {
-      return c.json(error("CONFLICT", "Another contact already uses this email"), 409);
-    }
-    throw err;
-  }
+contactRoutes.patch("/:id", validateJson(FieldsSchema, (e) => error("VALIDATION_ERROR", "Invalid contact", e.flatten()), { emptyBody: null }), async (c) => {
+  const owner = requireUser(c);
+  return c.json(success(await editContact(owner, c.req.param("id"), c.req.valid("json"))), 200);
 });
 
 contactRoutes.delete("/:id", async (c) => {
-  const owner = ownerId(c);
-  if (!owner) return unauthorized(c);
-  const deleted = await repos().contacts.delete(owner, c.req.param("id"));
-  return deleted ? c.json(success({ deleted: true }), 200) : notFound(c);
+  const owner = requireUser(c);
+  await deleteContact(owner, c.req.param("id"));
+  return c.json(success({ deleted: true }), 200);
 });
 
 contactRoutes.post("/:id/enrich", async (c) => {
-  const owner = ownerId(c);
-  if (!owner) return unauthorized(c);
-  const result = await enrichContact(repos(), owner, c.req.param("id"));
-  if ("reason" in result) {
-    if (result.reason === "not_found") return notFound(c);
-    return c.json(error("INSUFFICIENT_CREDITS", "No enrichment credits remaining. Purchase a pack to continue."), 402);
-  }
-  return c.json(success(result), 200);
+  const owner = requireUser(c);
+  return c.json(success(await enrichOwnedContact(owner, c.req.param("id"))), 200);
 });
 
-contactRoutes.post("/:id/jobs", async (c) => {
-  const owner = ownerId(c);
-  if (!owner) return unauthorized(c);
-  const parsed = LinkSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid link", parsed.error.flatten()), 400);
-  const result = await linkContactToJob(
-    { contacts: repos().contacts, canManageJob },
-    owner,
-    c.req.param("id"),
-    parsed.data.jobId,
-    parsed.data.stage,
-  );
-  if ("reason" in result) {
-    if (result.reason === "contact_not_found") return notFound(c);
-    return c.json(error("FORBIDDEN", "You can't manage that job's pipeline"), 403);
-  }
-  return c.json(success(result.link), 200);
+contactRoutes.post("/:id/jobs", validateJson(LinkSchema, (e) => error("VALIDATION_ERROR", "Invalid link", e.flatten()), { emptyBody: null }), async (c) => {
+  const owner = requireUser(c);
+  const body = c.req.valid("json");
+  return c.json(success(await linkJob(owner, c.req.param("id"), body.jobId, body.stage)), 200);
 });
 
 contactRoutes.delete("/:id/jobs/:jobId", async (c) => {
-  const owner = ownerId(c);
-  if (!owner) return unauthorized(c);
-  const removed = await unlinkContactFromJob(repos(), owner, c.req.param("id"), c.req.param("jobId"));
-  return removed ? c.json(success({ removed: true }), 200) : notFound(c);
+  const owner = requireUser(c);
+  await unlinkJob(owner, c.req.param("id"), c.req.param("jobId"));
+  return c.json(success({ removed: true }), 200);
 });

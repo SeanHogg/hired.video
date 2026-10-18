@@ -18,15 +18,23 @@ import { bumpCacheVersion } from "../../utils/edge-cache.js";
 import { assertCanWrite, WorkspaceForbiddenError } from "../studio/workspace.js";
 import { recordPublication, type PublicationRecord } from "../studio/publication-service.js";
 import { metricsVersionNamespace } from "./metrics/sync-post-metrics.js";
+import { DomainError } from "../../domains/errors.js";
 
 export type ManualPostErrorKind = "PROJECT_NOT_FOUND" | "FORBIDDEN" | "UNKNOWN_DESTINATION" | "INVALID_URL";
 
-export class ManualPostError extends Error {
+const MANUAL_POST_ERROR_STATUS: Record<ManualPostErrorKind, 400 | 403 | 404 | 422> = {
+  PROJECT_NOT_FOUND: 404,
+  FORBIDDEN: 403,
+  UNKNOWN_DESTINATION: 400,
+  INVALID_URL: 422,
+};
+
+export class ManualPostError extends DomainError {
   constructor(
     public readonly kind: ManualPostErrorKind,
     message: string,
   ) {
-    super(message);
+    super(MANUAL_POST_ERROR_STATUS[kind], kind, message);
     this.name = "ManualPostError";
   }
 }

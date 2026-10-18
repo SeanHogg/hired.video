@@ -1,21 +1,17 @@
 /**
- * At-rest encryption for third-party credentials stored in plain `text`
- * columns (W1-D, 2026-10-17): ats_connections.api_key + webhook_secret
- * (0577), calendar_connections,
- * lms_connectors, oauth_accounts and youtube_accounts access/refresh tokens.
+ * The canonical cipher for third-party credentials: AES-256-GCM under
+ * CREDENTIALS_KMS_KEY, HKDF label "hired.video/credentials/v1".
  *
- * Each such column has an `*_enc` sibling. Writers call `sealCredential` and
- * store BOTH halves it returns; readers call `openCredential(enc, plain)`.
+ * Since W3-C (migration 0600) every credential lives in provider_connections
+ * and is sealed / opened through services/provider-connections/
+ * connection-secrets.ts, which builds on these two primitives:
  *
- *   - CREDENTIALS_KMS_KEY set   → { enc: ciphertext, plain: null }
- *   - CREDENTIALS_KMS_KEY unset → { enc: null, plain: plaintext } (legacy
- *     behaviour, so connecting an account keeps working in an environment
- *     that has no key yet)
+ *   - CREDENTIALS_KMS_KEY set   → sealCredential → { enc: ciphertext, plain: null }
+ *   - CREDENTIALS_KMS_KEY unset → { enc: null, plain: plaintext } (the caller
+ *     decides whether a plaintext fallback is allowed)
  *
- * Reads prefer `enc` and fall back to the plaintext column only for rows
- * written before the key existed; scripts/backfill-credential-encryption.ts
- * moves those rows over, and migrations 0549 / 0578 (owner-gated) clear
- * what is left. Key derivation lives in the shared seam services/crypto/secrets.ts.
+ * `openCredential(enc, plain)` prefers `enc`. Key derivation lives in the
+ * shared seam services/crypto/secrets.ts.
  *
  * The key name is fixed on purpose (no fallback chain): a ciphertext only
  * decrypts under the key that wrote it, so the key a deployment uses must

@@ -1,16 +1,17 @@
 // Password reset + email verification — the token-consuming use cases.
 
-import { and, eq, gt } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { schema } from "../../db/index.js";
+import { AuthTokensRepository } from "../../repositories/authTokensRepository.js";
 import { ForgotPasswordSchema, ResetPasswordSchema, VerifyEmailSchema } from "./schemas.js";
 import { hashPassword } from "./password.js";
-import { bumpSessionVersion, revokeAllSessionsForUser } from "./sessions.js";
+import { bumpSessionVersion, revokeAllSessionsForUser } from "./session-lifecycle.js";
 import { captchaSoftCheck } from "./signupGuard.js";
 import { logger } from "../../lib/logger.js";
 import { DomainError } from "../../domains/errors.js";
 import type { AuthDeps } from "./authPorts.js";
 
-const { users, passwordResetTokens, emailVerificationTokens } = schema;
+const { users } = schema;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleForgotPassword — always 200 to avoid email enumeration
@@ -49,13 +50,9 @@ export async function handleForgotPassword(deps: AuthDeps, body: unknown): Promi
   if (user) {
     const token = deps.randomHex(32);
     const expiresAt = new Date(deps.now().getTime() + 60 * 60 * 1000);
-    await deps.db
-      .update(passwordResetTokens)
-      .set({ used: true } as any)
-      .where(eq(passwordResetTokens.userId, user.id));
-    await deps.db
-      .insert(passwordResetTokens)
-      .values({ userId: user.id, token, expiresAt });
+    const tokens = new AuthTokensRepository(deps.db, deps.now);
+    await tokens.invalidatePasswordResetsForUser(user.id);
+    await tokens.insertPasswordResetToken({ userId: user.id, token, expiresAt });
     try {
       await deps.email.sendPasswordReset(user.email, user.name, token);
     } catch (err) {
@@ -78,17 +75,8 @@ export async function handleResetPassword(deps: AuthDeps, body: unknown): Promis
   }
 
   const now = deps.now();
-  const [tokenRow] = await deps.db
-    .select()
-    .from(passwordResetTokens)
-    .where(
-      and(
-        eq(passwordResetTokens.token, parsed.data.token),
-        eq(passwordResetTokens.used, false),
-        gt(passwordResetTokens.expiresAt, now),
-      ),
-    )
-    .limit(1);
+  const tokens = new AuthTokensRepository(deps.db, deps.now);
+  const tokenRow = await tokens.findValidPasswordResetToken(parsed.data.token);
 
   if (!tokenRow) throw new DomainError(400, "INVALID_TOKEN", "Reset token is invalid or has expired");
 
@@ -97,10 +85,7 @@ export async function handleResetPassword(deps: AuthDeps, body: unknown): Promis
     .update(users)
     .set({ passwordHash, passwordChangedAt: now } as any)
     .where(eq(users.id, tokenRow.userId));
-  await deps.db
-    .update(passwordResetTokens)
-    .set({ used: true } as any)
-    .where(eq(passwordResetTokens.id, tokenRow.id));
+  await tokens.markPasswordResetUsed(tokenRow.id);
 
   // Invalidate every existing JWT in the wild + every active session
   // row. Bumping session_version covers legacy tokens (no `sid` claim);
@@ -122,26 +107,13 @@ export async function handleVerifyEmail(deps: AuthDeps, body: unknown): Promise<
     throw new DomainError(400, "VALIDATION_ERROR", "Invalid request body");
   }
 
-  const now = deps.now();
-  const [tokenRow] = await deps.db
-    .select()
-    .from(emailVerificationTokens)
-    .where(
-      and(
-        eq(emailVerificationTokens.token, parsed.data.token),
-        eq(emailVerificationTokens.used, false),
-        gt(emailVerificationTokens.expiresAt, now),
-      ),
-    )
-    .limit(1);
+  const tokens = new AuthTokensRepository(deps.db, deps.now);
+  const tokenRow = await tokens.findValidEmailVerificationToken(parsed.data.token);
 
   if (!tokenRow) throw new DomainError(400, "INVALID_TOKEN", "Verification token is invalid or has expired");
 
   await deps.db.update(users).set({ emailVerified: true } as any).where(eq(users.id, tokenRow.userId));
-  await deps.db
-    .update(emailVerificationTokens)
-    .set({ used: true } as any)
-    .where(eq(emailVerificationTokens.id, tokenRow.id));
+  await tokens.markEmailVerificationUsed(tokenRow.id);
 
   // Return the userId so the route adapter can issue a fresh JWT.
   // Without this the caller's stored token still carries

@@ -55,7 +55,7 @@ import {
   STUDIO_SUBJECT_LABEL,
   type StudioSubject,
 } from "@shared/studio-subject";
-import { type MediaKind } from "@shared/media-kinds";
+import { type MediaKind, mediaKindIsDocument } from "@shared/media-kinds";
 import { useApiReady } from "@/lib/auth";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
@@ -132,7 +132,7 @@ export default function EntityMedia({
         // not a media attachment, so it must never show in the attachments
         // rail. Without this the resume's own studio document rendered as a
         // bogus "Document" tile alongside real videos/images.
-        setItems((res.data ?? []).filter((p) => p.mediaKind !== "document"));
+        setItems((res.data ?? []).filter((p) => !mediaKindIsDocument(p.mediaKind)));
       })
       .catch(() => {
         if (cancelled) return;

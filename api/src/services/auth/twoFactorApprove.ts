@@ -12,7 +12,7 @@
  * the browser that started the login. So the link carries a stateless
  * HMAC signature over the challenge id, keyed by JWT_SECRET — knowledge of
  * the id alone can't forge it, and no schema column is needed (the
- * `two_factor_codes` row's `used`/`expiresAt` remain the replay guard).
+ * two_factor `auth_tokens` row's `usedAt`/`expiresAt` remain the replay guard).
  *
  * Format: `<challengeId>.<hmacHex(challengeId)>`
  */

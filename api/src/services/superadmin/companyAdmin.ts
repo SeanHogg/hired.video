@@ -7,7 +7,7 @@
  *
  * Reuses the existing per-company foundations (company_subscriptions,
  * the company ai_tokens wallet, user_company_role_associations, people_segments,
- * people_employees, company_integrations, company_embed_keys, job_items,
+ * people_employees, workforce provider_connections, company_embed_keys, job_items,
  * candidate_resumes) — no new storage. SA auth is enforced upstream by
  * superAdminMiddleware on the route.
  */
@@ -16,13 +16,13 @@ import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { slugify } from "../../../../shared/slugify.js";
 import { companyWallet, WalletRepository } from "../../repositories/walletRepository.js";
+import { WorkforceIntegrations } from "../provider-connections/workforce-integrations.js";
 
 const {
   companyProfiles,
   users,
   userCompanyRoleAssociations,
   companySubscriptions,
-  companyIntegrations,
   companyEmbedKeys,
   peopleSegments,
   peopleEmployees,
@@ -178,10 +178,8 @@ export async function getCompanyFeatureTree(
     ? await count(db, peopleEmployees, eq(peopleEmployees.segmentId, segment.id))
     : 0;
 
-  const integrations = await db
-    .select({ provider: companyIntegrations.provider, status: companyIntegrations.status, lastSyncAt: companyIntegrations.lastSyncAt })
-    .from(companyIntegrations)
-    .where(eq(companyIntegrations.companyId, companyId));
+  const integrations = (await new WorkforceIntegrations(db).listForCompany(companyId))
+    .map((i) => ({ provider: i.provider, status: i.status, lastSyncAt: i.lastSyncAt }));
 
   const activeEmbedKeys = await count(
     db,

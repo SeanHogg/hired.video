@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseJobFromPage } from "../job/JobService.js";
+import { parseJobFromPage } from "../job/job-page-parse.js";
 
 /**
  * Tests that the job extraction pipeline populates `applyUrl` from

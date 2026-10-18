@@ -1,7 +1,7 @@
 /**
  * /api/admin/promotions — SuperAdmin review of the promotion queue (Lane A,
  * #2046). Approve publishes on hired.video's managed brand account
- * (connected under /api/admin/social).
+ * (connected via /api/social?lane=managed).
  *
  *   GET  /?status=pending        — queue page (newest first, bounded)
  *   GET  /reach                  — brand-channel reach per platform (cached)
@@ -19,7 +19,7 @@ import {
   listPromotionQueue,
   rejectPromotion,
 } from "../services/promotions/promotionUseCases.js";
-import { promotionErrorResponse } from "./promotion-errors.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const adminPromotionRoutes = new Hono<AppEnv>();
 
@@ -32,23 +32,14 @@ adminPromotionRoutes.get("/", async (c) => {
 adminPromotionRoutes.get("/reach", async (c) => c.json(success(await reachSummary(c.env))));
 
 adminPromotionRoutes.post("/:id/approve", async (c) => {
-  try {
-    const submission = await approvePromotion({ reviewerId: c.var.user.sub, submissionId: c.req.param("id"), env: c.env });
-    return c.json(success(submission));
-  } catch (err) {
-    return promotionErrorResponse(c, err);
-  }
+  const submission = await approvePromotion({ reviewerId: c.var.userId, submissionId: c.req.param("id"), env: c.env });
+  return c.json(success(submission));
 });
 
 const RejectSchema = z.object({ reason: z.string().trim().min(1).max(500) });
 
-adminPromotionRoutes.post("/:id/reject", async (c) => {
-  const parsed = RejectSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "A reason is required"), 400);
-  try {
-    const submission = await rejectPromotion({ reviewerId: c.var.user.sub, submissionId: c.req.param("id"), reason: parsed.data.reason });
-    return c.json(success(submission));
-  } catch (err) {
-    return promotionErrorResponse(c, err);
-  }
+adminPromotionRoutes.post("/:id/reject", validateJson(RejectSchema, () => error("VALIDATION_ERROR", "A reason is required"), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  const submission = await rejectPromotion({ reviewerId: c.var.userId, submissionId: c.req.param("id"), reason: body.reason });
+  return c.json(success(submission));
 });

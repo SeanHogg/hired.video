@@ -7,7 +7,10 @@ import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import type { AppEnv } from "../../types/index.js";
 import { generateInterviewQuestions } from "../../services/interview/assignment-generation.js";
-import { fail, ok, sendFailure } from "./shared.js";
+import { sendFailure } from "./shared.js";
+import { success } from "../../types/index.js";
+import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 
 const GenerateRequestSchema = z
   .object({
@@ -28,17 +31,13 @@ const GenerateRequestSchema = z
 
 export const interviewAssignmentGenerateRoutes = new Hono<AppEnv>();
 
-interviewAssignmentGenerateRoutes.post("/generate", async (c) => {
+interviewAssignmentGenerateRoutes.post("/generate", validateJson(GenerateRequestSchema, undefined, { emptyBody: null }), async (c) => {
   const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in to generate questions"), 401);
+  requireUser(c);
 
-  const body = await c.req.json().catch(() => null);
-  const parsed = GenerateRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  }
+  const body = c.req.valid("json");
 
-  const result = await generateInterviewQuestions(c.env, user, parsed.data);
-  if (!result.ok) return sendFailure(c, result);
-  return c.json(ok(result.data));
+  const result = await generateInterviewQuestions(c.env, user, body);
+  if (result.ok === false) return sendFailure(c, result);
+  return c.json(success(result.data));
 });

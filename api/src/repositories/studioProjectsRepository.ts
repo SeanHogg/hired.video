@@ -5,7 +5,7 @@
  * the rules (auth, gates, cache bumps), this module owns the SQL.
  * Split out of routes/studio.ts (W2-3a).
  */
-import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { schema, type Db } from "../db/index.js";
 import { buildOwnershipFilter } from "../services/studio/workspace.js";
 import type { WorkspaceRestriction } from "../services/studio/workspace-request.js";
@@ -42,6 +42,48 @@ export async function findProjectWithVideo(db: Db, projectId: string): Promise<P
     .limit(1);
   if (!row) return null;
   return { project: row.project, video: row.video ?? null };
+}
+
+/** The ownership + kind columns an access check needs (no content columns). */
+export interface ProjectAccessRow {
+  id: string;
+  userId: string;
+  companyId: string | null;
+  mediaKind: StudioProjectRow["mediaKind"];
+}
+
+export async function findProjectAccess(db: Db, projectId: string): Promise<ProjectAccessRow | null> {
+  const [row] = await db
+    .select({
+      id: studioProjects.id,
+      userId: studioProjects.userId,
+      companyId: studioProjects.companyId,
+      mediaKind: studioProjects.mediaKind,
+    })
+    .from(studioProjects)
+    .where(eq(studioProjects.id, projectId))
+    .limit(1);
+  return row ?? null;
+}
+
+/** Access columns plus one per-kind state field (see projectStateAs). */
+export async function findProjectAccessWithState(
+  db: Db,
+  projectId: string,
+  field: StudioStateField,
+): Promise<(ProjectAccessRow & { state: unknown }) | null> {
+  const [row] = await db
+    .select({
+      id: studioProjects.id,
+      userId: studioProjects.userId,
+      companyId: studioProjects.companyId,
+      mediaKind: studioProjects.mediaKind,
+      state: projectStateAs(field),
+    })
+    .from(studioProjects)
+    .where(eq(studioProjects.id, projectId))
+    .limit(1);
+  return row ?? null;
 }
 
 /**
@@ -138,6 +180,62 @@ export interface OwnershipScope {
 
 function ownershipFilter(scope: OwnershipScope, userIdColumn: unknown, companyIdColumn: unknown): SQL | undefined {
   return buildOwnershipFilter({ userIdColumn, companyIdColumn, ...scope });
+}
+
+/** Bump the content revision alongside `patch` (a content save that no
+ *  stale-write check guards still advances it, #2242). */
+export async function updateProjectBumpingRevision(
+  db: Db,
+  projectId: string,
+  patch: StudioProjectPatch,
+): Promise<StudioProjectRow | null> {
+  const [updated] = await db
+    .update(studioProjects)
+    .set({ ...withDerivedColumns(patch), revision: sql`${studioProjects.revision} + 1` })
+    .where(eq(studioProjects.id, projectId))
+    .returning();
+  return updated ?? null;
+}
+
+// ─── NLE projects (kind='nle'; Timeline JSON lives in `state`) ──────────────
+
+/** The NLE dashboard list: metadata only (no Timeline), newest 200. */
+export async function findNleProjectSummariesVisibleTo(db: Db, scope: OwnershipScope) {
+  return db
+    .select({
+      id: studioProjects.id,
+      title: studioProjects.resumeText,
+      userId: studioProjects.userId,
+      companyId: studioProjects.companyId,
+      status: studioProjects.status,
+      videoId: studioProjects.videoId,
+      updatedAt: studioProjects.updatedAt,
+      createdAt: studioProjects.createdAt,
+    })
+    .from(studioProjects)
+    .where(and(eq(studioProjects.kind, "nle"), ownershipFilter(scope, studioProjects.userId, studioProjects.companyId)))
+    .orderBy(desc(studioProjects.updatedAt))
+    .limit(200);
+}
+
+/** One project the actor can read, with its Timeline (`state`) as
+ *  `timelineSpec`. Any kind — the caller rejects non-NLE rows. */
+export async function findNleProjectDetailVisibleTo(db: Db, scope: OwnershipScope, projectId: string) {
+  const [row] = await db
+    .select({
+      id: studioProjects.id,
+      title: studioProjects.resumeText,
+      kind: studioProjects.kind,
+      timelineSpec: studioProjects.state,
+      status: studioProjects.status,
+      videoId: studioProjects.videoId,
+      updatedAt: studioProjects.updatedAt,
+      createdAt: studioProjects.createdAt,
+    })
+    .from(studioProjects)
+    .where(and(eq(studioProjects.id, projectId), ownershipFilter(scope, studioProjects.userId, studioProjects.companyId)))
+    .limit(1);
+  return row ?? null;
 }
 
 // ─── Linked renders (videos) ────────────────────────────────────────────────

@@ -27,7 +27,8 @@ import {
 } from "../../repositories/calibrationRepository.js";
 import {
   ScorecardsRepository,
-  type IScorecardsRepository,
+  type IScorecardSubmissionsRepository,
+  type IScorecardTemplatesRepository,
 } from "../../repositories/scorecardsRepository.js";
 import { getDb } from "../../db/index.js";
 import {
@@ -38,6 +39,7 @@ import {
   computeCalibrationDeltas,
   type AttributeDelta,
 } from "./scoring.js";
+import { DomainError, statusForErrorCode } from "../errors.js";
 
 export type ServiceErrorCode =
   | "NOT_FOUND"
@@ -45,18 +47,19 @@ export type ServiceErrorCode =
   | "CONFLICT"
   | "VALIDATION_ERROR";
 
-export class CalibrationServiceError extends Error {
-  constructor(
-    public readonly code: ServiceErrorCode,
-    message: string,
-  ) {
-    super(message);
+/** A DomainError the global handler renders with the code's status. */
+export class CalibrationServiceError extends DomainError {
+  declare readonly code: ServiceErrorCode;
+  constructor(code: ServiceErrorCode, message: string) {
+    super(statusForErrorCode(code), code, message);
+    this.name = "CalibrationServiceError";
   }
 }
 
 export interface CalibrationServiceDeps {
   calibrationRepo: ICalibrationRepository;
-  scorecardsRepo: IScorecardsRepository;
+  /** Reads submitted scorecards + ratings and templates only. */
+  scorecardsRepo: IScorecardSubmissionsRepository & IScorecardTemplatesRepository;
   canAccessCompany: (userId: string, companyId: string) => Promise<boolean>;
   getCompanyIdsForUser: (userId: string) => Promise<string[]>;
   now?: () => Date;

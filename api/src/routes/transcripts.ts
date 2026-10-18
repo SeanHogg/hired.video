@@ -15,6 +15,7 @@ import { success, error } from "../types/index.js";
 import { clampLimit } from "../utils/pagination.js";
 import { searchTranscripts } from "../services/transcripts/transcript-search.js";
 import { requestRetranscription, type RetranscribeClaim } from "../services/interview/retranscribe.js";
+import { requireUser } from "./helpers/routerHelpers.js";
 
 type QueuedClaim = Extract<RetranscribeClaim, { outcome: "queued" }>;
 type NotRetryableClaim = Extract<RetranscribeClaim, { outcome: "not_retryable" }>;
@@ -22,7 +23,7 @@ type NotRetryableClaim = Extract<RetranscribeClaim, { outcome: "not_retryable" }
 export const transcriptRoutes = new Hono<AppEnv>();
 
 transcriptRoutes.get("/search", async (c) => {
-  if (!c.var.user?.sub) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  requireUser(c);
 
   const q = (c.req.query("q") ?? "").trim();
   if (q.length < 2) {
@@ -33,8 +34,7 @@ transcriptRoutes.get("/search", async (c) => {
 });
 
 transcriptRoutes.post("/:responseId/retranscribe", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Sign in"), 401);
+  const userId = requireUser(c);
 
   const result = await requestRetranscription(
     c.env,

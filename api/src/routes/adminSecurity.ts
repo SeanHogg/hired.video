@@ -18,6 +18,7 @@ import { success, error } from "../types/index.js";
 import { AdminSecurityRepository } from "../repositories/admin/adminSecurityRepository.js";
 import { adminLockAccount, adminLockStatus, adminUnlockAccount } from "../services/admin/adminAccountLocks.js";
 import { clampLimit } from "../utils/pagination.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const adminSecurityRoutes = new Hono<AppEnv>();
 
@@ -31,14 +32,13 @@ const ManualLockSchema = z.object({
   durationMinutes: z.number().int().min(1).max(60 * 24 * 30).optional(),
 });
 
-adminSecurityRoutes.post("/locked-accounts/:userId/lock", async (c) => {
-  const parsed = ManualLockSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid body"), 400);
-  const { reason, notes, durationMinutes } = parsed.data;
+adminSecurityRoutes.post("/locked-accounts/:userId/lock", validateJson(ManualLockSchema, () => error("VALIDATION_ERROR", "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
+  const { reason, notes, durationMinutes } = body;
   const lock = await adminLockAccount({
     userId: c.req.param("userId"),
     reason,
-    lockedBy: c.var.user.sub,
+    lockedBy: c.var.userId,
     unlocksAt: durationMinutes ? new Date(Date.now() + durationMinutes * 60 * 1000) : null,
     notes: notes ?? null,
   });
@@ -51,7 +51,7 @@ adminSecurityRoutes.get("/locked-accounts/:userId/status", async (c) => {
 });
 
 adminSecurityRoutes.post("/locked-accounts/:userId/unlock", async (c) => {
-  await adminUnlockAccount(c.req.param("userId"), c.var.user.sub);
+  await adminUnlockAccount(c.req.param("userId"), c.var.userId);
   return c.json(success(null, "Account unlocked"));
 });
 
@@ -84,9 +84,8 @@ const ReviewWaitlistSchema = z.object({
   status: z.enum(["invited", "declined"]),
 });
 
-adminSecurityRoutes.post("/region-waitlist/:id/review", async (c) => {
-  const parsed = ReviewWaitlistSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid body"), 400);
-  await AdminSecurityRepository.create().reviewWaitlist(c.req.param("id"), parsed.data.status, c.var.user.sub);
-  return c.json(success(null, `Marked ${parsed.data.status}`));
+adminSecurityRoutes.post("/region-waitlist/:id/review", validateJson(ReviewWaitlistSchema, () => error("VALIDATION_ERROR", "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
+  await AdminSecurityRepository.create().reviewWaitlist(c.req.param("id"), body.status, c.var.userId);
+  return c.json(success(null, `Marked ${body.status}`));
 });

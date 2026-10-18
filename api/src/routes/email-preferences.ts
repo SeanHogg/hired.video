@@ -13,24 +13,21 @@
  *   POST /api/email/webhooks/sendpulse        — provider bounce/complaint → hard suppression (public)
  */
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
 import { getEnv } from "../utils/env.js";
 import type { AppEnv } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { buildRepos } from "../repositories/index.js";
-import { MarketingConsentService } from "../services/email/MarketingConsentService.js";
+import {
+  getMyEmailPreferences,
+  marketingConsentService as service,
+  recordHardSuppressions,
+  updateMyEmailPreferences,
+} from "../services/email/emailPreferences.js";
 import { extractHardSuppressions } from "../services/email/bounce-classifier.js";
 import { UpdatePreferencesSchema } from "../../../shared/email-consent.js";
+import { success, error } from "../types/index.js";
+import { validateJson } from "./helpers/validate.js";
+import { requireUser } from "./helpers/routerHelpers.js";
 
 export const emailPreferencesRoutes = new Hono<AppEnv>();
-
-function service(): MarketingConsentService {
-  return new MarketingConsentService(buildRepos(getDb()).emailConsent as any);
-}
-
-function ok<T>(data: T) {
-  return { success: true as const, data, timestamp: new Date().toISOString() };
-}
 
 function page(title: string, body: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>
@@ -63,49 +60,29 @@ emailPreferencesRoutes.get("/unsubscribe/:token", async (c) => {
 // ── Preference center by token (public) ─────────────────────────────────────
 emailPreferencesRoutes.get("/preferences/token/:token", async (c) => {
   const dto = await service().getByToken(c.req.param("token"));
-  if (!dto) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Invalid link" } }, 404);
-  return c.json(ok(dto), 200);
+  if (!dto) return c.json(error("NOT_FOUND", "Invalid link"), 404);
+  return c.json(success(dto), 200);
 });
 
-emailPreferencesRoutes.put("/preferences/token/:token", async (c) => {
-  const parsed = UpdatePreferencesSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid body" } }, 400);
-  }
-  const dto = await service().updateByToken(c.req.param("token"), parsed.data);
-  if (!dto) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Invalid link" } }, 404);
-  return c.json(ok(dto), 200);
+emailPreferencesRoutes.put("/preferences/token/:token", validateJson(UpdatePreferencesSchema, () => error("VALIDATION_ERROR", "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
+  const dto = await service().updateByToken(c.req.param("token"), body);
+  if (!dto) return c.json(error("NOT_FOUND", "Invalid link"), 404);
+  return c.json(success(dto), 200);
 });
 
 // ── Authenticated /me (Settings panel) ───────────────────────────────────────
-async function resolveCallerEmail(c: any): Promise<{ email: string; userId: string } | null> {
-  const userId = c.var.user?.sub as string | undefined;
-  if (!userId) return null;
-  const [row] = await getDb()
-    .select({ email: schema.users.email })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
-  if (!row?.email) return null;
-  return { email: row.email, userId };
-}
-
+// Resolved by the caller's own email; 401 when signed out or the account has
+// no email (services/email/emailPreferences.ts).
 emailPreferencesRoutes.get("/preferences/me", async (c) => {
-  const caller = await resolveCallerEmail(c);
-  if (!caller) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
-  const dto = await service().getByEmail(caller.email, caller.userId);
-  return c.json(ok(dto), 200);
+  const dto = await getMyEmailPreferences(requireUser(c));
+  return c.json(success(dto), 200);
 });
 
-emailPreferencesRoutes.put("/preferences/me", async (c) => {
-  const caller = await resolveCallerEmail(c);
-  if (!caller) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
-  const parsed = UpdatePreferencesSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid body" } }, 400);
-  }
-  const dto = await service().updateByEmail(caller.email, parsed.data, caller.userId);
-  return c.json(ok(dto), 200);
+emailPreferencesRoutes.put("/preferences/me", validateJson(UpdatePreferencesSchema, () => error("VALIDATION_ERROR", "Invalid body")), async (c) => {
+  const userId = requireUser(c);
+  const dto = await updateMyEmailPreferences(userId, c.req.valid("json"));
+  return c.json(success(dto), 200);
 });
 
 // ── Provider bounce/complaint webhook (#1975) ───────────────────────────────
@@ -121,20 +98,13 @@ emailPreferencesRoutes.put("/preferences/me", async (c) => {
 emailPreferencesRoutes.post("/webhooks/sendpulse", async (c) => {
   const required = getEnv("EMAIL_WEBHOOK_SECRET");
   if (required && c.req.query("key") !== required) {
-    return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Bad webhook key" } }, 401);
+    return c.json(error("UNAUTHORIZED", "Bad webhook key"), 401);
   }
   const body = await c.req.json().catch(() => null);
   const suppressions = extractHardSuppressions(body);
-  if (suppressions.length > 0) {
-    const svc = service();
-    // Sequential, idempotent (ON CONFLICT DO NOTHING) — webhook batches are
-    // tiny (a handful of events per POST), so no fan-out concern.
-    for (const s of suppressions) {
-      await svc.recordHardSuppression(s.email, `webhook:${s.reason}`);
-    }
-  }
+  await recordHardSuppressions(suppressions);
   // Always 200 so the provider doesn't retry-storm on a partially-bad batch.
-  return c.json(ok({ suppressed: suppressions.length }), 200);
+  return c.json(success({ suppressed: suppressions.length }), 200);
 });
 
 export default emailPreferencesRoutes;

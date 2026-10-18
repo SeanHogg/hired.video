@@ -15,29 +15,13 @@
  * endpoint just returns the pin metadata, not the full detail drawer.
  */
 import { Hono } from "hono";
-import { and, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
-import type { Variables, AppEnv } from "../types/index.js";
+import type { AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { resolveProfileSections } from "../../../shared/profile-sections.js";
-
-const {
-  scheduledEvents,
-  contentLocations,
-  users,
-  userProfiles,
-} = schema;
+import { loadMapPins, type PinBox } from "../services/location/mapPins.js";
 
 export const mapRoutes = new Hono<AppEnv>();
 
-interface PinFilter {
-  minLat: number;
-  maxLat: number;
-  minLng: number;
-  maxLng: number;
-}
-
-function parseFilter(c: any): PinFilter | null {
+function parseFilter(c: any): PinBox | null {
   const minLat = c.req.query("minLat") ? Number(c.req.query("minLat")) : -90;
   const maxLat = c.req.query("maxLat") ? Number(c.req.query("maxLat")) : 90;
   const minLng = c.req.query("minLng") ? Number(c.req.query("minLng")) : -180;
@@ -57,131 +41,5 @@ function parseFilter(c: any): PinFilter | null {
 mapRoutes.get("/", async (c) => {
   const filter = parseFilter(c);
   if (!filter) return c.json(success({ events: [], people: [] }), 200);
-
-  const db = getDb();
-  const now = new Date();
-
-  // Events: join scheduledEvents → content_locations for the origin row
-  // with lat/lng. Only public, non-cancelled, upcoming-or-current.
-  const eventsPromise = db
-    .select({
-      id: scheduledEvents.id,
-      title: scheduledEvents.title,
-      slug: scheduledEvents.slug,
-      category: scheduledEvents.category,
-      eventFormat: scheduledEvents.eventFormat,
-      startAt: scheduledEvents.startAt,
-      attendeeCount: scheduledEvents.attendeeCount,
-      capacity: scheduledEvents.capacity,
-      coverImageUrl: scheduledEvents.coverImageUrl,
-      lat: contentLocations.latitude,
-      lng: contentLocations.longitude,
-    })
-    .from(scheduledEvents)
-    .innerJoin(
-      contentLocations,
-      and(
-        eq(contentLocations.entityKind, "event"),
-        eq(contentLocations.entityId, scheduledEvents.id),
-        eq(contentLocations.role, "origin"),
-      ),
-    )
-    .where(
-      and(
-        eq(scheduledEvents.visibility, "public"),
-        gte(scheduledEvents.startAt, now),
-        sql`${scheduledEvents.cancelledAt} IS NULL`,
-        sql`${scheduledEvents.type} IN ('event', 'coffee')`,
-        isNotNull(contentLocations.latitude),
-        isNotNull(contentLocations.longitude),
-        gte(contentLocations.latitude, filter.minLat),
-        lte(contentLocations.latitude, filter.maxLat),
-        gte(contentLocations.longitude, filter.minLng),
-        lte(contentLocations.longitude, filter.maxLng),
-      ),
-    )
-    .limit(500);
-
-  // People: users whose home location (content_locations origin row for
-  // their user_profile) has lat/lng AND profileSections.openToCoffee=true.
-  // We pull the profileSections JSON + role and apply the resolver
-  // post-query (small enough cohort that an in-DB JSON path filter isn't
-  // worth the index complexity yet — revisit at 100k+ opted-in users).
-  const peoplePromise = db
-    .select({
-      id: users.id,
-      name: users.name,
-      role: users.role,
-      avatarUrl: userProfiles.avatarUrl,
-      headline: userProfiles.headline,
-      lat: contentLocations.latitude,
-      lng: contentLocations.longitude,
-      sections: userProfiles.profileSections,
-      profileVisibility: userProfiles.profileVisibility,
-    })
-    .from(users)
-    .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
-    .innerJoin(
-      contentLocations,
-      and(
-        eq(contentLocations.entityKind, "user_profile"),
-        eq(contentLocations.entityId, users.id),
-        eq(contentLocations.role, "origin"),
-      ),
-    )
-    .where(
-      and(
-        eq(userProfiles.profileVisibility, "public"),
-        eq(users.emailVerified, true),
-        isNotNull(contentLocations.latitude),
-        isNotNull(contentLocations.longitude),
-        gte(contentLocations.latitude, filter.minLat),
-        lte(contentLocations.latitude, filter.maxLat),
-        gte(contentLocations.longitude, filter.minLng),
-        lte(contentLocations.longitude, filter.maxLng),
-      ),
-    )
-    .limit(500);
-
-  const [events, people] = await Promise.all([eventsPromise, peoplePromise]);
-
-  const filteredPeople = people
-    .map((p) => {
-      const resolved = resolveProfileSections(p.sections as any, p.role);
-      if (!resolved.openToCoffee) return null;
-      return {
-        id: p.id,
-        name: p.name,
-        role: p.role,
-        avatarUrl: p.avatarUrl,
-        headline: p.headline,
-        lat: p.lat,
-        lng: p.lng,
-      };
-    })
-    .filter(Boolean);
-
-  return c.json(
-    success({
-      events: events.map((e) => ({
-        id: e.id,
-        title: e.title,
-        slug: e.slug,
-        category: e.category,
-        eventFormat: e.eventFormat,
-        startAt: e.startAt.toISOString(),
-        attendeeCount: e.attendeeCount,
-        capacity: e.capacity,
-        coverImageUrl: e.coverImageUrl,
-        lat: e.lat,
-        lng: e.lng,
-      })),
-      people: filteredPeople,
-    }),
-    200,
-  );
+  return c.json(success(await loadMapPins(filter)), 200);
 });
-
-mapRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Map route not found" } }, 404),
-);

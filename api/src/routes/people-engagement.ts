@@ -7,19 +7,13 @@
 
 import { z } from "zod";
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
 import { success, error } from "../types/index.js";
 import type { PeopleEnv } from "../middleware/peopleOps.js";
 import { crudRouter } from "./helpers/peopleCrud.js";
-import { PeopleSegmentRepo } from "../repositories/peopleSegmentRepo.js";
-import { getDb, schema } from "../db/index.js";
+import { insertChild, listChildren } from "../services/people-ops/segmentStore.js";
 import { PULSE_FREQUENCIES, PULSE_QUESTION_TYPES } from "../../../shared/people-ops.js";
 import { computeTeamHealth } from "../domains/people-ops/teamHealth.js";
-
-const {
-  peoplePulseChecks, peoplePulseResponses,
-  peopleScheduledCheckIns, peopleCheckInResponses,
-} = schema;
+import { validateJson } from "./helpers/validate.js";
 
 const QuestionSchema = z.object({
   id: z.string().min(1),
@@ -37,24 +31,19 @@ const PulseSchema = z.object({
   questions: z.array(QuestionSchema).max(30).optional(),
   isActive: z.boolean().optional(),
 });
-export const pulseChecksRouter = crudRouter(peoplePulseChecks, PulseSchema, PulseSchema.partial(), { stampCreatedBy: true });
+export const pulseChecksRouter = crudRouter("pulseChecks", PulseSchema, PulseSchema.partial(), { stampCreatedBy: true });
 
 const ResponseSchema = z.object({
   employeeId: z.string().uuid().nullish(),
   responses: z.record(z.string(), z.unknown()),
   sentiment: z.number().min(-1).max(1).nullish(),
 });
-pulseChecksRouter.get("/:id/responses", async (c) => {
-  const repo = new PeopleSegmentRepo(getDb(), peoplePulseResponses);
-  return c.json(success(await repo.list(c.var.peopleCtx, [eq(peoplePulseResponses.pulseCheckId, c.req.param("id"))])));
-});
-pulseChecksRouter.post("/:id/responses", async (c) => {
-  const parent = new PeopleSegmentRepo(getDb(), peoplePulseChecks);
-  if (!(await parent.findById(c.var.peopleCtx, c.req.param("id")))) return c.json(error("NOT_FOUND", "Pulse check not found"), 404);
-  const p = ResponseSchema.safeParse(await c.req.json().catch(() => null));
-  if (!p.success) return c.json(error("VALIDATION_ERROR", "Invalid body", p.error.flatten()), 400);
-  const repo = new PeopleSegmentRepo(getDb(), peoplePulseResponses);
-  return c.json(success(await repo.insert(c.var.peopleCtx, { ...p.data, pulseCheckId: c.req.param("id") })), 201);
+pulseChecksRouter.get("/:id/responses", async (c) =>
+  c.json(success(await listChildren(c.var.peopleCtx, "pulseResponses", "pulseCheckId", c.req.param("id")))));
+pulseChecksRouter.post("/:id/responses", validateJson(ResponseSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const row = await insertChild(c.var.peopleCtx, "pulseChecks", "pulseResponses", "pulseCheckId", c.req.param("id"), c.req.valid("json"));
+  if (!row) return c.json(error("NOT_FOUND", "Pulse check not found"), 404);
+  return c.json(success(row), 201);
 });
 
 // ── Scheduled check-ins (+ responses) ────────────────────────────────────────
@@ -68,19 +57,14 @@ const CheckInSchema = z.object({
   questions: z.array(QuestionSchema).max(30).optional(),
   isActive: z.boolean().optional(),
 });
-export const checkInsRouter = crudRouter(peopleScheduledCheckIns, CheckInSchema, CheckInSchema.partial(), { stampCreatedBy: true });
+export const checkInsRouter = crudRouter("scheduledCheckIns", CheckInSchema, CheckInSchema.partial(), { stampCreatedBy: true });
 
-checkInsRouter.get("/:id/responses", async (c) => {
-  const repo = new PeopleSegmentRepo(getDb(), peopleCheckInResponses);
-  return c.json(success(await repo.list(c.var.peopleCtx, [eq(peopleCheckInResponses.checkInId, c.req.param("id"))])));
-});
-checkInsRouter.post("/:id/responses", async (c) => {
-  const parent = new PeopleSegmentRepo(getDb(), peopleScheduledCheckIns);
-  if (!(await parent.findById(c.var.peopleCtx, c.req.param("id")))) return c.json(error("NOT_FOUND", "Check-in not found"), 404);
-  const p = ResponseSchema.safeParse(await c.req.json().catch(() => null));
-  if (!p.success) return c.json(error("VALIDATION_ERROR", "Invalid body", p.error.flatten()), 400);
-  const repo = new PeopleSegmentRepo(getDb(), peopleCheckInResponses);
-  return c.json(success(await repo.insert(c.var.peopleCtx, { ...p.data, checkInId: c.req.param("id") })), 201);
+checkInsRouter.get("/:id/responses", async (c) =>
+  c.json(success(await listChildren(c.var.peopleCtx, "checkInResponses", "checkInId", c.req.param("id")))));
+checkInsRouter.post("/:id/responses", validateJson(ResponseSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const row = await insertChild(c.var.peopleCtx, "scheduledCheckIns", "checkInResponses", "checkInId", c.req.param("id"), c.req.valid("json"));
+  if (!row) return c.json(error("NOT_FOUND", "Check-in not found"), 404);
+  return c.json(success(row), 201);
 });
 
 // ── Team Health composite (PO-8) — shared computeTeamHealth (used by embed too)

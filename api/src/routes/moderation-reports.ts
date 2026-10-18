@@ -20,14 +20,15 @@ import {
   REPORT_ENTITY_TYPES,
   REPORT_REASONS,
   REPORT_STATUSES,
-} from "../db/schema/reports.js";
-import { ModerationError } from "../services/moderation/moderationService.js";
+} from "../../../shared/moderation.js";
 import {
   listContentReportQueue,
   listMyContentReports,
   resolveContentReport,
   submitContentReport,
 } from "../services/moderation/moderationReports.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const moderationReportRoutes = new Hono<AppEnv>();
 const adminRoutes = new Hono<AppEnv>();
@@ -49,41 +50,27 @@ const ResolveReportSchema = z.object({
   resolution: z.string().max(2000).optional(),
 });
 
-function moderationErrorResponse(c: any, e: unknown) {
-  if (e instanceof ModerationError) {
-    return c.json(error(e.code, e.message), e.code === "NOT_FOUND" ? 404 : 400);
-  }
-  throw e;
-}
-
 moderationReportRoutes.use("*", async (c, next) => {
-  if (!c.var.user?.sub) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  requireUser(c);
   return next();
 });
 
-moderationReportRoutes.post("/reports", async (c) => {
-  const parsed = CreateReportSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
+moderationReportRoutes.post("/reports", validateJson(CreateReportSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
   // ModerationService owns the owner snapshot, admin fan-out and inbox
   // thread setup (DRY).
-  try {
-    const filed = await submitContentReport({
-      reporterId: c.var.user.sub,
-      entityType: parsed.data.entityType,
-      entityId: parsed.data.entityId,
-      reason: parsed.data.reason,
-      notes: parsed.data.notes,
-    });
-    return c.json(success(filed), filed.created ? 201 : 200);
-  } catch (e) {
-    return moderationErrorResponse(c, e);
-  }
+  const filed = await submitContentReport({
+    reporterId: c.var.userId,
+    entityType: body.entityType,
+    entityId: body.entityId,
+    reason: body.reason,
+    notes: body.notes,
+  });
+  return c.json(success(filed), filed.created ? 201 : 200);
 });
 
 moderationReportRoutes.get("/reports/me", async (c) => {
-  const rows = await listMyContentReports(c.var.user.sub);
+  const rows = await listMyContentReports(c.var.userId);
   return c.json(success(rows), 200);
 });
 
@@ -102,24 +89,17 @@ adminRoutes.get("/queue", async (c) => {
   return c.json(success(rows), 200);
 });
 
-adminRoutes.patch("/:id/resolve", async (c) => {
-  const parsed = ResolveReportSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
+adminRoutes.patch("/:id/resolve", validateJson(ResolveReportSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
   // ModerationService fires reporter + owner notifications and the inbox
   // recap, idempotently.
-  try {
-    const updated = await resolveContentReport({
-      reportId: c.req.param("id"),
-      resolverUserId: c.var.user.sub,
-      status: parsed.data.status,
-      resolution: parsed.data.resolution,
-    });
-    return c.json(success(updated), 200);
-  } catch (e) {
-    return moderationErrorResponse(c, e);
-  }
+  const updated = await resolveContentReport({
+    reportId: c.req.param("id"),
+    resolverUserId: c.var.userId,
+    status: body.status,
+    resolution: body.resolution,
+  });
+  return c.json(success(updated), 200);
 });
 
 moderationReportRoutes.route("/reports/admin", adminRoutes);

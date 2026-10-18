@@ -9,11 +9,8 @@
 import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  buildNotificationEmail,
-  __setEmailProvider,
-  type EmailMessage,
-} from "../adapters/email.js";
+import { buildNotificationEmail } from "../adapters/email/templates/notifications.js";
+import { __setEmailProvider, type EmailMessage } from "../adapters/email/transport.js";
 import { emitNotification } from "../notifications/notificationService.js";
 
 // ---------------------------------------------------------------------------

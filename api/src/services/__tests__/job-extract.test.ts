@@ -1,13 +1,10 @@
 import { describe, it } from "node:test";
 import { strict as assert } from "node:assert";
 
-import {
-  htmlToMarkdown,
-  parseJobFromPage,
-  splitDescriptionSections,
-  extractAndClassifyJob,
-  type ParsedJob,
-} from "../job/JobService.js";
+import { htmlToMarkdown } from "../../../../shared/scraping/index.js";
+import { parseJobFromPage, type ParsedJob } from "../job/job-page-parse.js";
+import { splitDescriptionSections } from "../job/job-description-sections.js";
+import { extractAndClassifyJob } from "../job/job-classify.js";
 
 // =====================================================================
 // htmlToMarkdown

@@ -65,6 +65,7 @@ function job(overrides: Partial<PublishJob> = {}): PublishJob {
     updatedAt: NOW,
     source: "user",
     captionSource: null,
+    postYourself: false,
     ...overrides,
   };
 }

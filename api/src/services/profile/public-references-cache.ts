@@ -7,7 +7,7 @@
  * (role-keyed visibility defaults). EVERY write to any of those must call
  * `invalidatePublicReferences(userId)` — otherwise a hidden section keeps
  * leaking summaries until the TTL lapses:
- *   - contact create / update / delete  (routes/references.ts)
+ *   - contact create / update / delete  (services/references/referenceService.ts)
  *   - profileSections update            (routes/users.ts PUT /me)
  *   - role flips                        (services/user/account.ts)
  */

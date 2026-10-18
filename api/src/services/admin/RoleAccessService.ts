@@ -28,6 +28,7 @@ import {
   getRegistryEntry,
 } from "../../../../shared/feature-registry.js";
 import type { UserRole } from "../../../../shared/user-roles.js";
+import { DomainError } from "../../domains/errors.js";
 
 const CACHE_VERSION = "v1";
 const CACHE_TTL_SECONDS = 300;
@@ -179,9 +180,9 @@ export class RoleAccessService {
 }
 
 /** Typed service error so routes can map to the right HTTP status. */
-export class RoleAccessError extends Error {
-  constructor(public readonly code: string, message: string) {
-    super(message);
+export class RoleAccessError extends DomainError {
+  constructor(code: string, message: string) {
+    super(400, code, message);
     this.name = "RoleAccessError";
   }
 }

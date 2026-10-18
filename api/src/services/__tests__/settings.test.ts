@@ -126,10 +126,11 @@ describe("other defaults are stable", () => {
     assert.equal(d.profileVisibleToPublic, true);
   });
 
-  it("job preferences default to non-auto-apply with empty selections", () => {
+  it("job preferences default to empty selections in USD", () => {
     const d = defaultJobPreferences();
-    assert.equal(d.autoApplyEnabled, false);
-    assert.deepEqual(d.preferredJobTypes, []);
+    assert.equal(d.remoteOnly, false);
+    assert.deepEqual(d.preferredRoles, []);
+    assert.deepEqual(d.industries, []);
     assert.equal(d.salaryCurrency, "USD");
   });
 

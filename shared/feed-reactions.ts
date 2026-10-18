@@ -8,8 +8,8 @@
  * backend (validation + DTO summaries), the frontend (the reaction picker,
  * post + comment cards), and analytics (trending weights) can't drift.
  *
- * Both posts (`feed_post_likes.reaction_type`) and comments
- * (`feed_comment_reactions.reaction_type`) use this exact set — the picker
+ * Both post and comment reactions (`reactions.reaction_type`, subject
+ * 'feed_post' / 'comment' — shared/engagement-subjects.ts) use this exact set — the picker
  * is reused across both surfaces, so the reaction vocabulary must be too.
  *
  * Emojis are intentionally used (not icon imports) so the same definition

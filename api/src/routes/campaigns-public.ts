@@ -12,7 +12,6 @@
  */
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
-import { getDb } from "../db/index.js";
 import { frontendBaseUrl } from "../utils/public-urls.js";
 import { CampaignService } from "../services/campaigns/CampaignService.js";
 import {
@@ -37,7 +36,7 @@ campaignsPublicRoutes.get("/open/:pixel", async (c) => {
   // :pixel is "<recipientId>.png" — strip the extension.
   const recipientId = c.req.param("pixel").replace(/\.(png|gif)$/i, "");
   if (recipientId) {
-    await CampaignService.create(getDb()).markOpened(recipientId);
+    await CampaignService.live().markOpened(recipientId);
   }
   return new Response(PIXEL, {
     status: 200,
@@ -67,7 +66,7 @@ campaignsPublicRoutes.get("/click/:recipientId", async (c) => {
     return c.redirect(frontendBaseUrl(), 302);
   }
 
-  await CampaignService.create(getDb()).markClicked(recipientId);
+  await CampaignService.live().markClicked(recipientId);
   return c.redirect(target, 302);
 });
 

@@ -5,7 +5,7 @@
  * field names its clients already read.
  */
 
-import type { WalletLedgerRow, WalletRow } from "./walletRepository.js";
+import type { WalletLedgerRow, WalletRow } from "./walletTypes.js";
 
 // ── balances ──────────────────────────────────────────────────────────────
 

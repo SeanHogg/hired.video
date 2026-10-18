@@ -18,7 +18,7 @@ import { z } from "zod";
 
 // ─── Category taxonomy ──────────────────────────────────────────────────────
 // Job alerts are intentionally NOT here — they keep their own existing toggle
-// (account_preferences.jobAlertEmailsEnabled).
+// (user_settings.jobAlertEmailsEnabled).
 export const MARKETING_CATEGORIES = [
   "tips_coaching",
   "product_launches",

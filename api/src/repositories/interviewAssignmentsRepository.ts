@@ -64,13 +64,17 @@ export async function findInterviewsForCreator(
     .where(and(eq(studioAsyncInterviews.recruiterId, recruiterId), inArray(studioAsyncInterviews.id, ids)));
 }
 
-export async function listInterviewsCreatedBy(db: Db, recruiterId: string): Promise<InterviewAssignmentRow[]> {
+export async function listInterviewsCreatedBy(
+  db: Db,
+  recruiterId: string,
+  opts: { limit?: number } = {},
+): Promise<InterviewAssignmentRow[]> {
   return db
     .select()
     .from(studioAsyncInterviews)
     .where(eq(studioAsyncInterviews.recruiterId, recruiterId))
     .orderBy(desc(studioAsyncInterviews.createdAt))
-    .limit(MINE_LIST_LIMIT);
+    .limit(opts.limit ?? MINE_LIST_LIMIT);
 }
 
 /** Bound to the candidate, or addressed to their email and not yet claimed. */
@@ -200,15 +204,18 @@ export async function updateResponse(
   return row ?? null;
 }
 
+/** Marks the candidate's answers submitted; returns how many rows matched. */
 export async function markCandidateResponsesSubmitted(
   db: Db,
   interviewId: string,
   candidateId: string,
-): Promise<void> {
-  await db
+): Promise<number> {
+  const rows = await db
     .update(studioAsyncResponses)
     .set({ status: "submitted" })
-    .where(and(eq(studioAsyncResponses.interviewId, interviewId), eq(studioAsyncResponses.candidateId, candidateId)));
+    .where(and(eq(studioAsyncResponses.interviewId, interviewId), eq(studioAsyncResponses.candidateId, candidateId)))
+    .returning({ id: studioAsyncResponses.id });
+  return rows.length;
 }
 
 // ─── Neighbouring tables ────────────────────────────────────────────────────

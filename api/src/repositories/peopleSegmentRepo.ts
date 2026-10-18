@@ -31,6 +31,11 @@ export class PeopleSegmentRepo {
     return orderCol ? await q.orderBy(desc(orderCol)) : await q;
   }
 
+  /** Rows whose `field` column equals `value`, newest first by `orderField` (default created_at). */
+  listByField(s: SegmentScope, field: string, value: unknown, orderField?: string): Promise<any[]> {
+    return this.list(s, [eq(this.table[field], value)], orderField ? this.table[orderField] : this.table.createdAt);
+  }
+
   async findById(s: SegmentScope, id: string): Promise<any | null> {
     const [row] = await this.db
       .select()

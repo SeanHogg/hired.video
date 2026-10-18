@@ -24,5 +24,3 @@ settingsRoutes.route("/", settingsPreferenceRoutes);
 settingsRoutes.route("/", settingsPrivacyRoutes);
 settingsRoutes.route("/", settingsSecurityRoutes);
 settingsRoutes.route("/", settingsExportRoutes);
-
-settingsRoutes.all("*", (c) => c.json({ error: { code: "NOT_FOUND", message: "Settings endpoint not found" } }, 404));

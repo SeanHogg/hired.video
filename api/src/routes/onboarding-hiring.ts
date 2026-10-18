@@ -1,15 +1,30 @@
 import { Hono } from "hono";
-import { and, desc, eq, count } from "drizzle-orm";
 import { getEnv } from "../utils/env.js";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
-import type { Variables, AppEnv } from "../types/index.js";
-import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
+import type { AppEnv } from "../types/index.js";
+import { success } from "../types/index.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
-import { isDevEnvironment } from "../utils/runtime-env.js";
-import { logger } from "../lib/logger.js";
 import { hexToBytes, hmacSha256Verify } from "../utils/crypto.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
+import {
+  acceptOffer,
+  createOffer,
+  declineOffer,
+  getOffer,
+  listOffers,
+  markOfferSigned,
+  removeOffer,
+  sendOffer,
+  sendOfferForSignature,
+} from "../services/hiring/offer-letters.js";
+import {
+  completeTask,
+  createChecklist,
+  getChecklist,
+  listChecklists,
+} from "../services/hiring/onboarding-checklists.js";
 
 export const hiringOnboardingRoutes = new Hono<AppEnv>();
 
@@ -32,150 +47,49 @@ const CreateOfferSchema = z.object({
 
 // GET /api/hiring/offers
 hiringOnboardingRoutes.get("/offers", requirePro("Hiring & Onboarding"), async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-
-  const offers = await db
-    .select()
-    .from(schema.offerLetters)
-    .where(eq(schema.offerLetters.createdByUserId, userId))
-    .orderBy(desc(schema.offerLetters.createdAt));
-
-  return c.json(success(offers), 200);
+  const userId = requireUser(c);
+  return c.json(success(await listOffers(userId)), 200);
 });
 
 // POST /api/hiring/offers
-hiringOnboardingRoutes.post("/offers", requirePro("Hiring & Onboarding"), async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
-  const body = await c.req.json().catch(() => null);
-  const parsed = CreateOfferSchema.safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-
-  const db = getDb();
-  const expiresAt = new Date(Date.now() + parsed.data.expiresInDays * 24 * 60 * 60 * 1000);
-
-  const [offer] = await db
-    .insert(schema.offerLetters)
-    .values({
-      createdByUserId: userId,
-      candidateUserId: parsed.data.candidateUserId,
-      candidateName: parsed.data.candidateName,
-      candidateEmail: parsed.data.candidateEmail,
-      jobTitle: parsed.data.jobTitle,
-      companyName: parsed.data.companyName,
-      salary: parsed.data.salary ? String(parsed.data.salary) : undefined,
-      currency: parsed.data.currency,
-      startDate: parsed.data.startDate ? new Date(parsed.data.startDate) : undefined,
-      expiresAt,
-      bodyHtml: parsed.data.bodyHtml,
-      status: "draft",
-    } as any)
-    .returning();
-
+hiringOnboardingRoutes.post("/offers", requirePro("Hiring & Onboarding"), validateJson(CreateOfferSchema, undefined, { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const offer = await createOffer(userId, c.req.valid("json"));
   return c.json(success(offer), 201);
 });
 
 // GET /api/hiring/offers/:id
 hiringOnboardingRoutes.get("/offers/:id", requirePro("Hiring & Onboarding"), async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-
-  const [offer] = await db
-    .select()
-    .from(schema.offerLetters)
-    .where(and(eq(schema.offerLetters.id, c.req.param("id")), eq(schema.offerLetters.createdByUserId, userId)))
-    .limit(1);
-
-  if (!offer) return c.json(error("NOT_FOUND", "Offer letter not found"), 404);
-  return c.json(success(offer), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getOffer(c.req.param("id"), userId)), 200);
 });
 
 // PATCH /api/hiring/offers/:id/send
 hiringOnboardingRoutes.patch("/offers/:id/send", requirePro("Hiring & Onboarding"), async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-
-  const [offer] = await db
-    .select({ id: schema.offerLetters.id, status: schema.offerLetters.status })
-    .from(schema.offerLetters)
-    .where(and(eq(schema.offerLetters.id, c.req.param("id")), eq(schema.offerLetters.createdByUserId, userId)))
-    .limit(1);
-
-  if (!offer) return c.json(error("NOT_FOUND", "Offer letter not found"), 404);
-  if (offer.status !== "draft") return c.json(error("CONFLICT", "Offer has already been sent"), 409);
-
-  const [updated] = await db
-    .update(schema.offerLetters)
-    .set({ status: "sent", updatedAt: new Date() } as any)
-    .where(eq(schema.offerLetters.id, offer.id))
-    .returning();
-
-  return c.json(success(updated), 200);
+  const userId = requireUser(c);
+  return c.json(success(await sendOffer(c.req.param("id"), userId)), 200);
 });
 
 // PATCH /api/hiring/offers/:id/accept  — candidate accepts (public token-based endpoint in future)
 hiringOnboardingRoutes.patch("/offers/:id/accept", async (c) => {
-  const db = getDb();
-  const [offer] = await db
-    .select({ id: schema.offerLetters.id, status: schema.offerLetters.status })
-    .from(schema.offerLetters)
-    .where(eq(schema.offerLetters.id, c.req.param("id")))
-    .limit(1);
-
-  if (!offer) return c.json(error("NOT_FOUND", "Offer not found"), 404);
-  if (!["sent", "viewed"].includes(offer.status))
-    return c.json(error("CONFLICT", "Offer cannot be accepted in its current state"), 409);
-
+  const id = c.req.param("id");
   const body = await c.req.json().catch(() => ({}));
-  const [updated] = await db
-    .update(schema.offerLetters)
-    .set({ status: "accepted", signedAt: new Date(), signatureData: body.signatureData ?? null, updatedAt: new Date() } as any)
-    .where(eq(schema.offerLetters.id, offer.id))
-    .returning();
-
+  const updated = await acceptOffer(id, (body.signatureData ?? null) as string | null);
   return c.json(success(updated), 200);
 });
 
 // PATCH /api/hiring/offers/:id/decline
 hiringOnboardingRoutes.patch("/offers/:id/decline", async (c) => {
-  const db = getDb();
-  const [offer] = await db
-    .select({ id: schema.offerLetters.id, status: schema.offerLetters.status })
-    .from(schema.offerLetters)
-    .where(eq(schema.offerLetters.id, c.req.param("id")))
-    .limit(1);
-
-  if (!offer) return c.json(error("NOT_FOUND", "Offer not found"), 404);
-
+  const id = c.req.param("id");
   const body = await c.req.json().catch(() => ({}));
-  const [updated] = await db
-    .update(schema.offerLetters)
-    .set({ status: "declined", declineReason: body.reason ?? null, updatedAt: new Date() } as any)
-    .where(eq(schema.offerLetters.id, offer.id))
-    .returning();
-
+  const updated = await declineOffer(id, (body.reason ?? null) as string | null);
   return c.json(success(updated), 200);
 });
 
 // DELETE /api/hiring/offers/:id
 hiringOnboardingRoutes.delete("/offers/:id", requirePro("Hiring & Onboarding"), async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-
-  const [offer] = await db
-    .select({ id: schema.offerLetters.id })
-    .from(schema.offerLetters)
-    .where(and(eq(schema.offerLetters.id, c.req.param("id")), eq(schema.offerLetters.createdByUserId, userId)))
-    .limit(1);
-
-  if (!offer) return c.json(error("NOT_FOUND", "Offer letter not found"), 404);
-  await db.delete(schema.offerLetters).where(eq(schema.offerLetters.id, offer.id));
+  const userId = requireUser(c);
+  await removeOffer(c.req.param("id"), userId);
   return c.json(success({ deleted: true }), 200);
 });
 
@@ -199,114 +113,28 @@ const CreateChecklistSchema = z.object({
 
 // GET /api/hiring/checklists
 hiringOnboardingRoutes.get("/checklists", requirePro("Hiring & Onboarding"), async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-
-  const checklists = await db
-    .select()
-    .from(schema.onboardingChecklists)
-    .where(eq(schema.onboardingChecklists.createdByUserId, userId))
-    .orderBy(desc(schema.onboardingChecklists.createdAt));
-
-  return c.json(success(checklists), 200);
+  const userId = requireUser(c);
+  return c.json(success(await listChecklists(userId)), 200);
 });
 
 // POST /api/hiring/checklists
-hiringOnboardingRoutes.post("/checklists", requirePro("Hiring & Onboarding"), async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
-  const body = await c.req.json().catch(() => null);
-  const parsed = CreateChecklistSchema.safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-
-  const db = getDb();
-  const [checklist] = await db
-    .insert(schema.onboardingChecklists)
-    .values({
-      createdByUserId: userId,
-      candidateUserId: parsed.data.candidateUserId,
-      offerLetterId: parsed.data.offerLetterId,
-      candidateName: parsed.data.candidateName,
-      jobTitle: parsed.data.jobTitle,
-      startDate: parsed.data.startDate ? new Date(parsed.data.startDate) : undefined,
-      status: "pending",
-      completionPercentage: "0",
-    } as any)
-    .returning();
-
-  const tasks = await db
-    .insert(schema.onboardingTasks)
-    .values(
-      parsed.data.tasks.map((t, i) => ({
-        checklistId: checklist.id,
-        title: t.title,
-        description: t.description,
-        category: t.category ?? "general",
-        dueDate: t.dueDate ? new Date(t.dueDate) : undefined,
-        sortOrder: String(i + 1),
-      })),
-    )
-    .returning();
-
-  return c.json(success({ ...checklist, tasks }), 201);
+hiringOnboardingRoutes.post("/checklists", requirePro("Hiring & Onboarding"), validateJson(CreateChecklistSchema, undefined, { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const checklist = await createChecklist(userId, c.req.valid("json"));
+  return c.json(success(checklist), 201);
 });
 
 // GET /api/hiring/checklists/:id
 hiringOnboardingRoutes.get("/checklists/:id", requirePro("Hiring & Onboarding"), async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-
-  const [checklist] = await db
-    .select()
-    .from(schema.onboardingChecklists)
-    .where(and(eq(schema.onboardingChecklists.id, c.req.param("id")), eq(schema.onboardingChecklists.createdByUserId, userId)))
-    .limit(1);
-
-  if (!checklist) return c.json(error("NOT_FOUND", "Checklist not found"), 404);
-
-  const tasks = await db
-    .select()
-    .from(schema.onboardingTasks)
-    .where(eq(schema.onboardingTasks.checklistId, checklist.id));
-
-  return c.json(success({ ...checklist, tasks }), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getChecklist(c.req.param("id"), userId)), 200);
 });
 
 // PATCH /api/hiring/checklists/:id/tasks/:taskId/complete
 hiringOnboardingRoutes.patch("/checklists/:id/tasks/:taskId/complete", requirePro("Hiring & Onboarding"), async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-
-  const [checklist] = await db
-    .select({ id: schema.onboardingChecklists.id })
-    .from(schema.onboardingChecklists)
-    .where(and(eq(schema.onboardingChecklists.id, c.req.param("id")), eq(schema.onboardingChecklists.createdByUserId, userId)))
-    .limit(1);
-
-  if (!checklist) return c.json(error("NOT_FOUND", "Checklist not found"), 404);
-
-  await db
-    .update(schema.onboardingTasks)
-    .set({ isCompleted: true, completedAt: new Date(), completedByUserId: userId } as any)
-    .where(and(eq(schema.onboardingTasks.id, c.req.param("taskId")), eq(schema.onboardingTasks.checklistId, checklist.id)));
-
-  // Recompute completion percentage
-  const allTasks = await db.select().from(schema.onboardingTasks).where(eq(schema.onboardingTasks.checklistId, checklist.id));
-  const completedCount = allTasks.filter((t) => t.isCompleted).length;
-  const pct = allTasks.length > 0 ? Math.round((completedCount / allTasks.length) * 100) : 0;
-  const newStatus = pct === 100 ? "completed" : pct > 0 ? "in_progress" : "pending";
-
-  const [updated] = await db
-    .update(schema.onboardingChecklists)
-    .set({ completionPercentage: String(pct), status: newStatus, updatedAt: new Date() } as any)
-    .where(eq(schema.onboardingChecklists.id, checklist.id))
-    .returning();
-
-  return c.json(success({ checklist: updated, completionPercentage: pct }), 200);
+  const userId = requireUser(c);
+  const result = await completeTask(c.req.param("id"), c.req.param("taskId"), userId);
+  return c.json(success(result), 200);
 });
 
 // ---------------------------------------------------------------------------
@@ -317,92 +145,21 @@ hiringOnboardingRoutes.patch("/checklists/:id/tasks/:taskId/complete", requirePr
 // ---------------------------------------------------------------------------
 
 hiringOnboardingRoutes.post("/offers/:id/send-for-signature", requirePro("E-Signature"), async (c) => {
-  const userId = c.var.user?.sub as string | undefined;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
-  const db = getDb();
-  const [offer] = await db
-    .select()
-    .from(schema.offerLetters)
-    .where(and(eq(schema.offerLetters.id, c.req.param("id")), eq((schema.offerLetters as any).recruiterId, userId)))
-    .limit(1);
-
-  if (!offer) return c.json(error("NOT_FOUND", "Offer letter not found"), 404);
-  if (offer.status === "signed") return c.json(error("CONFLICT", "Offer letter is already signed"), 409);
-
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => ({}));
-  const signerName: string = body.signerName ?? offer.candidateName;
-  const signerEmail: string = body.signerEmail ?? offer.candidateEmail;
-
-  const apiKey = getEnv("DROPBOX_SIGN_API_KEY");
-
-  let signatureRequestId: string | null = null;
-  let signingUrl: string | null = null;
-
-  if (apiKey) {
-    try {
-      // Dropbox Sign — create an embedded signature request
-      const formData = {
-        test_mode: isDevEnvironment() ? 1 : 0,
-        "signers[0][email_address]": signerEmail,
-        "signers[0][name]": signerName,
-        "signers[0][order]": 0,
-        title: `Offer Letter — ${offer.jobTitle}`,
-        subject: `Please sign your offer letter for ${offer.companyName}`,
-        message: `Hi ${signerName}, please review and sign your offer letter for the ${offer.jobTitle} position at ${offer.companyName}.`,
-        signing_redirect_url: `${process.env.FRONTEND_URL ?? "https://hired.video"}/hiring/offers/${offer.id}/signed`,
-        "files[0]": offer.bodyHtml ?? `<p>Offer for ${offer.jobTitle}</p>`,
-        "file_type[0]": "HTML",
-        "metadata[offerId]": offer.id,
-      };
-      const encoded = new URLSearchParams(formData as any).toString();
-      const res = await fetch("https://api.hellosign.com/v3/signature_request/create_embedded", {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${btoa(apiKey + ":")}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: encoded,
-      });
-      if (res.ok) {
-        const data: any = await res.json();
-        signatureRequestId = data?.signature_request?.signature_request_id ?? null;
-        const firstSig = data?.signature_request?.signatures?.[0];
-        if (firstSig?.signature_id) {
-          // Get embedded signing URL
-          const urlRes = await fetch(`https://api.hellosign.com/v3/embedded/sign_url/${firstSig.signature_id}`, {
-            headers: { Authorization: `Basic ${btoa(apiKey + ":")}` },
-          });
-          if (urlRes.ok) {
-            const urlData: any = await urlRes.json();
-            signingUrl = urlData?.embedded?.sign_url ?? null;
-          }
-        }
-      }
-    } catch (err) {
-      logger.error("[e-sign] Dropbox Sign error", err);
-    }
-  }
-
-  // Update offer status
-  await db.update(schema.offerLetters)
-    .set({ status: "sent", updatedAt: new Date() } as any)
-    .where(eq(schema.offerLetters.id, offer.id));
-
-  return c.json(success({
-    offerId: offer.id,
-    signatureRequestId,
-    signingUrl,
-    signerEmail,
-    status: "sent",
-    note: apiKey ? "Signature request created via Dropbox Sign" : "DROPBOX_SIGN_API_KEY not set — stub response",
-  }), 200);
+  const result = await sendOfferForSignature(
+    c.req.param("id"),
+    userId,
+    { signerName: body.signerName, signerEmail: body.signerEmail },
+    getEnv("DROPBOX_SIGN_API_KEY"),
+  );
+  return c.json(success(result), 200);
 });
 
 /**
  * POST /api/hiring/offers/webhook/dropbox-sign
  * Receives Dropbox Sign event webhooks (signature_request_signed, etc.)
- * Verifies HMAC and marks the offer as signed.
+ * Verifies HMAC and marks the offer as signed. Raw (non-envelope) bodies.
  */
 hiringOnboardingRoutes.post("/offers/webhook/dropbox-sign", async (c) => {
   const rawBody = await c.req.text();
@@ -417,24 +174,18 @@ hiringOnboardingRoutes.post("/offers/webhook/dropbox-sign", async (c) => {
     } catch { /* non-fatal — log and continue */ }
   }
 
-  let payload: any;
+  let payload: {
+    event?: { event_type?: string };
+    signature_request?: { metadata?: { offerId?: string } };
+  } | null;
   try { payload = JSON.parse(rawBody); } catch { return c.json({ error: "Invalid JSON" }, 400); }
 
   const event = payload?.event?.event_type ?? "";
-  const metadata = payload?.signature_request?.metadata ?? {};
-  const offerId: string = metadata.offerId ?? "";
+  const offerId = payload?.signature_request?.metadata?.offerId ?? "";
 
   if (event === "signature_request_signed" && offerId) {
-    const db = getDb();
-    await db.update(schema.offerLetters)
-      .set({ status: "signed", signedAt: new Date(), updatedAt: new Date() } as any)
-      .where(eq(schema.offerLetters.id, offerId))
-      .catch(() => undefined);
+    await markOfferSigned(offerId);
   }
 
   return c.json({ received: true }, 200);
 });
-
-hiringOnboardingRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Hiring & onboarding route not found" } }, 404),
-);

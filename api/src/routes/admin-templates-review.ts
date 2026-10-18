@@ -15,6 +15,7 @@ import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { TemplateReviewRepository, type TemplateDecision } from "../repositories/admin/templateReviewRepository.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const adminTemplatesReviewRoutes = new Hono<AppEnv>();
 
@@ -28,14 +29,16 @@ adminTemplatesReviewRoutes.get("/", async (c) => {
 
 const DecisionSchema = z.object({ notes: z.string().max(5_000).optional() });
 
+type DecisionCtx = Context<AppEnv, string, { out: { json: z.output<typeof DecisionSchema> } }>;
+const decisionBody = validateJson(DecisionSchema, () => error("VALIDATION_ERROR", "Invalid decision body"));
+
 function decide(decision: TemplateDecision) {
-  return async (c: Context<AppEnv>) => {
+  return async (c: DecisionCtx) => {
     const kind = c.req.param("kind");
     if (!isReviewKind(kind)) return c.json(error("VALIDATION_ERROR", "kind must be 'studio' or 'job'"), 400);
-    const parsed = DecisionSchema.safeParse(await c.req.json().catch(() => ({})));
-    if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid decision body"), 400);
+    const { notes } = c.req.valid("json");
     try {
-      const row = await TemplateReviewRepository.create().decide(c.req.param("id"), decision, parsed.data.notes ?? null);
+      const row = await TemplateReviewRepository.create().decide(c.req.param("id"), decision, notes ?? null);
       if (!row) return c.json(error("NOT_FOUND", "Template not found"), 404);
       return c.json(success({ kind, row }), 200);
     } catch (err) {
@@ -45,5 +48,5 @@ function decide(decision: TemplateDecision) {
   };
 }
 
-adminTemplatesReviewRoutes.post("/:kind/:id/approve", decide("approved"));
-adminTemplatesReviewRoutes.post("/:kind/:id/reject", decide("rejected"));
+adminTemplatesReviewRoutes.post("/:kind/:id/approve", decisionBody, decide("approved"));
+adminTemplatesReviewRoutes.post("/:kind/:id/reject", decisionBody, decide("rejected"));

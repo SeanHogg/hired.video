@@ -19,10 +19,9 @@
 import { Hono } from "hono";
 import { frontendBaseUrl } from "../utils/public-urls.js";
 import { z } from "zod";
-import type { Context } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import type { AppEnv, JwtPayload } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb } from "../db/index.js";
 import { invalidateCachedKey } from "../utils/edge-cache.js";
 import { partnerAuth } from "../middleware/partnerAuth.js";
 import { getPartner } from "../services/partner/partners.js";
@@ -39,7 +38,6 @@ import {
   getConnection,
   revokeConnection,
   partnerProfileCacheKey,
-  ConnectionRequiredError,
 } from "../services/partner/connections.js";
 import { mintEmbedToken } from "../services/partner/tokens.js";
 import { createBlankResume } from "../services/resume/create.js";
@@ -47,9 +45,7 @@ import { asHandler } from "../handlers/shared.js";
 
 // The create use case returns the résumé / throws DomainError → envelope.
 const handleCreateResume = asHandler(createBlankResume, 201);
-import { buildResumeParserPort } from "../services/resume/deps.js";
-import { buildRepos } from "../repositories/index.js";
-import { refreshDiffPercentFor } from "../services/resume/view.js";
+import { buildResumeDeps } from "../services/resume/deps.js";
 import { runResumeParse } from "../services/resume/parsePipeline.js";
 import { createAiTextCaller, hasAiTextProvider } from "../services/adapters/ai-text-caller.js";
 import { resolvePartnerResumeAiParse, buildPartnerTextParser } from "../services/partner/resumeTextParser.js";
@@ -62,6 +58,7 @@ import {
   PARTNER_RESUME_UPLOAD_MAX_BYTES,
   type PartnerScope,
 } from "../../../shared/partner.js";
+import { validateJson } from "./helpers/validate.js";
 
 /** Decode a résumé `file` (base64, data-URL, or raw PDF bytes) and extract
  *  its text. PDF/DOCX are extracted server-side; a scanned PDF with no text
@@ -129,7 +126,6 @@ function billingSubject(userId: string): JwtPayload {
  *  to that account. JSON Resume short-circuits; AI failure falls back to
  *  the regex parser so a partner write never fails on the model. */
 function partnerResumeDeps(c: Context<AppEnv>, partnerId: string, jobSeekerUserId: string) {
-  const now = () => new Date();
   const aiParse = hasAiTextProvider(c.env)
     ? (text: string, billedUserId: string) =>
         runResumeParse(text, {
@@ -141,22 +137,24 @@ function partnerResumeDeps(c: Context<AppEnv>, partnerId: string, jobSeekerUserI
           extractSkills: null,
         })
     : null;
-  return {
-    repo: buildRepos(getDb(), now).resumes,
-    parser: buildResumeParserPort(
-      buildPartnerTextParser({
-        mode: resolvePartnerResumeAiParse(c.env.PARTNER_RESUME_AI_PARSE),
-        context: async () => ({
-          partnerOwnerUserId: (await getPartner(partnerId))?.ownerUserId ?? null,
-          jobSeekerUserId,
-        }),
-        aiParse,
+  return buildResumeDeps(
+    buildPartnerTextParser({
+      mode: resolvePartnerResumeAiParse(c.env.PARTNER_RESUME_AI_PARSE),
+      context: async () => ({
+        partnerOwnerUserId: (await getPartner(partnerId))?.ownerUserId ?? null,
+        jobSeekerUserId,
       }),
-    ),
-    diff: { refresh: refreshDiffPercentFor },
-    now,
-  };
+      aiParse,
+    }),
+  );
 }
+
+/** Gate on an ACTIVE connection to `:userId` before anything else (incl. body
+ *  validation). ConnectionRequiredError is a DomainError (403 FORBIDDEN). */
+const activeConnectionParam: MiddlewareHandler<AppEnv> = async (c, next) => {
+  await requireActiveConnection(c.var.partner!.partnerId, c.req.param("userId")!);
+  await next();
+};
 
 // ── GET /v1/me — whoami ─────────────────────────────────────────────────────
 partnerRoutes.get("/v1/me", partnerAuth(null), async (c) => {
@@ -215,20 +213,16 @@ const CreateJobSeekerBody = z.object({
   resume: ResumeWriteBody.optional(),
 });
 
-partnerRoutes.post("/v1/job-seekers", partnerAuth("write:job_seekers"), async (c) => {
+partnerRoutes.post("/v1/job-seekers", partnerAuth("write:job_seekers"), validateJson(CreateJobSeekerBody, (e) => error("VALIDATION_ERROR", "Invalid request body", e.flatten()), { emptyBody: null }), async (c) => {
   const { partnerId, scopes } = c.var.partner!;
-  const body = await c.req.json().catch(() => null);
-  const parsed = CreateJobSeekerBody.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
-  }
+  const body = c.req.valid("json");
 
   const result = await createJobSeekerForPartner({
     partnerId,
-    email: parsed.data.email,
-    name: parsed.data.name,
-    password: parsed.data.password ?? null,
-    externalUserId: parsed.data.externalUserId ?? null,
+    email: body.email,
+    name: body.name,
+    password: body.password ?? null,
+    externalUserId: body.externalUserId ?? null,
     grantScopes: grantedScopes(scopes),
   });
 
@@ -261,8 +255,8 @@ partnerRoutes.post("/v1/job-seekers", partnerAuth("write:job_seekers"), async (c
 
   // Optional first resume — reuse the canonical write path.
   let resumeId: string | null = null;
-  if (parsed.data.resume) {
-    const resolved = await resolveResumeWrite(parsed.data.resume, (image) => ocrResumeImage(c, image));
+  if (body.resume) {
+    const resolved = await resolveResumeWrite(body.resume, (image) => ocrResumeImage(c, image));
     // A malformed résumé must not orphan the just-created account — surface the
     // decode error but keep the account (the partner can retry uploadResume).
     // `in`-narrowing: non-strict tsconfig won't narrow on `!resolved.ok`.
@@ -304,21 +298,10 @@ partnerRoutes.post("/v1/job-seekers", partnerAuth("write:job_seekers"), async (c
 });
 
 // ── POST /v1/job-seekers/:userId/resumes — upload a resume ──────────────────
-partnerRoutes.post("/v1/job-seekers/:userId/resumes", partnerAuth("write:resumes"), async (c) => {
+partnerRoutes.post("/v1/job-seekers/:userId/resumes", partnerAuth("write:resumes"), activeConnectionParam, validateJson(ResumeWriteBody, (e) => error("VALIDATION_ERROR", "Invalid request body", e.flatten()), { emptyBody: null }), async (c) => {
   const { partnerId } = c.var.partner!;
   const userId = c.req.param("userId");
-  try {
-    await requireActiveConnection(partnerId, userId);
-  } catch (e) {
-    if (e instanceof ConnectionRequiredError) return c.json(error("FORBIDDEN", e.message), 403);
-    throw e;
-  }
-  const body = await c.req.json().catch(() => null);
-  const parsed = ResumeWriteBody.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
-  }
-  const resolved = await resolveResumeWrite(parsed.data, (image) => ocrResumeImage(c, image));
+  const resolved = await resolveResumeWrite(c.req.valid("json"), (image) => ocrResumeImage(c, image));
   if ("code" in resolved) { // in-narrowing (non-strict tsconfig)
     return c.json(error(resolved.code, resolved.message), resolved.status as any);
   }
@@ -347,15 +330,9 @@ partnerRoutes.get(
 );
 
 // ── GET /v1/job-seekers/:userId/profile — live profile + resume ─────────────
-partnerRoutes.get("/v1/job-seekers/:userId/profile", partnerAuth("read:profile"), async (c) => {
+partnerRoutes.get("/v1/job-seekers/:userId/profile", partnerAuth("read:profile"), activeConnectionParam, async (c) => {
   const { partnerId } = c.var.partner!;
   const userId = c.req.param("userId");
-  try {
-    await requireActiveConnection(partnerId, userId);
-  } catch (e) {
-    if (e instanceof ConnectionRequiredError) return c.json(error("FORBIDDEN", e.message), 403);
-    throw e;
-  }
   const payload = await getProfileForPartner(partnerId, userId);
   if (!payload) return c.json(error("NOT_FOUND", "Profile not found"), 404);
   // ETag from the résumé/profile updatedAt so a polling partner can send
@@ -375,23 +352,19 @@ const ConnectBody = z.object({
   redirectUrl: z.string().url().max(2000).optional(),
 });
 
-partnerRoutes.post("/v1/connect", partnerAuth("write:connections"), async (c) => {
+partnerRoutes.post("/v1/connect", partnerAuth("write:connections"), validateJson(ConnectBody, (e) => error("VALIDATION_ERROR", "Invalid request body", e.flatten()), { emptyBody: null }), async (c) => {
   const { partnerId, scopes } = c.var.partner!;
-  const body = await c.req.json().catch(() => null);
-  const parsed = ConnectBody.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
-  }
+  const body = c.req.valid("json");
   const partner = await getPartner(partnerId);
   if (!partner) return c.json(error("NOT_FOUND", "Partner not found"), 404);
 
   const result = await connectExistingAccount({
     partnerId,
     partnerSlug: partner.slug,
-    email: parsed.data.email,
-    externalUserId: parsed.data.externalUserId ?? null,
+    email: body.email,
+    externalUserId: body.externalUserId ?? null,
     grantScopes: grantedScopes(scopes),
-    redirectUrl: parsed.data.redirectUrl ?? null,
+    redirectUrl: body.redirectUrl ?? null,
   });
 
   if (!result.ok) {
@@ -440,38 +413,29 @@ const EmbedTokenBody = z.object({
   locale: z.string().max(10).optional(),
 });
 
-partnerRoutes.post("/v1/embed-tokens", partnerAuth("read:profile"), async (c) => {
+partnerRoutes.post("/v1/embed-tokens", partnerAuth("read:profile"), validateJson(EmbedTokenBody, (e) => error("VALIDATION_ERROR", "Invalid request body", e.flatten()), { emptyBody: null }), async (c) => {
   const { partnerId } = c.var.partner!;
-  const body = await c.req.json().catch(() => null);
-  const parsed = EmbedTokenBody.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
-  }
-  try {
-    await requireActiveConnection(partnerId, parsed.data.userId);
-  } catch (e) {
-    if (e instanceof ConnectionRequiredError) return c.json(error("FORBIDDEN", e.message), 403);
-    throw e;
-  }
-  const { token, expiresAt } = await mintEmbedToken(partnerId, parsed.data.userId, parsed.data.kind);
+  const body = c.req.valid("json");
+  await requireActiveConnection(partnerId, body.userId);
+  const { token, expiresAt } = await mintEmbedToken(partnerId, body.userId, body.kind);
   // The embed reuses the canonical `/embedded/resume/:identifier` page — the
   // token rides as `?pt=` and grants owner-level read of the connected job
   // seeker's (possibly private) resume. No bespoke partner embed page/endpoint.
-  const resumeId = await getPrimaryResumeId(parsed.data.userId);
+  const resumeId = await getPrimaryResumeId(body.userId);
   const base = frontendBaseUrl();
   let embedUrl: string | null = null;
   if (resumeId) {
     const params = new URLSearchParams({ pt: token });
-    if (parsed.data.theme) params.set("theme", parsed.data.theme);
-    if (parsed.data.locale) params.set("locale", parsed.data.locale);
+    if (body.theme) params.set("theme", body.theme);
+    if (body.locale) params.set("locale", body.locale);
     embedUrl = `${base}/embedded/resume/${resumeId}?${params.toString()}`;
   }
   return c.json(
     success({
       token,
-      kind: parsed.data.kind,
-      theme: parsed.data.theme ?? null,
-      locale: parsed.data.locale ?? null,
+      kind: body.kind,
+      theme: body.theme ?? null,
+      locale: body.locale ?? null,
       resumeId,
       embedUrl,
       expiresAt: expiresAt.toISOString(),
@@ -479,7 +443,3 @@ partnerRoutes.post("/v1/embed-tokens", partnerAuth("read:profile"), async (c) =>
     200,
   );
 });
-
-partnerRoutes.all("*", (c) =>
-  c.json(error("NOT_FOUND", "Partner API route not found"), 404),
-);

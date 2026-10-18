@@ -3,10 +3,8 @@
  * session persistence and client-executed tool calls.
  */
 import { Hono } from "hono";
-import { and, eq, desc } from "drizzle-orm";
 import type { AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
-import { getDb, schema } from "../../db/index.js";
 import {
   createLLMClient,
   hasAnyLLMProviderKey,
@@ -19,10 +17,14 @@ import { estimateTokens } from "../../services/adapters/llm-stream.js";
 import { checkTokenBudget } from "../../middleware/tierEnforcement.js";
 import { servicesProcessor } from "../../domains/services-processing/index.js";
 import { getPrompt } from "../../../../shared/ai-prompts/index.js";
-import { logger } from "../../lib/logger.js";
+import {
+  loadCoachHistory,
+  persistCoachMessage,
+  resolveCoachSession,
+} from "../../services/messaging/aiCoachSessions.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 
 export const aiChatRoutes = new Hono<AppEnv>();
-
 
 // Career-coach persona — single source in shared/ai-prompts/. The
 // in-app AIChatPanel reads from the same prompt so the persona never
@@ -84,8 +86,7 @@ function isToolSpec(v: unknown): v is ToolSpec {
 }
 
 aiChatRoutes.post("/chat", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
 
   const limitError = await checkTokenBudget(c as any);
   if (limitError) return limitError;
@@ -118,45 +119,12 @@ aiChatRoutes.post("/chat", async (c) => {
     if (blocked) return blocked;
   }
 
-  const db = getDb();
-
-  // Resolve or create a chat session. The ownership filter (`userId` AND
-  // `id`) is load-bearing: without it, any authenticated user could post
-  // a turn that persists into another user's session by guessing or
-  // observing the UUID — leaking content + corrupting their history. If
-  // the supplied session id is missing or belongs to someone else we
-  // silently fall through to creating a fresh session below.
-  let sessionId = incomingSessionId;
-  if (sessionId) {
-    const [existing] = await db
-      .select({ id: schema.aiChatSessions.id })
-      .from(schema.aiChatSessions)
-      .where(and(
-        eq(schema.aiChatSessions.id, sessionId),
-        eq(schema.aiChatSessions.userId, userId),
-      ))
-      .limit(1);
-    if (!existing) sessionId = null;
-  }
-
-  if (!sessionId) {
-    const [created] = await db
-      .insert(schema.aiChatSessions)
-      .values({
-        userId,
-        title: (userMessage || "Tool-call follow-up").slice(0, 100),
-        model: "google/gemini-flash-1.5",
-        systemPrompt: customSystemPrompt,
-        isActive: true,
-      } as any)
-      .returning({ id: schema.aiChatSessions.id });
-    sessionId = created.id;
-  } else {
-    await db
-      .update(schema.aiChatSessions)
-      .set({ updatedAt: new Date() } as any)
-      .where(eq(schema.aiChatSessions.id, sessionId));
-  }
+  // Resolve or create a chat session (owner-filtered — a missing or foreign
+  // session id silently falls through to a fresh session).
+  const sessionId = await resolveCoachSession(userId, incomingSessionId, {
+    title: (userMessage || "Tool-call follow-up").slice(0, 100),
+    systemPrompt: customSystemPrompt,
+  });
 
   // Tool follow-ups carry their own minimal context (the prior assistant
   // tool_call turn + tool results); plain user turns load history from
@@ -164,37 +132,15 @@ aiChatRoutes.post("/chat", async (c) => {
   // persistence below so we don't replay the just-written turn back at
   // the LLM as duplicated context.
   if (history.length === 0 && !isToolFollowup) {
-    const prevMessages = await db
-      .select({ role: schema.aiChatMessages.role, content: schema.aiChatMessages.content })
-      .from(schema.aiChatMessages)
-      .where(eq(schema.aiChatMessages.sessionId, sessionId))
-      .orderBy(desc(schema.aiChatMessages.createdAt))
-      .limit(20);
-    history.push(...prevMessages.reverse());
+    history.push(...(await loadCoachHistory(sessionId)));
   }
 
-  // Persistence is best-effort: a failure here (Cloudflare per-invocation
-  // subrequest cap, Neon transient, FK race) must NOT take down the
-  // chat — the user message is already in the request body, the
-  // assistant response is already generated, and the client cares about
-  // getting the answer back. We log + swallow so the route still
-  // returns 200. Once gap #1578's `_pg` surface confirms the failure
-  // class we can either wrap the two writes in a Neon transaction (FK
-  // race) or trim the dispatch chain (subrequest cap).
-  //
-  // We persist the user message BEFORE the LLM call so it lands while
-  // there's still subrequest budget — the LLM dispatch + token-ledger
-  // writes inside callMessages burn most of the per-invocation cap and
-  // were leaving the post-LLM message inserts to fail every time
-  // (see #1570 + #1578).
-  async function persistChatMessage(role: "user" | "assistant", content: string, tokensUsed: number) {
-    if (!content) return;
-    try {
-      await db.insert(schema.aiChatMessages).values({ sessionId, role, content, tokensUsed } as any);
-    } catch (persistErr) {
-      logger.error("[ai/chat] persist message failed", { sessionId, role, tokensUsed, error: persistErr });
-    }
-  }
+  // Persistence is best-effort (persistCoachMessage logs + swallows). We
+  // persist the user message BEFORE the LLM call so it lands while there's
+  // still subrequest budget — the LLM dispatch + token-ledger writes inside
+  // callMessages burn most of the per-invocation cap (#1570 + #1578).
+  const persistChatMessage = (role: "user" | "assistant", content: string, tokensUsed: number) =>
+    persistCoachMessage(sessionId, role, content, tokensUsed);
 
   if (!isToolFollowup && userMessage) {
     // `tokens_used` on the message row is denormalized + approximate;

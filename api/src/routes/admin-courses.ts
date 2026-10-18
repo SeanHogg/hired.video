@@ -12,28 +12,25 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
-import { ok } from "../utils/response.js";
-import { error } from "../types/index.js";
+import { error, success } from "../types/index.js";
 import { AdminCourseCertService } from "../services/admin/AdminCourseCertService.js";
 import { gamificationFromContext } from "../domains/gamification/with-gamification.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const adminCourseRoutes = new Hono<AppEnv>();
 
 adminCourseRoutes.post("/issue-backfill-certs", async (c) => {
   const report = await AdminCourseCertService.create().backfill(gamificationFromContext(c));
-  return c.json(ok(report));
+  return c.json(success(report));
 });
 
 const RevokeSchema = z.object({
   reason: z.string().min(1).max(1000),
 });
 
-adminCourseRoutes.post("/certificates/:certNumber/revoke", async (c) => {
-  const parsed = RevokeSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
-  const result = await AdminCourseCertService.create().revoke(c.req.param("certNumber"), parsed.data.reason);
+adminCourseRoutes.post("/certificates/:certNumber/revoke", validateJson(RevokeSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
+  const result = await AdminCourseCertService.create().revoke(c.req.param("certNumber"), body.reason);
   if (!result) return c.json(error("NOT_FOUND", "Certificate not found"), 404);
-  return c.json(ok({ certificate: result }), 200);
+  return c.json(success({ certificate: result }), 200);
 });

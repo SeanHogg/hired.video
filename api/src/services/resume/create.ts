@@ -82,12 +82,16 @@ export async function createBlankResume(deps: ResumeDeps, ownerId: string, body:
   const parsed = BlankResumeSchema.safeParse(body);
   if (!parsed.success) throw invalidResumeBody(parsed.error.flatten());
 
+  // The schema strips top-level `title`/`name` from content, so infer from the raw body first.
+  const rawBodyContent = (body as { content?: unknown } | null)?.content;
+  const rawContent: Record<string, unknown> =
+    rawBodyContent && typeof rawBodyContent === "object" ? (rawBodyContent as Record<string, unknown>) : {};
   let content: unknown = parsed.data.content ?? {};
   if (parsed.data.rawText) {
     content = deps.parser.tryParseJsonResume(parsed.data.rawText) ?? (await deps.parser.parseRawText(parsed.data.rawText));
   }
   return insertOwnedResume(deps, ownerId, {
-    title: parsed.data.title ?? inferTitle(content as Record<string, unknown>) ?? "Untitled Resume",
+    title: parsed.data.title ?? inferTitle(rawContent) ?? inferTitle(content as Record<string, unknown>) ?? "Untitled Resume",
     content,
     slug: parsed.data.slug ?? null,
     status: parsed.data.status,

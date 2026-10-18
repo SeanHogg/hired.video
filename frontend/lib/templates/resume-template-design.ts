@@ -17,6 +17,7 @@ import type { DocumentState } from "@/lib/studio/editor-v2/document-state";
 import { descriptorFromResumeDocument } from "@/lib/studio/document/resume-document-descriptor";
 import { getTemplateById, type ResumeTemplateDescriptor } from "@/types/resume-template";
 import type { StudioTemplate } from "@/lib/services/studio-templates-service";
+import { mediaKindIsDocument } from "@shared/media-kinds";
 
 export type ResumeTemplateDesign = { kind: "preset"; templateId: string } | { kind: "layout"; layout: DocumentState };
 
@@ -24,7 +25,7 @@ type StudioTemplateFacts = Pick<StudioTemplate, "mediaKind" | "documentKind" | "
 
 /** True when the studio template is a résumé template. */
 export function isResumeStudioTemplate(template: Pick<StudioTemplate, "mediaKind" | "documentKind">): boolean {
-  return template.mediaKind === "document" && template.documentKind === "resume";
+  return mediaKindIsDocument(template.mediaKind) && template.documentKind === "resume";
 }
 
 /** The design a résumé studio template carries, or null when it is not a

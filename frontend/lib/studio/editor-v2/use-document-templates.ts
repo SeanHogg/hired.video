@@ -29,6 +29,7 @@ import {
   type DocumentTemplateOption,
 } from "./document-templates";
 import type { DocumentEntityKind } from "./document-state";
+import { mediaKindIsDocument } from "@shared/media-kinds";
 
 export interface DocumentTemplateGroups {
   presets: DocumentTemplateOption[];
@@ -47,7 +48,7 @@ function toOptions(
   const out: DocumentTemplateOption[] = [];
   for (const row of rows) {
     // The row's document kind (a column) says which document it designs.
-    if (row.mediaKind !== "document" || row.documentKind !== entityKind) continue;
+    if (!mediaKindIsDocument(row.mediaKind) || row.documentKind !== entityKind) continue;
     const option = documentStateToTemplateOption(row.videoScript, {
       id: row.id,
       name: row.name,

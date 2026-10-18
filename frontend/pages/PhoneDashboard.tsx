@@ -63,6 +63,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
+import { formatDuration } from "@/lib/format";
 import { confirmDialog, alertDialog } from "@/lib/dialogs";
 import {
   phoneService,
@@ -76,13 +77,6 @@ import {
 } from "@/lib/services/phone-service";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}m ${s.toString().padStart(2, "0")}s`;
-}
 
 function formatPhone(num: string): string {
   const digits = num.replace(/\D/g, "");
@@ -531,7 +525,7 @@ export default function PhoneDashboard() {
                                 <span className="font-medium">{formatPhone(call.direction === "inbound" ? call.callerNumber : call.calledNumber)}</span>
                                 <span className="text-muted-foreground ml-2">{call.direction === "inbound" ? t("labels.inbound") : t("labels.outbound")}</span>
                               </div>
-                              <span className="text-muted-foreground">{formatDuration(call.durationSeconds)}</span>
+                              <span className="text-muted-foreground">{formatDuration(call.durationSeconds, { style: "minSecPadded" })}</span>
                               <span className="text-muted-foreground text-xs">{formatDate(call.createdAt)}</span>
                             </div>
                           ))}
@@ -590,7 +584,7 @@ export default function PhoneDashboard() {
                                 <TableCell className="font-mono text-sm">
                                   {formatPhone(call.direction === "inbound" ? call.callerNumber : call.calledNumber)}
                                 </TableCell>
-                                <TableCell>{formatDuration(call.durationSeconds)}</TableCell>
+                                <TableCell>{formatDuration(call.durationSeconds, { style: "minSecPadded" })}</TableCell>
                                 <TableCell className="text-sm text-muted-foreground">{formatDate(call.createdAt)}</TableCell>
                                 <TableCell>
                                   {call.recordingUrl ? (

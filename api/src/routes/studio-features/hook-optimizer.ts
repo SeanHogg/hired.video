@@ -3,14 +3,14 @@
  * routes/studio-features.ts barrel (split out of that file; paths unchanged).
  */
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import type { AppEnv } from "../../types/index.js";
-import { getDb } from "../../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../../services/adapters/llm-client.js";
 import { aiFailure } from "../../services/adapters/llm-error.js";
-import { ok, fail, studioVideoHeatmap } from "./shared.js";
+import { getRetentionDiagnosis, type RetentionDiagnosis } from "../../services/studio/video-heatmap.js";
+import { success, error } from "../../types/index.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const hookOptimizerRoutes = new Hono<AppEnv>();
 
@@ -25,54 +25,27 @@ export const hookOptimizerRoutes = new Hono<AppEnv>();
 // ██  back into the existing storyboard verbatim.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-hookOptimizerRoutes.post("/projects/:projectId/hook/optimize", async (c) => {
-  const projectId = c.req.param("projectId");
-  const body = await c.req.json().catch(() => null);
-  const parsed = z.object({
+hookOptimizerRoutes.post("/projects/:projectId/hook/optimize", validateJson(z.object({
     storyboard: z.unknown(),
     /** Optional: explicit projectId to pull retention data from */
     projectId: UuidLikeSchema.optional(),
-  }).safeParse(body);
-  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
+  }), (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const projectId = c.req.param("projectId");
+  const body = c.req.valid("json");
 
-  if (!hasAnyLLMProviderKey(c.env)) return c.json(fail("AI_UNAVAILABLE", "LLM API key not configured"), 503);
+  if (!hasAnyLLMProviderKey(c.env)) return c.json(error("AI_UNAVAILABLE", "LLM API key not configured"), 503);
 
-  const sb = parsed.data.storyboard as { scenes?: Array<Record<string, any>> } | null;
+  const sb = body.storyboard as { scenes?: Array<Record<string, any>> } | null;
   const scene0 = sb?.scenes?.[0];
-  if (!scene0) return c.json(fail("VALIDATION_ERROR", "storyboard has no scenes"), 400);
-
-  const db = getDb();
+  if (!scene0) return c.json(error("VALIDATION_ERROR", "storyboard has no scenes"), 400);
 
   // Pull retention signals if a projectId was supplied. We compute the
   // average % of viewers who dropped within the first 3 seconds and the
   // most common drop-off second so the LLM can be told *why* the hook is
   // failing rather than just told to rewrite it.
-  let retentionDiagnosis: {
-    earlyDropPct: number | null;
-    topDropOffSecond: number | null;
-    sampleSize: number;
-  } = { earlyDropPct: null, topDropOffSecond: null, sampleSize: 0 };
-
-  if (parsed.data.projectId) {
-    const views = await db.select().from(studioVideoHeatmap)
-      .where(eq(studioVideoHeatmap.studioProjectId, parsed.data.projectId))
-      .limit(500);
-    if (views.length > 0) {
-      const earlyDrops = views.filter((v) => (v.dropOffSecond ?? 999) <= 3).length;
-      const dropCounts: Record<number, number> = {};
-      for (const v of views) {
-        if (v.dropOffSecond != null) {
-          dropCounts[v.dropOffSecond] = (dropCounts[v.dropOffSecond] ?? 0) + 1;
-        }
-      }
-      const top = Object.entries(dropCounts).sort(([, a], [, b]) => b - a)[0];
-      retentionDiagnosis = {
-        earlyDropPct: Math.round((earlyDrops / views.length) * 100),
-        topDropOffSecond: top ? Number(top[0]) : null,
-        sampleSize: views.length,
-      };
-    }
-  }
+  const retentionDiagnosis: RetentionDiagnosis = body.projectId
+    ? await getRetentionDiagnosis(body.projectId)
+    : { earlyDropPct: null, topDropOffSecond: null, sampleSize: 0 };
 
   const HookSchema = z.object({
     diagnosis: z.string(),
@@ -101,7 +74,7 @@ hookOptimizerRoutes.post("/projects/:projectId/hook/optimize", async (c) => {
       HookSchema,
     );
 
-    return c.json(ok({
+    return c.json(success({
       projectId,
       diagnosis: data.diagnosis,
       variants: data.variants,

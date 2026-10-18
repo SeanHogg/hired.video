@@ -9,7 +9,7 @@
  *                                feedback layer kept OUT of the resume's
  *                                DocumentState so it never prints
  *
- * Full draft proposals reuse `resume_versions` (proposed_by_user_id / review_id
+ * Full draft proposals reuse `entity_versions` résumé rows (proposed_by_user_id / review_id
  * / proposal_status columns) rather than a parallel table — the owner accepts a
  * proposal through the existing version-restore path.
  *

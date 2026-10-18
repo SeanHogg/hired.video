@@ -19,6 +19,7 @@ import { companyService } from "@/lib/services/company-service";
 import { studioService } from "@/lib/services/studio-service";
 import { publicCompanyPath, publicJobPath } from "@shared/public-paths";
 import type { ResumeContent, Work, Skill, Basics, Project } from "@shared/resume";
+import { mediaKindIsPrimaryVideo } from "@shared/media-kinds";
 
 /** Content families a template's binders read BEYOND the profile + résumé
  *  (which every template may read, so they always load). */
@@ -188,7 +189,7 @@ async function loadClips(clipIds: readonly string[] | undefined): Promise<UserCo
     const picked = clipIds?.length
       ? projects.filter((p) => clipIds.includes(p.id))
       : projects
-          .filter((p) => p.mediaKind === "video")
+          .filter((p) => mediaKindIsPrimaryVideo(p.mediaKind))
           .sort((a, b) => b.updateDateTime.localeCompare(a.updateDateTime));
     return picked.slice(0, 3).map((p) => ({ id: p.id, title: p.title }));
   } catch {

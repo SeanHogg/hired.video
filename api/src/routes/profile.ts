@@ -11,6 +11,8 @@ import type { AppEnv } from "../types/index.js";
 import { error, success } from "../types/index.js";
 import { BillingAddressSchema } from "../../../shared/billing-address.js";
 import { getBillingAddress, saveBillingAddress } from "../services/billing/userBillingContext.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const profileRoutes = new Hono<AppEnv>();
 
@@ -20,8 +22,7 @@ export const profileRoutes = new Hono<AppEnv>();
 // set" and shows empty form fields.
 // ---------------------------------------------------------------------------
 profileRoutes.get("/billing-address", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
 
   return c.json(success({ billingAddress: await getBillingAddress(userId) }), 200);
 });
@@ -31,16 +32,11 @@ profileRoutes.get("/billing-address", async (c) => {
 // Validates against BillingAddressSchema and upserts the user's
 // billing_addresses row (one per user).
 // ---------------------------------------------------------------------------
-profileRoutes.put("/billing-address", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+profileRoutes.put("/billing-address", validateJson(BillingAddressSchema, (e) => error("VALIDATION_ERROR", "Invalid billing address", e.flatten()), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
 
-  const body = await c.req.json().catch(() => null);
-  const parsed = BillingAddressSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid billing address", parsed.error.flatten()), 400);
-  }
-  const address = parsed.data;
+  const body = c.req.valid("json");
+  const address = body;
   await saveBillingAddress(userId, address);
 
   return c.json(success({ billingAddress: address }), 200);

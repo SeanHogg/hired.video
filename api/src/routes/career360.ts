@@ -33,19 +33,19 @@ import {
   suggestTargets,
 } from "../services/career360/Career360Service.js";
 import { aiFailure as sharedAiFailure } from "../services/adapters/llm-error.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const career360Routes = new Hono<AppEnv>();
 
 career360Routes.get("/", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const state = await getCareer360State(userId);
   return c.json(success(state), 200);
 });
 
 career360Routes.post("/suggest", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
 
   const limitError = await checkTokenBudget(c as any);
   if (limitError) return limitError;
@@ -62,25 +62,20 @@ career360Routes.post("/suggest", async (c) => {
   }
 });
 
-career360Routes.post("/select", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+career360Routes.post("/select", validateJson(SelectTargetRequestSchema, () => error("VALIDATION_ERROR", "Invalid select-target request"), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
 
   const limitError = await checkTokenBudget(c as any);
   if (limitError) return limitError;
 
-  const body = await c.req.json().catch(() => null);
-  const parsed = SelectTargetRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid select-target request"), 400);
-  }
+  const body = c.req.valid("json");
 
   try {
     const selected = await selectTarget({
       userId,
       env: (c.env as any) ?? {},
       user: c.var.user,
-      request: parsed.data,
+      request: body,
     });
     return c.json(success({ selected }), 200);
   } catch (err) {
@@ -95,25 +90,20 @@ career360Routes.post("/select", async (c) => {
   }
 });
 
-career360Routes.post("/evaluate", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+career360Routes.post("/evaluate", validateJson(EvaluateRequestSchema, () => error("VALIDATION_ERROR", "Provide either gapId or roadmapStepId."), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
 
   const limitError = await checkTokenBudget(c as any);
   if (limitError) return limitError;
 
-  const body = await c.req.json().catch(() => null);
-  const parsed = EvaluateRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Provide either gapId or roadmapStepId."), 400);
-  }
+  const body = c.req.valid("json");
 
   try {
     const evaluation = await evaluateItem({
       userId,
       env: (c.env as any) ?? {},
       user: c.var.user,
-      request: parsed.data,
+      request: body,
     });
     return c.json(success({ evaluation }), 200);
   } catch (err) {
@@ -128,18 +118,13 @@ career360Routes.post("/evaluate", async (c) => {
   }
 });
 
-career360Routes.post("/resolve", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+career360Routes.post("/resolve", validateJson(ResolveItemRequestSchema, () => error("VALIDATION_ERROR", "Provide itemId, kind, and resolved."), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
 
-  const body = await c.req.json().catch(() => null);
-  const parsed = ResolveItemRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Provide itemId, kind, and resolved."), 400);
-  }
+  const body = c.req.valid("json");
 
   try {
-    const selected = await setItemResolved({ userId, request: parsed.data });
+    const selected = await setItemResolved({ userId, request: body });
     return c.json(success({ selected }), 200);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -154,8 +139,7 @@ career360Routes.post("/resolve", async (c) => {
 });
 
 career360Routes.delete("/target", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   await clearTarget(userId);
   return c.json(success({ ok: true }), 200);
 });

@@ -17,56 +17,35 @@ import {
   patchCampaign,
 } from "../../services/studio/campaigns.js";
 import { parseWorkspaceQueryParam } from "../../services/studio/workspace-request.js";
-import { actorId, fail, ok, studioErrorResponse } from "./http.js";
+import { success, error } from "../../types/index.js";
+import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const studioCampaignRoutes = new Hono<AppEnv>();
 
 studioCampaignRoutes.get("/campaigns", async (c) => {
-  const userId = actorId(c);
-  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
-  return c.json(ok(await listCampaigns(userId, parseWorkspaceQueryParam(c.req.query("workspace")))));
+  const userId = requireUser(c);
+  return c.json(success(await listCampaigns(userId, parseWorkspaceQueryParam(c.req.query("workspace")))));
 });
 
-studioCampaignRoutes.post("/campaigns", async (c) => {
-  const userId = actorId(c);
-  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
-  const body = await c.req.json().catch(() => null);
-  const parsed = CampaignSchema.safeParse(body);
-  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  try {
-    return c.json(ok(await createCampaign(userId, parsed.data, body)), 201);
-  } catch (e) {
-    return studioErrorResponse(c, e);
-  }
+studioCampaignRoutes.post("/campaigns", validateJson(CampaignSchema, undefined, { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  // The raw body too (Hono caches the parsed JSON) — the service reads extra fields off it.
+  return c.json(success(await createCampaign(userId, c.req.valid("json"), await c.req.json())), 201);
 });
 
 studioCampaignRoutes.patch("/campaigns/:id", async (c) => {
-  const userId = actorId(c);
-  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown> | null;
-  try {
-    return c.json(ok(await patchCampaign(userId, c.req.param("id"), body ?? {})));
-  } catch (e) {
-    return studioErrorResponse(c, e);
-  }
+  return c.json(success(await patchCampaign(userId, c.req.param("id"), body ?? {})));
 });
 
 studioCampaignRoutes.delete("/campaigns/:id", async (c) => {
-  const userId = actorId(c);
-  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
-  try {
-    return c.json(ok(await archiveCampaign(userId, c.req.param("id"))));
-  } catch (e) {
-    return studioErrorResponse(c, e);
-  }
+  const userId = requireUser(c);
+  return c.json(success(await archiveCampaign(userId, c.req.param("id"))));
 });
 
 studioCampaignRoutes.get("/campaigns/:id/stats", async (c) => {
-  const userId = actorId(c);
-  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
-  try {
-    return c.json(ok(await campaignStats(userId, c.req.param("id"))));
-  } catch (e) {
-    return studioErrorResponse(c, e);
-  }
+  const userId = requireUser(c);
+  return c.json(success(await campaignStats(userId, c.req.param("id"))));
 });

@@ -15,6 +15,7 @@ import type {
   PartnerConnectionSource,
   PartnerScope,
 } from "../../../../shared/partner.js";
+import { DomainError } from "../../domains/errors.js";
 
 const { partnerConnections, partners, users } = schema;
 
@@ -218,9 +219,10 @@ export async function revokeConnection(
  * handlers can convert to a 403. The single gate every partner read/write on a
  * specific user runs behind.
  */
-export class ConnectionRequiredError extends Error {
+export class ConnectionRequiredError extends DomainError {
   constructor(message = "No active connection for this user. The job seeker must approve access first.") {
-    super(message);
+    super(403, "FORBIDDEN", message);
+    this.name = "ConnectionRequiredError";
   }
 }
 

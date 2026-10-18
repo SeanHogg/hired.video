@@ -18,6 +18,11 @@ export type AnswerCacheInsert = typeof answerCache.$inferInsert;
 export type ApplicationFormAnswerRow = typeof applicationFormAnswers.$inferSelect;
 export type ApplicationFormAnswerInsert = typeof applicationFormAnswers.$inferInsert;
 
+export type CachedAnswerListItem = Pick<
+  AnswerCacheRow,
+  "id" | "questionText" | "questionCategory" | "answer" | "timesUsed" | "lastUsedAt"
+>;
+
 export interface GeneratedAnswerEntry {
   questionHash: string;
   questionText: string;
@@ -27,6 +32,8 @@ export interface GeneratedAnswerEntry {
 
 export interface IAutofillRepository {
   findCachedAnswersForUser(userId: string): Promise<AnswerCacheRow[]>;
+  /** The user's cached answers for the cache manager, most-used first. */
+  listCachedAnswersByUsage(userId: string, limit: number): Promise<CachedAnswerListItem[]>;
   upsertCachedAnswer(input: AnswerCacheInsert): Promise<void>;
   /**
    * Record freshly generated answers in ONE multi-row upsert: new questions
@@ -47,6 +54,22 @@ export class AutofillRepository implements IAutofillRepository {
       .select()
       .from(answerCache)
       .where(eq(answerCache.userId, userId))) as AnswerCacheRow[];
+  }
+
+  async listCachedAnswersByUsage(userId: string, limit: number): Promise<CachedAnswerListItem[]> {
+    return (await this.db
+      .select({
+        id: answerCache.id,
+        questionText: answerCache.questionText,
+        questionCategory: answerCache.questionCategory,
+        answer: answerCache.answer,
+        timesUsed: answerCache.timesUsed,
+        lastUsedAt: answerCache.lastUsedAt,
+      })
+      .from(answerCache)
+      .where(eq(answerCache.userId, userId))
+      .orderBy(desc(answerCache.timesUsed))
+      .limit(limit)) as CachedAnswerListItem[];
   }
 
   async upsertCachedAnswer(input: AnswerCacheInsert): Promise<void> {

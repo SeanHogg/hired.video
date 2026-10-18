@@ -16,46 +16,30 @@ import {
   removeBrandKit,
 } from "../../services/studio/brand-kits.js";
 import { parseWorkspaceQueryParam } from "../../services/studio/workspace-request.js";
-import { actorId, fail, ok, studioErrorResponse } from "./http.js";
+import { success, error } from "../../types/index.js";
+import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const studioBrandKitRoutes = new Hono<AppEnv>();
 
 studioBrandKitRoutes.get("/brand-kits", async (c) => {
-  const userId = actorId(c);
-  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
-  return c.json(ok(await listBrandKits(userId, parseWorkspaceQueryParam(c.req.query("workspace")))));
+  const userId = requireUser(c);
+  return c.json(success(await listBrandKits(userId, parseWorkspaceQueryParam(c.req.query("workspace")))));
 });
 
-studioBrandKitRoutes.post("/brand-kits", requirePro("Brand Kits"), async (c) => {
-  const userId = actorId(c);
-  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
-  const body = await c.req.json().catch(() => null);
-  const parsed = BrandKitSchema.safeParse(body);
-  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  try {
-    return c.json(ok(await createBrandKit(userId, parsed.data, body)), 201);
-  } catch (e) {
-    return studioErrorResponse(c, e);
-  }
+studioBrandKitRoutes.post("/brand-kits", requirePro("Brand Kits"), validateJson(BrandKitSchema, undefined, { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  // The raw body too (Hono caches the parsed JSON) — the service reads extra fields off it.
+  return c.json(success(await createBrandKit(userId, c.req.valid("json"), await c.req.json())), 201);
 });
 
 studioBrandKitRoutes.patch("/brand-kits/:id", requirePro("Brand Kits"), async (c) => {
-  const userId = actorId(c);
-  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown> | null;
-  try {
-    return c.json(ok(await patchBrandKit(userId, c.req.param("id"), body ?? {})));
-  } catch (e) {
-    return studioErrorResponse(c, e);
-  }
+  return c.json(success(await patchBrandKit(userId, c.req.param("id"), body ?? {})));
 });
 
 studioBrandKitRoutes.delete("/brand-kits/:id", async (c) => {
-  const userId = actorId(c);
-  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
-  try {
-    return c.json(ok(await removeBrandKit(userId, c.req.param("id"))));
-  } catch (e) {
-    return studioErrorResponse(c, e);
-  }
+  const userId = requireUser(c);
+  return c.json(success(await removeBrandKit(userId, c.req.param("id"))));
 });

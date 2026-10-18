@@ -15,6 +15,7 @@ import { getCacheVersion, getOrSetCached } from "../../../utils/edge-cache.js";
 import * as metricsRepo from "../../../repositories/externalPostMetricsRepository.js";
 import { assertCanWrite, WorkspaceForbiddenError } from "../../studio/workspace.js";
 import { metricsVersionNamespace } from "./sync-post-metrics.js";
+import { DomainError } from "../../../domains/errors.js";
 
 const TTL_SECONDS = 60 * 60;
 
@@ -30,9 +31,10 @@ export interface OffPlatformReach {
   totals: PostMetricCounts;
 }
 
-export class ReachAccessError extends Error {
+/** PROJECT_NOT_FOUND → 404, FORBIDDEN → 403 (code = kind). */
+export class ReachAccessError extends DomainError {
   constructor(public readonly kind: "PROJECT_NOT_FOUND" | "FORBIDDEN") {
-    super(kind === "FORBIDDEN" ? "Only the owner can see this video's reach." : "Project not found");
+    super(kind === "FORBIDDEN" ? 403 : 404, kind, kind === "FORBIDDEN" ? "Only the owner can see this video's reach." : "Project not found");
     this.name = "ReachAccessError";
   }
 }

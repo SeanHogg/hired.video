@@ -13,10 +13,14 @@ import { evaluateVideoForPublic, scanVideoFrames } from "./videoScan.js";
 import { loadProjectVideo } from "./videoScanContext.js";
 import type { ImageInput } from "./imageClassifier.js";
 import type { ExplicitScanDeps } from "./deps.js";
+import { DomainError } from "../../../domains/errors.js";
 
-export class ProjectScanError extends Error {
-  constructor(readonly code: "NOT_FOUND" | "NO_VIDEO") {
-    super(code === "NOT_FOUND" ? "Project not found" : "This project has no uploaded video yet");
+/** NOT_FOUND → 404, NO_VIDEO → 409. */
+export class ProjectScanError extends DomainError {
+  declare readonly code: "NOT_FOUND" | "NO_VIDEO";
+  constructor(code: "NOT_FOUND" | "NO_VIDEO") {
+    super(code === "NOT_FOUND" ? 404 : 409, code, code === "NOT_FOUND" ? "Project not found" : "This project has no uploaded video yet");
+    this.name = "ProjectScanError";
   }
 }
 

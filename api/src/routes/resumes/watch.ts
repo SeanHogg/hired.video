@@ -7,11 +7,9 @@
  */
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/index.js";
-import { getDb } from "../../db/index.js";
 import { requireUserId } from "../../domains/errors.js";
-import { ResumeVersionRepository } from "../../repositories/resumeVersionRepository.js";
 import { unwatchResume, watchResume } from "../../services/resume/commands.js";
-import { listWatched } from "../../services/resume/history.js";
+import { listWatched, liveResumeVersions } from "../../services/resume/history.js";
 import { respond, resumeDeps } from "./shared.js";
 
 export const resumeWatchRoutes = new Hono<AppEnv>();
@@ -19,9 +17,9 @@ export const resumeWatchRoutes = new Hono<AppEnv>();
 // `/watched` is a single segment, so app.ts's optional-auth detail regex can
 // match it — require the user here rather than trusting the mode.
 resumeWatchRoutes.get("/watched", (c) =>
-  respond(c, Promise.resolve().then(() => listWatched(new ResumeVersionRepository(getDb()), requireUserId(c.var.user?.sub)))),
+  respond(c, Promise.resolve().then(() => listWatched(liveResumeVersions(), requireUserId(c.var.userId)))),
 );
 
-resumeWatchRoutes.put("/:id/watch", (c) => respond(c, watchResume(resumeDeps(c), c.var.user.sub, c.req.param("id"))));
+resumeWatchRoutes.put("/:id/watch", (c) => respond(c, watchResume(resumeDeps(c), c.var.userId, c.req.param("id"))));
 
-resumeWatchRoutes.delete("/:id/watch", (c) => respond(c, unwatchResume(resumeDeps(c), c.var.user.sub, c.req.param("id"))));
+resumeWatchRoutes.delete("/:id/watch", (c) => respond(c, unwatchResume(resumeDeps(c), c.var.userId, c.req.param("id"))));

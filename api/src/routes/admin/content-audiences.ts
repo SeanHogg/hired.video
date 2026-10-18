@@ -9,10 +9,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../../types/index.js";
-import { ok } from "../../utils/response.js";
 import { CONTENT_AUDIENCE_KINDS, type ContentAudienceKind } from "../../../../shared/content-audiences.js";
 import { AudienceKeySchema } from "../../../../shared/audiences.js";
 import { adminAudienceService } from "../../services/admin/adminAudiences.js";
+import { success, error } from "../../types/index.js";
+import { validateJson } from "../helpers/validate.js";
 
 const BatchAudienceBodySchema = z.object({
   entityKind: z.enum(CONTENT_AUDIENCE_KINDS as readonly string[] as [ContentAudienceKind, ...ContentAudienceKind[]]),
@@ -22,12 +23,9 @@ const BatchAudienceBodySchema = z.object({
 
 export const adminContentAudienceRoutes = new Hono<AppEnv>();
 
-adminContentAudienceRoutes.post("/batch", async (c) => {
-  const parsed = BatchAudienceBodySchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json({ error: { code: "VALIDATION_ERROR", message: parsed.error.message } }, 400);
-  }
-  const { entityKind, entityIds, audienceKeys } = parsed.data;
+adminContentAudienceRoutes.post("/batch", validateJson(BatchAudienceBodySchema, (e) => error("VALIDATION_ERROR", e.message)), async (c) => {
+  const body = c.req.valid("json");
+  const { entityKind, entityIds, audienceKeys } = body;
   // One batched read of existing tags + one bulk ON CONFLICT DO NOTHING insert.
   const existingByEntity = await adminAudienceService().addAudiencesToEntities(entityKind, entityIds, audienceKeys);
   const results = entityIds.map((id) => {
@@ -36,7 +34,7 @@ adminContentAudienceRoutes.post("/batch", async (c) => {
     const added = audienceKeys.filter((k) => !existingKeys.has(k));
     return { entityId: id, tagsApplied: audienceKeys.length, totalTags: existing.length + added.length };
   });
-  return c.json(ok({ entityKind, results }), 200);
+  return c.json(success({ entityKind, results }), 200);
 });
 
 /** Current audience tag set for one entity so the picker pre-fills. */
@@ -44,8 +42,8 @@ adminContentAudienceRoutes.get("/:kind/:entityId", async (c) => {
   const kindParam = c.req.param("kind");
   const entityId = c.req.param("entityId");
   if (!CONTENT_AUDIENCE_KINDS.includes(kindParam as ContentAudienceKind)) {
-    return c.json({ error: { code: "VALIDATION_ERROR", message: "Unknown kind" } }, 400);
+    return c.json(error("VALIDATION_ERROR", "Unknown kind"), 400);
   }
   const rows = await adminAudienceService().resolveForEntity(kindParam as ContentAudienceKind, entityId);
-  return c.json(ok({ entityId, kind: kindParam, audiences: rows }), 200);
+  return c.json(success({ entityId, kind: kindParam, audiences: rows }), 200);
 });

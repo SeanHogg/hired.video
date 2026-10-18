@@ -12,18 +12,16 @@ import { z } from "zod";
 import type { AppEnv } from "../../types/index.js";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import { DomainError } from "../../domains/errors.js";
-import { getDb } from "../../db/index.js";
-import { buildRepos } from "../../repositories/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../../services/adapters/llm-client.js";
-import { invalidResumeBody, invalidResumeContent } from "../../services/resume/errors.js";
+import { liveResumes } from "../../services/resume/deps.js";
+import { invalidResumeContent } from "../../services/resume/errors.js";
 import { analyzeMerge } from "../../services/resume/merge.js";
 import { MergeRunSchema, commitMerge, resolveMergeSide, runMerge, type MergeRunInput } from "../../services/resume/merge-flow.js";
 import { mergeFromFileHandler } from "../resume-merge-from-file.js";
-import { ownerId, respond, type ResumeCtx } from "./shared.js";
+import { invalidResumeBodyHook, respond, type ResumeCtx } from "./shared.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const resumeMergeRoutes = new Hono<AppEnv>();
-
-const repo = () => buildRepos(getDb()).resumes;
 
 const MergeAnalyzeSchema = z
   .object({
@@ -36,15 +34,13 @@ const MergeAnalyzeSchema = z
 
 /** Content of one merge side, or a 404 naming which side is missing. */
 async function side(c: ResumeCtx, which: "Source" | "Target", ref: { resumeId?: string; content?: Record<string, unknown> }) {
-  const resolved = await resolveMergeSide(repo(), ownerId(c), which, ref);
+  const resolved = await resolveMergeSide(liveResumes(), c.var.userId, which, ref);
   if ("which" in resolved) throw new DomainError(404, "NOT_FOUND", `${which} resume not found`);
   return resolved.content;
 }
 
-async function analyze(c: ResumeCtx) {
-  const parsed = MergeAnalyzeSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) throw invalidResumeBody(parsed.error.flatten());
-  const { sourceResumeId, targetResumeId, targetContent, useAI } = parsed.data;
+async function analyze(c: ResumeCtx, input: z.output<typeof MergeAnalyzeSchema>) {
+  const { sourceResumeId, targetResumeId, targetContent, useAI } = input;
   if (sourceResumeId === targetResumeId) {
     throw new DomainError(400, "VALIDATION_ERROR", "Source and target must be different resumes");
   }
@@ -55,26 +51,18 @@ async function analyze(c: ResumeCtx) {
   return { analysis, sourceContent: source, targetContent: target };
 }
 
-async function runInput(c: ResumeCtx): Promise<MergeRunInput> {
-  const parsed = MergeRunSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) throw invalidResumeBody(parsed.error.flatten());
-  return parsed.data;
-}
-
-async function preview(c: ResumeCtx) {
-  const input = await runInput(c);
+async function preview(c: ResumeCtx, input: MergeRunInput) {
   const target = await side(c, "Target", { resumeId: input.targetResumeId, content: input.targetContent });
   const source = await side(c, "Source", { resumeId: input.sourceResumeId, content: input.sourceContent });
   return runMerge(target, source, input);
 }
 
-async function execute(c: ResumeCtx) {
-  const input = await runInput(c);
+async function execute(c: ResumeCtx, input: MergeRunInput) {
   if (!input.targetResumeId) throw new DomainError(400, "VALIDATION_ERROR", "targetResumeId is required to save a merge");
   const target = await side(c, "Target", { resumeId: input.targetResumeId, content: input.targetContent });
   const source = await side(c, "Source", { resumeId: input.sourceResumeId, content: input.sourceContent });
   const { mergedContent, stats } = runMerge(target, source, input);
-  const outcome = await commitMerge(repo(), ownerId(c), {
+  const outcome = await commitMerge(liveResumes(), c.var.userId, {
     targetResumeId: input.targetResumeId,
     merged: mergedContent,
     createNew: input.createNew ?? false,
@@ -88,11 +76,14 @@ async function execute(c: ResumeCtx) {
   return { created: outcome.created, data: { resumeId: outcome.resumeId, title: outcome.title, ...stats } };
 }
 
-resumeMergeRoutes.post("/merge/analyze", (c) => respond(c, analyze(c)));
-resumeMergeRoutes.post("/merge/preview", (c) => respond(c, preview(c)));
-resumeMergeRoutes.post("/merge/execute", async (c) => {
+const mergeAnalyzeBody = validateJson(MergeAnalyzeSchema, invalidResumeBodyHook, { emptyBody: null });
+const mergeRunBody = validateJson(MergeRunSchema, invalidResumeBodyHook, { emptyBody: null });
+
+resumeMergeRoutes.post("/merge/analyze", mergeAnalyzeBody, (c) => respond(c, analyze(c, c.req.valid("json"))));
+resumeMergeRoutes.post("/merge/preview", mergeRunBody, (c) => respond(c, preview(c, c.req.valid("json"))));
+resumeMergeRoutes.post("/merge/execute", mergeRunBody, async (c) => {
   try {
-    const { created, data } = await execute(c);
+    const { created, data } = await execute(c, c.req.valid("json"));
     return respond(c, Promise.resolve(data), created ? 201 : 200);
   } catch (err) {
     return respond(c, Promise.reject(err));

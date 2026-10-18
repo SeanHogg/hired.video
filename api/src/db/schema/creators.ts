@@ -13,8 +13,8 @@
  *   - promoProjectExtraRevisionPurchases — line items when customer buys revisions 4+
  *   - promoProjectReviews               — customer rating + review after acceptance
  *
- * Scene-level / time-coded comments reuse the existing `studioReviewComments`
- * table from studiofeatures.ts (Frame.io-style review system).
+ * Scene-level / time-coded comments reuse the studio review comments
+ * (`comments`, subject 'studio_project' — comments.ts; Frame.io-style).
  */
 
 import {

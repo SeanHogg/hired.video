@@ -15,7 +15,7 @@ export const placementNotificationRoutes = new Hono<AppEnv>();
 
 // GET /placements/:id/notifications — the caller's subscriptions
 placementNotificationRoutes.get("/placements/:id/notifications", async (c) => {
-  const subs = await listMyPlacementSubscriptions(c.get("user").sub, c.req.param("id"));
+  const subs = await listMyPlacementSubscriptions(c.var.userId, c.req.param("id"));
   if (!subs) return c.json(responseEnvelope(null), 404);
   return c.json(responseEnvelope(subs));
 });

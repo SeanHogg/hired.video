@@ -20,7 +20,7 @@
  * passes `documentKind` reads "Résumé" / "Article" instead of "Document".
  */
 import { AudioWaveform, BookOpen, Box, Film, FileText, Gamepad2, Headphones, Image as ImageIcon, Ruler, Sparkles, Workflow } from "lucide-react";
-import type { MediaKind } from "@shared/media-kinds";
+import { mediaKindIsPrimaryVideo, type MediaKind } from "@shared/media-kinds";
 import { useTranslation } from "react-i18next";
 import { templateKindLabelKey } from "@shared/template-kinds";
 import { cn } from "@/lib/utils";
@@ -76,7 +76,7 @@ export default function MediaKindBadge({
   // surface because they're the new + rare case the user needs to notice.
   // `alwaysShow` opts a surface out of the gate when every item must be
   // typed.
-  if (mediaKind === "video" && !alwaysShow) return null;
+  if (mediaKindIsPrimaryVideo(mediaKind) && !alwaysShow) return null;
   const visual = KIND_VISUAL[mediaKind];
   const label = t(templateKindLabelKey(mediaKind, documentKind));
   const sizing =

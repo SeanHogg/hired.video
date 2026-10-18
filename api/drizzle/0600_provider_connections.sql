@@ -438,6 +438,30 @@ BEGIN
   END IF;
 END $$;
 
+-- ── Company deletion ────────────────────────────────────────────────────────
+-- ats_connections / company_integrations / tenant_integrations cascaded on
+-- company_profiles delete; company_id here is a scope column without an FK
+-- (some legacy workspace rows name a company that no longer exists), so a
+-- statement-level trigger deletes a removed company's connections instead
+-- (0581 pattern).
+
+CREATE OR REPLACE FUNCTION public.provider_connections_company_deleted() RETURNS trigger
+LANGUAGE plpgsql
+AS $f$
+BEGIN
+  DELETE FROM public.provider_connections pc
+   USING old_rows o
+   WHERE pc.company_id = o.id;
+  RETURN NULL;
+END;
+$f$;
+
+DROP TRIGGER IF EXISTS trg_provider_connections_company_deleted ON public.company_profiles;
+CREATE TRIGGER trg_provider_connections_company_deleted
+  AFTER DELETE ON public.company_profiles
+  REFERENCING OLD TABLE AS old_rows
+  FOR EACH STATEMENT EXECUTE FUNCTION public.provider_connections_company_deleted();
+
 -- ── Guest adoption (0533) moves provider_connections ────────────────────────
 -- adopt_guest_user named social_connections + youtube_accounts, which 0601
 -- archives. Same behaviour on the merged table: the visitor's fresh

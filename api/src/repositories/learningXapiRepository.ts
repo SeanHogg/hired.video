@@ -10,6 +10,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { schema, type Db } from "../db/index.js";
 import type { LrsCredential } from "../db/schema/learning.js";
 
+export { XAPI_VERBS } from "../db/schema/learning.js";
+
 const { lrsCredentials, courseEnrollments, xapiStatements, externalLrsTargets } = schema;
 
 // ── LRS credentials ──────────────────────────────────────────────────────────

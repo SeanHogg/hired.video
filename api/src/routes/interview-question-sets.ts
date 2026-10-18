@@ -6,7 +6,7 @@
  * surface — "I built the Senior Backend question set last week, attach it
  * to this job posting and to that ad-hoc invite." That library is owned
  * either by the user (personal scratchpad) OR by a company (shared across
- * the company's recruiters). The xor is enforced by SQL + by the route
+ * the company's recruiters). The xor is enforced by SQL + by the service
  * layer when picking an owner from the request body.
  *
  * Endpoints (mounted at /api/interview-question-sets):
@@ -16,6 +16,9 @@
  *   PUT    /:id                  — update
  *   DELETE /:id                  — archive (soft-delete via is_archived)
  *
+ * Use cases: services/interview/question-sets.ts; data access:
+ * repositories/interviewQuestionSetsRepository.ts.
+ *
  * Companion endpoints elsewhere consume these sets:
  *   - routes/jobs.ts            — GET/PUT /api/jobs/:id/screening attaches a set to a job
  *   - routes/interview-assignments.ts — assign-from-set helper (POST /assign passes
@@ -24,42 +27,26 @@
  */
 
 import { Hono } from "hono";
-import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
-import type { Env, Variables, AppEnv } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { USER_ROLES } from "../../../shared/user-roles.js";
+import type { AppEnv } from "../types/index.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
-
-const { interviewQuestionSets, userCompanyRoleAssociations } = schema;
+import { success } from "../types/index.js";
+import {
+  archiveQuestionSet,
+  createQuestionSet,
+  getReadableQuestionSet,
+  listQuestionSets,
+  updateQuestionSet,
+} from "../services/interview/question-sets.js";
+import type { QuestionSetPatch } from "../repositories/interviewQuestionSetsRepository.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const interviewQuestionSetRoutes = new Hono<AppEnv>();
 interviewQuestionSetRoutes.use("*", attachTokenBudget());
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function ok<T>(data: T) {
-  return { success: true as const, data, timestamp: new Date().toISOString() };
-}
-function fail(code: string, message: string, details?: unknown) {
-  return {
-    success: false as const,
-    error: { code, message, ...(details !== undefined ? { details } : {}) },
-    timestamp: new Date().toISOString(),
-  };
-}
-
-const ASSIGNABLE_ROLES: ReadonlySet<string> = new Set([
-  USER_ROLES.RECRUITER,
-  USER_ROLES.EMPLOYER,
-  USER_ROLES.ADMIN,
-  USER_ROLES.SUPER_ADMIN,
-]);
-
-function hasRecruiterRole(roles: readonly string[] | undefined): boolean {
-  return !!roles?.some((r) => ASSIGNABLE_ROLES.has(r));
-}
+// ─── Schemas ────────────────────────────────────────────────────────────────
 
 const QuestionShape = z.object({
   id: z.string(),
@@ -89,108 +76,31 @@ const UpdateSchema = CreateSchema.partial().omit({ companyId: true }).extend({
   isArchived: z.boolean().optional(),
 });
 
-// Resolve the set of companies the current user can read/write sets for.
-async function getUserCompanyIds(userId: string): Promise<string[]> {
-  const db = getDb();
-  const rows = await db
-    .select({ companyId: userCompanyRoleAssociations.companyId })
-    .from(userCompanyRoleAssociations)
-    .where(
-      and(
-        eq(userCompanyRoleAssociations.userId, userId),
-        eq(userCompanyRoleAssociations.isActive, true),
-      ),
-    );
-  return rows.map((r) => r.companyId).filter((id): id is string => !!id);
-}
-
-async function canReadSet(set: typeof interviewQuestionSets.$inferSelect, userId: string): Promise<boolean> {
-  if (set.ownerUserId === userId) return true;
-  if (set.ownerCompanyId) {
-    const ids = await getUserCompanyIds(userId);
-    return ids.includes(set.ownerCompanyId);
-  }
-  return false;
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // LIST — every set the user can see (their own + their companies')
 // ═══════════════════════════════════════════════════════════════════════════
 
 interviewQuestionSetRoutes.get("/", async (c) => {
-  const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
-  if (!hasRecruiterRole(user.roles)) {
-    return c.json(fail("FORBIDDEN", "Only recruiters or employers can manage question sets"), 403);
-  }
-  const includeArchived = c.req.query("includeArchived") === "true";
-  const db = getDb();
-  const companyIds = await getUserCompanyIds(user.sub);
-
-  // One query: owner_user_id = me OR owner_company_id IN (my companies)
-  const rows = await db
-    .select()
-    .from(interviewQuestionSets)
-    .where(
-      and(
-        includeArchived ? undefined : eq(interviewQuestionSets.isArchived, false),
-        or(
-          eq(interviewQuestionSets.ownerUserId, user.sub),
-          companyIds.length > 0
-            ? inArray(interviewQuestionSets.ownerCompanyId, companyIds)
-            : isNull(interviewQuestionSets.ownerCompanyId), // never matches anything if no companies — fine
-        ),
-      ),
-    )
-    .orderBy(desc(interviewQuestionSets.updatedAt))
-    .limit(200);
-
-  return c.json(ok({ sets: rows }));
+  const userId = requireUser(c);
+  const sets = await listQuestionSets(
+    { userId, roles: c.var.user.roles },
+    c.req.query("includeArchived") === "true",
+  );
+  return c.json(success({ sets }));
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CREATE
 // ═══════════════════════════════════════════════════════════════════════════
 
-interviewQuestionSetRoutes.post("/", async (c) => {
-  const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
-  if (!hasRecruiterRole(user.roles)) {
-    return c.json(fail("FORBIDDEN", "Only recruiters or employers can create question sets"), 403);
-  }
-
-  const body = await c.req.json().catch(() => null);
-  const parsed = CreateSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  }
-
-  if (parsed.data.companyId) {
-    const allowed = await getUserCompanyIds(user.sub);
-    if (!allowed.includes(parsed.data.companyId)) {
-      return c.json(fail("FORBIDDEN", "You're not a member of that company"), 403);
-    }
-  }
-
-  const db = getDb();
-  const [created] = await db
-    .insert(interviewQuestionSets)
-    .values({
-      ownerUserId: parsed.data.companyId ? null : user.sub,
-      ownerCompanyId: parsed.data.companyId ?? null,
-      title: parsed.data.title,
-      description: parsed.data.description ?? null,
-      targetRole: parsed.data.targetRole ?? null,
-      style: parsed.data.style,
-      questions: parsed.data.questions,
-      skills: parsed.data.skills,
-      prepTimeSec: parsed.data.prepTimeSec,
-      maxRetakes: parsed.data.maxRetakes,
-      proctoringOn: parsed.data.proctoringOn,
-    } as any)
-    .returning();
-
-  return c.json(ok(created), 201);
+interviewQuestionSetRoutes.post("/", validateJson(CreateSchema, undefined, { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  const created = await createQuestionSet(
+    { userId, roles: c.var.user.roles },
+    { ...body, description: body.description ?? null, targetRole: body.targetRole ?? null },
+  );
+  return c.json(success(created), 201);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -198,66 +108,21 @@ interviewQuestionSetRoutes.post("/", async (c) => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 interviewQuestionSetRoutes.get("/:id", async (c) => {
-  const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
-  const id = c.req.param("id");
-  const db = getDb();
-  const [row] = await db
-    .select()
-    .from(interviewQuestionSets)
-    .where(eq(interviewQuestionSets.id, id))
-    .limit(1);
-  if (!row) return c.json(fail("NOT_FOUND", "Question set not found"), 404);
-  if (!(await canReadSet(row, user.sub))) {
-    return c.json(fail("FORBIDDEN", "Not your question set"), 403);
-  }
-  return c.json(ok(row));
+  const userId = requireUser(c);
+  return c.json(success(await getReadableQuestionSet(userId, c.req.param("id"))));
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// UPDATE
+// UPDATE — only the fields present in the body are written
 // ═══════════════════════════════════════════════════════════════════════════
 
-interviewQuestionSetRoutes.put("/:id", async (c) => {
-  const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
-  const id = c.req.param("id");
-  const body = await c.req.json().catch(() => null);
-  const parsed = UpdateSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  }
-
-  const db = getDb();
-  const [existing] = await db
-    .select()
-    .from(interviewQuestionSets)
-    .where(eq(interviewQuestionSets.id, id))
-    .limit(1);
-  if (!existing) return c.json(fail("NOT_FOUND", "Question set not found"), 404);
-  if (!(await canReadSet(existing, user.sub))) {
-    return c.json(fail("FORBIDDEN", "Not your question set"), 403);
-  }
-
-  const [updated] = await db
-    .update(interviewQuestionSets)
-    .set({
-      ...(parsed.data.title !== undefined ? { title: parsed.data.title } : {}),
-      ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
-      ...(parsed.data.targetRole !== undefined ? { targetRole: parsed.data.targetRole } : {}),
-      ...(parsed.data.style !== undefined ? { style: parsed.data.style } : {}),
-      ...(parsed.data.questions !== undefined ? { questions: parsed.data.questions } : {}),
-      ...(parsed.data.skills !== undefined ? { skills: parsed.data.skills } : {}),
-      ...(parsed.data.prepTimeSec !== undefined ? { prepTimeSec: parsed.data.prepTimeSec } : {}),
-      ...(parsed.data.maxRetakes !== undefined ? { maxRetakes: parsed.data.maxRetakes } : {}),
-      ...(parsed.data.proctoringOn !== undefined ? { proctoringOn: parsed.data.proctoringOn } : {}),
-      ...(parsed.data.isArchived !== undefined ? { isArchived: parsed.data.isArchived } : {}),
-      updatedAt: new Date(),
-    } as any)
-    .where(eq(interviewQuestionSets.id, id))
-    .returning();
-
-  return c.json(ok(updated));
+interviewQuestionSetRoutes.put("/:id", validateJson(UpdateSchema, undefined, { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  const patch = Object.fromEntries(
+    Object.entries(body).filter(([, v]) => v !== undefined),
+  ) as QuestionSetPatch;
+  return c.json(success(await updateQuestionSet(userId, c.req.param("id"), patch)));
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -265,24 +130,7 @@ interviewQuestionSetRoutes.put("/:id", async (c) => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 interviewQuestionSetRoutes.delete("/:id", async (c) => {
-  const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
-  const id = c.req.param("id");
-  const db = getDb();
-  const [existing] = await db
-    .select()
-    .from(interviewQuestionSets)
-    .where(eq(interviewQuestionSets.id, id))
-    .limit(1);
-  if (!existing) return c.json(fail("NOT_FOUND", "Question set not found"), 404);
-  if (!(await canReadSet(existing, user.sub))) {
-    return c.json(fail("FORBIDDEN", "Not your question set"), 403);
-  }
-
-  await db
-    .update(interviewQuestionSets)
-    .set({ isArchived: true, updatedAt: new Date() } as any)
-    .where(eq(interviewQuestionSets.id, id));
-
-  return c.json(ok({ archived: true }));
+  const userId = requireUser(c);
+  await archiveQuestionSet(userId, c.req.param("id"));
+  return c.json(success({ archived: true }));
 });

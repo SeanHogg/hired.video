@@ -1,11 +1,8 @@
 /**
- * Studio features — voice clone marketplace: fee constants and licence
- * checks shared by the read and write route modules.
+ * Studio features — voice clone marketplace: the fee constants shared by the
+ * write routes and services/studio/voice-clone-commands.ts (which resolves a
+ * creator's fee override).
  */
-import { and, eq } from "drizzle-orm";
-import { getDb, schema } from "../../db/index.js";
-import { studioVoiceCloneLicenses } from "./shared.js";
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // ██  9. VOICE CLONE MARKETPLACE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -36,28 +33,3 @@ import { studioVoiceCloneLicenses } from "./shared.js";
 export const PLATFORM_FEE_BPS_DEFAULT = 500; // 5%
 export const MAX_PRICE_CENTS = 1_000_00;       // $1,000 hard cap, sanity guard
 
-/**
- * Resolve the platform fee bps to snapshot onto a listing for `userId`
- * (#157). Reads `users.creator_platform_fee_bps_override`; falls back to
- * `PLATFORM_FEE_BPS_DEFAULT` when null. Snapshot semantics apply at the
- * call site — existing listings keep their stored `platform_fee_bps`.
- */
-export async function resolveCreatorFeeBps(userId: string): Promise<number> {
-  const db = getDb();
-  const [row] = await db
-    .select({ override: schema.users.creatorPlatformFeeBpsOverride })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
-  return row?.override ?? PLATFORM_FEE_BPS_DEFAULT;
-}
-
-/** Returns true iff `userId` may synthesize speech with `cloneId`. */
-export async function userHasVoiceLicense(db: ReturnType<typeof getDb>, userId: string, cloneId: string): Promise<boolean> {
-  const rows = await db
-    .select({ id: studioVoiceCloneLicenses.id })
-    .from(studioVoiceCloneLicenses)
-    .where(and(eq(studioVoiceCloneLicenses.userId, userId), eq(studioVoiceCloneLicenses.voiceCloneId, cloneId)))
-    .limit(1);
-  return rows.length > 0;
-}

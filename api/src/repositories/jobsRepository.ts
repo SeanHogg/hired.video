@@ -3,7 +3,8 @@
  * two small join/activity tables that belong to it: jobApplications and
  * savedJobs. These three are co-owned because they have one-to-many
  * cardinality back to jobItems and are always queried together on the
- * seeker's dashboard.
+ * seeker's dashboard. job_applications is READ-only here: the single
+ * writer is jobApplicationTrackerRepository (one application per user+job).
  *
  * Every direct Drizzle call against these tables outside the repository
  * module is a layering violation.
@@ -17,29 +18,32 @@ const {
   jobApplications,
   savedJobs,
   resumeMatchScores,
-  jobBoardSources,
-  jobBoardPostings,
-  jobBoardSyncLog,
-  exclusiveBoards,
-  boardBids,
 } = schema;
 
 export type DbLike = any;
 
+const JOB_BRIEF_COLUMNS = {
+  id: jobItems.id,
+  title: jobItems.title,
+  description: jobItems.description,
+  company: jobItems.company,
+  location: jobItems.location,
+};
+
 export type JobRow = typeof jobItems.$inferSelect;
 export type JobInsert = typeof jobItems.$inferInsert;
 export type JobApplicationRow = typeof jobApplications.$inferSelect;
-export type JobApplicationInsert = typeof jobApplications.$inferInsert;
 export type SavedJobRow = typeof savedJobs.$inferSelect;
 export type ResumeMatchScoreRow = typeof resumeMatchScores.$inferSelect;
 export type ResumeMatchScoreInsert = typeof resumeMatchScores.$inferInsert;
-export type JobBoardSourceRow = typeof jobBoardSources.$inferSelect;
-export type JobBoardPostingRow = typeof jobBoardPostings.$inferSelect;
-export type JobBoardPostingInsert = typeof jobBoardPostings.$inferInsert;
-export type JobBoardSyncLogRow = typeof jobBoardSyncLog.$inferSelect;
-export type ExclusiveBoardRow = typeof exclusiveBoards.$inferSelect;
-export type BoardBidRow = typeof boardBids.$inferSelect;
-export type BoardBidInsert = typeof boardBids.$inferInsert;
+
+export interface JobBrief {
+  id: string;
+  title: string;
+  description: string;
+  company: string | null;
+  location: string | null;
+}
 
 export interface JobSearchFilters {
   search?: string;
@@ -51,6 +55,14 @@ export interface IJobReader {
   findJobById(id: string): Promise<JobRow | null>;
   findJobsByIds(ids: string[]): Promise<JobRow[]>;
   listActiveJobs(limit?: number): Promise<JobRow[]>;
+  /** Narrow {id,title,description,company,location} rows for AI tailoring/ranking. */
+  findJobBriefsByIds(ids: string[]): Promise<JobBrief[]>;
+  /** Up to `limit` active jobs (newest first) as briefs. */
+  listActiveJobBriefs(limit: number): Promise<JobBrief[]>;
+  /** {id,title,description,skillsRequired} for heuristic résumé scoring; null when missing. */
+  findJobScoringBrief(id: string): Promise<Pick<JobRow, "id" | "title" | "description" | "skillsRequired"> | null>;
+  /** The job's poster (`ownerId` null for unowned postings); null when the job doesn't exist. */
+  findJobOwner(id: string): Promise<{ ownerId: string | null } | null>;
   searchJobs(filters: JobSearchFilters, limit?: number): Promise<JobRow[]>;
   countJobs(): Promise<number>;
   countActiveJobs(): Promise<number>;
@@ -75,7 +87,6 @@ export interface IJobWriter {
 export interface IJobApplicationStore {
   findApplicationById(id: string): Promise<JobApplicationRow | null>;
   findApplicationsForUser(userId: string): Promise<JobApplicationRow[]>;
-  insertApplication(input: JobApplicationInsert): Promise<JobApplicationRow>;
   countApplications(): Promise<number>;
   countApplicationsCreatedSince(since: Date): Promise<number>;
 }
@@ -94,29 +105,12 @@ export interface IResumeMatchStore {
   upsertResumeMatch(input: ResumeMatchScoreInsert): Promise<void>;
 }
 
-/** job-board distribution (syndication of job posts to external boards). */
-export interface IJobBoardDistributionStore {
-  listJobBoardSources(): Promise<JobBoardSourceRow[]>;
-  findJobBoardPostingsForJob(jobId: string): Promise<JobBoardPostingRow[]>;
-  insertJobBoardPosting(input: JobBoardPostingInsert): Promise<JobBoardPostingRow>;
-  findJobBoardSyncLogs(sourceId: string, limit?: number): Promise<JobBoardSyncLogRow[]>;
-}
-
-/** exclusive (closed) boards + their bids. */
-export interface IExclusiveBoardStore {
-  listExclusiveBoards(): Promise<ExclusiveBoardRow[]>;
-  findBidsForBoard(boardId: string): Promise<BoardBidRow[]>;
-  insertBoardBid(input: BoardBidInsert): Promise<BoardBidRow>;
-}
-
 export interface IJobsRepository
   extends IJobReader,
     IJobWriter,
     IJobApplicationStore,
     ISavedJobStore,
-    IResumeMatchStore,
-    IJobBoardDistributionStore,
-    IExclusiveBoardStore {}
+    IResumeMatchStore {}
 
 export class JobsRepository implements IJobsRepository {
   constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}
@@ -156,6 +150,43 @@ export class JobsRepository implements IJobsRepository {
       .where(eq(jobItems.isActive, true))
       .orderBy(desc(jobItems.createdAt))
       .limit(Math.min(500, Math.max(1, limit)))) as JobRow[];
+  }
+
+  async findJobBriefsByIds(ids: string[]): Promise<JobBrief[]> {
+    if (ids.length === 0) return [];
+    return (await this.db.select(JOB_BRIEF_COLUMNS).from(jobItems).where(inArray(jobItems.id, ids))) as JobBrief[];
+  }
+
+  async listActiveJobBriefs(limit: number): Promise<JobBrief[]> {
+    return (await this.db
+      .select(JOB_BRIEF_COLUMNS)
+      .from(jobItems)
+      .where(eq(jobItems.isActive, true))
+      .orderBy(desc(jobItems.createdAt))
+      .limit(limit)) as JobBrief[];
+  }
+
+  async findJobScoringBrief(id: string): Promise<Pick<JobRow, "id" | "title" | "description" | "skillsRequired"> | null> {
+    const [row] = await this.db
+      .select({
+        id: jobItems.id,
+        title: jobItems.title,
+        description: jobItems.description,
+        skillsRequired: jobItems.skillsRequired,
+      })
+      .from(jobItems)
+      .where(eq(jobItems.id, id))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findJobOwner(id: string): Promise<{ ownerId: string | null } | null> {
+    const [row] = await this.db
+      .select({ ownerId: jobItems.postedByUserId })
+      .from(jobItems)
+      .where(eq(jobItems.id, id))
+      .limit(1);
+    return row ?? null;
   }
 
   async searchJobs(filters: JobSearchFilters, limit = 100): Promise<JobRow[]> {
@@ -243,11 +274,6 @@ export class JobsRepository implements IJobsRepository {
       .orderBy(desc(jobApplications.createdAt))) as JobApplicationRow[];
   }
 
-  async insertApplication(input: JobApplicationInsert): Promise<JobApplicationRow> {
-    const [created] = await this.db.insert(jobApplications).values(input as any).returning();
-    return created as JobApplicationRow;
-  }
-
   async countApplications(): Promise<number> {
     const [row] = await this.db.select({ n: count() }).from(jobApplications);
     return Number(row?.n ?? 0);
@@ -259,6 +285,11 @@ export class JobsRepository implements IJobsRepository {
   }
 
   // ── saved jobs ────────────────────────────────────────────────────────────
+
+  async countSavedForUser(userId: string): Promise<number> {
+    const [row] = await this.db.select({ n: count() }).from(savedJobs).where(eq(savedJobs.userId, userId));
+    return Number(row?.n ?? 0);
+  }
 
   async findSavedForUser(userId: string): Promise<SavedJobRow[]> {
     return (await this.db.select().from(savedJobs).where(eq(savedJobs.userId, userId))) as SavedJobRow[];
@@ -295,51 +326,6 @@ export class JobsRepository implements IJobsRepository {
 
   async upsertResumeMatch(input: ResumeMatchScoreInsert): Promise<void> {
     await this.db.insert(resumeMatchScores).values(input as any);
-  }
-
-  // ── job-board distribution ────────────────────────────────────────────────
-
-  async listJobBoardSources(): Promise<JobBoardSourceRow[]> {
-    return (await this.db.select().from(jobBoardSources)) as JobBoardSourceRow[];
-  }
-
-  async findJobBoardPostingsForJob(jobId: string): Promise<JobBoardPostingRow[]> {
-    return (await this.db
-      .select()
-      .from(jobBoardPostings)
-      .where(eq(jobBoardPostings.jobId, jobId))) as JobBoardPostingRow[];
-  }
-
-  async insertJobBoardPosting(input: JobBoardPostingInsert): Promise<JobBoardPostingRow> {
-    const [row] = await this.db.insert(jobBoardPostings).values(input as any).returning();
-    return row as JobBoardPostingRow;
-  }
-
-  async findJobBoardSyncLogs(sourceId: string, limit = 50): Promise<JobBoardSyncLogRow[]> {
-    return (await this.db
-      .select()
-      .from(jobBoardSyncLog)
-      .where(eq(jobBoardSyncLog.sourceId, sourceId))
-      .orderBy(desc(jobBoardSyncLog.startedAt))
-      .limit(Math.min(200, Math.max(1, limit)))) as JobBoardSyncLogRow[];
-  }
-
-  // ── exclusive boards + bids ───────────────────────────────────────────────
-
-  async listExclusiveBoards(): Promise<ExclusiveBoardRow[]> {
-    return (await this.db.select().from(exclusiveBoards)) as ExclusiveBoardRow[];
-  }
-
-  async findBidsForBoard(boardId: string): Promise<BoardBidRow[]> {
-    return (await this.db
-      .select()
-      .from(boardBids)
-      .where(eq(boardBids.boardId, boardId))) as BoardBidRow[];
-  }
-
-  async insertBoardBid(input: BoardBidInsert): Promise<BoardBidRow> {
-    const [row] = await this.db.insert(boardBids).values(input as any).returning();
-    return row as BoardBidRow;
   }
 
   // Keep `sql` import alive for future aggregate queries.

@@ -27,6 +27,7 @@ import { success, error } from "../types/index.js";
 import { recruiterBdPipelineService } from "../services/recruiter/bd-pipeline.js";
 import { resolveCompanyScope } from "../services/company/scope.js";
 import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const recruiterBdRoutes = new Hono<AppEnv>();
 
@@ -47,19 +48,16 @@ const NewClientSchema = z.object({
 });
 
 recruiterBdRoutes.get("/clients", async (c) => {
-  const auth = requireUser(c); if ("response" in auth) return auth.response;
-  const u = auth.userId;
+  const userId = requireUser(c);   const u = userId;
   const { workspaceIds } = await bdScope(u);
   return c.json(success({ items: await recruiterBdPipelineService.listClients(u, workspaceIds) }), 200);
 });
 
-recruiterBdRoutes.post("/clients", async (c) => {
-  const auth = requireUser(c); if ("response" in auth) return auth.response;
-  const u = auth.userId;
-  const parsed = NewClientSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid client", parsed.error.flatten()), 400);
+recruiterBdRoutes.post("/clients", validateJson(NewClientSchema, (e) => error("VALIDATION_ERROR", "Invalid client", e.flatten())), async (c) => {
+  const userId = requireUser(c);   const u = userId;
+  const body = c.req.valid("json");
   const { primary } = await bdScope(u);
-  return c.json(success({ client: await recruiterBdPipelineService.createClient(u, parsed.data, primary) }), 201);
+  return c.json(success({ client: await recruiterBdPipelineService.createClient(u, body, primary) }), 201);
 });
 
 const ClientContactSchema = z.object({
@@ -70,29 +68,26 @@ const ClientContactSchema = z.object({
   isPrimary: z.boolean().optional(),
 });
 
-recruiterBdRoutes.post("/clients/:id/contacts", async (c) => {
-  const auth = requireUser(c); if ("response" in auth) return auth.response;
-  const u = auth.userId;
-  const parsed = ClientContactSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid contact", parsed.error.flatten()), 400);
+recruiterBdRoutes.post("/clients/:id/contacts", validateJson(ClientContactSchema, (e) => error("VALIDATION_ERROR", "Invalid contact", e.flatten())), async (c) => {
+  const userId = requireUser(c);   const u = userId;
+  const body = c.req.valid("json");
   const { workspaceIds } = await bdScope(u);
   const row = await recruiterBdPipelineService.addClientContact({
     clientId: c.req.param("id"),
     recruiterUserId: u,
     workspaceIds,
-    name: parsed.data.name,
-    title: parsed.data.title ?? null,
-    email: parsed.data.email ?? null,
-    phone: parsed.data.phone ?? null,
-    isPrimary: parsed.data.isPrimary ?? false,
+    name: body.name,
+    title: body.title ?? null,
+    email: body.email ?? null,
+    phone: body.phone ?? null,
+    isPrimary: body.isPrimary ?? false,
   });
   if (!row) return c.json(error("NOT_FOUND", "Client not found"), 404);
   return c.json(success({ contact: row }), 201);
 });
 
 recruiterBdRoutes.get("/stages", async (c) => {
-  const auth = requireUser(c); if ("response" in auth) return auth.response;
-  const u = auth.userId;
+  const userId = requireUser(c);   const u = userId;
   const pipelineKey = c.req.query("pipelineKey") ?? "default";
   return c.json(success({ items: await recruiterBdPipelineService.listStages(u, pipelineKey) }), 200);
 });
@@ -108,14 +103,12 @@ const StageUpsertSchema = z.object({
   isClosedLost: z.boolean().optional(),
 });
 
-recruiterBdRoutes.put("/stages", async (c) => {
-  const auth = requireUser(c); if ("response" in auth) return auth.response;
-  const u = auth.userId;
-  const parsed = StageUpsertSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid stage", parsed.error.flatten()), 400);
+recruiterBdRoutes.put("/stages", validateJson(StageUpsertSchema, (e) => error("VALIDATION_ERROR", "Invalid stage", e.flatten())), async (c) => {
+  const userId = requireUser(c);   const u = userId;
+  const body = c.req.valid("json");
   const row = await recruiterBdPipelineService.upsertStage({
     recruiterUserId: u,
-    ...parsed.data,
+    ...body,
   });
   return c.json(success({ stage: row }), 200);
 });
@@ -135,19 +128,16 @@ const NewDealSchema = z.object({
 });
 
 recruiterBdRoutes.get("/deals", async (c) => {
-  const auth = requireUser(c); if ("response" in auth) return auth.response;
-  const u = auth.userId;
+  const userId = requireUser(c);   const u = userId;
   const { workspaceIds } = await bdScope(u);
   return c.json(success({ items: await recruiterBdPipelineService.listDeals(u, workspaceIds) }), 200);
 });
 
-recruiterBdRoutes.post("/deals", async (c) => {
-  const auth = requireUser(c); if ("response" in auth) return auth.response;
-  const u = auth.userId;
-  const parsed = NewDealSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid deal", parsed.error.flatten()), 400);
+recruiterBdRoutes.post("/deals", validateJson(NewDealSchema, (e) => error("VALIDATION_ERROR", "Invalid deal", e.flatten())), async (c) => {
+  const userId = requireUser(c);   const u = userId;
+  const body = c.req.valid("json");
   const { primary } = await bdScope(u);
-  return c.json(success({ deal: await recruiterBdPipelineService.createDeal(u, parsed.data, primary) }), 201);
+  return c.json(success({ deal: await recruiterBdPipelineService.createDeal(u, body, primary) }), 201);
 });
 
 const StageMoveSchema = z.object({
@@ -155,18 +145,16 @@ const StageMoveSchema = z.object({
   pipelineKey: z.string().max(32).optional(),
 });
 
-recruiterBdRoutes.patch("/deals/:id/stage", async (c) => {
-  const auth = requireUser(c); if ("response" in auth) return auth.response;
-  const u = auth.userId;
-  const parsed = StageMoveSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid stage move", parsed.error.flatten()), 400);
+recruiterBdRoutes.patch("/deals/:id/stage", validateJson(StageMoveSchema, (e) => error("VALIDATION_ERROR", "Invalid stage move", e.flatten())), async (c) => {
+  const userId = requireUser(c);   const u = userId;
+  const body = c.req.valid("json");
   const { workspaceIds } = await bdScope(u);
   const row = await recruiterBdPipelineService.moveDealToStage({
     dealId: c.req.param("id"),
     recruiterUserId: u,
     workspaceIds,
-    stageKey: parsed.data.stageKey,
-    pipelineKey: parsed.data.pipelineKey,
+    stageKey: body.stageKey,
+    pipelineKey: body.pipelineKey,
   });
   if (!row) return c.json(error("NOT_FOUND", "Deal not found"), 404);
   return c.json(success({ deal: row }), 200);
@@ -177,31 +165,24 @@ const OwnerSchema = z.object({
   ownerType: z.string().max(24).optional(),
 });
 
-recruiterBdRoutes.patch("/deals/:id/owner", async (c) => {
-  const auth = requireUser(c); if ("response" in auth) return auth.response;
-  const u = auth.userId;
-  const parsed = OwnerSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid owner", parsed.error.flatten()), 400);
+recruiterBdRoutes.patch("/deals/:id/owner", validateJson(OwnerSchema, (e) => error("VALIDATION_ERROR", "Invalid owner", e.flatten())), async (c) => {
+  const userId = requireUser(c);   const u = userId;
+  const body = c.req.valid("json");
   const { workspaceIds } = await bdScope(u);
   const row = await recruiterBdPipelineService.assignDealOwner({
     dealId: c.req.param("id"),
     recruiterUserId: u,
     workspaceIds,
-    ownerUserId: parsed.data.ownerUserId,
-    ownerType: parsed.data.ownerType,
+    ownerUserId: body.ownerUserId,
+    ownerType: body.ownerType,
   });
   if (!row) return c.json(error("NOT_FOUND", "Deal not found"), 404);
   return c.json(success({ deal: row }), 200);
 });
 
 recruiterBdRoutes.get("/rollup", async (c) => {
-  const auth = requireUser(c); if ("response" in auth) return auth.response;
-  const u = auth.userId;
+  const userId = requireUser(c);   const u = userId;
   const pipelineKey = c.req.query("pipelineKey") ?? "default";
   const { workspaceIds } = await bdScope(u);
   return c.json(success(await recruiterBdPipelineService.pipelineRollup(u, pipelineKey, workspaceIds)), 200);
 });
-
-recruiterBdRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Recruiter-BD route not found" } }, 404),
-);

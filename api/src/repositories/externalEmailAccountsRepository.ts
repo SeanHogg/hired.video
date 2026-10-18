@@ -1,21 +1,68 @@
 /**
- * ExternalEmailAccountsRepository — connected mailboxes (Gmail, Outlook).
+ * ExternalEmailAccountsRepository — the connected-mailbox adapter over
+ * provider_connections (purpose "email_inbox", W3-C migration 0600; was
+ * external_email_accounts). Row ids were kept, so external_email_messages /
+ * email_sync_runs still point at the same mailbox.
  *
- * Encryption is service-layer concern: the repo stores whatever's in
- * `oauthRefreshTokenEnc` verbatim. Callers (oauth.ts, ingest.ts) handle
- * the encrypt/decrypt step.
+ * Maps a provider connection to the mailbox shape the inbox code has always
+ * used:
+ *   accountEmail ← external_account_id   accountLabel ← handle
+ *   oauthRefreshTokenEnc ← refresh_token_enc (open with connection-secrets.ts)
+ *   status "paused" ⇄ status active + enabled = false
+ *   sync cursors / push subscription ← config
+ *
+ * Encryption is a service-layer concern: the adapter stores whatever's in
+ * `oauthRefreshTokenEnc` verbatim. Callers (email-integration route, oauth.ts)
+ * seal / open it.
  */
-
 import { and, eq } from "drizzle-orm";
 import { schema } from "../db/index.js";
+import {
+  ProviderConnectionsRepository,
+  type ProviderConnectionFilter,
+  type ProviderConnectionPatch,
+  type ProviderConnectionRow,
+} from "./providerConnectionsRepository.js";
 
-const { externalEmailAccounts } = schema;
+const { providerConnections } = schema;
 
 export type DbLike = any;
 
-export type ExternalEmailAccountRow = typeof externalEmailAccounts.$inferSelect;
-export type ExternalEmailAccountInsert = typeof externalEmailAccounts.$inferInsert;
-export type ExternalEmailAccountPatch = Partial<ExternalEmailAccountInsert>;
+const PURPOSE = "email_inbox" as const;
+
+/** Mailbox status as the API has always reported it. */
+export type ExternalEmailAccountStatus = "active" | "paused" | "error" | "expired" | "revoked";
+
+export interface ExternalEmailAccountRow {
+  id: string;
+  userId: string;
+  provider: string;
+  accountEmail: string;
+  accountLabel: string | null;
+  oauthRefreshTokenEnc: string | null;
+  pushSubscriptionId: string | null;
+  pushExpiresAt: Date | null;
+  lastSyncedAt: Date | null;
+  /** Gmail `users.history.list` cursor. */
+  lastHistoryId: string | null;
+  /** Outlook Graph `/me/messages/delta` link. */
+  lastDeltaLink: string | null;
+  scopes: string[] | null;
+  status: string;
+  lastError: string | null;
+  /** numeric(4,3) as text, e.g. "0.500". */
+  minRelevanceScore: string;
+  activeProfileId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type ExternalEmailAccountInsert = Partial<ExternalEmailAccountRow> & {
+  userId: string;
+  provider: string;
+  accountEmail: string;
+};
+export type ExternalEmailAccountPatch = Partial<ExternalEmailAccountRow>;
 
 export interface IExternalEmailAccountsRepository {
   findAllForUser(userId: string): Promise<ExternalEmailAccountRow[]>;
@@ -28,25 +75,105 @@ export interface IExternalEmailAccountsRepository {
   upsert(input: ExternalEmailAccountInsert): Promise<ExternalEmailAccountRow>;
   patch(id: string, userId: string, patch: ExternalEmailAccountPatch): Promise<void>;
   remove(id: string, userId: string): Promise<void>;
+  /** Mailboxes counted against the inbox cap (active, not paused). */
+  countActiveForUser(userId: string): Promise<number>;
+}
+
+/** Join helpers for the messages repository (mailbox label / email / floor). */
+export const mailboxJoin = {
+  table: providerConnections,
+  on: (accountIdColumn: unknown) => and(eq(providerConnections.id, accountIdColumn as any), eq(providerConnections.purpose, PURPOSE)),
+  accountLabel: providerConnections.handle,
+  accountEmail: providerConnections.externalAccountId,
+  /** NULL only for a row that is not a mailbox — the inner join excludes those. */
+  minRelevanceScore: providerConnections.minRelevanceScore,
+};
+
+function str(v: unknown): string | null {
+  return typeof v === "string" ? v : null;
+}
+
+function toScopes(scopes: string | null): string[] | null {
+  if (!scopes) return null;
+  return scopes.split(" ").filter(Boolean);
+}
+
+export function toMailbox(row: ProviderConnectionRow): ExternalEmailAccountRow {
+  const config = (row.config ?? {}) as Record<string, unknown>;
+  const pushExpiresAt = str(config.pushExpiresAt);
+  return {
+    id: row.id,
+    userId: row.userId ?? "",
+    provider: row.provider,
+    accountEmail: row.externalAccountId ?? "",
+    accountLabel: row.handle,
+    oauthRefreshTokenEnc: row.refreshTokenEnc,
+    pushSubscriptionId: str(config.pushSubscriptionId),
+    pushExpiresAt: pushExpiresAt ? new Date(pushExpiresAt) : null,
+    lastSyncedAt: row.lastSyncAt,
+    lastHistoryId: str(config.lastHistoryId),
+    lastDeltaLink: str(config.lastDeltaLink),
+    scopes: toScopes(row.scopes),
+    status: row.status === "active" && !row.enabled ? "paused" : row.status,
+    lastError: row.lastError,
+    minRelevanceScore: row.minRelevanceScore ?? "0.500",
+    activeProfileId: row.activeProfileId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/** A mailbox patch as a provider_connections patch. */
+function toPatch(patch: ExternalEmailAccountPatch): ProviderConnectionPatch {
+  const out: ProviderConnectionPatch = {};
+  const config: Record<string, unknown> = {};
+  if (patch.provider !== undefined) out.provider = patch.provider;
+  if (patch.accountEmail !== undefined) out.externalAccountId = patch.accountEmail;
+  if (patch.accountLabel !== undefined) out.handle = patch.accountLabel;
+  if (patch.oauthRefreshTokenEnc !== undefined) out.refreshTokenEnc = patch.oauthRefreshTokenEnc;
+  if (patch.lastSyncedAt !== undefined) out.lastSyncAt = patch.lastSyncedAt;
+  if (patch.scopes !== undefined) {
+    const scopes = patch.scopes as unknown;
+    out.scopes = Array.isArray(scopes) ? scopes.join(" ") : typeof scopes === "string" ? scopes : null;
+  }
+  if (patch.status !== undefined) {
+    if (patch.status === "paused") {
+      out.status = "active";
+      out.enabled = false;
+    } else {
+      out.status = patch.status === "expired" || patch.status === "revoked" || patch.status === "error" ? patch.status : "active";
+      out.enabled = true;
+    }
+  }
+  if (patch.lastError !== undefined) out.lastError = patch.lastError;
+  if (patch.minRelevanceScore !== undefined) out.minRelevanceScore = patch.minRelevanceScore;
+  if (patch.activeProfileId !== undefined) out.activeProfileId = patch.activeProfileId;
+  if (patch.pushSubscriptionId !== undefined) config.pushSubscriptionId = patch.pushSubscriptionId;
+  if (patch.pushExpiresAt !== undefined) config.pushExpiresAt = patch.pushExpiresAt ? new Date(patch.pushExpiresAt).toISOString() : null;
+  if (patch.lastHistoryId !== undefined) config.lastHistoryId = patch.lastHistoryId;
+  if (patch.lastDeltaLink !== undefined) config.lastDeltaLink = patch.lastDeltaLink;
+  if (Object.keys(config).length > 0) out.configMerge = config;
+  return out;
+}
+
+function owned(id: string, userId: string): ProviderConnectionFilter {
+  return { id, purpose: PURPOSE, userId };
 }
 
 export class ExternalEmailAccountsRepository implements IExternalEmailAccountsRepository {
-  constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}
+  private readonly connections: ProviderConnectionsRepository;
+
+  constructor(db: DbLike, now: () => Date = () => new Date()) {
+    this.connections = new ProviderConnectionsRepository(db, now);
+  }
 
   async findAllForUser(userId: string): Promise<ExternalEmailAccountRow[]> {
-    return (await this.db
-      .select()
-      .from(externalEmailAccounts)
-      .where(eq(externalEmailAccounts.userId, userId))) as ExternalEmailAccountRow[];
+    return (await this.connections.list({ purpose: PURPOSE, userId })).map(toMailbox);
   }
 
   async findById(id: string, userId: string): Promise<ExternalEmailAccountRow | null> {
-    const rows = (await this.db
-      .select()
-      .from(externalEmailAccounts)
-      .where(and(eq(externalEmailAccounts.id, id), eq(externalEmailAccounts.userId, userId)))
-      .limit(1)) as ExternalEmailAccountRow[];
-    return rows[0] ?? null;
+    const row = await this.connections.findOne(owned(id, userId));
+    return row ? toMailbox(row) : null;
   }
 
   async findByProviderEmail(
@@ -54,48 +181,41 @@ export class ExternalEmailAccountsRepository implements IExternalEmailAccountsRe
     provider: string,
     email: string,
   ): Promise<ExternalEmailAccountRow | null> {
-    const rows = (await this.db
-      .select()
-      .from(externalEmailAccounts)
-      .where(
-        and(
-          eq(externalEmailAccounts.userId, userId),
-          eq(externalEmailAccounts.provider, provider),
-          eq(externalEmailAccounts.accountEmail, email),
-        ),
-      )
-      .limit(1)) as ExternalEmailAccountRow[];
-    return rows[0] ?? null;
+    const row = await this.connections.findOne({ purpose: PURPOSE, userId, provider, externalAccountId: email });
+    return row ? toMailbox(row) : null;
   }
 
   async upsert(input: ExternalEmailAccountInsert): Promise<ExternalEmailAccountRow> {
-    // Look up first — drizzle's onConflictDoUpdate on the unique
-    // (user_id, provider, account_email) is fine but the surrounding
-    // service wants the row back regardless of insert vs update.
-    const existing = input.userId && input.provider && input.accountEmail
-      ? await this.findByProviderEmail(input.userId, input.provider, input.accountEmail)
-      : null;
-    if (existing) {
-      await this.db
-        .update(externalEmailAccounts)
-        .set({ ...input, updatedAt: this.now() } as any)
-        .where(eq(externalEmailAccounts.id, existing.id));
-      return { ...existing, ...(input as any), updatedAt: this.now() };
-    }
-    const [row] = await this.db.insert(externalEmailAccounts).values(input as any).returning();
-    return row as ExternalEmailAccountRow;
+    const patch = toPatch(input);
+    const { configMerge, ...fields } = patch;
+    const row = await this.connections.upsert(
+      { purpose: PURPOSE, userId: input.userId, provider: input.provider, externalAccountId: input.accountEmail },
+      {
+        ...fields,
+        ownerKind: "user",
+        ownerId: input.userId,
+        userId: input.userId,
+        provider: input.provider,
+        purpose: PURPOSE,
+        externalAccountId: input.accountEmail,
+        // Newly connected mailboxes get the "relevant mail only" floor.
+        minRelevanceScore: fields.minRelevanceScore ?? "0.500",
+        config: configMerge ?? {},
+      },
+      patch,
+    );
+    return toMailbox(row);
   }
 
   async patch(id: string, userId: string, patch: ExternalEmailAccountPatch): Promise<void> {
-    await this.db
-      .update(externalEmailAccounts)
-      .set({ ...patch, updatedAt: this.now() } as any)
-      .where(and(eq(externalEmailAccounts.id, id), eq(externalEmailAccounts.userId, userId)));
+    await this.connections.update(owned(id, userId), toPatch(patch));
   }
 
   async remove(id: string, userId: string): Promise<void> {
-    await this.db
-      .delete(externalEmailAccounts)
-      .where(and(eq(externalEmailAccounts.id, id), eq(externalEmailAccounts.userId, userId)));
+    await this.connections.delete(owned(id, userId));
+  }
+
+  async countActiveForUser(userId: string): Promise<number> {
+    return this.connections.count({ purpose: PURPOSE, userId, status: "active", enabled: true });
   }
 }

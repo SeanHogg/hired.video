@@ -19,8 +19,9 @@ import { ResumeContentSchema, type ResumeContent } from "../../../../shared/resu
 import { CoverLetterSchema, type CoverLetter } from "../../../../shared/cover-letter.js";
 import { DomainError, requireUserId } from "../../domains/errors.js";
 import { defineLenientIngest } from "../../services/adapters/llm-client.js";
-import type { ParsedJob } from "../../services/job/JobService.js";
-import { resolveJobForFit, type MatchDeps } from "./match-handlers.js";
+import type { ParsedJob } from "./job-page-parse.js";
+import { resolveJobForFit } from "./match-resolvers.js";
+import type { MatchDeps } from "./match-deps.js";
 import { aiDomainError } from "./tailor-handler.js";
 
 export const CoverLetterInputSchema = z

@@ -13,70 +13,25 @@
  */
 
 import { Hono } from "hono";
-import { and, desc, eq } from "drizzle-orm";
 import type { AppEnv } from "../types/index.js";
-import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { toBoostView } from "../services/advertising/boost-checkout.js";
-
-const { boosts } = schema;
+import { success } from "../types/index.js";
+import { cancelBoost, listActiveBoostsForSubject, listMyBoosts } from "../services/advertising/boosts.js";
+import { requireUser } from "./helpers/routerHelpers.js";
 
 export const boostRoutes = new Hono<AppEnv>();
 
-function userId(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
-
 boostRoutes.get("/me", async (c) => {
-  const uid = userId(c);
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(boosts)
-    .where(eq(boosts.userId, uid))
-    .orderBy(desc(boosts.createdAt));
-  return c.json(success({ items: rows.map(toBoostView) }), 200);
+  const uid = requireUser(c);
+  return c.json(success({ items: await listMyBoosts(uid) }), 200);
 });
 
 boostRoutes.get("/:subjectType/:subjectId", async (c) => {
-  const subjectType = c.req.param("subjectType");
-  const subjectId = c.req.param("subjectId");
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(boosts)
-    .where(
-      and(
-        eq(boosts.subjectType, subjectType),
-        eq(boosts.subjectId, subjectId),
-        eq(boosts.status, "active"),
-      ),
-    )
-    .orderBy(desc(boosts.createdAt));
-  return c.json(success({ items: rows.map(toBoostView) }), 200);
+  const items = await listActiveBoostsForSubject(c.req.param("subjectType"), c.req.param("subjectId"));
+  return c.json(success({ items }), 200);
 });
 
 boostRoutes.post("/:boostId/cancel", async (c) => {
-  const uid = userId(c);
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-  const [existing] = await db
-    .select({ id: boosts.id, userId: boosts.userId })
-    .from(boosts)
-    .where(eq(boosts.id, c.req.param("boostId")))
-    .limit(1);
-  if (!existing) return c.json(error("NOT_FOUND", "Boost not found"), 404);
-  if (existing.userId !== uid) {
-    return c.json(error("FORBIDDEN", "You can only cancel your own boost"), 403);
-  }
-  await db
-    .update(boosts)
-    .set({ status: "cancelled", updatedAt: new Date() } as any)
-    .where(eq(boosts.id, existing.id));
+  const uid = requireUser(c);
+  await cancelBoost(uid, c.req.param("boostId"));
   return c.json(success({ cancelled: true }), 200);
 });
-
-boostRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Boosts endpoint not found" } }, 404),
-);

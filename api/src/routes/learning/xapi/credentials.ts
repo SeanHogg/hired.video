@@ -17,20 +17,18 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Variables, AppEnv } from "../../../types/index.js";
 import { success, error } from "../../../types/index.js";
-import { LRS_PERMISSIONS } from "../../../db/schema/learning.js";
 import {
+  LRS_PERMISSIONS,
   createCredential,
   listCredentials,
   revokeCredential,
   rotateCredential,
   updateCredential,
 } from "../../../services/learning/xapi-use-cases.js";
+import { requireUser } from "../../helpers/routerHelpers.js";
+import { validateJson } from "../../helpers/validate.js";
 
 export const xapiCredentialRoutes = new Hono<{ Variables: Variables } & AppEnv>();
-
-function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
 
 const CreateSchema = z.object({
   label: z.string().min(1).max(200),
@@ -44,40 +42,33 @@ const UpdateSchema = z.object({
 });
 
 xapiCredentialRoutes.get("/credentials", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   return c.json(success(await listCredentials(userId)), 200);
 });
 
-xapiCredentialRoutes.post("/credentials", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const parsed = CreateSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  return c.json(success(await createCredential(userId, parsed.data.label, parsed.data.permission)), 201);
+xapiCredentialRoutes.post("/credentials", validateJson(CreateSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  return c.json(success(await createCredential(userId, body.label, body.permission)), 201);
 });
 
 xapiCredentialRoutes.post("/credentials/:id/rotate", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const rotated = await rotateCredential(userId, c.req.param("id"));
   if (!rotated) return c.json(error("NOT_FOUND", "Credential not found"), 404);
   return c.json(success(rotated), 200);
 });
 
-xapiCredentialRoutes.patch("/credentials/:id", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const parsed = UpdateSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  const view = await updateCredential(userId, c.req.param("id"), parsed.data);
+xapiCredentialRoutes.patch("/credentials/:id", validateJson(UpdateSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  const view = await updateCredential(userId, c.req.param("id"), body);
   if (!view) return c.json(error("NOT_FOUND", "Credential not found"), 404);
   return c.json(success(view), 200);
 });
 
 xapiCredentialRoutes.delete("/credentials/:id", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const revoked = await revokeCredential(userId, c.req.param("id"));
   if (!revoked) return c.json(error("NOT_FOUND", "Credential not found"), 404);
   return c.json(success({ revoked }), 200);

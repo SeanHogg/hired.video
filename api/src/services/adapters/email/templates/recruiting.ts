@@ -14,8 +14,8 @@ export interface ScreeningInvitationEmailInput {
   message?: string | null;
 }
 
-/** Pure builder: the screening invitation. Rendered through the layout
- *  WITHOUT the `{{Year}}` pass, exactly as the pre-split sender did. */
+/** Pure builder: the screening invitation, rendered through the shared
+ *  layout (footer year substituted; every user value escaped). */
 export function buildScreeningInvitationEmail(
   input: ScreeningInvitationEmailInput,
 ): { subject: string; html: string } {
@@ -43,7 +43,7 @@ export function buildScreeningInvitationEmail(
       Or paste this link into your browser:<br />
       <a href="${link}" style="color:#2563eb;">${link}</a>
     </p>`;
-  const html = emailLayout(body, { substituteYear: false });
+  const html = emailLayout(body);
   return { subject: "Complete your application screening", html };
 }
 
@@ -77,11 +77,6 @@ export interface CandidateVideoConsentEmailInput {
   /** The raw consent token (never stored). */
   token: string;
   expiresAt: Date;
-}
-
-/** `${FRONTEND_URL}/consent/video/<token>` — the candidate's public consent page. */
-export function buildCandidateVideoConsentUrl(token: string): string {
-  return `${getBaseUrl()}/consent/video/${encodeURIComponent(token)}`;
 }
 
 /** Pure builder: render the candidate-video consent email. Exported for tests. */

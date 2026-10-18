@@ -16,7 +16,6 @@ import assert from "node:assert/strict";
 import {
   PARTNER_DOMAINS,
   expandPartnerOrigins,
-  isPartnerDomain,
 } from "../../../../shared/security/partnerDomains.js";
 
 const REQUIRED_DOMAINS = [
@@ -67,33 +66,5 @@ describe("expandPartnerOrigins", () => {
     for (const o of origins) {
       assert.ok(o.startsWith("https://"), `non-https origin leaked: ${o}`);
     }
-  });
-});
-
-describe("isPartnerDomain", () => {
-  it("matches bare hostnames", () => {
-    assert.equal(isPartnerDomain("hired.video"), true);
-    assert.equal(isPartnerDomain("connecttalent.today"), true);
-  });
-
-  it("matches www-prefixed hostnames", () => {
-    assert.equal(isPartnerDomain("www.hired.video"), true);
-    assert.equal(isPartnerDomain("www.reelresu.me"), true);
-  });
-
-  it("is case-insensitive", () => {
-    assert.equal(isPartnerDomain("HIRED.VIDEO"), true);
-    assert.equal(isPartnerDomain("Www.Hired.Video"), true);
-  });
-
-  it("returns false for unknown domains", () => {
-    assert.equal(isPartnerDomain("evil.example.com"), false);
-    assert.equal(isPartnerDomain("hired.video.evil.com"), false);
-  });
-
-  it("returns false for null / undefined / empty", () => {
-    assert.equal(isPartnerDomain(null), false);
-    assert.equal(isPartnerDomain(undefined), false);
-    assert.equal(isPartnerDomain(""), false);
   });
 });

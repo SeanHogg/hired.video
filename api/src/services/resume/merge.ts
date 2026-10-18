@@ -287,10 +287,6 @@ export function mergeHighlights(source: string[], target: string[]): string[] {
   return result;
 }
 
-export function mergeKeywords(source: string[], target: string[]): string[] {
-  return mergeHighlights(source, target); // same dedup logic
-}
-
 /** Diff two string-arrays by normalised text. */
 function diffStringArray(source: unknown, target: unknown): ArrayDiff {
   const s = Array.isArray(source) ? source : [];
@@ -306,14 +302,6 @@ function diffStringArray(source: unknown, target: unknown): ArrayDiff {
     if (!sNorm.has(n)) onlyInTarget++;
   }
   return { onlyInSource, onlyInTarget, shared };
-}
-
-/** Backwards-compatible export — delegates to the broader diffStringArray. */
-export function computeHighlightDiff(
-  sourceItem: Record<string, any> | null | undefined,
-  targetItem: Record<string, any> | null | undefined,
-): ArrayDiff {
-  return diffStringArray(sourceItem?.highlights, targetItem?.highlights);
 }
 
 /** Scalar fields to check per section type. These are fields where both

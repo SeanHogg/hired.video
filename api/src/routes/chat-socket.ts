@@ -16,6 +16,7 @@
 
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
+import { requireUser } from "./helpers/routerHelpers.js";
 
 export const chatSocketRoutes = new Hono<{ Variables: Variables; Bindings: any }>();
 
@@ -28,7 +29,7 @@ chatSocketRoutes.get("/:conversationId", async (c) => {
   if (!conversationId) return c.text("Missing conversationId", 400);
 
   const user = c.var.user;
-  if (!user?.sub) return c.text("Unauthorized", 401);
+  requireUser(c);
 
   const env = (c.env as any) ?? {};
   const binding = env.CHAT_ROOM as DurableObjectNamespace | undefined;

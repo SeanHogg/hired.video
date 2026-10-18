@@ -3,6 +3,7 @@
  * Based on hired.video.Abstractions.Productivity namespace
  */
 
+import i18next from "i18next";
 import { UserProfile } from "@/lib/services/user-service";
 
 // Backend enums - must match exactly
@@ -274,92 +275,67 @@ export const getAvailableTaskTypesForRole = (userRole: string): TaskType[] => {
   return availableTypes.filter(type => !systemCreated.includes(type));
 };
 
+// Display-name registries — one entry per enum member (open/closed: a new
+// member is one row here + its locale key). English values are the fallback
+// when i18n hasn't loaded the key.
+const TASK_TYPE_LABELS: Record<TaskType, string> = {
+  [TaskType.General]: "General",
+  [TaskType.Project]: "Project",
+  [TaskType.Email]: "Email",
+  [TaskType.Phone]: "Phone",
+  [TaskType.Meeting]: "Meeting",
+  [TaskType.Interview]: "Interview",
+  [TaskType.Recruiting]: "Recruiting",
+  [TaskType.Sales]: "Sales",
+  [TaskType.Onboarding]: "Onboarding",
+  [TaskType.OnboardingProfile]: "Profile Setup",
+  [TaskType.OnboardingProfileSettings]: "Profile Settings",
+  [TaskType.OnboardingPrivacy]: "Privacy Settings",
+  [TaskType.OnboardingCreateTask]: "Create First Task",
+  [TaskType.OnboardingCreateResume]: "Create Resume",
+  [TaskType.OnboardingPostJob]: "Post Job",
+  [TaskType.OnboardingFollowCandidate]: "Follow Candidate",
+  [TaskType.OnboardingFollowResume]: "Follow Resume",
+  [TaskType.OnboardingReferUser]: "Refer User",
+  [TaskType.Recruiter]: "Recruiter Tasks",
+  [TaskType.RecruiterPreferences]: "Recruiter Preferences",
+  [TaskType.JobSeeker]: "Job Seeker Tasks",
+  [TaskType.JobSeekerPreferences]: "Job Seeker Preferences",
+  [TaskType.Company]: "Company",
+  [TaskType.CompanySettings]: "Company Settings",
+  [TaskType.Profile]: "Profile",
+  [TaskType.Job]: "Job",
+  [TaskType.Resume]: "Resume",
+};
+
+const TASK_STATUS_LABELS: Record<ProductivityItemStatus, string> = {
+  [ProductivityItemStatus.Planning]: "Planning",
+  [ProductivityItemStatus.ToDo]: "To Do",
+  [ProductivityItemStatus.Open]: "Open",
+  [ProductivityItemStatus.InProgress]: "In Progress",
+  [ProductivityItemStatus.Closed]: "Closed",
+  [ProductivityItemStatus.Descoped]: "Descoped",
+  [ProductivityItemStatus.Completed]: "Completed",
+  [ProductivityItemStatus.OnHold]: "On Hold",
+  [ProductivityItemStatus.Cancelled]: "Cancelled",
+};
+
+function translatedLabel(key: string, fallback: string): string {
+  return i18next.t(key, { defaultValue: fallback }) || fallback;
+}
+
 // Get display name for task type
 export const getTaskTypeDisplayName = (taskType: TaskType): string => {
-  switch (taskType) {
-    case TaskType.General:
-      return "General";
-    case TaskType.Project:
-      return "Project";
-    case TaskType.Email:
-      return "Email";
-    case TaskType.Phone:
-      return "Phone";
-    case TaskType.Meeting:
-      return "Meeting";
-    case TaskType.Interview:
-      return "Interview";
-    case TaskType.Recruiting:
-      return "Recruiting";
-    case TaskType.Sales:
-      return "Sales";
-    case TaskType.Onboarding:
-      return "Onboarding";
-    case TaskType.OnboardingProfile:
-      return "Profile Setup";
-    case TaskType.OnboardingProfileSettings:
-      return "Profile Settings";
-    case TaskType.OnboardingPrivacy:
-      return "Privacy Settings";
-    case TaskType.OnboardingCreateTask:
-      return "Create First Task";
-    case TaskType.OnboardingCreateResume:
-      return "Create Resume";
-    case TaskType.OnboardingPostJob:
-      return "Post Job";
-    case TaskType.OnboardingFollowCandidate:
-      return "Follow Candidate";
-    case TaskType.OnboardingFollowResume:
-      return "Follow Resume";
-    case TaskType.OnboardingReferUser:
-      return "Refer User";
-    case TaskType.Recruiter:
-      return "Recruiter Tasks";
-    case TaskType.RecruiterPreferences:
-      return "Recruiter Preferences";
-    case TaskType.JobSeeker:
-      return "Job Seeker Tasks";
-    case TaskType.JobSeekerPreferences:
-      return "Job Seeker Preferences";
-    case TaskType.Company:
-      return "Company";
-    case TaskType.CompanySettings:
-      return "Company Settings";
-    case TaskType.Profile:
-      return "Profile";
-    case TaskType.Job:
-      return "Job";
-    case TaskType.Resume:
-      return "Resume";
-    default:
-      return "Unknown";
-  }
+  const fallback = TASK_TYPE_LABELS[taskType];
+  if (fallback === undefined) return translatedLabel("tasks.label.unknown", "Unknown");
+  return translatedLabel(`tasks.type.${TaskType[taskType]}`, fallback);
 };
 
 // Get status display name
 export const getStatusDisplayName = (status: ProductivityItemStatus): string => {
-  switch (status) {
-    case ProductivityItemStatus.Planning:
-      return "Planning";
-    case ProductivityItemStatus.ToDo:
-      return "To Do";
-    case ProductivityItemStatus.Open:
-      return "Open";
-    case ProductivityItemStatus.InProgress:
-      return "In Progress";
-    case ProductivityItemStatus.Closed:
-      return "Closed";
-    case ProductivityItemStatus.Descoped:
-      return "Descoped";
-    case ProductivityItemStatus.Completed:
-      return "Completed";
-    case ProductivityItemStatus.OnHold:
-      return "On Hold";
-    case ProductivityItemStatus.Cancelled:
-      return "Cancelled";
-    default:
-      return "Unknown";
-  }
+  const fallback = TASK_STATUS_LABELS[status];
+  if (fallback === undefined) return translatedLabel("tasks.label.unknown", "Unknown");
+  return translatedLabel(`tasks.status.${ProductivityItemStatus[status]}`, fallback);
 };
 
 // Task filtering and sorting options

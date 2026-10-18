@@ -14,12 +14,10 @@ import { z } from "zod";
 import type { Variables, AppEnv } from "../../../types/index.js";
 import { success, error } from "../../../types/index.js";
 import { createTarget, deleteTarget, listTargets, updateTarget } from "../../../services/learning/xapi-use-cases.js";
+import { requireUser } from "../../helpers/routerHelpers.js";
+import { validateJson } from "../../helpers/validate.js";
 
 export const xapiTargetRoutes = new Hono<{ Variables: Variables } & AppEnv>();
-
-function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
 
 const ExternalLrsTargetSchema = z.object({
   endpoint: z.string().url(),
@@ -30,36 +28,26 @@ const ExternalLrsTargetSchema = z.object({
 });
 
 xapiTargetRoutes.get("/targets", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   return c.json(success({ targets: await listTargets(userId) }), 200);
 });
 
-xapiTargetRoutes.post("/targets", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const parsed = ExternalLrsTargetSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
-  return c.json(success(await createTarget(userId, parsed.data)), 201);
+xapiTargetRoutes.post("/targets", validateJson(ExternalLrsTargetSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  return c.json(success(await createTarget(userId, body)), 201);
 });
 
-xapiTargetRoutes.patch("/targets/:id", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const parsed = ExternalLrsTargetSchema.partial().safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
-  const updated = await updateTarget(userId, c.req.param("id"), parsed.data);
+xapiTargetRoutes.patch("/targets/:id", validateJson(ExternalLrsTargetSchema.partial(), (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  const updated = await updateTarget(userId, c.req.param("id"), body);
   if (!updated) return c.json(error("NOT_FOUND", "Target not found"), 404);
   return c.json(success(updated), 200);
 });
 
 xapiTargetRoutes.delete("/targets/:id", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const deleted = await deleteTarget(userId, c.req.param("id"));
   if (!deleted) return c.json(error("NOT_FOUND", "Target not found"), 404);
   return c.json(success({ deleted }), 200);

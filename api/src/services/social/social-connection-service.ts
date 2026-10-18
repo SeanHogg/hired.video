@@ -50,6 +50,7 @@ import {
 } from "../provider-connections/connection-secrets.js";
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
 import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
+import { DomainError } from "../../domains/errors.js";
 
 /** CREDENTIALS_KMS_KEY seals every connection secret (connection-secrets.ts).
  *  The pre-merge SOCIAL_KMS_KEY / PAID_MEDIA_KMS_KEY are only read (via
@@ -66,9 +67,10 @@ function selfStatusKey(userId: string, companyId: string | null): string {
   return `social:self-status:v1:${userId}:${companyId ?? "_"}`;
 }
 
-export class SocialConnectionError extends Error {
-  constructor(public readonly code: string, message: string) {
-    super(message);
+/** NOT_CONFIGURED → 503; every other code → 400. */
+export class SocialConnectionError extends DomainError {
+  constructor(code: string, message: string) {
+    super(code === "NOT_CONFIGURED" ? 503 : 400, code, message);
     this.name = "SocialConnectionError";
   }
 }

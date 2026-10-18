@@ -16,11 +16,9 @@
 import { bearer, clip, pollUntil, readJson, sleep, type FetchLike } from "./http.js";
 import {
   SocialPublishError,
-  viewsOf,
   type PostMetrics,
   type SocialMetricsReader,
   type SocialVideoPublisher,
-  type SocialViewReader,
 } from "./types.js";
 import { POST_TEXT_LIMITS } from "../../../../../shared/social-platforms.js";
 
@@ -146,8 +144,4 @@ export function createXMetricsReader(deps: { fetch?: FetchLike } = {}): SocialMe
     }
     return metrics;
   };
-}
-
-export function createXViewReader(deps: { fetch?: FetchLike } = {}): SocialViewReader {
-  return viewsOf(createXMetricsReader(deps));
 }

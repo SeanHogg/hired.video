@@ -8,6 +8,7 @@
 import { getDb } from "../../db/index.js";
 import { DomainError } from "../../domains/errors.js";
 import { normalizeReaction } from "../../../../shared/feed-reactions.js";
+import { UUID_LIKE_REGEX } from "../../../../shared/validation.js";
 import {
   deleteComment,
   deleteCommentReaction,
@@ -21,6 +22,7 @@ import {
   upsertCommentReaction,
   upsertPostReaction,
 } from "../../repositories/feedEngagementRepository.js";
+import { findPostOwner, type FeedDb } from "../../repositories/feedPostsRepository.js";
 import { buildCommentDtos } from "./feedDtos.js";
 import { notifyCommentReaction, notifyPostReaction } from "./feedNotifications.js";
 import type { WaitUntil } from "./feedPostsService.js";
@@ -29,6 +31,13 @@ type Body = Record<string, unknown>;
 
 const commentNotFound = () => new DomainError(404, "NOT_FOUND", "Comment not found");
 const notYourComment = () => new DomainError(403, "FORBIDDEN", "Not your comment");
+const postNotFound = () => new DomainError(404, "NOT_FOUND", "Post not found");
+
+/** `comments` / `reactions` are polymorphic (no FK to the post), so the post's
+ *  existence is checked before a comment or reaction is written to it. */
+async function requirePost(db: FeedDb, postId: string): Promise<void> {
+  if (!UUID_LIKE_REGEX.test(postId) || !(await findPostOwner(db, postId))) throw postNotFound();
+}
 
 // ─── Post reactions ──────────────────────────────────────────────────────────
 
@@ -38,6 +47,7 @@ export async function reactToPost(userId: string, postId: string, body: Body, wa
   const reactionType = normalizeReaction(body.reactionType);
   const db = getDb();
 
+  await requirePost(db, postId);
   const hadReaction = await hasPostReaction(db, postId, userId);
   const reaction = await upsertPostReaction(db, postId, userId, reactionType);
 
@@ -68,6 +78,7 @@ export async function createComment(userId: string, body: Body) {
   const content = typeof body.content === "string" ? body.content : "";
   const db = getDb();
 
+  await requirePost(db, postId);
   const comment = await insertComment(db, { feedPostId: postId, userId, content });
   const [dto] = await buildCommentDtos([comment], userId, db);
   return dto;
@@ -105,6 +116,7 @@ export async function reactToComment(userId: string, commentId: string, body: Bo
   const reactionType = normalizeReaction(body.reactionType);
   const db = getDb();
 
+  if (!UUID_LIKE_REGEX.test(commentId) || !(await findCommentById(db, commentId))) throw commentNotFound();
   const hadReaction = await hasCommentReaction(db, commentId, userId);
   const reaction = await upsertCommentReaction(db, commentId, userId, reactionType);
 

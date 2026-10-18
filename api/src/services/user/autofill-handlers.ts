@@ -19,7 +19,7 @@
  */
 
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { schema } from "../../db/index.js";
+import { getDb, schema } from "../../db/index.js";
 import { recordApply } from "../../repositories/jobApplicationTrackerRepository.js";
 
 const { applicationFormAnswers, savedJobs, answerCache, jobItems } = schema;
@@ -32,6 +32,11 @@ export type DbPort = any;
 export interface AutofillDeps {
   db: DbPort;
   now: () => Date;
+}
+
+/** Production wiring for the handlers below. */
+export function defaultAutofillDeps(): AutofillDeps {
+  return { db: getDb(), now: () => new Date() };
 }
 
 // Use cases return plain data and throw DomainError; the exported

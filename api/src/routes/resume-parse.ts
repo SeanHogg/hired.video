@@ -35,9 +35,9 @@ import { servicesProcessor } from "../domains/services-processing/index.js";
 import { tokenBudgetFor } from "../services/adapters/ai-stream-response.js";
 import { isAbortError } from "../utils/abort.js";
 import { eventStreamResponse } from "../utils/event-stream.js";
-import { fail, ok } from "../utils/response.js";
 import { readFormFiles } from "../utils/multipart.js";
 import { logger } from "../lib/logger.js";
+import { success, error } from "../types/index.js";
 
 type Ctx = Context<AppEnv>;
 
@@ -58,12 +58,12 @@ export async function resumeParseHandler(c: Ctx): Promise<Response> {
   if (blocked) return blocked;
 
   const input = await readParseInput(c);
-  if (!input) return c.json(fail("PARSE_FAILED", NOTHING_TO_READ), 422);
+  if (!input) return c.json(error("PARSE_FAILED", NOTHING_TO_READ), 422);
 
   if (!(c.req.header("Accept") ?? "").includes("text/event-stream")) {
     const outcome = await executeResumeParse(c, input);
-    if ("message" in outcome) return c.json(fail("PARSE_FAILED", outcome.message), 422);
-    return c.json(ok({ result: JSON.stringify(outcome.content) }), 200);
+    if ("message" in outcome) return c.json(error("PARSE_FAILED", outcome.message), 422);
+    return c.json(success({ result: JSON.stringify(outcome.content) }), 200);
   }
 
   return eventStreamResponse<ResumeParseEvent>(
@@ -228,6 +228,6 @@ export async function ocrResumeImage(c: Ctx, file: File): Promise<string> {
         ],
       },
     ],
-  }, { signal, ...ocrBillingOpts(c.var.user?.sub, c.env.HOUSE_USER_ID) });
+  }, { signal, ...ocrBillingOpts(c.var.userId, c.env.HOUSE_USER_ID) });
   return (content ?? "").trim();
 }

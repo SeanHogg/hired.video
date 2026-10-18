@@ -1,26 +1,22 @@
 /**
- * AuthFlowRepository — the reads/writes the /api/auth challenge flows need
- * that the AuthTokensRepository / UsersRepository classes don't already
- * cover:
- *   • twoFactorCodes   — challenge lookup by id, re-issue, attempt counter
- *   • magicLinkTokens  — issue / find-valid / consume
- *   • emailVerificationTokens — retire every token for a user (resend)
- *   • users            — narrow projections (contact, /me summary) and the
- *                        magic-link "email proven" flag
+ * AuthFlowRepository — the user reads/writes the /api/auth challenge flows
+ * need that UsersRepository doesn't already cover: narrow projections
+ * (contact, /me summary) and the magic-link "email proven" flag. One-time
+ * tokens (2FA challenges, magic links, verification) live in
+ * AuthTokensRepository.
  *
  * Zero business logic — typed Drizzle wrappers taking a `db` handle. Rules
  * (attempt caps, TTLs, enumeration-safe responses) live in services/auth/*.
  */
 
-import { and, eq, gt } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { schema } from "../db/index.js";
+import { randomHex } from "../utils/crypto.js";
+import { AuthTokensRepository } from "./authTokensRepository.js";
 
-const { users, twoFactorCodes, magicLinkTokens, emailVerificationTokens } = schema;
+const { users } = schema;
 
 export type DbLike = any;
-
-export type TwoFactorChallengeRow = typeof twoFactorCodes.$inferSelect;
-export type MagicLinkTokenRow = typeof magicLinkTokens.$inferSelect;
 
 export interface UserContactRow {
   id: string;
@@ -37,68 +33,6 @@ export interface UserSummaryRow {
   emailVerified: boolean | null;
   isGuest: boolean | null;
   createdAt: Date;
-}
-
-// ── two-factor challenges ───────────────────────────────────────────────────
-
-export async function findTwoFactorChallenge(db: DbLike, id: string): Promise<TwoFactorChallengeRow | null> {
-  const [row] = await db.select().from(twoFactorCodes).where(eq(twoFactorCodes.id, id)).limit(1);
-  return (row as TwoFactorChallengeRow) ?? null;
-}
-
-/** Retire every pending code for the user, then insert a fresh challenge. */
-export async function reissueTwoFactorChallenge(
-  db: DbLike,
-  input: { userId: string; code: string; expiresAt: Date },
-): Promise<TwoFactorChallengeRow> {
-  await db
-    .update(twoFactorCodes)
-    .set({ used: true })
-    .where(and(eq(twoFactorCodes.userId, input.userId), eq(twoFactorCodes.used, false)));
-  const [row] = await db
-    .insert(twoFactorCodes)
-    .values({ userId: input.userId, code: input.code, expiresAt: input.expiresAt, used: false })
-    .returning();
-  return row as TwoFactorChallengeRow;
-}
-
-export async function setTwoFactorAttempts(db: DbLike, id: string, attempts: number): Promise<void> {
-  await db.update(twoFactorCodes).set({ attempts }).where(eq(twoFactorCodes.id, id));
-}
-
-// ── magic links ─────────────────────────────────────────────────────────────
-
-export async function retireOpenMagicLinks(db: DbLike, email: string): Promise<void> {
-  await db
-    .update(magicLinkTokens)
-    .set({ used: true })
-    .where(and(eq(magicLinkTokens.email, email), eq(magicLinkTokens.used, false)));
-}
-
-export async function insertMagicLink(
-  db: DbLike,
-  input: { email: string; token: string; expiresAt: Date; redirect: string },
-): Promise<void> {
-  await db.insert(magicLinkTokens).values({ ...input, used: false });
-}
-
-export async function findValidMagicLink(db: DbLike, token: string, now: Date): Promise<MagicLinkTokenRow | null> {
-  const [row] = await db
-    .select()
-    .from(magicLinkTokens)
-    .where(and(eq(magicLinkTokens.token, token), eq(magicLinkTokens.used, false), gt(magicLinkTokens.expiresAt, now)))
-    .limit(1);
-  return (row as MagicLinkTokenRow) ?? null;
-}
-
-export async function markMagicLinkUsed(db: DbLike, id: string): Promise<void> {
-  await db.update(magicLinkTokens).set({ used: true }).where(eq(magicLinkTokens.id, id));
-}
-
-// ── email verification ──────────────────────────────────────────────────────
-
-export async function retireEmailVerificationTokensForUser(db: DbLike, userId: string): Promise<void> {
-  await db.update(emailVerificationTokens).set({ used: true }).where(eq(emailVerificationTokens.userId, userId));
 }
 
 // ── users (narrow projections) ──────────────────────────────────────────────
@@ -138,6 +72,47 @@ export async function findUserSummaryById(db: DbLike, id: string): Promise<UserS
   return (row as UserSummaryRow) ?? null;
 }
 
+/** Whether the user has a password sign-in method (OAuth-only accounts don't). */
+export async function userHasPassword(db: DbLike, userId: string): Promise<boolean> {
+  const [row] = await db.select({ passwordHash: users.passwordHash }).from(users).where(eq(users.id, userId)).limit(1);
+  return !!row?.passwordHash;
+}
+
+/** Set a password hash + stamp `passwordChangedAt` (OAuth "add password"). */
+export async function setPasswordHashStamped(db: DbLike, userId: string, passwordHash: string, at: Date = new Date()): Promise<void> {
+  await db.update(users).set({ passwordHash, passwordChangedAt: at } as any).where(eq(users.id, userId));
+}
+
+/** The password-age baseline: when it was last changed, else account creation. */
+export async function findPasswordAgeById(
+  db: DbLike,
+  id: string,
+): Promise<{ passwordChangedAt: Date | null; createdAt: Date } | null> {
+  const [row] = await db
+    .select({ passwordChangedAt: users.passwordChangedAt, createdAt: users.createdAt })
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function markEmailVerified(db: DbLike, userId: string): Promise<void> {
   await db.update(users).set({ emailVerified: true }).where(eq(users.id, userId));
+}
+
+/**
+ * Mint a magic-link token for `email`: retire every open link for the
+ * address, store a fresh one-time token (TTL + post-login redirect chosen by
+ * the caller) and return it. The ONE mint used by sign-in, OAuth's email
+ * fallback and partner claim links.
+ */
+export async function mintMagicLinkToken(
+  db: DbLike,
+  input: { email: string; ttlMs: number; redirect: string },
+): Promise<string> {
+  const tokens = new AuthTokensRepository(db);
+  await tokens.retireOpenMagicLinks(input.email);
+  const token = randomHex(32);
+  await tokens.insertMagicLink({ email: input.email, token, expiresAt: new Date(Date.now() + input.ttlMs), redirect: input.redirect });
+  return token;
 }

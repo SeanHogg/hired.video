@@ -19,15 +19,15 @@ import {
   setJobScreening,
 } from "../../services/jobs/jobScreening.js";
 import { JobScreeningSchema } from "./schemas.js";
-import { withDomainErrors } from "./http.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const jobScreeningRoutes = new Hono<AppEnv>();
 
 /** Public-ish: aggregate stats only (count, total expected minutes,
  *  prep/retake config) so the apply page can warn the candidate without
  *  leaking the actual question text in advance. */
-jobScreeningRoutes.get("/:id/screening/preview", (c) =>
-  withDomainErrors(c, async () => c.json(success(await getScreeningPreview(c.req.param("id"))))),
+jobScreeningRoutes.get("/:id/screening/preview", async (c) =>
+  c.json(success(await getScreeningPreview(c.req.param("id")))),
 );
 
 /** Returns `{ questionSetId, screeningRequired, set }` for the job edit
@@ -36,26 +36,20 @@ jobScreeningRoutes.get("/:id/screening", async (c) => {
   const jobId = c.req.param("id");
   const { denied } = await requireJobOwner(c, jobId);
   if (denied) return denied;
-  return withDomainErrors(c, async () => c.json(success(await getScreeningAttachment(jobId))));
+  return c.json(success(await getScreeningAttachment(jobId)));
 });
 
 /** Body: `{ questionSetId: string | null, screeningRequired: 'none' | 'optional' | 'required' }`. */
-jobScreeningRoutes.put("/:id/screening", async (c) => {
+jobScreeningRoutes.put("/:id/screening", validateJson(JobScreeningSchema, (e) => error("VALIDATION_ERROR", "Invalid screening payload", { issues: e.flatten() }), { emptyBody: null }), async (c) => {
   const jobId = c.req.param("id");
   const { denied } = await requireJobOwner(c, jobId);
   if (denied) return denied;
 
-  const body = await c.req.json().catch(() => null);
-  const parsed = JobScreeningSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid screening payload", { issues: parsed.error.flatten() }), 400);
-  }
-  return withDomainErrors(c, async () =>
-    c.json(success(await setJobScreening(jobId, {
-      questionSetId: parsed.data.questionSetId ?? null,
-      screeningRequired: parsed.data.screeningRequired,
-    }))),
-  );
+  const body = c.req.valid("json");
+  return c.json(success(await setJobScreening(jobId, {
+    questionSetId: body.questionSetId ?? null,
+    screeningRequired: body.screeningRequired,
+  })));
 });
 
 /** Used by [JobScreeningCard] to render "Send screening to N existing

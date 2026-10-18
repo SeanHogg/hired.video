@@ -19,61 +19,25 @@
  */
 
 import { Hono } from "hono";
-import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { AppEnv } from "../types/index.js";
-import { getDb } from "../db/index.js";
-import { studioProjects } from "../db/schema/resumes.js";
-import { gamePlayInvites } from "../db/schema/games.js";
-import { canActFor } from "../services/studio/workspace.js";
-import { projectStateAs } from "../repositories/studioProjectsRepository.js";
-import { sendPushToUser } from "../services/push/web-push.js";
-import { randomBase64Url } from "../utils/crypto.js";
+import {
+  createGameInvite,
+  getGameProjectState,
+  joinGameInvite,
+  listGameInvites,
+  notifyGameOwner,
+  resolveGameInvite,
+  revokeGameInvite,
+} from "../services/studio/game-play.js";
+import { success, error } from "../types/index.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const gamesRoutes = new Hono<AppEnv>();
 
-// ─── Shared response helpers ─────────────────────────────────────────────
-//
-// Inlined (and identical to studio-features.ts / studio.ts copies) — the
-// `ok` / `fail` helpers are a project-wide convention. Extracting them
-// to a shared module is tracked separately; for now the duplication is
-// intentional to keep route files self-contained.
-
-function ok<T>(data: T) {
-  return { success: true as const, data, timestamp: new Date().toISOString() };
-}
-function fail(code: string, message: string, details?: unknown) {
-  return {
-    success: false as const,
-    error: { code, message, ...(details !== undefined ? { details } : {}) },
-    timestamp: new Date().toISOString(),
-  };
-}
-
-type ProjectGuard =
-  | { ok: true; userId: string; companyId: string | null; gameState: unknown }
-  | { ok: false; status: 404; code: "NOT_FOUND" };
-
-/** Resolve a project + assert the caller can act on it. Returns a
- *  discriminated-union result every route here can narrow against
- *  without duplicating the auth seam. */
-async function loadActableProject(projectId: string, actorUserId: string): Promise<ProjectGuard> {
-  const db = getDb();
-  const [row] = await db
-    .select({
-      userId: studioProjects.userId,
-      companyId: studioProjects.companyId,
-      gameState: projectStateAs("gameState"),
-    })
-    .from(studioProjects)
-    .where(eq(studioProjects.id, projectId))
-    .limit(1);
-  if (!row) return { ok: false, status: 404, code: "NOT_FOUND" };
-  const allowed = await canActFor(actorUserId, row.userId, row.companyId ?? null);
-  if (!allowed) return { ok: false, status: 404, code: "NOT_FOUND" };
-  return { ok: true, userId: row.userId, companyId: row.companyId ?? null, gameState: row.gameState };
-}
+const invalidProjectId = () => error("VALIDATION_ERROR", "Invalid projectId");
 
 // ─── Phase 2 — challenge-complete (gap #1635) ────────────────────────────
 //
@@ -92,32 +56,18 @@ const ChallengeCompleteSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
-gamesRoutes.post("/:projectId/challenge-complete", async (c) => {
-  const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in to earn points"), 401);
+gamesRoutes.post("/:projectId/challenge-complete", validateJson(ChallengeCompleteSchema, () => error("VALIDATION_ERROR", "Invalid body"), { emptyBody: null }), async (c) => {
+  requireUser(c);
 
   const projectId = c.req.param("projectId");
   if (!UuidLikeSchema.safeParse(projectId).success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid projectId"), 400);
+    return c.json(invalidProjectId(), 400);
   }
-  const body = await c.req.json().catch(() => null);
-  const parsed = ChallengeCompleteSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
-  }
+  const body = c.req.valid("json");
 
   // Project must exist + be readable. Owners + delegated editors + any
   // future "invited player" pass through the same seam.
-  const db = getDb();
-  const [project] = await db
-    .select({
-      id: studioProjects.id,
-      gameState: projectStateAs("gameState"),
-    })
-    .from(studioProjects)
-    .where(eq(studioProjects.id, projectId))
-    .limit(1);
-  if (!project) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  await getGameProjectState(projectId);
 
   // Award through the standard gamification surface. Lazy import keeps
   // the route file slim + matches the existing call-site convention in
@@ -127,18 +77,18 @@ gamesRoutes.post("/:projectId/challenge-complete", async (c) => {
     game.award("play.game.challenge", {
       userId: uid,
       role,
-      refId: `${projectId}:${parsed.data.challengeId}`,
+      refId: `${projectId}:${body.challengeId}`,
       refType: "game_challenge",
       metadata: {
         projectId,
-        challengeId: parsed.data.challengeId,
-        durationMs: parsed.data.durationMs,
-        ...(parsed.data.metadata ?? {}),
+        challengeId: body.challengeId,
+        durationMs: body.durationMs,
+        ...(body.metadata ?? {}),
       },
     }),
   );
 
-  return c.json(ok({ projectId, challengeId: parsed.data.challengeId }));
+  return c.json(success({ projectId, challengeId: body.challengeId }));
 });
 
 // ─── #1656 — Game-event PWA push to the project owner ────────────────────
@@ -164,41 +114,13 @@ const NotifyOwnerSchema = z.object({
   pointsAwarded: z.number().int().optional(),
 });
 
-gamesRoutes.post("/:projectId/notify-owner", async (c) => {
+gamesRoutes.post("/:projectId/notify-owner", validateJson(NotifyOwnerSchema, () => error("VALIDATION_ERROR", "Invalid body"), { emptyBody: null }), async (c) => {
   const projectId = c.req.param("projectId");
   if (!UuidLikeSchema.safeParse(projectId).success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid projectId"), 400);
+    return c.json(invalidProjectId(), 400);
   }
-  const body = await c.req.json().catch(() => null);
-  const parsed = NotifyOwnerSchema.safeParse(body);
-  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
-
-  const db = getDb();
-  const [row] = await db
-    .select({ userId: studioProjects.userId })
-    .from(studioProjects)
-    .where(eq(studioProjects.id, projectId))
-    .limit(1);
-  if (!row) return c.json(fail("NOT_FOUND", "Project not found"), 404);
-
-  const peer = parsed.data.peerName?.trim() || "Someone";
-  const payload =
-    parsed.data.event === "peer_joined"
-      ? {
-          title: `${peer} joined your world`,
-          body: "Tap to jump back in.",
-          url: `/studio/${projectId}/play`,
-        }
-      : {
-          title: "Challenge completed",
-          body: parsed.data.pointsAwarded
-            ? `${peer} earned ${parsed.data.pointsAwarded} points in your world.`
-            : `${peer} completed a challenge in your world.`,
-          url: `/studio/${projectId}/play`,
-        };
-
-  await sendPushToUser(row.userId, payload).catch(() => undefined);
-  return c.json(ok({ delivered: true }));
+  await notifyGameOwner(projectId, c.req.valid("json"));
+  return c.json(success({ delivered: true }));
 });
 
 // ─── Phase 4 — friend-invite share-links (gap #1637) ─────────────────────
@@ -219,184 +141,46 @@ const CreateInviteSchema = z.object({
   restrictToUserId: UuidLikeSchema.optional(),
 });
 
-/** Invite tokens are URL-safe: 18 random bytes → 24 base64url chars. Enough
- *  entropy to make guessing impractical; short enough that the share link
- *  fits in a single tap-to-copy line. */
-const INVITE_TOKEN_BYTES = 18;
-
-gamesRoutes.post("/:projectId/invites", async (c) => {
-  const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+gamesRoutes.post("/:projectId/invites", validateJson(CreateInviteSchema, () => error("VALIDATION_ERROR", "Invalid body")), async (c) => {
+  const userId = requireUser(c);
   const projectId = c.req.param("projectId");
   if (!UuidLikeSchema.safeParse(projectId).success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid projectId"), 400);
+    return c.json(invalidProjectId(), 400);
   }
-  const guard = await loadActableProject(projectId, user.sub);
-  if (guard.ok === false) {
-    return c.json(fail(guard.code, "Project not found"), guard.status);
-  }
-
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = CreateInviteSchema.safeParse(body ?? {});
-  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
-
-  const expiresAt = parsed.data.expiresInHours
-    ? new Date(Date.now() + parsed.data.expiresInHours * 3600_000)
-    : null;
-
-  const db = getDb();
-  const [invite] = await db
-    .insert(gamePlayInvites)
-    .values({
-      projectId,
-      createdBy: user.sub,
-      token: randomBase64Url(INVITE_TOKEN_BYTES),
-      label: parsed.data.label ?? null,
-      maxUses: parsed.data.maxUses ?? null,
-      restrictToUserId: parsed.data.restrictToUserId ?? null,
-      expiresAt,
-    })
-    .returning();
-
-  return c.json(ok(invite), 201);
+  const invite = await createGameInvite(userId, projectId, c.req.valid("json"));
+  return c.json(success(invite), 201);
 });
 
 gamesRoutes.get("/:projectId/invites", async (c) => {
-  const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+  const userId = requireUser(c);
   const projectId = c.req.param("projectId");
   if (!UuidLikeSchema.safeParse(projectId).success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid projectId"), 400);
+    return c.json(invalidProjectId(), 400);
   }
-  const guard = await loadActableProject(projectId, user.sub);
-  if (guard.ok === false) {
-    return c.json(fail(guard.code, "Project not found"), guard.status);
-  }
-
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(gamePlayInvites)
-    .where(eq(gamePlayInvites.projectId, projectId))
-    .orderBy(desc(gamePlayInvites.createdAt))
-    .limit(50);
-  return c.json(ok(rows));
+  return c.json(success(await listGameInvites(userId, projectId)));
 });
 
 gamesRoutes.delete("/:projectId/invites/:inviteId", async (c) => {
-  const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+  const userId = requireUser(c);
   const projectId = c.req.param("projectId");
   const inviteId = c.req.param("inviteId");
   if (!UuidLikeSchema.safeParse(projectId).success || !UuidLikeSchema.safeParse(inviteId).success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid id"), 400);
+    return c.json(error("VALIDATION_ERROR", "Invalid id"), 400);
   }
-  const guard = await loadActableProject(projectId, user.sub);
-  if (guard.ok === false) {
-    return c.json(fail(guard.code, "Project not found"), guard.status);
-  }
-
-  const db = getDb();
-  await db
-    .update(gamePlayInvites)
-    .set({ revokedAt: new Date() })
-    .where(and(eq(gamePlayInvites.id, inviteId), eq(gamePlayInvites.projectId, projectId)));
-  return c.json(ok({ inviteId }));
+  await revokeGameInvite(userId, projectId, inviteId);
+  return c.json(success({ inviteId }));
 });
 
 // Public — anonymous guests can resolve + join. Owner identity not
 // required because the token is the credential.
 gamesRoutes.get("/invites/:token", async (c) => {
   const token = c.req.param("token");
-  if (!token || token.length < 8) return c.json(fail("VALIDATION_ERROR", "Invalid token"), 400);
-
-  const db = getDb();
-  const [invite] = await db
-    .select({
-      id: gamePlayInvites.id,
-      projectId: gamePlayInvites.projectId,
-      label: gamePlayInvites.label,
-      maxUses: gamePlayInvites.maxUses,
-      joinedCount: gamePlayInvites.joinedCount,
-      restrictToUserId: gamePlayInvites.restrictToUserId,
-      revokedAt: gamePlayInvites.revokedAt,
-      expiresAt: gamePlayInvites.expiresAt,
-    })
-    .from(gamePlayInvites)
-    .where(eq(gamePlayInvites.token, token))
-    .limit(1);
-  if (!invite) return c.json(fail("NOT_FOUND", "Invite not found"), 404);
-
-  const inviteStatus = computeInviteStatus(invite);
-  if (inviteStatus !== "active") {
-    return c.json(fail(inviteStatus.toUpperCase(), `Invite is ${inviteStatus}`), 410);
-  }
-
-  const [project] = await db
-    .select({
-      id: studioProjects.id,
-      // `studio_projects` doesn't carry a per-row display name — the
-      // project's identity is the `studio_templates` template that
-      // seeded it + the user's local "draft" naming convention. Invite
-      // label is the user-facing title on the play landing.
-      gameState: projectStateAs("gameState"),
-    })
-    .from(studioProjects)
-    .where(eq(studioProjects.id, invite.projectId))
-    .limit(1);
-  if (!project) return c.json(fail("NOT_FOUND", "Project not found"), 404);
-
-  return c.json(
-    ok({
-      projectId: project.id,
-      label: invite.label,
-      gameState: project.gameState,
-    }),
-  );
+  if (!token || token.length < 8) return c.json(error("VALIDATION_ERROR", "Invalid token"), 400);
+  return c.json(success(await resolveGameInvite(token)));
 });
 
 gamesRoutes.post("/invites/:token/join", async (c) => {
   const token = c.req.param("token");
-  if (!token || token.length < 8) return c.json(fail("VALIDATION_ERROR", "Invalid token"), 400);
-
-  const db = getDb();
-  const [invite] = await db
-    .select()
-    .from(gamePlayInvites)
-    .where(eq(gamePlayInvites.token, token))
-    .limit(1);
-  if (!invite) return c.json(fail("NOT_FOUND", "Invite not found"), 404);
-
-  const inviteStatus = computeInviteStatus(invite);
-  if (inviteStatus !== "active") {
-    return c.json(fail(inviteStatus.toUpperCase(), `Invite is ${inviteStatus}`), 410);
-  }
-
-  // Optional account-bound link — only the matched user may join.
-  // Anonymous callers (no JWT) are rejected when restrictToUserId is set.
-  const callerUserId = c.var.user?.sub ?? null;
-  if (invite.restrictToUserId && invite.restrictToUserId !== callerUserId) {
-    return c.json(fail("FORBIDDEN", "This invite is bound to a specific account"), 403);
-  }
-
-  await db
-    .update(gamePlayInvites)
-    .set({ joinedCount: sql`${gamePlayInvites.joinedCount} + 1` })
-    .where(eq(gamePlayInvites.id, invite.id));
-
-  return c.json(ok({ projectId: invite.projectId }));
+  if (!token || token.length < 8) return c.json(error("VALIDATION_ERROR", "Invalid token"), 400);
+  return c.json(success(await joinGameInvite(token, c.var.userId ?? null)));
 });
-
-/** Compute the current status of an invite — single seam so the
- *  resolve + join paths can't drift on what "expired" means. */
-function computeInviteStatus(invite: {
-  revokedAt: Date | null;
-  expiresAt: Date | null;
-  maxUses: number | null;
-  joinedCount: number;
-}): "active" | "revoked" | "expired" | "exhausted" {
-  if (invite.revokedAt) return "revoked";
-  if (invite.expiresAt && invite.expiresAt.getTime() < Date.now()) return "expired";
-  if (invite.maxUses != null && invite.joinedCount >= invite.maxUses) return "exhausted";
-  return "active";
-}

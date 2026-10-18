@@ -169,3 +169,30 @@ export async function findVideoForEmbed(db: Db, videoId: string) {
     .limit(1);
   return vid ?? null;
 }
+
+/**
+ * A public channel's native videos (`/u/:handle`): only videos whose studio
+ * project is currently published — the INNER JOIN is the structural gate so
+ * a writer that forgets to mirror `videos.privacy_status` can't leak an
+ * unpublished video (gap #723). The profile-primary video leads (gap #725).
+ */
+export async function listChannelNativeVideos(db: Db, userId: string) {
+  return db
+    .select({
+      id: videos.id,
+      title: videos.title,
+      thumbnailUrl: videos.thumbnailUrl,
+      r2Key: videos.r2Key,
+      duration: videos.duration,
+      createdAt: videos.createdAt,
+      isProfilePrimary: studioProjects.isProfilePrimary,
+    })
+    .from(videos)
+    .innerJoin(studioProjects, eq(studioProjects.videoId, videos.id))
+    .where(and(
+      eq(videos.userId, userId),
+      eq(videos.privacyStatus, "public"),
+      eq(studioProjects.status, "published"),
+    ))
+    .orderBy(desc(studioProjects.isProfilePrimary), desc(videos.createdAt));
+}

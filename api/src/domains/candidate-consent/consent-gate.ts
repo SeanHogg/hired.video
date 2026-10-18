@@ -27,20 +27,24 @@ import type {
   ICandidateVideoConsentRepository,
 } from "../../repositories/candidateVideoConsentRepository.js";
 import { effectiveStatus } from "./ports.js";
+import { DomainError } from "../errors.js";
 
 const DEFAULT_MESSAGE = "The candidate must approve this video before it can be made public or posted.";
 const CONTENT_CHANGED_MESSAGE = "The video changed after the candidate approved it. Ask them to approve it again.";
 
-export class CandidateConsentRequiredError extends Error {
-  readonly code = CANDIDATE_CONSENT_REQUIRED_CODE;
-  constructor(public readonly reason: CandidateConsentBlockReason = "not_requested", message?: string) {
-    super(message ?? (reason === "content_changed" ? CONTENT_CHANGED_MESSAGE : DEFAULT_MESSAGE));
-    this.name = "CandidateConsentRequiredError";
-  }
-
+/** 403 CONSENT_REQUIRED; `details.reason` tells the UI why. */
+export class CandidateConsentRequiredError extends DomainError {
+  declare readonly code: typeof CANDIDATE_CONSENT_REQUIRED_CODE;
   /** The `details` of the CONSENT_REQUIRED envelope. */
-  get details(): { reason: CandidateConsentBlockReason } {
-    return { reason: this.reason };
+  declare readonly details: { reason: CandidateConsentBlockReason };
+  constructor(public readonly reason: CandidateConsentBlockReason = "not_requested", message?: string) {
+    super(
+      403,
+      CANDIDATE_CONSENT_REQUIRED_CODE,
+      message ?? (reason === "content_changed" ? CONTENT_CHANGED_MESSAGE : DEFAULT_MESSAGE),
+      { reason },
+    );
+    this.name = "CandidateConsentRequiredError";
   }
 }
 

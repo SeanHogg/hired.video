@@ -8,7 +8,7 @@
  */
 
 import { and, eq, inArray } from "drizzle-orm";
-import { schema } from "../../db/index.js";
+import { getDb, schema } from "../../db/index.js";
 
 const { refundRequests, subscriptions } = schema;
 
@@ -21,6 +21,11 @@ export type DbPort = any;
 export interface BillingDeps {
   db: DbPort;
   now: () => Date;
+}
+
+/** Production wiring for the routes. */
+export function liveBillingDeps(): BillingDeps {
+  return { db: getDb(), now: () => new Date() };
 }
 
 // Result envelope + auth guard live in the shared handler module so every

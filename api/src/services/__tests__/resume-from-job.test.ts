@@ -6,7 +6,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { assembleDraft, evidenceCorpus, withVersionEvidence } from "../resume/from-job.js";
-import { applyResumeEdits, dropUnsupportedSkills, toJobGaps } from "../job/tailor-edits.js";
+import { applyResumeEdits, dropUnsupportedSkills, toJobGaps } from "../job/tailor-apply.js";
 import { ResumeContentSchema, type ResumeContent } from "../../../../shared/resume.js";
 
 const master = ResumeContentSchema.parse({

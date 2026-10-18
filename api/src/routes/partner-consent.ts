@@ -19,6 +19,7 @@ import {
   revokeConnection,
 } from "../services/partner/connections.js";
 import { getPartner } from "../services/partner/partners.js";
+import { requireUser } from "./helpers/routerHelpers.js";
 
 export const partnerConsentRoutes = new Hono<AppEnv>();
 
@@ -32,8 +33,7 @@ function clientIp(c: any): string | null {
 
 // GET /grants — the user's connected partners (for the management surface).
 partnerConsentRoutes.get("/grants", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const grants = await listConnectionsForUser(userId);
   return c.json(success({ grants }), 200);
 });
@@ -41,8 +41,7 @@ partnerConsentRoutes.get("/grants", async (c) => {
 // GET /connections/:id — details for the consent screen. Only the owning user
 // may read it, so a leaked connection id reveals nothing to anyone else.
 partnerConsentRoutes.get("/connections/:id", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const conn = await getConnectionById(c.req.param("id"));
   if (!conn || conn.userId !== userId) return c.json(error("NOT_FOUND", "Connection not found"), 404);
   const partner = await getPartner(conn.partnerId);
@@ -66,8 +65,7 @@ partnerConsentRoutes.get("/connections/:id", async (c) => {
 
 // POST /connections/:id/authorize — the job seeker approves.
 partnerConsentRoutes.post("/connections/:id/authorize", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const conn = await getConnectionById(c.req.param("id"));
   if (!conn || conn.userId !== userId) return c.json(error("NOT_FOUND", "Connection not found"), 404);
   const updated = await activateConnection(conn.id, clientIp(c));
@@ -76,14 +74,9 @@ partnerConsentRoutes.post("/connections/:id/authorize", async (c) => {
 
 // POST /connections/:id/revoke — the job seeker cuts off access.
 partnerConsentRoutes.post("/connections/:id/revoke", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const conn = await getConnectionById(c.req.param("id"));
   if (!conn || conn.userId !== userId) return c.json(error("NOT_FOUND", "Connection not found"), 404);
   await revokeConnection(conn.id);
   return c.json(success({ status: "revoked" }), 200);
 });
-
-partnerConsentRoutes.all("*", (c) =>
-  c.json(error("NOT_FOUND", "Partner consent route not found"), 404),
-);

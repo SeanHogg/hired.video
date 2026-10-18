@@ -22,7 +22,3 @@ export const listsRoutes = new Hono<AppEnv>();
 
 listsRoutes.route("/", listsCrudRoutes);
 listsRoutes.route("/", wishlistRoutes);
-
-listsRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Lists route not found" } }, 404),
-);

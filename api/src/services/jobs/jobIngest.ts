@@ -14,7 +14,15 @@ import { buildRepos } from "../../repositories/index.js";
 import type { JobInsert } from "../../repositories/jobsRepository.js";
 import { DomainError } from "../../domains/errors.js";
 import type { LLMClient } from "../adapters/llm-client.js";
-import * as jobService from "../job/JobService.js";
+import { htmlToMarkdown } from "../../../../shared/scraping/index.js";
+import { HIRED_VIDEO_SEED_COMPANY } from "../job/job-seed-company.js";
+import { deduplicateJob } from "../job/job-dedup.js";
+import { createTrackedJob } from "../job/job-write.js";
+import type { ParsedJob } from "../job/job-page-parse.js";
+import { enrichParsedWithLLM, extractAndClassifyJob } from "../job/job-classify.js";
+import { deriveApplyUrl } from "../job/job-apply-url.js";
+import { computeRefreshBackfill } from "../job/job-refresh-backfill.js";
+import { saveJob } from "../job/job-saved.js";
 
 /** A use-case answer whose success status varies by outcome. */
 export interface StatusedResult {
@@ -27,7 +35,7 @@ export async function createJobFromFile(
   payload: { title: string; description: string; location: string | undefined },
   userId: string,
   llm: LLMClient | null,
-): Promise<Awaited<ReturnType<typeof jobService.createTrackedJob>>> {
+): Promise<Awaited<ReturnType<typeof createTrackedJob>>> {
   if (!payload.description.trim()) {
     throw new DomainError(400, "VALIDATION_ERROR", "File contained no readable text");
   }
@@ -35,7 +43,7 @@ export async function createJobFromFile(
   // Feed the file text through the unified extraction pipeline. No JSON-LD
   // will match (it's not HTML), so this routes straight to the LLM
   // classifier which returns the structured ParsedJob shape.
-  const result = await jobService.extractAndClassifyJob({
+  const result = await extractAndClassifyJob({
     html: payload.description,
     llm,
   });
@@ -44,7 +52,7 @@ export async function createJobFromFile(
   // job), keep the user's content anyway — we still have their filename as
   // a title and the raw text as a description. The extension-path does the
   // same "fall open" on extractor failure.
-  const parsed: jobService.ParsedJob = result.parsed ?? {
+  const parsed: ParsedJob = result.parsed ?? {
     title: payload.title,
     description: payload.description,
     confidence: "low" as const,
@@ -54,7 +62,7 @@ export async function createJobFromFile(
   }
   if (payload.location && !parsed.location) parsed.location = payload.location;
 
-  return jobService.createTrackedJob(
+  return createTrackedJob(
     {
       title: parsed.title,
       description: parsed.description,
@@ -106,13 +114,13 @@ export async function extractJobFromPage(input: ExtractJobInput): Promise<Status
   const { userId, html, sourceUrl, track, force, hintTitle, hintCompany, hintLocation, llm } = input;
 
   // ---- Step 1: classify the page --------------------------------
-  const result = await jobService.extractAndClassifyJob({
+  const result = await extractAndClassifyJob({
     url: sourceUrl,
     html,
     llm,
   });
 
-  let parsed: jobService.ParsedJob;
+  let parsed: ParsedJob;
   if (!result.ok || !result.parsed) {
     // If AI extraction fails but we have hints from the content script,
     // create a minimal job from the hints + MD description rather than
@@ -122,14 +130,14 @@ export async function extractJobFromPage(input: ExtractJobInput): Promise<Status
         confidence: result.confidence,
       });
     }
-    const markdown = jobService.htmlToMarkdown(html);
+    const markdown = htmlToMarkdown(html);
     // Try to extract the "About the job" section from the text.
     const aboutIdx = markdown.toLowerCase().indexOf("about the job");
     const descText =
       aboutIdx >= 0 ? markdown.slice(aboutIdx, aboutIdx + 8000).trim() : markdown.slice(0, 8000);
     parsed = {
       title: hintTitle,
-      company: hintCompany || jobService.HIRED_VIDEO_SEED_COMPANY,
+      company: hintCompany || HIRED_VIDEO_SEED_COMPANY,
       location: hintLocation,
       description: descText,
       confidence: "low",
@@ -143,18 +151,18 @@ export async function extractJobFromPage(input: ExtractJobInput): Promise<Status
   if (hintTitle && (!parsed.title || parsed.title.toLowerCase().includes("job from"))) {
     parsed.title = hintTitle;
   }
-  if (hintCompany && (!parsed.company || parsed.company === jobService.HIRED_VIDEO_SEED_COMPANY)) {
+  if (hintCompany && (!parsed.company || parsed.company === HIRED_VIDEO_SEED_COMPANY)) {
     parsed.company = hintCompany;
   }
   if (hintLocation && !parsed.location) {
     parsed.location = hintLocation;
   }
 
-  const company = track ? parsed.company : jobService.HIRED_VIDEO_SEED_COMPANY;
+  const company = track ? parsed.company : HIRED_VIDEO_SEED_COMPANY;
 
   // ---- Step 2: dedup (skip when force=true — user confirmed "new") --
   if (!force) {
-    const dedup = await jobService.deduplicateJob(
+    const dedup = await deduplicateJob(
       {
         title: parsed.title,
         company,
@@ -167,12 +175,12 @@ export async function extractJobFromPage(input: ExtractJobInput): Promise<Status
 
     // Exact match, or AI-confirmed fuzzy match — just bookmark the existing row.
     if ((dedup.outcome === "exact" || dedup.outcome === "fuzzy") && dedup.existingJob) {
-      if (track) await jobService.saveJob(dedup.existingJob.id, userId);
+      if (track) await saveJob(dedup.existingJob.id, userId);
       return {
         status: 200,
         data: {
           ...dedup.existingJob,
-          applyUrl: jobService.deriveApplyUrl({
+          applyUrl: deriveApplyUrl({
             parsed,
             job: dedup.existingJob,
             fallbackUrl: sourceUrl,
@@ -203,7 +211,7 @@ export async function extractJobFromPage(input: ExtractJobInput): Promise<Status
   }
 
   // ---- Step 3: create new job ------------------------------------
-  const created = await jobService.createTrackedJob(
+  const created = await createTrackedJob(
     {
       title: parsed.title,
       description: parsed.description,
@@ -227,7 +235,7 @@ export async function extractJobFromPage(input: ExtractJobInput): Promise<Status
     { track },
   );
 
-  const applyUrl = jobService.deriveApplyUrl({ parsed, fallbackUrl: sourceUrl });
+  const applyUrl = deriveApplyUrl({ parsed, fallbackUrl: sourceUrl });
   return { status: 201, data: { ...created, applyUrl } };
 }
 
@@ -259,7 +267,7 @@ export async function refreshTrackedJob(input: {
 
   // Re-extract from the posted HTML. Same pipeline as /extract, so hit
   // rates / fallbacks are consistent.
-  const result = await jobService.extractAndClassifyJob({ url, html, llm });
+  const result = await extractAndClassifyJob({ url, html, llm });
   if (!result.ok || !result.parsed) {
     throw new DomainError(422, "EXTRACTION_FAILED", result.reason || "Could not extract job data from this page.");
   }
@@ -278,13 +286,13 @@ export async function refreshTrackedJob(input: {
     !(parsed.skills && parsed.skills.length > 0) ||
     !(parsed.benefits && parsed.benefits.length > 0);
   if (llm && needsEnrichment) {
-    parsed = await jobService.enrichParsedWithLLM(parsed, { url, html, llm });
+    parsed = await enrichParsedWithLLM(parsed, { url, html, llm });
   }
 
   // Merge policy lives in JobService so it can be unit-tested without
   // spinning up Hono + DB. See computeRefreshBackfill() for the exact rules
   // (never overwrite, honor missingFields allow-list, per-key details merging).
-  const { updates, updatedFields } = jobService.computeRefreshBackfill({
+  const { updates, updatedFields } = computeRefreshBackfill({
     row,
     parsed,
     url,
@@ -295,7 +303,7 @@ export async function refreshTrackedJob(input: {
     // Nothing to do — return the row as-is so the client can no-op gracefully.
     return {
       ...row,
-      applyUrl: jobService.deriveApplyUrl({ parsed, job: row, fallbackUrl: url }),
+      applyUrl: deriveApplyUrl({ parsed, job: row, fallbackUrl: url }),
       updated: false,
       updatedFields: [],
     };
@@ -306,7 +314,7 @@ export async function refreshTrackedJob(input: {
 
   return {
     ...updatedRow,
-    applyUrl: jobService.deriveApplyUrl({ parsed, job: updatedRow, fallbackUrl: url }),
+    applyUrl: deriveApplyUrl({ parsed, job: updatedRow, fallbackUrl: url }),
     updated: true,
     updatedFields,
   };

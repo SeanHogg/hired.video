@@ -10,7 +10,9 @@ import type { AppEnv } from "../../types/index.js";
 import { isSuperAdmin } from "../../middleware/superAdmin.js";
 import { normalisePathname, pageEmbedService } from "../../services/studio/page-embed-service.js";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
-import { fail, ok } from "./http.js";
+import { success, error } from "../../types/index.js";
+import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const studioPageEmbedRoutes = new Hono<AppEnv>();
 
@@ -23,52 +25,48 @@ const PublishEmbedSchema = z.object({
 /** 401 / 403 for the SuperAdmin management surface, or null when allowed. */
 function superAdminGate(c: Context<AppEnv>): Response | null {
   const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
-  if (!isSuperAdmin(user)) return c.json(fail("FORBIDDEN", "SuperAdmin access required"), 403);
+  requireUser(c);
+  if (!isSuperAdmin(user)) return c.json(error("FORBIDDEN", "SuperAdmin access required"), 403);
   return null;
 }
 
 // Public membership set — the client fetches this once (cached) and only
 // runs the full resolve below when the current route is in the set (#1863).
 studioPageEmbedRoutes.get("/page-embeds/paths", async (c) => {
-  return c.json(ok({ paths: await pageEmbedService().listActivePathsCached() }));
+  return c.json(success({ paths: await pageEmbedService().listActivePathsCached() }));
 });
 
 // Public resolver — 200 with `{ embed: null }` (not 404) so the client can
 // cache "no embed here" cheaply without treating it as an error.
 studioPageEmbedRoutes.get("/page-embeds/resolve", async (c) => {
   const path = normalisePathname(c.req.query("path") ?? "");
-  return c.json(ok({ embed: await pageEmbedService().resolveForPathCached(path) }));
+  return c.json(success({ embed: await pageEmbedService().resolveForPathCached(path) }));
 });
 
 // SuperAdmin: list all active mappings (management surface).
 studioPageEmbedRoutes.get("/page-embeds", async (c) => {
   const denied = superAdminGate(c);
   if (denied) return denied;
-  return c.json(ok({ embeds: await pageEmbedService().listActive() }));
+  return c.json(success({ embeds: await pageEmbedService().listActive() }));
 });
 
 // SuperAdmin: publish a project to a path (upsert).
-studioPageEmbedRoutes.post("/page-embeds", async (c) => {
+studioPageEmbedRoutes.post("/page-embeds", validateJson(PublishEmbedSchema, undefined, { emptyBody: null }), async (c) => {
   const denied = superAdminGate(c);
   if (denied) return denied;
-  const body = await c.req.json().catch(() => null);
-  const parsed = PublishEmbedSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  }
-  const pathname = normalisePathname(parsed.data.pathname);
+  const body = c.req.valid("json");
+  const pathname = normalisePathname(body.pathname);
   try {
     await pageEmbedService().publish({
       pathname,
-      projectId: parsed.data.projectId,
-      placement: parsed.data.placement,
-      userId: c.var.user!.sub,
+      projectId: body.projectId,
+      placement: body.placement,
+      userId: c.var.userId,
     });
   } catch (err) {
-    return c.json(fail("PUBLISH_FAILED", err instanceof Error ? err.message : "Publish failed"), 400);
+    return c.json(error("PUBLISH_FAILED", err instanceof Error ? err.message : "Publish failed"), 400);
   }
-  return c.json(ok({ pathname, placement: parsed.data.placement }), 201);
+  return c.json(success({ pathname, placement: body.placement }), 201);
 });
 
 // SuperAdmin: unpublish a path.
@@ -77,5 +75,5 @@ studioPageEmbedRoutes.delete("/page-embeds", async (c) => {
   if (denied) return denied;
   const pathname = normalisePathname(c.req.query("path") ?? "");
   const removed = await pageEmbedService().unpublish(pathname);
-  return c.json(ok({ pathname, removed }));
+  return c.json(success({ pathname, removed }));
 });

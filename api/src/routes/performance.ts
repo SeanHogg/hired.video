@@ -7,16 +7,14 @@
  */
 
 import { Hono, type Context } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb } from "../db/index.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
-import { isDomainError } from "../domains/errors.js";
-import { PerformanceRepository } from "../repositories/performanceRepository.js";
-import { PerformanceService, type LegacyKeyResult } from "../services/performance/performanceService.js";
+import { performanceService as service, type LegacyKeyResult } from "../services/performance/performanceService.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const performanceRoutes = new Hono<AppEnv>();
 
@@ -54,93 +52,71 @@ const KeyResultSchema = z.object({
 });
 
 const gate = requirePro("Performance Management");
-const service = () => new PerformanceService(new PerformanceRepository(getDb()));
 const readBody = (c: Context<AppEnv>): Promise<unknown> => c.req.json().catch(() => null);
 const asRecord = (v: unknown): Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 
-/** Authenticated handler: resolves the caller and renders DomainErrors as the error envelope. */
-function handle(run: (c: Context<AppEnv>, userId: string) => Promise<Response>) {
-  return async (c: Context<AppEnv>): Promise<Response> => {
-    const userId = c.var.user?.sub;
-    if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-    try {
-      return await run(c, userId);
-    } catch (err) {
-      if (isDomainError(err)) {
-        return c.json(error(err.code, err.message, err.details), err.status as ContentfulStatusCode);
-      }
-      throw err;
-    }
-  };
-}
+/** Body validator keeping the historical envelope; an unreadable body parses as null. */
+const body = <T extends z.ZodTypeAny>(schema: T) =>
+  validateJson(schema, (e) => error("VALIDATION_ERROR", "Invalid request", e.flatten()), { emptyBody: null });
 
 // ── Cycles ───────────────────────────────────────────────────────────────────
-performanceRoutes.get("/cycles", gate, handle(async (c, userId) =>
-  c.json(success(await service().listCycles(userId)), 200)));
+performanceRoutes.get("/cycles", gate, async (c) =>
+  c.json(success(await service().listCycles(requireUser(c))), 200));
 
-performanceRoutes.post("/cycles", gate, handle(async (c, userId) => {
-  const parsed = CreateCycleSchema.safeParse(await readBody(c));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  return c.json(success(await service().createCycle(userId, parsed.data)), 201);
-}));
+performanceRoutes.post("/cycles", gate, body(CreateCycleSchema), async (c) =>
+  c.json(success(await service().createCycle(requireUser(c), c.req.valid("json"))), 201));
 
-performanceRoutes.get("/cycles/:id", gate, handle(async (c, userId) =>
-  c.json(success(await service().getCycle(userId, c.req.param("id"))), 200)));
+performanceRoutes.get("/cycles/:id", gate, async (c) =>
+  c.json(success(await service().getCycle(requireUser(c), c.req.param("id"))), 200));
 
-performanceRoutes.patch("/cycles/:id/complete", gate, handle(async (c, userId) =>
-  c.json(success(await service().completeCycle(userId, c.req.param("id"))), 200)));
+performanceRoutes.patch("/cycles/:id/complete", gate, async (c) =>
+  c.json(success(await service().completeCycle(requireUser(c), c.req.param("id"))), 200));
 
 // ── Reviews ──────────────────────────────────────────────────────────────────
-performanceRoutes.post("/reviews", gate, handle(async (c, userId) => {
-  const parsed = CreateReviewSchema.safeParse(await readBody(c));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  return c.json(success(await service().createReview(userId, parsed.data)), 201);
-}));
+performanceRoutes.post("/reviews", gate, body(CreateReviewSchema), async (c) =>
+  c.json(success(await service().createReview(requireUser(c), c.req.valid("json"))), 201));
 
 // Reviews I've written or received.
-performanceRoutes.get("/reviews", gate, handle(async (c, userId) =>
-  c.json(success(await service().listReviews(userId)), 200)));
+performanceRoutes.get("/reviews", gate, async (c) =>
+  c.json(success(await service().listReviews(requireUser(c))), 200));
 
-performanceRoutes.patch("/reviews/:id/submit", gate, handle(async (c, userId) =>
-  c.json(success(await service().submitReview(userId, c.req.param("id"))), 200)));
+performanceRoutes.patch("/reviews/:id/submit", gate, async (c) =>
+  c.json(success(await service().submitReview(requireUser(c), c.req.param("id"))), 200));
 
 // Employee acknowledges a submitted review (#14).
-performanceRoutes.patch("/reviews/:id/acknowledge", gate, handle(async (c, userId) => {
-  const body = asRecord(await readBody(c));
-  return c.json(success(await service().acknowledgeReview(userId, c.req.param("id"), body.response)), 200);
-}));
+performanceRoutes.patch("/reviews/:id/acknowledge", gate, async (c) => {
+  const userId = requireUser(c);
+  const raw = asRecord(await readBody(c));
+  return c.json(success(await service().acknowledgeReview(userId, c.req.param("id"), raw.response)), 200);
+});
 
 // ── Goals / OKRs ─────────────────────────────────────────────────────────────
-performanceRoutes.get("/goals", gate, handle(async (c, userId) =>
-  c.json(success(await service().listGoals(userId)), 200)));
+performanceRoutes.get("/goals", gate, async (c) =>
+  c.json(success(await service().listGoals(requireUser(c))), 200));
 
-performanceRoutes.post("/goals", gate, handle(async (c, userId) => {
-  const parsed = CreateGoalSchema.safeParse(await readBody(c));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  return c.json(success(await service().createGoal(userId, parsed.data)), 201);
-}));
+performanceRoutes.post("/goals", gate, body(CreateGoalSchema), async (c) =>
+  c.json(success(await service().createGoal(requireUser(c), c.req.valid("json"))), 201));
 
-performanceRoutes.patch("/goals/:id", gate, handle(async (c, userId) =>
-  c.json(success(await service().updateGoal(userId, c.req.param("id"), asRecord(await readBody(c)))), 200)));
+performanceRoutes.patch("/goals/:id", gate, async (c) => {
+  const userId = requireUser(c);
+  return c.json(success(await service().updateGoal(userId, c.req.param("id"), asRecord(await readBody(c)))), 200);
+});
 
-performanceRoutes.delete("/goals/:id", gate, handle(async (c, userId) => {
-  await service().deleteGoal(userId, c.req.param("id"));
+performanceRoutes.delete("/goals/:id", gate, async (c) => {
+  await service().deleteGoal(requireUser(c), c.req.param("id"));
   return c.json(success({ deleted: true }), 200);
-}));
+});
 
 // Dedicated OKR progress update (#14).
 // Body: { progressPercentage?: number, keyResults?: Array<{title,current,target,unit}> }
 // Key results persist on the goal's key_results; progress rolls up from them
 // when no explicit percentage is given; 100% auto-completes the goal.
-performanceRoutes.patch("/goals/:id/progress", gate, handle(async (c, userId) => {
-  const body = asRecord(await readBody(c));
-  const progress = typeof body.progressPercentage === "number" ? body.progressPercentage : undefined;
-  const krs = z.array(KeyResultSchema).safeParse(body.keyResults);
+performanceRoutes.patch("/goals/:id/progress", gate, async (c) => {
+  const userId = requireUser(c);
+  const raw = asRecord(await readBody(c));
+  const progress = typeof raw.progressPercentage === "number" ? raw.progressPercentage : undefined;
+  const krs = z.array(KeyResultSchema).safeParse(raw.keyResults);
   const keyResults: LegacyKeyResult[] | undefined = krs.success ? krs.data : undefined;
   return c.json(success(await service().updateGoalProgress(userId, c.req.param("id"), progress, keyResults)), 200);
-}));
-
-performanceRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Performance route not found" } }, 404),
-);
+});

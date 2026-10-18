@@ -10,20 +10,20 @@
  */
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/index.js";
-import { ok } from "../../utils/response.js";
 import { AdminMetricsService } from "../../services/admin/AdminMetricsService.js";
+import { success } from "../../types/index.js";
 
 export const adminMetricsRoutes = new Hono<AppEnv>();
 
-adminMetricsRoutes.get("/", async (c) => c.json(ok(await AdminMetricsService.create().dashboard()), 200));
+adminMetricsRoutes.get("/", async (c) => c.json(success(await AdminMetricsService.create().dashboard()), 200));
 
-adminMetricsRoutes.get("/saas", async (c) => c.json(ok(await AdminMetricsService.create().saas()), 200));
+adminMetricsRoutes.get("/saas", async (c) => c.json(success(await AdminMetricsService.create().saas()), 200));
 
 adminMetricsRoutes.get("/time-series/:metric", async (c) =>
-  c.json(ok(await AdminMetricsService.create().timeSeries(c.req.param("metric"))), 200),
+  c.json(success(await AdminMetricsService.create().timeSeries(c.req.param("metric"))), 200),
 );
 
-adminMetricsRoutes.get("/affiliate-stats", (c) => c.json(ok(AdminMetricsService.affiliateStats()), 200));
+adminMetricsRoutes.get("/affiliate-stats", (c) => c.json(success(AdminMetricsService.affiliateStats()), 200));
 
 adminMetricsRoutes.get("/export/:format", async (c) => {
   const format = c.req.param("format");

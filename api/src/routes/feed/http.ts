@@ -16,7 +16,7 @@ export type FeedContext = Context<AppEnv>;
 
 /** The current viewer (anonymous → empty id) + their recruiter-visibility tier. */
 export function viewerOf(c: FeedContext): FeedViewer {
-  return { userId: c.var.user?.sub ?? "", isRecruiter: isRecruiterLike(c.var.user) };
+  return { userId: c.var.userId ?? "", isRecruiter: isRecruiterLike(c.var.user) };
 }
 
 /** Request body as a plain record; malformed / missing JSON → `{}`. */

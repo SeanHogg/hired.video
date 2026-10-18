@@ -5,7 +5,7 @@
  * descriptor's `collab` slice. Lifted out of StudioEditorV2.
  */
 import { useCallback, useMemo, type Dispatch, type SetStateAction } from "react";
-import type { MediaKind } from "@shared/media-kinds";
+import { mediaKindIsDocument, type MediaKind } from "@shared/media-kinds";
 import type { User } from "@/lib/auth";
 import type { StudioProject } from "@/lib/services/studio-service";
 import { useCollabDocSync } from "@/lib/studio/collab/use-collab-doc-sync";
@@ -194,7 +194,7 @@ export function useStudioCollabAutosave({
       title,
       slice,
       entityContent:
-        currentMediaKind === "document" ? documentEntityContent : undefined,
+        mediaKindIsDocument(currentMediaKind) ? documentEntityContent : undefined,
     });
   }, [
     currentMediaKind,

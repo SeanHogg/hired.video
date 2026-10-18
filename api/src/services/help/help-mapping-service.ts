@@ -11,7 +11,7 @@
  */
 
 import { and, asc, eq } from "drizzle-orm";
-import type { getDb } from "../../db/index.js";
+import { getDb } from "../../db/index.js";
 import { helpMappings } from "../../db/schema/helpMappings.js";
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
 import {
@@ -36,6 +36,11 @@ const CONTEXTS_TTL_SECONDS = 600;
 
 const ctxCacheKey = (contextKey: string) => `help:ctx:${contextKey}`;
 const CONTEXTS_KEY = "help:contexts";
+
+/** The request-scoped service on the global db — what the /api/help routes use. */
+export function helpMappingService(): HelpMappingService {
+  return new HelpMappingService(getDb());
+}
 
 export class HelpMappingService {
   constructor(private readonly db: Db) {}

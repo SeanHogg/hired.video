@@ -19,6 +19,7 @@ import { studioTemplatesService, type StudioTemplate } from "@/lib/services/stud
 import { isResumeStudioTemplate } from "@/lib/templates/resume-template-design";
 import type { DocumentState } from "@/lib/studio/editor-v2/document-state";
 import type { VideoScript } from "@/types/video-script";
+import { mediaKindIsDocument } from "@shared/media-kinds";
 
 /** The create input (`useCreateStudioDraft`) a studio template starts from. */
 export type StudioTemplateStart =
@@ -36,7 +37,7 @@ export function studioTemplateStart(template: TemplateFacts): StudioTemplateStar
   if (isResumeStudioTemplate(template)) {
     return { kind: "resumeTemplate", design: template.listingSlug ?? template.id };
   }
-  if (template.mediaKind === "document") {
+  if (mediaKindIsDocument(template.mediaKind)) {
     // A template is structure, not content: the new document binds to no entity.
     return { kind: "document", documentState: { ...(payload as DocumentState), entityId: null }, name: template.name };
   }

@@ -37,6 +37,8 @@ export interface INotificationsRepository {
   listForUser(userId: string, fields: readonly string[] | null, limit: number): Promise<Partial<NotificationRow>[]>;
   /** SQL COUNT — never ships the unread rows to the Worker. */
   countUnreadForUser(userId: string): Promise<number>;
+  /** Newest unread rows (list columns), capped at `limit`. */
+  listUnreadForUser(userId: string, limit: number): Promise<NotificationRow[]>;
   markAllReadForUser(userId: string): Promise<void>;
   markReadForUser(userId: string, notificationId: string): Promise<void>;
   deleteForUser(userId: string, notificationId: string): Promise<void>;
@@ -83,6 +85,15 @@ export class NotificationsRepository implements INotificationsRepository {
       .from(notifications)
       .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
     return Number(row?.n ?? 0);
+  }
+
+  async listUnreadForUser(userId: string, limit: number): Promise<NotificationRow[]> {
+    return (await this.db
+      .select(NOTIFICATION_SELECT_SHAPE)
+      .from(notifications)
+      .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)))
+      .orderBy(desc(notifications.createdAt))
+      .limit(limit)) as NotificationRow[];
   }
 
   async markAllReadForUser(userId: string): Promise<void> {

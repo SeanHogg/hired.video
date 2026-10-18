@@ -25,463 +25,124 @@
  *
  * Sync history:
  *   GET    /sync-runs
+ *
+ * Use cases: services/email-integration/mailbox-accounts.ts (accounts,
+ * OAuth, sync history) and inbox-processor-config.ts (rules, profiles,
+ * actions). Failures are DomainErrors rendered by the global handler.
  */
 
 import { Hono } from "hono";
-import { jwtVerify } from "jose";
 import type { AppEnv } from "../types/index.js";
-import { success, error } from "../types/index.js";
-import { getDb } from "../db/index.js";
-import { buildRepos } from "../repositories/index.js";
-import {
-  EMAIL_PROVIDER_CONFIG,
-  type EmailProviderId,
-  createState,
-  verifyState,
-  exchangeCode,
-  encryptToken,
-  refreshAccessToken,
-  RefreshAccessTokenError,
-} from "../services/email-integration/oauth.js";
+import { success } from "../types/index.js";
 import { requirePro } from "../middleware/auth-gates.js";
 import { createLLMClient } from "../services/adapters/llm-client.js";
 import {
-  cloneProfile,
-  updateProfile,
-  deleteProfile,
-  dryRun,
-  rowToProfileShape,
-} from "../services/email-integration/processor-service.js";
+  completeMailboxConnect,
+  listMailboxAccounts,
+  listSyncRuns,
+  patchMailboxAccount,
+  removeMailboxAccount,
+  startMailboxConnect,
+  vendMailboxAccessToken,
+} from "../services/email-integration/mailbox-accounts.js";
 import {
-  INBOX_ACTION_TRIGGER_VALUES,
-  INBOX_ACTION_HANDLER_VALUES,
-} from "../../../shared/email-classification/index.js";
-import { getSubscription } from "../services/billing/BillingService.js";
-import { USER_ROLES } from "../../../shared/user-roles.js";
-import { loadConsumed } from "../domains/services-processing/services-processor.js";
-import { getEntitlement } from "../domains/services-processing/entitlement-catalog.js";
-import { inboxSeatAddonService } from "../services/billing/InboxSeatAddonService.js";
-import { pricingUpgradeUrl } from "../../../shared/upgrade-slugs.js";
-import { getJwtSecretOptional } from "../utils/jwt.js";
-import { apiBaseUrl, frontendBaseUrl } from "../utils/public-urls.js";
+  cloneInboxProfile,
+  createEmailRule,
+  createProfileAction,
+  dryRunInboxProfile,
+  getInboxProfile,
+  listActionRuns,
+  listEmailRules,
+  listInboxProfiles,
+  listProfileActions,
+  patchEmailRule,
+  patchInboxProfile,
+  patchProfileAction,
+  removeEmailRule,
+  removeInboxProfile,
+  removeProfileAction,
+} from "../services/email-integration/inbox-processor-config.js";
+import { frontendBaseUrl } from "../utils/public-urls.js";
 import { clampLimit } from "../utils/pagination.js";
-import { logger } from "../lib/logger.js";
-
-
-function callbackUrl(provider: string): string {
-  return `${apiBaseUrl()}/api/integrations/email/${provider}/callback`;
-}
-
-/** Top-level browser navigation can't carry an Authorization header — the
- *  /connect route is in the public allowlist (see app.ts EMAIL_OAUTH_PUBLIC_ROUTE)
- *  and authenticates the caller via a short-lived `link_token` JWT in the
- *  query string. Mirrors the existing `/api/auth/oauth/:provider` pattern. */
-async function userIdFromLinkToken(token: string | undefined): Promise<string | null> {
-  if (!token) return null;
-  // Optional on purpose: an unconfigured secret means "cannot authenticate
-  // this link", not a crash — see utils/jwt.ts for the throwing variant.
-  const secret = getJwtSecretOptional();
-  if (!secret) return null;
-  try {
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
-      algorithms: ["HS256"],
-    });
-    return typeof payload.sub === "string" ? payload.sub : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Validate a redirect path is in-app — must start with `/` and not begin
- *  with `//` or `/\\` (which most browsers parse as a scheme-relative URL
- *  to another host). Falls back to the default when invalid. Closes the
- *  open-redirect class noted in gap #540. */
-function safeRedirect(raw: string | undefined, fallback: string): string {
-  if (!raw) return fallback;
-  if (!raw.startsWith("/")) return fallback;
-  if (raw.startsWith("//") || raw.startsWith("/\\")) return fallback;
-  return raw;
-}
-
-/**
- * Inbox Sync entitlement check — shared by `/connect` and `/callback` so
- * the Pro gate + 3-inbox cap can't drift between them. Returns either
- * `{ ok: true }` (user may proceed) or `{ ok: false, redirect }` where
- * `redirect` is the in-app path the browser should land on (an
- * upgrade page when blocked).
- *
- * Admin / SuperAdmin bypass — same posture as `requirePro`.
- *
- * When `skipIfExisting` is supplied (callback path), re-connecting an
- * already-tracked `(provider, email)` is exempt from the cap so users
- * can re-consent without being blocked.
- */
-async function checkInboxSyncEntitlement(
-  userId: string,
-  userRole: string | null | undefined,
-  repos: ReturnType<typeof buildRepos>,
-  skipIfExisting?: { provider: string; accountEmail: string },
-): Promise<{ ok: true } | { ok: false; redirect: string }> {
-  if (userRole === USER_ROLES.SUPER_ADMIN || userRole === USER_ROLES.ADMIN) {
-    return { ok: true };
-  }
-  const sub = await getSubscription(userId);
-  if (!sub.isPro) {
-    return { ok: false, redirect: pricingUpgradeUrl("inbox-sync") };
-  }
-  // Cap = catalog default (INBOX_SYNC_INCLUDED_ACCOUNTS) + any extra
-  // inbox-seat addons the user has purchased (#809). Consumed count
-  // comes from the same catalog dispatcher `gate()` uses.
-  const baseCap = getEntitlement("email_account").monthlyCap.pro;
-  const addonState = await inboxSeatAddonService.getState(userId);
-  const cap = baseCap + addonState.quantity;
-  const consumed = await loadConsumed(userId, "email_account");
-  if (consumed < cap) return { ok: true };
-  if (skipIfExisting) {
-    const existing = await repos.externalEmailAccounts.findByProviderEmail(
-      userId,
-      skipIfExisting.provider,
-      skipIfExisting.accountEmail,
-    );
-    if (existing) return { ok: true };
-  }
-  return { ok: false, redirect: pricingUpgradeUrl("inbox-extra") };
-}
+import { requireUser } from "./helpers/routerHelpers.js";
 
 export const emailIntegrationRoutes = new Hono<AppEnv>();
 
 // ── Connect / callback ───────────────────────────────────────────────────────
 
+/** Browser navigation (authenticated by `?link_token=`, see the service):
+ *  login / verify-email / pricing-upgrade redirects when blocked, else the
+ *  provider's authorize URL. A JSON 404/503 for an unknown/unconfigured
+ *  provider. */
 emailIntegrationRoutes.get("/:provider/connect", async (c) => {
-  const base = frontendBaseUrl();
-  const uid = await userIdFromLinkToken(c.req.query("link_token"));
-  if (!uid) {
-    // No token / invalid token — bounce to login with a redirect back to
-    // the integrations tab so a fresh sign-in lands the user on the right
-    // surface to retry.
-    return c.redirect(`${base}/login?redirect=${encodeURIComponent("/settings?tab=email")}`);
-  }
-  // Per-route email-verify gate. We bypass `emailVerifiedMiddleware`
-  // globally for this public route because the middleware sees no
-  // `c.var.user` (auth was bypassed) and 403s, which is a dead-end on a
-  // browser navigation. Surface the verification flow instead.
-  const repos = buildRepos(getDb());
-  const user = await repos.users.findById(uid);
-  if (!user) {
-    return c.redirect(`${base}/login?redirect=${encodeURIComponent("/settings?tab=email")}`);
-  }
-  if (!user.emailVerified) {
-    return c.redirect(
-      `${base}/verify-email?redirect=${encodeURIComponent("/settings?tab=email")}`,
-    );
-  }
-  // Pro gate + 3-inbox cap. Browser navigation can't render a 402 JSON
-  // envelope, so on block we bounce to the Pricing page with an upgrade
-  // highlight instead. Helper is shared with the /callback path so the
-  // two gates can't drift.
-  const entitlement = await checkInboxSyncEntitlement(uid, user.role, repos);
-  if (entitlement.ok === false) return c.redirect(`${base}${entitlement.redirect}`);
-  const provider = c.req.param("provider").toLowerCase() as EmailProviderId;
-  const cfg = EMAIL_PROVIDER_CONFIG[provider];
-  if (!cfg) return c.json(error("NOT_FOUND", `Unknown provider: ${provider}`), 404);
-  if (!cfg.clientId() || !cfg.clientSecret()) {
-    return c.json(error("SERVICE_UNAVAILABLE", `${provider} integration not configured`), 503);
-  }
-  const redirect = safeRedirect(c.req.query("redirect"), "/settings?tab=email");
-  const nonce = crypto.randomUUID();
-  // #916 — When the request is a Reconnect for a specific mailbox,
-  // thread the expected email through the state JWT so the callback can
-  // detect a mismatch + bounce back without upserting a new row. Also
-  // forward as `login_hint` so the provider's account picker defaults to
-  // the right account.
-  const reconnectAccountEmail = c.req.query("reconnectAccountEmail")?.trim() || undefined;
-  const state = await createState({
-    userId: uid,
-    ts: Date.now(),
-    nonce,
-    redirect,
-    reconnectAccountEmail,
+  const start = await startMailboxConnect({
+    provider: c.req.param("provider"),
+    linkToken: c.req.query("link_token"),
+    redirect: c.req.query("redirect"),
+    reconnectAccountEmail: c.req.query("reconnectAccountEmail"),
   });
-
-  const params = new URLSearchParams({
-    client_id: cfg.clientId(),
-    redirect_uri: callbackUrl(provider),
-    response_type: "code",
-    scope: cfg.scopes.join(" "),
-    state,
-    ...cfg.authParams,
-    ...(reconnectAccountEmail ? { login_hint: reconnectAccountEmail } : {}),
-  });
-  return c.redirect(`${cfg.authUrl}?${params.toString()}`);
+  return c.redirect(start.kind === "authorize" ? start.url : `${frontendBaseUrl()}${start.path}`);
 });
 
 emailIntegrationRoutes.get("/:provider/callback", async (c) => {
-  const provider = c.req.param("provider").toLowerCase() as EmailProviderId;
-  const cfg = EMAIL_PROVIDER_CONFIG[provider];
-  const base = frontendBaseUrl();
-  if (!cfg) return c.redirect(`${base}/settings?tab=email&error=unknown_provider`);
-
-  const code = c.req.query("code");
-  const stateParam = c.req.query("state");
-  if (!code || !stateParam) {
-    return c.redirect(`${base}/settings?tab=email&error=missing_params`);
-  }
-  const state = await verifyState(stateParam);
-  if (!state) return c.redirect(`${base}/settings?tab=email&error=invalid_state`);
-
-  let tokens: Awaited<ReturnType<typeof exchangeCode>>;
-  let mailboxEmail: string;
-  try {
-    tokens = await exchangeCode(provider, code, callbackUrl(provider));
-    mailboxEmail = await cfg.fetchAccountEmail(tokens.access_token);
-  } catch (err) {
-    logger.error(`[email-integration:${provider}] callback failed`, err);
-    return c.redirect(`${base}/settings?tab=email&error=auth_failed`);
-  }
-  if (!tokens.refresh_token) {
-    // Without a refresh token we can't sync — bounce so the user
-    // re-consents (Google sometimes skips refresh on repeat consent).
-    return c.redirect(`${base}/settings?tab=email&error=no_refresh_token`);
-  }
-
-  // #916 — Reconnect happy-path account-mismatch guard. When the
-  // connect step pinned `reconnectAccountEmail`, the consented mailbox
-  // MUST match — otherwise we'd silently create a duplicate row for the
-  // wrong account and leave the broken row in `status: "error"`.
-  if (
-    state.reconnectAccountEmail &&
-    state.reconnectAccountEmail.toLowerCase() !== mailboxEmail.toLowerCase()
-  ) {
-    return c.redirect(
-      `${base}/settings?tab=email&error=reconnect_account_mismatch&expected=${encodeURIComponent(state.reconnectAccountEmail)}&picked=${encodeURIComponent(mailboxEmail)}`,
-    );
-  }
-
-  const repos = buildRepos(getDb());
-  // Belt-and-braces: re-check Pro + cap at callback time so a user who
-  // downgraded between /connect and /callback (or completed an older
-  // link) can't slip past the gate. Re-connecting an existing mailbox
-  // is exempt from the cap.
-  const cbUser = await repos.users.findById(state.userId);
-  const cbEntitlement = await checkInboxSyncEntitlement(
-    state.userId,
-    cbUser?.role ?? null,
-    repos,
-    { provider, accountEmail: mailboxEmail },
-  );
-  if (cbEntitlement.ok === false) return c.redirect(`${base}${cbEntitlement.redirect}`);
-  const encryptedRefresh = await encryptToken(tokens.refresh_token);
-  await repos.externalEmailAccounts.upsert({
-    userId: state.userId,
-    provider,
-    accountEmail: mailboxEmail,
-    accountLabel: mailboxEmail,
-    oauthRefreshTokenEnc: encryptedRefresh,
-    scopes: tokens.scope?.split(" ") ?? cfg.scopes,
-    status: "active",
-    lastError: null,
-  } as any);
-
-  return c.redirect(
-    `${base}${state.redirect}${state.redirect.includes("?") ? "&" : "?"}connected=${provider}`,
-  );
+  const path = await completeMailboxConnect({
+    provider: c.req.param("provider"),
+    code: c.req.query("code"),
+    state: c.req.query("state"),
+  });
+  return c.redirect(`${frontendBaseUrl()}${path}`);
 });
 
 // ── Account management ───────────────────────────────────────────────────────
 
 emailIntegrationRoutes.get("/accounts", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const repos = buildRepos(getDb());
-  const accounts = await repos.externalEmailAccounts.findAllForUser(uid);
-  return c.json(
-    success(
-      accounts.map((a) => ({
-        id: a.id,
-        provider: a.provider,
-        accountEmail: a.accountEmail,
-        accountLabel: a.accountLabel,
-        status: a.status,
-        lastSyncedAt: a.lastSyncedAt?.toISOString() ?? null,
-        lastError: a.lastError,
-      })),
-    ),
-  );
+  const uid = requireUser(c);
+  return c.json(success(await listMailboxAccounts(uid)));
 });
 
 emailIntegrationRoutes.patch("/accounts/:id", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const uid = requireUser(c);
   const body = await c.req.json().catch(() => ({}));
-  const repos = buildRepos(getDb());
-  const patch: Record<string, unknown> = {};
-  if (typeof body.accountLabel === "string") patch.accountLabel = body.accountLabel.slice(0, 120);
-  if (body.status === "active" || body.status === "paused") patch.status = body.status;
-  // Per-account confidence floor for the inbox feed. Clamp to [0, 1]
-  // so a misconfigured client can't permanently hide every message
-  // (>1) or flood the inbox with every newsletter (<0). Accept the
-  // legacy `minJobScore` key too so a stale client build keeps working
-  // through the rename.
-  const rawScore =
-    typeof body.minRelevanceScore === "number"
-      ? body.minRelevanceScore
-      : typeof body.minJobScore === "number"
-        ? body.minJobScore
-        : undefined;
-  if (typeof rawScore === "number" && Number.isFinite(rawScore)) {
-    const clamped = Math.max(0, Math.min(1, rawScore));
-    patch.minRelevanceScore = clamped.toFixed(3);
-  }
-  // Active inbox profile assignment (#1984) — validate ownership/preset
-  // membership before persisting so a user can't point a mailbox at
-  // someone else's clone.
-  if (body.activeProfileId === null) {
-    // Reset to the default (Job Hunter) — the resolver falls back when null.
-    patch.activeProfileId = null;
-  } else if (typeof body.activeProfileId === "string" && body.activeProfileId) {
-    const candidate = await repos.inboxProfiles.findById(body.activeProfileId);
-    if (candidate && (candidate.isPreset || candidate.ownerId === uid)) {
-      patch.activeProfileId = body.activeProfileId;
-    } else {
-      return c.json(error("VALIDATION_ERROR", "Unknown or unauthorized profile"), 400);
-    }
-  }
-  if (Object.keys(patch).length === 0) {
-    return c.json(error("VALIDATION_ERROR", "No supported fields in patch"), 400);
-  }
-  await repos.externalEmailAccounts.patch(c.req.param("id"), uid, patch as any);
+  await patchMailboxAccount(uid, c.req.param("id"), body);
   return c.json(success({ success: true }));
 });
 
 emailIntegrationRoutes.delete("/accounts/:id", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const repos = buildRepos(getDb());
-  await repos.externalEmailAccounts.remove(c.req.param("id"), uid);
+  const uid = requireUser(c);
+  await removeMailboxAccount(uid, c.req.param("id"));
   return c.json(success({ success: true }));
 });
 
 /** Vends a short-lived provider access token for the client-driven
- *  PWA sync. The browser uses it to call Gmail/Graph APIs directly
- *  (CORS-enabled) instead of routing every message fetch through the
- *  Worker. The refresh token stays server-side encrypted — only the
- *  ~1h access token crosses the wire. See #755 for the architecture.
- *  Pro-gated — this is the actual sync engine entry point. */
+ *  PWA sync (#755). Pro-gated — this is the actual sync engine entry point. */
 emailIntegrationRoutes.get("/accounts/:id/access-token", requirePro("Inbox Sync"), async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const repos = buildRepos(getDb());
-  const account = await repos.externalEmailAccounts.findById(c.req.param("id"), uid);
-  if (!account) return c.json(error("NOT_FOUND", "Account not found"), 404);
-  if (!account.oauthRefreshTokenEnc) {
-    return c.json(error("NOT_CONNECTED", "Mailbox missing refresh token"), 400);
-  }
-  try {
-    const { accessToken, expiresIn } = await refreshAccessToken(
-      account.provider as EmailProviderId,
-      account.oauthRefreshTokenEnc,
-    );
-    return c.json(
-      success({
-        accessToken,
-        expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
-        provider: account.provider,
-        accountEmail: account.accountEmail,
-      }),
-    );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Refresh failed";
-    // Mark the account as error so the UI can surface a reconnect CTA.
-    try {
-      await repos.externalEmailAccounts.patch(account.id, uid, {
-        status: "error",
-        lastError: message.slice(0, 8000),
-      } as any);
-    } catch {
-      // Diagnostic write failure shouldn't mask the underlying refresh error.
-    }
-    // #918 — Branch on the typed RefreshFailure.kind instead of a regex
-    // over Google's `invalid_grant` substring. Microsoft Graph emits
-    // additional re-auth codes (AADSTS70000 / interaction_required /
-    // consent_required) that the classifier in oauth.ts maps to
-    // kind === "reauth" so they reach the same Reconnect banner.
-    const isReauth =
-      err instanceof RefreshAccessTokenError
-        ? err.failure.kind === "reauth"
-        : /invalid_grant/i.test(message);
-    if (isReauth) {
-      return c.json(
-        error("MAILBOX_REAUTH_REQUIRED", message, {
-          accountId: account.id,
-          provider: account.provider,
-          accountEmail: account.accountEmail,
-          failureCode: err instanceof RefreshAccessTokenError ? err.failure.code : null,
-        }),
-        400,
-      );
-    }
-    return c.json(error("REFRESH_FAILED", message), 502);
-  }
+  const uid = requireUser(c);
+  return c.json(success(await vendMailboxAccessToken(uid, c.req.param("id"))));
 });
 
 // ── Rules CRUD ───────────────────────────────────────────────────────────────
 
 emailIntegrationRoutes.get("/rules", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const repos = buildRepos(getDb());
-  // Optional ?profileId scopes to one profile's rules (builder UI);
-  // omitted = all of the user's rules (legacy Settings panel).
-  const profileId = c.req.query("profileId");
-  const rules = profileId
-    ? await repos.emailUserRules.findAllForProfile(uid, profileId)
-    : await repos.emailUserRules.findAllForUser(uid);
-  return c.json(success(rules));
+  const uid = requireUser(c);
+  return c.json(success(await listEmailRules(uid, c.req.query("profileId"))));
 });
 
 emailIntegrationRoutes.post("/rules", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const uid = requireUser(c);
   const body = await c.req.json().catch(() => null);
-  if (!body || typeof body.name !== "string" || !Array.isArray(body.conditions)) {
-    return c.json(error("VALIDATION_ERROR", "Required: name, conditions[]"), 400);
-  }
-  const repos = buildRepos(getDb());
-  const row = await repos.emailUserRules.insert({
-    userId: uid,
-    profileId: typeof body.profileId === "string" ? body.profileId : null,
-    name: body.name.slice(0, 120),
-    conditions: body.conditions,
-    actionCategory: typeof body.actionCategory === "string" ? body.actionCategory : "other",
-    actionScore: String(typeof body.actionScore === "number" ? body.actionScore : 1),
-    isEnabled: body.isEnabled !== false,
-    priority: typeof body.priority === "number" ? body.priority : 100,
-  } as any);
-  return c.json(success(row), 201);
+  return c.json(success(await createEmailRule(uid, body)), 201);
 });
 
 emailIntegrationRoutes.patch("/rules/:id", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const uid = requireUser(c);
   const body = await c.req.json().catch(() => ({}));
-  const repos = buildRepos(getDb());
-  const patch: Record<string, unknown> = {};
-  for (const k of ["name", "actionCategory"] as const) {
-    if (typeof body[k] === "string") patch[k] = body[k];
-  }
-  if (Array.isArray(body.conditions)) patch.conditions = body.conditions;
-  if (typeof body.actionScore === "number") patch.actionScore = String(body.actionScore);
-  if (typeof body.isEnabled === "boolean") patch.isEnabled = body.isEnabled;
-  if (typeof body.priority === "number") patch.priority = body.priority;
-  await repos.emailUserRules.patch(c.req.param("id"), uid, patch as any);
+  await patchEmailRule(uid, c.req.param("id"), body);
   return c.json(success({ success: true }));
 });
 
 emailIntegrationRoutes.delete("/rules/:id", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const repos = buildRepos(getDb());
-  await repos.emailUserRules.remove(c.req.param("id"), uid);
+  const uid = requireUser(c);
+  await removeEmailRule(uid, c.req.param("id"));
   return c.json(success({ success: true }));
 });
 
@@ -497,50 +158,9 @@ emailIntegrationRoutes.delete("/rules/:id", async (c) => {
 // surfaced below.
 
 emailIntegrationRoutes.get("/sync-runs", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const uid = requireUser(c);
   const limit = clampLimit(c.req.query("limit"), 10, 50);
-  const repos = buildRepos(getDb());
-  const [runs, accounts] = await Promise.all([
-    repos.emailSyncRuns.findRecentForUser(uid, limit),
-    repos.externalEmailAccounts.findAllForUser(uid),
-  ]);
-  // Join in the account label + provider so the Sync History UI can
-  // render without a second round-trip. The raw rows don't carry
-  // either field (the join lives at the read site, not the table).
-  const accountById = new Map(
-    accounts.map((a) => [a.id, { provider: a.provider, label: a.accountLabel?.trim() || a.accountEmail }]),
-  );
-  return c.json(
-    success(
-      runs.map((r) => {
-        const acct = accountById.get(r.accountId);
-        return {
-          id: r.id,
-          accountId: r.accountId,
-          accountLabel: acct?.label ?? null,
-          provider: acct?.provider ?? null,
-          startedAt:
-            r.startedAt instanceof Date ? r.startedAt.toISOString() : new Date(r.startedAt).toISOString(),
-          completedAt: r.completedAt
-            ? r.completedAt instanceof Date
-              ? r.completedAt.toISOString()
-              : new Date(r.completedAt).toISOString()
-            : null,
-          status: r.status,
-          messagesSynced: r.messagesSynced ?? 0,
-          messagesClassified: r.messagesClassified ?? 0,
-          messagesExcluded: r.messagesExcluded ?? 0,
-          messagesJobRelated: r.messagesJobRelated ?? 0,
-          jobsLinked: r.jobsLinked ?? 0,
-          jobsCreated: r.jobsCreated ?? 0,
-          rulesFired: (r.rulesFired ?? {}) as Record<string, number>,
-          digestSummary: r.digestSummary,
-          errorMessage: r.errorMessage,
-        };
-      }),
-    ),
-  );
+  return c.json(success(await listSyncRuns(uid, limit)));
 });
 
 // ── Inbox processors — profiles (#1979/#1983) ────────────────────────────────
@@ -548,194 +168,72 @@ emailIntegrationRoutes.get("/sync-runs", async (c) => {
 // users clone + edit owner-scoped copies. The builder UI reads/writes here.
 
 emailIntegrationRoutes.get("/profiles", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const repos = buildRepos(getDb());
-  const rows = await repos.inboxProfiles.listAvailableForOwner(uid);
-  // Decode to the runtime shape so the editor gets typed taxonomy/schema.
-  return c.json(success(rows.map((r) => rowToProfileShape(r))));
+  const uid = requireUser(c);
+  return c.json(success(await listInboxProfiles(uid)));
 });
 
 emailIntegrationRoutes.get("/profiles/:id", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const repos = buildRepos(getDb());
-  const row = await repos.inboxProfiles.findById(c.req.param("id"));
-  if (!row || (!row.isPreset && row.ownerId !== uid)) {
-    return c.json(error("NOT_FOUND", "Profile not found"), 404);
-  }
-  return c.json(success(rowToProfileShape(row)));
+  const uid = requireUser(c);
+  return c.json(success(await getInboxProfile(uid, c.req.param("id"))));
 });
 
 /** Clone a profile (preset or own) into an editable copy. */
 emailIntegrationRoutes.post("/profiles", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const uid = requireUser(c);
   const body = await c.req.json().catch(() => null);
-  if (!body || typeof body.sourceProfileId !== "string") {
-    return c.json(error("VALIDATION_ERROR", "Required: sourceProfileId"), 400);
-  }
-  const repos = buildRepos(getDb());
-  const cloned = await cloneProfile(repos, uid, body.sourceProfileId, {
-    name: typeof body.name === "string" ? body.name : undefined,
-  });
-  if (!cloned) return c.json(error("NOT_FOUND", "Source profile not found"), 404);
-  return c.json(success(rowToProfileShape(cloned)), 201);
+  return c.json(success(await cloneInboxProfile(uid, body)), 201);
 });
 
 emailIntegrationRoutes.patch("/profiles/:id", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const uid = requireUser(c);
   const body = await c.req.json().catch(() => ({}));
-  const patch: Record<string, unknown> = {};
-  if (typeof body.name === "string") patch.name = body.name.slice(0, 120);
-  if (typeof body.description === "string") patch.description = body.description;
-  if (Array.isArray(body.taxonomy)) patch.taxonomy = body.taxonomy;
-  if (typeof body.classifyPrompt === "string") patch.classifyPrompt = body.classifyPrompt;
-  if (typeof body.summaryPrompt === "string" || body.summaryPrompt === null) {
-    patch.summaryPrompt = body.summaryPrompt;
-  }
-  if (body.extractSchema === null || (body.extractSchema && typeof body.extractSchema === "object")) {
-    patch.extractSchema = body.extractSchema;
-  }
-  if (Array.isArray(body.roles)) patch.roles = body.roles;
-  if (typeof body.defaultRuleSet === "string" || body.defaultRuleSet === null) {
-    patch.defaultRuleSet = body.defaultRuleSet;
-  }
-  if (typeof body.minRelevanceScore === "number" && Number.isFinite(body.minRelevanceScore)) {
-    patch.minRelevanceScore = Math.max(0, Math.min(1, body.minRelevanceScore)).toFixed(3);
-  }
-  if (Object.keys(patch).length === 0) {
-    return c.json(error("VALIDATION_ERROR", "No supported fields in patch"), 400);
-  }
-  const repos = buildRepos(getDb());
-  const updated = await updateProfile(repos, uid, c.req.param("id"), patch);
-  if (!updated) return c.json(error("NOT_FOUND", "Profile not found or not editable"), 404);
-  return c.json(success(rowToProfileShape(updated)));
+  return c.json(success(await patchInboxProfile(uid, c.req.param("id"), body)));
 });
 
 emailIntegrationRoutes.delete("/profiles/:id", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const repos = buildRepos(getDb());
-  await deleteProfile(repos, uid, c.req.param("id"));
+  const uid = requireUser(c);
+  await removeInboxProfile(uid, c.req.param("id"));
   return c.json(success({ success: true }));
 });
 
 /** Dry-run preview — classify a sample of the last N synced messages
  *  under this profile WITHOUT persisting (guards a bad prompt). */
 emailIntegrationRoutes.post("/profiles/:id/dry-run", requirePro("Inbox Sync"), async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const uid = requireUser(c);
   const body = await c.req.json().catch(() => ({}));
-  const sampleSize = Math.min(20, Math.max(1, Number(body.sampleSize ?? 10) || 10));
-  const repos = buildRepos(getDb());
   const llm = createLLMClient(c.env, c.var.user);
-  const result = await dryRun({ repos, llm }, uid, c.req.param("id"), sampleSize);
-  if (!result) return c.json(error("NOT_FOUND", "Profile not found"), 404);
-  return c.json(success(result));
+  return c.json(success(await dryRunInboxProfile(llm, uid, c.req.param("id"), body)));
 });
 
 // ── Inbox processors — actions (#1981) ───────────────────────────────────────
 
 emailIntegrationRoutes.get("/profiles/:id/actions", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const repos = buildRepos(getDb());
-  const profile = await repos.inboxProfiles.findById(c.req.param("id"));
-  if (!profile || (!profile.isPreset && profile.ownerId !== uid)) {
-    return c.json(error("NOT_FOUND", "Profile not found"), 404);
-  }
-  const actions = await repos.inboxActions.findAllForProfile(c.req.param("id"));
-  return c.json(success(actions));
+  const uid = requireUser(c);
+  return c.json(success(await listProfileActions(uid, c.req.param("id"))));
 });
 
 emailIntegrationRoutes.post("/profiles/:id/actions", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const uid = requireUser(c);
   const body = await c.req.json().catch(() => null);
-  if (
-    !body ||
-    typeof body.name !== "string" ||
-    !INBOX_ACTION_TRIGGER_VALUES.includes(body.triggerType) ||
-    !INBOX_ACTION_HANDLER_VALUES.includes(body.handler)
-  ) {
-    return c.json(error("VALIDATION_ERROR", "Required: name, valid triggerType, valid handler"), 400);
-  }
-  const repos = buildRepos(getDb());
-  // Only the owner of a cloned profile may attach actions to it.
-  const profile = await repos.inboxProfiles.findById(c.req.param("id"));
-  if (!profile || profile.ownerId !== uid) {
-    return c.json(error("FORBIDDEN", "Can only add actions to your own profile"), 403);
-  }
-  const row = await repos.inboxActions.insert({
-    profileId: c.req.param("id"),
-    ownerId: uid,
-    name: body.name.slice(0, 120),
-    triggerType: body.triggerType,
-    triggerValue: typeof body.triggerValue === "string" ? body.triggerValue.slice(0, 120) : null,
-    handler: body.handler,
-    config: body.config && typeof body.config === "object" ? body.config : null,
-    isEnabled: body.isEnabled !== false,
-    priority: typeof body.priority === "number" ? body.priority : 100,
-  } as any);
-  return c.json(success(row), 201);
+  return c.json(success(await createProfileAction(uid, c.req.param("id"), body)), 201);
 });
 
 emailIntegrationRoutes.patch("/actions/:id", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const uid = requireUser(c);
   const body = await c.req.json().catch(() => ({}));
-  const patch: Record<string, unknown> = {};
-  if (typeof body.name === "string") patch.name = body.name.slice(0, 120);
-  if (INBOX_ACTION_TRIGGER_VALUES.includes(body.triggerType)) patch.triggerType = body.triggerType;
-  if (typeof body.triggerValue === "string" || body.triggerValue === null) {
-    patch.triggerValue = body.triggerValue;
-  }
-  if (INBOX_ACTION_HANDLER_VALUES.includes(body.handler)) patch.handler = body.handler;
-  if (body.config === null || (body.config && typeof body.config === "object")) patch.config = body.config;
-  if (typeof body.isEnabled === "boolean") patch.isEnabled = body.isEnabled;
-  if (typeof body.priority === "number") patch.priority = body.priority;
-  if (Object.keys(patch).length === 0) {
-    return c.json(error("VALIDATION_ERROR", "No supported fields in patch"), 400);
-  }
-  const repos = buildRepos(getDb());
-  const updated = await repos.inboxActions.patchOwned(c.req.param("id"), uid, patch as any);
-  if (!updated) return c.json(error("NOT_FOUND", "Action not found or not owned"), 404);
-  return c.json(success(updated));
+  return c.json(success(await patchProfileAction(uid, c.req.param("id"), body)));
 });
 
 emailIntegrationRoutes.delete("/actions/:id", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const repos = buildRepos(getDb());
-  await repos.inboxActions.removeOwned(c.req.param("id"), uid);
+  const uid = requireUser(c);
+  await removeProfileAction(uid, c.req.param("id"));
   return c.json(success({ success: true }));
 });
 
 // ── Inbox processors — action run audit (#1981 Sync-History surfacing) ───────
 
 emailIntegrationRoutes.get("/action-runs", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const uid = requireUser(c);
   const limit = clampLimit(c.req.query("limit"), 25, 100);
-  const repos = buildRepos(getDb());
-  const runs = await repos.inboxActionRuns.findRecentForUser(uid, limit);
-  return c.json(
-    success(
-      runs.map((r) => ({
-        id: r.id,
-        messageId: r.messageId,
-        actionId: r.actionId,
-        handler: r.handler,
-        status: r.status,
-        targetType: r.targetType,
-        targetId: r.targetId,
-        detail: r.detail,
-        createdAt:
-          r.createdAt instanceof Date ? r.createdAt.toISOString() : new Date(r.createdAt).toISOString(),
-      })),
-    ),
-  );
+  return c.json(success(await listActionRuns(uid, limit)));
 });
-

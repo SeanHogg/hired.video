@@ -9,7 +9,7 @@ import { Hono } from "hono";
 import { success, type AppEnv } from "../../types/index.js";
 import { deleteReview, editReview } from "../../services/reviews/reviewWrites.js";
 import { toReviewDto } from "../../services/reviews/reviewMappers.js";
-import { handleReviews, readJsonBody, viewerId } from "./http.js";
+import { handleReviews, readJsonBody } from "./http.js";
 
 export const reviewItemRoutes = new Hono<AppEnv>();
 
@@ -26,7 +26,7 @@ reviewItemRoutes.put("/:reviewId", (c) =>
 
 reviewItemRoutes.delete("/:reviewId", (c) =>
   handleReviews(c, async () => {
-    await deleteReview({ viewerId: viewerId(c), reviewId: c.req.param("reviewId") });
+    await deleteReview({ viewerId: c.var.userId, reviewId: c.req.param("reviewId") });
     return c.json(success({ deleted: true }), 200);
   }),
 );

@@ -10,7 +10,7 @@
  * Every handler is best-effort: ingestion never fails the client, so the
  * dispatcher swallows handler errors and only counts accepted / rejected.
  */
-import type { ZodTypeAny } from "zod";
+import type { ZodType } from "zod";
 import {
   ANALYTICS_EVENT_SCHEMAS,
   MAX_ANALYTICS_EVENTS_PER_REQUEST,
@@ -43,7 +43,7 @@ export interface AnalyticsRequestContext {
 }
 
 interface EventKindDef<K extends AnalyticsEventKind> {
-  schema: ZodTypeAny;
+  schema: ZodType<AnalyticsEventOf<K>>;
   handle(event: AnalyticsEventOf<K>, ctx: AnalyticsRequestContext): Promise<void>;
 }
 

@@ -10,9 +10,10 @@ import {
   CreateSubmissionSchema,
   UpdateSubmissionSchema,
 } from "../../domains/scorecards/schemas.js";
-import { mapServiceError, requireUser } from "../helpers/routerHelpers.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 import type { ScorecardsService } from "../../domains/scorecards/scorecardsService.js";
 import { withGamification } from "../../domains/gamification/with-gamification.js";
+import { validateJson } from "../helpers/validate.js";
 
 export function submissionRoutes(
   service: () => ScorecardsService,
@@ -20,82 +21,51 @@ export function submissionRoutes(
   const r = new Hono<AppEnv>();
 
   r.get("/", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
+    const userId = requireUser(c);
     const applicationId = c.req.query("applicationId") || undefined;
     const interviewId = c.req.query("interviewId") || undefined;
-    try {
-      return c.json(
-        success(
-          await service().listSubmissions(auth.userId, { applicationId, interviewId }),
-        ),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    return c.json(
+      success(
+        await service().listSubmissions(userId, { applicationId, interviewId }),
+      ),
+    );
   });
 
   r.get("/:id", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    try {
-      return c.json(
-        success(await service().getSubmission(auth.userId, c.req.param("id"))),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    const userId = requireUser(c);
+    return c.json(
+      success(await service().getSubmission(userId, c.req.param("id"))),
+    );
   });
 
-  r.post("/", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = CreateSubmissionSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(
-        success(await service().createSubmission(auth.userId, parsed.data)),
-        201,
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+  r.post("/", validateJson(CreateSubmissionSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(
+      success(await service().createSubmission(userId, body)),
+      201,
+    );
   });
 
-  r.patch("/:id", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = UpdateSubmissionSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(
-        success(
-          await service().updateSubmission(auth.userId, c.req.param("id"), parsed.data),
-        ),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+  r.patch("/:id", validateJson(UpdateSubmissionSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(
+      success(
+        await service().updateSubmission(userId, c.req.param("id"), body),
+      ),
+    );
   });
 
   r.post("/:id/submit", async (c) => {
     const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    try {
-      const result = await service().submitSubmission(auth.userId, c.req.param("id"));
-      // #1118 — award the interviewer for completing a scorecard. RefId = the
-      // submission id keeps it idempotent across resubmits. Best-effort.
-      await withGamification(c, "scorecard-completed", (game, role, uidEarner) =>
-        game.onScorecardCompleted({ userId: uidEarner, role, scorecardId: c.req.param("id") }),
-      );
-      return c.json(success(result));
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    const result = await service().submitSubmission(auth, c.req.param("id"));
+    // #1118 — award the interviewer for completing a scorecard. RefId = the
+    // submission id keeps it idempotent across resubmits. Best-effort.
+    await withGamification(c, "scorecard-completed", (game, role, uidEarner) =>
+      game.onScorecardCompleted({ userId: uidEarner, role, scorecardId: c.req.param("id") }),
+    );
+    return c.json(success(result));
   });
 
   return r;
@@ -107,17 +77,12 @@ export function debriefRoutes(
   const r = new Hono<AppEnv>();
 
   r.get("/", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
+    const userId = requireUser(c);
     const applicationId = c.req.query("applicationId");
     if (!applicationId) {
       return c.json(error("VALIDATION_ERROR", "applicationId required"), 400);
     }
-    try {
-      return c.json(success(await service().getDebrief(auth.userId, applicationId)));
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    return c.json(success(await service().getDebrief(userId, applicationId)));
   });
 
   return r;

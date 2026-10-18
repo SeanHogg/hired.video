@@ -1,38 +1,13 @@
 /**
  * What more than one article sub-router uses (#2312 split of
- * routes/articles.ts): the request's user id, the read-time estimate, the
- * creator enrollment read, the moderation classifier gate, the request
- * schemas and the public-card mapper.
+ * routes/articles.ts): the moderation classifier gate, the request
+ * schemas and the public-card mapper. (Enrollment + read-time live in
+ * services/articles/authoring.ts.)
  */
-import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { getDb, schema } from "../../db/index.js";
-import { ARTICLE_KINDS } from "../../db/schema/articles.js";
+import { ARTICLE_KINDS, type PublicArticleCardRow } from "../../repositories/articlesRepository.js";
 import { createLLMClient } from "../../services/adapters/llm-client.js";
 import { classifyArticle, gateForSeverity } from "../../services/articles/moderation-classifier.js";
-
-const { articles, creatorProfiles } = schema;
-
-export async function getArticlesEnrollment(db: ReturnType<typeof getDb>, userId: string) {
-  const [row] = await db.select()
-    .from(creatorProfiles)
-    .where(and(
-      eq(creatorProfiles.userId, userId),
-      sql`${creatorProfiles.endedAt} IS NULL`,
-      eq(creatorProfiles.articlesActive, true),
-    ))
-    .limit(1);
-  return row ?? null;
-}
-
-export function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
-
-export function readMinutes(bodyMd: string): number {
-  const words = bodyMd.trim().split(/\s+/).filter(Boolean).length;
-  return Math.max(1, Math.ceil(words / 225));
-}
 
 /**
  * Run the article moderation/quality classifier (#175) and compute the
@@ -76,15 +51,10 @@ export const UpdateArticleSchema = CreateArticleSchema.partial().extend({
   slug: z.string().regex(/^[a-z0-9-]+$/).max(80).optional(),
 });
 
-
 // ---------------------------------------------------------------------------
 // Shared row → public card mapper (used by /public + /public/by-user).
 // ---------------------------------------------------------------------------
-export function toPublicCard(r: {
-  article: typeof articles.$inferSelect;
-  author: { id: string; name: string | null; isSystem: boolean };
-  authorProfile: { avatarUrl: string | null; customUrlSlug: string | null } | null;
-}) {
+export function toPublicCard(r: PublicArticleCardRow) {
   return {
     id: r.article.id,
     type: "article" as const,

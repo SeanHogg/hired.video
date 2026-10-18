@@ -3,7 +3,7 @@
 /**
  * VersionHistoryDialog — gap #131 frontend.
  *
- * Lists `studio_project_versions` rows for the current project (autosaves
+ * Lists the project's `entity_versions` rows (studio_project; autosaves
  * + manual snapshots). Restoring a version calls
  * `POST /projects/:id/versions/:vid/restore` and rehydrates the storyboard
  * via `onRestore` so StudioLayout re-renders without a page refresh.

@@ -12,7 +12,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { scoreOne } from "../bulk-scoring.js";
+import { scoreOne } from "../../services/recruit/bulk-scoring.js";
 
 const DEFAULT_WEIGHTS = { skill: 70, title: 20, description: 10 };
 

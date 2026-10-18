@@ -7,8 +7,6 @@
  *   • levenshteinDistance        — classic edit distance
  *   • levenshteinRatio           — 0-1 similarity on normalised strings
  *   • mergeHighlights            — union of bullets, de-duplicated
- *   • mergeKeywords              — union of keywords, de-duplicated
- *   • computeHighlightDiff       — counts onlyInSource / onlyInTarget / shared
  *
  * These are the deterministic parts of the merge pipeline that the UI
  * uses to drive its auto/manual/skip decisions. AI-backed paths live in
@@ -25,8 +23,6 @@ import {
   levenshteinDistance,
   levenshteinRatio,
   mergeHighlights,
-  mergeKeywords,
-  computeHighlightDiff,
 } from "../resume/merge.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -108,7 +104,7 @@ describe("levenshteinRatio", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// mergeHighlights / mergeKeywords
+// mergeHighlights
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("mergeHighlights", () => {
@@ -133,63 +129,5 @@ describe("mergeHighlights", () => {
     assert.ok(merged.includes("a"));
     assert.ok(merged.includes("b"));
     assert.equal(merged.length, 2);
-  });
-});
-
-describe("mergeKeywords", () => {
-  it("union of keywords, de-duplicated", () => {
-    const merged = mergeKeywords(["AWS", "React"], ["React", "Node.js"]);
-    assert.equal(new Set(merged).size, merged.length, "no duplicates");
-    assert.ok(merged.includes("AWS"));
-    assert.ok(merged.includes("React"));
-    assert.ok(merged.includes("Node.js"));
-  });
-
-  it("returns empty array when both sides are empty", () => {
-    assert.deepEqual(mergeKeywords([], []), []);
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// computeHighlightDiff
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("computeHighlightDiff", () => {
-  // Signature is (sourceItem, targetItem) — takes section items and looks
-  // up `.highlights` internally. This matches how the merge analyser
-  // drives the UI's per-entry bullet diff.
-
-  it("counts only-in-source, only-in-target, and shared bullets", () => {
-    const diff = computeHighlightDiff(
-      { highlights: ["a", "b", "c"] },
-      { highlights: ["b", "c", "d"] },
-    );
-    // "a" is only in source, "d" is only in target, "b" and "c" are shared.
-    assert.equal(diff.onlyInSource, 1);
-    assert.equal(diff.onlyInTarget, 1);
-    assert.equal(diff.shared, 2);
-  });
-
-  it("handles empty / missing highlights arrays", () => {
-    assert.deepEqual(computeHighlightDiff({}, {}), { onlyInSource: 0, onlyInTarget: 0, shared: 0 });
-    assert.deepEqual(
-      computeHighlightDiff({ highlights: ["a"] }, {}),
-      { onlyInSource: 1, onlyInTarget: 0, shared: 0 },
-    );
-    assert.deepEqual(
-      computeHighlightDiff({}, { highlights: ["a"] }),
-      { onlyInSource: 0, onlyInTarget: 1, shared: 0 },
-    );
-  });
-
-  it("tolerates null/undefined items (robustness at merge boundaries)", () => {
-    assert.deepEqual(
-      computeHighlightDiff(null, null),
-      { onlyInSource: 0, onlyInTarget: 0, shared: 0 },
-    );
-    assert.deepEqual(
-      computeHighlightDiff(undefined, { highlights: ["a"] }),
-      { onlyInSource: 0, onlyInTarget: 1, shared: 0 },
-    );
   });
 });

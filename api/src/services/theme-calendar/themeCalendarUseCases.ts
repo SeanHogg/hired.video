@@ -15,17 +15,26 @@ import { localToday } from "../../../../shared/theme-calendar/dates.js";
 import { missingYearlyDates } from "../../../../shared/theme-calendar/pick.js";
 import type { ThemeEvent, ThemeEventDate, ThemeEventInput } from "../../../../shared/theme-calendar/event.js";
 import * as repo from "./themeCalendarRepository.js";
+import { DomainError } from "../../domains/errors.js";
 
 const PUBLIC_KEY = "theme-calendar:v1:events";
 /** Backstop only — every write invalidates. */
 const PUBLIC_TTL_SECONDS = 3600;
 
-export class ThemeCalendarError extends Error {
-  constructor(
-    readonly code: "NOT_FOUND" | "SLUG_TAKEN" | "NOT_A_TABLE_EVENT" | "BUILTIN_DELETE",
-    message: string,
-  ) {
-    super(message);
+type ThemeCalendarErrorCode = "NOT_FOUND" | "SLUG_TAKEN" | "NOT_A_TABLE_EVENT" | "BUILTIN_DELETE";
+
+const THEME_CALENDAR_ERROR_STATUS: Record<ThemeCalendarErrorCode, 400 | 404 | 409> = {
+  NOT_FOUND: 404,
+  SLUG_TAKEN: 409,
+  NOT_A_TABLE_EVENT: 400,
+  BUILTIN_DELETE: 409,
+};
+
+export class ThemeCalendarError extends DomainError {
+  declare readonly code: ThemeCalendarErrorCode;
+  constructor(code: ThemeCalendarErrorCode, message: string) {
+    super(THEME_CALENDAR_ERROR_STATUS[code], code, message);
+    this.name = "ThemeCalendarError";
   }
 }
 

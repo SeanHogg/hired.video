@@ -16,13 +16,12 @@ import {
   PROMOTION_DESCRIPTION_MAX,
   PROMOTION_TITLE_MAX,
 } from "../../../shared/promotions.js";
-import { WorkspaceForbiddenError } from "../services/studio/workspace.js";
 import { socialConnectionServiceFor } from "../services/social/social-connection-factory.js";
 import {
   listProjectPromotions,
   submitForPromotion,
 } from "../services/promotions/promotionUseCases.js";
-import { promotionErrorResponse } from "./promotion-errors.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const promotionRoutes = new Hono<AppEnv>();
 
@@ -35,30 +34,19 @@ const SubmitSchema = z.object({
   variantVideoId: UuidLikeSchema.optional(),
 });
 
-promotionRoutes.post("/", async (c) => {
-  const parsed = SubmitSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid submission", parsed.error.flatten()), 400);
-  try {
-    const submission = await submitForPromotion({ actorUserId: c.var.user.sub, ...parsed.data, env: c.env });
-    return c.json(success(submission), 201);
-  } catch (err) {
-    if (err instanceof WorkspaceForbiddenError) return c.json(error("FORBIDDEN", err.message), 403);
-    return promotionErrorResponse(c, err);
-  }
+promotionRoutes.post("/", validateJson(SubmitSchema, (e) => error("VALIDATION_ERROR", "Invalid submission", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  const submission = await submitForPromotion({ actorUserId: c.var.userId, ...body, env: c.env });
+  return c.json(success(submission), 201);
 });
 
 promotionRoutes.get("/project/:projectId", async (c) => {
   const projectId = c.req.param("projectId");
   if (!UuidLikeSchema.safeParse(projectId).success) return c.json(error("VALIDATION_ERROR", "Invalid project id"), 400);
-  try {
-    const social = socialConnectionServiceFor(c.env);
-    const [submissions, ready] = await Promise.all([
-      listProjectPromotions({ actorUserId: c.var.user.sub, projectId, env: c.env }),
-      Promise.all(PROMOTION_PLATFORMS.map(async (platform) => ({ platform, ready: await social.isManagedLaneReady(platform) }))),
-    ]);
-    return c.json(success({ submissions, platforms: ready }));
-  } catch (err) {
-    if (err instanceof WorkspaceForbiddenError) return c.json(error("FORBIDDEN", err.message), 403);
-    return promotionErrorResponse(c, err);
-  }
+  const social = socialConnectionServiceFor(c.env);
+  const [submissions, ready] = await Promise.all([
+    listProjectPromotions({ actorUserId: c.var.userId, projectId, env: c.env }),
+    Promise.all(PROMOTION_PLATFORMS.map(async (platform) => ({ platform, ready: await social.isManagedLaneReady(platform) }))),
+  ]);
+  return c.json(success({ submissions, platforms: ready }));
 });

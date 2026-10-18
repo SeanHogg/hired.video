@@ -91,7 +91,7 @@ const captcha = buildCaptcha();
 /** Extract the caller's IP from common proxy headers, in priority order:
  *  CF-Connecting-IP (Cloudflare), then the first hop in X-Forwarded-For.
  *  Returns null when neither is present (direct/local requests). */
-function extractClientIp(c: any): string | null {
+export function extractClientIp(c: any): string | null {
   if (!c?.req?.header) return null;
   const cf = c.req.header("CF-Connecting-IP");
   if (cf) return cf.trim();
@@ -103,7 +103,7 @@ function extractClientIp(c: any): string | null {
   return null;
 }
 
-function extractUserAgent(c: any): string | null {
+export function extractUserAgent(c: any): string | null {
   if (!c?.req?.header) return null;
   const ua = c.req.header("User-Agent");
   return ua ? ua.slice(0, 1024) : null; // cap so a hostile UA can't blow the row size

@@ -53,7 +53,3 @@ taxReportingRoutes.get("/tax-year/:year.csv", adminMiddleware, async (c) => {
     return c.text(msg, 500);
   }
 });
-
-taxReportingRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Tax reporting route not found" } }, 404),
-);

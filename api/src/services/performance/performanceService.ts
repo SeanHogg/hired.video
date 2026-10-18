@@ -6,15 +6,16 @@
  */
 
 import { DomainError } from "../../domains/errors.js";
+import { getDb } from "../../db/index.js";
 import { rollupGoalProgress } from "../../domains/people-ops/peopleOpsService.js";
 import { GOAL_STATUSES, type GoalStatus, type KeyResult, type ReviewGoal } from "../../../../shared/people-ops.js";
-import type {
+import {
   PerformanceRepository,
-  CycleRow,
-  GoalPatch,
-  PerformanceGoalDto,
-  PerformanceReviewDto,
-  RosterRef,
+  type CycleRow,
+  type GoalPatch,
+  type PerformanceGoalDto,
+  type PerformanceReviewDto,
+  type RosterRef,
 } from "../../repositories/performanceRepository.js";
 
 export interface CreateCycleInput {
@@ -241,4 +242,9 @@ export class PerformanceService {
       revieweeResponse: typeof response === "string" ? response.slice(0, 5000) : undefined,
     });
   }
+}
+
+/** Production wiring: a service over the request-scoped db handle. */
+export function performanceService(): PerformanceService {
+  return new PerformanceService(new PerformanceRepository(getDb()));
 }

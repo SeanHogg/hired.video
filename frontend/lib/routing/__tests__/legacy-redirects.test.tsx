@@ -3,7 +3,7 @@
  * the studio (route tests over the ONE redirect table), and the retired form
  * pages + components are gone.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -71,8 +71,13 @@ describe("legacy route redirects", () => {
     expect(studioNewEntityHref("company")).toBe(STUDIO_NEW_COMPANY_PATH);
   });
 
-  it("App.tsx mounts the table and no longer routes the retired pages", () => {
-    const app = readFileSync(resolve(FRONTEND, "App.tsx"), "utf8");
+  it("the route table mounts the legacy table and no longer routes the retired pages", () => {
+    // The route table lives in routes/*.tsx (composed by routes/index.tsx).
+    const routesDir = resolve(FRONTEND, "routes");
+    const app = readdirSync(routesDir)
+      .filter((name) => name.endsWith(".tsx"))
+      .map((name) => readFileSync(resolve(routesDir, name), "utf8"))
+      .join("\n");
     expect(app).toContain("LEGACY_REDIRECTS.map");
     for (const row of LEGACY_REDIRECTS) expect(app, row.path).not.toContain(`path="${row.path}"`);
   });

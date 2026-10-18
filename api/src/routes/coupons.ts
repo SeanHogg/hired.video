@@ -12,7 +12,7 @@ import { RedeemCouponSchema } from "../../../shared/coupons.js";
 import { createIpRateLimiter, getClientIp } from "../middleware/rateLimiter.js";
 import { buildCouponDeps } from "../services/coupons/couponDeps.js";
 import { redeemCoupon } from "../services/coupons/couponUseCases.js";
-import { couponErrorResponse } from "./coupon-errors.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const couponRoutes = new Hono<AppEnv>();
 
@@ -25,13 +25,8 @@ const redeemLimiter = createIpRateLimiter({
   keyOf: (c) => `coupon:${(c.get("user") as { sub?: string } | undefined)?.sub ?? getClientIp(c)}`,
 });
 
-couponRoutes.post("/redeem", redeemLimiter, async (c) => {
-  const parsed = RedeemCouponSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json(error("INVALID_CODE", "That code isn't valid"), 400);
-  try {
-    const result = await redeemCoupon(buildCouponDeps(), { userId: c.var.user.sub, isGuest: Boolean(c.var.user.guest), code: parsed.data.code });
-    return c.json(success(result));
-  } catch (err) {
-    return couponErrorResponse(c, err);
-  }
+couponRoutes.post("/redeem", redeemLimiter, validateJson(RedeemCouponSchema, () => error("INVALID_CODE", "That code isn't valid"), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  const result = await redeemCoupon(buildCouponDeps(), { userId: c.var.userId, isGuest: Boolean(c.var.user.guest), code: body.code });
+  return c.json(success(result));
 });

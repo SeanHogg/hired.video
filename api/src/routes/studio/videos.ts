@@ -13,28 +13,24 @@ import {
   listResumeRail,
   listUserRail,
 } from "../../services/studio/video-catalog.js";
-import { actorId, ok, studioErrorResponse } from "./http.js";
+import { success } from "../../types/index.js";
 
 export const studioVideoRoutes = new Hono<AppEnv>();
 
 studioVideoRoutes.get("/videos/user/:userId", async (c) => {
-  return c.json(ok(await listUserRail(c.req.param("userId"), actorId(c))));
+  return c.json(success(await listUserRail(c.req.param("userId"), c.var.userId)));
 });
 
 studioVideoRoutes.get("/videos/resume/:resumeId", async (c) => {
-  return c.json(ok(await listResumeRail(c.req.param("resumeId"), actorId(c))));
+  return c.json(success(await listResumeRail(c.req.param("resumeId"), c.var.userId)));
 });
 
 studioVideoRoutes.get("/videos/featured", async (c) => {
-  return c.json(ok(await listFeaturedVideos()));
+  return c.json(success(await listFeaturedVideos()));
 });
 
 studioVideoRoutes.get("/videos/:videoId/embed", async (c) => {
   const width = Number(c.req.query("width") ?? 640);
   const height = Number(c.req.query("height") ?? 360);
-  try {
-    return c.json(ok(await buildVideoEmbed(c.req.param("videoId"), width, height)));
-  } catch (e) {
-    return studioErrorResponse(c, e);
-  }
+  return c.json(success(await buildVideoEmbed(c.req.param("videoId"), width, height)));
 });

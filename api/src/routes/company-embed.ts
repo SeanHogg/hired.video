@@ -15,7 +15,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
 import { requireCompanyOwner } from "../services/company/companyOwnership.js";
 import {
   listEmbedKeys,
@@ -23,9 +22,11 @@ import {
   revokeEmbedKey,
   rotateEmbedKey,
   buildEmbedSnippet,
+  getCompanyEmbedSettings,
+  setCompanyEmbedEnabled,
 } from "../services/company/embed.js";
 import { EMBED_VIEWS, EMBED_VIEW_KEYS, EMBED_ROADMAP } from "../../../shared/embed.js";
-import { eq } from "drizzle-orm";
+import { validateJson } from "./helpers/validate.js";
 
 export const companyEmbedRoutes = new Hono<AppEnv>();
 
@@ -43,12 +44,7 @@ companyEmbedRoutes.get("/", async (c) => {
   if (denied) return denied;
   const companyId = access!.companyId;
 
-  const db = getDb();
-  const [company] = await db
-    .select({ slug: schema.companyProfiles.slug, embedEnabled: schema.companyProfiles.embedEnabled })
-    .from(schema.companyProfiles)
-    .where(eq(schema.companyProfiles.id, companyId))
-    .limit(1);
+  const company = await getCompanyEmbedSettings(companyId);
 
   const slugOrId = company?.slug || companyId;
   const keys = await listEmbedKeys(companyId);
@@ -69,39 +65,30 @@ companyEmbedRoutes.get("/", async (c) => {
 });
 
 /** PATCH — toggle embedding on/off. */
-companyEmbedRoutes.patch("/", async (c) => {
+companyEmbedRoutes.patch("/", validateJson(z.object({ enabled: z.boolean() }), () => error("VALIDATION_ERROR", "Invalid body"), { emptyBody: null }), async (c) => {
   const { denied, access } = await requireCompanyOwner(c, c.req.param("companyId"));
   if (denied) return denied;
-  const body = await c.req.json().catch(() => null);
-  const parsed = z.object({ enabled: z.boolean() }).safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid body"), 400);
+  const body = c.req.valid("json");
 
-  const db = getDb();
-  await db
-    .update(schema.companyProfiles)
-    .set({ embedEnabled: parsed.data.enabled, updatedAt: new Date() })
-    .where(eq(schema.companyProfiles.id, access!.companyId));
-  return c.json(success({ enabled: parsed.data.enabled }));
+  await setCompanyEmbedEnabled(access!.companyId, body.enabled);
+  return c.json(success({ enabled: body.enabled }));
 });
 
 /** POST keys — mint a key; full plaintext returned ONCE. */
-companyEmbedRoutes.post("/keys", async (c) => {
+companyEmbedRoutes.post("/keys", validateJson(CreateKeySchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
   const { denied, access } = await requireCompanyOwner(c, c.req.param("companyId"));
   if (denied) return denied;
-  const userId = c.var.user!.sub;
-  const parsed = CreateKeySchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-  }
+  const userId = c.var.userId;
+  const body = c.req.valid("json");
   // Default scope = all views if none specified.
-  const scopes = parsed.data.scopes.length ? parsed.data.scopes : EMBED_VIEWS.map((v) => v.scope);
+  const scopes = body.scopes.length ? body.scopes : EMBED_VIEWS.map((v) => v.scope);
   const { key, view } = await createEmbedKey({
     companyId: access!.companyId,
-    label: parsed.data.label,
+    label: body.label,
     scopes,
-    allowedOrigins: parsed.data.allowedOrigins,
+    allowedOrigins: body.allowedOrigins,
     createdBy: userId,
-    expiresInDays: parsed.data.expiresInDays ?? null,
+    expiresInDays: body.expiresInDays ?? null,
   });
   // The full key is returned exactly once.
   return c.json(success({ key, keyInfo: view }), 201);
@@ -112,7 +99,7 @@ companyEmbedRoutes.post("/keys", async (c) => {
 companyEmbedRoutes.post("/keys/:keyId/rotate", async (c) => {
   const { denied, access } = await requireCompanyOwner(c, c.req.param("companyId"));
   if (denied) return denied;
-  const userId = c.var.user!.sub;
+  const userId = c.var.userId;
   const body = await c.req.json().catch(() => ({}));
   const expiresInDays =
     typeof body?.expiresInDays === "number" && body.expiresInDays > 0 ? body.expiresInDays : null;

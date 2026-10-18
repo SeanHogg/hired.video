@@ -9,9 +9,9 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createYouTubePublisher, createYouTubeViewReader, youtubeTitle } from "../publishers/youtube.js";
+import { createYouTubeMetricsReader, createYouTubePublisher, youtubeTitle } from "../publishers/youtube.js";
 import { SOCIAL_VIDEO_PUBLISHERS, SOCIAL_VIEW_READERS } from "../publishers/index.js";
-import { SocialPublishError } from "../publishers/types.js";
+import { SocialPublishError, viewsOf } from "../publishers/types.js";
 import { VIDEO_PUBLISH_PLATFORMS } from "../../../../../shared/social-platforms.js";
 
 // ── Recorded responses (shape of videos.insert / videos.list / error envelopes) ──
@@ -177,7 +177,7 @@ describe("YouTube view reader", () => {
       { match: "youtube/v3/videos?part=statistics", body: STATS_OK },
       { match: "youtube/v3/videos?part=statistics", body: { items: [] } },
     ]);
-    const views = await createYouTubeViewReader({ fetch })("tok", ids);
+    const views = await viewsOf(createYouTubeMetricsReader({ fetch }))("tok", ids);
     assert.equal(calls.length, 2);
     assert.equal(views.get("Ks-_Mh1QhMc"), 1234);
     assert.equal(views.get("a1b2c3d4e5F"), 0);

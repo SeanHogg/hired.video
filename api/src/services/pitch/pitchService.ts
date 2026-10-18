@@ -31,12 +31,21 @@ import {
   type IPitchRepository,
   type ProfilePitchRow,
 } from "../../repositories/pitchRepository.js";
+import { DomainError } from "../../domains/errors.js";
 
 export type PitchErrorCode = "NOT_FOUND" | "FORBIDDEN" | "NOT_A_PITCH" | "NO_MEDIA";
 
-export class PitchError extends Error {
-  constructor(public readonly code: PitchErrorCode, message: string) {
-    super(message);
+const PITCH_ERROR_STATUS: Record<PitchErrorCode, 400 | 403 | 404 | 409> = {
+  NOT_FOUND: 404,
+  FORBIDDEN: 403,
+  NOT_A_PITCH: 400,
+  NO_MEDIA: 409,
+};
+
+export class PitchError extends DomainError {
+  declare readonly code: PitchErrorCode;
+  constructor(code: PitchErrorCode, message: string) {
+    super(PITCH_ERROR_STATUS[code], code, message);
     this.name = "PitchError";
   }
 }
@@ -212,6 +221,24 @@ export async function clearCurrentPitch(
   repo: IPitchRepository = defaultPitchRepository(),
 ): Promise<void> {
   await repo.clearCurrent(userId);
+}
+
+/** PUT /api/video-pitch/current — set (or with `null`, clear) the user's
+ *  current pitch, then bust every cache that embeds it (the partner payload
+ *  is read-through cached). Returns the new summary, or null when cleared. */
+export async function updateCurrentPitch(
+  userId: string,
+  projectId: string | null,
+  repo: IPitchRepository = defaultPitchRepository(),
+): Promise<PitchSummary | null> {
+  if (projectId === null) {
+    await clearCurrentPitch(userId, repo);
+    await invalidatePitchCaches(userId);
+    return null;
+  }
+  const pitch = await setCurrentPitch(userId, projectId, repo);
+  await invalidatePitchCaches(userId);
+  return pitch;
 }
 
 // ─── Cache invalidation (#2133 / #2391) ─────────────────────────────────────

@@ -13,7 +13,7 @@
 export interface FraudInput {
   userId: string;
   /** Closed user-generated tasks per minute, last 30 minutes. The
-   *  caller pre-aggregates from `pointsLedger` rows where
+   *  caller pre-aggregates from points ledger (wallet_ledger) rows where
    *  action='task.complete.user'. */
   recentUserTaskClosesPerMinute: number[];
   /** Total user-generated tasks closed in the last hour. */

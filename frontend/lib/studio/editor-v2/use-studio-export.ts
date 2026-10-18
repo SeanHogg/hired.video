@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { MediaKind } from "@shared/media-kinds";
+import { mediaKindIsDocument, mediaKindIsGame, mediaKindIsPrimaryVideo, type MediaKind } from "@shared/media-kinds";
 import { useToast } from "@/hooks/use-toast";
 import type { StudioProject } from "@/lib/services/studio-service";
 import { shouldShowBranding } from "@/lib/studio/branding-policy";
@@ -153,7 +153,7 @@ export function useStudioExport({
     }
     // Document export is a browser print → Save as PDF of the read-only
     // DocumentView (#1912), not a Blob render — "preview === render === print".
-    if (currentMediaKind === "document") {
+    if (mediaKindIsDocument(currentMediaKind)) {
       const ok = await exportDocument(documentState, documentEntityContent, title, printDocument);
       if (!ok) {
         toast({
@@ -194,7 +194,7 @@ export function useStudioExport({
         // user needs to pick a game template before export means
         // anything. Other null returns mean "nothing to export"
         // (empty timeline / no image canvas yet) and stay silent.
-        if (currentMediaKind === "game" && !gameState) {
+        if (mediaKindIsGame(currentMediaKind) && !gameState) {
           toast({
             title: t("studio.editor.saveProjectFirstTitle"),
             description: t("studio.editor.saveProjectFirstGameDesc"),
@@ -293,7 +293,7 @@ export function useStudioExport({
   /** What a fitted cut (#2045) renders from: the live canvas with the
    *  master's branding and campaign. Null for kinds that post no video. */
   function variantSource(): VariantSource | null {
-    if (currentMediaKind !== "video") return null;
+    if (!mediaKindIsPrimaryVideo(currentMediaKind)) return null;
     return { state, includeBranding: shouldShowBranding({ isPro, removeBrandingFlag: removeBranding }), campaign };
   }
 

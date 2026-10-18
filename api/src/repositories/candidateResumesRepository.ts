@@ -54,6 +54,19 @@ export async function findCandidateResumesByIds(ids: string[]): Promise<Candidat
   return getDb().select().from(candidateResumes).where(inArray(candidateResumes.id, ids));
 }
 
+/** {id,label,content} for the given ids, restricted to `companyIds`
+ *  (bulk scoring reads only the caller's own companies' résumés). */
+export async function findCandidateResumeContentsForCompanies(
+  ids: string[],
+  companyIds: string[],
+): Promise<Array<Pick<CandidateResumeRow, "id" | "label" | "content">>> {
+  if (ids.length === 0 || companyIds.length === 0) return [];
+  return getDb()
+    .select({ id: candidateResumes.id, label: candidateResumes.label, content: candidateResumes.content })
+    .from(candidateResumes)
+    .where(and(inArray(candidateResumes.id, ids), inArray(candidateResumes.companyId, companyIds)));
+}
+
 export async function insertCandidateResume(values: CandidateResumeInsert): Promise<CandidateResumeRow> {
   const [row] = await getDb().insert(candidateResumes).values(values).returning();
   return row;

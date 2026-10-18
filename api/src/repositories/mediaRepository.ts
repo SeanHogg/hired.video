@@ -10,9 +10,10 @@
  * hosts" with similar storage/visibility semantics.
  */
 
-import { and, desc, eq, ne, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, isNotNull, ne, sql, type SQL } from "drizzle-orm";
 import { schema } from "../db/index.js";
 import { isNotRenderVariant } from "./renderVariantRepository.js";
+import { syncFeedPostHashtags } from "./feedPostTagsRepository.js";
 import { invalidatePublicVideoFeed } from "../services/studio/public-video-feed.js";
 
 const {
@@ -96,6 +97,16 @@ export interface IMediaRepository
 
 export class MediaRepository implements IMediaRepository {
   constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}
+
+  /** Video résumés — the user's videos attached to one of their résumés
+   *  (association lives on videos.resumeId; render variants excluded). */
+  async countResumeVideosForUser(userId: string): Promise<number> {
+    const [row] = await this.db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(videos)
+      .where(and(eq(videos.userId, userId), isNotNull(videos.resumeId), isNotRenderVariant(videos.id)));
+    return Number(row?.n ?? 0);
+  }
 
   // ── videos ────────────────────────────────────────────────────────────────
 
@@ -270,6 +281,7 @@ export class MediaRepository implements IMediaRepository {
 
   async insertFeedPost(input: FeedPostInsert): Promise<FeedPostRow> {
     const [row] = await this.db.insert(feedPosts).values(input as any).returning();
+    if (input.tags !== undefined) await syncFeedPostHashtags(this.db, row, row.tags);
     return row as FeedPostRow;
   }
 

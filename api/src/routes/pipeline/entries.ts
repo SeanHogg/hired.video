@@ -29,6 +29,8 @@ import * as pipelineService from "../../services/pipeline/PipelineService.js";
 import { withGamification } from "../../domains/gamification/with-gamification.js";
 import { cacheMiddleware } from "../../utils/cache-headers.js";
 import { etagMiddleware } from "../../utils/etag.js";
+import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const pipelineEntryRoutes = new Hono<AppEnv>();
 
@@ -97,8 +99,7 @@ async function loadOwnedEntry(
 // GET /?jobId=&stage= — the board, grouped by stage
 // ---------------------------------------------------------------------------
 pipelineEntryRoutes.get("/", async (c) => {
-  const userId = c.var.user?.sub as string | undefined;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
 
   const parsed = ListQuerySchema.safeParse({ stage: c.req.query("stage"), jobId: c.req.query("jobId") });
   if (!parsed.success) {
@@ -128,17 +129,14 @@ pipelineEntryRoutes.get("/", async (c) => {
 // ---------------------------------------------------------------------------
 // POST / — add a candidate (manual sourcing)
 // ---------------------------------------------------------------------------
-pipelineEntryRoutes.post("/", async (c) => {
-  const parsed = AddEntrySchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid pipeline entry", parsed.error.flatten()), 400);
-  }
-  const { denied } = await requireJobOwner(c, parsed.data.jobId);
+pipelineEntryRoutes.post("/", validateJson(AddEntrySchema, (e) => error("VALIDATION_ERROR", "Invalid pipeline entry", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  const { denied } = await requireJobOwner(c, body.jobId);
   if (denied) return denied;
 
   const created = await pipelineService.addEntry({
-    ...parsed.data,
-    ownerId: c.var.user?.sub as string,
+    ...body,
+    ownerId: c.var.userId,
   } as Parameters<typeof pipelineService.addEntry>[0]);
   return c.json(success(created), 201);
 });
@@ -159,16 +157,13 @@ pipelineEntryRoutes.get("/reports", async (c) => {
 // PATCH /:entryId — stage and/or notes / tags / owner. Stage side effects
 // (touchpoint, rejection metadata, offer award) fire only on a real change.
 // ---------------------------------------------------------------------------
-pipelineEntryRoutes.patch("/:entryId", async (c) => {
+pipelineEntryRoutes.patch("/:entryId", validateJson(UpdateEntrySchema, (e) => error("VALIDATION_ERROR", "Invalid entry update", e.flatten()), { emptyBody: null }), async (c) => {
   const entryId = c.req.param("entryId");
-  const parsed = UpdateEntrySchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid entry update", parsed.error.flatten()), 400);
-  }
+  const body = c.req.valid("json");
   const owned = await loadOwnedEntry(c, entryId);
   if ("denied" in owned) return owned.denied;
 
-  const { stage, rejectionReason, notes, tags, ownerId } = parsed.data;
+  const { stage, rejectionReason, notes, tags, ownerId } = body;
   let result: pipelineService.PipelineEntryRow | null = owned.entry;
 
   if (stage !== undefined && stage !== owned.entry.stage) {
@@ -177,7 +172,7 @@ pipelineEntryRoutes.patch("/:entryId", async (c) => {
       entryId,
       toStage: stage,
       rejectionReason: rejectionReason ?? null,
-      performedByUserId: c.var.user?.sub as string,
+      performedByUserId: c.var.userId,
     });
     if (!moved.found) return c.json(error("NOT_FOUND", "Pipeline entry not found"), 404);
     result = moved.updated as pipelineService.PipelineEntryRow;
@@ -214,19 +209,16 @@ pipelineEntryRoutes.delete("/:entryId", async (c) => {
 // ---------------------------------------------------------------------------
 // POST /:entryId/touchpoint — log an outreach touchpoint (email / sms / etc)
 // ---------------------------------------------------------------------------
-pipelineEntryRoutes.post("/:entryId/touchpoint", async (c) => {
-  const parsed = TouchpointSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid touchpoint", parsed.error.flatten()), 400);
-  }
+pipelineEntryRoutes.post("/:entryId/touchpoint", validateJson(TouchpointSchema, (e) => error("VALIDATION_ERROR", "Invalid touchpoint", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
   const owned = await loadOwnedEntry(c, c.req.param("entryId"));
   if ("denied" in owned) return owned.denied;
 
   await pipelineService.logTouchpoint({
     entryId: owned.entry.id,
-    type: parsed.data.type,
-    payload: parsed.data.payload,
-    performedByUserId: c.var.user?.sub as string,
+    type: body.type,
+    payload: body.payload,
+    performedByUserId: c.var.userId,
   });
   return c.json(success({ logged: true }), 200);
 });

@@ -67,7 +67,7 @@ feedPostRoutes.post("/posts/:postId/reshare", async (c) => {
 
 /** POST /api/feed/posts */
 feedPostRoutes.post("/posts", async (c) => {
-  const userId = c.var.user.sub;
+  const userId = c.var.userId;
   const body = await readBody(c);
   return respond(
     c,
@@ -89,12 +89,12 @@ feedPostRoutes.post("/posts", async (c) => {
 /** PUT /api/feed/posts/:postId */
 feedPostRoutes.put("/posts/:postId", async (c) => {
   const body = await readBody(c);
-  return respond(c, updateFeedPost(c.var.user.sub, c.req.param("postId"), body));
+  return respond(c, updateFeedPost(c.var.userId, c.req.param("postId"), body));
 });
 
 /** DELETE /api/feed/posts/:postId */
 feedPostRoutes.delete("/posts/:postId", (c) =>
-  respond(c, deleteFeedPost(c.var.user.sub, c.req.param("postId"))),
+  respond(c, deleteFeedPost(c.var.userId, c.req.param("postId"))),
 );
 
 /** POST /api/feed/posts/:postId/report — 201 on a new report, 200 if the
@@ -102,7 +102,7 @@ feedPostRoutes.delete("/posts/:postId", (c) =>
 feedPostRoutes.post("/posts/:postId/report", async (c) => {
   const body = await readBody(c);
   try {
-    const { created } = await reportFeedPost(c.var.user.sub, c.req.param("postId"), body);
+    const { created } = await reportFeedPost(c.var.userId, c.req.param("postId"), body);
     return c.json(success({ reported: true }), created ? 201 : 200);
   } catch (err) {
     return renderDomainError(c, err);

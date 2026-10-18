@@ -1,8 +1,11 @@
-import type { ErrorHandler } from "hono";
+import type { ErrorHandler, NotFoundHandler } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { ZodError } from "zod";
 import type { ErrorSource } from "../handlers/shared.js";
 import { logger } from "../lib/logger.js";
+import { DomainError } from "../domains/errors.js";
+import { error } from "../types/index.js";
 
 /** Pull Postgres diagnostic fields off the underlying driver error.
  *  Drizzle wraps the driver error and rethrows with a message that begins
@@ -64,13 +67,11 @@ function sourceFromStack(err: unknown): ErrorSource | null {
   return null;
 }
 
-export class AppError extends Error {
-  constructor(
-    public readonly code: string,
-    message: string,
-    public readonly status: number = 500,
-  ) {
-    super(message);
+/** Legacy (code, message, status) constructor order over the ONE domain
+ *  error — every subclass is a DomainError the global handler renders. */
+export class AppError extends DomainError {
+  constructor(code: string, message: string, status = 500, details?: unknown) {
+    super(status, code, message, details);
     this.name = "AppError";
   }
 }
@@ -104,8 +105,8 @@ export class ConflictError extends AppError {
 }
 
 export class ValidationError extends AppError {
-  constructor(message = "Validation failed", public readonly details?: unknown) {
-    super("VALIDATION_ERROR", message, 422);
+  constructor(message = "Validation failed", details?: unknown) {
+    super("VALIDATION_ERROR", message, 422, details);
     this.name = "ValidationError";
   }
 }
@@ -121,41 +122,60 @@ export const globalErrorHandler: ErrorHandler = (err, c) => {
   const _pg = pgDiagnostics(err);
   const pgFragment = _pg ? { _pg } : {};
 
+  const timestamp = new Date().toISOString();
+
   if (err instanceof ZodError) {
     return c.json(
-      { error: { code: "VALIDATION_ERROR", message: "Validation failed", details: err.flatten(), ...sourceFragment, ...pgFragment } },
+      {
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "Validation failed", details: err.flatten(), ...sourceFragment, ...pgFragment },
+        timestamp,
+      },
       422,
     );
   }
 
-  if (err instanceof AppError) {
+  // The ONE domain error (AppError and every typed service error extend it):
+  // its status + code + details become the standard envelope.
+  if (err instanceof DomainError) {
+    const extra = err as DomainError & { upgradeUrl?: string };
     return c.json(
       {
+        success: false,
         error: {
           code: err.code,
           message: err.message,
-          // Structured details: ValidationError, or any AppError that
-          // carries a public `details` (e.g. ExplicitContentError's
-          // `{ categories }`, which the client localizes).
-          ...((err as AppError & { details?: unknown }).details ? { details: (err as AppError & { details?: unknown }).details } : {}),
+          ...(err.details !== undefined && err.details !== null ? { details: err.details } : {}),
+          ...(extra.upgradeUrl ? { upgradeUrl: extra.upgradeUrl } : {}),
           ...sourceFragment,
           ...pgFragment,
         },
+        timestamp,
       },
-      err.status as 400 | 401 | 403 | 404 | 409 | 422 | 500 | 503,
+      err.status as ContentfulStatusCode,
     );
   }
 
   logger.error("[errorHandler] unhandled error", _pg ? { error: err, pg: _pg } : err);
   return c.json(
     {
+      success: false,
       error: {
         code: "INTERNAL_ERROR",
         message: err instanceof Error ? err.message : String(err),
         ...sourceFragment,
         ...pgFragment,
       },
+      timestamp,
     },
     500,
   );
 };
+
+/** The ONE 404 for every unmatched path (per-router catch-alls are gone;
+ *  lazily-mounted routers fall through to here). */
+export const notFoundHandler: NotFoundHandler = (c) =>
+  c.json(
+    error("NOT_FOUND", `No route for ${c.req.method} ${c.req.path}`),
+    404,
+  );

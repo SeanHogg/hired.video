@@ -3,7 +3,6 @@
  *
  * Sub-routers (routes/jobs/), mounted in this order so static segments keep
  * winning over `/:id` params exactly as when this was one file:
- *   sentiment.ts  POST /sentimentprediction (W2-1 moving it to the AI-tools dispatcher)
  *   tracker.ts    seeker tracker: /:id/save, /:id/status, /:id/apply
  *   screening.ts  /:id/screening[/preview|/backfill-preview|/backfill]
  *   listing.ts    GET /, /getsummaryitems, /user-jobs, /saved, /public, /slug/:slug, /applications
@@ -17,7 +16,6 @@
  */
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
-import { jobSentimentRoutes } from "./jobs/sentiment.js";
 import { jobTrackerRoutes } from "./jobs/tracker.js";
 import { jobScreeningRoutes } from "./jobs/screening.js";
 import { jobListingRoutes } from "./jobs/listing.js";
@@ -29,7 +27,6 @@ export { CreateJobSchema, UpdateJobSchema, JobAlertSchema } from "./jobs/schemas
 export { extractCreateFromFilePayload } from "./jobs/payload.js";
 
 export const jobRoutes = new Hono<AppEnv>()
-  .route("/", jobSentimentRoutes)
   .route("/", jobTrackerRoutes)
   .route("/", jobScreeningRoutes)
   .route("/", jobListingRoutes)

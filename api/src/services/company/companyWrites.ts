@@ -31,10 +31,18 @@ function repo(): CompaniesRepository {
 const WRITABLE_BASIC = ["description", "website", "logoUrl", "industry", "size", "foundedYear", "headquarters", "contact"] as const;
 const WRITABLE_EXTENDED = ["tagline", "mission", "vision", "technologies", "perks", "culture", "values", "benefits"] as const;
 
+type WritableKey = (typeof WRITABLE_BASIC)[number] | (typeof WRITABLE_EXTENDED)[number];
+
+/** Generic over the key so the write is typed per column (a loop over the
+ *  key union would intersect every column's type to `never`). */
+function setField<K extends WritableKey>(out: Partial<CompanyProfileInsert>, key: K, value: CompanyProfileInsert[K]): void {
+  out[key] = value;
+}
+
 function buildWritableFields(body: CompanyBody): Partial<CompanyProfileInsert> {
   const out: Partial<CompanyProfileInsert> = {};
-  for (const key of WRITABLE_BASIC) if (key in body) out[key] = body[key];
-  for (const key of WRITABLE_EXTENDED) if (key in body) out[key] = body[key];
+  for (const key of WRITABLE_BASIC) if (key in body) setField(out, key, body[key]);
+  for (const key of WRITABLE_EXTENDED) if (key in body) setField(out, key, body[key]);
   return out;
 }
 

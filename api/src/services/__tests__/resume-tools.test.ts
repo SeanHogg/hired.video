@@ -23,7 +23,6 @@ import {
   levenshteinRatio,
   computeSectionSimilarity,
   mergeHighlights,
-  mergeKeywords,
   analyzeMerge,
   executeMerge,
   type MergeDecision,
@@ -244,13 +243,6 @@ describe("resume-merge: mergeHighlights", () => {
   it("deduplicates case-insensitively", () => {
     const result = mergeHighlights(["Led team"], ["led team"]);
     assert.equal(result.length, 1);
-  });
-});
-
-describe("resume-merge: mergeKeywords", () => {
-  it("deduplicates keywords", () => {
-    const result = mergeKeywords(["React", "Node"], ["react", "Vue"]);
-    assert.equal(result.length, 3);
   });
 });
 

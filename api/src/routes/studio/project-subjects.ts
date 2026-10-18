@@ -9,7 +9,8 @@ import { z } from "zod";
 import type { AppEnv } from "../../types/index.js";
 import { STUDIO_SUBJECT_KINDS } from "../../../../shared/studio-subject.js";
 import { addProjectSubject, removeProjectSubject } from "../../services/studio/project-subjects.js";
-import { fail, ok, studioErrorResponse } from "./http.js";
+import { success, error } from "../../types/index.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const studioProjectSubjectRoutes = new Hono<AppEnv>();
 
@@ -18,31 +19,19 @@ const SubjectBodySchema = z.object({
   id:   z.string().min(1).max(200),
 });
 
-studioProjectSubjectRoutes.post("/projects/:projectId/subjects", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = SubjectBodySchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
-  }
-  try {
-    return c.json(ok(await addProjectSubject(c.var.user.sub, c.req.param("projectId"), parsed.data)), 201);
-  } catch (e) {
-    return studioErrorResponse(c, e);
-  }
+studioProjectSubjectRoutes.post("/projects/:projectId/subjects", validateJson(SubjectBodySchema, (e) => error("VALIDATION_ERROR", "Invalid request body", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  return c.json(success(await addProjectSubject(c.var.userId, c.req.param("projectId"), body)), 201);
 });
 
 studioProjectSubjectRoutes.delete("/projects/:projectId/subjects/:kind/:subjectId", async (c) => {
   const kind = c.req.param("kind");
   if (!STUDIO_SUBJECT_KINDS.includes(kind as (typeof STUDIO_SUBJECT_KINDS)[number])) {
-    return c.json(fail("VALIDATION_ERROR", "Unknown subject kind"), 400);
+    return c.json(error("VALIDATION_ERROR", "Unknown subject kind"), 400);
   }
-  try {
-    const result = await removeProjectSubject(c.var.user.sub, c.req.param("projectId"), {
-      kind,
-      id: c.req.param("subjectId"),
-    });
-    return c.json(ok(result));
-  } catch (e) {
-    return studioErrorResponse(c, e);
-  }
+  const result = await removeProjectSubject(c.var.userId, c.req.param("projectId"), {
+    kind,
+    id: c.req.param("subjectId"),
+  });
+  return c.json(success(result));
 });

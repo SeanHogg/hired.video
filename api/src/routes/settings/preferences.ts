@@ -23,56 +23,47 @@ import {
 export const settingsPreferenceRoutes = new Hono<AppEnv>();
 
 settingsPreferenceRoutes.get("/", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await getAllSettings(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getAllSettings(userId)), 200);
 });
 
 settingsPreferenceRoutes.get("/notifications", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await getNotificationSettings(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getNotificationSettings(userId)), 200);
 });
 
 settingsPreferenceRoutes.put("/notifications", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await updateNotificationSettings(auth.userId, await readJsonBody(c))), 200);
+  const userId = requireUser(c);
+  return c.json(success(await updateNotificationSettings(userId, await readJsonBody(c))), 200);
 });
 
 settingsPreferenceRoutes.get("/job-preferences", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await getJobPreferences(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getJobPreferences(userId)), 200);
 });
 
 settingsPreferenceRoutes.put("/job-preferences", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await updateJobPreferences(auth.userId, await readJsonBody(c))), 200);
+  const userId = requireUser(c);
+  return c.json(success(await updateJobPreferences(userId, await readJsonBody(c))), 200);
 });
 
 settingsPreferenceRoutes.get("/account", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await getAccountSettings(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getAccountSettings(userId)), 200);
 });
 
 settingsPreferenceRoutes.put("/account", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
+  const userId = requireUser(c);
   const roles = (c.var.user?.roles as string[] | undefined) ?? [];
-  return c.json(success(await updateAccountSettings(auth.userId, await readJsonBody(c), roles)), 200);
+  return c.json(success(await updateAccountSettings(userId, await readJsonBody(c), roles)), 200);
 });
 
 settingsPreferenceRoutes.get("/extension-preferences", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await getExtensionSettings(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await getExtensionSettings(userId)), 200);
 });
 
 settingsPreferenceRoutes.put("/extension-preferences", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await updateExtensionSettings(auth.userId, await readJsonBody(c))), 200);
+  const userId = requireUser(c);
+  return c.json(success(await updateExtensionSettings(userId, await readJsonBody(c))), 200);
 });

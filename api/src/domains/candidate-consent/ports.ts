@@ -14,11 +14,14 @@ import type {
   ICandidateVideoConsentRepository,
 } from "../../repositories/candidateVideoConsentRepository.js";
 import {
+  CANDIDATE_CONSENT_EMAIL_MISMATCH_CODE,
+  CANDIDATE_CONSENT_EMAIL_NOT_ALLOWED_CODE,
   CANDIDATE_VIDEO_CONSENT_TTL_DAYS,
   type CandidateVideoConsent,
   type CandidateVideoConsentStatus,
 } from "../../../../shared/candidate-video-consent.js";
 import { randomHex, sha256Hex } from "../../utils/crypto.js";
+import { DomainError } from "../errors.js";
 
 /** What the consent email needs (the email adapter's input shape). */
 export interface ConsentEmail {
@@ -54,9 +57,22 @@ export type CandidateConsentErrorKind =
   | "EXPIRED"
   | "NOT_RESENDABLE";
 
-export class CandidateConsentError extends Error {
+/** The one CandidateConsentError kind → wire (code, status) mapping. */
+const CONSENT_ERROR_HTTP: Record<CandidateConsentErrorKind, { code: string; status: 400 | 403 | 404 | 409 | 410 }> = {
+  NOT_FOUND: { code: "NOT_FOUND", status: 404 },
+  FORBIDDEN: { code: "FORBIDDEN", status: 403 },
+  VALIDATION: { code: "VALIDATION_ERROR", status: 400 },
+  EMAIL_MISMATCH: { code: CANDIDATE_CONSENT_EMAIL_MISMATCH_CODE, status: 400 },
+  EMAIL_NOT_ALLOWED: { code: CANDIDATE_CONSENT_EMAIL_NOT_ALLOWED_CODE, status: 400 },
+  ALREADY_RESPONDED: { code: "CONSENT_ALREADY_RESPONDED", status: 409 },
+  NOT_APPROVED: { code: "CONSENT_NOT_APPROVED", status: 409 },
+  EXPIRED: { code: "CONSENT_EXPIRED", status: 410 },
+  NOT_RESENDABLE: { code: "CONSENT_NOT_RESENDABLE", status: 409 },
+};
+
+export class CandidateConsentError extends DomainError {
   constructor(public readonly kind: CandidateConsentErrorKind, message: string) {
-    super(message);
+    super(CONSENT_ERROR_HTTP[kind].status, CONSENT_ERROR_HTTP[kind].code, message);
     this.name = "CandidateConsentError";
   }
 }

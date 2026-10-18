@@ -27,7 +27,7 @@ import { and, eq, exists, or, sql } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 
 import { schema } from "../../db/index.js";
-import { ownsByJob } from "../tool-runs.js";
+import { ownsByJob } from "../../repositories/toolRunOwnershipRepository.js";
 
 const dialect = new PgDialect();
 const USER_ID = "11111111-1111-1111-1111-111111111111";

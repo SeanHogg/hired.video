@@ -1,7 +1,7 @@
 // Reviewer queue page (#1502) — lists every course in `in_review`
 // assigned to the calling user. SuperAdmin sees the entire queue.
 //
-// The threaded review thread for each course reuses studio_review_comments
+// The threaded review thread for each course reuses the studio review comments
 // (course id passed as the projectId), so the surface here is intentionally
 // thin: it's just an inbox + deep-link to the existing course editor.
 

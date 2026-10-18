@@ -22,6 +22,7 @@ const {
   courses,
   studioVoiceClones,
   userProfiles,
+  talentPoolCandidates,
 } = schema;
 
 function present(rows: unknown[]): boolean {
@@ -61,6 +62,14 @@ const ENTITY_EXISTS: Record<ListItemEntityType, (id: string) => Promise<boolean>
         .select({ id: studioVoiceClones.id })
         .from(studioVoiceClones)
         .where(eq(studioVoiceClones.id, id))
+        .limit(1),
+    ),
+  talent_pool_candidate: async (id) =>
+    present(
+      await getDb()
+        .select({ id: talentPoolCandidates.id })
+        .from(talentPoolCandidates)
+        .where(eq(talentPoolCandidates.id, id))
         .limit(1),
     ),
 };

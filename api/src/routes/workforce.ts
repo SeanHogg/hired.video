@@ -51,24 +51,16 @@ import {
 } from "../services/workforce/integrations.js";
 import { tokenLedger } from "../domains/billing/token-ledger.js";
 import { getVideoBucket, putObject } from "../services/storage/object-store.js";
+import { requireUser } from "./helpers/routerHelpers.js";
 
 export const workforceRoutes = new Hono<AppEnv>();
-
-function getCurrentUserId(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
-
-function unauthorized(c: any) {
-  return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-}
 
 // ---------------------------------------------------------------------------
 // Phase 1 — time entries
 // ---------------------------------------------------------------------------
 
 workforceRoutes.post("/punch-in", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => ({}));
   const row = await punchIn(userId, {
     taskId: body.taskId ?? null,
@@ -79,22 +71,19 @@ workforceRoutes.post("/punch-in", async (c) => {
 });
 
 workforceRoutes.post("/punch-out", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const row = await punchOut(userId);
   return c.json(success(row), 200);
 });
 
 workforceRoutes.get("/active", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const row = await getActiveTimeEntry(userId);
   return c.json(success(row), 200);
 });
 
 workforceRoutes.get("/week", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const periodStart = c.req.query("periodStart");
   if (!periodStart || !/^\d{4}-\d{2}-\d{2}$/.test(periodStart)) {
     return c.json(error("BAD_REQUEST", "periodStart must be YYYY-MM-DD"), 400);
@@ -108,8 +97,7 @@ workforceRoutes.get("/week", async (c) => {
 // ---------------------------------------------------------------------------
 
 workforceRoutes.post("/timesheets/submit", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => ({}));
   const periodStart = body.periodStart;
   if (!periodStart || !/^\d{4}-\d{2}-\d{2}$/.test(periodStart)) {
@@ -120,15 +108,13 @@ workforceRoutes.post("/timesheets/submit", async (c) => {
 });
 
 workforceRoutes.post("/timesheets/:id/approve", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const ts = await approveTimesheet(c.req.param("id"), userId);
   return c.json(success(ts), 200);
 });
 
 workforceRoutes.post("/timesheets/:id/reject", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => ({}));
   const reason = String(body.reason ?? "").trim();
   if (!reason) {
@@ -139,22 +125,19 @@ workforceRoutes.post("/timesheets/:id/reject", async (c) => {
 });
 
 workforceRoutes.get("/timesheets", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const list = await getEmployeeTimesheets(userId);
   return c.json(success({ timesheets: list }), 200);
 });
 
 workforceRoutes.get("/approval-queue", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const queue = await getCompanyApprovalQueue(userId);
   return c.json(success({ queue }), 200);
 });
 
 workforceRoutes.get("/roster", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const roster = await getCompanyRoster(userId);
   return c.json(success({ roster }), 200);
 });
@@ -164,8 +147,7 @@ workforceRoutes.get("/roster", async (c) => {
 // ---------------------------------------------------------------------------
 
 workforceRoutes.get("/desk-margin", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const rows = await getDeskMargin(userId);
   return c.json(success({ rows }), 200);
 });
@@ -175,15 +157,13 @@ workforceRoutes.get("/desk-margin", async (c) => {
 // ---------------------------------------------------------------------------
 
 workforceRoutes.get("/documents", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const docs = await listCompanyPlacementDocuments(userId);
   return c.json(success({ documents: docs }), 200);
 });
 
 workforceRoutes.post("/documents", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => ({}));
   if (!body.kind || typeof body.kind !== "string") {
     return c.json(error("BAD_REQUEST", "kind is required"), 400);
@@ -213,8 +193,7 @@ workforceRoutes.post("/documents", async (c) => {
  * extension survives.
  */
 workforceRoutes.post("/documents/:id/upload", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const documentId = c.req.param("id");
   // Authority + existence check first — failed auth shouldn't read the
   // request body (which could be many MB) into memory.
@@ -243,8 +222,7 @@ workforceRoutes.post("/documents/:id/upload", async (c) => {
  * #1442 sub-work).
  */
 workforceRoutes.post("/documents/:id/mark-signed", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => ({}));
   const signedAt = body.signedAt ? new Date(body.signedAt) : null;
   const row = await markDocumentSigned(userId, c.req.param("id"), signedAt);
@@ -256,8 +234,7 @@ workforceRoutes.post("/documents/:id/mark-signed", async (c) => {
  * R2 key; cdnUrl translates it to a public CDN URL.
  */
 workforceRoutes.get("/documents/:id/download", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const doc = await getDocumentForCaller(userId, c.req.param("id"));
   if (!doc.filePath) {
     return c.json(error("NOT_FOUND", "Document has no uploaded file"), 404);
@@ -272,8 +249,7 @@ workforceRoutes.get("/documents/:id/download", async (c) => {
 // ---------------------------------------------------------------------------
 
 workforceRoutes.get("/invoices/:id/print", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const html = await renderInvoiceHtml(userId, c.req.param("id"));
   return new Response(html, {
     status: 200,
@@ -282,8 +258,7 @@ workforceRoutes.get("/invoices/:id/print", async (c) => {
 });
 
 workforceRoutes.get("/timesheets/:id/print", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const html = await renderTimesheetHtml(userId, c.req.param("id"));
   return new Response(html, {
     status: 200,
@@ -300,8 +275,7 @@ workforceRoutes.get("/timesheets/:id/print", async (c) => {
 // ---------------------------------------------------------------------------
 
 workforceRoutes.post("/reconcile-seats", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const employerCompanies = await resolveEmployerCompanyIds(userId);
   if (employerCompanies.length === 0) {
     return c.json(error("FORBIDDEN", "Not an employer in any workspace"), 403);
@@ -319,15 +293,13 @@ workforceRoutes.post("/reconcile-seats", async (c) => {
 // ---------------------------------------------------------------------------
 
 workforceRoutes.get("/integrations", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const integrations = await listEmployerIntegrations(userId);
   return c.json(success({ integrations }), 200);
 });
 
 workforceRoutes.post("/integrations/:provider/disconnect", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const provider = c.req.param("provider") as IntegrationProvider;
   if (!["quickbooks", "xero", "gusto", "docusign", "helcim"].includes(provider)) {
     return c.json(error("BAD_REQUEST", `Unknown provider: ${provider}`), 400);
@@ -347,8 +319,7 @@ workforceRoutes.post("/integrations/:provider/disconnect", async (c) => {
 // GET /api/workforce/token-pool — the employer's shared AI pool + per-member
 // month-to-date usage and sub-caps.
 workforceRoutes.get("/token-pool", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   // A caller who manages no workspace simply has no pool to show — return an
   // absent view (200, `pool: null`) rather than a 403, matching every sibling
   // workforce endpoint (/roster, /approval-queue, /desk-margin, …) which
@@ -363,8 +334,7 @@ workforceRoutes.get("/token-pool", async (c) => {
 // PATCH /api/workforce/members/:userId/token-limit — set/clear a member's
 // monthly AI-token sub-cap. Body: { limit: number | null }.
 workforceRoutes.patch("/members/:userId/token-limit", async (c) => {
-  const userId = getCurrentUserId(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const targetUserId = c.req.param("userId");
   const body = await c.req.json().catch(() => ({}));
   const raw = body?.limit;

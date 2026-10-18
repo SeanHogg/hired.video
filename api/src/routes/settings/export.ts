@@ -12,9 +12,8 @@ import { buildAccountExport } from "../../services/settings/dataExportService.js
 export const settingsExportRoutes = new Hono<AppEnv>();
 
 settingsExportRoutes.get("/export", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const file = await buildAccountExport(auth.userId, c.req.query("format"));
+  const userId = requireUser(c);
+  const file = await buildAccountExport(userId, c.req.query("format"));
   return new Response(file.body, {
     status: 200,
     headers: {
@@ -30,7 +29,6 @@ settingsExportRoutes.get("/export/csv", async (c) => c.redirect(`/api/settings/e
 
 // Excel needs an xlsx library; fall back to the CSV export until one is added.
 settingsExportRoutes.get("/export/excel", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
+  const userId = requireUser(c);
   return c.redirect(`/api/settings/export?format=csv`, 302);
 });

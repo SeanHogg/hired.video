@@ -1,6 +1,6 @@
 /**
  * Pure-logic tests for the take-home magic-link invite primitives
- * (routes/take-home-invites.ts). The route's token mint + expiry math
+ * (services/hiring/take-home-invites.ts). The route's token mint + expiry math
  * was previously inlined and untested; it's now extracted into three
  * pure helpers the route delegates to, so this suite pins the
  * round-trip + the expiry boundary the public `/by-token/:token` read
@@ -20,7 +20,7 @@ import {
   generateInviteToken,
   computeExpiresAt,
   isInviteExpired,
-} from "../take-home-invites.js";
+} from "../../services/hiring/take-home-invites.js";
 
 const DAY_MS = 86_400_000;
 

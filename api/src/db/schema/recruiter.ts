@@ -24,6 +24,10 @@ export const talentPoolCandidates = pgTable("talent_pool_candidates", {
    *  read or wrote it); the column is kept, unreferenced, so no row changes. */
   poolId: uuid("pool_id"),
   recruiterId: uuid("recruiter_id").references(() => users.id, { onDelete: "cascade" }),
+  /** A platform user when the candidate has an account; for off-platform
+   *  candidates (extension extraction, ATS import) it is a placeholder —
+   *  the recruiter's own id — so the candidate_* / current_* columns below
+   *  are this CRM row's own data, not copies (W3-D2 3NF review). */
   candidateId: uuid("candidate_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   candidateName: varchar("candidate_name", { length: 255 }).default("").notNull(),
   candidateEmail: varchar("candidate_email", { length: 255 }),
@@ -82,6 +86,10 @@ export type NewCandidateInteraction = typeof candidateInteractions.$inferInsert;
 export const candidateSubmissions = pgTable("candidate_submissions", {
   id: uuid("id").primaryKey().defaultRandom(),
   recruiterId: uuid("recruiter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** Carries the talent-pool row's candidate_id, which is a placeholder
+   *  (the recruiter's id) for off-platform candidates — so candidate_name /
+   *  candidate_email, and job_title / company_name (job_id has no FK; it may
+   *  be an external client job), are the submission's own data (W3-D2). */
   candidateId: uuid("candidate_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   candidateName: varchar("candidate_name", { length: 255 }).default("").notNull(),
   candidateEmail: varchar("candidate_email", { length: 255 }),
@@ -122,7 +130,11 @@ export const placements = pgTable("placements", {
   placementTypeId: uuid("placement_type_id"),
   recruiterId: uuid("recruiter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   candidateId: uuid("candidate_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  recruiterName: varchar("recruiter_name", { length: 255 }).default("").notNull(),
+  // recruiter_name (a copy of users.name) was dropped in 0623 — read via
+  // recruiter_id. candidate_name / company_name / job_title stay: they are
+  // the placement's own data, because candidate_id is a placeholder (the
+  // recruiter's id) for off-platform candidates and the client company is
+  // usually not a platform company (company_id null).
   candidateName: varchar("candidate_name", { length: 255 }).default("").notNull(),
   companyId: uuid("company_id").references(() => companyProfiles.id, { onDelete: "set null" }),
   jobId: uuid("job_id"),
@@ -408,45 +420,8 @@ export const extractedProfiles = pgTable("extracted_profiles", {
 export type ExtractedProfile = typeof extractedProfiles.$inferSelect;
 export type NewExtractedProfile = typeof extractedProfiles.$inferInsert;
 
-// ─── Recruiter Lists (gap #1360) ─────────────────────────────────────────
-// Recruiter-scoped collections of candidates distinct from a job's
-// pipeline. `kind` discriminates ordinary lists from prioritised call
-// queues so the extension can render them in two separate sections.
-
-export const recruiterLists = pgTable("recruiter_lists", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  recruiterId: uuid("recruiter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
-  kind: varchar("kind", { length: 32 }).default("list").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [
-  index("recruiter_lists_recruiter_idx").on(t.recruiterId),
-]);
-
-export type RecruiterList = typeof recruiterLists.$inferSelect;
-export type NewRecruiterList = typeof recruiterLists.$inferInsert;
-
-export const recruiterListMembers = pgTable(
-  "recruiter_list_members",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    listId: uuid("list_id").notNull().references(() => recruiterLists.id, { onDelete: "cascade" }),
-    talentPoolCandidateId: uuid("talent_pool_candidate_id").notNull().references(() => talentPoolCandidates.id, { onDelete: "cascade" }),
-    position: integer("position").default(0).notNull(),
-    addedAt: timestamp("added_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (t) => [
-    // One row per candidate per list. Position can change but membership
-    // uniqueness is at the (list, candidate) pair.
-    uniqueIndex("uq_recruiter_list_members_pair").on(t.listId, t.talentPoolCandidateId),
-    index("recruiter_list_members_candidate_idx").on(t.talentPoolCandidateId),
-  ],
-);
-
-export type RecruiterListMember = typeof recruiterListMembers.$inferSelect;
-export type NewRecruiterListMember = typeof recruiterListMembers.$inferInsert;
+// Recruiter lists / call queues (gap #1360) live in the polymorphic
+// lists / list_items tables since migration 0624 (shared/lists.ts).
 
 // ─── Recruiter Match Scores (cached job ↔ candidate compatibility scores) ────
 // Stores the result of scoring a talent-pool candidate against a job.
@@ -457,8 +432,8 @@ export const recruiterMatchScores = pgTable("recruiter_match_scores", {
   recruiterId: uuid("recruiter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   jobId: uuid("job_id").notNull(),
   candidateId: uuid("candidate_id").notNull(), // talent_pool_candidates.id
-  candidateName: varchar("candidate_name", { length: 255 }).default("").notNull(),
-  jobTitle: varchar("job_title", { length: 255 }).default("").notNull(),
+  // candidate_name / job_title copies dropped in 0623 — read via
+  // talent_pool_candidates / job_items (recruiterMatchScoresRepository).
   score: integer("score").notNull(),
   recommendations: text("recommendations"),
   resumeTextHash: varchar("resume_text_hash", { length: 64 }),

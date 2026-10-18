@@ -6,7 +6,7 @@
  * `...isAnimationKind && animationState ? { animationState } : {}`,
  * `...gameKind && gameState ? { gameState } : {}`) plus the timeline
  * branch. Adding a new mediaKind (CAD, animated_film, etc.) used to
- * mean editing handleSave; now it's one more case in the switch here.
+ * mean editing handleSave; now it's one more entry in the builder map here.
  *
  * Per the canvas-runtime extensibility model (PRD §1.2), every mediaKind
  * persists exactly ONE runtime-state field — Timeline kinds write
@@ -61,6 +61,58 @@ export interface RuntimePayloadSlice {
   documentState?: DocumentState;
 }
 
+type RuntimeSliceBuilder = (snapshot: RuntimeSnapshot) => RuntimePayloadSlice;
+
+/** CanvasState-authoring kinds emit the Timeline JSON. */
+const timelineSlice: RuntimeSliceBuilder = (snapshot) => ({
+  kind: "nle",
+  timelineSpec: canvasStateToTimeline(snapshot.canvasState),
+});
+
+/** Per-kind slice builders. `Record<MediaKind, …>` makes a new MEDIA_KINDS
+ *  entry without a builder a compile error. */
+const RUNTIME_SLICE_BUILDERS: Record<MediaKind, RuntimeSliceBuilder> = {
+  image: (snapshot) =>
+    snapshot.imageState !== null
+      ? { kind: "scene", imageState: snapshot.imageState }
+      : { kind: "scene" },
+  animation: (snapshot) =>
+    snapshot.animationState !== null
+      ? { kind: "scene", animationState: snapshot.animationState }
+      : { kind: "scene" },
+  game: (snapshot) =>
+    snapshot.gameState !== null
+      ? { kind: "scene", gameState: snapshot.gameState }
+      : { kind: "scene" },
+  cad: (snapshot) =>
+    snapshot.cadState !== null
+      ? { kind: "scene", cadState: snapshot.cadState }
+      : { kind: "scene" },
+  cad_3d: (snapshot) =>
+    snapshot.cad3dState
+      ? { kind: "scene", cad3dState: snapshot.cad3dState }
+      : { kind: "scene" },
+  // Interactive comics carry BOTH the CanvasState (per-page widgets,
+  // same as linear comic) AND the branching graph. The Timeline
+  // emitter handles the CanvasState half; the branching graph rides
+  // alongside in `interactiveComicState`.
+  interactive_comic: (snapshot) =>
+    snapshot.interactiveComicState
+      ? { ...timelineSlice(snapshot), interactiveComicState: snapshot.interactiveComicState }
+      : timelineSlice(snapshot),
+  video: timelineSlice,
+  podcast: timelineSlice,
+  voice: timelineSlice,
+  comic: timelineSlice,
+  // Paged document runtime (#1912) — persists its DocumentState to the
+  // `document_state` JSONB column (storage kind "scene", like the other
+  // non-Timeline runtimes).
+  document: (snapshot) =>
+    snapshot.documentState
+      ? { kind: "scene", documentState: snapshot.documentState }
+      : { kind: "scene" },
+};
+
 /** Build the payload slice for the active mediaKind. The runtime owns
  *  exactly one state column — the slice contains exactly one of
  *  timelineSpec / imageState / animationState / gameState (or none
@@ -70,65 +122,12 @@ export function runtimeStatePayload(
   mediaKind: MediaKind,
   snapshot: RuntimeSnapshot,
 ): RuntimePayloadSlice {
-  switch (mediaKind) {
-    case "image":
-      return snapshot.imageState !== null
-        ? { kind: "scene", imageState: snapshot.imageState }
-        : { kind: "scene" };
-    case "animation":
-      return snapshot.animationState !== null
-        ? { kind: "scene", animationState: snapshot.animationState }
-        : { kind: "scene" };
-    case "game":
-      return snapshot.gameState !== null
-        ? { kind: "scene", gameState: snapshot.gameState }
-        : { kind: "scene" };
-    case "cad":
-      return snapshot.cadState !== null
-        ? { kind: "scene", cadState: snapshot.cadState }
-        : { kind: "scene" };
-    case "cad_3d":
-      return snapshot.cad3dState
-        ? { kind: "scene", cad3dState: snapshot.cad3dState }
-        : { kind: "scene" };
-    case "interactive_comic":
-      // Interactive comics carry BOTH the CanvasState (per-page widgets,
-      // same as linear comic) AND the branching graph. The Timeline
-      // emitter handles the CanvasState half; the branching graph rides
-      // alongside in `interactiveComicState`.
-      return snapshot.interactiveComicState
-        ? {
-            kind: "nle",
-            timelineSpec: canvasStateToTimeline(snapshot.canvasState),
-            interactiveComicState: snapshot.interactiveComicState,
-          }
-        : {
-            kind: "nle",
-            timelineSpec: canvasStateToTimeline(snapshot.canvasState),
-          };
-    case "video":
-    case "podcast":
-    case "voice":
-    case "comic":
-      // CanvasState-authoring kinds emit the Timeline JSON.
-      return {
-        kind: "nle",
-        timelineSpec: canvasStateToTimeline(snapshot.canvasState),
-      };
-    case "document":
-      // Paged document runtime (#1912) — persists its DocumentState to the
-      // `document_state` JSONB column (storage kind "scene", like the other
-      // non-Timeline runtimes).
-      return snapshot.documentState
-        ? { kind: "scene", documentState: snapshot.documentState }
-        : { kind: "scene" };
-    default:
-      // Exhaustiveness guard — TS errors here if MEDIA_KINDS gains a
-      // new entry without a matching branch above. Runtime throw is
-      // the safety net for future runtimes that add a mediaKind to
-      // MEDIA_KINDS but forget to wire this switch.
-      return assertNever(mediaKind, `Unhandled mediaKind in runtimeStatePayload(): ${String(mediaKind)}`);
+  const build: RuntimeSliceBuilder | undefined = RUNTIME_SLICE_BUILDERS[mediaKind];
+  // Runtime safety net for a kind with no builder (bad persisted data).
+  if (!build) {
+    throw new Error(`Unhandled mediaKind in runtimeStatePayload(): ${String(mediaKind)}`);
   }
+  return build(snapshot);
 }
 
 /** The slice a save actually writes: `runtimeStatePayload` with every
@@ -140,8 +139,4 @@ export function persistableRuntimeSlice(
   snapshot: RuntimeSnapshot,
 ): RuntimePayloadSlice {
   return stripTabScopedUrls(runtimeStatePayload(mediaKind, snapshot));
-}
-
-function assertNever(_x: never, msg: string): never {
-  throw new Error(msg);
 }

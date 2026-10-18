@@ -8,8 +8,11 @@
  * functions on purpose — each name documents its exact output contract.
  */
 import { formatDistanceToNow } from "date-fns";
+import { formatDuration } from "@shared/duration-format";
 
 export { formatUsdPrice } from "@shared/pricing";
+export { formatDuration, durationMinSecParts } from "@shared/duration-format";
+export type { DurationStyle, DurationUnit, DurationFormatOptions } from "@shared/duration-format";
 
 // ── Money ────────────────────────────────────────────────────────────────
 
@@ -64,25 +67,23 @@ export function formatMoneyCents(
   }
 }
 
+// ── Percentages ──────────────────────────────────────────────────────────
+
+/** A value already on the 0–100 scale → `12.3%` (`fractionDigits` default 1). */
+export function formatPercent(value: number, fractionDigits = 1): string {
+  return `${value.toFixed(fractionDigits)}%`;
+}
+
 // ── Durations ────────────────────────────────────────────────────────────
 
 /** Seconds → `1h 5m` / `5m 3s` / `3s` (floored, negatives clamp to 0). */
 export function formatDurationHms(sec: number): string {
-  const s = Math.max(0, Math.floor(sec || 0));
-  const m = Math.floor(s / 60);
-  const h = Math.floor(m / 60);
-  const mm = m % 60;
-  const ss = s % 60;
-  if (h > 0) return `${h}h ${mm}m`;
-  if (m > 0) return `${m}m ${ss}s`;
-  return `${ss}s`;
+  return formatDuration(sec, { style: "hms" });
 }
 
 /** Seconds → `2m 5s` / `5s` (minutes uncapped; remainder seconds rounded). */
 export function formatDurationMinSec(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  return formatDuration(sec, { style: "minSec" });
 }
 
 /** Minutes → `45m` / `2h` / `2h 15m`; `null` → `null`. */

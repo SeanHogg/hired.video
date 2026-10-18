@@ -17,8 +17,6 @@
  * `job_items.experience_level` rows (and NULLs the "None"/not-specified ones).
  */
 
-import { z } from "zod";
-
 /** Canonical seniority / experience levels, lowercase. */
 export const SENIORITY_LEVELS = [
   "entry",
@@ -102,14 +100,3 @@ export function normalizeSeniority(raw: string | null | undefined): SeniorityLev
   if (ALIAS[collapsed]) return ALIAS[collapsed];
   return null;
 }
-
-/**
- * Lenient Zod schema for a seniority value at an API boundary — accepts any
- * spelling and outputs the canonical lowercase value, or `null` for
- * not-specified / unmapped. Use on request/response schemas during the
- * consolidation window so a form still sending "Senior" isn't rejected.
- */
-export const SenioritySchema = z.preprocess(
-  (v) => (typeof v === "string" ? normalizeSeniority(v) : v),
-  z.enum(SENIORITY_LEVELS).nullable(),
-);

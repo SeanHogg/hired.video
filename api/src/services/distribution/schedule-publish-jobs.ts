@@ -43,6 +43,7 @@ import * as repo from "../../repositories/socialPublishJobRepository.js";
 import { assertCanWrite, WorkspaceForbiddenError } from "../studio/workspace.js";
 import { resolvePostedVariant } from "../studio/render-variants.js";
 import type { JobPostSettings } from "./send-publish-job.js";
+import { DomainError } from "../../domains/errors.js";
 
 export type ScheduleErrorKind =
   | ScheduleProblem
@@ -61,12 +62,32 @@ export type ScheduleErrorKind =
   | "NOT_FOUND"
   | "ALREADY_SCHEDULED";
 
-export class ScheduleError extends Error {
+const SCHEDULE_ERROR_STATUS: Record<ScheduleErrorKind, 400 | 403 | 404 | 409 | 422> = {
+  INVALID: 400,
+  IN_PAST: 422,
+  TOO_FAR_AHEAD: 422,
+  ACCOUNT_REQUIRED: 403,
+  NO_DESTINATIONS: 400,
+  TOO_MANY_DESTINATIONS: 400,
+  INVALID_LANE: 400,
+  CAPTION_TOO_LONG: 422,
+  TITLE_TOO_LONG: 422,
+  TITLE_NOT_SUPPORTED: 422,
+  TIKTOK_SETTINGS_REQUIRED: 400,
+  PROJECT_NOT_FOUND: 404,
+  FORBIDDEN: 403,
+  VIDEO_NOT_READY: 409,
+  INVALID_VARIANT: 422,
+  NOT_FOUND: 404,
+  ALREADY_SCHEDULED: 409,
+};
+
+export class ScheduleError extends DomainError {
   constructor(
     public readonly kind: ScheduleErrorKind,
     message: string,
   ) {
-    super(message);
+    super(SCHEDULE_ERROR_STATUS[kind], kind, message);
     this.name = "ScheduleError";
   }
 }

@@ -5,10 +5,10 @@
  *   • conversations             — DM / group thread root
  *   • conversationParticipants  — thread membership
  *   • messages                  — message bodies on user-to-user threads
- *   • aiChatSessions            — AI chat session state
- *   • aiChatMessages            — per-message body / role
  *   • businessPhoneNumbers      — per-user outbound phone provisioning
  *   • callLogs                  — call history
+ *
+ * (The user-to-AI chat channel lives in AiChatRepository.)
  *
  * Grouped because they're all "an ongoing exchange between two
  * parties" — different channels, same conversational shape.
@@ -23,8 +23,6 @@ const {
   conversationParticipants,
   messages,
   messageReadReceipts,
-  aiChatSessions,
-  aiChatMessages,
   businessPhoneNumbers,
   callLogs,
 } = schema;
@@ -37,10 +35,7 @@ export type ConversationParticipantRow = typeof conversationParticipants.$inferS
 export type ConversationParticipantInsert = typeof conversationParticipants.$inferInsert;
 export type MessageRow = typeof messages.$inferSelect;
 export type MessageInsert = typeof messages.$inferInsert;
-export type AiChatSessionRow = typeof aiChatSessions.$inferSelect;
-export type AiChatSessionInsert = typeof aiChatSessions.$inferInsert;
-export type AiChatMessageRow = typeof aiChatMessages.$inferSelect;
-export type AiChatMessageInsert = typeof aiChatMessages.$inferInsert;
+export type { AiChatSessionRow, AiChatSessionInsert, AiChatMessageRow, AiChatMessageInsert } from "./aiChatRepository.js";
 export type BusinessPhoneNumberRow = typeof businessPhoneNumbers.$inferSelect;
 export type BusinessPhoneNumberInsert = typeof businessPhoneNumbers.$inferInsert;
 export type CallLogRow = typeof callLogs.$inferSelect;
@@ -60,6 +55,10 @@ export interface IConversationRepository {
   insertConversationParticipant(input: ConversationParticipantInsert): Promise<void>;
   insertConversationParticipants(inputs: ConversationParticipantInsert[]): Promise<void>;
   findParticipantUserIds(conversationId: string): Promise<string[]>;
+  /** True when `userId` is a participant of the conversation. */
+  isParticipant(conversationId: string, userId: string): Promise<boolean>;
+  /** Full participant rows for one conversation. */
+  findParticipantsForConversation(conversationId: string): Promise<ConversationParticipantRow[]>;
   /** Batch participant lookup — one round-trip for a page of conversations. */
   findParticipantUserIdsForConversations(conversationIds: string[]): Promise<Map<string, string[]>>;
   /** Bump the conversation's `updatedAt` so the inbox sort by most-recent
@@ -70,6 +69,8 @@ export interface IConversationRepository {
 /** Messages + read receipts. */
 export interface IConversationMessageRepository {
   findMessagesForConversation(conversationId: string, limit?: number): Promise<MessageRow[]>;
+  /** Every non-deleted message in a conversation, newest first. */
+  findVisibleMessagesForConversation(conversationId: string): Promise<MessageRow[]>;
   /** Newest-first messages across every conversation `userId` participates
    *  in (optionally narrowed to one conversation), capped at `limit`
    *  (default 100, max 500). */
@@ -98,14 +99,6 @@ export interface IConversationMessageRepository {
   ): Promise<Map<string, number>>;
 }
 
-/** AI chat (separate channel; same repo for the messaging bounded ctx). */
-export interface IAiChatRepository {
-  findAiChatSessionsForUser(userId: string, limit?: number): Promise<AiChatSessionRow[]>;
-  insertAiChatSession(input: AiChatSessionInsert): Promise<AiChatSessionRow>;
-  findAiChatMessages(sessionId: string): Promise<AiChatMessageRow[]>;
-  insertAiChatMessage(input: AiChatMessageInsert): Promise<void>;
-}
-
 /** Business phone numbers + call logs. */
 export interface ITelephonyRepository {
   findBusinessPhoneNumbersForUser(userId: string): Promise<BusinessPhoneNumberRow[]>;
@@ -116,7 +109,6 @@ export interface ITelephonyRepository {
 export interface IConversationsRepository
   extends IConversationRepository,
     IConversationMessageRepository,
-    IAiChatRepository,
     ITelephonyRepository {}
 
 export class ConversationsRepository implements IConversationsRepository {
@@ -182,6 +174,22 @@ export class ConversationsRepository implements IConversationsRepository {
     return rows.map((r: any) => r.userId as string);
   }
 
+  async isParticipant(conversationId: string, userId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: conversationParticipants.id })
+      .from(conversationParticipants)
+      .where(and(eq(conversationParticipants.conversationId, conversationId), eq(conversationParticipants.userId, userId)))
+      .limit(1);
+    return !!row;
+  }
+
+  async findParticipantsForConversation(conversationId: string): Promise<ConversationParticipantRow[]> {
+    return (await this.db
+      .select()
+      .from(conversationParticipants)
+      .where(eq(conversationParticipants.conversationId, conversationId))) as ConversationParticipantRow[];
+  }
+
   async findParticipantUserIdsForConversations(
     conversationIds: string[],
   ): Promise<Map<string, string[]>> {
@@ -214,6 +222,14 @@ export class ConversationsRepository implements IConversationsRepository {
       .where(eq(messages.conversationId, conversationId))
       .orderBy(desc(messages.createdAt))
       .limit(Math.min(500, Math.max(1, limit)))) as MessageRow[];
+  }
+
+  async findVisibleMessagesForConversation(conversationId: string): Promise<MessageRow[]> {
+    return (await this.db
+      .select()
+      .from(messages)
+      .where(and(eq(messages.conversationId, conversationId), eq(messages.isDeleted, false)))
+      .orderBy(desc(messages.createdAt))) as MessageRow[];
   }
 
   async findMessagesForParticipant(
@@ -345,32 +361,6 @@ export class ConversationsRepository implements IConversationsRepository {
       .groupBy(messages.conversationId)) as Array<{ conversationId: string; count: number }>;
     for (const row of rows) out.set(row.conversationId, Number(row.count) || 0);
     return out;
-  }
-
-  async findAiChatSessionsForUser(userId: string, limit = 50): Promise<AiChatSessionRow[]> {
-    return (await this.db
-      .select()
-      .from(aiChatSessions)
-      .where(eq(aiChatSessions.userId, userId))
-      .orderBy(desc(aiChatSessions.createdAt))
-      .limit(Math.min(200, Math.max(1, limit)))) as AiChatSessionRow[];
-  }
-
-  async insertAiChatSession(input: AiChatSessionInsert): Promise<AiChatSessionRow> {
-    const [row] = await this.db.insert(aiChatSessions).values(input as any).returning();
-    return row as AiChatSessionRow;
-  }
-
-  async findAiChatMessages(sessionId: string): Promise<AiChatMessageRow[]> {
-    return (await this.db
-      .select()
-      .from(aiChatMessages)
-      .where(eq(aiChatMessages.sessionId, sessionId))
-      .orderBy(aiChatMessages.createdAt)) as AiChatMessageRow[];
-  }
-
-  async insertAiChatMessage(input: AiChatMessageInsert): Promise<void> {
-    await this.db.insert(aiChatMessages).values(input as any);
   }
 
   async findBusinessPhoneNumbersForUser(userId: string): Promise<BusinessPhoneNumberRow[]> {

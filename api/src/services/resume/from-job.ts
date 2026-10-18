@@ -23,18 +23,13 @@ import { z } from "zod";
 import type { IResumeOwnerReader } from "../../repositories/resumeRepository.js";
 import type { LLMClient } from "../adapters/llm-client.js";
 import { defineLenientIngest } from "../adapters/llm-client.js";
-import type { ParsedJob } from "../job/JobService.js";
+import type { ParsedJob } from "../job/job-page-parse.js";
 import { ResumeContentSchema, type ResumeContent } from "../../../../shared/resume.js";
 import { entryPathOf, joinPath, normalizeText, readAt } from "../../../../shared/resume-path.js";
 import { entryNaturalKey, type JobGap } from "../../../../shared/resume-tailor.js";
 import type { FromJobDraft, JobRequirement, LeftOutItem } from "../../../../shared/resume-from-job.js";
-import {
-  TailorEditSchemaWire,
-  TailorGapWireSchema,
-  applyResumeEdits,
-  dropUnsupportedSkills,
-  toJobGaps,
-} from "../job/tailor-edits.js";
+import { TailorEditSchemaWire, TailorGapWireSchema } from "../job/tailor-edit-contract.js";
+import { applyResumeEdits, dropUnsupportedSkills, toJobGaps } from "../job/tailor-apply.js";
 
 type Entry = Record<string, unknown>;
 const ENTRY_SECTIONS = ["work", "volunteer", "projects"] as const;

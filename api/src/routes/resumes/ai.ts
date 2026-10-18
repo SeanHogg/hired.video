@@ -18,6 +18,7 @@ import { RoastRequestSchema, buildMockRoast, roastWithLlm } from "../../services
 import { resumeExtractTextHandler } from "../resume-extract-text.js";
 import { resumeParseHandler } from "../resume-parse.js";
 import { failWith, respond } from "./shared.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const resumeAiRoutes = new Hono<AppEnv>();
 
@@ -26,20 +27,17 @@ resumeAiRoutes.post("/extract-text", anonResumeAiGate, attachTokenBudget(), resu
 
 // Signed-in callers are billed (token budget + Free-tier 3 roasts / month,
 // #765); anonymous visitors skip the gate — the marketing loss-leader.
-resumeAiRoutes.post("/roast", attachTokenBudget(), async (c) => {
-  const parsed = RoastRequestSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return failWith(c, new DomainError(400, "VALIDATION_ERROR", "resumeText is required (20–50 000 chars)", parsed.error.flatten()));
-  }
+resumeAiRoutes.post("/roast", attachTokenBudget(), validateJson(RoastRequestSchema, (e, c) => failWith(c, new DomainError(400, "VALIDATION_ERROR", "resumeText is required (20–50 000 chars)", e.flatten())), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
   const blocked = await servicesProcessor.enforce(c, "resume_roast");
   if (blocked) return blocked;
 
   if (!hasAnyLLMProviderKey(c.env)) {
     servicesProcessor.meterEvent(c, "resume_roast");
-    return respond(c, Promise.resolve(buildMockRoast(parsed.data.resumeText)));
+    return respond(c, Promise.resolve(buildMockRoast(body.resumeText)));
   }
   try {
-    const roast = await roastWithLlm(createLLMClient(c.env, c.var.user), parsed.data.resumeText);
+    const roast = await roastWithLlm(createLLMClient(c.env, c.var.user), body.resumeText);
     servicesProcessor.meterEvent(c, "resume_roast");
     return respond(c, Promise.resolve(roast));
   } catch (err) {

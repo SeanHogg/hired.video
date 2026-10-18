@@ -40,6 +40,7 @@ import { runSelfPublishGate } from "./self-publish-gate.js";
 import { CandidateConsentRequiredError, type AssertCandidateConsent } from "../../domains/candidate-consent/consent-gate.js";
 import { assertCandidateVideoConsent } from "../candidate-consent/candidate-consent-deps.js";
 import { SocialPublishError, type SocialVideoPublisher, type YouTubePostSettings } from "./publishers/index.js";
+import { DomainError } from "../../domains/errors.js";
 
 export type PublishProjectVideoErrorKind =
   | "PROJECT_NOT_FOUND"
@@ -52,14 +53,29 @@ export type PublishProjectVideoErrorKind =
   | "ACCOUNT_UNSUPPORTED"
   | "PUBLISH_FAILED";
 
-export class PublishProjectVideoError extends Error {
+const PUBLISH_ERROR_STATUS: Record<PublishProjectVideoErrorKind, 403 | 404 | 409 | 422 | 502> = {
+  PROJECT_NOT_FOUND: 404,
+  FORBIDDEN: 403,
+  VIDEO_NOT_READY: 409,
+  INVALID_VARIANT: 422,
+  CONSENT_REQUIRED: 403,
+  // The route answers CHANNEL_LIMIT with the shared upgrade envelope instead.
+  CHANNEL_LIMIT: 403,
+  NOT_CONNECTED: 409,
+  ACCOUNT_UNSUPPORTED: 422,
+  PUBLISH_FAILED: 502,
+};
+
+/** A DomainError; `details` is the envelope's (CONSENT_REQUIRED carries
+ *  `{ reason }`). NOT_CONNECTED answers with the platform-agnostic
+ *  SOCIAL_NOT_CONNECTED code the Post dock maps to "connect again". */
+export class PublishProjectVideoError extends DomainError {
   constructor(
     public readonly kind: PublishProjectVideoErrorKind,
     message: string,
-    /** Envelope `details` (CONSENT_REQUIRED carries `{ reason }`). */
-    public readonly details?: unknown,
+    details?: unknown,
   ) {
-    super(message);
+    super(PUBLISH_ERROR_STATUS[kind], kind === "NOT_CONNECTED" ? "SOCIAL_NOT_CONNECTED" : kind, message, details);
     this.name = "PublishProjectVideoError";
   }
 }

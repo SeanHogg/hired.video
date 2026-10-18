@@ -19,10 +19,12 @@ import {
   AdPromotionRepository,
   type AdRow,
   type NewAdRow,
+  type ServableAd,
 } from "../../repositories/adPromotionRepository.js";
 import type { AdContentTarget } from "../../../../shared/ad-content-target.js";
 import { adSubjectColumns, resolveAdContentTarget } from "./content-target.js";
 import { costPerClick, ctr } from "./metrics.js";
+import { placementsForSlot } from "./slot-placements.js";
 
 export type PromotionResult<T> =
   | { ok: true; value: T }
@@ -53,6 +55,27 @@ export async function listJobBoosts(userId: string, repo?: AdPromotionRepository
       costPerClick: costPerClick(b.spentCents, b.clicks),
     };
   });
+}
+
+/** Owner-scoped pause (active → paused) / resume (paused → active); null when no such boost in `from`. */
+export async function transitionJobBoost(
+  userId: string,
+  boostId: string,
+  from: "active" | "paused",
+  to: "active" | "paused",
+  repo?: AdPromotionRepository,
+) {
+  return repoOf(repo).transitionJobBoostStatus(boostId, userId, from, to);
+}
+
+/** Cancel the owner's boost and unsponsor its job; false when not found. */
+export async function cancelJobBoost(userId: string, boostId: string, repo?: AdPromotionRepository): Promise<boolean> {
+  const r = repoOf(repo);
+  const boost = await r.findJobBoostForOwner(boostId, userId);
+  if (!boost) return false;
+  await r.setJobBoostStatus(boost.id, "cancelled");
+  await r.unsponsorJob(boost.jobId);
+  return true;
 }
 
 // ─── Company boosts ───────────────────────────────────────────────────────
@@ -106,6 +129,22 @@ export async function updateAd(
   const ad = await repoOf(repo).updateAdForOwner(adId, userId, { ...input.fields, ...targetColumns(input.target) });
   if (!ad) return { ok: false, code: "NOT_FOUND", message: "Ad not found" };
   return { ok: true, value: withTarget(ad) };
+}
+
+/** Delete the owner's ad; false when not found / not theirs. */
+export async function deleteAd(userId: string, adId: string, repo?: AdPromotionRepository): Promise<boolean> {
+  return repoOf(repo).deleteAdForOwner(adId, userId);
+}
+
+/**
+ * #2396 — one active internal creative for a named page slot, counting the
+ * impression. Not owner-filtered: ads are shown TO the viewer.
+ */
+export async function serveAdForSlot(slot: string, repo?: AdPromotionRepository): Promise<ServableAd | null> {
+  const r = repoOf(repo);
+  const ad = await r.findServableAd([...placementsForSlot(slot)]);
+  if (ad) await r.incrementAdImpressions(ad.id);
+  return ad;
 }
 
 export async function listAds(

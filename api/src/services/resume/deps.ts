@@ -15,12 +15,13 @@ import {
   tryParseJsonResume,
 } from "../../services/resume/parse.js";
 import { refreshDiffPercentFor } from "../../services/resume/view.js";
-import { buildRepos } from "../../repositories/index.js";
+import { buildRepos, type IResumeRepository } from "../../repositories/index.js";
 import { isPromotedWithoutAuth } from "../user/promotionFlags.js";
 import type { ResumeDeps, ResumeParserPort, DiffRecomputePort } from "./ports.js";
 import { createLLMClient, hasAnyLLMProviderKey, type LLMEnv } from "../adapters/llm-client.js";
 import type { JwtPayload } from "../../types/index.js";
 import type { MergeFromFileDeps } from "./mergeFromFile.js";
+import type { FromJobDeps } from "./from-job-request.js";
 
 /** Concrete parser adapter. parseRawText is supplied by the caller (the
  *  Hono route) since the AI parse needs the request context for the
@@ -71,4 +72,16 @@ export function buildMergeFromFileDeps(
     llm: hasAnyLLMProviderKey(env) ? createLLMClient(env, user) : null,
     ...ports,
   };
+}
+
+/** Live résumé repository for the HTTP layer (merge, versions, lineage). */
+export function liveResumes(): IResumeRepository {
+  return buildRepos(getDb()).resumes;
+}
+
+/** Live ports for `POST /api/resumes { source: "job" }`. The caller has
+ *  already checked that an LLM provider is configured. */
+export function buildFromJobDeps(env: LLMEnv | undefined, user: JwtPayload | null | undefined): FromJobDeps {
+  const db = getDb();
+  return { repo: buildRepos(db).resumes, llm: createLLMClient(env, user), db };
 }

@@ -13,9 +13,9 @@ import { requireUser } from "./helpers/routerHelpers.js";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb } from "../db/index.js";
-import { buildRepos } from "../repositories/index.js";
 import { getVapidPublicKey } from "../services/push/web-push.js";
+import { subscribeToPush, unsubscribeFromPush } from "../services/push/pushSubscriptions.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const pushRoutes = new Hono<AppEnv>();
 
@@ -33,27 +33,22 @@ pushRoutes.get("/vapid-public-key", (c) =>
   c.json(success({ publicKey: getVapidPublicKey() }), 200),
 );
 
-pushRoutes.post("/subscriptions", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
-  const parsed = SubscribeSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid push subscription"), 400);
-  await buildRepos(getDb()).pushSubscriptions.upsert({
+pushRoutes.post("/subscriptions", validateJson(SubscribeSchema, () => error("VALIDATION_ERROR", "Invalid push subscription"), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  await subscribeToPush({
     userId,
-    endpoint: parsed.data.endpoint,
-    p256dh: parsed.data.keys.p256dh,
-    auth: parsed.data.keys.auth,
+    endpoint: body.endpoint,
+    p256dh: body.keys.p256dh,
+    auth: body.keys.auth,
   });
   return c.json(success({ subscribed: true }), 201);
 });
 
 pushRoutes.delete("/subscriptions", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const { userId } = auth;
+  const userId = requireUser(c);
   const parsed = UnsubscribeSchema.safeParse({ endpoint: c.req.query("endpoint") });
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "endpoint is required"), 400);
-  await buildRepos(getDb()).pushSubscriptions.deleteForUser(userId, parsed.data.endpoint);
+  await unsubscribeFromPush(userId, parsed.data.endpoint);
   return c.json(success({ subscribed: false }), 200);
 });

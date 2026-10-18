@@ -14,10 +14,12 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Variables, AppEnv } from "../../../types/index.js";
 import { success, error } from "../../../types/index.js";
-import { XAPI_VERBS } from "../../../db/schema/learning.js";
+import { XAPI_VERBS } from "../../../repositories/learningXapiRepository.js";
 import { UuidLikeSchema } from "../../../../../shared/validation.js";
 import { withGamification } from "../../../domains/gamification/with-gamification.js";
 import { ingestInternalStatement } from "../../../services/learning/xapi-use-cases.js";
+import { requireUser } from "../../helpers/routerHelpers.js";
+import { validateJson } from "../../helpers/validate.js";
 
 export const xapiStatementRoutes = new Hono<{ Variables: Variables } & AppEnv>();
 
@@ -43,14 +45,10 @@ export const XapiStatementSchema = z.object({
   timestamp: z.string().optional(),
 });
 
-xapiStatementRoutes.post("/statements", async (c) => {
-  const userId = c.var.user?.sub as string | undefined;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const parsed = XapiStatementSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
-  const data = parsed.data;
+xapiStatementRoutes.post("/statements", validateJson(XapiStatementSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  const data = body;
   const id = await ingestInternalStatement(userId, data);
   if (!id) return c.json(error("NOT_FOUND", "Enrollment not found"), 404);
 

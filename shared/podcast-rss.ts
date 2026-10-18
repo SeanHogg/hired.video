@@ -29,6 +29,8 @@
  * server worker that publishes the feed at `/feed/:projectId.xml`.
  */
 
+import { formatDuration } from "./duration-format.js";
+
 export interface PodcastFeedSpec {
   /** Show title — surfaced as the podcast name on Apple / Spotify. */
   title: string;
@@ -145,7 +147,7 @@ export function renderPodcastRss(spec: PodcastFeedSpec, episodes: PodcastEpisode
     lines.push(
       `      <enclosure url="${esc(ep.audioUrl)}" length="${ep.audioBytes}" type="${esc(ep.audioMime)}"/>`,
     );
-    lines.push(`      <itunes:duration>${formatDuration(ep.durationSec)}</itunes:duration>`);
+    lines.push(`      <itunes:duration>${formatDuration(ep.durationSec, { style: "clockHms" })}</itunes:duration>`);
     if (ep.season !== undefined) lines.push(`      <itunes:season>${ep.season}</itunes:season>`);
     if (ep.episodeNumber !== undefined) lines.push(`      <itunes:episode>${ep.episodeNumber}</itunes:episode>`);
     if (ep.imageUrl) lines.push(`      <itunes:image href="${esc(ep.imageUrl)}"/>`);
@@ -192,16 +194,4 @@ function esc(text: string): string {
 /** RFC-822 timestamp (RSS 2.0 mandates this format for pubDate). */
 function toRfc822(date: Date): string {
   return date.toUTCString();
-}
-
-/** Format a duration in seconds as HH:MM:SS or MM:SS (Apple Podcasts
- *  accepts both; HH:MM:SS for episodes ≥1h). */
-function formatDuration(totalSec: number): string {
-  const total = Math.max(0, Math.round(totalSec));
-  const hours = Math.floor(total / 3600);
-  const mins = Math.floor((total % 3600) / 60);
-  const secs = total % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  if (hours > 0) return `${hours}:${pad(mins)}:${pad(secs)}`;
-  return `${pad(mins)}:${pad(secs)}`;
 }

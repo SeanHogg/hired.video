@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import MediaPicker from "@/components/shared/MediaPicker";
-import type { MediaKind } from "@shared/media-kinds";
+import { mediaKindIsPrimaryVideo, type MediaKind } from "@shared/media-kinds";
 import { mediaKindLabelKey } from "@shared/template-kinds";
 import {
   CREATOR_SHARE_PCT,
@@ -27,7 +27,7 @@ const HELP = "mt-1 text-xs text-muted-foreground";
 /** Read-only "publishing as a {kind} template" line — hidden for video. */
 export function KindNote({ mediaKind }: { mediaKind: MediaKind }) {
   const { t } = useTranslation();
-  if (mediaKind === "video") return null;
+  if (mediaKindIsPrimaryVideo(mediaKind)) return null;
   return <div className={NOTE}>{t("publishTemplate.kindNote", { kind: t(mediaKindLabelKey(mediaKind)) })}</div>;
 }
 

@@ -3,18 +3,17 @@
  * routes/studio-features.ts barrel (split out of that file; paths unchanged).
  */
 import { Hono } from "hono";
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import type { AppEnv } from "../../types/index.js";
-import { getDb, schema } from "../../db/index.js";
 import { aiFailure } from "../../services/adapters/llm-error.js";
 import { checkTokenBudget } from "../../middleware/tierEnforcement.js";
 import { createAiTextCaller, hasAiTextProvider } from "../../services/adapters/ai-text-caller.js";
 import { CAPTION_TONES, generateProjectSocialCaption } from "../../../../shared/social-caption.js";
-import { projectStateDto } from "../../services/studio/project-state.js";
+import { loadOwnedCaptionSource } from "../../services/studio/social-caption.js";
 import { VIDEO_PUBLISH_PLATFORMS } from "../../../../shared/social-platforms.js";
-import { ok, fail } from "./shared.js";
+import { success } from "../../types/index.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const socialCaptionRoutes = new Hono<AppEnv>();
 
@@ -37,26 +36,14 @@ const SocialCaptionSchema = z.object({
 
 // Free for every plan (the Post dock's "Write it for me"); metered by the
 // monthly AI token budget like the other free AI helpers.
-socialCaptionRoutes.post("/social/generate-caption", async (c) => {
+socialCaptionRoutes.post("/social/generate-caption", validateJson(SocialCaptionSchema, undefined, { emptyBody: null }), async (c) => {
   const user = c.var.user;
   const overBudget = await checkTokenBudget(c);
   if (overBudget) return overBudget;
-  const body = await c.req.json().catch(() => null);
-  const parsed = SocialCaptionSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  }
+  const body = c.req.valid("json");
 
-  const db = getDb();
-  const [project] = await db
-    .select()
-    .from(schema.studioProjects)
-    .where(and(
-      eq(schema.studioProjects.id, parsed.data.projectId),
-      eq(schema.studioProjects.userId, user.sub),
-    ))
-    .limit(1);
-  if (!project) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  // The caption reads the Timeline under its per-kind name (state → timelineSpec).
+  const source = await loadOwnedCaptionSource(user.sub, body.projectId);
 
   // Gateway first, Workers AI fallback — a revoked gateway key degrades
   // instead of taking the caption down (#2309).
@@ -64,9 +51,7 @@ socialCaptionRoutes.post("/social/generate-caption", async (c) => {
     ? createAiTextCaller(c.env, user, { label: "linkedin_post_gen", useCase: "linkedin_post" })
     : null;
   try {
-    // The caption reads the Timeline under its per-kind name (state → timelineSpec).
-    const source = { ...project, timelineSpec: projectStateDto(project).timelineSpec };
-    return c.json(ok(await generateProjectSocialCaption(source, { tone: parsed.data.tone, platforms: parsed.data.platforms }, callAI)));
+    return c.json(success(await generateProjectSocialCaption(source, { tone: body.tone, platforms: body.platforms }, callAI)));
   } catch (err) {
     // A model answered but not with a usable post: a typed AI_* envelope,
     // never the heuristic post dressed up as the AI's.

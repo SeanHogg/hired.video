@@ -20,6 +20,7 @@
 
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
+import { requireUser } from "./helpers/routerHelpers.js";
 
 export const gameSocketRoutes = new Hono<{ Variables: Variables; Bindings: any }>();
 
@@ -32,7 +33,7 @@ gameSocketRoutes.get("/:projectId/socket", async (c) => {
   if (!projectId) return c.text("Missing projectId", 400);
 
   const user = c.var.user;
-  if (!user?.sub) return c.text("Unauthorized", 401);
+  requireUser(c);
 
   const env = (c.env as any) ?? {};
   const binding = env.GAME_ROOM as DurableObjectNamespace | undefined;

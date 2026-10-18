@@ -84,6 +84,21 @@ export async function findOwnedAgentRun(recruiterId: string, id: string): Promis
   return run ?? null;
 }
 
+/** The recruiter's most recently completed run for `jobId` (live-screen auto-match). */
+export async function findLatestCompletedAgentRunForJob(recruiterId: string, jobId: string): Promise<AgentRunRow | null> {
+  const [run] = await getDb()
+    .select()
+    .from(recruiterAgentRuns)
+    .where(and(
+      eq(recruiterAgentRuns.recruiterId, recruiterId),
+      eq(recruiterAgentRuns.jobId, jobId),
+      eq(recruiterAgentRuns.status, "completed"),
+    ))
+    .orderBy(desc(recruiterAgentRuns.completedAt))
+    .limit(1);
+  return run ?? null;
+}
+
 /** Owner of a run (null when the run does not exist). */
 export async function findAgentRunOwner(id: string): Promise<{ id: string; recruiterId: string } | null> {
   const [run] = await getDb()

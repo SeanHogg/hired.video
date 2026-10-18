@@ -2,13 +2,14 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { lazyRoute, type RouteLoader } from "./lib/lazy-route.js";
 import { registerAdminRoutes } from "./routes/admin/index.js";
+import { registerLegacyExtensionAliases } from "./routes/legacy-extension-aliases.js";
 import { cors } from "hono/cors";
 import { TIER_NAME } from "../../shared/tier-copy.js";
 import { PRO_MONTHLY_PRICE } from "../../shared/pricing.js";
 import { authMiddleware, optionalAuthMiddleware } from "./middleware/auth.js";
 import { emailVerifiedMiddleware } from "./middleware/emailVerified.js";
 import { passwordChangeMiddleware } from "./middleware/passwordChange.js";
-import { globalErrorHandler } from "./middleware/errorHandler.js";
+import { globalErrorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { rateLimiterMiddleware } from "./middleware/rateLimiter.js";
 import { requestLoggerMiddleware } from "./middleware/requestLogger.js";
 import { getRelease } from "./utils/release.js";
@@ -72,11 +73,9 @@ export function createApp() {
 
   // Apply JWT auth middleware to all /api/* routes except public ones
   const PUBLIC_PREFIXES = [
-    "/api/auth",
-    "/api/auth/oauth",
+    "/api/auth", // also covers /api/auth/oauth and /api/auth/magic-link
     // Inbound social webhooks (#2048): authenticated by each network's signature, not a JWT.
     "/api/social/webhooks",
-    "/api/auth/magic-link",
     "/api/errors/report",
     // Opened straight from a recipient's email client (no JWT): the open-
     // tracking pixel, the signed click redirect, one-click unsubscribe, and the
@@ -576,6 +575,10 @@ export function createApp() {
   // (no business logic currently needed)
   app.get("/api/collab/:id", (c) => c.body(null, 204));
 
+  // DEPRECATED paths the CWS-published extension still calls — must precede
+  // the /api/resumes and /api/studio mounts (their /:id routes would match).
+  registerLegacyExtensionAliases(app);
+
   mount("/api/auth/passkey", () => import("./routes/passkeys.js").then((m) => m.passkeyRoutes));
   mount("/api/auth/oauth", () => import("./routes/oauth.js").then((m) => m.oauthRoutes));
   mount("/api/auth/guest", () => import("./routes/guest-auth.js").then((m) => m.guestAuthRoutes));
@@ -696,8 +699,7 @@ export function createApp() {
   // /api/social/oauth/callback, kept ONLY because it is the redirect URI
   // registered in each provider's developer console (social-oauth.ts
   // socialCallbackUrl). Same single handler; the lane rides the signed state.
-  // The managed-lane API itself is /api/social/*?lane=managed. Must stay above
-  // the "/api/admin" catch-all.
+  // The managed-lane API itself is /api/social/*?lane=managed.
   mount("/api/admin/social/oauth", () => import("./routes/social-oauth-callback.js").then((m) => m.managedOAuthCallbackAliasRoutes));
   mount("/api/admin/theme-calendar", () => import("./routes/theme-calendar.js").then((m) => m.adminThemeCalendarRoutes)); // SA theme calendar (#2350)
   // The /api/admin composite: every admin / SuperAdmin sub-router, lazily
@@ -855,6 +857,9 @@ Keep responses concise (2–4 sentences). Answer questions about features, prici
     return c.json({ success: true, reply }, 200);
   });
 
+
+  // ONE 404 envelope for every unmatched path (no per-router catch-alls).
+  app.notFound(notFoundHandler);
 
   // Wrap globalErrorHandler to ensure CORS headers are present on error responses.
   // Hono's onError creates a fresh response that bypasses middleware-set headers.

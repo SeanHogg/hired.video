@@ -3,12 +3,12 @@
  * routes/studio-features.ts barrel (split out of that file; paths unchanged).
  */
 import { Hono } from "hono";
-import { and, eq, desc } from "drizzle-orm";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import type { AppEnv } from "../../types/index.js";
-import { getDb } from "../../db/index.js";
-import { ok, fail, studioCaptions } from "./shared.js";
+import { getLatestCaption, saveCaption } from "../../services/studio/captions.js";
+import { success, error } from "../../types/index.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const captionsRoutes = new Hono<AppEnv>();
 
@@ -57,10 +57,7 @@ export function buildVtt(cues: Array<{ start: number; end: number; text: string 
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // POST /api/studio/captions/generate — generate captions from TTS timestamps or Whisper
-captionsRoutes.post("/captions/generate", async (c) => {
-  const user = c.var.user;
-  const body = await c.req.json().catch(() => null);
-  const parsed = z.object({
+captionsRoutes.post("/captions/generate", validateJson(z.object({
     projectId: UuidLikeSchema,
     wordTimestamps: z.array(z.object({
       word: z.string(),
@@ -70,17 +67,18 @@ captionsRoutes.post("/captions/generate", async (c) => {
     style: z.enum(["standard", "bold-pop", "word-by-word", "lower-thirds"]).default("standard"),
     language: z.string().default("en"),
     wordsPerCue: z.number().min(3).max(15).default(8),
-  }).safeParse(body);
+  }), () => error("VALIDATION_ERROR", "Invalid request body"), { emptyBody: null }), async (c) => {
+  const user = c.var.user;
+  const body = c.req.valid("json");
 
-  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request body"), 400);
 
-  const timestamps = parsed.data.wordTimestamps ?? [];
+  const timestamps = body.wordTimestamps ?? [];
   if (timestamps.length === 0) {
-    return c.json(fail("NO_TIMESTAMPS", "No word timestamps provided. Generate TTS first or upload a recording."), 400);
+    return c.json(error("NO_TIMESTAMPS", "No word timestamps provided. Generate TTS first or upload a recording."), 400);
   }
 
   // Build caption cues
-  const wordsPerCue = parsed.data.wordsPerCue;
+  const wordsPerCue = body.wordsPerCue;
   const cues: Array<{ start: number; end: number; text: string; words: Array<{ word: string; start: number; end: number }> }> = [];
   for (let i = 0; i < timestamps.length; i += wordsPerCue) {
     const chunk = timestamps.slice(i, i + wordsPerCue);
@@ -95,23 +93,22 @@ captionsRoutes.post("/captions/generate", async (c) => {
   const srtContent = buildSrt(cues);
   const vttContent = buildVtt(cues);
 
-  const db = getDb();
-  const [caption] = await db.insert(studioCaptions).values({
+  const caption = await saveCaption({
     userId: user.sub,
-    projectId: parsed.data.projectId,
-    language: parsed.data.language,
-    style: parsed.data.style,
+    projectId: body.projectId,
+    language: body.language,
+    style: body.style,
     cues,
     srtContent,
     vttContent,
-  } as any).returning();
+  });
 
-  return c.json(ok({
+  return c.json(success({
     id: caption.id,
     cues,
     srtContent,
     vttContent,
-    style: parsed.data.style,
+    style: body.style,
   }), 201);
 });
 
@@ -119,13 +116,5 @@ captionsRoutes.post("/captions/generate", async (c) => {
 captionsRoutes.get("/captions/:projectId", async (c) => {
   const user = c.var.user;
   const projectId = c.req.param("projectId");
-  const db = getDb();
-
-  const captions = await db.select().from(studioCaptions)
-    .where(and(eq(studioCaptions.projectId, projectId), eq(studioCaptions.userId, user.sub)))
-    .orderBy(desc(studioCaptions.createdAt))
-    .limit(1);
-
-  if (!captions.length) return c.json(ok(null));
-  return c.json(ok(captions[0]));
+  return c.json(success(await getLatestCaption(user.sub, projectId)));
 });

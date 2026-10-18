@@ -49,9 +49,7 @@ export async function loadUserDataExportRows(userId: string) {
     studioProjects,
     invoices,
     paymentMethods,
-    [cookiePrefsRow],
-    [privacyPrefsRow],
-    [accountPrefsRow],
+    settings,
   ] = await Promise.all([
     db.select().from(schema.jobApplications).where(eq(schema.jobApplications.userId, userId)),
     db.select().from(schema.savedJobs).where(eq(schema.savedJobs.userId, userId)),
@@ -114,9 +112,8 @@ export async function loadUserDataExportRows(userId: string) {
       })
       .from(schema.paymentMethods)
       .where(eq(schema.paymentMethods.userId, userId)),
-    db.select().from(schema.cookiePreferences).where(eq(schema.cookiePreferences.userId, userId)).limit(1),
-    db.select().from(schema.privacyPreferences).where(eq(schema.privacyPreferences.userId, userId)).limit(1),
-    db.select().from(schema.accountPreferences).where(eq(schema.accountPreferences.userId, userId)).limit(1),
+    // user_settings (one row, three sections — W3-B 0592).
+    repos.preferences.findSettingsSections(userId),
   ]);
 
   return {
@@ -130,8 +127,8 @@ export async function loadUserDataExportRows(userId: string) {
     studioProjects,
     invoices,
     paymentMethods,
-    cookiePrefsRow: cookiePrefsRow ?? null,
-    privacyPrefsRow: privacyPrefsRow ?? null,
-    accountPrefsRow: accountPrefsRow ?? null,
+    cookiePrefsRow: settings.cookie,
+    privacyPrefsRow: settings.privacy,
+    accountPrefsRow: settings.account,
   };
 }

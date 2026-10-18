@@ -6,7 +6,7 @@
  * Inserts / patches accept a loose record: fee + salary columns are
  * numeric in Postgres but computed as numbers by the fee resolver.
  */
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 
 const { placements, placementSplits, users } = schema;
@@ -31,6 +31,14 @@ export async function findUserName(userId: string): Promise<string | null> {
     .where(eq(users.id, userId))
     .limit(1);
   return row ? row.name : null;
+}
+
+/** Platform-wide placement count + average salary (partner-portal analytics). */
+export async function aggregateAllPlacements(): Promise<{ total: number; avgSalary: string | null }> {
+  const [row] = await getDb()
+    .select({ total: count(), avgSalary: sql<string | null>`avg(${placements.salary})::numeric` })
+    .from(placements);
+  return { total: Number(row?.total ?? 0), avgSalary: row?.avgSalary ?? null };
 }
 
 export async function insertPlacement(values: Record<string, unknown>): Promise<PlacementRow> {
@@ -61,6 +69,14 @@ export async function listPlacementsForRecruiter(recruiterId: string): Promise<P
     .from(placements)
     .where(eq(placements.recruiterId, recruiterId))
     .orderBy(desc(placements.createdAt));
+}
+
+/** The recruiter's placements created on/after `since` (ad ROAS window). */
+export async function listPlacementsForRecruiterSince(recruiterId: string, since: Date): Promise<PlacementRow[]> {
+  return getDb()
+    .select()
+    .from(placements)
+    .where(and(eq(placements.recruiterId, recruiterId), gte(placements.createdAt, since)));
 }
 
 export async function findOwnedPlacement(recruiterId: string, id: string): Promise<PlacementRow | null> {

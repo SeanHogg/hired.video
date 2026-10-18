@@ -21,6 +21,7 @@ import { getSubscription } from "../../services/billing/BillingService.js";
 import { isAdminRole } from "../../middleware/superAdmin.js";
 import type { JwtPayload } from "../../types/index.js";
 import { logger } from "../../lib/logger.js";
+import { ExternalEmailAccountsRepository } from "../../repositories/externalEmailAccountsRepository.js";
 import type {
   PlanTier,
   UsageEventType,
@@ -229,20 +230,11 @@ async function consumedInPeriod(
     }
 
     case "connected_inboxes_active": {
-      // Snapshot count of `external_email_accounts` rows with `status =
-      // 'active'`. Disconnecting a mailbox frees the slot immediately, so
-      // periodStart is intentionally ignored.
-      const [row] = (await db
-        .select({ total: sql<number>`count(*)::int` })
-        .from(schema.externalEmailAccounts)
-        .where(
-          and(
-            eq(schema.externalEmailAccounts.userId, userId),
-            eq(schema.externalEmailAccounts.status, "active"),
-          ),
-        )) as Array<{ total: number | string | null }>;
-      const v = row?.total ?? 0;
-      return typeof v === "string" ? Number(v) : v;
+      // Snapshot count of connected mailboxes (provider_connections purpose
+      // "email_inbox") that are active and not paused. Disconnecting a
+      // mailbox frees the slot immediately, so periodStart is intentionally
+      // ignored.
+      return new ExternalEmailAccountsRepository(db).countActiveForUser(userId);
     }
 
     default: {

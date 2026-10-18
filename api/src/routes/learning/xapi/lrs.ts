@@ -39,8 +39,9 @@ import {
   type ResolvedLrsCredential,
   type DocumentKey,
 } from "../../../services/learning/lrs-service.js";
-import type { LrsDocumentType } from "../../../db/schema/learning.js";
 import { clampLimit } from "../../../utils/pagination.js";
+
+type LrsDocumentType = DocumentKey["docType"];
 
 export const xapiLrsRoutes = new Hono<{ Variables: Variables } & AppEnv>();
 

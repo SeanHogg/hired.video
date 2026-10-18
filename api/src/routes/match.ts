@@ -2,7 +2,7 @@
  * Thin HTTP route layer for /api/match.
  *
  * All business logic lives in routes/match-handlers.ts. This file only:
- *   1. Builds MatchDeps from the Hono request env (db, clock, LLM).
+ *   1. Builds MatchDeps from the Hono request env (services/job/match-deps.ts).
  *   2. Parses the JSON body.
  *   3. Delegates to the matching handler and returns its HandlerResult.
  *
@@ -14,9 +14,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import type { Variables, AppEnv } from "../types/index.js";
-import { getDb } from "../db/index.js";
 import { attachTokenBudget, checkTokenBudget, requirePro } from "../middleware/tierEnforcement.js";
-import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import {
   handleAnalyze,
@@ -25,6 +23,7 @@ import {
   handleInsights,
   type MatchDeps,
 } from "../services/job/match-handlers.js";
+import { liveMatchDeps } from "../services/job/match-deps.js";
 import { handleTailor } from "../services/job/tailor-handler.js";
 import { handleCoverLetter } from "../services/job/cover-letter-handler.js";
 import { handleCoverLetterTone } from "../services/job/cover-letter-tone.js";
@@ -39,17 +38,7 @@ matchRoutes.use("*", attachTokenBudget());
 // ---------------------------------------------------------------------------
 
 function buildMatchDeps(c: Context<AppEnv>): MatchDeps {
-  const env = (c.env as any) ?? {};
-  // Match flows touch multiple use cases (analyze, tailor, roast, insights)
-  // so we hand the handler a plain use-case-driven facade — each call site
-  // inside the handler picks its own useCase per `llm.callJson(...)`.
-  // The facade gates the budget and charges the ledger automatically;
-  // route wiring is just db + clock + client.
-  return {
-    db: getDb(),
-    now: () => new Date(),
-    llm: hasAnyLLMProviderKey(env) ? createLLMClient(env, c.var.user) : null,
-  };
+  return liveMatchDeps((c.env as any) ?? {}, c.var.user);
 }
 
 async function relay(
@@ -72,7 +61,7 @@ async function relay(
 /** POST /api/match/analyze — score resume vs job */
 matchRoutes.post("/analyze", async (c) => {
   const body = await c.req.json().catch(() => null);
-  return relay(c, handleAnalyze(buildMatchDeps(c), c.var.user?.sub ?? null, body));
+  return relay(c, handleAnalyze(buildMatchDeps(c), c.var.userId ?? null, body));
 });
 
 /** POST /api/match/tailor — rewrite resume to match job */
@@ -82,7 +71,7 @@ matchRoutes.post("/tailor", async (c) => {
   if (blocked) return blocked;
 
   const body = await c.req.json().catch(() => null);
-  const response = await relay(c, handleTailor(buildMatchDeps(c), c.var.user?.sub ?? null, body));
+  const response = await relay(c, handleTailor(buildMatchDeps(c), c.var.userId ?? null, body));
   if (response.status >= 200 && response.status < 300) {
     servicesProcessor.meterEvent(c, "resume_tailor");
   }
@@ -92,7 +81,7 @@ matchRoutes.post("/tailor", async (c) => {
 /** POST /api/match/cover-letter — the letter for a tailored résumé (Pro) */
 matchRoutes.post("/cover-letter", requirePro("Cover Letter"), async (c) => {
   const body = await c.req.json().catch(() => null);
-  return relay(c, handleCoverLetter(buildMatchDeps(c), c.var.user?.sub ?? null, body));
+  return relay(c, handleCoverLetter(buildMatchDeps(c), c.var.userId ?? null, body));
 });
 
 // Tone rewrites are FREE (no Pro, no token budget), so the budget can't
@@ -108,31 +97,27 @@ const toneLimiter = createIpRateLimiter({
 /** POST /api/match/cover-letter/tone — rewrite the letter in a tone (FREE, audited) */
 matchRoutes.post("/cover-letter/tone", toneLimiter, async (c) => {
   const body = await c.req.json().catch(() => null);
-  const { status, body: out } = await toHandlerResult(handleCoverLetterTone(buildMatchDeps(c), c.var.user?.sub ?? null, body));
+  const { status, body: out } = await toHandlerResult(handleCoverLetterTone(buildMatchDeps(c), c.var.userId ?? null, body));
   return c.json(out as never, status as never);
 });
 
 /** POST /api/match/bycontent — raw-string analyze */
 matchRoutes.post("/bycontent", async (c) => {
   const body = await c.req.json().catch(() => null);
-  return relay(c, handleByContent(buildMatchDeps(c), c.var.user?.sub ?? null, body));
+  return relay(c, handleByContent(buildMatchDeps(c), c.var.userId ?? null, body));
 });
 
 /** POST /api/match/byid — analyze by persisted IDs */
 matchRoutes.post("/byid", async (c) => {
   const body = await c.req.json().catch(() => null);
-  return relay(c, handleByid(buildMatchDeps(c), c.var.user?.sub ?? null, body));
+  return relay(c, handleByid(buildMatchDeps(c), c.var.userId ?? null, body));
 });
 
 /** POST /api/match/insights — deep career analysis (Pro only) */
 matchRoutes.post("/insights", requirePro("Career Insights"), async (c) => {
   const body = await c.req.json().catch(() => null);
-  return relay(c, handleInsights(buildMatchDeps(c), c.var.user?.sub ?? null, body));
+  return relay(c, handleInsights(buildMatchDeps(c), c.var.userId ?? null, body));
 });
 
 /** POST /api/match — redirect to analyze (canonical root) */
 matchRoutes.post("/", (_c) => _c.redirect("/api/match/analyze", 307));
-
-matchRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Match route not found" } }, 404),
-);

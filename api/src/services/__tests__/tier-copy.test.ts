@@ -19,7 +19,6 @@ import {
   UPGRADE_URL,
   TIER_ID,
   PERSONALIZE_TIER,
-  AD_TEMPLATE_TIER,
   type PersonalizeResponse,
   type PersonalizeTier,
   type AdTemplateTier,
@@ -90,15 +89,10 @@ describe("PERSONALIZE_TIER — response discriminator for /api/messages/personal
   });
 });
 
-describe("AD_TEMPLATE_TIER — studio ad-template gate", () => {
-  it("aliases TIER_ID — one source of truth for tier identifiers", () => {
-    assert.equal(AD_TEMPLATE_TIER.pro, TIER_ID.pro);
-    assert.equal(AD_TEMPLATE_TIER.free, TIER_ID.free);
-  });
-
+describe("AdTemplateTier — studio ad-template gate", () => {
   it("AdTemplateTier accepts only TIER_ID values (compile-time check)", () => {
-    const free: AdTemplateTier = AD_TEMPLATE_TIER.free;
-    const pro: AdTemplateTier = AD_TEMPLATE_TIER.pro;
+    const free: AdTemplateTier = TIER_ID.free;
+    const pro: AdTemplateTier = TIER_ID.pro;
     assert.deepEqual([free, pro], ["free", "pro"]);
   });
 });

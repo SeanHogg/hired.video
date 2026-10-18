@@ -2,15 +2,18 @@
  * OAuth + access-token-refresh for Gmail and Outlook mailbox connections.
  *
  * Mirrors the existing sign-in OAuth pattern (HMAC-signed state, code
- * exchange) but writes to `external_email_accounts` with encrypted
- * refresh tokens — these tokens are NOT for sign-in, they exist solely
+ * exchange) but writes to provider_connections (purpose "email_inbox") with
+ * encrypted refresh tokens — these tokens are NOT for sign-in, they exist solely
  * to read mailbox content for the unified inbox.
  *
  * Access tokens are short-lived (Gmail ~1h, Outlook ~1h) and never
  * persisted — `refreshAccessToken()` re-mints them on each sync run.
  */
 
-import { decryptToken, encryptToken } from "./encryption.js";
+import {
+  openAndResealSecret,
+  sealConnectionSecret,
+} from "../provider-connections/connection-secrets.js";
 import { getJwtSecret } from "../../utils/jwt.js";
 import { hexToBytes, hmacSha256Hex, hmacSha256Verify } from "../../utils/crypto.js";
 import { getEnv } from "../../utils/env.js";
@@ -251,9 +254,13 @@ function classifyRefreshFailure(args: {
 export async function refreshAccessToken(
   provider: EmailProviderId,
   encryptedRefreshToken: string,
+  /** Persists a legacy-encrypted refresh token re-sealed under the one
+   *  connection-secrets key (lazy re-seal on read). */
+  onReseal?: (resealed: string) => Promise<void>,
 ): Promise<{ accessToken: string; expiresIn: number }> {
   const cfg = EMAIL_PROVIDER_CONFIG[provider];
-  const refreshToken = await decryptToken(encryptedRefreshToken);
+  const refreshToken =
+    (await openAndResealSecret(encryptedRefreshToken, onReseal ?? (async () => {}))) ?? "";
   const params = new URLSearchParams({
     grant_type: "refresh_token",
     refresh_token: refreshToken,
@@ -275,4 +282,8 @@ export async function refreshAccessToken(
   return { accessToken: j.access_token, expiresIn: j.expires_in ?? 3600 };
 }
 
-export { encryptToken };
+/** Seal a mailbox refresh token for provider_connections.refresh_token_enc.
+ *  Mailbox tokens were always encrypted, so no plaintext fallback. */
+export async function encryptToken(plaintext: string): Promise<string> {
+  return (await sealConnectionSecret(plaintext)) ?? "";
+}

@@ -4,7 +4,7 @@ import { error, type JwtPayload, type AppEnv } from "../types/index.js";
 import { getJwtSecret, getJwtSecretOptional } from "../utils/jwt.js";
 import { isSuperAdmin } from "./superAdmin.js";
 import { getDb } from "../db/index.js";
-import { loadSessionForJwt } from "../services/auth/sessions.js";
+import { loadSessionForJwt } from "../services/auth/session-validation.js";
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 

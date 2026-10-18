@@ -11,8 +11,9 @@ import {
   StageInputSchema,
   UpdateKitSchema,
 } from "../../domains/scorecards/schemas.js";
-import { mapServiceError, requireUser } from "../helpers/routerHelpers.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 import type { ScorecardsService } from "../../domains/scorecards/scorecardsService.js";
+import { validateJson } from "../helpers/validate.js";
 
 export function kitRoutes(
   service: () => ScorecardsService,
@@ -20,77 +21,43 @@ export function kitRoutes(
   const r = new Hono<AppEnv>();
 
   r.get("/", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    try {
-      return c.json(
-        success(
-          await service().listKits(auth.userId, {
-            onlyCompanyId: c.req.query("companyId") || undefined,
-            jobId: c.req.query("jobId") || undefined,
-          }),
-        ),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    const userId = requireUser(c);
+    return c.json(
+      success(
+        await service().listKits(userId, {
+          onlyCompanyId: c.req.query("companyId") || undefined,
+          jobId: c.req.query("jobId") || undefined,
+        }),
+      ),
+    );
   });
 
   r.get("/:id", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    try {
-      return c.json(success(await service().getKit(auth.userId, c.req.param("id"))));
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    const userId = requireUser(c);
+    return c.json(success(await service().getKit(userId, c.req.param("id"))));
   });
 
-  r.post("/", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = CreateKitSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(success(await service().createKit(auth.userId, parsed.data)), 201);
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+  r.post("/", validateJson(CreateKitSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(success(await service().createKit(userId, body)), 201);
   });
 
-  r.patch("/:id", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = UpdateKitSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(
-        success(await service().updateKit(auth.userId, c.req.param("id"), parsed.data)),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+  r.patch("/:id", validateJson(UpdateKitSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(
+      success(await service().updateKit(userId, c.req.param("id"), body)),
+    );
   });
 
-  r.post("/:id/stages", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = StageInputSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(
-        success(await service().addStage(auth.userId, c.req.param("id"), parsed.data)),
-        201,
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+  r.post("/:id/stages", validateJson(StageInputSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(
+      success(await service().addStage(userId, c.req.param("id"), body)),
+      201,
+    );
   });
 
   return r;
@@ -101,33 +68,18 @@ export function stageRoutes(
 ): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
 
-  r.patch("/:id", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = StageInputSchema.partial().safeParse(
-      await c.req.json().catch(() => ({})),
+  r.patch("/:id", validateJson(StageInputSchema.partial(), (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten())), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(
+      success(await service().updateStage(userId, c.req.param("id"), body)),
     );
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(
-        success(await service().updateStage(auth.userId, c.req.param("id"), parsed.data)),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
   });
 
   r.delete("/:id", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    try {
-      await service().deleteStage(auth.userId, c.req.param("id"));
-      return c.json(success({ id: c.req.param("id") }));
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    const userId = requireUser(c);
+    await service().deleteStage(userId, c.req.param("id"));
+    return c.json(success({ id: c.req.param("id") }));
   });
 
   return r;

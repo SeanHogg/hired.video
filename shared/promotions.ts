@@ -4,7 +4,7 @@
  *
  * A creator submits a rendered Studio project; a SuperAdmin approves it and
  * it is published under hired.video's managed brand account for the chosen
- * platform (`managed_accounts`). The creator's own hired.video pages stay the
+ * platform (provider_connections purpose "managed_social"). The creator's own hired.video pages stay the
  * always-available destination; promotion is the curated extra reach.
  *
  * A new SOCIAL_POST_PLATFORMS adapter that can also post for the brand

@@ -19,12 +19,9 @@ import { success, error } from "../../types/index.js";
 import { adminRepos } from "../../repositories/admin/index.js";
 import { gamificationFromContext } from "../../domains/gamification/with-gamification.js";
 import { auditLog, AUDIT_ACTIONS } from "../../utils/audit.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const superadminPointsRoutes = new Hono<AppEnv>();
-
-function actorId(c: { var: { user: { sub: string } } }): string {
-  return c.var.user.sub;
-}
 
 // ── Reads ──────────────────────────────────────────────────────────────
 
@@ -66,25 +63,24 @@ const AdjustBody = z.object({
   reason: z.string().min(3).max(500),
 });
 
-superadminPointsRoutes.post("/user/:userId/adjust", async (c) => {
+superadminPointsRoutes.post("/user/:userId/adjust", validateJson(AdjustBody, (e) => error("VALIDATION_ERROR", e.issues[0].message)), async (c) => {
   const targetId = c.req.param("userId");
-  const parsed = AdjustBody.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
+  const body = c.req.valid("json");
 
   const game = gamificationFromContext(c);
   const row = await game.adminAdjust({
     userId: targetId,
-    delta: parsed.data.delta,
-    reason: parsed.data.reason,
-    adminUserId: actorId(c),
+    delta: body.delta,
+    reason: body.reason,
+    adminUserId: c.var.userId,
   });
 
   await auditLog({
     action: AUDIT_ACTIONS.POINTS_ADJUSTED,
-    actorId: actorId(c),
+    actorId: c.var.userId,
     targetType: "user",
     targetId,
-    metadata: { delta: parsed.data.delta, reason: parsed.data.reason, ledgerId: row.id },
+    metadata: { delta: body.delta, reason: body.reason, ledgerId: row.id },
   });
 
   return c.json(success({ ledger: row }));
@@ -92,28 +88,27 @@ superadminPointsRoutes.post("/user/:userId/adjust", async (c) => {
 
 const SuspendBody = z.object({ reason: z.string().min(3).max(500) });
 
-superadminPointsRoutes.post("/user/:userId/suspend", async (c) => {
+superadminPointsRoutes.post("/user/:userId/suspend", validateJson(SuspendBody, (e) => error("VALIDATION_ERROR", e.issues[0].message)), async (c) => {
   const targetId = c.req.param("userId");
-  const parsed = SuspendBody.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
+  const body = c.req.valid("json");
 
-  const row = await gamificationFromContext(c).adminSuspend(targetId, parsed.data.reason, actorId(c));
+  const row = await gamificationFromContext(c).adminSuspend(targetId, body.reason, c.var.userId);
   await auditLog({
     action: AUDIT_ACTIONS.POINTS_SUSPENDED,
-    actorId: actorId(c),
+    actorId: c.var.userId,
     targetType: "user",
     targetId,
-    metadata: { reason: parsed.data.reason },
+    metadata: { reason: body.reason },
   });
   return c.json(success({ balance: row }));
 });
 
 superadminPointsRoutes.post("/user/:userId/reinstate", async (c) => {
   const targetId = c.req.param("userId");
-  const row = await gamificationFromContext(c).adminReinstate(targetId, actorId(c));
+  const row = await gamificationFromContext(c).adminReinstate(targetId, c.var.userId);
   await auditLog({
     action: AUDIT_ACTIONS.POINTS_REINSTATED,
-    actorId: actorId(c),
+    actorId: c.var.userId,
     targetType: "user",
     targetId,
   });
@@ -138,25 +133,24 @@ const ResolveBody = z.object({
   reinstate: z.boolean().optional(),
 });
 
-superadminPointsRoutes.post("/fraud/:flagId/resolve", async (c) => {
+superadminPointsRoutes.post("/fraud/:flagId/resolve", validateJson(ResolveBody, (e) => error("VALIDATION_ERROR", e.issues[0].message)), async (c) => {
   const flagId = c.req.param("flagId");
-  const parsed = ResolveBody.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
+  const body = c.req.valid("json");
 
   const flag = await gamificationFromContext(c).resolveFraudFlag({
     flagId,
-    decision: parsed.data.decision,
-    reviewerId: actorId(c),
-    notes: parsed.data.notes ?? null,
-    reinstate: parsed.data.reinstate ?? false,
+    decision: body.decision,
+    reviewerId: c.var.userId,
+    notes: body.notes ?? null,
+    reinstate: body.reinstate ?? false,
   });
 
   await auditLog({
     action: AUDIT_ACTIONS.POINTS_FRAUD_RESOLVED,
-    actorId: actorId(c),
+    actorId: c.var.userId,
     targetType: "points_fraud_flag",
     targetId: flagId,
-    metadata: { userId: flag.userId, decision: parsed.data.decision, reinstate: parsed.data.reinstate ?? false },
+    metadata: { userId: flag.userId, decision: body.decision, reinstate: body.reinstate ?? false },
   });
 
   return c.json(success({ flag }));
@@ -193,21 +187,20 @@ const ApproveBody = z.object({
   recipientEmail: z.string().email().optional(),
 });
 
-superadminPointsRoutes.post("/redemptions/:id/approve", async (c) => {
+superadminPointsRoutes.post("/redemptions/:id/approve", validateJson(ApproveBody, (e) => error("VALIDATION_ERROR", e.issues[0].message)), async (c) => {
   const id = c.req.param("id");
-  const parsed = ApproveBody.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
+  const body = c.req.valid("json");
 
   const row = await gamificationFromContext(c).approveRedemption({
     redemptionId: id,
-    approverId: actorId(c),
-    recipientName: parsed.data.recipientName,
-    recipientEmail: parsed.data.recipientEmail,
+    approverId: c.var.userId,
+    recipientName: body.recipientName,
+    recipientEmail: body.recipientEmail,
   });
 
   await auditLog({
     action: AUDIT_ACTIONS.POINTS_REDEMPTION_APPROVED,
-    actorId: actorId(c),
+    actorId: c.var.userId,
     targetType: "point_redemption",
     targetId: id,
     metadata: { userId: row.userId, kind: row.kind, valueCents: row.valueCents },
@@ -217,23 +210,22 @@ superadminPointsRoutes.post("/redemptions/:id/approve", async (c) => {
 
 const CancelBody = z.object({ reason: z.string().min(3).max(500) });
 
-superadminPointsRoutes.post("/redemptions/:id/cancel", async (c) => {
+superadminPointsRoutes.post("/redemptions/:id/cancel", validateJson(CancelBody, (e) => error("VALIDATION_ERROR", e.issues[0].message)), async (c) => {
   const id = c.req.param("id");
-  const parsed = CancelBody.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
+  const body = c.req.valid("json");
 
   const row = await gamificationFromContext(c).cancelRedemption({
     redemptionId: id,
-    reason: parsed.data.reason,
-    actorId: actorId(c),
+    reason: body.reason,
+    actorId: c.var.userId,
   });
 
   await auditLog({
     action: AUDIT_ACTIONS.POINTS_REDEMPTION_CANCELLED,
-    actorId: actorId(c),
+    actorId: c.var.userId,
     targetType: "point_redemption",
     targetId: id,
-    metadata: { userId: row.userId, reason: parsed.data.reason },
+    metadata: { userId: row.userId, reason: body.reason },
   });
   return c.json(success({ redemption: row }));
 });
@@ -244,22 +236,21 @@ const W9Body = z.object({
   taxClassification: z.enum(["personal", "business"]),
 });
 
-superadminPointsRoutes.post("/user/:userId/w9", async (c) => {
+superadminPointsRoutes.post("/user/:userId/w9", validateJson(W9Body, (e) => error("VALIDATION_ERROR", e.issues[0].message)), async (c) => {
   const targetId = c.req.param("userId");
-  const parsed = W9Body.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
+  const body = c.req.valid("json");
 
   const row = await gamificationFromContext(c).markW9Collected({
     userId: targetId,
-    ...parsed.data,
+    ...body,
   });
 
   await auditLog({
     action: AUDIT_ACTIONS.POINTS_W9_COLLECTED,
-    actorId: actorId(c),
+    actorId: c.var.userId,
     targetType: "user",
     targetId,
-    metadata: { taxClassification: parsed.data.taxClassification, taxIdLast4: parsed.data.taxIdLast4 },
+    metadata: { taxClassification: body.taxClassification, taxIdLast4: body.taxIdLast4 },
   });
 
   return c.json(success({ taxStatus: row }));

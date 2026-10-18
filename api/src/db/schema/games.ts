@@ -1,7 +1,7 @@
 /**
  * Games schema — companion tables for `mediaKind: "game"` studio
  * projects. The game-kind project itself lives on `studio_projects`
- * (`gameState` JSONB column); this file holds the side-tables that
+ * (`state` JSONB column, migration 0610); this file holds the side-tables that
  * don't fit there:
  *
  *   - play invites (gap #1637, Phase 4) — tokenized share-links a
@@ -11,7 +11,7 @@
  *     chat history for the AI game-builder agent, one row per
  *     (project, user) pair.
  *
- * `studio_projects.gameState` JSONB is still the SSoT for the game
+ * `studio_projects.state` JSONB is still the SSoT for the game
  * world's *content* (entities, lighting, challenges). These tables
  * only carry metadata that is naturally relational (invite tokens,
  * per-user conversation threads).

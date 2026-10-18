@@ -6,8 +6,7 @@
  *   engagement 25% · performance 25% · goalAlignment 20% · reviewHealth 15% · communication 15%
  */
 
-import { getDb, schema } from "../../db/index.js";
-import { PeopleSegmentRepo } from "../../repositories/peopleSegmentRepo.js";
+import { segmentStore } from "../../services/people-ops/segmentStore.js";
 import { PeopleOpsService, defaultPeopleOpsServiceDeps } from "./peopleOpsService.js";
 import type { PeopleSegmentScope } from "../../services/people-ops/segment.js";
 
@@ -23,14 +22,13 @@ const WEIGHTS = { engagement: 0.25, performance: 0.25, goalAlignment: 0.2, revie
 
 export async function computeTeamHealth(ctx: PeopleSegmentScope): Promise<TeamHealth> {
   const svc = new PeopleOpsService(defaultPeopleOpsServiceDeps());
-  const db = getDb();
   const [employees, goals, sessions, pulseResp, checkResp, reviews] = await Promise.all([
     svc.listEmployees(ctx),
     svc.listGoals(ctx),
     svc.listOneOnOnes(ctx),
-    new PeopleSegmentRepo(db, schema.peoplePulseResponses).list(ctx),
-    new PeopleSegmentRepo(db, schema.peopleCheckInResponses).list(ctx),
-    new PeopleSegmentRepo(db, schema.peoplePerformanceReviews).list(ctx),
+    segmentStore("pulseResponses").list(ctx),
+    segmentStore("checkInResponses").list(ctx),
+    segmentStore("performanceReviews").list(ctx),
   ]);
 
   const active = employees.filter((e) => e.status === "active");

@@ -8,9 +8,10 @@ import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import type { AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
-import { mapServiceError, requireUser } from "../helpers/routerHelpers.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 import type { ScorecardsService } from "../../domains/scorecards/scorecardsService.js";
 import { generateQuestionsForCompetency } from "../../services/interview/question-generator.js";
+import { validateJson } from "../helpers/validate.js";
 
 const StageQuestionSchema = z.object({
   prompt: z.string().min(1).max(2000),
@@ -64,92 +65,66 @@ export function stageQuestionRoutes(
   const r = new Hono<AppEnv>();
 
   r.get("/:stageId", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    try {
-      return c.json(
-        success(await service().listStageQuestions(auth.userId, c.req.param("stageId"))),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    const userId = requireUser(c);
+    return c.json(
+      success(await service().listStageQuestions(userId, c.req.param("stageId"))),
+    );
   });
 
-  r.post("/:stageId", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = StageQuestionSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(
-        success(
-          await service().addStageQuestion(
-            auth.userId,
-            c.req.param("stageId"),
-            parsed.data,
-          ),
+  r.post("/:stageId", validateJson(StageQuestionSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(
+      success(
+        await service().addStageQuestion(
+          userId,
+          c.req.param("stageId"),
+          body,
         ),
-        201,
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+      ),
+      201,
+    );
   });
 
   r.delete("/items/:id", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    try {
-      await service().deleteStageQuestion(auth.userId, c.req.param("id"));
-      return c.json(success({ id: c.req.param("id") }));
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    const userId = requireUser(c);
+    await service().deleteStageQuestion(userId, c.req.param("id"));
+    return c.json(success({ id: c.req.param("id") }));
   });
 
   // AI-generate competency-aware questions (#1439). Persists each
   // suggestion as a tagged question on the stage in one round-trip.
-  r.post("/:stageId/ai-generate", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = AiGenerateSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
+  r.post("/:stageId/ai-generate", validateJson(AiGenerateSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    const stageId = c.req.param("stageId");
+    const competency = await service().getCompetency(
+      userId,
+      body.competencyId,
+    );
+    const suggestions = await generateQuestionsForCompetency(
+      c.env as any,
+      c.var.user as any,
+      {
+        competencyName: competency.name,
+        level: body.level,
+        count: body.count,
+        targetRole: body.targetRole,
+        anchorText: competency.levels.find((l) => l.label === body.level)
+          ?.anchor,
+      },
+    );
+    const persisted = [];
+    for (const q of suggestions) {
+      const row = await service().addStageQuestion(userId, stageId, {
+        prompt: q.prompt,
+        competencyId: body.competencyId,
+        difficulty: q.difficulty ?? body.level ?? null,
+        expectedAnswer: q.expectedAnswer,
+      });
+      persisted.push(row);
     }
-    try {
-      const stageId = c.req.param("stageId");
-      const competency = await service().getCompetency(
-        auth.userId,
-        parsed.data.competencyId,
-      );
-      const suggestions = await generateQuestionsForCompetency(
-        c.env as any,
-        c.var.user as any,
-        {
-          competencyName: competency.name,
-          level: parsed.data.level,
-          count: parsed.data.count,
-          targetRole: parsed.data.targetRole,
-          anchorText: competency.levels.find((l) => l.label === parsed.data.level)
-            ?.anchor,
-        },
-      );
-      const persisted = [];
-      for (const q of suggestions) {
-        const row = await service().addStageQuestion(auth.userId, stageId, {
-          prompt: q.prompt,
-          competencyId: parsed.data.competencyId,
-          difficulty: q.difficulty ?? parsed.data.level ?? null,
-          expectedAnswer: q.expectedAnswer,
-        });
-        persisted.push(row);
-      }
-      return c.json(success({ questions: persisted }), 201);
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    return c.json(success({ questions: persisted }), 201);
   });
 
   return r;
@@ -161,99 +136,65 @@ export function takeHomeRoutes(
   const r = new Hono<AppEnv>();
 
   r.get("/:stageId", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    try {
-      return c.json(
-        success(await service().getTakeHomeForStage(auth.userId, c.req.param("stageId"))),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    const userId = requireUser(c);
+    return c.json(
+      success(await service().getTakeHomeForStage(userId, c.req.param("stageId"))),
+    );
   });
 
-  r.put("/:stageId", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = TakeHomeSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(
-        success(
-          await service().upsertTakeHome(
-            auth.userId,
-            c.req.param("stageId"),
-            parsed.data,
-          ),
+  r.put("/:stageId", validateJson(TakeHomeSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(
+      success(
+        await service().upsertTakeHome(
+          userId,
+          c.req.param("stageId"),
+          body,
         ),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+      ),
+    );
   });
 
   // Recruiter — list submissions for review.
   r.get("/:stageId/submissions", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    try {
-      return c.json(
-        success(
-          await service().listTakeHomeSubmissions(auth.userId, c.req.param("stageId")),
-        ),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    const userId = requireUser(c);
+    return c.json(
+      success(
+        await service().listTakeHomeSubmissions(userId, c.req.param("stageId")),
+      ),
+    );
   });
 
   // Recruiter — mint a candidate invite.
-  r.post("/:stageId/invites", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = InviteSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(
-        success(
-          await service().createTakeHomeInvite(
-            auth.userId,
-            c.req.param("stageId"),
-            parsed.data,
-          ),
+  r.post("/:stageId/invites", validateJson(InviteSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(
+      success(
+        await service().createTakeHomeInvite(
+          userId,
+          c.req.param("stageId"),
+          body,
         ),
-        201,
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+      ),
+      201,
+    );
   });
 
   // Recruiter — link a take-home submission to a scorecard for review.
-  r.post("/start-review", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = StartReviewSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(
-        success(
-          await service().startTakeHomeReview(
-            auth.userId,
-            parsed.data.takeHomeSubmissionId,
-            parsed.data.templateId,
-          ),
+  r.post("/start-review", validateJson(StartReviewSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
+    return c.json(
+      success(
+        await service().startTakeHomeReview(
+          userId,
+          body.takeHomeSubmissionId,
+          body.templateId,
         ),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+      ),
+    );
   });
 
   return r;
@@ -269,27 +210,16 @@ export function takeHomePublicRoutes(
   const r = new Hono<AppEnv>();
 
   r.get("/invite/:token", async (c) => {
-    try {
-      return c.json(success(await service().getTakeHomeByToken(c.req.param("token"))));
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    return c.json(success(await service().getTakeHomeByToken(c.req.param("token"))));
   });
 
-  r.post("/invite/:token", async (c) => {
-    const parsed = DeliverySchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
-    try {
-      return c.json(
-        success(
-          await service().submitTakeHomeByToken(c.req.param("token"), parsed.data),
-        ),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+  r.post("/invite/:token", validateJson(DeliverySchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const body = c.req.valid("json");
+    return c.json(
+      success(
+        await service().submitTakeHomeByToken(c.req.param("token"), body),
+      ),
+    );
   });
 
   return r;
@@ -301,15 +231,10 @@ export function coverageRoutes(
   const r = new Hono<AppEnv>();
 
   r.get("/:kitId", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    try {
-      return c.json(
-        success(await service().getKitCoverage(auth.userId, c.req.param("kitId"))),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    const userId = requireUser(c);
+    return c.json(
+      success(await service().getKitCoverage(userId, c.req.param("kitId"))),
+    );
   });
 
   return r;

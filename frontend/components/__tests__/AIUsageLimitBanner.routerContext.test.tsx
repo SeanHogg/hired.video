@@ -63,7 +63,8 @@ vi.mock("@/hooks/use-token-budget", async () => {
 });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const APP_TSX_PATH = resolve(__dirname, "../../App.tsx");
+// The provider stack + global chrome moved out of App.tsx into AppProviders.
+const APP_TSX_PATH = resolve(__dirname, "../../providers/AppProviders.tsx");
 
 function dispatchAIUsageLimitEvent(detail: Partial<ApiErrorEvent> = {}): void {
   const full: ApiErrorEvent = {
@@ -153,7 +154,7 @@ describe("GlobalAIUsageBanner — AI_USAGE_LIMIT_REACHED flow", () => {
   });
 });
 
-describe("App.tsx — global chrome lives inside <BrowserRouter>", () => {
+describe("AppProviders — global chrome lives inside <BrowserRouter>", () => {
   // Structural guard. The behavioural tests above prove the banner
   // works when mounted inside a router; this test proves App.tsx
   // actually mounts it inside one. Catches a regression where someone
@@ -163,7 +164,7 @@ describe("App.tsx — global chrome lives inside <BrowserRouter>", () => {
 
   function indexOfTag(tag: string): number {
     const idx = appSource.indexOf(tag);
-    expect(idx, `expected to find ${tag} in App.tsx`).toBeGreaterThan(-1);
+    expect(idx, `expected to find ${tag} in AppProviders.tsx`).toBeGreaterThan(-1);
     return idx;
   }
 

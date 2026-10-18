@@ -22,25 +22,20 @@ import {
   importStatements,
 } from "../../../services/learning/portability-service.js";
 import { resolveOwnedCredential } from "../../../services/learning/xapi-use-cases.js";
+import { requireUser } from "../../helpers/routerHelpers.js";
 
 export const xapiPortabilityRoutes = new Hono<{ Variables: Variables } & AppEnv>();
 
-function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
-
 // ── Export (company leaving) ────────────────────────────────────────────────
 xapiPortabilityRoutes.get("/portability/export/manifest", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const manifest = await exportManifest(userId, new Date().toISOString());
   c.header("Content-Disposition", 'attachment; filename="learning-manifest.json"');
   return c.json(manifest, 200);
 });
 
 xapiPortabilityRoutes.get("/portability/export/results.csv", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const csv = await exportResultsCsv(userId);
   c.header("Content-Type", "text/csv; charset=utf-8");
   c.header("Content-Disposition", 'attachment; filename="learning-results.csv"');
@@ -48,8 +43,7 @@ xapiPortabilityRoutes.get("/portability/export/results.csv", async (c) => {
 });
 
 xapiPortabilityRoutes.get("/portability/export/statements", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const out = await exportStatements(userId);
   c.header("Content-Disposition", 'attachment; filename="learning-statements.json"');
   // Raw xAPI-shaped payload (statements array + export metadata), not the
@@ -65,8 +59,7 @@ const ImportSchema = z.object({
 });
 
 xapiPortabilityRoutes.post("/portability/import/statements", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
 
   const body = await c.req.json().catch(() => ({}));
   // Unwrap an export envelope ({ statements: [...] }) transparently.

@@ -7,10 +7,10 @@
  * connected user's id, so partner uploads go through the exact same heal +
  * validate + auto-promote write path as the first-party UI (DRY).
  */
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { hashPassword } from "../auth/password.js";
-import { randomHex } from "../../utils/crypto.js";
+import { mintMagicLinkToken } from "../../repositories/authFlowRepository.js";
 import { publicAppBaseUrl } from "../../utils/public-urls.js";
 import { getOrSetCached } from "../../utils/edge-cache.js";
 import { buildRepos } from "../../repositories/index.js";
@@ -29,19 +29,10 @@ import type { PartnerResumeStatus, PartnerScope } from "../../../../shared/partn
 const { users, userProfiles } = schema;
 
 async function issueClaimLink(email: string, name: string, db = getDb()): Promise<string> {
-  // Mirror routes/auth.ts magic-link mint: invalidate old tokens, mint a fresh
-  // 24h token (longer than the 15m login link — a partner-provisioned user may
-  // not check email immediately), point it at onboarding.
-  await db
-    .update(schema.magicLinkTokens)
-    .set({ used: true } as any)
-    .where(and(eq(schema.magicLinkTokens.email, email), eq(schema.magicLinkTokens.used, false)));
-  const token = randomHex(32);
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  // The shared magic-link mint with a 24h TTL (longer than the 15m login
+  // link — a partner-provisioned user may not check email immediately).
   const redirect = "/dashboard";
-  await db
-    .insert(schema.magicLinkTokens)
-    .values({ email, token, expiresAt, redirect, used: false } as any);
+  const token = await mintMagicLinkToken(db, { email, ttlMs: 24 * 60 * 60 * 1000, redirect });
   return `${publicAppBaseUrl()}/auth/magic-link?token=${token}&redirect=${encodeURIComponent(redirect)}`;
 }
 

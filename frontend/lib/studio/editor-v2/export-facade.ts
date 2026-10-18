@@ -24,7 +24,7 @@
  * `renderVariant` is the fitted-cut entry point (#2045): the Timeline
  * render path again, on a reframed + trimmed copy of the canvas.
  *
- * Adding a new mediaKind = one more case in this switch + (if it has
+ * Adding a new mediaKind = one more entry in `KIND_EXPORTERS` + (if it has
  * a runtime-specific export pipeline) one new strategy module under
  * `lib/studio/<kind>/`.
  */
@@ -68,110 +68,126 @@ export interface ExportInputs {
   };
 }
 
+type ExportSnapshot = ExportInputs["snapshot"];
+type KindExporter = (
+  snapshot: ExportSnapshot,
+  ctx: { mediaKind: MediaKind; title: string },
+) => Promise<Blob | null>;
+
+/** Timeline-runtime kinds — route through the caller's renderTimeline
+ *  callback so the heavy render imports don't enter the facade's bundle. */
+const exportViaTimeline: KindExporter = async (snapshot) => {
+  if (!snapshot.renderTimeline) return null;
+  return snapshot.renderTimeline();
+};
+
+// Comic Phase 2 (#939) — render via the dedicated comic exporter
+// (CBZ / PNG-strip / PDF). Motion-comic profiles (`comic-mp4` /
+// `comic-gif`) fall back to the Timeline render path because
+// they ARE Timeline outputs. Interactive comics flatten to a
+// linear strip on print export (first-valid-branch walk happens
+// inside `renderComic` when the snapshot carries an interactive
+// comic state — for now they share the linear path).
+const exportComic: KindExporter = async (snapshot, { mediaKind }) => {
+  const profile = outputProfilesFor(mediaKind)[0] ?? outputProfilesFor("comic")[0];
+  const isMotionProfile = profile.container === "mp4" || profile.container === "gif";
+  if (isMotionProfile) {
+    if (!snapshot.renderTimeline) return null;
+    return snapshot.renderTimeline();
+  }
+  const { renderComic } = await import("@/lib/studio/comic/comic-export");
+  const { blob } = await renderComic(snapshot.canvasState, profile);
+  return blob;
+};
+
+/** Per-kind export strategies. `Record<MediaKind, …>` makes a new
+ *  MEDIA_KINDS entry without a strategy a compile error. */
+const KIND_EXPORTERS: Record<MediaKind, KindExporter> = {
+  image: async (snapshot) => {
+    // PSD dispatch (#940 Phase 2 — Photoshop round-trip via ag-psd).
+    // Falls through to the flatten path for every other container
+    // (png/jpg/webp) so the existing image export flow doesn't change.
+    const profile = defaultOutputProfile("image");
+    if (profile.container === "psd") {
+      if (!snapshot.imageState) return null;
+      const { exportImageStateToPsd } = await import("@/lib/studio/drawing/psd-roundtrip");
+      const buffer = await exportImageStateToPsd(snapshot.imageState);
+      const { toBlobPart } = await import("@/lib/studio/bytes/to-blob-part");
+      return new Blob([toBlobPart(new Uint8Array(buffer))], { type: "image/vnd.adobe.photoshop" });
+    }
+    if (!snapshot.flattenImage) return null;
+    return snapshot.flattenImage();
+  },
+  animation: async (snapshot) => {
+    const { renderAnimation } = await import("@/lib/studio/animation/animation-export");
+    const profile = defaultOutputProfile("animation");
+    if (!snapshot.animationState) return null;
+    const { blob } = await renderAnimation(snapshot.animationState, profile);
+    return blob;
+  },
+  game: async (snapshot, { title }) => {
+    if (!snapshot.gameState) return null;
+    const { bundleGame } = await import("@/lib/studio/game/game-export");
+    return bundleGame(snapshot.gameState, { title });
+  },
+  cad: async (snapshot) => {
+    if (!snapshot.cadState) return null;
+    // CAD Phase 1 (#930) — dispatch by output profile. SVG + DXF +
+    // PDF all ship today; STL + STEP are 3D-only and stay deferred
+    // until the `cad_3d` runtime lands. The PNG path falls through
+    // to the canvas-2D rasteriser (a CAD drawing rendered at 150dpi
+    // — same path the PDF encoder uses internally).
+    const profile = (await import("@shared/media-kinds")).defaultOutputProfile("cad");
+    if (profile.container === "dxf") {
+      const { renderCadDxf } = await import("@/lib/studio/cad/cad-dxf-encoder");
+      return renderCadDxf(snapshot.cadState);
+    }
+    if (profile.container === "pdf") {
+      const { renderCadPdf } = await import("@/lib/studio/cad/cad-pdf-encoder");
+      return renderCadPdf(snapshot.cadState);
+    }
+    if (profile.container === "stl") {
+      const { renderCadStlBlob } = await import("@/lib/studio/cad/cad-stl-encoder");
+      return renderCadStlBlob(snapshot.cadState);
+    }
+    if (profile.container === "step") {
+      const { renderCadStepBlob } = await import("@/lib/studio/cad/cad-step-encoder");
+      return renderCadStepBlob(snapshot.cadState);
+    }
+    const { renderCadSvg } = await import("@/lib/studio/cad/cad-export");
+    return renderCadSvg(snapshot.cadState);
+  },
+  comic: exportComic,
+  interactive_comic: exportComic,
+  // 3D CAD runtime (#930 follow-on). The bundled mesh-export pipeline
+  // is the existing `cad-stl-encoder` extended to take the 3D
+  // state's triangulated mesh — for now we delegate to the cad_3d
+  // export module that ships alongside the runtime.
+  cad_3d: async (snapshot, { mediaKind }) => {
+    const { renderCad3D } = await import("@/lib/studio/cad/cad-3d-export");
+    return renderCad3D(snapshot, mediaKind);
+  },
+  video: exportViaTimeline,
+  podcast: exportViaTimeline,
+  voice: exportViaTimeline,
+  // PDF/PNG export for the paged document runtime is a client-side print
+  // of the live renderer (preview === render) — it lands with the
+  // DocumentStage build (#1912), not through this Blob facade.
+  // Unreachable today: no document projects can be created yet.
+  document: async () => {
+    throw new Error("document mediaKind export not yet wired — see gap #1912");
+  },
+};
+
 /** Dispatch the export. Returns the produced Blob or null when the
  *  active kind can't render yet (e.g. game without a seeded state). */
 export async function exportProjectByKind(inputs: ExportInputs): Promise<Blob | null> {
   const { mediaKind, title, snapshot } = inputs;
-  switch (mediaKind) {
-    case "image": {
-      // PSD dispatch (#940 Phase 2 — Photoshop round-trip via ag-psd).
-      // Falls through to the flatten path for every other container
-      // (png/jpg/webp) so the existing image export flow doesn't change.
-      const profile = defaultOutputProfile("image");
-      if (profile.container === "psd") {
-        if (!snapshot.imageState) return null;
-        const { exportImageStateToPsd } = await import("@/lib/studio/drawing/psd-roundtrip");
-        const buffer = await exportImageStateToPsd(snapshot.imageState);
-        const { toBlobPart } = await import("@/lib/studio/bytes/to-blob-part");
-        return new Blob([toBlobPart(new Uint8Array(buffer))], { type: "image/vnd.adobe.photoshop" });
-      }
-      if (!snapshot.flattenImage) return null;
-      return snapshot.flattenImage();
-    }
-    case "animation": {
-      const { renderAnimation } = await import("@/lib/studio/animation/animation-export");
-      const profile = defaultOutputProfile("animation");
-      if (!snapshot.animationState) return null;
-      const { blob } = await renderAnimation(snapshot.animationState, profile);
-      return blob;
-    }
-    case "game": {
-      if (!snapshot.gameState) return null;
-      const { bundleGame } = await import("@/lib/studio/game/game-export");
-      return bundleGame(snapshot.gameState, { title });
-    }
-    case "cad": {
-      if (!snapshot.cadState) return null;
-      // CAD Phase 1 (#930) — dispatch by output profile. SVG + DXF +
-      // PDF all ship today; STL + STEP are 3D-only and stay deferred
-      // until the `cad_3d` runtime lands. The PNG path falls through
-      // to the canvas-2D rasteriser (a CAD drawing rendered at 150dpi
-      // — same path the PDF encoder uses internally).
-      const profile = (await import("@shared/media-kinds")).defaultOutputProfile("cad");
-      if (profile.container === "dxf") {
-        const { renderCadDxf } = await import("@/lib/studio/cad/cad-dxf-encoder");
-        return renderCadDxf(snapshot.cadState);
-      }
-      if (profile.container === "pdf") {
-        const { renderCadPdf } = await import("@/lib/studio/cad/cad-pdf-encoder");
-        return renderCadPdf(snapshot.cadState);
-      }
-      if (profile.container === "stl") {
-        const { renderCadStlBlob } = await import("@/lib/studio/cad/cad-stl-encoder");
-        return renderCadStlBlob(snapshot.cadState);
-      }
-      if (profile.container === "step") {
-        const { renderCadStepBlob } = await import("@/lib/studio/cad/cad-step-encoder");
-        return renderCadStepBlob(snapshot.cadState);
-      }
-      const { renderCadSvg } = await import("@/lib/studio/cad/cad-export");
-      return renderCadSvg(snapshot.cadState);
-    }
-    case "comic":
-    case "interactive_comic": {
-      // Comic Phase 2 (#939) — render via the dedicated comic exporter
-      // (CBZ / PNG-strip / PDF). Motion-comic profiles (`comic-mp4` /
-      // `comic-gif`) fall back to the Timeline render path because
-      // they ARE Timeline outputs. Interactive comics flatten to a
-      // linear strip on print export (first-valid-branch walk happens
-      // inside `renderComic` when the snapshot carries an interactive
-      // comic state — for now they share the linear path).
-      const profile = outputProfilesFor(mediaKind)[0] ?? outputProfilesFor("comic")[0];
-      const isMotionProfile = profile.container === "mp4" || profile.container === "gif";
-      if (isMotionProfile) {
-        if (!snapshot.renderTimeline) return null;
-        return snapshot.renderTimeline();
-      }
-      const { renderComic } = await import("@/lib/studio/comic/comic-export");
-      const { blob } = await renderComic(snapshot.canvasState, profile);
-      return blob;
-    }
-    case "cad_3d": {
-      // 3D CAD runtime (#930 follow-on). The bundled mesh-export pipeline
-      // is the existing `cad-stl-encoder` extended to take the 3D
-      // state's triangulated mesh — for now we delegate to the cad_3d
-      // export module that ships alongside the runtime.
-      const { renderCad3D } = await import("@/lib/studio/cad/cad-3d-export");
-      return renderCad3D(snapshot, mediaKind);
-    }
-    case "video":
-    case "podcast":
-    case "voice": {
-      // Timeline-runtime kinds — route through the caller's
-      // renderTimeline callback so the heavy render imports don't
-      // enter the facade's bundle.
-      if (!snapshot.renderTimeline) return null;
-      return snapshot.renderTimeline();
-    }
-    case "document":
-      // PDF/PNG export for the paged document runtime is a client-side print
-      // of the live renderer (preview === render) — it lands with the
-      // DocumentStage build (#1912), not through this Blob facade.
-      // Unreachable today: no document projects can be created yet.
-      throw new Error("document mediaKind export not yet wired — see gap #1912");
-    default:
-      return assertNever(mediaKind, `Unhandled mediaKind in exportProjectByKind(): ${String(mediaKind)}`);
+  const exporter: KindExporter | undefined = KIND_EXPORTERS[mediaKind];
+  if (!exporter) {
+    throw new Error(`Unhandled mediaKind in exportProjectByKind(): ${String(mediaKind)}`);
   }
+  return exporter(snapshot, { mediaKind, title });
 }
 
 /** A fitted cut of a Timeline-kind project for one network's preset (#2045). */
@@ -233,8 +249,4 @@ export function extensionForBlob(blob: Blob): string {
   if (blob.type.includes("mpeg")) return "mp3";
   if (blob.type.includes("quicktime")) return "mov";
   return "mp4";
-}
-
-function assertNever(_x: never, msg: string): never {
-  throw new Error(msg);
 }

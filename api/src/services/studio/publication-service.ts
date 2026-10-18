@@ -17,7 +17,7 @@
  * Zero Hono/Context awareness — callable from a route, a queue consumer, or
  * a test with an injected db.
  */
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
 
@@ -190,31 +190,6 @@ export function publishedChannelCounts(
     if (Number.isFinite(n) && n > 0) counts.set(row.projectId, n);
   }
   return counts;
-}
-
-/** Read a single (project, destination) record — uncached helper for write
- *  paths that want to short-circuit duplicate work.
- *
- * When `renderVariantId` is omitted, returns the latest live cut for that
- * destination (ordered by publishedAt desc). When a variant is passed, returns
- * that specific cut (or null if not found). */
-export async function getPublication(
-  projectId: string,
-  destination: string,
-  renderVariantId?: string | null,
-  db: Db = getDb(),
-): Promise<PublicationRecord | null> {
-  const variantCond = publicationVariantMatch(renderVariantId);
-  const where = and(
-    eq(studioProjectPublications.projectId, projectId),
-    eq(studioProjectPublications.destination, destination),
-    ...(variantCond !== undefined ? [variantCond] : []),
-  );
-  const base = db.select().from(studioProjectPublications).where(where);
-  const [row] = await (renderVariantId === undefined
-    ? base.orderBy(desc(studioProjectPublications.publishedAt)).limit(1)
-    : base.limit(1));
-  return row ? toRecord(row) : null;
 }
 
 /**

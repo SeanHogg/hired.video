@@ -18,9 +18,11 @@
  * video says").
  *
  * Per the standing DRY rule: every text-only extraction goes through
- * this helper. No caller hand-rolls a switch over widget kinds.
+ * this helper. No caller hand-rolls a switch over widget kinds — the
+ * per-kind text is `toText` on `widget-kinds/registry.ts`.
  */
 import type { CanvasState, Widget } from "./canvas-state";
+import { widgetParamsToText } from "./widget-kinds/registry";
 
 export function canvasStateToText(state: CanvasState): string {
   return state.scenes
@@ -35,47 +37,5 @@ export function canvasStateToText(state: CanvasState): string {
 }
 
 function widgetToText(widget: Widget): string {
-  const p = widget.params;
-  switch (p.kind) {
-    case "text":
-    case "heading":
-      return p.data.text.trim();
-    case "chips":
-      return p.data.chips.filter(Boolean).join(", ");
-    case "cta": {
-      const headline = p.data.headline?.trim();
-      const sub = p.data.subheadline?.trim();
-      const cta = p.data.ctaText?.trim();
-      return [headline, sub, cta].filter(Boolean).join(" · ");
-    }
-    case "linked-content":
-      // Entity body is fetched at render time, not authored here, so
-      // we don't include it. The widget's presence still counts via
-      // the entity kind label — useful for ATS readers who want to
-      // know "Resume embedded here".
-      return `[${p.data.entityKind} embedded]`;
-    case "speech-bubble":
-    case "caption-box":
-    case "sfx-burst":
-      // Comic dialogue + caption + SFX text — extract the spoken /
-      // narrated string so the AI rewriter can act on the comic the
-      // same way it acts on any other widget's text. SFX bursts are
-      // short ("POW!") but still count as authored content.
-      return p.data.text.trim();
-    case "avatar":
-      // The presenter's script IS its authored content — the AI
-      // rewriter, captions extractor, and dubbing pipeline all consume
-      // it the same way they consume a `text` widget's body.
-      return p.data.script.trim();
-    case "image":
-    case "video":
-    case "shape-rect":
-    case "shape-circle":
-    case "divider":
-    case "chart":
-    case "webcam":
-    case "engagement-asset":
-    case "brand-kit":
-      return "";
-  }
+  return widgetParamsToText(widget.params);
 }

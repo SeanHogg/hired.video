@@ -18,7 +18,7 @@
  * CASCADE the retired per-user tables had.
  *
  * Only ONE module reads or writes these tables:
- * api/src/repositories/wallet/walletRepository.ts.
+ * api/src/repositories/walletRepository.ts.
  */
 
 import { sql } from "drizzle-orm";

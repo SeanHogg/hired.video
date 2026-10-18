@@ -30,55 +30,46 @@ import { updateLessonProgress } from "../../services/courses/courseProgressServi
 import { PrerequisiteSchema, ProgressUpdateSchema } from "./schemas.js";
 import {
   courseActor,
-  handle,
+  invalidBody,
   learnerGamification,
-  readBody,
   respond,
-  uid,
   unauthorized,
-  validationError,
 } from "./shared.js";
+import { validateJson } from "../helpers/validate.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 
 export const courseEnrollmentRoutes = new Hono<AppEnv>();
 
 courseEnrollmentRoutes.get("/me/enrollments", (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   return respond(c, () => listMyEnrollments(userId));
 });
 
 // Gated on owning the enrolment — never leaks content by enrolment id.
 courseEnrollmentRoutes.get("/enrollments/:enrollmentId/content", (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   return respond(c, () => getEnrollmentContent(userId, c.req.param("enrollmentId")));
 });
 
-courseEnrollmentRoutes.post("/:id/enroll", (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
-  return handle(c, async () => {
-    const { enrollment, created } = await enrollInCourse(userId, c.req.param("id"));
-    return c.json(success(enrollment), created ? 201 : 200);
-  });
+courseEnrollmentRoutes.post("/:id/enroll", async (c) => {
+  const userId = requireUser(c);
+  const { enrollment, created } = await enrollInCourse(userId, c.req.param("id"));
+  return c.json(success(enrollment), created ? 201 : 200);
 });
 
 courseEnrollmentRoutes.delete("/:id/enroll", (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   return respond(c, async () => {
     await unenrollFromCourse(userId, c.req.param("id"));
     return { unenrolled: true };
   });
 });
 
-courseEnrollmentRoutes.patch("/enrollments/:enrollmentId/progress", async (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
-  const parsed = ProgressUpdateSchema.safeParse(await readBody(c));
-  if (!parsed.success) return validationError(c, parsed.error);
+courseEnrollmentRoutes.patch("/enrollments/:enrollmentId/progress", validateJson(ProgressUpdateSchema, invalidBody), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
   return respond(c, () =>
-    updateLessonProgress(userId, c.req.param("enrollmentId"), parsed.data, learnerGamification(c)),
+    updateLessonProgress(userId, c.req.param("enrollmentId"), body, learnerGamification(c)),
   );
 });
 
@@ -90,15 +81,12 @@ courseEnrollmentRoutes.get("/:id/prerequisites", (c) =>
   respond(c, () => listCoursePrerequisites(c.req.param("id"))),
 );
 
-courseEnrollmentRoutes.post("/:id/prerequisites", async (c) => {
+courseEnrollmentRoutes.post("/:id/prerequisites", validateJson(PrerequisiteSchema, invalidBody), async (c) => {
   const actor = courseActor(c);
   if (!actor) return unauthorized(c);
-  const parsed = PrerequisiteSchema.safeParse(await readBody(c));
-  if (!parsed.success) return validationError(c, parsed.error);
-  return handle(c, async () => {
-    const result = await addCoursePrerequisite(actor, c.req.param("id"), parsed.data.prerequisiteCourseId);
-    return c.json(success(result), result.created ? 201 : 200);
-  });
+  const body = c.req.valid("json");
+  const result = await addCoursePrerequisite(actor, c.req.param("id"), body.prerequisiteCourseId);
+  return c.json(success(result), result.created ? 201 : 200);
 });
 
 courseEnrollmentRoutes.delete("/:id/prerequisites/:prereqId", (c) => {
@@ -111,27 +99,23 @@ courseEnrollmentRoutes.delete("/:id/prerequisites/:prereqId", (c) => {
 // Certificates
 // ---------------------------------------------------------------------------
 
-courseEnrollmentRoutes.post("/enrollments/:enrollmentId/certificate", (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
-  return handle(c, async () => {
-    const result = await issueEnrollmentCertificate(userId, c.req.param("enrollmentId"));
-    if (result.newlyIssued) {
-      await withGamification(c, "certificate-earned", (game, role, uid2) =>
-        game.onCertificateEarned({
-          userId: uid2,
-          role,
-          certificateId: result.certificate.id,
-          metadata: { certNumber: result.certificate.certNumber },
-        }),
-      );
-    }
-    return c.json(success(result.certificate), result.newlyIssued ? 201 : 200);
-  });
+courseEnrollmentRoutes.post("/enrollments/:enrollmentId/certificate", async (c) => {
+  const userId = requireUser(c);
+  const result = await issueEnrollmentCertificate(userId, c.req.param("enrollmentId"));
+  if (result.newlyIssued) {
+    await withGamification(c, "certificate-earned", (game, role, uid2) =>
+      game.onCertificateEarned({
+        userId: uid2,
+        role,
+        certificateId: result.certificate.id,
+        metadata: { certNumber: result.certificate.certNumber },
+      }),
+    );
+  }
+  return c.json(success(result.certificate), result.newlyIssued ? 201 : 200);
 });
 
 courseEnrollmentRoutes.get("/me/certificates", (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   return respond(c, () => listMyCertificates(userId));
 });

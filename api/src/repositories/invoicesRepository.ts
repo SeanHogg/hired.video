@@ -22,6 +22,8 @@ export interface IInvoicesRepository {
   findInvoicesForUser(userId: string, limit?: number): Promise<InvoiceRow[]>;
   insertInvoice(input: InvoiceInsert): Promise<InvoiceRow>;
   insertBillingEvent(input: BillingEventInsert): Promise<void>;
+  hasBillingEvent(providerEventId: string): Promise<boolean>;
+  markBillingEventProcessed(providerEventId: string): Promise<void>;
 }
 
 export class InvoicesRepository implements IInvoicesRepository {
@@ -48,6 +50,23 @@ export class InvoicesRepository implements IInvoicesRepository {
 
   async insertBillingEvent(input: BillingEventInsert): Promise<void> {
     await this.db.insert(billingEvents).values(input as any);
+  }
+
+  /** Webhook idempotency — `stripe_event_id` stores any provider's event id. */
+  async hasBillingEvent(providerEventId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: billingEvents.id })
+      .from(billingEvents)
+      .where(eq(billingEvents.stripeEventId, providerEventId))
+      .limit(1);
+    return Boolean(row);
+  }
+
+  async markBillingEventProcessed(providerEventId: string): Promise<void> {
+    await this.db
+      .update(billingEvents)
+      .set({ processedAt: this.now() } as any)
+      .where(eq(billingEvents.stripeEventId, providerEventId));
   }
 
   // Pin otherwise-unused imports reserved for future date-range /

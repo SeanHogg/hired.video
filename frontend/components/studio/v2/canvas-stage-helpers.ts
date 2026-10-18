@@ -5,6 +5,7 @@
  */
 import type { Widget } from "@/lib/studio/editor-v2/canvas-state";
 import type { AnimateInput } from "@/lib/timeline/effects/animate";
+import { clamp01 } from "@/lib/numeric";
 
 /**
  * Build the AnimateInput for a widget at the current playhead position.
@@ -88,4 +89,4 @@ export function sceneEffectsToCss(
   return parts.join(" ");
 }
 
-export { clamp01 } from "@/lib/numeric";
+export { clamp01 };

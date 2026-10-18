@@ -220,8 +220,7 @@ export async function reportFeedPost(
   const reason: ReportReason = isReportReason(rawReason) ? rawReason : "other";
   const notes = [reason === rawReason ? null : `Reason: ${rawReason}`, details]
     .filter((part): part is string => Boolean(part))
-    .join("
-");
+    .join("\n");
   const filed = await submitContentReport({
     reporterId: userId,
     entityType: "feed_post",

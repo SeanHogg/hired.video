@@ -1,8 +1,8 @@
 /**
  * /api/recruiter/lists — recruiter lists / call queues (gap #1360) of
- * talent-pool candidates. NOT the polymorphic /api/lists feature
- * (different tables: recruiter_lists / recruiter_list_members); merging
- * the tables is a Wave 3 item.
+ * talent-pool candidates. Stored in the polymorphic lists / list_items
+ * tables (W3-D2, migration 0624) under the recruiter kinds; this route keeps
+ * the legacy request/response shapes.
  */
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/index.js";
@@ -26,7 +26,7 @@ recruiterListRoutes.post("/lists", async (c) => {
 });
 
 recruiterListRoutes.get("/lists", async (c) => {
-  return c.json(success(await getRecruiterLists(c.get("user").sub)));
+  return c.json(success(await getRecruiterLists(c.var.userId)));
 });
 
 recruiterListRoutes.delete("/lists/:id", async (c) => {

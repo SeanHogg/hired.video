@@ -27,7 +27,7 @@ import {
   type Skill as ResumeSkillType,
   type SkillEvidence,
 } from "../../../../shared/resume.js";
-import type { ParsedJob } from "../job/JobService.js";
+import type { ParsedJob } from "../job/job-page-parse.js";
 import { logger } from "../../lib/logger.js";
 
 export const SkillSchema = z.object({
@@ -224,8 +224,6 @@ export function buildSkillExtractorPrompt(items?: ResolvedItem[]): string {
 Resume items available for evidenceLabels (use the title/organization shown — anything else won't bind):
 ${lines}`;
 }
-
-export const SKILL_EXTRACTOR_PROMPT = BASE_PROMPT;
 
 /** Heuristic fallback used when no LLM is available. */
 export function buildFallbackExtraction(

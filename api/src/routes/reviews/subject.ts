@@ -14,7 +14,7 @@ import { hashClientIp } from "../../utils/crypto.js";
 import { getOwnReview, getSubjectAggregate, listSubjectReviews } from "../../services/reviews/reviewReads.js";
 import { upsertReview } from "../../services/reviews/reviewWrites.js";
 import { toReviewDto } from "../../services/reviews/reviewMappers.js";
-import { handleReviews, readJsonBody, subjectTypeParam, viewerId } from "./http.js";
+import { handleReviews, readJsonBody, subjectTypeParam } from "./http.js";
 
 export const reviewSubjectRoutes = new Hono<AppEnv>();
 
@@ -39,7 +39,7 @@ reviewSubjectRoutes.get("/:subjectType/:subjectId/me", (c) =>
   handleReviews(c, async () => {
     const subjectType = subjectTypeParam(c);
     const data = await getOwnReview({
-      viewerId: viewerId(c),
+      viewerId: c.var.userId,
       subjectType,
       subjectId: c.req.param("subjectId"),
     });

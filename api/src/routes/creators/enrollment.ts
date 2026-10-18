@@ -25,8 +25,7 @@ import { sendResult } from "./shared.js";
 export const creatorEnrollmentRoutes = new Hono<AppEnv>();
 
 creatorEnrollmentRoutes.post("/opt-in", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
+  const userId = requireUser(c);
   const body = await c.req.json().catch(() => ({})) as {
     programs?: unknown;
     displayName?: string;
@@ -35,7 +34,7 @@ creatorEnrollmentRoutes.post("/opt-in", async (c) => {
     languages?: string[];
   };
   const programs = Array.isArray(body.programs) ? body.programs.filter(isCreatorProgram) : [];
-  return sendResult(c, await optInCreator(auth.userId, {
+  return sendResult(c, await optInCreator(userId, {
     programs,
     displayName: body.displayName,
     tagline: body.tagline,
@@ -45,27 +44,24 @@ creatorEnrollmentRoutes.post("/opt-in", async (c) => {
 });
 
 creatorEnrollmentRoutes.post("/me/programs/:program", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
+  const userId = requireUser(c);
   const program = c.req.param("program");
   if (!isCreatorProgram(program)) {
     return c.json(error("VALIDATION_ERROR", "Unknown program"), 400);
   }
-  return sendResult(c, await enableCreatorProgram(auth.userId, program));
+  return sendResult(c, await enableCreatorProgram(userId, program));
 });
 
 creatorEnrollmentRoutes.delete("/me/programs/:program", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
+  const userId = requireUser(c);
   const program = c.req.param("program");
   if (!isCreatorProgram(program)) {
     return c.json(error("VALIDATION_ERROR", "Unknown program"), 400);
   }
-  return sendResult(c, await disableCreatorProgram(auth.userId, program));
+  return sendResult(c, await disableCreatorProgram(userId, program));
 });
 
 creatorEnrollmentRoutes.post("/me/cancel", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return sendResult(c, await cancelCreatorEnrollment(auth.userId));
+  const userId = requireUser(c);
+  return sendResult(c, await cancelCreatorEnrollment(userId));
 });

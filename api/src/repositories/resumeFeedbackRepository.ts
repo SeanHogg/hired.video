@@ -17,6 +17,7 @@
 import { desc, eq, inArray, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
 import { EntityVersionRepository } from "./entityVersionRepository.js";
+import { videoMetaColumns } from "./resumeVideoMetaColumns.js";
 import {
   toResumeVersionRow,
   type ResumeVersionInsert,
@@ -96,9 +97,9 @@ export interface IResumeReviewUserDirectory {
   findUserContacts(ids: string[]): Promise<UserContact[]>;
 }
 
-/** Proposed-draft revisions (resume_versions proposal slice). */
+/** Proposed-draft revisions (entity_versions résumé proposal slice, W3-E). */
 export interface IResumeReviewProposalRepository {
-  nextVersionNumber(resumeId: string): Promise<number>;
+  /** Inserts at the résumé's next version number (allocated in-statement). */
   insertProposedVersion(input: ResumeVersionInsert): Promise<ResumeVersionRow>;
   findVersionById(id: string): Promise<ResumeVersionRow | null>;
   listProposalsForReview(reviewId: string): Promise<ResumeVersionRow[]>;
@@ -272,7 +273,7 @@ export class ResumeFeedbackRepository implements IResumeFeedbackRepository {
   async updateResumeContent(resumeId: string, content: unknown): Promise<void> {
     await this.db
       .update(resumeInformation)
-      .set({ content: content as any, updatedAt: this.now() })
+      .set({ content: content as any, ...videoMetaColumns(content), updatedAt: this.now() })
       .where(eq(resumeInformation.id, resumeId));
   }
 

@@ -6,11 +6,11 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createTikTokPublisher, createTikTokViewReader, tiktokChunkPlan } from "../publishers/tiktok.js";
+import { createTikTokMetricsReader, createTikTokPublisher, tiktokChunkPlan } from "../publishers/tiktok.js";
 import { createInstagramPublisher, createInstagramViewReader } from "../publishers/instagram.js";
 import { createFacebookPublisher, createFacebookViewReader } from "../publishers/facebook.js";
-import { createXPublisher, createXViewReader } from "../publishers/x.js";
-import { SocialPublishError } from "../publishers/types.js";
+import { createXMetricsReader, createXPublisher } from "../publishers/x.js";
+import { SocialPublishError, viewsOf } from "../publishers/types.js";
 import { EMPTY_TIKTOK_POST_SETTINGS } from "../../../../../shared/tiktok-post-settings.js";
 
 interface Call {
@@ -203,14 +203,14 @@ describe("view readers", () => {
     const { fetch, calls } = scriptedFetch([
       { match: "video/query", body: { data: { videos: [{ id: "777", view_count: 42 }] }, error: { code: "ok" } } },
     ]);
-    const views = await createTikTokViewReader({ fetch })("tok", ["777", "v_pub_file~abc"]);
+    const views = await viewsOf(createTikTokMetricsReader({ fetch }))("tok", ["777", "v_pub_file~abc"]);
     assert.deepEqual([...views], [["777", 42]]);
     assert.deepEqual(JSON.parse(String(calls[0].init?.body)), { filters: { video_ids: ["777"] } });
   });
 
   it("TikTok surfaces a missing video.list scope as NOT_AUTHORIZED", async () => {
     const { fetch } = scriptedFetch([{ match: "video/query", body: { error: { code: "scope_not_authorized" } } }]);
-    await assert.rejects(createTikTokViewReader({ fetch })("tok", ["1"]), (e: unknown) => e instanceof SocialPublishError && e.kind === "NOT_AUTHORIZED");
+    await assert.rejects(viewsOf(createTikTokMetricsReader({ fetch }))("tok", ["1"]), (e: unknown) => e instanceof SocialPublishError && e.kind === "NOT_AUTHORIZED");
   });
 
   it("Instagram batches insights and skips the item that failed", async () => {
@@ -237,7 +237,7 @@ describe("view readers", () => {
     const { fetch, calls } = scriptedFetch([
       { match: "tweets?ids=", body: { data: [{ id: "t1", public_metrics: { impression_count: 300 } }], errors: [{ resource_id: "t2" }] } },
     ]);
-    const views = await createXViewReader({ fetch })("tok", ["t1", "t2"]);
+    const views = await viewsOf(createXMetricsReader({ fetch }))("tok", ["t1", "t2"]);
     assert.deepEqual([...views], [["t1", 300]]);
     assert.ok(calls[0].url.includes("ids=t1,t2"));
   });

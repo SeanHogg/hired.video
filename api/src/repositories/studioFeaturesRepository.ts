@@ -1,13 +1,13 @@
 /**
  * Studio-features batch writes/reads used by routes/studio-features.ts —
- * voice-clone licenses (cart checkout) and the default interview-question
- * seed. Batch-shaped so a cart / seed costs a fixed number of round-trips
+ * voice-clone licenses (cart checkout). Batch-shaped so a cart costs a
+ * fixed number of round-trips
  * instead of one per line item (neon-http: every query is an HTTP request).
  */
 import { and, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "../db/index.js";
 
-const { studioVoiceCloneLicenses, studioInterviewQuestions } = schema;
+const { studioVoiceCloneLicenses } = schema;
 
 /** Which of `cloneIds` the user already holds a license for — ONE query. */
 export async function findLicensedVoiceCloneIds(
@@ -37,22 +37,5 @@ export async function grantFreeVoiceCloneLicenses(
   await db
     .insert(studioVoiceCloneLicenses)
     .values(unique.map((voiceCloneId) => ({ userId, voiceCloneId, source: "free" })))
-    .onConflictDoNothing();
-}
-
-export type InterviewQuestionSeed = Omit<
-  typeof studioInterviewQuestions.$inferInsert,
-  "id" | "createdAt" | "isDefault"
->;
-
-/** Seed system-default interview questions in ONE multi-row insert. */
-export async function insertDefaultInterviewQuestions(
-  db: Db,
-  questions: readonly InterviewQuestionSeed[],
-): Promise<void> {
-  if (questions.length === 0) return;
-  await db
-    .insert(studioInterviewQuestions)
-    .values(questions.map((q) => ({ ...q, isDefault: true })))
     .onConflictDoNothing();
 }

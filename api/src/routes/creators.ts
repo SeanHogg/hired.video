@@ -30,7 +30,3 @@ creatorRoutes.route("/", creatorMeRoutes);
 creatorRoutes.route("/", creatorDiscoveryRoutes);
 creatorRoutes.route("/", creatorPortfolioRoutes);
 creatorRoutes.route("/", creatorProjectRoutes);
-
-creatorRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Creator route not found" } }, 404),
-);

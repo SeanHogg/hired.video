@@ -15,6 +15,8 @@ import { resolveSegmentForCompany } from "../people-ops/segment.js";
 import type { PeopleSegmentScope } from "../people-ops/segment.js";
 import { randomHex, sha256Hex } from "../../utils/crypto.js";
 import { publicAppBaseUrl } from "../../utils/public-urls.js";
+import { DomainError } from "../../domains/errors.js";
+import { CompaniesRepository } from "../../repositories/companiesRepository.js";
 
 const { companyEmbedKeys } = schema;
 
@@ -155,17 +157,14 @@ export async function revokeEmbedKey(
 }
 
 // ── Embed runtime validation (#1826/#1828) ──────────────────────────────────
-export class EmbedAuthError extends Error {
-  constructor(
-    public readonly code:
-      | "INVALID_KEY"
-      | "EXPIRED"
-      | "FORBIDDEN_ORIGIN"
-      | "FORBIDDEN_SCOPE"
-      | "NOT_ENABLED",
-    message: string,
-  ) {
-    super(message);
+export type EmbedAuthErrorCode = "INVALID_KEY" | "EXPIRED" | "FORBIDDEN_ORIGIN" | "FORBIDDEN_SCOPE" | "NOT_ENABLED";
+
+/** Bad/expired key → 401; origin/scope/disabled → 403. */
+export class EmbedAuthError extends DomainError {
+  declare readonly code: EmbedAuthErrorCode;
+  constructor(code: EmbedAuthErrorCode, message: string) {
+    super(code === "INVALID_KEY" || code === "EXPIRED" ? 401 : 403, code, message);
+    this.name = "EmbedAuthError";
   }
 }
 
@@ -243,6 +242,16 @@ export async function resolveEmbedRequest(
 
   const scope = await resolveSegmentForCompany(row.companyId);
   return { scope, companyId: row.companyId, scopes, allowedOrigins };
+}
+
+/** The company's slug + embed toggle (null when the company is missing). */
+export function getCompanyEmbedSettings(companyId: string): Promise<{ slug: string | null; embedEnabled: boolean } | null> {
+  return new CompaniesRepository(getDb()).findEmbedSettings(companyId);
+}
+
+/** Turn embedding on/off for a company. */
+export function setCompanyEmbedEnabled(companyId: string, enabled: boolean): Promise<void> {
+  return new CompaniesRepository(getDb()).setEmbedEnabled(companyId, enabled);
 }
 
 /**

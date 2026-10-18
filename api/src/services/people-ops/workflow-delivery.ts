@@ -1,6 +1,6 @@
 /**
  * Workflow action delivery (#1843). The People-Ops workflow engine
- * (routes/people-cadence.ts) used to RECORD notify/slack/email actions
+ * (services/people-ops/cadence.ts) used to RECORD notify/slack/email actions
  * without delivering them. This module is the single seam that actually
  * delivers each action over a real channel:
  *
@@ -8,7 +8,8 @@
  *     same canonical path as People-Ops events #1824)
  *   • send_email                            → the existing mail provider
  *   • slack_message                         → the company's Slack incoming
- *     webhook stored on `company_integrations(provider='slack')`
+ *     webhook stored on the company's Slack workforce connection
+ *     (provider_connections purpose "workforce", provider 'slack')
  *   • create_task / create_meeting          → handled by the engine itself
  *
  * Best-effort by contract: a delivery failure is returned as `delivered:false`
@@ -16,11 +17,11 @@
  * whole workflow run.
  */
 
-import { and, eq } from "drizzle-orm";
-import { getDb, schema } from "../../db/index.js";
+import { getDb } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
 import { emitNotification, resolveActor } from "../notifications/notificationService.js";
 import { getEmailProvider } from "../adapters/email/transport.js";
+import { WorkforceIntegrations } from "../provider-connections/workforce-integrations.js";
 import { escapeHtml } from "../../../../shared/html-escape.js";
 import {
   PeopleEmployeesRepository,
@@ -148,19 +149,10 @@ export async function deliverWorkflowAction(
 }
 
 /** Slack incoming-webhook URL for a company, stored on the connected
- *  `company_integrations(provider='slack')` row's metadata. */
+ *  Slack workforce connection's metadata (config). */
 async function resolveSlackWebhook(companyId: string): Promise<string | null> {
-  const [row] = await getDb()
-    .select({ metadata: schema.companyIntegrations.metadata, status: schema.companyIntegrations.status })
-    .from(schema.companyIntegrations)
-    .where(
-      and(
-        eq(schema.companyIntegrations.companyId, companyId),
-        eq(schema.companyIntegrations.provider, "slack"),
-      ),
-    )
-    .limit(1);
+  const row = await new WorkforceIntegrations(getDb()).find(companyId, "slack");
   if (!row || row.status !== "connected") return null;
-  const url = (row.metadata as any)?.webhookUrl;
+  const url = row.metadata?.webhookUrl;
   return typeof url === "string" && url.startsWith("https://") ? url : null;
 }

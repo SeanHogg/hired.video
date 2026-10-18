@@ -8,14 +8,12 @@ import {
   SCREENING_ITEM_TYPES,
   SCREENING_ITEM_CATALOG,
   getScreeningCatalogEntry,
-  isScreeningItemType,
   validateScreeningItem,
 } from "../screening.js";
 
 describe("ai_screening_chat screening item (#1853)", () => {
   it("is a recognized item type with a catalog entry", () => {
     assert.ok((SCREENING_ITEM_TYPES as readonly string[]).includes("ai_screening_chat"));
-    assert.ok(isScreeningItemType("ai_screening_chat"));
     const entry = getScreeningCatalogEntry("ai_screening_chat");
     assert.equal(entry.itemType, "ai_screening_chat");
     assert.equal(entry.alwaysRequired, false);

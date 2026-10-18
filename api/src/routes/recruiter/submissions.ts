@@ -21,7 +21,7 @@ export const submissionRoutes = new Hono<AppEnv>();
 
 // GET /submissions/job/:jobId — must be before /:id
 submissionRoutes.get("/submissions/job/:jobId", async (c) => {
-  return c.json(responseEnvelope(await listSubmissionsByJob(c.get("user").sub, c.req.param("jobId"))));
+  return c.json(responseEnvelope(await listSubmissionsByJob(c.var.userId, c.req.param("jobId"))));
 });
 
 // POST /submissions — create a submission
@@ -39,7 +39,7 @@ submissionRoutes.post("/submissions", async (c) => {
 
 // GET /submissions — list all submissions for current recruiter
 submissionRoutes.get("/submissions", async (c) => {
-  return c.json(responseEnvelope(await listSubmissions(c.get("user").sub)));
+  return c.json(responseEnvelope(await listSubmissions(c.var.userId)));
 });
 
 // GET /submissions/packet — print-ready multi-candidate packet (#243), HTML
@@ -51,7 +51,7 @@ submissionRoutes.get("/submissions/packet", async (c) => {
     .map((s) => s.trim())
     .filter(Boolean);
   const anonymize = ["1", "true", "yes"].includes((c.req.query("anonymize") ?? "").toLowerCase());
-  const html = await renderCandidatePacketHtml(c.get("user").sub, ids, anonymize);
+  const html = await renderCandidatePacketHtml(c.var.userId, ids, anonymize);
   return new Response(html, {
     status: 200,
     headers: { "Content-Type": "text/html; charset=utf-8" },
@@ -60,7 +60,7 @@ submissionRoutes.get("/submissions/packet", async (c) => {
 
 // GET /submissions/:id — single submission
 submissionRoutes.get("/submissions/:id", async (c) => {
-  const row = await getSubmission(c.get("user").sub, c.req.param("id"));
+  const row = await getSubmission(c.var.userId, c.req.param("id"));
   if (!row) return c.json(responseEnvelope(null), 404);
   return c.json(responseEnvelope(row));
 });

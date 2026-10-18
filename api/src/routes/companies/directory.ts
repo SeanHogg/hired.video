@@ -55,9 +55,8 @@ companyDirectoryRoutes.get("/trending", async (c) => {
 
 // Companies the current user follows
 companyDirectoryRoutes.get("/me/followed", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await listFollowedCompanyMetas(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await listFollowedCompanyMetas(userId)), 200);
 });
 
 // Look up by slug
@@ -78,9 +77,8 @@ companyDirectoryRoutes.get("/:id/stats", async (c) => {
 // Companies owned by the caller / by a given user (public). Drives the
 // Company tab on the People profile.
 companyDirectoryRoutes.get("/me", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return c.json(success(await listOwnedCompanyMetas(auth.userId)), 200);
+  const userId = requireUser(c);
+  return c.json(success(await listOwnedCompanyMetas(userId)), 200);
 });
 
 companyDirectoryRoutes.get("/by-user/:userId", async (c) => {

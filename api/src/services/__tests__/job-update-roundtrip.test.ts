@@ -12,8 +12,8 @@ import {
   extractDetailsPatch,
   createJob,
   updateJob,
-  getJobById,
-} from "../job/JobService.js";
+} from "../job/job-write.js";
+import { getJobById } from "../job/job-queries.js";
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
 import type { CreateJobDTO } from "../../../../shared/job.js";
 

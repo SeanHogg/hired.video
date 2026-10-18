@@ -25,16 +25,13 @@ import {
   rankTopIntroducers,
   requestWarmIntro,
 } from "../services/graph/professionalGraph.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const graphRoutes = new Hono<AppEnv>();
 
-function userId(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
-
 graphRoutes.get("/mutuals/:userId", async (c) => {
-  const me = userId(c);
-  if (!me) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const me = requireUser(c);
   const target = c.req.param("userId");
   if (!target) return c.json(error("VALIDATION_ERROR", "userId required"), 400);
   const result = await findMutualConnections(me, target);
@@ -42,8 +39,7 @@ graphRoutes.get("/mutuals/:userId", async (c) => {
 });
 
 graphRoutes.get("/path/:userId", async (c) => {
-  const me = userId(c);
-  if (!me) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const me = requireUser(c);
   const target = c.req.param("userId");
   if (!target) return c.json(error("VALIDATION_ERROR", "userId required"), 400);
   const result = await findShortestPath(me, target);
@@ -55,13 +51,10 @@ const IntroducersSchema = z.object({
   limit: z.number().int().min(1).max(50).optional(),
 });
 
-graphRoutes.post("/top-introducers", async (c) => {
-  const me = userId(c);
-  if (!me) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = IntroducersSchema.safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.message), 400);
-  const result = await rankTopIntroducers(me, parsed.data.candidateIds, parsed.data.limit ?? 10);
+graphRoutes.post("/top-introducers", validateJson(IntroducersSchema, (e) => error("VALIDATION_ERROR", e.message)), async (c) => {
+  const me = requireUser(c);
+  const body = c.req.valid("json");
+  const result = await rankTopIntroducers(me, body.candidateIds, body.limit ?? 10);
   return c.json(success(result), 200);
 });
 
@@ -72,17 +65,14 @@ const WarmIntroSchema = z.object({
   message: z.string().min(1).max(2000),
 });
 
-graphRoutes.post("/intro", async (c) => {
-  const me = userId(c);
-  if (!me) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = WarmIntroSchema.safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.message), 400);
+graphRoutes.post("/intro", validateJson(WarmIntroSchema, (e) => error("VALIDATION_ERROR", e.message)), async (c) => {
+  const me = requireUser(c);
+  const body = c.req.valid("json");
   const result = await requestWarmIntro(
     me,
-    parsed.data.viaUserId,
-    parsed.data.targetUserId,
-    parsed.data.message,
+    body.viaUserId,
+    body.targetUserId,
+    body.message,
   );
   if ("error" in result) {
     if (result.error === "self") return c.json(error("BAD_REQUEST", "Cannot request an intro with yourself"), 400);
@@ -95,23 +85,20 @@ graphRoutes.post("/intro", async (c) => {
 
 // ─── GET /intros/incoming|outgoing — warm-intro inbox ──────────────────
 graphRoutes.get("/intros/incoming", async (c) => {
-  const me = userId(c);
-  if (!me) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const me = requireUser(c);
   const result = await listWarmIntros(me, "incoming");
   return c.json(success(result), 200);
 });
 
 graphRoutes.get("/intros/outgoing", async (c) => {
-  const me = userId(c);
-  if (!me) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const me = requireUser(c);
   const result = await listWarmIntros(me, "outgoing");
   return c.json(success(result), 200);
 });
 
 // ─── POST /intros/:conversationId/forward — mutual forwards the ask ───
 graphRoutes.post("/intros/:conversationId/forward", async (c) => {
-  const me = userId(c);
-  if (!me) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const me = requireUser(c);
   const conversationId = c.req.param("conversationId");
   if (!conversationId) return c.json(error("VALIDATION_ERROR", "conversationId required"), 400);
   const result = await forwardWarmIntro(me, conversationId);
@@ -128,8 +115,7 @@ graphRoutes.post("/intros/:conversationId/forward", async (c) => {
 
 // ─── POST /intros/:conversationId/decline — mutual declines the ask (#1465) ──
 graphRoutes.post("/intros/:conversationId/decline", async (c) => {
-  const me = userId(c);
-  if (!me) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const me = requireUser(c);
   const conversationId = c.req.param("conversationId");
   if (!conversationId) return c.json(error("VALIDATION_ERROR", "conversationId required"), 400);
   const result = await declineWarmIntro(me, conversationId);

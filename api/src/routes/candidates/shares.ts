@@ -6,6 +6,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/index.js";
 import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 import {
   createCandidateResumeShare,
   listCandidateResumeShares,
@@ -14,42 +15,36 @@ import {
   viewSharedCandidateResume,
 } from "../../services/recruit/candidateResumeSharesService.js";
 import { CreateShareSchema, UpdateShareSchema } from "../../services/recruit/schemas.js";
-import { parseJsonBody, respond } from "./http.js";
+import { invalidPayload, respond } from "./http.js";
 
 export const candidateShareRoutes = new Hono<AppEnv>();
 
 candidateShareRoutes.get("/shares", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
+  const userId = requireUser(c);
   return respond(
     c,
-    listCandidateResumeShares(auth.userId, {
+    listCandidateResumeShares(userId, {
       companyId: c.req.query("companyId"),
       candidateResumeId: c.req.query("candidateResumeId"),
     }),
   );
 });
 
-candidateShareRoutes.post("/shares", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const body = await parseJsonBody(c, CreateShareSchema);
-  if ("response" in body) return body.response;
-  return respond(c, createCandidateResumeShare(auth.userId, body.data), 201);
+candidateShareRoutes.post("/shares", validateJson(CreateShareSchema, invalidPayload(), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  return respond(c, createCandidateResumeShare(userId, body), 201);
 });
 
-candidateShareRoutes.patch("/shares/:id", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  const body = await parseJsonBody(c, UpdateShareSchema);
-  if ("response" in body) return body.response;
-  return respond(c, updateCandidateResumeShare(auth.userId, c.req.param("id"), body.data));
+candidateShareRoutes.patch("/shares/:id", validateJson(UpdateShareSchema, invalidPayload(), { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
+  const body = c.req.valid("json");
+  return respond(c, updateCandidateResumeShare(userId, c.req.param("id"), body));
 });
 
 candidateShareRoutes.delete("/shares/:id", async (c) => {
-  const auth = requireUser(c);
-  if ("response" in auth) return auth.response;
-  return respond(c, revokeCandidateResumeShare(auth.userId, c.req.param("id")));
+  const userId = requireUser(c);
+  return respond(c, revokeCandidateResumeShare(userId, c.req.param("id")));
 });
 
 /** Public (no auth) — mounted at /api/public/candidate-resume. Redacted

@@ -1,7 +1,7 @@
 /**
  * Supported UI locales — the single source of truth for both the API
  * (sanitisation/role gating) and the frontend (i18next setup, Settings
- * picker). Stored on `account_preferences.language` as the literal value.
+ * picker). Stored on `user_settings.language` as the literal value.
  *
  *   en    — English (canonical source-of-truth catalogue)
  *   es    — Spanish (Latin American base; fork to es-MX for Mexico phase)

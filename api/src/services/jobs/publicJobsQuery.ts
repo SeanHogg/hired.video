@@ -7,13 +7,13 @@
  * (query + env) instead of the Hono Context so it stays decoupled from
  * per-route Bindings typing.
  */
-import * as jobService from "../job/JobService.js";
+import { getPublicJobs } from "../job/job-queries.js";
 import { buildApiDeps } from "../apiDeps.js";
 import { LocationService } from "../location/LocationService.js";
 import { parsePagination } from "../../utils/pagination.js";
 import { getCachedSearch } from "../../utils/search-cache.js";
 
-export type PublicJobsPage = Awaited<ReturnType<typeof jobService.getPublicJobs>>;
+export type PublicJobsPage = Awaited<ReturnType<typeof getPublicJobs>>;
 
 export async function publicJobsFromQuery(
   query: Record<string, string | undefined>,
@@ -54,7 +54,7 @@ async function loadPublicJobsFromQuery(
     { req: { query: (key: string) => query[key] } },
     { defaultLimit: 10, maxLimit: 100 },
   );
-  return jobService.getPublicJobs({
+  return getPublicJobs({
     page,
     limit,
     search: query.search,

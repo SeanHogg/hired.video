@@ -7,22 +7,28 @@
  * SECURITY INVARIANTS:
  *   • The raw credential is NEVER returned to the client or logged. List /
  *     read responses expose only provider / slug / is_active / last4.
- *   • Encryption reuses services/payout/encryption.ts (the SAME AES-256-GCM
- *     helper used for payout tax IDs) — no bespoke crypto here.
+ *   • The credential is sealed with the ONE provider_connections scheme
+ *     (services/provider-connections/connection-secrets.ts) — no bespoke
+ *     crypto here.
  *   • Every mutation is authorized through `canActFor` (the workspace
  *     admin / company-member gate) before any DB write.
  */
 
 import type { Repos } from "../../repositories/index.js";
+import { getDb } from "../../db/index.js";
+import { TenantIntegrationsRepository } from "../../repositories/tenantIntegrationsRepository.js";
 import type {
   OwnerScope,
+  TenantIntegrationPatch,
   TenantIntegrationRow,
 } from "../../repositories/tenantIntegrationsRepository.js";
-import { encryptTaxId } from "../payout/encryption.js";
+import { sealConnectionSecret } from "../provider-connections/connection-secrets.js";
 import { canActFor } from "../studio/workspace.js";
+import { DomainError, statusForErrorCode } from "../../domains/errors.js";
 
 export type TenantIntegrationsServiceDeps = {
   repos: Pick<Repos, "tenantIntegrations">;
+  /** Worker env — CREDENTIALS_KMS_KEY seals the credential. */
   env: Record<string, string | undefined>;
 };
 
@@ -32,12 +38,10 @@ export type TenantIntegrationErrorCode =
   | "CONFLICT"
   | "VALIDATION_ERROR";
 
-export class TenantIntegrationError extends Error {
-  constructor(
-    public readonly code: TenantIntegrationErrorCode,
-    message: string,
-  ) {
-    super(message);
+export class TenantIntegrationError extends DomainError {
+  declare readonly code: TenantIntegrationErrorCode;
+  constructor(code: TenantIntegrationErrorCode, message: string) {
+    super(statusForErrorCode(code), code, message);
     this.name = "TenantIntegrationError";
   }
 }
@@ -99,15 +103,11 @@ export class TenantIntegrationsService {
     }
   }
 
-  /** Encrypt a raw credential via the shared AES-GCM helper. */
+  /** Seal a raw credential (always encrypted — no plaintext fallback). */
   private async encrypt(credential: string) {
-    const enc = await encryptTaxId(credential, this.deps.env);
-    return {
-      ciphertext: enc.ciphertext,
-      nonce: enc.nonce,
-      kmsKeyId: enc.kmsKeyId,
-      last4: last4(credential),
-    };
+    const masterKey = this.deps.env.CREDENTIALS_KMS_KEY;
+    const enc = await sealConnectionSecret(credential, masterKey ? { masterKey } : {});
+    return { enc: enc ?? "", last4: last4(credential) };
   }
 
   async list(
@@ -154,9 +154,7 @@ export class TenantIntegrationsService {
       companyId: scope.companyId,
       provider,
       slug,
-      credentialsCiphertext: enc.ciphertext,
-      credentialsNonce: enc.nonce,
-      credentialsKmsKeyId: enc.kmsKeyId,
+      credentialsEnc: enc.enc,
       credentialsLast4: enc.last4,
       isActive: true,
     });
@@ -173,7 +171,7 @@ export class TenantIntegrationsService {
 
     const row = await this.loadOwned(scope, id);
 
-    const patch: Record<string, unknown> = {};
+    const patch: TenantIntegrationPatch = {};
     if (typeof input.isActive === "boolean") patch.isActive = input.isActive;
     if (typeof input.credentials === "string") {
       const credentials = input.credentials.trim();
@@ -184,9 +182,7 @@ export class TenantIntegrationsService {
         );
       }
       const enc = await this.encrypt(credentials);
-      patch.credentialsCiphertext = enc.ciphertext;
-      patch.credentialsNonce = enc.nonce;
-      patch.credentialsKmsKeyId = enc.kmsKeyId;
+      patch.credentialsEnc = enc.enc;
       patch.credentialsLast4 = enc.last4;
     }
 
@@ -225,4 +221,12 @@ export class TenantIntegrationsService {
     }
     return row;
   }
+}
+
+/** Production wiring over the request-scoped db handle. */
+export function tenantIntegrationsService(env: Record<string, string | undefined>): TenantIntegrationsService {
+  return new TenantIntegrationsService({
+    repos: { tenantIntegrations: new TenantIntegrationsRepository(getDb()) },
+    env,
+  });
 }

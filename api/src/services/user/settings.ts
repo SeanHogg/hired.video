@@ -1,4 +1,5 @@
 import { DEFAULT_NOTIFICATION_PREFERENCES } from "../../../../shared/notification-preferences.js";
+import { DEFAULT_JOB_PREFERENCES, type JobPreferences } from "../../../../shared/settings.js";
 
 /** Canonical default notification matrix. SSoT is
  *  shared/notification-preferences.ts so the dispatcher + frontend agree. */
@@ -26,26 +27,10 @@ export function defaultPrivacyPreferences() {
   };
 }
 
-export function defaultJobPreferences() {
-  return {
-    autoApplyEnabled: false,
-    preferredJobTypes: [],
-    preferredIndustries: [],
-    preferredLocations: [],
-    remoteOnly: false,
-    willingToRelocate: false,
-    minSalaryExpectation: null,
-    maxSalaryExpectation: null,
-    salaryCurrency: "USD",
-    salaryPeriod: "yearly",
-    availableFrom: null,
-    noticePeriodDays: null,
-    preferredWorkingHours: [],
-    jobMatchThreshold: null,
-    onlyExactMatches: false,
-    excludedCompanies: [],
-    excludedKeywords: [],
-  };
+/** Settings › Job preferences defaults. SSoT is shared/settings.ts (the
+ *  API contract the form parses with). */
+export function defaultJobPreferences(): JobPreferences {
+  return { ...DEFAULT_JOB_PREFERENCES, preferredRoles: [], industries: [] };
 }
 
 export function defaultAccountSettings() {
@@ -57,7 +42,7 @@ export function defaultAccountSettings() {
   };
 }
 
-/** String-typed columns on `account_preferences` that the PUT /api/Settings/
+/** String-typed account-section columns on `user_settings` that the PUT /api/Settings/
  *  account handler accepts. */
 export const ACCOUNT_SETTINGS_STRING_FIELDS = [
   "theme",

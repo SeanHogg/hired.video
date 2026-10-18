@@ -20,7 +20,7 @@
  * naturally drops below threshold and the next tick skips the user.
  *
  * Webhook side: lifecycle transitions (sent → settled / failed) come
- * from applyPayoutWebhook in routes/payouts.ts — this worker is the
+ * from applyPayoutWebhook in services/payout/payoutWebhook.ts — this worker is the
  * producer; the webhook is the consumer. The two never write the same
  * column at the same time because:
  *   • worker only writes the initial 'queued' → 'sent' transition

@@ -1,8 +1,6 @@
-import { schema } from "../../db/index.js";
 import { logger } from "../../lib/logger.js";
+import { LoginEventsRepository, type DbLike } from "../../repositories/loginEventsRepository.js";
 import type { AuthDeps } from "./authPorts.js";
-
-const { loginEvents } = schema;
 
 // ---------------------------------------------------------------------------
 // recordLoginEvent — fire-and-forget insert into login_events. Awaited so
@@ -21,19 +19,30 @@ export interface LoginEventInput {
   failureReason?: string | null;
 }
 
-export async function recordLoginEvent(deps: AuthDeps, ev: LoginEventInput): Promise<void> {
+export interface LoginEventClient {
+  clientIp: string | null;
+  userAgent: string | null;
+}
+
+/** The ONE login_events writer — callers without full AuthDeps (OAuth)
+ *  pass a db handle + the request's client context directly. */
+export async function writeLoginEvent(db: DbLike, client: LoginEventClient, ev: LoginEventInput): Promise<void> {
   try {
-    await deps.db.insert(loginEvents).values({
+    await new LoginEventsRepository(db).insert({
       userId: ev.userId,
       email: ev.email,
       kind: ev.kind,
       provider: ev.provider,
-      ipAddress: deps.clientIp,
-      userAgent: deps.userAgent,
+      ipAddress: client.clientIp,
+      userAgent: client.userAgent,
       success: ev.success,
       failureReason: ev.failureReason ?? null,
-    } as any);
+    });
   } catch (err) {
     logger.error("[loginEvent] insert failed", err);
   }
+}
+
+export async function recordLoginEvent(deps: AuthDeps, ev: LoginEventInput): Promise<void> {
+  await writeLoginEvent(deps.db, deps, ev);
 }

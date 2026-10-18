@@ -30,6 +30,7 @@ import {
 import { findOrCreateDirectConversation, sendMessage } from "../messaging/messagingService.js";
 import { sendModerationFlagEmail } from "../../services/adapters/email/senders/notifications.js";
 import { logger } from "../../lib/logger.js";
+import { DomainError } from "../../domains/errors.js";
 
 export type ModerationServiceDeps = {
   repos: Pick<Repos, "users" | "notifications" | "conversations">;
@@ -53,9 +54,11 @@ const {
 
 export type ModerationErrorCode = "NOT_FOUND" | "FORBIDDEN" | "VALIDATION_ERROR";
 
-export class ModerationError extends Error {
-  constructor(public readonly code: ModerationErrorCode, message: string) {
-    super(message);
+/** NOT_FOUND → 404; every other code → 400 (the historical wire status). */
+export class ModerationError extends DomainError {
+  declare readonly code: ModerationErrorCode;
+  constructor(code: ModerationErrorCode, message: string) {
+    super(code === "NOT_FOUND" ? 404 : 400, code, message);
     this.name = "ModerationError";
   }
 }

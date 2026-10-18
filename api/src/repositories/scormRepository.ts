@@ -5,6 +5,8 @@
 import { and, eq } from "drizzle-orm";
 import { schema, type Db } from "../db/index.js";
 
+export { SCORM_COMPLETION_STATUSES } from "../db/schema/learning.js";
+
 const { scormCmiStates } = schema;
 
 export type ScormCmiStateRow = typeof scormCmiStates.$inferSelect;

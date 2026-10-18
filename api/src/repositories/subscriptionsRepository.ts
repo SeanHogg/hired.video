@@ -6,7 +6,7 @@
  * three repos would force every caller to juggle three handles.
  */
 
-import { and, count, desc, eq, inArray, sql, sum } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, sql, sum } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 const { subscriptions, subscriptionPlans, userPlanOverrides } = schema;
@@ -31,9 +31,15 @@ export interface ISubscriptionsRepository {
   activeMrrBefore(date: Date): Promise<number>;
   insertSubscription(input: SubscriptionInsert): Promise<SubscriptionRow>;
   updateSubscriptionById(id: string, patch: Partial<SubscriptionInsert>): Promise<SubscriptionRow | null>;
+  findFirstByUserAndStatus(userId: string, status: string): Promise<SubscriptionRow | null>;
+  hasEverTrialed(userId: string): Promise<boolean>;
+  cancelForUserInStatuses(userId: string, statuses: string[], extra?: { cancelAtPeriodEnd?: boolean }): Promise<void>;
+  cancelByProviderSubscriptionId(providerSubscriptionId: string): Promise<string[]>;
   // plans
   findPlanBySlug(slug: string): Promise<SubscriptionPlanRow | null>;
   findPlanById(id: string): Promise<SubscriptionPlanRow | null>;
+  findActivePlanBySlug(slug: string): Promise<SubscriptionPlanRow | null>;
+  findCheapestActivePlan(): Promise<SubscriptionPlanRow | null>;
   listAllPlans(): Promise<SubscriptionPlanRow[]>;
   // overrides
   findOverrideByUserId(userId: string): Promise<PlanOverrideRow | null>;
@@ -129,6 +135,51 @@ export class SubscriptionsRepository implements ISubscriptionsRepository {
     return (updated as SubscriptionRow) ?? null;
   }
 
+  async findFirstByUserAndStatus(userId: string, status: string): Promise<SubscriptionRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(subscriptions)
+      .where(and(eq(subscriptions.userId, userId), eq(subscriptions.status, status as any)))
+      .limit(1);
+    return (row as SubscriptionRow) ?? null;
+  }
+
+  /** True when ANY prior subscription carried a trial (non-null trialEnd),
+   *  regardless of its current status — the one-trial-per-user rule (#2190). */
+  async hasEverTrialed(userId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: subscriptions.id })
+      .from(subscriptions)
+      .where(and(eq(subscriptions.userId, userId), isNotNull(subscriptions.trialEnd)))
+      .limit(1);
+    return Boolean(row);
+  }
+
+  /** Cancel every subscription of the user currently in one of `statuses`. */
+  async cancelForUserInStatuses(
+    userId: string,
+    statuses: string[],
+    extra: { cancelAtPeriodEnd?: boolean } = {},
+  ): Promise<void> {
+    const now = this.now();
+    await this.db
+      .update(subscriptions)
+      .set({ status: "canceled", canceledAt: now, ...extra, updatedAt: now } as any)
+      .where(and(eq(subscriptions.userId, userId), inArray(subscriptions.status, statuses as any)));
+  }
+
+  /** Provider-side deletion → cancel locally; returns affected user ids so
+   *  the caller can bust their cached plan. */
+  async cancelByProviderSubscriptionId(providerSubscriptionId: string): Promise<string[]> {
+    const now = this.now();
+    const rows = await this.db
+      .update(subscriptions)
+      .set({ status: "canceled", canceledAt: now, updatedAt: now } as any)
+      .where(eq(subscriptions.stripeSubscriptionId, providerSubscriptionId))
+      .returning({ userId: subscriptions.userId });
+    return (rows as Array<{ userId: string | null }>).map((r) => r.userId).filter((id): id is string => Boolean(id));
+  }
+
   // ── plans ─────────────────────────────────────────────────────────────────
 
   async findPlanBySlug(slug: string): Promise<SubscriptionPlanRow | null> {
@@ -138,6 +189,25 @@ export class SubscriptionsRepository implements ISubscriptionsRepository {
 
   async findPlanById(id: string): Promise<SubscriptionPlanRow | null> {
     const [row] = await this.db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, id)).limit(1);
+    return (row as SubscriptionPlanRow) ?? null;
+  }
+
+  async findActivePlanBySlug(slug: string): Promise<SubscriptionPlanRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(subscriptionPlans)
+      .where(and(eq(subscriptionPlans.slug, slug), eq(subscriptionPlans.isActive, true)))
+      .limit(1);
+    return (row as SubscriptionPlanRow) ?? null;
+  }
+
+  async findCheapestActivePlan(): Promise<SubscriptionPlanRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(subscriptionPlans)
+      .where(eq(subscriptionPlans.isActive, true))
+      .orderBy(asc(subscriptionPlans.priceMonthly))
+      .limit(1);
     return (row as SubscriptionPlanRow) ?? null;
   }
 

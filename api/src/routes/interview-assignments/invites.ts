@@ -8,24 +8,26 @@ import { Hono } from "hono";
 import type { AppEnv } from "../../types/index.js";
 import { USER_ROLES } from "../../../../shared/user-roles.js";
 import { claimInterviewInvite, previewInterviewInvite } from "../../services/interview/assignment-invites.js";
-import { fail, ok, sendFailure } from "./shared.js";
+import { sendFailure } from "./shared.js";
+import { success, error } from "../../types/index.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 
 export const interviewAssignmentInviteRoutes = new Hono<AppEnv>();
 
 interviewAssignmentInviteRoutes.get("/invite/:token", async (c) => {
   const result = await previewInterviewInvite(c.req.param("token"));
-  if (!result.ok) return sendFailure(c, result);
-  return c.json(ok(result.data));
+  if (result.ok === false) return sendFailure(c, result);
+  return c.json(success(result.data));
 });
 
 interviewAssignmentInviteRoutes.post("/claim/:token", async (c) => {
   const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in to claim"), 401);
+  requireUser(c);
   if (!user.roles?.includes(USER_ROLES.JOB_SEEKER)) {
-    return c.json(fail("INVALID_ROLE", "Only job seekers can claim an interview assignment"), 403);
+    return c.json(error("INVALID_ROLE", "Only job seekers can claim an interview assignment"), 403);
   }
 
   const result = await claimInterviewInvite(user, c.req.param("token"));
-  if (!result.ok) return sendFailure(c, result);
-  return c.json(ok(result.data));
+  if (result.ok === false) return sendFailure(c, result);
+  return c.json(success(result.data));
 });

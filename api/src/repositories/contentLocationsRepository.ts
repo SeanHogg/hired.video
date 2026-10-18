@@ -8,8 +8,8 @@
  * that inserts new cities discovered via autocomplete.
  */
 
-import { and, eq, inArray, sql } from "drizzle-orm";
-import { schema } from "../db/index.js";
+import { and, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import { schema, type Db } from "../db/index.js";
 import type {
   ContentLocationKind,
   ContentLocationRole,
@@ -251,4 +251,95 @@ export class ContentLocationsRepository implements IContentLocationsRepository {
       updatedAt: this.now(),
     } as ContentLocationInsert;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Map pins (/api/map): entities whose `origin` location has lat/lng inside a
+// bounding box. Events (entity_kind 'event') and people (entity_kind
+// 'user_profile', entity_id = users.id — the home location, mig 0631).
+// ---------------------------------------------------------------------------
+
+export interface PinBox {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}
+
+function originInBox(box: PinBox) {
+  return and(
+    eq(contentLocations.role, "origin"),
+    isNotNull(contentLocations.latitude),
+    isNotNull(contentLocations.longitude),
+    gte(contentLocations.latitude, box.minLat),
+    lte(contentLocations.latitude, box.maxLat),
+    gte(contentLocations.longitude, box.minLng),
+    lte(contentLocations.longitude, box.maxLng),
+  );
+}
+
+/** Public, non-cancelled, upcoming events (type event/coffee) pinned in the box (max 500). */
+export async function listEventPinsInBox(db: Db, box: PinBox, now: Date) {
+  const { scheduledEvents } = schema;
+  return db
+    .select({
+      id: scheduledEvents.id,
+      title: scheduledEvents.title,
+      slug: scheduledEvents.slug,
+      category: scheduledEvents.category,
+      eventFormat: scheduledEvents.eventFormat,
+      startAt: scheduledEvents.startAt,
+      attendeeCount: scheduledEvents.attendeeCount,
+      capacity: scheduledEvents.capacity,
+      coverImageUrl: scheduledEvents.coverImageUrl,
+      lat: contentLocations.latitude,
+      lng: contentLocations.longitude,
+    })
+    .from(scheduledEvents)
+    .innerJoin(
+      contentLocations,
+      and(eq(contentLocations.entityKind, "event"), eq(contentLocations.entityId, scheduledEvents.id)),
+    )
+    .where(
+      and(
+        eq(scheduledEvents.visibility, "public"),
+        gte(scheduledEvents.startAt, now),
+        sql`${scheduledEvents.cancelledAt} IS NULL`,
+        sql`${scheduledEvents.type} IN ('event', 'coffee')`,
+        originInBox(box),
+      ),
+    )
+    .limit(500);
+}
+
+/** Public, verified users whose home location is in the box (max 500), with
+ *  their profileSections + role so the caller applies the openToCoffee rule. */
+export async function listPeoplePinsInBox(db: Db, box: PinBox) {
+  const { users, userProfiles } = schema;
+  return db
+    .select({
+      id: users.id,
+      name: users.name,
+      role: users.role,
+      avatarUrl: userProfiles.avatarUrl,
+      headline: userProfiles.headline,
+      lat: contentLocations.latitude,
+      lng: contentLocations.longitude,
+      sections: userProfiles.profileSections,
+      profileVisibility: userProfiles.profileVisibility,
+    })
+    .from(users)
+    .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .innerJoin(
+      contentLocations,
+      and(eq(contentLocations.entityKind, "user_profile"), eq(contentLocations.entityId, users.id)),
+    )
+    .where(
+      and(
+        eq(userProfiles.profileVisibility, "public"),
+        eq(users.emailVerified, true),
+        originInBox(box),
+      ),
+    )
+    .limit(500);
 }

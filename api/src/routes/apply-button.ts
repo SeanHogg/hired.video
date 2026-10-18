@@ -13,10 +13,10 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Env, Variables, AppEnv } from "../types/index.js";
+import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { eq } from "drizzle-orm";
+import { getApplyButtonJobMeta, trackApplyButtonClick } from "../services/marketing/apply-button.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const applyButtonRoutes = new Hono<AppEnv>();
 
@@ -35,50 +35,15 @@ const TrackClickSchema = z.object({
 // Records a button click and optionally captures the candidate's email as a
 // marketing lead. No auth required — anonymous visitors use this.
 
-applyButtonRoutes.post("/track", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = TrackClickSchema.safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request"), 400);
-
-  const { email, jobId, jobTitle, companyName, source, referrerUrl } = parsed.data;
-  const db = getDb();
-
-  // Capture as marketing lead if email provided
-  if (email) {
-    await db
-      .insert(schema.marketingLeads)
-      .values({
-        email,
-        source,
-        metadata: { jobId, jobTitle, companyName, referrerUrl },
-      } as any)
-      .onConflictDoNothing();
-  }
-
-  // Build redirect URL — send directly to signup with job pre-filled
-  const params = new URLSearchParams({ source: "apply-button" });
-  if (jobId) params.set("jobId", jobId);
-  if (email) params.set("email", email);
-  const signupUrl = `/signup?${params.toString()}`;
-
-  return c.json(success({ signupUrl, jobId }), 200);
+applyButtonRoutes.post("/track", validateJson(TrackClickSchema, () => error("VALIDATION_ERROR", "Invalid request")), async (c) => {
+  return c.json(success(await trackApplyButtonClick(c.req.valid("json"))), 200);
 });
 
 // ─── GET /api/apply-button/:jobId/meta ────────────────────────────────────────
 // Returns minimal job metadata so the embed button can display the job title.
 
 applyButtonRoutes.get("/:jobId/meta", async (c) => {
-  const { jobId } = c.req.param();
-  const db = getDb();
-
-  const [job] = await db
-    .select({ id: schema.jobItems.id, title: schema.jobItems.title, company: schema.jobItems.company })
-    .from(schema.jobItems)
-    .where(eq(schema.jobItems.id, jobId))
-    .limit(1);
-
-  if (!job) return c.json(error("NOT_FOUND", "Job not found"), 404);
-  return c.json(success({ id: job.id, title: job.title, company: job.company }), 200);
+  return c.json(success(await getApplyButtonJobMeta(c.req.param("jobId"))), 200);
 });
 
 // ─── GET /api/apply-button/snippet ────────────────────────────────────────────

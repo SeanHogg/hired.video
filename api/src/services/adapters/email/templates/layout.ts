@@ -80,17 +80,10 @@ const LAYOUT_FOOTER = `            </td>
 </body>
 </html>`;
 
-export interface EmailLayoutOptions {
-  /** Substitute the footer's `{{Year}}` placeholder (default true). The
-   *  screening invitation historically skipped this step and ships the
-   *  literal placeholder — kept as-is so output stays byte-identical. */
-  substituteYear?: boolean;
-}
-
-/** Wrap a body fragment in the shared header/footer chrome. */
-export function emailLayout(body: string, options: EmailLayoutOptions = {}): string {
+/** Wrap a body fragment in the shared header/footer chrome, with the
+ *  footer's `{{Year}}` placeholder replaced by the current year. */
+export function emailLayout(body: string): string {
   const html = LAYOUT_HEADER + body + LAYOUT_FOOTER;
-  if (options.substituteYear === false) return html;
   return html.replaceAll("{{Year}}", new Date().getFullYear().toString());
 }
 

@@ -116,3 +116,17 @@ export async function findBetweenViewerAndMany(viewerId: string, otherIds: strin
       ),
     )) as UserConnectionRow[];
 }
+
+/** Every accepted edge with either side in `userIds` (raw from/to pairs, row
+ *  order) — the 2nd-degree walk behind /api/network/warm-intros. */
+export async function findAcceptedEdgesTouching(userIds: string[]): Promise<{ from: string; to: string }[]> {
+  return getDb()
+    .select({ from: userConnections.fromUserId, to: userConnections.toUserId })
+    .from(userConnections)
+    .where(
+      and(
+        eq(userConnections.status, ACCEPTED),
+        or(inArray(userConnections.fromUserId, userIds), inArray(userConnections.toUserId, userIds)),
+      ),
+    );
+}

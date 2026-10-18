@@ -25,7 +25,7 @@ import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
 import { JobsRepository } from "../../repositories/jobsRepository.js";
 import { handleJobSentimentPrediction as jobSentimentUseCase } from "../job/job-sentiment-handler.js";
 import { asHandler } from "../../handlers/shared.js";
-import { jobRowToLLMText } from "../job/match-handlers.js";
+import { jobRowToLLMText } from "../job/match-text.js";
 import { scoreSentiment } from "../../../../shared/sentiment.js";
 
 // The use case returns data / throws DomainError; assert the HTTP envelope

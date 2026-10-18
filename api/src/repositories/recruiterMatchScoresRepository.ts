@@ -7,9 +7,13 @@
 import { and, desc, eq, type SQL } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 
-const { recruiterMatchScores, queueJobToProcess } = schema;
+const { recruiterMatchScores, queueJobToProcess, talentPoolCandidates, jobItems } = schema;
 
 export type RecruiterMatchScoreRow = typeof recruiterMatchScores.$inferSelect;
+
+/** A score with its display names read live (W3-D2: the copied
+ *  candidate_name / job_title columns were dropped in 0623). */
+export type RecruiterMatchScoreView = RecruiterMatchScoreRow & { candidateName: string; jobTitle: string };
 export type QueueJobInsert = typeof queueJobToProcess.$inferInsert;
 
 export type RecruiterScoringJob =
@@ -28,14 +32,21 @@ export async function listRecruiterMatchScores(
   recruiterId: string,
   filters: { jobId?: string; candidateId?: string },
   limit = 200,
-): Promise<RecruiterMatchScoreRow[]> {
+): Promise<RecruiterMatchScoreView[]> {
   let condition: SQL = eq(recruiterMatchScores.recruiterId, recruiterId);
   if (filters.jobId) condition = and(condition, eq(recruiterMatchScores.jobId, filters.jobId));
   if (filters.candidateId) condition = and(condition, eq(recruiterMatchScores.candidateId, filters.candidateId));
-  return getDb()
-    .select()
+  const rows = await getDb()
+    .select({
+      score: recruiterMatchScores,
+      candidateName: talentPoolCandidates.candidateName,
+      jobTitle: jobItems.title,
+    })
     .from(recruiterMatchScores)
+    .leftJoin(talentPoolCandidates, eq(talentPoolCandidates.id, recruiterMatchScores.candidateId))
+    .leftJoin(jobItems, eq(jobItems.id, recruiterMatchScores.jobId))
     .where(condition)
     .orderBy(desc(recruiterMatchScores.score))
     .limit(limit);
+  return rows.map((r) => ({ ...r.score, candidateName: r.candidateName ?? "", jobTitle: r.jobTitle ?? "" }));
 }

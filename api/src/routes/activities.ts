@@ -24,21 +24,14 @@ import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { activityService } from "../services/activities/ActivityService.js";
 import { isActivityPayType } from "../../../shared/activities.js";
+import { requireUser } from "./helpers/routerHelpers.js";
 
 export const activityRoutes = new Hono<AppEnv>();
-
-function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
-function unauthorized(c: any) {
-  return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-}
 
 // ── Employer ────────────────────────────────────────────────────────────────
 
 activityRoutes.post("/", async (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, any>;
   if (!body.workerUserId || typeof body.workerUserId !== "string") {
     return c.json(error("BAD_REQUEST", "workerUserId is required"), 400);
@@ -61,29 +54,25 @@ activityRoutes.post("/", async (c) => {
 });
 
 activityRoutes.get("/company", async (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const activities = await activityService.listForEmployer(userId);
   return c.json(success({ activities }), 200);
 });
 
 activityRoutes.get("/assignable-workers", async (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const workers = await activityService.listAssignableWorkers(userId);
   return c.json(success({ workers }), 200);
 });
 
 activityRoutes.post("/:id/approve", async (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const dto = await activityService.approve(userId, c.req.param("id"));
   return c.json(success(dto), 200);
 });
 
 activityRoutes.post("/:id/reject", async (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, any>;
   const reason = typeof body.reason === "string" ? body.reason.trim() : "";
   if (!reason) return c.json(error("BAD_REQUEST", "A rejection reason is required"), 400);
@@ -94,37 +83,32 @@ activityRoutes.post("/:id/reject", async (c) => {
 // ── Worker (owner) ────────────────────────────────────────────────────────────
 
 activityRoutes.get("/assigned", async (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const activities = await activityService.listForWorker(userId);
   return c.json(success({ activities }), 200);
 });
 
 activityRoutes.get("/timer/active", async (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const { getActiveTimeEntry } = await import("../services/workforce/index.js");
   const entry = await getActiveTimeEntry(userId);
   return c.json(success(entry), 200);
 });
 
 activityRoutes.post("/:id/timer/start", async (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const entry = await activityService.startTimer(userId, c.req.param("id"));
   return c.json(success(entry), 200);
 });
 
 activityRoutes.post("/:id/timer/stop", async (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const entry = await activityService.stopTimer(userId, c.req.param("id"));
   return c.json(success(entry), 200);
 });
 
 activityRoutes.post("/:id/submit", async (c) => {
-  const userId = uid(c);
-  if (!userId) return unauthorized(c);
+  const userId = requireUser(c);
   const dto = await activityService.submit(userId, c.req.param("id"));
   return c.json(success(dto), 200);
 });

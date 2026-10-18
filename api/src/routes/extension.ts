@@ -24,10 +24,10 @@ import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb } from "../db/index.js";
 import { optionalAuthMiddleware } from "../middleware/auth.js";
 import { createIpRateLimiter, getClientIp } from "../middleware/rateLimiter.js";
-import { EVENT_KINDS, handleIngestExtensionBatch } from "../services/extension/ingest.js";
+import { EVENT_KINDS, handleIngestExtensionBatch, liveIngestDeps } from "../services/extension/ingest.js";
+import { validateJson } from "./helpers/validate.js";
 
 // ── Schemas ────────────────────────────────────────────────────────────────
 // Event-kind union lives in services/extension/ingest.ts (the canonical
@@ -73,24 +73,20 @@ extensionRoutes.post(
   "/sessions",
   ingestRateLimiter,
   optionalAuthMiddleware,
-  async (c) => {
+  validateJson(BatchSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid batch"), { emptyBody: null }), async (c) => {
     const lengthHeader = c.req.header("content-length");
     if (lengthHeader && Number(lengthHeader) > 200_000) {
       return c.json(error("PAYLOAD_TOO_LARGE", "Telemetry batch too large."), 413);
     }
 
-    const raw = await c.req.json().catch(() => null);
-    const parsed = BatchSchema.safeParse(raw);
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid batch"), 400);
-    }
+    const body = c.req.valid("json");
 
     const ip = getClientIp(c);
     const result = await handleIngestExtensionBatch(
-      { db: getDb() },
-      parsed.data,
+      liveIngestDeps(),
+      body,
       {
-        userId: (c.var.user?.sub as string | undefined) ?? null,
+        userId: c.var.userId ?? null,
         userAgent: c.req.header("user-agent") ?? null,
         ip: ip === "unknown" ? null : ip,
       },

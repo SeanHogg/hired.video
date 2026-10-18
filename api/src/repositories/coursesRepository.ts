@@ -7,6 +7,14 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { schema, type Db } from "../db/index.js";
 
+/** Course enums owned by this aggregate — re-exported so route-layer
+ *  validators don't import db/schema. */
+export {
+  COURSE_LESSON_SOURCE_TYPES,
+  COURSE_DIFFICULTIES,
+  SCORM_VERSIONS,
+} from "../db/schema/courses.js";
+
 const { courses, courseLessons } = schema;
 
 export type CourseRow = typeof courses.$inferSelect;
@@ -18,6 +26,15 @@ export async function courseOwnedBy(db: Db, userId: string, courseId: string): P
     .where(and(eq(courses.id, courseId), eq(courses.userId, userId)))
     .limit(1);
   return row != null;
+}
+
+/** The course owner's user id; null when the course doesn't exist. */
+export async function findCourseOwnerId(db: Db, courseId: string): Promise<string | null> {
+  const [row] = await db.select({ userId: courses.userId })
+    .from(courses)
+    .where(eq(courses.id, courseId))
+    .limit(1);
+  return row?.userId ?? null;
 }
 
 export async function courseExists(db: Db, courseId: string): Promise<boolean> {

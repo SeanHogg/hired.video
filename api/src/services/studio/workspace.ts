@@ -29,6 +29,7 @@ import {
   userCanAccessCompany,
   type CompanyScopeDeps,
 } from "../company/scope.js";
+import { DomainError } from "../../domains/errors.js";
 
 export type DbHandle = ReturnType<typeof getDb>;
 
@@ -55,10 +56,10 @@ export interface WorkspaceContext {
   ownerCompanyId: string | null;
 }
 
-export class WorkspaceForbiddenError extends Error {
-  readonly code = "WORKSPACE_FORBIDDEN" as const;
+/** 403 FORBIDDEN — the ONE code every workspace refusal answers with. */
+export class WorkspaceForbiddenError extends DomainError {
   constructor(message = "You do not have permission to act on this workspace.") {
-    super(message);
+    super(403, "FORBIDDEN", message);
     this.name = "WorkspaceForbiddenError";
   }
 }

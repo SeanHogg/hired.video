@@ -18,7 +18,7 @@ import type {
   VoiceCloneRow,
 } from "../../repositories/publicSearchRepository.js";
 import type { ResumeRow } from "../../repositories/resumeRepository.js";
-import type { JobEntity } from "../job/JobService.js";
+import type { JobEntity } from "../job/job-entity.js";
 
 export function toSearchItem(job: JobEntity) {
   return {

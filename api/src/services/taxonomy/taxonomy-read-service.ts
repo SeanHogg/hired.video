@@ -9,17 +9,15 @@
  * serialised to ISO strings) so the KV round-trip is lossless.
  */
 
-import { asc, eq } from "drizzle-orm";
-import { getDb, schema } from "../../db/index.js";
+import { getDb } from "../../db/index.js";
 import type { WorkspaceJobType, WorkspaceSource, WorkspaceTag } from "../../db/schema/taxonomies.js";
+import { TaxonomyRepository, type TaxonomyKind } from "../../repositories/taxonomyRepository.js";
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
-
-const { workspaceTags, workspaceJobTypes, workspaceSources } = schema;
 
 export const TAG_AXES = ["company", "job", "person"] as const;
 export type TagAxis = (typeof TAG_AXES)[number];
 
-export type TaxonomyKind = "tags" | "job-types" | "sources";
+export type { TaxonomyKind };
 
 /** Backstop TTL — every write path invalidates explicitly. */
 const TAXONOMY_TTL_SECONDS = 600;
@@ -49,13 +47,7 @@ export function listTags(axis: TagAxis | null): Promise<WorkspaceTagDto[]> {
     key: tagsKey(axis),
     ttlSeconds: TAXONOMY_TTL_SECONDS,
     loader: async () => {
-      const db = getDb();
-      const baseQuery = db.select().from(workspaceTags);
-      const rows = await (axis ? baseQuery.where(eq(workspaceTags.axis, axis)) : baseQuery).orderBy(
-        asc(workspaceTags.axis),
-        asc(workspaceTags.orderIndex),
-        asc(workspaceTags.name),
-      );
+      const rows = await new TaxonomyRepository(getDb()).listTags(axis);
       return rows.map((r) => ({ ...r, createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt) }));
     },
   });
@@ -66,10 +58,7 @@ export function listJobTypes(): Promise<WorkspaceJobTypeDto[]> {
     key: JOB_TYPES_KEY,
     ttlSeconds: TAXONOMY_TTL_SECONDS,
     loader: async () => {
-      const rows = await getDb()
-        .select()
-        .from(workspaceJobTypes)
-        .orderBy(asc(workspaceJobTypes.orderIndex), asc(workspaceJobTypes.label));
+      const rows = await new TaxonomyRepository(getDb()).listJobTypes();
       return rows.map((r) => ({ ...r, createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt) }));
     },
   });
@@ -80,10 +69,7 @@ export function listSources(): Promise<WorkspaceSourceDto[]> {
     key: SOURCES_KEY,
     ttlSeconds: TAXONOMY_TTL_SECONDS,
     loader: async () => {
-      const rows = await getDb()
-        .select()
-        .from(workspaceSources)
-        .orderBy(asc(workspaceSources.orderIndex), asc(workspaceSources.label));
+      const rows = await new TaxonomyRepository(getDb()).listSources();
       return rows.map((r) => ({ ...r, createdAt: iso(r.createdAt) }));
     },
   });

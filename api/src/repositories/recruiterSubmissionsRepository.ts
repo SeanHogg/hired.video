@@ -4,7 +4,7 @@
  * documented otherwise. The pipeline kanban's bounded read lives in
  * recruiterPipelineRepository.ts.
  */
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 
 const { candidateSubmissions } = schema;
@@ -36,6 +36,18 @@ export async function listSubmissionsForRecruiter(recruiterId: string): Promise<
     .from(candidateSubmissions)
     .where(eq(candidateSubmissions.recruiterId, recruiterId))
     .orderBy(desc(candidateSubmissions.submittedAt));
+}
+
+/** The recruiter's submissions grouped by status (dashboard tiles). */
+export async function countSubmissionsByStatusForRecruiter(
+  recruiterId: string,
+): Promise<Array<{ status: string; total: number }>> {
+  const rows = await getDb()
+    .select({ status: candidateSubmissions.status, total: count() })
+    .from(candidateSubmissions)
+    .where(eq(candidateSubmissions.recruiterId, recruiterId))
+    .groupBy(candidateSubmissions.status);
+  return rows.map((r) => ({ status: r.status, total: Number(r.total) }));
 }
 
 export async function insertSubmission(values: Record<string, unknown>): Promise<SubmissionRow> {

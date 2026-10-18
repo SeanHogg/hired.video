@@ -66,7 +66,10 @@ function readCreatedTables() {
   const files = readdirSync(DRIZZLE_DIR).filter((f) => f.endsWith(".sql")).sort();
   const names = new Set();
   const dropRe = /DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+((?:(?:"?[a-z_][a-z0-9_]*"?\.)?"?[a-z_][a-z0-9_]*"?\s*,\s*)*(?:"?[a-z_][a-z0-9_]*"?\.)?"?[a-z_][a-z0-9_]*"?)/gi;
-  const createRe = /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:"?[a-z_][a-z0-9_]*"?\.)?"?([a-z_][a-z0-9_]*)"?/gi;
+  // Group 1 = optional schema qualifier, group 2 = table name. A table
+  // created directly in the `archive` schema (archive-first backfill /
+  // snapshot tables, 0590+) is never a public pgTable, so it is skipped.
+  const createRe = /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:"?([a-z_][a-z0-9_]*)"?\.)?"?([a-z_][a-z0-9_]*)"?/gi;
   // Scratch tables that exist only inside a single migration (created
   // then RENAMEd to their permanent name, e.g. the job_items rebuild
   // pattern in 0122c_job_items_rebuild.sql) shouldn't count as orphans
@@ -82,7 +85,9 @@ function readCreatedTables() {
     // Replay CREATE / DROP in textual order so a drop-then-recreate rebuild
     // inside one migration leaves the table present.
     const events = [
-      ...[...text.matchAll(createRe)].map((m) => ({ at: m.index, create: [m[1]] })),
+      ...[...text.matchAll(createRe)]
+        .filter((m) => (m[1] ?? "").toLowerCase() !== "archive")
+        .map((m) => ({ at: m.index, create: [m[2]] })),
       ...[...text.matchAll(dropRe)].map((m) => ({ at: m.index, drop: m[1].split(",") })),
       ...[...text.matchAll(archiveRe)].map((m) => ({ at: m.index, drop: [m[1]] })),
     ].sort((x, y) => x.at - y.at);

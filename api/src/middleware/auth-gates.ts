@@ -17,6 +17,7 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { isAdminRole } from "./superAdmin.js";
 import { TIER_COPY, UPGRADE_URL } from "../../../shared/tier-copy.js";
+import { error } from "../types/index.js";
 
 type AppCtx = Context<AppEnv>;
 
@@ -29,7 +30,7 @@ export function requirePro(featureName: string): MiddlewareHandler<AppEnv> {
   return async (c: AppCtx, next) => {
     const userId = c.var.user?.sub;
     if (!userId) {
-      return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
+      return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
     }
 
     if (isAdminRole(c.var.user)) {

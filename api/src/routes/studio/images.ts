@@ -10,21 +10,19 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/index.js";
 import { parseAiImageRequest, runAiImageRequest } from "../../services/studio/ai-images.js";
-import { fail, guardGenerationPrompt, ok, studioErrorResponse } from "./http.js";
+import { guardGenerationPrompt } from "./http.js";
+import { success } from "../../types/index.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 
 export const studioImageRoutes = new Hono<AppEnv>();
 
 studioImageRoutes.post("/images", async (c) => {
   const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  requireUser(c);
 
   const body: unknown = await c.req.json().catch(() => null);
-  try {
-    const request = parseAiImageRequest(body && typeof body === "object" ? (body as Record<string, unknown>) : null);
-    const blocked = guardGenerationPrompt(c, request.prompt);
-    if (blocked) return blocked;
-    return c.json(ok(await runAiImageRequest(c.env, user, request)));
-  } catch (err) {
-    return studioErrorResponse(c, err);
-  }
+  const request = parseAiImageRequest(body && typeof body === "object" ? (body as Record<string, unknown>) : null);
+  const blocked = guardGenerationPrompt(c, request.prompt);
+  if (blocked) return blocked;
+  return c.json(success(await runAiImageRequest(c.env, user, request)));
 });

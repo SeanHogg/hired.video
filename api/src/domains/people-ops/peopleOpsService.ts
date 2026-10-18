@@ -56,6 +56,7 @@ import {
   type PeopleOpsEventSink,
 } from "./events.js";
 import { buildRepos } from "../../repositories/index.js";
+import { DomainError, statusForErrorCode } from "../errors.js";
 
 export type ServiceErrorCode =
   | "NOT_FOUND"
@@ -63,12 +64,12 @@ export type ServiceErrorCode =
   | "CONFLICT"
   | "VALIDATION_ERROR";
 
-export class PeopleOpsServiceError extends Error {
-  constructor(
-    public readonly code: ServiceErrorCode,
-    message: string,
-  ) {
-    super(message);
+/** A DomainError the global handler renders with the code's status. */
+export class PeopleOpsServiceError extends DomainError {
+  declare readonly code: ServiceErrorCode;
+  constructor(code: ServiceErrorCode, message: string) {
+    super(statusForErrorCode(code), code, message);
+    this.name = "PeopleOpsServiceError";
   }
 }
 

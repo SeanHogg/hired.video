@@ -134,14 +134,12 @@ export class ChatRoom {
   }
 
   private broadcastPresence(): void {
-    const online = [...this.sessions.values()].map((m) => m.userId);
-    const unique = [...new Set(online)];
-    this.broadcast({ kind: "presence", online: unique });
+    this.broadcast(buildPresencePayload([...this.sessions.values()].map((m) => m.userId)));
   }
 }
 
-// Pure-helper export so a unit test can lock down the protocol shape
-// without needing the DurableObjectState mock.
+// Pure presence-frame builder — the one shape `broadcastPresence` sends,
+// unit-testable without the DurableObjectState mock.
 export function buildPresencePayload(userIds: string[]): { kind: "presence"; online: string[] } {
   return { kind: "presence", online: [...new Set(userIds)] };
 }

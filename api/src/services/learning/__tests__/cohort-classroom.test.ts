@@ -143,7 +143,7 @@ describe("cohort gate — assertCanWrite (throws WorkspaceForbiddenError on deny
     const { db } = buildFakeDb({ workspace_grants: [] });
     await assert.rejects(
       () => assertCanWrite(ACTOR, OWNER, null, { db: db as never }),
-      (e) => e instanceof WorkspaceForbiddenError && e.code === "WORKSPACE_FORBIDDEN",
+      (e) => e instanceof WorkspaceForbiddenError && e.code === "FORBIDDEN",
     );
     // owner is allowed — resolves without throwing
     await assertCanWrite(ACTOR, ACTOR, null, { db: db as never });

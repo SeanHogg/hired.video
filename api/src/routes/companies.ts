@@ -33,7 +33,3 @@ companyRoutes.route("/", companyFollowRoutes);
 companyRoutes.route("/", companyChildrenRoutes);
 companyRoutes.route("/", companyBrandingRoutes);
 companyRoutes.route("/", companyProfileRoutes);
-
-companyRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Company endpoint not found" } }, 404),
-);

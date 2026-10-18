@@ -106,7 +106,7 @@ export const companyProfiles = pgTable("company_profiles", {
   featuredUntil: timestamp("featured_until", { withTimezone: true }),
   featuredRankBoost: integer("featured_rank_boost").default(0).notNull(),
   // Denormalized review aggregate — recomputed by
-  // recomputeAggregateCache() in api/src/routes/reviews.ts on every
+  // recomputeAggregateCache() in api/src/services/reviews/reviewProjections.ts on every
   // review write/delete. Avoids re-scanning the polymorphic `reviews`
   // table on every directory / card / OG render. See migration 0035.
   reviewCount: integer("review_count").notNull().default(0),

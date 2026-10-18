@@ -14,12 +14,12 @@ import {
   listProjectPublications,
   listProjects,
 } from "../../services/studio/project-queries.js";
-import { ok, studioErrorResponse } from "./http.js";
+import { success } from "../../types/index.js";
 
 export const studioProjectReadRoutes = new Hono<AppEnv>();
 
 studioProjectReadRoutes.get("/projects", async (c) => {
-  const dtos = await listProjects(c.var.user.sub, {
+  const dtos = await listProjects(c.var.userId, {
     subjectKind: c.req.query("subjectKind"),
     subjectId: c.req.query("subjectId"),
     workspace: c.req.query("workspace"),
@@ -27,17 +27,13 @@ studioProjectReadRoutes.get("/projects", async (c) => {
   // `?fields=` trims each row for list views (the full DTO carries every
   // editor state blob).
   const fields = parseFields(c.req.query("fields"), STUDIO_PROJECT_LIST_FIELDS);
-  return c.json(ok(projectRows(dtos as Array<Record<string, unknown>>, fields)));
+  return c.json(success(projectRows(dtos as Array<Record<string, unknown>>, fields)));
 });
 
 // Readable by owner / company member / delegated grantee; 404 (not 403)
 // otherwise so ids can't be enumerated.
 studioProjectReadRoutes.get("/projects/:projectId", async (c) => {
-  try {
-    return c.json(ok(await getReadableProject(c.var.user.sub, c.req.param("projectId"))));
-  } catch (e) {
-    return studioErrorResponse(c, e);
-  }
+  return c.json(success(await getReadableProject(c.var.userId, c.req.param("projectId"))));
 });
 
 // Extension-only alias: the published Chrome extension polls this for render
@@ -46,17 +42,9 @@ studioProjectReadRoutes.get("/projects/:projectId", async (c) => {
 // load as GET /projects/:projectId; new clients use that route.
 // DEPRECATED alias for extension <= current version — remove after next CWS release
 studioProjectReadRoutes.get("/status/:projectId", async (c) => {
-  try {
-    return c.json(ok(await getLegacyProjectStatus(c.var.user.sub, c.req.param("projectId"))));
-  } catch (e) {
-    return studioErrorResponse(c, e);
-  }
+  return c.json(success(await getLegacyProjectStatus(c.var.userId, c.req.param("projectId"))));
 });
 
 studioProjectReadRoutes.get("/projects/:projectId/publications", async (c) => {
-  try {
-    return c.json(ok(await listProjectPublications(c.var.user.sub, c.req.param("projectId"))));
-  } catch (e) {
-    return studioErrorResponse(c, e);
-  }
+  return c.json(success(await listProjectPublications(c.var.userId, c.req.param("projectId"))));
 });

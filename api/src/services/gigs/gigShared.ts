@@ -3,6 +3,7 @@
 // Every gig module (projects, bids, work, escrow, disputes) builds on these.
 
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { DomainError } from "../../domains/errors.js";
 
 // Milestone states from which a dispute may be opened. 'pending' (not started)
 // and the terminal 'released'/'refunded' can't be disputed; 'disputed' is
@@ -57,12 +58,19 @@ export interface PlaceBidInput {
   proposedDurationDays?: number;
 }
 
-export class GigError extends Error {
-  constructor(
-    public code: "NOT_FOUND" | "FORBIDDEN" | "CONFLICT" | "VALIDATION_ERROR",
-    message: string,
-  ) {
-    super(message);
+type GigErrorCode = "NOT_FOUND" | "FORBIDDEN" | "CONFLICT" | "VALIDATION_ERROR";
+
+const GIG_ERROR_STATUS: Record<GigErrorCode, 400 | 403 | 404 | 409> = {
+  VALIDATION_ERROR: 400,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  CONFLICT: 409,
+};
+
+export class GigError extends DomainError {
+  declare readonly code: GigErrorCode;
+  constructor(code: GigErrorCode, message: string) {
+    super(GIG_ERROR_STATUS[code], code, message);
     this.name = "GigError";
   }
 }

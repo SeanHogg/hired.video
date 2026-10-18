@@ -32,6 +32,7 @@ import {
   YouTubeAuthError,
   youtubeOAuthConfig,
 } from "../services/youtube/youtubeOAuth.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const youtubeRoutes = new Hono<AppEnv>();
 
@@ -41,7 +42,7 @@ const CallbackSchema = z.object({
 
 // ─── GET /api/youtube/account ───────────────────────────────────────────────
 youtubeRoutes.get("/account", async (c) => {
-  const account = await getActiveAccount(c.var.user.sub);
+  const account = await getActiveAccount(c.var.userId);
   return c.json(success(account ? accountToDto(account) : null));
 });
 
@@ -54,17 +55,15 @@ youtubeRoutes.get("/auth-url", (c) => {
 });
 
 // ─── POST /api/youtube/callback ─────────────────────────────────────────────
-youtubeRoutes.post("/callback", async (c) => {
+youtubeRoutes.post("/callback", validateJson(CallbackSchema, () => error("VALIDATION_ERROR", "Missing OAuth callback code"), { emptyBody: null }), async (c) => {
   const user = c.var.user;
-  const body = await c.req.json().catch(() => null);
-  const parsed = CallbackSchema.safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Missing OAuth callback code"), 400);
+  const body = c.req.valid("json");
 
   const redirectUri = integrationRedirectUri("youtube");
 
   let tokens;
   try {
-    tokens = await exchangeAuthCode(youtubeOAuthConfig(c.env), parsed.data.code, redirectUri);
+    tokens = await exchangeAuthCode(youtubeOAuthConfig(c.env), body.code, redirectUri);
   } catch (err) {
     if (err instanceof YouTubeAuthError && err.reason === "YOUTUBE_NOT_CONFIGURED") {
       return c.json(error("YOUTUBE_UNAVAILABLE", "YouTube integration not configured"), 503);
@@ -101,6 +100,6 @@ youtubeRoutes.post("/callback", async (c) => {
 
 // ─── POST /api/youtube/disconnect ───────────────────────────────────────────
 youtubeRoutes.post("/disconnect", async (c) => {
-  await deactivateAllForUser(c.var.user.sub);
+  await deactivateAllForUser(c.var.userId);
   return c.json(success(undefined));
 });

@@ -9,7 +9,7 @@ import { PageEmbedDialog } from "@/components/studio/PageEmbedDialog";
 import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
 import DocumentPreviewOverlay from "@/components/studio/document/DocumentPreviewOverlay";
 import InviteDialog from "@/components/studio/game/world-3d/InviteDialog";
-import type { MediaKind } from "@shared/media-kinds";
+import { mediaKindIsDocument, type MediaKind } from "@shared/media-kinds";
 import type { GameState } from "@shared/game-state";
 import type { StudioProject } from "@/lib/services/studio-service";
 import type { CanvasState } from "@/lib/studio/editor-v2/canvas-state";
@@ -87,7 +87,7 @@ export default function StudioEditorDialogs({
           onClose={() => dialogs.setPreviewOpen(false)}
         />
       )}
-      {dialogs.docPreviewOpen && currentMediaKind === "document" && (
+      {dialogs.docPreviewOpen && mediaKindIsDocument(currentMediaKind) && (
         <DocumentPreviewOverlay
           state={documentState}
           content={documentEntityContent}

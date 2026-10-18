@@ -23,6 +23,7 @@ import {
   CreateFeedFeatureSchema,
   UpdateFeedFeatureSchema,
 } from "../../../shared/feed-features.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const adminFeedFeatureRoutes = new Hono<AppEnv>();
 
@@ -45,14 +46,11 @@ adminFeedFeatureRoutes.get("/", async (c) => {
 // ---------------------------------------------------------------------------
 // POST / — create or upsert (entity_kind + entity_id is unique)
 // ---------------------------------------------------------------------------
-adminFeedFeatureRoutes.post("/", async (c) => {
-  const parsed = CreateFeedFeatureSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
-  const actorId = c.var.user?.sub as string;
+adminFeedFeatureRoutes.post("/", validateJson(CreateFeedFeatureSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
+  const actorId = c.var.userId;
   const created = await buildService().create({
-    ...parsed.data,
+    ...body,
     createdBy: actorId,
   });
   await audit(actorId, "feed_features.create", created.id, {
@@ -66,18 +64,15 @@ adminFeedFeatureRoutes.post("/", async (c) => {
 // ---------------------------------------------------------------------------
 // PATCH /:id — update roles / rank / active / payload
 // ---------------------------------------------------------------------------
-adminFeedFeatureRoutes.patch("/:id", async (c) => {
+adminFeedFeatureRoutes.patch("/:id", validateJson(UpdateFeedFeatureSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
   const id = c.req.param("id");
-  const parsed = UpdateFeedFeatureSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
-  const updated = await buildService().update(id, parsed.data);
+  const body = c.req.valid("json");
+  const updated = await buildService().update(id, body);
   if (!updated) {
     return c.json(error("NOT_FOUND", "Feed feature not found"), 404);
   }
-  const actorId = c.var.user?.sub as string;
-  await audit(actorId, "feed_features.update", id, { patch: parsed.data });
+  const actorId = c.var.userId;
+  await audit(actorId, "feed_features.update", id, { patch: body });
   return c.json(success(updated), 200);
 });
 
@@ -90,7 +85,7 @@ adminFeedFeatureRoutes.delete("/:id", async (c) => {
   if (!ok) {
     return c.json(error("NOT_FOUND", "Feed feature not found"), 404);
   }
-  const actorId = c.var.user?.sub as string;
+  const actorId = c.var.userId;
   await audit(actorId, "feed_features.delete", id, {});
   return c.json(success({ id, deleted: true }), 200);
 });

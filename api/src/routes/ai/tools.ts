@@ -30,12 +30,13 @@ async function gate(mw: MiddlewareHandler<AppEnv>, c: AiToolContext): Promise<Re
   const res = await mw(c, async () => {
     passed = true;
   });
-  return passed ? null : (res ?? c.res);
+  if (passed) return null;
+  return res instanceof Response ? res : c.res;
 }
 
 /** auth → module toggle → Pro → token budget → per-tool guard. */
 async function runGates(c: AiToolContext, tool: AiToolEntry): Promise<Response | null> {
-  if (!c.var.user?.sub && !ANONYMOUS_AI_TOOL_IDS.includes(tool.id)) {
+  if (!c.var.userId && !ANONYMOUS_AI_TOOL_IDS.includes(tool.id)) {
     return failTool(c, new DomainError(401, "UNAUTHORIZED", "Authentication required"));
   }
   if (tool.moduleSlug) {

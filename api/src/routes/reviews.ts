@@ -32,7 +32,3 @@ export const reviewRoutes = new Hono<AppEnv>();
 reviewRoutes.route("/", reviewCommentRoutes);
 reviewRoutes.route("/", reviewSubjectRoutes);
 reviewRoutes.route("/", reviewItemRoutes);
-
-reviewRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Reviews endpoint not found" } }, 404),
-);

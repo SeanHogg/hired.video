@@ -4,7 +4,7 @@
  * `applySuggestedEdit` applies one reviewer-proposed field change to a resume's
  * `content` when the owner accepts an annotation. `validateProposedDraft`
  * narrows an opaque reviewer-submitted draft to `ResumeContent` before it is
- * stored as a proposed `resume_versions` row.
+ * stored as a proposed `entity_versions` résumé row.
  *
  * Targeting (mirrors shared/resume-feedback.ts SuggestedEdit):
  *   • sectionKey === "basics" → set `fieldPath` on the basics object.

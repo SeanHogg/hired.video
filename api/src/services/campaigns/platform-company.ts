@@ -7,7 +7,7 @@
 import { eq } from "drizzle-orm";
 import { schema } from "../../db/index.js";
 import { getOrSetCached } from "../../utils/edge-cache.js";
-import { HIRED_VIDEO_SEED_COMPANY } from "../job/JobService.js";
+import { HIRED_VIDEO_SEED_COMPANY } from "../job/job-seed-company.js";
 
 const CACHE_KEY = "platform:hired-video-company-id";
 const CACHE_TTL = 600;

@@ -26,6 +26,7 @@ import {
 import { requireJobOwner } from "../../services/jobs/jobOwnership.js";
 import { requireCompanyOwner } from "../../services/company/companyOwnership.js";
 import { isArtifactKind } from "../../../../shared/artifact-views.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 
 export const analyticsArtifactRoutes = new Hono<AppEnv>();
 
@@ -60,8 +61,7 @@ analyticsArtifactRoutes.get("/artifacts/:kind/:id", async (c) => {
     return c.json(success(await getJobRollup(id)), 200);
   }
 
-  const uid = c.var.user?.sub ?? null;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const uid = requireUser(c);
   const ownerUserId = await lookupArtifactOwner(kind, id);
   // Owner-or-super-admin via the canonical predicate (the JWT carries
   // `roles[]` + `isSuperAdmin`, never a singular `role`).
@@ -72,8 +72,7 @@ analyticsArtifactRoutes.get("/artifacts/:kind/:id", async (c) => {
 });
 
 analyticsArtifactRoutes.get("/creator/me", async (c) => {
-  const uid = c.var.user?.sub ?? null;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const uid = requireUser(c);
   const { buildCreatorRollup } = await import("../../services/analytics/creatorRollup.js");
   return c.json(success(await buildCreatorRollup(uid)), 200);
 });

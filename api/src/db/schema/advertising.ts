@@ -6,7 +6,7 @@
  *
  * Also includes:
  *   - jobBoosts      — self-serve sponsored job placements (gap #106)
- *   - enrichmentCredits / enrichmentTransactions — contact enrichment balance (gap #96)
+ *   - (enrichment credits are the `enrichment_credits` wallet — wallets.ts)
  *   - careerResilienceReports — AI career risk analysis (gap #103)
  */
 
@@ -228,75 +228,9 @@ export const ads = pgTable("ads", {
   check("ads_subject_check", sql`(${t.subjectType} IS NULL AND ${t.subjectId} IS NULL) OR (${t.subjectId} IS NOT NULL AND ${t.subjectType} IN ('job', 'company', 'article', 'course', 'template', 'video', 'studio_project', 'resume', 'service', 'voice_clone', 'event', 'user_profile'))`),
 ]);
 
-// ---------------------------------------------------------------------------
-// Enrichment Credits (gap #96)
-// ---------------------------------------------------------------------------
-export const enrichmentCredits = pgTable("enrichment_credits", {
-  id:             uuid("id").primaryKey().defaultRandom(),
-  userId:         uuid("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
-  balance:        integer("balance").notNull().default(0),
-  totalPurchased: integer("total_purchased").notNull().default(0),
-  totalConsumed:  integer("total_consumed").notNull().default(0),
-  updatedAt:      timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const enrichmentTransactions = pgTable("enrichment_transactions", {
-  id:            uuid("id").primaryKey().defaultRandom(),
-  userId:        uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  type:          text("type").notNull(), // purchase | deduction | refund | monthly_grant
-  amount:        integer("amount").notNull(),    // positive = credit, negative = debit
-  balanceAfter:  integer("balance_after").notNull(),
-  description:   text("description"),
-  referenceId:   text("reference_id"),           // Stripe charge ID or enriched contact ID
-  createdAt:     timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [
-  index("idx_enrichment_tx_user").on(t.userId),
-]);
-
-// ---------------------------------------------------------------------------
-// Campaign Dollars (#169) — ad/boost credit balance redeemable from
-// gamification points. Mirrors enrichment_credits + Tremendous flow but
-// terminates in an internal ledger that the boosts checkout consumes
-// before charging a card. Points → cents at a per-user snapshot rate.
-// ---------------------------------------------------------------------------
-export const campaignDollarsBalance = pgTable("campaign_dollars_balance", {
-  id:                   uuid("id").primaryKey().defaultRandom(),
-  userId:               uuid("user_id").notNull().unique(),
-  balanceCents:         integer("balance_cents").notNull().default(0),
-  lifetimeGrantedCents: integer("lifetime_granted_cents").notNull().default(0),
-  lifetimeSpentCents:   integer("lifetime_spent_cents").notNull().default(0),
-  /** Snapshotted on first opt-in. Falls back to platform default when
-   *  NULL. Insulates the user from later global rate adjustments. */
-  rateCentsPer1kPoints: integer("rate_cents_per_1k_points"),
-  createdAt:            timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt:            timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-export type CampaignDollarsBalance = typeof campaignDollarsBalance.$inferSelect;
-export type NewCampaignDollarsBalance = typeof campaignDollarsBalance.$inferInsert;
-
-export const campaignDollarsTransactions = pgTable(
-  "campaign_dollars_transactions",
-  {
-    id:                  uuid("id").primaryKey().defaultRandom(),
-    userId:              uuid("user_id").notNull(),
-    /** "grant_redemption" | "boost_spend" | "ad_spend" | "refund" */
-    kind:                varchar("kind", { length: 32 }).notNull(),
-    /** Signed: positive = credit, negative = debit. */
-    amountCents:         integer("amount_cents").notNull(),
-    balanceAfterCents:   integer("balance_after_cents").notNull(),
-    referenceId:         text("reference_id"),
-    referenceType:       varchar("reference_type", { length: 40 }),
-    description:         text("description"),
-    createdAt:           timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [
-    index("idx_campaign_dollars_tx_user").on(t.userId, t.createdAt),
-  ],
-);
-
-export type CampaignDollarsTransaction = typeof campaignDollarsTransactions.$inferSelect;
-export type NewCampaignDollarsTransaction = typeof campaignDollarsTransactions.$inferInsert;
+// Enrichment credits (gap #96) and Campaign $ (#169) are wallets —
+// currencies `enrichment_credits` / `campaign_dollars` in wallets.ts
+// (W3-B, migration 0590).
 
 // ---------------------------------------------------------------------------
 // Career Resilience Reports (gap #103)

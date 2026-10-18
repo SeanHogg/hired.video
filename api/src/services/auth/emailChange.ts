@@ -22,7 +22,7 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 import { schema } from "../../db/index.js";
 import { logger } from "../../lib/logger.js";
 import { sendEmailChangeCurrent, sendEmailChangeNew } from "../adapters/email/senders/auth.js";
-import { bumpSessionVersion, revokeAllSessionsForUser } from "./sessions.js";
+import { bumpSessionVersion, revokeAllSessionsForUser } from "./session-lifecycle.js";
 import { randomHex } from "../../utils/crypto.js";
 
 const { users, emailChangeRequests } = schema;

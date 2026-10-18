@@ -50,6 +50,31 @@ export const EARNINGS_SOURCE_BY_LEDGER_KIND: Record<string, EarningsSourceMeta> 
   task: { source: "contract", label: "Contract work" },
 };
 
+/**
+ * Every `payout_ledger_entries.source_kind` the CHECK constraint accepts
+ * (migration 0593): the accrual kinds PayoutLedgerService writes (the keys of
+ * EARNINGS_SOURCE_BY_LEDGER_KIND) plus the legacy kinds the 0151 constraint
+ * allowed. The schema + migration CHECK lists must equal this list.
+ */
+export const PAYOUT_LEDGER_SOURCE_KINDS = [
+  "service_order",
+  "voice_clone_license",
+  "gift_card",
+  "platform_fee",
+  "creator_payout",
+  "manual_adjustment",
+  "commission",
+  "partner_program",
+  "promo_project",
+  "promo_extra_revision",
+  "template_license",
+  "course_enrollment",
+  "article_pool_distribution",
+  "article",
+  "timesheet",
+  "task",
+] as const;
+
 /** Stable display order for the breakdown rows. */
 export const EARNINGS_SOURCE_ORDER: EarningsSourceKey[] = [...EARNINGS_SOURCES];
 

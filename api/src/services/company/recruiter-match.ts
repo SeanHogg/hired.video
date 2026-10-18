@@ -224,8 +224,6 @@ export async function scoreAllCandidatesForJob(
       recruiterId,
       jobId,
       candidateId: candidate.id,
-      candidateName: candidate.candidateName,
-      jobTitle: job.title,
       score,
       recommendations,
     } as any);
@@ -397,8 +395,6 @@ export async function scoreAllJobsForCandidate(
       recruiterId,
       jobId,
       candidateId,
-      candidateName: candidate.candidateName,
-      jobTitle: job.title,
       score,
       recommendations,
     } as any);

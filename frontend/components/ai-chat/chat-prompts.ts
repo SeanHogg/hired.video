@@ -350,56 +350,42 @@ export function getConversationalPrompt(action: AIAction): string {
   return prompts[action] || `Help me with ${action.replace(/-/g, " ")}`;
 }
 
+type ContextFactory = (userRole?: string) => AIContext;
+
+/** Route contextType → AIContext factory (open/closed: a new surface is one
+ *  entry). Studio + content surfaces get the general-shaped payload but keep
+ *  their contextType so the page keeps its label in the system prompt +
+ *  suggestions. outreach / messaging / general (and anything unlisted) fall
+ *  back to the plain general context. */
+const CONTEXT_FACTORIES: Partial<Record<AIContextType, ContextFactory>> = {
+  dashboard: (userRole) => createDashboardContext(undefined, undefined, userRole),
+  "resume-list": (userRole) => createResumeContext("resume-list", undefined, userRole),
+  "resume-create": (userRole) => createResumeContext("resume-create", undefined, userRole),
+  "resume-edit": (userRole) => createResumeContext("resume-edit", undefined, userRole),
+  "resume-view": (userRole) => createResumeContext("resume-view", undefined, userRole),
+  "job-list": (userRole) => createJobContext("job-list", undefined, userRole),
+  "job-create": (userRole) => createJobContext("job-create", undefined, userRole),
+  "job-edit": (userRole) => createJobContext("job-edit", undefined, userRole),
+  "job-view": (userRole) => createJobContext("job-view", undefined, userRole),
+  "profile-view": (userRole) => createProfileContext("profile-view", undefined, userRole),
+  "profile-edit": (userRole) => createProfileContext("profile-edit", undefined, userRole),
+  search: (userRole) => createSearchContext(undefined, undefined, undefined, undefined, userRole),
+  tasks: (userRole) => createTasksContext(undefined, userRole),
+  "studio": (userRole) => createGeneralContext(userRole, "studio"),
+  "article-view": (userRole) => createGeneralContext(userRole, "article-view"),
+  "article-edit": (userRole) => createGeneralContext(userRole, "article-edit"),
+  "company-view": (userRole) => createGeneralContext(userRole, "company-view"),
+  "company-edit": (userRole) => createGeneralContext(userRole, "company-edit"),
+  "course-learn": (userRole) => createGeneralContext(userRole, "course-learn"),
+  "course-author": (userRole) => createGeneralContext(userRole, "course-author"),
+  "learning": (userRole) => createGeneralContext(userRole, "learning"),
+  "interview-practice": (userRole) => createGeneralContext(userRole, "interview-practice"),
+};
+
 /**
  * Create appropriate context object for a given context type and user role
  */
-export function createContextForType(contextType: AIContextType, userRole?: string) {
-  switch (contextType) {
-    case "dashboard":
-      return createDashboardContext(undefined, undefined, userRole);
-
-    case "resume-list":
-    case "resume-create":
-    case "resume-edit":
-    case "resume-view":
-      return createResumeContext(contextType, undefined, userRole);
-
-    case "job-list":
-    case "job-create":
-    case "job-edit":
-    case "job-view":
-      return createJobContext(contextType, undefined, userRole);
-
-    case "profile-view":
-    case "profile-edit":
-      return createProfileContext(contextType, undefined, userRole);
-
-    case "search":
-      return createSearchContext(undefined, undefined, undefined, undefined, userRole);
-
-    case "tasks":
-      return createTasksContext(undefined, userRole);
-
-    // Studio + content surfaces — general-shaped payload, but pass the
-    // resolved contextType through so the page keeps its label in the
-    // system prompt + suggestions instead of flattening to "general".
-    case "studio":
-    case "article-view":
-    case "article-edit":
-    case "company-view":
-    case "company-edit":
-    case "course-learn":
-    case "course-author":
-    case "learning":
-    case "interview-practice":
-      return createGeneralContext(userRole, contextType);
-
-    // outreach / messaging carry the general payload today (no bespoke
-    // wiring in this panel); general is the fallback for everything else.
-    case "outreach":
-    case "messaging":
-    case "general":
-    default:
-      return createGeneralContext(userRole);
-  }
+export function createContextForType(contextType: AIContextType, userRole?: string): AIContext {
+  const factory = CONTEXT_FACTORIES[contextType];
+  return factory ? factory(userRole) : createGeneralContext(userRole);
 }

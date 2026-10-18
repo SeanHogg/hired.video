@@ -4,24 +4,16 @@
  * /api/people/* behind peopleOpsContext (segment + paid gate already applied).
  */
 
-import { Hono } from "hono";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
 import { success, error } from "../types/index.js";
-import type { PeopleEnv } from "../middleware/peopleOps.js";
 import { crudRouter } from "./helpers/peopleCrud.js";
-import { PeopleSegmentRepo } from "../repositories/peopleSegmentRepo.js";
-import { getDb, schema } from "../db/index.js";
+import { insertChild, listChildren } from "../services/people-ops/segmentStore.js";
 import {
   OBJECTIVE_CATEGORIES, OBJECTIVE_TIMEFRAMES, OBJECTIVE_STATUSES,
   OUTCOME_STATUSES, MILESTONE_STATUSES,
   COMPANY_MILESTONE_CATEGORIES, COMPANY_MILESTONE_STATUSES,
 } from "../../../shared/people-ops.js";
-
-const {
-  peopleStrategicObjectives, peopleObjectiveOutcomes, peopleObjectiveMilestones,
-  peopleCompanyMilestones, peoplePerformanceReviews,
-} = schema;
+import { validateJson } from "./helpers/validate.js";
 
 // ── Strategic objectives (+ nested outcomes & milestones) ────────────────────
 const ObjectiveSchema = z.object({
@@ -36,7 +28,7 @@ const ObjectiveSchema = z.object({
   ownerId: z.string().uuid().nullish(),
   progress: z.number().int().min(0).max(100).optional(),
 });
-export const objectivesRouter = crudRouter(peopleStrategicObjectives, ObjectiveSchema, ObjectiveSchema.partial(), {
+export const objectivesRouter = crudRouter("strategicObjectives", ObjectiveSchema, ObjectiveSchema.partial(), {
   stampCreatedBy: true,
   coerceDates: ["startDate", "endDate"],
 });
@@ -57,35 +49,20 @@ const ObjMilestoneSchema = z.object({
   status: z.enum(MILESTONE_STATUSES).optional(),
 });
 
-// Nested children: outcomes + milestones for an objective (validate parent in-segment).
-async function assertObjectiveInSegment(c: any, objectiveId: string): Promise<boolean> {
-  const repo = new PeopleSegmentRepo(getDb(), peopleStrategicObjectives);
-  return Boolean(await repo.findById(c.var.peopleCtx, objectiveId));
-}
-
-objectivesRouter.get("/:id/outcomes", async (c) => {
-  const repo = new PeopleSegmentRepo(getDb(), peopleObjectiveOutcomes);
-  const rows = await repo.list(c.var.peopleCtx, [eq(peopleObjectiveOutcomes.objectiveId, c.req.param("id"))]);
-  return c.json(success(rows));
+// Nested children: outcomes + milestones for an objective (parent validated in-segment).
+objectivesRouter.get("/:id/outcomes", async (c) =>
+  c.json(success(await listChildren(c.var.peopleCtx, "objectiveOutcomes", "objectiveId", c.req.param("id")))));
+objectivesRouter.post("/:id/outcomes", validateJson(OutcomeSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const row = await insertChild(c.var.peopleCtx, "strategicObjectives", "objectiveOutcomes", "objectiveId", c.req.param("id"), c.req.valid("json"));
+  if (!row) return c.json(error("NOT_FOUND", "Objective not found"), 404);
+  return c.json(success(row), 201);
 });
-objectivesRouter.post("/:id/outcomes", async (c) => {
-  if (!(await assertObjectiveInSegment(c, c.req.param("id")))) return c.json(error("NOT_FOUND", "Objective not found"), 404);
-  const p = OutcomeSchema.safeParse(await c.req.json().catch(() => null));
-  if (!p.success) return c.json(error("VALIDATION_ERROR", "Invalid body", p.error.flatten()), 400);
-  const repo = new PeopleSegmentRepo(getDb(), peopleObjectiveOutcomes);
-  return c.json(success(await repo.insert(c.var.peopleCtx, { ...p.data, objectiveId: c.req.param("id") })), 201);
-});
-objectivesRouter.get("/:id/milestones", async (c) => {
-  const repo = new PeopleSegmentRepo(getDb(), peopleObjectiveMilestones);
-  const rows = await repo.list(c.var.peopleCtx, [eq(peopleObjectiveMilestones.objectiveId, c.req.param("id"))]);
-  return c.json(success(rows));
-});
-objectivesRouter.post("/:id/milestones", async (c) => {
-  if (!(await assertObjectiveInSegment(c, c.req.param("id")))) return c.json(error("NOT_FOUND", "Objective not found"), 404);
-  const p = ObjMilestoneSchema.safeParse(await c.req.json().catch(() => null));
-  if (!p.success) return c.json(error("VALIDATION_ERROR", "Invalid body", p.error.flatten()), 400);
-  const repo = new PeopleSegmentRepo(getDb(), peopleObjectiveMilestones);
-  return c.json(success(await repo.insert(c.var.peopleCtx, { ...p.data, objectiveId: c.req.param("id") })), 201);
+objectivesRouter.get("/:id/milestones", async (c) =>
+  c.json(success(await listChildren(c.var.peopleCtx, "objectiveMilestones", "objectiveId", c.req.param("id")))));
+objectivesRouter.post("/:id/milestones", validateJson(ObjMilestoneSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const row = await insertChild(c.var.peopleCtx, "strategicObjectives", "objectiveMilestones", "objectiveId", c.req.param("id"), c.req.valid("json"));
+  if (!row) return c.json(error("NOT_FOUND", "Objective not found"), 404);
+  return c.json(success(row), 201);
 });
 
 // ── Company milestones ───────────────────────────────────────────────────────
@@ -100,7 +77,7 @@ const CompanyMilestoneSchema = z.object({
   progress: z.number().int().min(0).max(100).optional(),
   objectiveId: z.string().uuid().nullish(),
 });
-export const companyMilestonesRouter = crudRouter(peopleCompanyMilestones, CompanyMilestoneSchema, CompanyMilestoneSchema.partial(), {
+export const companyMilestonesRouter = crudRouter("companyMilestones", CompanyMilestoneSchema, CompanyMilestoneSchema.partial(), {
   stampCreatedBy: true,
   coerceDates: ["targetDate", "completedDate"],
 });
@@ -119,7 +96,7 @@ const ReviewSchema = z.object({
   areasForImprovement: z.string().max(5000).nullish(),
   comments: z.string().max(5000).nullish(),
 });
-export const performanceReviewsRouter = crudRouter(peoplePerformanceReviews, ReviewSchema, ReviewSchema.partial(), {
+export const performanceReviewsRouter = crudRouter("performanceReviews", ReviewSchema, ReviewSchema.partial(), {
   employeeRefs: ["employeeId", "reviewerId"],
   coerceDates: ["scheduledDate", "completedDate"],
 });

@@ -13,8 +13,9 @@ import { z } from "zod";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 import type { AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
-import { mapServiceError, requireUser } from "../helpers/routerHelpers.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 import type { ScorecardsService } from "../../domains/scorecards/scorecardsService.js";
+import { validateJson } from "../helpers/validate.js";
 
 const AssignSubmissionSchema = z.object({
   templateId: UuidLikeSchema,
@@ -33,15 +34,10 @@ export function reliabilityRoutes(
   const r = new Hono<AppEnv>();
 
   r.get("/:userId", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    try {
-      return c.json(
-        success(await service().getReliability(auth.userId, c.req.param("userId"))),
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    const userId = requireUser(c);
+    return c.json(
+      success(await service().getReliability(userId, c.req.param("userId"))),
+    );
   });
 
   return r;
@@ -52,32 +48,22 @@ export function assignmentRoutes(
 ): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
 
-  r.post("/", async (c) => {
-    const auth = requireUser(c);
-    if ("response" in auth) return auth.response;
-    const parsed = AssignSubmissionSchema.safeParse(
-      await c.req.json().catch(() => null),
-    );
-    if (!parsed.success) {
-      return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-    }
+  r.post("/", validateJson(AssignSubmissionSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const userId = requireUser(c);
+    const body = c.req.valid("json");
     // Zod widens `dueAt` to optional after `.union().transform()` even
     // though the schema doesn't call `.optional()`. We narrow here so
     // the service contract stays strict.
-    const { dueAt, ...rest } = parsed.data;
+    const { dueAt, ...rest } = body;
     if (!dueAt) {
       return c.json(error("VALIDATION_ERROR", "dueAt is required"), 400);
     }
-    try {
-      return c.json(
-        success(
-          await service().assignSubmission(auth.userId, { ...rest, dueAt }),
-        ),
-        201,
-      );
-    } catch (e) {
-      return mapServiceError(c, e);
-    }
+    return c.json(
+      success(
+        await service().assignSubmission(userId, { ...rest, dueAt }),
+      ),
+      201,
+    );
   });
 
   return r;

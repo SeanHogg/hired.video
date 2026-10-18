@@ -3,8 +3,8 @@
  * surfaces. Collapses the identical list/create/get/update/delete boilerplate
  * (objectives, pulse, syncs, scorecards, workflows, headcount, PTO, …) into
  * one place. Every handler reads `c.var.peopleCtx` (set by peopleOpsContext)
- * and goes through PeopleSegmentRepo, so the (tenant, segment) no-bleed filter
- * is automatic.
+ * and goes through the segment store (PeopleSegmentRepo), so the (tenant,
+ * segment) no-bleed filter is automatic. Tables are named by registry key.
  *
  * Options:
  *  - stampCreatedBy: write `created_by = <host user>` on create (NOT-NULL cols).
@@ -18,9 +18,8 @@ import { Hono } from "hono";
 import type { z } from "zod";
 import { success, error } from "../../types/index.js";
 import type { PeopleEnv } from "../../middleware/peopleOps.js";
-import { PeopleSegmentRepo } from "../../repositories/peopleSegmentRepo.js";
-import { PeopleEmployeesRepository } from "../../repositories/peopleEmployeesRepository.js";
-import { getDb } from "../../db/index.js";
+import { segmentStore, rosterEmployeeIds, type PeopleSegmentTable } from "../../services/people-ops/segmentStore.js";
+import { validateJson } from "./validate.js";
 
 export interface CrudOpts {
   stampCreatedBy?: boolean;
@@ -33,7 +32,7 @@ function prep(c: any, data: Record<string, unknown>, opts: CrudOpts): Record<str
   for (const f of opts.coerceDates ?? []) {
     if (out[f] != null) out[f] = new Date(out[f] as string);
   }
-  if (opts.stampCreatedBy) out.createdBy = c.var.user.sub;
+  if (opts.stampCreatedBy) out.createdBy = c.var.userId;
   return out;
 }
 
@@ -45,29 +44,25 @@ async function assertEmployeeRefs(c: any, data: Record<string, unknown>, opts: C
   });
   if (refs.length === 0) return null;
   // ONE inArray lookup for every referenced employee (was one per field).
-  const repo = new PeopleEmployeesRepository(getDb());
-  const found = new Set(
-    (await repo.findManyByIds(c.var.peopleCtx, refs.map((r) => r.id))).map((r) => r.id),
-  );
+  const found = await rosterEmployeeIds(c.var.peopleCtx, refs.map((r) => r.id));
   const missing = refs.find((r) => !found.has(r.id));
   return missing ? `${missing.field} is not an employee on this roster.` : null;
 }
 
 export function crudRouter(
-  table: any,
+  table: PeopleSegmentTable,
   writeSchema: z.ZodTypeAny,
   updateSchema?: z.ZodTypeAny,
   opts: CrudOpts = {},
 ): Hono<PeopleEnv> {
   const r = new Hono<PeopleEnv>();
-  const repo = () => new PeopleSegmentRepo(getDb(), table);
+  const repo = () => segmentStore(table);
 
   r.get("/", async (c) => c.json(success(await repo().list(c.var.peopleCtx))));
 
-  r.post("/", async (c) => {
-    const p = writeSchema.safeParse(await c.req.json().catch(() => null));
-    if (!p.success) return c.json(error("VALIDATION_ERROR", "Invalid body", p.error.flatten()), 400);
-    const data = prep(c, p.data as Record<string, unknown>, opts);
+  r.post("/", validateJson(writeSchema, (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const body = c.req.valid("json");
+    const data = prep(c, body as Record<string, unknown>, opts);
     const refErr = await assertEmployeeRefs(c, data, opts);
     if (refErr) return c.json(error("VALIDATION_ERROR", refErr), 400);
     return c.json(success(await repo().insert(c.var.peopleCtx, data)), 201);
@@ -78,10 +73,9 @@ export function crudRouter(
     return row ? c.json(success(row)) : c.json(error("NOT_FOUND", "Not found"), 404);
   });
 
-  r.put("/:id", async (c) => {
-    const p = (updateSchema ?? writeSchema).safeParse(await c.req.json().catch(() => null));
-    if (!p.success) return c.json(error("VALIDATION_ERROR", "Invalid body", p.error.flatten()), 400);
-    const data = prep(c, p.data as Record<string, unknown>, { ...opts, stampCreatedBy: false });
+  r.put("/:id", validateJson((updateSchema ?? writeSchema), (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+    const body = c.req.valid("json");
+    const data = prep(c, body as Record<string, unknown>, { ...opts, stampCreatedBy: false });
     const refErr = await assertEmployeeRefs(c, data, opts);
     if (refErr) return c.json(error("VALIDATION_ERROR", refErr), 400);
     const row = await repo().update(c.var.peopleCtx, c.req.param("id"), data);

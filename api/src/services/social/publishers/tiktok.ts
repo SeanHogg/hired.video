@@ -23,11 +23,9 @@
 import { bearer, clip, pollUntil, readJson, sleep, type FetchLike } from "./http.js";
 import {
   SocialPublishError,
-  viewsOf,
   type PostMetrics,
   type SocialMetricsReader,
   type SocialVideoPublisher,
-  type SocialViewReader,
 } from "./types.js";
 import {
   tiktokSettingsProblem,
@@ -243,8 +241,4 @@ export function createTikTokMetricsReader(deps: { fetch?: FetchLike } = {}): Soc
     }
     return metrics;
   };
-}
-
-export function createTikTokViewReader(deps: { fetch?: FetchLike } = {}): SocialViewReader {
-  return viewsOf(createTikTokMetricsReader(deps));
 }

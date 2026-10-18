@@ -22,16 +22,16 @@ import {
   type WatchVideoRow,
 } from "../../repositories/studioPublicWatchRepository.js";
 import { asIso } from "./project-dto.js";
-import { fail, ok } from "./envelope.js";
 import { findProjectCampaignUtm } from "./project-campaign-utm.js";
 import { legacyScriptForPublic } from "./public-video-state.js";
 import { projectStateDto } from "./project-state.js";
 import { getPublicWatchCached } from "./public-watch-cache.js";
+import { success, error } from "../../types/index.js";
 
 /** `{ status, body }` with the studio envelope as body — the exact shape
  *  the watch cache has always stored, so cached entries survive deploys. */
 export type WatchResult =
-  | { status: 404; body: ReturnType<typeof fail> }
+  | { status: 404; body: ReturnType<typeof error> }
   | { status: 200; body: { success: true; data: Record<string, unknown> & { pending: boolean }; timestamp: string } };
 
 /** The JSONB-stored meta of a project row, lifted in one place. */
@@ -94,7 +94,7 @@ async function buildWatchPayload(param: string): Promise<WatchResult> {
   const projectInfo = proj ? toProjectInfo(proj) : null;
   const v = await findWatchVideo(db, { resolvedVideoId: proj?.videoId ?? null, param, paramIsUuid });
 
-  if (!v && !projectInfo) return { status: 404, body: fail("NOT_FOUND", "Video not found") };
+  if (!v && !projectInfo) return { status: 404, body: error("NOT_FOUND", "Video not found") };
 
   // The project's own flags are authoritative for the in-platform watch
   // page; videos.privacy_status only gates legacy direct uploads.
@@ -102,7 +102,7 @@ async function buildWatchPayload(param: string): Promise<WatchResult> {
   const ownerName = projectInfo?.ownerName ?? v?.ownerName ?? null;
   const ownerAvatar = projectInfo?.ownerAvatar ?? v?.ownerAvatar ?? null;
   if (!isViewable) {
-    return { status: 200, body: ok({
+    return { status: 200, body: success({
       pending: true,
       // Lets the watch page offer the OWNER "Publish" / "Edit" in place of a
       // dead end. Null for a legacy direct upload (no project).
@@ -124,7 +124,7 @@ async function buildWatchPayload(param: string): Promise<WatchResult> {
   const storyboardForPlayback = projectInfo?.storyboard ?? v?.storyboard ?? null;
   const scriptForMeta = storyboardForPlayback as { video?: { aspect?: string; resolution?: string } } | null;
 
-  return { status: 200, body: ok({
+  return { status: 200, body: success({
     pending: false,
     id: projectInfo?.id ?? v!.id,
     title: projectInfo?.title || v?.title || `${ownerName ?? "Owner"}'s Video Resume`,

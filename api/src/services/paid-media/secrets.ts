@@ -8,8 +8,10 @@
  * HKDF `info` label + env-var binding.
  *
  * Used for:
- *   - paid_media_connections.access_token_enc / refresh_token_enc
  *   - paid_media_pixels.*_token_enc
+ * (Ad-platform OAuth tokens moved to provider_connections in W3-C and are
+ * sealed by services/provider-connections/connection-secrets.ts, which still
+ * opens this label's legacy ciphertext until it is re-sealed.)
  *
  * NEVER call crypto.subtle from a route handler — always route through
  * encryptSecret / decryptSecret here so the key derivation stays in one

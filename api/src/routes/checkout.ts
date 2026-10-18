@@ -20,49 +20,30 @@ import {
   parseCheckoutId,
   PayCheckoutSchema,
   StartCheckoutSchema,
-  type CheckoutErrorKind,
   type CheckoutKind,
 } from "../../../shared/checkout.js";
 import { createIpRateLimiter, getClientIp } from "../middleware/rateLimiter.js";
 import { oneOffPaymentsFromEnv } from "../services/billing/payment/oneOffPayments.js";
 import { checkoutHandler } from "../services/billing/checkout/registry.js";
-import { CheckoutError, type CheckoutContext } from "../services/billing/checkout/types.js";
+import { type CheckoutContext } from "../services/billing/checkout/types.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const checkoutRoutes = new Hono<AppEnv>();
-
-const STATUS: Record<CheckoutErrorKind, 402 | 403 | 404 | 409 | 503> = {
-  NOT_FOUND: 404,
-  FORBIDDEN: 403,
-  NOTHING_DUE: 409,
-  PAYMENTS_UNAVAILABLE: 503,
-  PAYMENT_NOT_VERIFIED: 402,
-  PAYMENT_ALREADY_USED: 409,
-  UNKNOWN_PACK: 404,
-  PRO_REQUIRED: 403,
-  FREE_COURSE: 409,
-  ALREADY_ENROLLED: 409,
-  CHECKOUT_REFUNDED: 409,
-};
 
 function envOf(c: Context<AppEnv>): Record<string, string | undefined> {
   return (c as unknown as { env?: Record<string, string | undefined> }).env ?? {};
 }
 
 function contextOf(c: Context<AppEnv>): CheckoutContext | null {
-  const userId = (c.var.user?.sub as string | undefined) ?? null;
+  const userId = c.var.userId ?? null;
   if (!userId) return null;
   const env = envOf(c);
   return { userId, env, payments: oneOffPaymentsFromEnv(env) };
 }
 
-/** Run a handler call, mapping typed refusals to their HTTP status. */
+/** Run a handler call; typed refusals (CheckoutError) render via the global error handler. */
 async function respond<T>(c: Context<AppEnv>, fn: () => Promise<T>, status: 200 | 201 = 200): Promise<Response> {
-  try {
-    return c.json(success(await fn()), status);
-  } catch (err) {
-    if (err instanceof CheckoutError) return c.json(error(err.kind, err.message), STATUS[err.kind]);
-    throw err;
-  }
+  return c.json(success(await fn()), status);
 }
 
 const unauthorized = (c: Context<AppEnv>) => c.json(error("UNAUTHORIZED", "Authentication required"), 401);
@@ -77,14 +58,11 @@ const confirmLimiter = createIpRateLimiter({
   keyOf: (c) => `checkout-confirm:${(c.get("user") as { sub?: string } | undefined)?.sub ?? getClientIp(c)}`,
 });
 
-checkoutRoutes.post("/", async (c) => {
+checkoutRoutes.post("/", validateJson(StartCheckoutSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid checkout payload")), async (c) => {
   const ctx = contextOf(c);
   if (!ctx) return unauthorized(c);
-  const parsed = StartCheckoutSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid checkout payload"), 400);
-  }
-  const input = parsed.data;
+  const body = c.req.valid("json");
+  const input = body;
   return respond(c, () => checkoutHandler(input.kind).start(ctx, input), 201);
 });
 
@@ -111,29 +89,25 @@ checkoutRoutes.get("/:id", async (c) => {
   return respond(c, () => checkoutHandler(ref.kind).get(ctx, ref.key));
 });
 
-checkoutRoutes.post("/:id/pay", async (c) => {
+checkoutRoutes.post("/:id/pay", validateJson(PayCheckoutSchema, () => error("VALIDATION_ERROR", "Invalid successUrl / cancelUrl")), async (c) => {
   const ctx = contextOf(c);
   if (!ctx) return unauthorized(c);
   const ref = parseCheckoutId(c.req.param("id"));
   if (!ref) return notFound(c);
-  const parsed = PayCheckoutSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid successUrl / cancelUrl"), 400);
+  const body = c.req.valid("json");
   const fallback = `${c.req.header("origin") ?? "https://hired.video"}/settings?tab=billing`;
   const urls = {
-    successUrl: parsed.data.successUrl ?? fallback,
-    cancelUrl: parsed.data.cancelUrl ?? fallback,
+    successUrl: body.successUrl ?? fallback,
+    cancelUrl: body.cancelUrl ?? fallback,
   };
   return respond(c, () => checkoutHandler(ref.kind).pay(ctx, ref.key, urls));
 });
 
-checkoutRoutes.post("/:id/confirm", confirmLimiter, async (c) => {
+checkoutRoutes.post("/:id/confirm", confirmLimiter, validateJson(ConfirmCheckoutSchema, () => error("VALIDATION_ERROR", "transactionId required"), { emptyBody: null }), async (c) => {
   const ctx = contextOf(c);
   if (!ctx) return unauthorized(c);
   const ref = parseCheckoutId(c.req.param("id"));
   if (!ref) return notFound(c);
-  const parsed = ConfirmCheckoutSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "transactionId required"), 400);
-  return respond(c, () => checkoutHandler(ref.kind).confirm(ctx, ref.key, parsed.data.transactionId));
+  const body = c.req.valid("json");
+  return respond(c, () => checkoutHandler(ref.kind).confirm(ctx, ref.key, body.transactionId));
 });
-
-checkoutRoutes.all("*", (c) => c.json(error("NOT_FOUND", "Checkout route not found"), 404));

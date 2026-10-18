@@ -19,6 +19,7 @@ import { invalidatePublicVideoFeed } from "../../studio/public-video-feed.js";
 import { getScan, listVideoScansForReview, setOverride, type ReviewFilter, type StoredScan } from "./contentScanRepository.js";
 import { evaluateVideoForPublic } from "./videoScan.js";
 import type { ExplicitScanDeps } from "./deps.js";
+import { DomainError } from "../../../domains/errors.js";
 
 const QUEUE_LIMIT = 100;
 
@@ -75,9 +76,11 @@ export async function listVideoScanQueue(filter: ReviewFilter, db: Db = getDb())
   });
 }
 
-export class ScanReviewError extends Error {
-  constructor(readonly code: "NOT_FOUND") {
-    super("No scan found for that video");
+export class ScanReviewError extends DomainError {
+  declare readonly code: "NOT_FOUND";
+  constructor(code: "NOT_FOUND") {
+    super(404, code, "No scan found for that video");
+    this.name = "ScanReviewError";
   }
 }
 

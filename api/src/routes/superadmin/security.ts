@@ -8,8 +8,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../../types/index.js";
-import { ok } from "../../utils/response.js";
 import { AdminSecurityRepository } from "../../repositories/admin/adminSecurityRepository.js";
+import { success, error } from "../../types/index.js";
 
 const RecentSignupsSchema = z.object({
   // Window in hours. Default 24h matches the typical spam-burst horizon.
@@ -33,19 +33,19 @@ export const securityRoutes = new Hono<AppEnv>();
 securityRoutes.get("/signups/recent", async (c) => {
   const parsed = RecentSignupsSchema.safeParse(c.req.query());
   if (!parsed.success) {
-    return c.json({ error: { code: "BAD_REQUEST", message: parsed.error.issues[0].message } }, 400);
+    return c.json(error("BAD_REQUEST", parsed.error.issues[0].message), 400);
   }
   const { hours, minCount, limit } = parsed.data;
   const groups = await AdminSecurityRepository.create().signupGroupsByIp(hoursAgo(hours), minCount, limit);
-  return c.json(ok({ windowHours: hours, minCount, groups }), 200);
+  return c.json(success({ windowHours: hours, minCount, groups }), 200);
 });
 
 securityRoutes.get("/signups/by-ip", async (c) => {
   const parsed = ByIpSchema.safeParse(c.req.query());
   if (!parsed.success) {
-    return c.json({ error: { code: "BAD_REQUEST", message: parsed.error.issues[0].message } }, 400);
+    return c.json(error("BAD_REQUEST", parsed.error.issues[0].message), 400);
   }
   const { ip, hours, limit } = parsed.data;
   const { accounts, events } = await AdminSecurityRepository.create().activityFromIp(ip, hoursAgo(hours), limit);
-  return c.json(ok({ ip, windowHours: hours, accounts, events }), 200);
+  return c.json(success({ ip, windowHours: hours, accounts, events }), 200);
 });

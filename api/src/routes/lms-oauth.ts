@@ -36,27 +36,19 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
 import { SignJWT, jwtVerify } from "jose";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { LMS_PROVIDERS, type LmsProvider } from "../db/schema/courses.js";
+import { LMS_PROVIDERS, type LmsProvider } from "../repositories/lmsCoursePublishesRepository.js";
 import { getJwtSecret } from "../utils/jwt.js";
 import { apiBaseUrl, frontendBaseUrl } from "../utils/public-urls.js";
 import { getEnv } from "../utils/env.js";
 import { logger } from "../lib/logger.js";
-import { sealCredential } from "../services/crypto/credential-columns.js";
-import { lmsConnectorPublicColumns } from "../services/lms/connector-columns.js";
-
-const { lmsConnectors } = schema;
+import { LmsConnectors } from "../services/provider-connections/lms-connectors.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const lmsOauthRoutes = new Hono<AppEnv>();
-
-function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
-
 
 // JWT_SECRET resolution is NOT local to this file — see utils/jwt.ts. The old
 // local copy fell back to the literal "dev-secret-not-for-prod", which in a
@@ -158,9 +150,8 @@ async function verifyState(token: string): Promise<Record<string, unknown> | nul
 /** Returns the authorize URL the caller should redirect the browser to.
  *  The frontend can render this as a "Connect Docebo" button — clicking
  *  it sends the user to the provider for consent. */
-lmsOauthRoutes.post("/:provider/start", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+lmsOauthRoutes.post("/:provider/start", validateJson(StartSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const userId = requireUser(c);
   const provider = c.req.param("provider") as LmsProvider;
   if (!LMS_PROVIDERS.includes(provider)) {
     return c.json(error("VALIDATION_ERROR", `Unknown LMS provider: ${provider}`), 400);
@@ -175,8 +166,7 @@ lmsOauthRoutes.post("/:provider/start", async (c) => {
       409,
     );
   }
-  const parsed = StartSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
+  const body = c.req.valid("json");
 
   const clientId = getEnv(`${cfg.envPrefix}_CLIENT_ID`);
   if (!clientId) {
@@ -189,11 +179,11 @@ lmsOauthRoutes.post("/:provider/start", async (c) => {
   const state = await signState({
     userId,
     provider,
-    baseUrl: parsed.data.baseUrl,
-    displayName: parsed.data.displayName ?? null,
+    baseUrl: body.baseUrl,
+    displayName: body.displayName ?? null,
   });
   const authorizeUrl = cfg.buildAuthorizeUrl({
-    baseUrl: parsed.data.baseUrl,
+    baseUrl: body.baseUrl,
     redirectUri,
     clientId,
     state,
@@ -203,7 +193,7 @@ lmsOauthRoutes.post("/:provider/start", async (c) => {
 });
 
 /** Provider callback — exchanges the code for tokens, upserts a row
- *  in lmsConnectors keyed on (userId, provider), and redirects the
+ *  in the LMS connectors (provider_connections, purpose "lms") keyed on (userId, provider), and redirects the
  *  browser back to the connector settings page. */
 lmsOauthRoutes.get("/:provider/callback", async (c) => {
   const provider = c.req.param("provider") as LmsProvider;
@@ -246,44 +236,16 @@ lmsOauthRoutes.get("/:provider/callback", async (c) => {
     return c.redirect(`${frontendBaseUrl()}/services/creator/courses?lms_error=token_exchange_failed`);
   }
 
-  const db = getDb();
-  const expiresAt = tokens.expiresIn ? new Date(Date.now() + tokens.expiresIn * 1000) : null;
-  const [existing] = await db.select({ id: lmsConnectors.id })
-    .from(lmsConnectors)
-    .where(and(eq(lmsConnectors.userId, userId), eq(lmsConnectors.provider, provider)))
-    .limit(1);
-  const access = await sealCredential(tokens.accessToken);
-  const refresh = await sealCredential(tokens.refreshToken);
-
-  if (existing) {
-    await db.update(lmsConnectors).set({
-      baseUrl,
-      accessToken: access.plain,
-      accessTokenEnc: access.enc,
-      refreshToken: refresh.plain,
-      refreshTokenEnc: refresh.enc,
-      scope: tokens.scope ?? null,
-      expiresAt,
-      status: "connected",
-      lastError: null,
-      displayName: displayName ?? undefined,
-      updatedAt: new Date(),
-    } as any).where(eq(lmsConnectors.id, existing.id));
-  } else {
-    await db.insert(lmsConnectors).values({
-      userId,
-      provider,
-      displayName,
-      baseUrl,
-      accessToken: access.plain,
-      accessTokenEnc: access.enc,
-      refreshToken: refresh.plain,
-      refreshTokenEnc: refresh.enc,
-      scope: tokens.scope ?? null,
-      expiresAt,
-      status: "connected",
-    } as any);
-  }
+  await new LmsConnectors().saveOAuth({
+    userId,
+    provider,
+    baseUrl,
+    displayName,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken ?? null,
+    scope: tokens.scope ?? null,
+    expiresAt: tokens.expiresIn ? new Date(Date.now() + tokens.expiresIn * 1000) : null,
+  });
 
   return c.redirect(`${frontendBaseUrl()}/services/creator/courses?lms_connected=${provider}`);
 });
@@ -302,45 +264,21 @@ const ConfigureSchema = z.object({
  *  flow. We store the credential as the connector's access token (encrypted,
  *  services/crypto/credential-columns.ts) so the existing adapter chain
  *  (publishCourse / checkStatus / revoke) picks it up unchanged. */
-lmsOauthRoutes.post("/:provider/configure", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+lmsOauthRoutes.post("/:provider/configure", validateJson(ConfigureSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const userId = requireUser(c);
   const provider = c.req.param("provider") as LmsProvider;
   if (!LMS_PROVIDERS.includes(provider)) {
     return c.json(error("VALIDATION_ERROR", `Unknown LMS provider: ${provider}`), 400);
   }
-  const parsed = ConfigureSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
+  const body = c.req.valid("json");
 
-  const db = getDb();
-  const [existing] = await db.select({ id: lmsConnectors.id })
-    .from(lmsConnectors)
-    .where(and(eq(lmsConnectors.userId, userId), eq(lmsConnectors.provider, provider)))
-    .limit(1);
-  const key = await sealCredential(parsed.data.apiKey);
-
-  if (existing) {
-    const [updated] = await db.update(lmsConnectors).set({
-      baseUrl: parsed.data.baseUrl,
-      accessToken: key.plain,
-      accessTokenEnc: key.enc,
-      displayName: parsed.data.displayName ?? null,
-      metadata: parsed.data.metadata ?? null,
-      status: "connected",
-      lastError: null,
-      updatedAt: new Date(),
-    } as any).where(eq(lmsConnectors.id, existing.id)).returning(lmsConnectorPublicColumns);
-    return c.json(success(updated), 200);
-  }
-  const [created] = await db.insert(lmsConnectors).values({
+  const { connector, created } = await new LmsConnectors().saveApiKey({
     userId,
     provider,
-    baseUrl: parsed.data.baseUrl,
-    accessToken: key.plain,
-    accessTokenEnc: key.enc,
-    displayName: parsed.data.displayName ?? null,
-    metadata: parsed.data.metadata ?? null,
-    status: "connected",
-  } as any).returning(lmsConnectorPublicColumns);
-  return c.json(success(created), 201);
+    baseUrl: body.baseUrl,
+    apiKey: body.apiKey,
+    displayName: body.displayName ?? null,
+    metadata: body.metadata ?? null,
+  });
+  return c.json(success(connector), created ? 201 : 200);
 });

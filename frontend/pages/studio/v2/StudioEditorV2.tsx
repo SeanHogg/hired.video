@@ -42,7 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { StudioProject } from "@/lib/services/studio-service";
 import StudioLoadingShell from "../StudioLoadingShell";
 import { AnonGateContext } from "@/lib/studio/anon-gate-context";
-import { mediaKindUsesCanvasStateAuthoring, type MediaKind } from "@shared/media-kinds";
+import { mediaKindUsesCanvasStateAuthoring, type MediaKind, mediaKindIsPrimaryVideo } from "@shared/media-kinds";
 import { useWorkspaceDepth } from "@/lib/workspace/use-workspace-depth";
 import { useIsWideWorkspace } from "@/hooks/use-media-query";
 import WorkspaceFrame from "@/components/workspace/WorkspaceFrame";
@@ -245,7 +245,7 @@ export default function StudioEditorV2({ loadedProject = null }: StudioEditorV2P
   });
   // `?render=1` (Chrome extension "Render & post"): render the loaded video once.
   useRenderOnLoad({
-    enabled: entry.renderOnLoad && currentMediaKind === "video",
+    enabled: entry.renderOnLoad && mediaKindIsPrimaryVideo(currentMediaKind),
     ready: projectReady && !!persistedProjectId && state.scenes.length > 0,
     ensureRendered,
   });

@@ -42,6 +42,7 @@ import {
 import { requirePro } from "../middleware/auth-gates.js";
 import { generateSocialCaption } from "../../../shared/social-caption.js";
 import type { VideoPublishPlatform } from "../../../shared/social-platforms.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const postingAgentRoutes = new Hono<AppEnv>();
 
@@ -78,26 +79,24 @@ const AGENT_SETTINGS_DEFAULTS = {
 
 /** GET /api/distribution/posting-agent/settings - get user's agent settings */
 postingAgentRoutes.get("/posting-agent/settings", async (c) => {
-  const userId = c.var.user.sub;
+  const userId = c.var.userId;
   const settings = await getSettings(userId);
   const globallyEnabled = (c.env as { POSTING_AGENT_ENABLED?: string }).POSTING_AGENT_ENABLED !== "false";
   return c.json(success({ ...(settings ?? AGENT_SETTINGS_DEFAULTS), globallyEnabled }));
 });
 
 /** POST /api/distribution/posting-agent/settings - update agent settings */
-postingAgentRoutes.post("/posting-agent/settings", requirePro("AI Posting Agent"), async (c) => {
-  const userId = c.var.user.sub;
-  const body = await c.req.json().catch(() => null);
-  const parsed = AgentSettingsSchema.safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request"), 400);
+postingAgentRoutes.post("/posting-agent/settings", requirePro("AI Posting Agent"), validateJson(AgentSettingsSchema, () => error("VALIDATION_ERROR", "Invalid request"), { emptyBody: null }), async (c) => {
+  const userId = c.var.userId;
+  const body = c.req.valid("json");
 
-  const settings = await upsertSettings(userId, parsed.data);
+  const settings = await upsertSettings(userId, body);
   return c.json(success(settings));
 });
 
 /** POST /api/distribution/posting-agent/start - enable the agent */
 postingAgentRoutes.post("/posting-agent/start", requirePro("AI Posting Agent"), async (c) => {
-  const userId = c.var.user.sub;
+  const userId = c.var.userId;
   const body = await c.req.json().catch(() => null);
   if (body && typeof body === "object") {
     const parsed = AgentSettingsSchema.safeParse(body);
@@ -109,7 +108,7 @@ postingAgentRoutes.post("/posting-agent/start", requirePro("AI Posting Agent"), 
 
 /** POST /api/distribution/posting-agent/pause - disable the agent (user kill switch). */
 postingAgentRoutes.post("/posting-agent/pause", async (c) => {
-  const userId = c.var.user.sub;
+  const userId = c.var.userId;
   const settings = await pausePostingAgent(userId, "user");
   return c.json(success(settings));
 });
@@ -135,7 +134,7 @@ postingAgentRoutes.post("/posting-agent/pause-link", async (c) => {
 
 /** GET /api/distribution/posting-agent/drafts - list agent drafts */
 postingAgentRoutes.get("/posting-agent/drafts", async (c) => {
-  const userId = c.var.user.sub;
+  const userId = c.var.userId;
   const drafts = await listAgentDrafts(userId);
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const expiredCount = await countExpiredAgentDrafts(userId, since);
@@ -144,7 +143,7 @@ postingAgentRoutes.get("/posting-agent/drafts", async (c) => {
 
 /** POST /api/distribution/posting-agent/drafts/approve-all - before :id so "approve-all" is not captured. */
 postingAgentRoutes.post("/posting-agent/drafts/approve-all", requirePro("AI Posting Agent"), async (c) => {
-  const userId = c.var.user.sub;
+  const userId = c.var.userId;
   const drafts = await listAgentDrafts(userId);
   const now = new Date();
   let approved = 0;
@@ -159,8 +158,8 @@ postingAgentRoutes.post("/posting-agent/drafts/approve-all", requirePro("AI Post
 });
 
 /** POST /api/distribution/posting-agent/drafts/:id/approve - approve a draft */
-postingAgentRoutes.post("/posting-agent/drafts/:id/approve", requirePro("AI Posting Agent"), async (c) => {
-  const userId = c.var.user.sub;
+postingAgentRoutes.post("/posting-agent/drafts/:id/approve", requirePro("AI Posting Agent"), validateJson(DraftVariantSchema, () => error("VALIDATION_ERROR", "Invalid request")), async (c) => {
+  const userId = c.var.userId;
   const draftId = c.req.param("id");
 
   if (!UuidLikeSchema.safeParse(draftId).success) {
@@ -168,11 +167,7 @@ postingAgentRoutes.post("/posting-agent/drafts/:id/approve", requirePro("AI Post
   }
 
   const now = new Date();
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = DraftVariantSchema.safeParse(body ?? {});
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request"), 400);
-  }
+  const body = c.req.valid("json");
   const gate = await gateAgentDraftApprove(draftId, userId, now);
   if (gate.ok === false) {
     switch (gate.reason) {
@@ -193,7 +188,7 @@ postingAgentRoutes.post("/posting-agent/drafts/:id/approve", requirePro("AI Post
   if (!draft || draft.status !== "draft") {
     return c.json(error("NOT_FOUND", "Draft not found or already processed"), 404);
   }
-  const variantId = parsed.data.renderVariantId ?? draft.renderVariantId;
+  const variantId = body.renderVariantId ?? draft.renderVariantId;
   if (
     agentJobNeedsPreparedClip({
       source: "agent",
@@ -204,8 +199,8 @@ postingAgentRoutes.post("/posting-agent/drafts/:id/approve", requirePro("AI Post
   ) {
     return c.json(error("VALIDATION_ERROR", "Prepare the clip before approving"), 400);
   }
-  if (parsed.data.renderVariantId) {
-    await attachAgentJobVariant(draftId, userId, parsed.data.renderVariantId, now);
+  if (body.renderVariantId) {
+    await attachAgentJobVariant(draftId, userId, body.renderVariantId, now);
   }
   const ok = await approveAgentDraft(draftId, userId, now);
   if (!ok) return c.json(error("NOT_FOUND", "Draft not found or already processed"), 404);
@@ -215,7 +210,7 @@ postingAgentRoutes.post("/posting-agent/drafts/:id/approve", requirePro("AI Post
 
 /** POST /api/distribution/posting-agent/drafts/:id/prepare — attach a fitted cut. */
 postingAgentRoutes.post("/posting-agent/drafts/:id/prepare", requirePro("AI Posting Agent"), async (c) => {
-  const userId = c.var.user.sub;
+  const userId = c.var.userId;
   const draftId = c.req.param("id");
   if (!UuidLikeSchema.safeParse(draftId).success) {
     return c.json(error("VALIDATION_ERROR", "Invalid draft ID"), 400);
@@ -232,7 +227,7 @@ postingAgentRoutes.post("/posting-agent/drafts/:id/prepare", requirePro("AI Post
 
 /** POST /api/distribution/posting-agent/drafts/:id/skip - skip a draft */
 postingAgentRoutes.post("/posting-agent/drafts/:id/skip", requirePro("AI Posting Agent"), async (c) => {
-  const userId = c.var.user.sub;
+  const userId = c.var.userId;
   const draftId = c.req.param("id");
 
   if (!UuidLikeSchema.safeParse(draftId).success) {
@@ -247,7 +242,7 @@ postingAgentRoutes.post("/posting-agent/drafts/:id/skip", requirePro("AI Posting
 
 /** POST /api/distribution/posting-agent/drafts/:id/rewrite - rewrite caption */
 postingAgentRoutes.post("/posting-agent/drafts/:id/rewrite", requirePro("AI Posting Agent"), async (c) => {
-  const userId = c.var.user.sub;
+  const userId = c.var.userId;
   const draftId = c.req.param("id");
   const body = await c.req.json().catch(() => ({}));
   const parsed = RewriteCaptionSchema.safeParse(body ?? {});
@@ -279,7 +274,7 @@ postingAgentRoutes.post("/posting-agent/drafts/:id/rewrite", requirePro("AI Post
 
 /** POST /api/distribution/posting-agent/drafts/:id/undo - revert approval within 10 min */
 postingAgentRoutes.post("/posting-agent/drafts/:id/undo", requirePro("AI Posting Agent"), async (c) => {
-  const userId = c.var.user.sub;
+  const userId = c.var.userId;
   const draftId = c.req.param("id");
   if (!UuidLikeSchema.safeParse(draftId).success) {
     return c.json(error("VALIDATION_ERROR", "Invalid draft ID"), 400);

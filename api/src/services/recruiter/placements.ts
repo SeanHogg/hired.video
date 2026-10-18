@@ -27,7 +27,14 @@ export const PLACEMENT_BULK_CAP = 50;
 
 export type PlacementDto = ReturnType<typeof rowToPlacement>;
 
-export function rowToPlacement(row: PlacementRow) {
+/** The owning recruiter's display name — read from `users` (W3-D2: the
+ *  copied `placements.recruiter_name` column was dropped in 0623). Every
+ *  placement read here is owner-scoped, so it is the caller's name. */
+async function ownerName(recruiterId: string): Promise<string> {
+  return (await findUserName(recruiterId)) ?? "";
+}
+
+export function rowToPlacement(row: PlacementRow, recruiterName: string) {
   const annualSalaryDollars = row.annualSalary != null
     ? Number(row.annualSalary)
     : (row.salary != null ? Number(row.salary) : 0);
@@ -43,7 +50,7 @@ export function rowToPlacement(row: PlacementRow) {
     id: row.id,
     submissionId: row.submissionId ?? null,
     recruiterUserId: row.recruiterId,
-    recruiterName: row.recruiterName,
+    recruiterName,
     candidateUserId: row.candidateId,
     candidateName: row.candidateName,
     jobId: row.jobId ?? "",
@@ -121,12 +128,11 @@ function guaranteeEndFor(startDate: unknown, periodDays: unknown): Date | null {
 }
 
 /** Columns shared by the single + bulk create paths. */
-function placementBaseValues(recruiterId: string, recruiterName: string, p: JsonBody) {
+function placementBaseValues(recruiterId: string, p: JsonBody) {
   const annualSalary = Number(p.annualSalary ?? 0);
   const feeFields = deriveFeeFieldsFromBody(p);
   return {
     recruiterId,
-    recruiterName,
     submissionId: p.submissionId ?? null,
     startDate: p.startDate ? new Date(p.startDate) : null,
     annualSalary: annualSalary || null,
@@ -145,7 +151,7 @@ function placementBaseValues(recruiterId: string, recruiterName: string, p: Json
 /** Record a placement. Candidate/job names come from the linked submission
  *  when one is given, else from the body. */
 export async function createPlacement(recruiterId: string, body: JsonBody): Promise<PlacementDto> {
-  const recruiterName = await findUserName(recruiterId);
+  const recruiterName = await ownerName(recruiterId);
 
   let candidateId = body.candidateUserId ?? recruiterId;
   let candidateName = body.candidateName ?? "";
@@ -164,7 +170,7 @@ export async function createPlacement(recruiterId: string, body: JsonBody): Prom
   }
 
   const placement = await insertPlacement({
-    ...placementBaseValues(recruiterId, recruiterName ?? "", body),
+    ...placementBaseValues(recruiterId, body),
     candidateId,
     candidateName,
     jobId: jobId ?? null,
@@ -177,7 +183,7 @@ export async function createPlacement(recruiterId: string, body: JsonBody): Prom
     // coerced by the shared sanitizer so create can't inject arbitrary columns.
     ...sanitizePlacementBackOffice(body),
   });
-  return rowToPlacement(placement);
+  return rowToPlacement(placement, recruiterName);
 }
 
 /** #230 — auto-subscribe the owning recruiter to the placement's stage
@@ -201,9 +207,9 @@ export async function createPlacementsBulk(recruiterId: string, body: JsonBody |
   if (body.placements.length > PLACEMENT_BULK_CAP) {
     throw new DomainError(400, "VALIDATION_ERROR", "Bulk cap is 50 placements per call");
   }
-  const recruiterName = (await findUserName(recruiterId)) ?? "";
+  const recruiterName = await ownerName(recruiterId);
   const rows = (body.placements as JsonBody[]).map((p) => ({
-    ...placementBaseValues(recruiterId, recruiterName, p),
+    ...placementBaseValues(recruiterId, p),
     candidateId: p.candidateUserId ?? recruiterId,
     candidateName: p.candidateName ?? "",
     jobId: p.jobId ?? null,
@@ -211,7 +217,7 @@ export async function createPlacementsBulk(recruiterId: string, body: JsonBody |
     companyName: p.companyName ?? "",
     placementTypeId: p.placementTypeId ?? null,
   }));
-  return (await insertPlacements(rows)).map(rowToPlacement);
+  return (await insertPlacements(rows)).map((r) => rowToPlacement(r, recruiterName));
 }
 
 /** #229 — edit the back-office axis post-create (same sanitizer as create),
@@ -225,16 +231,17 @@ export async function updatePlacementBackOffice(recruiterId: string, id: string,
       : {}),
     updatedAt: new Date(),
   });
-  return updated ? rowToPlacement(updated) : null;
+  return updated ? rowToPlacement(updated, await ownerName(recruiterId)) : null;
 }
 
 export async function listPlacements(recruiterId: string): Promise<PlacementDto[]> {
-  return (await listPlacementsForRecruiter(recruiterId)).map(rowToPlacement);
+  const [rows, name] = await Promise.all([listPlacementsForRecruiter(recruiterId), ownerName(recruiterId)]);
+  return rows.map((r) => rowToPlacement(r, name));
 }
 
 export async function getPlacement(recruiterId: string, id: string): Promise<PlacementDto | null> {
   const row = await findOwnedPlacement(recruiterId, id);
-  return row ? rowToPlacement(row) : null;
+  return row ? rowToPlacement(row, await ownerName(recruiterId)) : null;
 }
 
 export async function updateCommissionStatus(recruiterId: string, id: string, body: JsonBody): Promise<PlacementDto | null> {
@@ -244,7 +251,7 @@ export async function updateCommissionStatus(recruiterId: string, id: string, bo
     paymentReference: body.paymentReference ?? null,
     updatedAt: new Date(),
   });
-  return updated ? rowToPlacement(updated) : null;
+  return updated ? rowToPlacement(updated, await ownerName(recruiterId)) : null;
 }
 
 /** Update guarantee status; #230 — notify subscribers when marked met. */
@@ -262,5 +269,5 @@ export async function updateGuaranteeStatus(recruiterId: string, id: string, bod
       logger.warn("[recruiter] placement guarantee-notify failed", err);
     }
   }
-  return rowToPlacement(updated);
+  return rowToPlacement(updated, await ownerName(recruiterId));
 }

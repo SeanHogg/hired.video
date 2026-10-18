@@ -57,6 +57,8 @@ export async function resolveKitForSubmission(
   return ctx.repo.findKitById(stage.kitId);
 }
 
+/** Batch form of `resolveKitForSubmission`: two inArray reads (stages,
+ *  then kits) for any number of submissions. Keyed by submission id. */
 export async function resolveKitsForSubmissions(
   ctx: ScorecardsCtx<IInterviewKitsRepository>,
   subs: ReadonlyArray<Pick<ScorecardSubmissionRow, "id" | "kitStageId">>,
@@ -76,6 +78,10 @@ export async function resolveKitsForSubmissions(
   return out;
 }
 
+/** Templates (by id) whose company the caller can access. One batched
+ *  template read + ONE accessible-company lookup, instead of a template
+ *  read and a `canAccessCompany` check per template. Same rule as
+ *  `canAccessCompany` (owner or active member) via `getCompanyIdsForUser`. */
 export async function findAccessibleTemplates(
   ctx: ScorecardsCtx<IScorecardTemplatesRepository>,
   userId: string,
@@ -90,6 +96,8 @@ export async function findAccessibleTemplates(
   return templates.filter((t) => allowed.has(t.companyId));
 }
 
+/** #241 — resolve the effective HM scorecard-visibility for a kit's job.
+ *  Ungoverned (no kit) submissions are always visible. */
 export async function resolveHmVisibilityForKit(
   ctx: Pick<ScorecardsCtx<unknown>, "resolveJobHmVisibility">,
   kit: InterviewKitRow | null,

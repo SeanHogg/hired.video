@@ -24,25 +24,15 @@ import { ResumeContentSchema, type ResumeContent } from "../../../../shared/resu
 import { buildRepos } from "../../repositories/index.js";
 import { DomainError, requireUserId } from "../../domains/errors.js";
 import { buildAIErrorEnvelope } from "../../services/adapters/llm-error.js";
-import type { ParsedJob } from "../../services/job/JobService.js";
+import type { ParsedJob } from "./job-page-parse.js";
 import { saveVersionOfMaster } from "../../services/resume/lineage.js";
-import {
-  loadPriorRecommendations,
-  resolveJobForFit,
-  resolveResumeV2,
-  type MatchDeps,
-} from "./match-handlers.js";
-import {
-  TailorEditResponseIngest,
-  applyResumeEdits,
-  buildTailorPrompt,
-  dropUnsupportedSkills,
-  strengthenEditMatchPrompt,
-  strengthenPrompt,
-  toJobGaps,
-  validateTailorOutput,
-  type TailorValidationResult,
-} from "./tailor-edits.js";
+import type { MatchDeps } from "./match-deps.js";
+import { resolveJobForFit, resolveResumeV2 } from "./match-resolvers.js";
+import { loadPriorRecommendations } from "./match-score-cache.js";
+import { TailorEditResponseIngest } from "./tailor-edit-contract.js";
+import { validateTailorOutput, type TailorValidationResult } from "./tailor-validation.js";
+import { buildTailorPrompt, strengthenEditMatchPrompt, strengthenPrompt } from "./tailor-prompt.js";
+import { applyResumeEdits, dropUnsupportedSkills, toJobGaps } from "./tailor-apply.js";
 import { verifiedMatchedKeywords } from "./matched-keywords.js";
 import { logger } from "../../lib/logger.js";
 

@@ -83,7 +83,7 @@ adminUsageRoutes.delete("/visitor/:visitorId", async (c) => {
   const visitorId = c.req.param("visitorId");
   const removed = await buildService().eraseForVisitor(visitorId);
   await recordAdminAudit({
-    actorId: c.var.user?.sub as string,
+    actorId: c.var.userId,
     action: "usage.dsr_erase",
     targetType: "usage_visitor",
     targetId: visitorId,

@@ -17,11 +17,10 @@ import type { AppEnv } from "../../types/index.js";
 import { ResumeCreateSourceSchema, TextResumeRequestSchema, type ResumeCreateSource } from "../../../../shared/resume-create.js";
 import { DomainError } from "../../domains/errors.js";
 import { servicesProcessor } from "../../domains/services-processing/index.js";
-import { getDb } from "../../db/index.js";
 import { checkTokenBudget } from "../../middleware/tierEnforcement.js";
-import { buildRepos } from "../../repositories/index.js";
-import { createLLMClient, hasAnyLLMProviderKey } from "../../services/adapters/llm-client.js";
+import { hasAnyLLMProviderKey } from "../../services/adapters/llm-client.js";
 import { cloneResume, createBlankResume, createFromText, createFromUpload, createVariation } from "../../services/resume/create.js";
+import { buildFromJobDeps } from "../../services/resume/deps.js";
 import { invalidResumeBody } from "../../services/resume/errors.js";
 import { draftFromJobRequest } from "../../services/resume/from-job-request.js";
 import {
@@ -33,7 +32,7 @@ import {
 import { readFormFiles } from "../../utils/multipart.js";
 import { ocrResumeImage } from "../resume-parse.js";
 import { gateUploadOcr } from "../resume-upload-ocr-gate.js";
-import { failWith, ownerId, respond, resumeDeps, type ResumeCtx } from "./shared.js";
+import { failWith, respond, resumeDeps, type ResumeCtx } from "./shared.js";
 
 export const resumeCreateRoutes = new Hono<AppEnv>();
 
@@ -65,7 +64,7 @@ const createFromFile: CreateHandler = async (c) => {
     else text = source.text;
   }
 
-  const response = await respond(c, createFromUpload(resumeDeps(c), ownerId(c), { structured, text, filename: files[0].name }), 201);
+  const response = await respond(c, createFromUpload(resumeDeps(c), c.var.userId, { structured, text, filename: files[0].name }), 201);
   if (response.status === 201) ocr.meter();
   return response;
 };
@@ -78,10 +77,9 @@ const createFromJob: CreateHandler = async (c, body) => {
   if (!hasAnyLLMProviderKey(c.env)) {
     return failWith(c, new DomainError(503, "AI_ERROR", "AI unavailable: no LLM configured"));
   }
-  const db = getDb();
   const draft = draftFromJobRequest(
-    { repo: buildRepos(db).resumes, llm: createLLMClient(c.env, c.var.user), db },
-    ownerId(c),
+    buildFromJobDeps(c.env, c.var.user),
+    c.var.userId,
     body,
   ).then((d) => {
     servicesProcessor.meterEvent(c, "resume_tailor");
@@ -91,15 +89,15 @@ const createFromJob: CreateHandler = async (c, body) => {
 };
 
 const CREATE_SOURCES: Record<ResumeCreateSource, CreateHandler> = {
-  blank: (c, body) => respond(c, createBlankResume(resumeDeps(c), ownerId(c), body), 201),
+  blank: (c, body) => respond(c, createBlankResume(resumeDeps(c), c.var.userId, body), 201),
   file: createFromFile,
   text: async (c, body) => {
     const parsed = TextResumeRequestSchema.safeParse(body);
     if (!parsed.success) return failWith(c, invalidResumeBody(parsed.error.flatten()));
-    return respond(c, createFromText(resumeDeps(c), ownerId(c), parsed.data), 201);
+    return respond(c, createFromText(resumeDeps(c), c.var.userId, parsed.data), 201);
   },
-  clone: (c, body) => respond(c, cloneResume(resumeDeps(c), ownerId(c), body), 201),
-  variation: (c, body) => respond(c, createVariation(resumeDeps(c), ownerId(c), body), 201),
+  clone: (c, body) => respond(c, cloneResume(resumeDeps(c), c.var.userId, body), 201),
+  variation: (c, body) => respond(c, createVariation(resumeDeps(c), c.var.userId, body), 201),
   job: createFromJob,
 };
 

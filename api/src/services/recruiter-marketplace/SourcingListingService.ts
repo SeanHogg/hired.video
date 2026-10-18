@@ -13,6 +13,8 @@
  */
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
+import { DomainError } from "../../domains/errors.js";
+import { JobsRepository } from "../../repositories/jobsRepository.js";
 
 export interface SourcingConfig {
   acceptsBids: boolean;
@@ -228,6 +230,29 @@ export async function placeBid(input: PlaceBidInput, jobOwnerId: string | null):
     .returning();
 
   return { ok: true, bid };
+}
+
+const BID_REJECTIONS: Record<BidRejectReason, [message: string, status: 400 | 409]> = {
+  NOT_OPEN: ["This job is not currently accepting sourcing bids", 400],
+  DEADLINE_PASSED: ["The sourcing deadline has passed", 400],
+  OWN_JOB: ["You cannot bid on your own job", 400],
+  BID_EXISTS: ["You already have a pending bid on this job", 409],
+};
+
+/**
+ * Place a bid on `input.jobId`: resolves the job's owner (404 when the job
+ * doesn't exist) so the "no self-bids" rule needs no re-query, then throws a
+ * DomainError (code = reject reason) when the bid isn't allowed.
+ */
+export async function placeBidOnJob(input: PlaceBidInput): Promise<typeof schema.boardBids.$inferSelect> {
+  const job = await new JobsRepository(getDb()).findJobOwner(input.jobId);
+  if (!job) throw new DomainError(404, "NOT_FOUND", "Job not found");
+  const result = await placeBid(input, job.ownerId);
+  if (result.ok === false) {
+    const [message, status] = BID_REJECTIONS[result.reason];
+    throw new DomainError(status, result.reason, message);
+  }
+  return result.bid;
 }
 
 export async function acceptBid(bidId: string, accepterUserId: string) {

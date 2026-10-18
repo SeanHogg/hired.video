@@ -29,6 +29,7 @@ import { putObject } from "../storage/object-store.js";
 import { deleteR2Keys } from "../storage/r2-delete.js";
 import { assertCanWrite } from "./workspace.js";
 import * as repo from "../../repositories/renderVariantRepository.js";
+import { DomainError } from "../../domains/errors.js";
 
 type Db = ReturnType<typeof getDb>;
 
@@ -38,12 +39,18 @@ const TTL_SECONDS = 600;
 
 export type RenderVariantErrorKind = "PROJECT_NOT_FOUND" | "INVALID_VARIANT" | "STORAGE_UNAVAILABLE";
 
-export class RenderVariantError extends Error {
+const RENDER_VARIANT_ERROR_STATUS: Record<RenderVariantErrorKind, 400 | 404 | 503> = {
+  PROJECT_NOT_FOUND: 404,
+  INVALID_VARIANT: 400,
+  STORAGE_UNAVAILABLE: 503,
+};
+
+export class RenderVariantError extends DomainError {
   constructor(
     public readonly kind: RenderVariantErrorKind,
     message: string,
   ) {
-    super(message);
+    super(RENDER_VARIANT_ERROR_STATUS[kind], kind, message);
     this.name = "RenderVariantError";
   }
 }

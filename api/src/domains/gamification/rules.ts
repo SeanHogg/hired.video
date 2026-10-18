@@ -733,7 +733,7 @@ export const USER_TASK_GATE_THRESHOLD = 100;
  * (≈ $3 / 1M tokens; 1000 pts ≈ $1 retail).
  */
 /** #169 — `campaign_dollars` grants ad/boost spend credits into the
- *  internal campaignDollarsBalance ledger. Distinct from gift_card
+ *  internal campaign_dollars wallet. Distinct from gift_card
  *  (cash equivalent — IRS taxable) because Campaign $ can only be spent
  *  on platform inventory. The KYC threshold logic in redemption-engine
  *  skips this kind for that reason. */

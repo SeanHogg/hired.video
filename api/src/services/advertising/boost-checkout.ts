@@ -21,9 +21,14 @@
  * OneOffPaymentsPort, so the money rules are testable without either.
  */
 
-import { and, desc, eq, sql } from "drizzle-orm";
-import { getDb, schema } from "../../db/index.js";
-import { buildRepos } from "../../repositories/index.js";
+import { getDb } from "../../db/index.js";
+import {
+  BoostsRepository,
+  type BoostCheckoutRecord,
+  type BoostInsert,
+  type BoostRow,
+} from "../../repositories/boostsRepository.js";
+import { PointsRepository } from "../../repositories/pointsRepository.js";
 import { logger } from "../../lib/logger.js";
 import { computeBoostPricing, type BoostPricingModel } from "./pricing.js";
 import {
@@ -45,21 +50,12 @@ export interface BoostCheckoutInput {
   maxCampaignDollarsCents?: number;
 }
 
-export type BoostRow = typeof schema.boosts.$inferSelect;
+export type { BoostRow };
 
-export interface CheckoutRecord {
-  id: string;
-  userId: string;
-  boostId: string | null;
-  usdCents: number;
-  status: string;
-  providerPaymentId: string | null;
-  totalCents?: number;
-  campaignDollarsCents?: number;
-}
+export type CheckoutRecord = BoostCheckoutRecord;
 
 export interface BoostCheckoutPort {
-  insertPendingBoost(row: typeof schema.boosts.$inferInsert): Promise<BoostRow>;
+  insertPendingBoost(row: BoostInsert): Promise<BoostRow>;
   insertCheckout(row: { userId: string; boostId: string; totalCents: number }): Promise<{ id: string }>;
   spendCampaignDollars(args: {
     userId: string;
@@ -274,77 +270,16 @@ export function toBoostView(row: BoostRow) {
 // ─── Production wiring ────────────────────────────────────────────────────
 
 export function defaultBoostCheckoutPort(db = getDb()): BoostCheckoutPort {
-  const { boosts, boostCheckouts, tokenPackPurchases, courseCheckouts, jobBoosts } = schema;
-  const repos = buildRepos(db);
-  const record = {
-    id: boostCheckouts.id,
-    userId: boostCheckouts.userId,
-    boostId: boostCheckouts.boostId,
-    usdCents: boostCheckouts.usdCents,
-    status: boostCheckouts.status,
-    providerPaymentId: boostCheckouts.providerPaymentId,
-    totalCents: boostCheckouts.totalCents,
-    campaignDollarsCents: boostCheckouts.campaignDollarsCents,
-  };
+  const boosts = new BoostsRepository(db);
+  const points = new PointsRepository(db);
   return {
-    async insertPendingBoost(row) {
-      const [created] = await db.insert(boosts).values(row).returning();
-      return created;
-    },
-    async insertCheckout(row) {
-      const [created] = await db.insert(boostCheckouts).values({ ...row, status: "pending" }).returning({ id: boostCheckouts.id });
-      return created;
-    },
-    spendCampaignDollars: (args) => repos.points.spendCampaignDollars(args),
-    async recordSplit(checkoutId, split) {
-      await db
-        .update(boostCheckouts)
-        .set({
-          campaignDollarsCents: split.campaignDollarsCents,
-          usdCents: split.usdCents,
-          status: split.paid ? "paid" : "pending",
-          paidAt: split.paid ? split.at : null,
-          updatedAt: split.at,
-        })
-        .where(eq(boostCheckouts.id, checkoutId));
-    },
-    async activateBoost(boostId, at) {
-      const [row] = await db
-        .update(boosts)
-        .set({ status: "active", updatedAt: at })
-        .where(eq(boosts.id, boostId))
-        .returning();
-      return row ?? null;
-    },
-    async findCheckout(checkoutId) {
-      const [row] = await db.select(record).from(boostCheckouts).where(eq(boostCheckouts.id, checkoutId)).limit(1);
-      return row ?? null;
-    },
-    async findCheckoutForBoost(boostId) {
-      const [row] = await db
-        .select(record)
-        .from(boostCheckouts)
-        .where(eq(boostCheckouts.boostId, boostId))
-        .orderBy(desc(boostCheckouts.createdAt))
-        .limit(1);
-      return row ?? null;
-    },
-    async claimPayment(checkoutId, providerPaymentId, at) {
-      const rows = await db
-        .update(boostCheckouts)
-        .set({ providerPaymentId, status: "paid", paidAt: at, updatedAt: at })
-        .where(
-          and(
-            eq(boostCheckouts.id, checkoutId),
-            eq(boostCheckouts.status, "pending"),
-            sql`NOT EXISTS (SELECT 1 FROM ${boostCheckouts} AS used WHERE used.provider_payment_id = ${providerPaymentId})`,
-            sql`NOT EXISTS (SELECT 1 FROM ${tokenPackPurchases} WHERE ${tokenPackPurchases.stripePaymentIntentId} = ${providerPaymentId})`,
-            sql`NOT EXISTS (SELECT 1 FROM ${courseCheckouts} WHERE ${courseCheckouts.providerPaymentId} = ${providerPaymentId})`,
-            sql`NOT EXISTS (SELECT 1 FROM ${jobBoosts} WHERE ${jobBoosts.stripePaymentIntentId} = ${providerPaymentId})`,
-          ),
-        )
-        .returning({ id: boostCheckouts.id });
-      return rows.length > 0;
-    },
+    insertPendingBoost: (row) => boosts.insertPendingBoost(row),
+    insertCheckout: (row) => boosts.insertCheckout(row),
+    spendCampaignDollars: (args) => points.spendCampaignDollars(args),
+    recordSplit: (checkoutId, split) => boosts.recordCheckoutSplit(checkoutId, split),
+    activateBoost: (boostId, at) => boosts.activateBoost(boostId, at),
+    findCheckout: (checkoutId) => boosts.findCheckout(checkoutId),
+    findCheckoutForBoost: (boostId) => boosts.findCheckoutForBoost(boostId),
+    claimPayment: (checkoutId, providerPaymentId, at) => boosts.claimCheckoutPayment(checkoutId, providerPaymentId, at),
   };
 }

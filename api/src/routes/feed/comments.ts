@@ -20,23 +20,23 @@ export const feedCommentRoutes = new Hono<AppEnv>();
 feedCommentRoutes.get("/posts/:postId/comments", (c) =>
   respond(
     c,
-    listPostComments(c.var.user?.sub ?? "", c.req.param("postId"), clampLimit(c.req.query("limit"), 200, 500)),
+    listPostComments(c.var.userId ?? "", c.req.param("postId"), clampLimit(c.req.query("limit"), 200, 500)),
   ),
 );
 
 /** POST /api/feed/comments */
 feedCommentRoutes.post("/comments", async (c) => {
   const body = await readBody(c);
-  return respond(c, createComment(c.var.user.sub, body), 201);
+  return respond(c, createComment(c.var.userId, body), 201);
 });
 
 /** PUT /api/feed/comments/:commentId */
 feedCommentRoutes.put("/comments/:commentId", async (c) => {
   const body = await readBody(c);
-  return respond(c, updateComment(c.var.user.sub, c.req.param("commentId"), body));
+  return respond(c, updateComment(c.var.userId, c.req.param("commentId"), body));
 });
 
 /** DELETE /api/feed/comments/:commentId */
 feedCommentRoutes.delete("/comments/:commentId", (c) =>
-  respond(c, removeComment(c.var.user.sub, c.req.param("commentId"))),
+  respond(c, removeComment(c.var.userId, c.req.param("commentId"))),
 );

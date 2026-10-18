@@ -1,6 +1,7 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { jwtVerify } from "jose";
 import { getJwtSecretOptional } from "../utils/jwt.js";
+import { error } from "../types/index.js";
 
 interface RateLimitEntry {
   count: number;
@@ -167,7 +168,7 @@ export function createIpRateLimiter(opts: IpRateLimiterOptions): MiddlewareHandl
       const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
       c.res.headers.set("Retry-After", String(retryAfter));
       return c.json(
-        { error: { code: "TOO_MANY_REQUESTS", message: opts.message } },
+        error("TOO_MANY_REQUESTS", opts.message),
         429,
       );
     }
@@ -228,7 +229,7 @@ export const rateLimiterMiddleware: MiddlewareHandler = async (c, next) => {
     const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
     c.res.headers.set("Retry-After", String(retryAfter));
     return c.json(
-      { error: { code: "TOO_MANY_REQUESTS", message: "Rate limit exceeded. Please try again later." } },
+      error("TOO_MANY_REQUESTS", "Rate limit exceeded. Please try again later."),
       429,
     );
   }

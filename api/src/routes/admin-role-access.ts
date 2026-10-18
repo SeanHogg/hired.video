@@ -18,11 +18,9 @@ import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { adminRepos } from "../repositories/admin/index.js";
 import { recordAdminAudit } from "../services/admin/adminAudit.js";
-import {
-  RoleAccessService,
-  RoleAccessError,
-} from "../services/admin/RoleAccessService.js";
+import { RoleAccessService } from "../services/admin/RoleAccessService.js";
 import { UpsertRoleAccessSchema } from "../../../shared/role-access.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const adminRoleAccessRoutes = new Hono<AppEnv>();
 
@@ -48,27 +46,17 @@ adminRoleAccessRoutes.get("/", async (c) => {
 // ---------------------------------------------------------------------------
 // POST / — upsert one (role, feature) override.
 // ---------------------------------------------------------------------------
-adminRoleAccessRoutes.post("/", async (c) => {
-  const parsed = UpsertRoleAccessSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
-  const actorId = c.var.user?.sub as string;
-  try {
-    const row = await buildService().upsert(parsed.data, actorId);
-    await audit(actorId, "role_access.upsert", parsed.data.role, {
-      featureKey: parsed.data.featureKey,
-      visible: parsed.data.visible ?? null,
-      enabled: parsed.data.enabled ?? null,
-      rank: parsed.data.rank ?? null,
-    });
-    return c.json(success(row), 200);
-  } catch (e) {
-    if (e instanceof RoleAccessError) {
-      return c.json(error(e.code, e.message), 400);
-    }
-    throw e;
-  }
+adminRoleAccessRoutes.post("/", validateJson(UpsertRoleAccessSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
+  const actorId = c.var.userId;
+  const row = await buildService().upsert(body, actorId);
+  await audit(actorId, "role_access.upsert", body.role, {
+    featureKey: body.featureKey,
+    visible: body.visible ?? null,
+    enabled: body.enabled ?? null,
+    rank: body.rank ?? null,
+  });
+  return c.json(success(row), 200);
 });
 
 // ---------------------------------------------------------------------------
@@ -76,17 +64,10 @@ adminRoleAccessRoutes.post("/", async (c) => {
 // ---------------------------------------------------------------------------
 adminRoleAccessRoutes.delete("/:role", async (c) => {
   const role = c.req.param("role");
-  const actorId = c.var.user?.sub as string;
-  try {
-    const removed = await buildService().resetRole(role);
-    await audit(actorId, "role_access.reset", role, { removed });
-    return c.json(success({ role, removed }), 200);
-  } catch (e) {
-    if (e instanceof RoleAccessError) {
-      return c.json(error(e.code, e.message), 400);
-    }
-    throw e;
-  }
+  const actorId = c.var.userId;
+  const removed = await buildService().resetRole(role);
+  await audit(actorId, "role_access.reset", role, { removed });
+  return c.json(success({ role, removed }), 200);
 });
 
 export default adminRoleAccessRoutes;

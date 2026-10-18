@@ -22,13 +22,10 @@
 import { describe, it } from "node:test";
 import { strict as assert } from "node:assert";
 
-import {
-  computeRefreshBackfill,
-  deriveApplyUrl,
-  extractAndClassifyJob,
-  findApplyLinkInHtml,
-  isApplyUrlFallback,
-} from "../job/JobService.js";
+import { findApplyLinkInHtml } from "../../../../shared/scraping/index.js";
+import { computeRefreshBackfill } from "../job/job-refresh-backfill.js";
+import { deriveApplyUrl } from "../job/job-apply-url.js";
+import { extractAndClassifyJob } from "../job/job-classify.js";
 
 // =====================================================================
 // Sample data — real-world JSON-LD payloads captured from the live
@@ -415,27 +412,6 @@ describe("computeRefreshBackfill", () => {
         missingFields: ["description"], // applyUrl omitted
       });
       assert.equal(updates.applyUrl, undefined);
-    });
-  });
-
-  // ---- isApplyUrlFallback predicate ---------------------------------
-  describe("isApplyUrlFallback", () => {
-    it("returns true when applyUrl is null/undefined/empty", () => {
-      assert.equal(isApplyUrlFallback({ sourceUrl: "https://x/" }), true);
-      assert.equal(isApplyUrlFallback({ applyUrl: null, sourceUrl: "https://x/" }), true);
-      assert.equal(isApplyUrlFallback({ applyUrl: "", sourceUrl: "https://x/" }), true);
-    });
-    it("returns true when applyUrl equals sourceUrl", () => {
-      assert.equal(
-        isApplyUrlFallback({ applyUrl: "https://x/", sourceUrl: "https://x/" }),
-        true,
-      );
-    });
-    it("returns false when applyUrl is distinct from sourceUrl", () => {
-      assert.equal(
-        isApplyUrlFallback({ applyUrl: "https://x/apply", sourceUrl: "https://x/" }),
-        false,
-      );
     });
   });
 

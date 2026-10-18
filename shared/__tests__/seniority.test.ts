@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import {
   SENIORITY_LEVELS,
   SENIORITY_LABELS,
-  SenioritySchema,
   normalizeSeniority,
 } from "../seniority.js";
 
@@ -54,11 +53,4 @@ describe("seniority normalizer (#2090)", () => {
     assert.equal(normalizeSeniority(undefined), null);
   });
 
-  it("SenioritySchema accepts any spelling and outputs canonical-or-null", () => {
-    assert.equal(SenioritySchema.parse("Senior"), "senior");
-    assert.equal(SenioritySchema.parse("LeadExecutive"), "lead");
-    assert.equal(SenioritySchema.parse("None"), null);
-    // Already-canonical is a no-op.
-    assert.equal(SenioritySchema.parse("mid"), "mid");
-  });
 });

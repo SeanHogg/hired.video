@@ -30,3 +30,16 @@ export function requireUserId(viewerId: string | null | undefined): string {
   if (!viewerId) throw new DomainError(401, "UNAUTHORIZED", "Authentication required");
   return viewerId;
 }
+
+const CONVENTIONAL_STATUS: Readonly<Record<string, number>> = {
+  NOT_FOUND: 404,
+  FORBIDDEN: 403,
+  CONFLICT: 409,
+};
+
+/** The conventional status for a service error code — NOT_FOUND 404,
+ *  FORBIDDEN 403, CONFLICT 409, anything else 400 — with `extra` for a
+ *  domain's own codes. Typed service errors pass it to `super(...)`. */
+export function statusForErrorCode(code: string, extra: Readonly<Record<string, number>> = {}): number {
+  return extra[code] ?? CONVENTIONAL_STATUS[code] ?? 400;
+}

@@ -60,6 +60,7 @@ function job(overrides: Partial<PublishJob> = {}): PublishJob {
     caption: "Open to senior product design roles — 60 seconds on how I work. #design",
     captionSource: null,
     postSettings: null,
+    postYourself: false,
     scheduledAt: new Date("2026-10-11T14:00:00.000Z"),
     runAt: new Date("2026-10-11T14:00:00.000Z"),
     status: "running",

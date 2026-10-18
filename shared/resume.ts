@@ -38,7 +38,7 @@
  *     tests pass.
  *
  * PENDING (follow-up PRs):
- *   - Services: resume-parse.ts still carries dual-case (ciGet/normalizeJsonResume)
+ *   - Services: resume-parse.ts still carries dual-case (normalizeJsonResume)
  *     fallbacks; now that content is always camelCase on read, those can
  *     collapse to direct property access.
  *   - resume-merge.ts, resume-diff.ts, skill-extraction.ts use content

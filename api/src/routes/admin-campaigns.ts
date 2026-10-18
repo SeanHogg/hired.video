@@ -39,6 +39,7 @@ import {
   CampaignAudienceSchema,
 } from "../../../shared/campaigns.js";
 import { MARKETING_CATEGORIES } from "../../../shared/email-consent.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const adminCampaignRoutes = new Hono<AppEnv>();
 
@@ -51,13 +52,10 @@ adminCampaignRoutes.get("/", async (c) => {
   return c.json(success(await buildService().list()), 200);
 });
 
-adminCampaignRoutes.post("/", async (c) => {
-  const parsed = CreateCampaignSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
-  const actorId = c.var.user?.sub as string;
-  const created = await createPlatformCampaign(parsed.data, actorId);
+adminCampaignRoutes.post("/", validateJson(CreateCampaignSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
+  const actorId = c.var.userId;
+  const created = await createPlatformCampaign(body, actorId);
   await audit(actorId, "campaign.create", created.id, { name: created.name });
   return c.json(success(created), 201);
 });
@@ -66,26 +64,20 @@ adminCampaignRoutes.get("/templates", async (c) => {
   return c.json(success(await buildService().listTemplates()), 200);
 });
 
-adminCampaignRoutes.post("/templates", async (c) => {
-  const parsed = CreateTemplateSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
-  const actorId = c.var.user?.sub as string;
-  const created = await buildService().createTemplate(parsed.data);
+adminCampaignRoutes.post("/templates", validateJson(CreateTemplateSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
+  const actorId = c.var.userId;
+  const created = await buildService().createTemplate(body);
   await audit(actorId, "campaign_template.create", created.id, { name: created.name });
   return c.json(success(created), 201);
 });
 
-adminCampaignRoutes.patch("/templates/:id", async (c) => {
-  const parsed = UpdateTemplateSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
+adminCampaignRoutes.patch("/templates/:id", validateJson(UpdateTemplateSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
   const id = c.req.param("id");
-  const updated = await buildService().updateTemplate(id, parsed.data);
+  const updated = await buildService().updateTemplate(id, body);
   if (!updated) return c.json(error("NOT_FOUND", "Template not found"), 404);
-  await audit(c.var.user?.sub as string, "campaign_template.update", id, {});
+  await audit(c.var.userId, "campaign_template.update", id, {});
   return c.json(success(updated), 200);
 });
 
@@ -93,7 +85,7 @@ adminCampaignRoutes.delete("/templates/:id", async (c) => {
   const id = c.req.param("id");
   const ok = await buildService().deleteTemplate(id);
   if (!ok) return c.json(error("NOT_FOUND", "Template not found"), 404);
-  await audit(c.var.user?.sub as string, "campaign_template.delete", id, {});
+  await audit(c.var.userId, "campaign_template.delete", id, {});
   return c.json(success({ id, deleted: true }), 200);
 });
 
@@ -102,13 +94,10 @@ const PreviewSchema = z.object({
   category: z.enum(MARKETING_CATEGORIES).optional(),
 });
 
-adminCampaignRoutes.post("/audience/preview", async (c) => {
-  const parsed = PreviewSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid audience"), 400);
-  }
+adminCampaignRoutes.post("/audience/preview", validateJson(PreviewSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid audience")), async (c) => {
+  const body = c.req.valid("json");
   return c.json(
-    success(await buildService().previewAudience(parsed.data.audience, parsed.data.category)),
+    success(await buildService().previewAudience(body.audience, body.category)),
     200,
   );
 });
@@ -119,28 +108,22 @@ adminCampaignRoutes.get("/:id", async (c) => {
   return c.json(success(dto), 200);
 });
 
-adminCampaignRoutes.patch("/:id", async (c) => {
-  const parsed = UpdateCampaignSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
+adminCampaignRoutes.patch("/:id", validateJson(UpdateCampaignSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
   const id = c.req.param("id");
-  const updated = await buildService().update(id, parsed.data);
+  const updated = await buildService().update(id, body);
   if (!updated) return c.json(error("NOT_FOUND", "Campaign not found"), 404);
-  await audit(c.var.user?.sub as string, "campaign.update", id, {});
+  await audit(c.var.userId, "campaign.update", id, {});
   return c.json(success(updated), 200);
 });
 
-adminCampaignRoutes.post("/:id/schedule", async (c) => {
-  const parsed = ScheduleCampaignSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
-  }
+adminCampaignRoutes.post("/:id/schedule", validateJson(ScheduleCampaignSchema, (e) => error("VALIDATION_ERROR", e.issues[0]?.message ?? "Invalid body")), async (c) => {
+  const body = c.req.valid("json");
   const id = c.req.param("id");
-  const result = await buildService().schedule(id, parsed.data.scheduledAt ?? null);
+  const result = await buildService().schedule(id, body.scheduledAt ?? null);
   if (result.ok && result.campaign) {
-    await audit(c.var.user?.sub as string, "campaign.schedule", id, {
-      scheduledAt: parsed.data.scheduledAt ?? "now",
+    await audit(c.var.userId, "campaign.schedule", id, {
+      scheduledAt: body.scheduledAt ?? "now",
     });
     return c.json(success(result.campaign), 200);
   }
@@ -151,7 +134,7 @@ adminCampaignRoutes.post("/:id/pause", async (c) => {
   const id = c.req.param("id");
   const updated = await buildService().setStatus(id, "paused");
   if (!updated) return c.json(error("NOT_FOUND", "Campaign not found"), 404);
-  await audit(c.var.user?.sub as string, "campaign.pause", id, {});
+  await audit(c.var.userId, "campaign.pause", id, {});
   return c.json(success(updated), 200);
 });
 
@@ -159,7 +142,7 @@ adminCampaignRoutes.post("/:id/cancel", async (c) => {
   const id = c.req.param("id");
   const updated = await buildService().setStatus(id, "cancelled");
   if (!updated) return c.json(error("NOT_FOUND", "Campaign not found"), 404);
-  await audit(c.var.user?.sub as string, "campaign.cancel", id, {});
+  await audit(c.var.userId, "campaign.cancel", id, {});
   return c.json(success(updated), 200);
 });
 

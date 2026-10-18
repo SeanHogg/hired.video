@@ -1,64 +1,18 @@
 import { Hono } from "hono";
-import { desc, eq } from "drizzle-orm";
-import type { Variables, AppEnv } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { verifyPassword } from "../services/auth/password.js";
+import type { AppEnv } from "../types/index.js";
+import { success, error } from "../types/index.js";
+import {
+  evaluatePassword,
+  getPasswordExpiry,
+  isPasswordRecentlyUsed,
+} from "../services/auth/passwordPolicy.js";
+import { requireUser } from "./helpers/routerHelpers.js";
 
 export const passwordManagementRoutes = new Hono<AppEnv>();
 
-// Password policy constants — must match frontend and email copy
-const PASSWORD_EXPIRY_DAYS = 90;
-
-function ok<T>(data: T) {
-  return { success: true as const, data, timestamp: new Date().toISOString() };
-}
-
-function evaluatePassword(password: string) {
-  const hasMinLength = password.length >= 8;
-  const hasUppercase = /[A-Z]/.test(password);
-  const hasLowercase = /[a-z]/.test(password);
-  const hasNumbers = /\d/.test(password);
-  const hasSpecialChars = /[^A-Za-z0-9]/.test(password);
-  const isNotCommon = !/^(password|123456|qwerty|admin)$/i.test(password.trim());
-
-  const checks = [hasMinLength, hasUppercase, hasLowercase, hasNumbers, hasSpecialChars, isNotCommon];
-  const score = Math.round((checks.filter(Boolean).length / checks.length) * 100);
-  const isValid = checks.every(Boolean);
-
-  const requirements = [
-    "At least 8 characters",
-    "At least one uppercase letter",
-    "At least one lowercase letter",
-    "At least one number",
-    "At least one special character",
-    "Not a common password",
-  ];
-
-  const suggestions: string[] = [];
-  if (!hasMinLength) suggestions.push("Use at least 8 characters");
-  if (!hasUppercase) suggestions.push("Add an uppercase letter");
-  if (!hasLowercase) suggestions.push("Add a lowercase letter");
-  if (!hasNumbers) suggestions.push("Add a number");
-  if (!hasSpecialChars) suggestions.push("Add a special character");
-  if (!isNotCommon) suggestions.push("Avoid common passwords");
-
-  return {
-    isValid,
-    score,
-    requirements,
-    suggestions,
-    hasMinLength,
-    hasUppercase,
-    hasLowercase,
-    hasNumbers,
-    hasSpecialChars,
-    isNotCommon,
-  };
-}
-
 passwordManagementRoutes.get("/requirements", (c) =>
   c.json(
-    ok({
+    success({
       requiresPasswordChange: false,
       isTemporaryPassword: false,
       passwordSetDate: new Date().toISOString(),
@@ -74,7 +28,7 @@ passwordManagementRoutes.get("/requirements", (c) =>
 passwordManagementRoutes.post("/validate-strength", async (c) => {
   const body = await c.req.json().catch(() => "");
   const password = typeof body === "string" ? body : String(body?.password ?? "");
-  return c.json(ok(evaluatePassword(password)), 200);
+  return c.json(success(evaluatePassword(password)), 200);
 });
 
 passwordManagementRoutes.post("/force-change", async (c) => {
@@ -84,11 +38,7 @@ passwordManagementRoutes.post("/force-change", async (c) => {
 
   if (!newPassword || newPassword !== confirmPassword) {
     return c.json(
-      {
-        success: false,
-        error: { code: "VALIDATION_ERROR", message: "Passwords do not match" },
-        timestamp: new Date().toISOString(),
-      },
+      error("VALIDATION_ERROR", "Passwords do not match"),
       400,
     );
   }
@@ -96,16 +46,12 @@ passwordManagementRoutes.post("/force-change", async (c) => {
   const strength = evaluatePassword(newPassword);
   if (!strength.isValid) {
     return c.json(
-      {
-        success: false,
-        error: { code: "WEAK_PASSWORD", message: "Password does not meet requirements", details: strength },
-        timestamp: new Date().toISOString(),
-      },
+      error("WEAK_PASSWORD", "Password does not meet requirements", strength),
       400,
     );
   }
 
-  return c.json(ok({ success: true }), 200);
+  return c.json(success({ success: true }), 200);
 });
 
 // ---------------------------------------------------------------------------
@@ -115,31 +61,15 @@ passwordManagementRoutes.post("/force-change", async (c) => {
 // Returns: { isReused: boolean, message: string }
 // ---------------------------------------------------------------------------
 passwordManagementRoutes.post("/validate-history", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
+  const userId = requireUser(c);
 
   const body = await c.req.json().catch(() => ({}));
   const candidate = typeof body.password === "string" ? body.password : "";
-  if (!candidate) return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "password is required" } }, 400);
+  if (!candidate) return c.json(error("VALIDATION_ERROR", "password is required"), 400);
 
-  const db = getDb();
-  // Fetch last 5 password hashes for this user
-  const history = await db
-    .select({ passwordHash: schema.passwordHistory.passwordHash })
-    .from(schema.passwordHistory)
-    .where(eq(schema.passwordHistory.userId, userId))
-    .orderBy(desc(schema.passwordHistory.createdAt))
-    .limit(5);
+  const isReused = await isPasswordRecentlyUsed(userId, candidate);
 
-  // Check the candidate against each stored hash (shared PBKDF2 verify).
-  let isReused = false;
-  for (const entry of history) {
-    try {
-      if (await verifyPassword(candidate, entry.passwordHash)) { isReused = true; break; }
-    } catch { continue; }
-  }
-
-  return c.json(ok({
+  return c.json(success({
     isReused,
     message: isReused
       ? "This password has been used recently. Please choose a different password."
@@ -153,40 +83,7 @@ passwordManagementRoutes.post("/validate-history", async (c) => {
 // Returns: { isExpired: boolean, daysUntilExpiry: number, expiredAt?: string }
 // ---------------------------------------------------------------------------
 passwordManagementRoutes.get("/is-expired", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
+  const userId = requireUser(c);
 
-  const db = getDb();
-  const [user] = await db
-    .select({ passwordChangedAt: schema.users.passwordChangedAt, createdAt: schema.users.createdAt })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
-
-  if (!user) return c.json({ success: false, error: { code: "NOT_FOUND", message: "User not found" } }, 404);
-
-  const baseline = user.passwordChangedAt ?? user.createdAt;
-  const expiresAt = new Date(baseline.getTime() + PASSWORD_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
-  const now = new Date();
-  const isExpired = now > expiresAt;
-  const daysUntilExpiry = Math.max(0, Math.ceil((expiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
-
-  return c.json(ok({
-    isExpired,
-    daysUntilExpiry,
-    expiredAt: isExpired ? expiresAt.toISOString() : undefined,
-    expiresAt: expiresAt.toISOString(),
-    passwordChangedAt: baseline.toISOString(),
-  }), 200);
+  return c.json(success(await getPasswordExpiry(userId)), 200);
 });
-
-passwordManagementRoutes.all("*", (c) =>
-  c.json(
-    {
-      success: false,
-      error: { code: "NOT_IMPLEMENTED", message: "Password management routes coming soon" },
-      timestamp: new Date().toISOString(),
-    },
-    501,
-  ),
-);

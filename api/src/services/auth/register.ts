@@ -3,6 +3,8 @@
 
 import { eq } from "drizzle-orm";
 import { schema } from "../../db/index.js";
+import { AuthTokensRepository } from "../../repositories/authTokensRepository.js";
+import { PreferencesRepository } from "../../repositories/preferencesRepository.js";
 import { RegisterSchema } from "./schemas.js";
 import { hashPassword } from "./password.js";
 import { validateSignupRequest } from "./signupGuard.js";
@@ -16,7 +18,7 @@ import { DomainError } from "../../domains/errors.js";
 import type { AuthDeps } from "./authPorts.js";
 import { recordLoginEvent } from "./loginEvents.js";
 
-const { users, userProfiles, accountPreferences, emailVerificationTokens } = schema;
+const { users, userProfiles } = schema;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleRegister
@@ -177,7 +179,7 @@ export async function handleRegister(deps: AuthDeps, body: unknown) {
 
   const verificationToken = deps.randomHex(32);
   const expiresAt = new Date(deps.now().getTime() + 24 * 60 * 60 * 1000);
-  await deps.db.insert(emailVerificationTokens).values({
+  await new AuthTokensRepository(deps.db, deps.now).insertEmailVerificationToken({
     userId: user.id,
     token: verificationToken,
     expiresAt,
@@ -208,20 +210,14 @@ export async function handleRegister(deps: AuthDeps, body: unknown) {
   } catch (err) {
     logger.error("[register] Failed to seed profile section defaults", err);
   }
-  // Seed account_preferences.language with the visitor's pre-auth pick
+  // Seed the account settings language with the visitor's pre-auth pick
   // so LocaleSync resolves to their chosen locale on the very first
   // authed render. Skipped when the form didn't forward a valid Locale
   // (organic flows, OAuth, anything pre-#1408 client) — those keep the
   // DB default "en" via the settings handler's fall-through.
   if (localePref) {
     try {
-      await deps.db
-        .insert(accountPreferences)
-        .values({ userId: user.id, language: localePref } as any)
-        .onConflictDoUpdate({
-          target: accountPreferences.userId,
-          set: { language: localePref },
-        });
+      await new PreferencesRepository(deps.db, deps.now).upsertAccount(user.id, { language: localePref });
     } catch (err) {
       logger.error("[register] Failed to seed account preferences language", err);
     }

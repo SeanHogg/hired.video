@@ -7,7 +7,8 @@ import { z } from "zod";
 import type { AppEnv } from "../../types/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../../services/adapters/llm-client.js";
 import { aiFailure } from "../../services/adapters/llm-error.js";
-import { ok, fail } from "./shared.js";
+import { success, error } from "../../types/index.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const scriptRewriterRoutes = new Hono<AppEnv>();
 
@@ -18,24 +19,22 @@ export const scriptRewriterRoutes = new Hono<AppEnv>();
 // ██  Returns a new scene array preserving timing constraints.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-scriptRewriterRoutes.post("/projects/:projectId/script/rewrite", async (c) => {
-  const user = c.var.user;
-  const projectId = c.req.param("projectId");
-  const body = await c.req.json().catch(() => null);
-  const parsed = z.object({
+scriptRewriterRoutes.post("/projects/:projectId/script/rewrite", validateJson(z.object({
     storyboard: z.unknown(),
     mode: z.enum(["shorten", "lengthen", "tone", "persona"]),
     targetSeconds: z.number().min(5).max(300).optional(),
     tone: z.enum(["professional", "conversational", "enthusiastic", "executive"]).optional(),
     persona: z.enum(["job-seeker", "recruiter", "company-promo", "personal-brand"]).optional(),
     instructions: z.string().max(500).optional(),
-  }).safeParse(body);
+  }), (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const body = c.req.valid("json");
 
-  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
 
-  if (!hasAnyLLMProviderKey(c.env)) return c.json(fail("AI_UNAVAILABLE", "LLM API key not configured"), 503);
+  if (!hasAnyLLMProviderKey(c.env)) return c.json(error("AI_UNAVAILABLE", "LLM API key not configured"), 503);
 
-  const { mode, targetSeconds, tone, persona, instructions } = parsed.data;
+  const { mode, targetSeconds, tone, persona, instructions } = body;
 
   const directive = (() => {
     switch (mode) {
@@ -51,7 +50,7 @@ scriptRewriterRoutes.post("/projects/:projectId/script/rewrite", async (c) => {
   })();
 
   const systemPrompt = `You rewrite video storyboard scripts. You must return ONLY valid JSON matching the input shape. Never invent facts not present in the original. Preserve scene 'type', 'visual', and 'camera' fields exactly. You may rewrite 'title', 'subtitle', 'text', 'ctaText'. If shortening, you may remove scenes. If lengthening, you may insert new scenes that build on existing themes.`;
-  const userMessage = `Original storyboard:\n${JSON.stringify(parsed.data.storyboard, null, 2)}\n\nRewrite directive: ${directive}${instructions ? `\n\nAdditional instructions: ${instructions}` : ""}\n\nReturn JSON: { "scenes": [...] }`;
+  const userMessage = `Original storyboard:\n${JSON.stringify(body.storyboard, null, 2)}\n\nRewrite directive: ${directive}${instructions ? `\n\nAdditional instructions: ${instructions}` : ""}\n\nReturn JSON: { "scenes": [...] }`;
 
   const RewriteSchema = z.object({
     scenes: z.array(z.record(z.string(), z.unknown())),
@@ -65,7 +64,7 @@ scriptRewriterRoutes.post("/projects/:projectId/script/rewrite", async (c) => {
       RewriteSchema,
     );
 
-    return c.json(ok({
+    return c.json(success({
       mode,
       sceneCount: data.scenes.length,
       storyboard: data,

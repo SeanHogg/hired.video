@@ -8,7 +8,7 @@
  * queries so the route layer never touches Drizzle.
  */
 
-import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import { countServerRecordedViews } from "./artifactViewStreams.js";
 
@@ -60,6 +60,24 @@ export async function listTrendingCompanies(
     .leftJoin(companyFollowers, eq(companyFollowers.companyId, companyProfiles.id))
     .groupBy(companyProfiles.id)
     .orderBy(desc(sql`count(${companyFollowers.userId})`))
+    .limit(limit);
+}
+
+/** Companies with at least `minReviews` reviews, best average first. */
+export function listTopRatedCompanies(minReviews: number, limit: number) {
+  return getDb()
+    .select({
+      id: companyProfiles.id,
+      slug: companyProfiles.slug,
+      name: companyProfiles.name,
+      logo: companyProfiles.logoUrl,
+      industry: companyProfiles.industry,
+      reviewCount: companyProfiles.reviewCount,
+      reviewAvgOverall: companyProfiles.reviewAvgOverall,
+    })
+    .from(companyProfiles)
+    .where(gte(companyProfiles.reviewCount, minReviews))
+    .orderBy(desc(companyProfiles.reviewAvgOverall), desc(companyProfiles.reviewCount))
     .limit(limit);
 }
 

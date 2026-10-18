@@ -5,8 +5,14 @@
 import { z } from "zod";
 import { DomainError } from "../../domains/errors.js";
 import type { IResumeRepository } from "../../repositories/index.js";
-import type { ResumeVersionRepository } from "../../repositories/resumeVersionRepository.js";
+import { getDb } from "../../db/index.js";
+import { ResumeVersionRepository } from "../../repositories/resumeVersionRepository.js";
 import { resumeNotFound } from "./errors.js";
+
+/** Live snapshot/watch repository for the HTTP layer. */
+export function liveResumeVersions(): ResumeVersionRepository {
+  return new ResumeVersionRepository(getDb());
+}
 
 const AUTOSAVE_CAP = 50;
 const AUTOSAVE_RETENTION_DAYS = 30;

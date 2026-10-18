@@ -7,14 +7,25 @@
  * multi-row `INSERT … ON CONFLICT DO UPDATE` statements chunked at 500.
  */
 
-import { sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql, type SQL } from "drizzle-orm";
 import { schema } from "../db/index.js";
 import { chunk } from "../utils/chunk.js";
+import { paidMediaAccountsOwnedBy } from "./paidMediaAccountsRepository.js";
 
-const { paidMediaInsights } = schema;
+const { paidMediaInsights, paidMediaAccounts } = schema;
 
 export type DbLike = any;
 export type PaidMediaInsightInsert = typeof paidMediaInsights.$inferInsert;
+export type PaidMediaInsightRow = typeof paidMediaInsights.$inferSelect;
+
+export interface InsightListFilter {
+  /** Personal owners + companies whose ad accounts the caller may read. */
+  ownerUserIds: string[];
+  ownerCompanyIds: string[];
+  since?: string;
+  until?: string;
+  internalId?: string;
+}
 
 export const INSIGHT_UPSERT_CHUNK = 500;
 
@@ -25,6 +36,8 @@ export interface IPaidMediaInsightsRepository {
    *  only the metric columns + fetched_at are refreshed (internal_id and
    *  account_id keep their first-written values). */
   upsertMany(rows: PaidMediaInsightInsert[], fetchedAt: Date): Promise<void>;
+  /** Insight rows of ad accounts owned by the given workspaces, newest day first. */
+  listForOwners(filter: InsightListFilter): Promise<PaidMediaInsightRow[]>;
 }
 
 export class PaidMediaInsightsRepository implements IPaidMediaInsightsRepository {
@@ -59,5 +72,21 @@ export class PaidMediaInsightsRepository implements IPaidMediaInsightsRepository
           },
         });
     }
+  }
+
+  async listForOwners(filter: InsightListFilter): Promise<PaidMediaInsightRow[]> {
+    const ownedAccountIds = this.db
+      .select({ id: paidMediaAccounts.id })
+      .from(paidMediaAccounts)
+      .where(paidMediaAccountsOwnedBy(filter.ownerUserIds, filter.ownerCompanyIds));
+    const conds: SQL[] = [inArray(paidMediaInsights.accountId, ownedAccountIds)];
+    if (filter.since) conds.push(gte(paidMediaInsights.date, filter.since));
+    if (filter.until) conds.push(lte(paidMediaInsights.date, filter.until));
+    if (filter.internalId) conds.push(eq(paidMediaInsights.internalId, filter.internalId));
+    return this.db
+      .select()
+      .from(paidMediaInsights)
+      .where(and(...conds))
+      .orderBy(desc(paidMediaInsights.date));
   }
 }

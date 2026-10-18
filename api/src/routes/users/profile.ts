@@ -26,7 +26,7 @@ profileRoutes.get("/:id/stats", (c) =>
 );
 
 /** GET /api/users/:id/resumes — the user's résumés (public ones unless the caller owns them) */
-profileRoutes.get("/:id/resumes", (c) => respond(c, listUserResumes(c.req.param("id"), c.var.user?.sub)));
+profileRoutes.get("/:id/resumes", (c) => respond(c, listUserResumes(c.req.param("id"), c.var.userId)));
 
 /** GET /api/users/:id — profile by id or custom slug; visibility-conditional */
 profileRoutes.get("/:id", (c) => respond(c, getPublicProfile(c.req.param("id"), c.var.user)));

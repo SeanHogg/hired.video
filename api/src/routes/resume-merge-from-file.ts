@@ -31,8 +31,8 @@ import {
 } from "../services/resume/mergeFromFile.js";
 import { ocrResumeImage, parseResumeTextWithAI } from "./resume-parse.js";
 import { gateUploadOcr } from "./resume-upload-ocr-gate.js";
-import { fail, ok } from "../utils/response.js";
 import { readFormFiles } from "../utils/multipart.js";
+import { success, error } from "../types/index.js";
 
 type Ctx = Context<AppEnv>;
 type Content = Record<string, unknown>;
@@ -71,7 +71,7 @@ export async function mergeFromFileHandler(c: Ctx): Promise<Response> {
   if (ocr.blocked) return ocr.blocked;
 
   const outcome = await analyzeMergeFromFile(
-    c.var.user.sub,
+    c.var.userId,
     input,
     buildMergeFromFileDeps(c.env, c.var.user, {
       ocrImage: (image) => ocrResumeImage(c, image),
@@ -80,17 +80,17 @@ export async function mergeFromFileHandler(c: Ctx): Promise<Response> {
   );
   if ("error" in outcome) {
     const status = outcome.error.code === "NOT_FOUND" ? 404 : 422;
-    return c.json(fail(outcome.error.code, outcome.error.message), status);
+    return c.json(error(outcome.error.code, outcome.error.message), status);
   }
   ocr.meter();
-  return c.json(ok(outcome.result), 200);
+  return c.json(success(outcome.result), 200);
 }
 
 /** JSON body or multipart upload → one validated input, or the 400 to return. */
 async function readMergeFromFileInput(c: Ctx): Promise<MergeFromFileInput | Response> {
   if ((c.req.header("Content-Type") ?? "").includes("multipart/form-data")) {
     const { form, files } = await readFormFiles(c);
-    if (!form || files.length === 0) return c.json(fail("VALIDATION_ERROR", "No file provided."), 400);
+    if (!form || files.length === 0) return c.json(error("VALIDATION_ERROR", "No file provided."), 400);
     const field = (name: string): string | undefined => {
       const value = form.get(name);
       return typeof value === "string" && value ? value : undefined;
@@ -100,12 +100,12 @@ async function readMergeFromFileInput(c: Ctx): Promise<MergeFromFileInput | Resp
       targetContent: parseJsonField(field("targetContent")),
       useAI: field("useAI") !== "false",
     });
-    if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
+    if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
     return { source: { kind: "files", files }, ...parsed.data };
   }
 
   const parsed = MergeFromFileJsonSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   const { text, parsedContent, ...target } = parsed.data;
   const source: MergeSourceInput = parsedContent
     ? { kind: "parsed", content: parsedContent }

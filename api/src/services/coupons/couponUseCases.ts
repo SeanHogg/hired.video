@@ -24,10 +24,23 @@ import type { PlanOverrideInsert, PlanOverrideRow } from "../../repositories/ind
 import { AUDIT_ACTIONS, type AuditAction } from "../../utils/audit.js";
 import * as couponRepo from "./couponRepository.js";
 import type { CouponRow } from "./couponRepository.js";
+import { DomainError } from "../../domains/errors.js";
 
-export class CouponError extends Error {
+/** CouponError → HTTP status (the global error handler renders it). */
+const COUPON_ERROR_STATUS: Record<CouponErrorKind, 403 | 404 | 409 | 410> = {
+  INVALID_CODE: 404,
+  NOT_FOUND: 404,
+  EXPIRED: 410,
+  EXHAUSTED: 410,
+  ALREADY_REDEEMED: 409,
+  ALREADY_PRO: 409,
+  ACCOUNT_REQUIRED: 403,
+  CODE_TAKEN: 409,
+};
+
+export class CouponError extends DomainError {
   constructor(public readonly kind: CouponErrorKind, message: string) {
-    super(message);
+    super(COUPON_ERROR_STATUS[kind], kind, message);
     this.name = "CouponError";
   }
 }

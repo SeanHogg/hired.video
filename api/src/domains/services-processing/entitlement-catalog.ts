@@ -42,8 +42,8 @@ import type { PlanTier, UsageEventType } from "../../../../shared/usage-statemen
  *    resumes, not a publish rate. Re-uploads to the same project replace
  *    the existing video and don't count.
  *
- *  - `"connected_inboxes_active"`: count of `external_email_accounts`
- *    rows with `status = 'active'` for the user. Snapshot semantic —
+ *  - `"connected_inboxes_active"`: count of connected mailboxes
+ *    (provider_connections "email_inbox") active and not paused for the user. Snapshot semantic —
  *    the cap is the current number of connected mailboxes, not a
  *    connect rate. Disconnecting a mailbox frees the slot immediately.
  */
@@ -227,7 +227,7 @@ export const ENTITLEMENT_CATALOG: Record<UsageEventType, EntitlementSpec> = {
   // for the Usage Statement (display only; unlimited within the Pro plan).
   // `email_account` is a snapshot dimension (current connected mailbox
   // count, not a monthly tally) — services-processor's dispatcher reads
-  // the count straight from the `external_email_accounts` table.
+  // the count from the connected mailboxes (provider_connections "email_inbox").
   email_sync: {
     eventType: "email_sync",
     label: "Inbox sync runs",

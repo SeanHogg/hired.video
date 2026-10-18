@@ -1,26 +1,53 @@
 /**
- * Persistence layer for `youtube_accounts`.
+ * YouTube channel connections — the adapter over provider_connections
+ * (purpose "youtube", provider "google", W3-C migration 0600; was
+ * youtube_accounts).
  *
- * Wraps the Drizzle calls so the OAuth and upload services never touch
- * the schema directly. All public methods take a `Db` instance so unit
- * tests can swap in fakes / transactions without a global side effect.
+ *   googleId ← external_account_id   channelTitle ← handle
+ *   channelId / email ← config       isActive ← status "active"
  *
- * Tokens are encrypted at rest (access_token_enc / refresh_token_enc via
- * services/crypto/credential-columns.ts). This module is the only place that
- * sees ciphertext: reads return decrypted tokens, writes take plaintext.
+ * Wraps the data access so the OAuth and upload services never touch the
+ * schema directly. All public methods take a `Db` instance so unit tests can
+ * swap in fakes / transactions without a global side effect.
+ *
+ * Tokens are sealed with the one provider_connections scheme
+ * (services/provider-connections/connection-secrets.ts). This module is the
+ * only place that sees ciphertext: reads return decrypted tokens (re-sealing
+ * a legacy value on the way), writes take plaintext.
  */
-
-import { and, eq } from "drizzle-orm";
-import { getDb, schema } from "../../db/index.js";
+import { getDb } from "../../db/index.js";
 import type { Db } from "../../db/index.js";
-import { openCredential, sealCredential } from "../crypto/credential-columns.js";
+import {
+  ProviderConnectionsRepository,
+  type ProviderConnectionRow,
+} from "../../repositories/providerConnectionsRepository.js";
+import {
+  openAndResealSecret,
+  sealConnectionSecret,
+} from "../provider-connections/connection-secrets.js";
 
-type YouTubeAccountRow = typeof schema.youtubeAccounts.$inferSelect;
+const PURPOSE = "youtube" as const;
+const PROVIDER = "google";
+/** YouTube wrote plaintext before CREDENTIALS_KMS_KEY existed — keep that. */
+const SEAL = { allowPlaintextFallback: true } as const;
 
-/** A `youtube_accounts` row with its tokens decrypted. */
-export type YouTubeAccount = Omit<YouTubeAccountRow, "accessToken" | "accessTokenEnc" | "refreshTokenEnc"> & {
+/** A connected YouTube channel with its tokens decrypted. */
+export interface YouTubeAccount {
+  id: string;
+  userId: string;
+  googleId: string;
+  channelId: string | null;
+  channelTitle: string | null;
+  displayName: string | null;
+  email: string | null;
   accessToken: string;
-};
+  refreshToken: string | null;
+  tokenExpiresAt: Date | null;
+  scopes: string | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface UpsertAccountInput {
   userId: string;
@@ -40,23 +67,41 @@ export interface RotateTokenInput {
   tokenExpiresAt: Date;
 }
 
-const { youtubeAccounts } = schema;
+function repo(db: Db): ProviderConnectionsRepository {
+  return new ProviderConnectionsRepository(db);
+}
 
-async function decrypt(row: YouTubeAccountRow): Promise<YouTubeAccount> {
-  const { accessTokenEnc, refreshTokenEnc, ...rest } = row;
+function configString(row: ProviderConnectionRow, key: string): string | null {
+  const v = (row.config ?? {})[key];
+  return typeof v === "string" ? v : null;
+}
+
+async function decrypt(row: ProviderConnectionRow, db: Db): Promise<YouTubeAccount> {
+  const connections = repo(db);
+  const reseal = (column: "accessTokenEnc" | "refreshTokenEnc", stored: string | null) =>
+    openAndResealSecret(stored, (next) => connections.resealSecret(row.id, column, stored as string, next));
   return {
-    ...rest,
-    accessToken: (await openCredential(accessTokenEnc, row.accessToken)) ?? "",
-    refreshToken: await openCredential(refreshTokenEnc, row.refreshToken),
+    id: row.id,
+    userId: row.userId ?? "",
+    googleId: row.externalAccountId ?? "",
+    channelId: configString(row, "channelId"),
+    channelTitle: row.handle,
+    displayName: row.displayName,
+    email: configString(row, "email"),
+    accessToken: (await reseal("accessTokenEnc", row.accessTokenEnc)) ?? "",
+    refreshToken: await reseal("refreshTokenEnc", row.refreshTokenEnc),
+    tokenExpiresAt: row.expiresAt,
+    scopes: row.scopes,
+    isActive: row.status === "active",
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
 /** Caller's currently-active YouTube account, if any. */
 export async function getActiveAccount(userId: string, db: Db = getDb()): Promise<YouTubeAccount | null> {
-  const [row] = await db.select().from(youtubeAccounts)
-    .where(and(eq(youtubeAccounts.userId, userId), eq(youtubeAccounts.isActive, true)))
-    .limit(1);
-  return row ? decrypt(row) : null;
+  const row = await repo(db).findOne({ purpose: PURPOSE, userId, status: "active" });
+  return row ? decrypt(row, db) : null;
 }
 
 /** Lookup by (userId, googleId) — used for re-auth upserts. */
@@ -65,10 +110,8 @@ export async function findAccountByGoogleId(
   googleId: string,
   db: Db = getDb(),
 ): Promise<YouTubeAccount | null> {
-  const [row] = await db.select().from(youtubeAccounts)
-    .where(and(eq(youtubeAccounts.userId, userId), eq(youtubeAccounts.googleId, googleId)))
-    .limit(1);
-  return row ? decrypt(row) : null;
+  const row = await repo(db).findOne({ purpose: PURPOSE, userId, externalAccountId: googleId });
+  return row ? decrypt(row, db) : null;
 }
 
 /**
@@ -78,43 +121,39 @@ export async function findAccountByGoogleId(
  */
 export async function upsertAccount(input: UpsertAccountInput, db: Db = getDb()): Promise<YouTubeAccount> {
   const existing = await findAccountByGoogleId(input.userId, input.googleId, db);
-  const access = await sealCredential(input.accessToken);
-  const refresh = await sealCredential(input.refreshToken ?? existing?.refreshToken);
+  const accessTokenEnc = await sealConnectionSecret(input.accessToken, SEAL);
+  const refreshTokenEnc = await sealConnectionSecret(input.refreshToken ?? existing?.refreshToken, SEAL);
+  const channelId = input.channelId ?? existing?.channelId ?? null;
+  const email = input.email ?? existing?.email ?? null;
+  const fields = {
+    accessTokenEnc,
+    refreshTokenEnc,
+    expiresAt: input.tokenExpiresAt,
+    scopes: input.scopes,
+    handle: input.channelTitle ?? existing?.channelTitle ?? null,
+    displayName: input.displayName ?? existing?.displayName ?? null,
+    config: {
+      ...(channelId ? { channelId } : {}),
+      ...(email ? { email } : {}),
+    },
+    status: "active" as const,
+    lastError: null,
+  };
 
-  if (existing) {
-    const [updated] = await db.update(youtubeAccounts).set({
-      accessToken:     access.plain,
-      accessTokenEnc:  access.enc,
-      refreshToken:    refresh.plain,
-      refreshTokenEnc: refresh.enc,
-      tokenExpiresAt: input.tokenExpiresAt,
-      scopes:         input.scopes,
-      channelId:      input.channelId ?? existing.channelId,
-      channelTitle:   input.channelTitle ?? existing.channelTitle,
-      displayName:    input.displayName ?? existing.displayName,
-      email:          input.email ?? existing.email,
-      isActive:       true,
-      updatedAt:      new Date(),
-    } as any).where(eq(youtubeAccounts.id, existing.id)).returning();
-    return decrypt(updated);
-  }
-
-  const [inserted] = await db.insert(youtubeAccounts).values({
-    userId:         input.userId,
-    googleId:       input.googleId,
-    accessToken:     access.plain,
-    accessTokenEnc:  access.enc,
-    refreshToken:    refresh.plain,
-    refreshTokenEnc: refresh.enc,
-    tokenExpiresAt: input.tokenExpiresAt,
-    scopes:         input.scopes,
-    channelId:      input.channelId,
-    channelTitle:   input.channelTitle,
-    displayName:    input.displayName,
-    email:          input.email,
-    isActive:       true,
-  } as any).returning();
-  return decrypt(inserted);
+  const connections = repo(db);
+  const row = existing
+    ? await connections.updateById(existing.id, fields)
+    : await connections.insert({
+        ownerKind: "user",
+        ownerId: input.userId,
+        userId: input.userId,
+        provider: PROVIDER,
+        purpose: PURPOSE,
+        externalAccountId: input.googleId,
+        ...fields,
+      });
+  if (!row) throw new Error(`YouTube connection ${existing?.id} disappeared during upsert`);
+  return decrypt(row, db);
 }
 
 /** Persist a refreshed access token + new expiry. */
@@ -123,20 +162,15 @@ export async function rotateAccessToken(
   rotation: RotateTokenInput,
   db: Db = getDb(),
 ): Promise<void> {
-  const access = await sealCredential(rotation.accessToken);
-  await db.update(youtubeAccounts).set({
-    accessToken:    access.plain,
-    accessTokenEnc: access.enc,
-    tokenExpiresAt: rotation.tokenExpiresAt,
-    updatedAt:      new Date(),
-  } as any).where(eq(youtubeAccounts.id, accountId));
+  await repo(db).update(
+    { id: accountId, purpose: PURPOSE },
+    { accessTokenEnc: await sealConnectionSecret(rotation.accessToken, SEAL), expiresAt: rotation.tokenExpiresAt },
+  );
 }
 
-/** Soft-delete: flip isActive=false for every connection owned by `userId`. */
+/** Soft-delete: revoke every connection owned by `userId` (kept for audit). */
 export async function deactivateAllForUser(userId: string, db: Db = getDb()): Promise<void> {
-  await db.update(youtubeAccounts)
-    .set({ isActive: false, updatedAt: new Date() } as any)
-    .where(eq(youtubeAccounts.userId, userId));
+  await repo(db).update({ purpose: PURPOSE, userId }, { status: "revoked" });
 }
 
 /** Public DTO — only fields safe to expose to the frontend. */

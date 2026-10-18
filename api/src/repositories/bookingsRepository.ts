@@ -19,6 +19,7 @@
 import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
 import { commentsOn } from "./engagementSubjectFilters.js";
+import { savedAccountSettingsOf } from "./preferencesRepository.js";
 
 const {
   bookingOfferings,
@@ -30,7 +31,7 @@ const {
   creatorProfiles,
   users,
   userProfiles,
-  accountPreferences,
+  userSettings,
 } = schema;
 
 export * from "./bookingsRepository.types.js";
@@ -78,7 +79,7 @@ export class BookingsRepository implements IBookingsRepository {
         handle: users.externalPublicHandle,
         displayName: users.name,
         bio: creatorProfiles.bio,
-        timezone: accountPreferences.timezone,
+        timezone: userSettings.timezone,
         avatarUrl: userProfiles.avatarUrl,
         platformFeeBps: creatorProfiles.platformFeeBps,
         bookingsActive: creatorProfiles.bookingsActive,
@@ -90,7 +91,7 @@ export class BookingsRepository implements IBookingsRepository {
         and(eq(creatorProfiles.userId, users.id), sql`${creatorProfiles.endedAt} IS NULL`),
       )
       .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-      .leftJoin(accountPreferences, eq(accountPreferences.userId, users.id))
+      .leftJoin(userSettings, savedAccountSettingsOf(users.id))
       .where(eq(users.id, userId))
       .limit(1);
     return rowToHostIdentity(row);
@@ -103,7 +104,7 @@ export class BookingsRepository implements IBookingsRepository {
         handle: users.externalPublicHandle,
         displayName: users.name,
         bio: creatorProfiles.bio,
-        timezone: accountPreferences.timezone,
+        timezone: userSettings.timezone,
         avatarUrl: userProfiles.avatarUrl,
         platformFeeBps: creatorProfiles.platformFeeBps,
         bookingsActive: creatorProfiles.bookingsActive,
@@ -115,7 +116,7 @@ export class BookingsRepository implements IBookingsRepository {
         and(eq(creatorProfiles.userId, users.id), sql`${creatorProfiles.endedAt} IS NULL`),
       )
       .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-      .leftJoin(accountPreferences, eq(accountPreferences.userId, users.id))
+      .leftJoin(userSettings, savedAccountSettingsOf(users.id))
       .where(eq(users.externalPublicHandle, handle))
       .limit(1);
     return rowToHostIdentity(row);

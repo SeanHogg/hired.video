@@ -88,6 +88,7 @@ function toLedgerInsert(input: PointsLedgerInsert) {
     ...(input.createdAt ? { createdAt: input.createdAt } : {}),
   };
 }
+
 export type PointsCountersRow = typeof pointsActivityCounters.$inferSelect;
 export type PointsStreakRow = typeof pointsStreaks.$inferSelect;
 export type PointsTaskStreakRow = typeof pointsTaskStreaks.$inferSelect;

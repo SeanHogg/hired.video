@@ -11,11 +11,12 @@
  */
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/index.js";
-import { success, error } from "../../types/index.js";
+import { success } from "../../types/index.js";
 import { buildSubmissionsBoard } from "../../services/pipeline/submissionsBoard.js";
 import { pipelinePublicRoutes } from "./public.js";
 import { pipelineShareRoutes } from "./share.js";
 import { pipelineEntryRoutes } from "./entries.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 
 export const pipelineRoutes = new Hono<AppEnv>();
 
@@ -25,8 +26,7 @@ pipelineRoutes.route("/share", pipelineShareRoutes);
 // GET /submissions — the recruiter's candidate_submissions bucketed by status
 // into sourcing stages (recruiter side-panel extension board).
 pipelineRoutes.get("/submissions", async (c) => {
-  const userId = c.var.user?.sub as string | undefined;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   return c.json(success({ stages: await buildSubmissionsBoard(userId) }));
 });
 

@@ -12,6 +12,8 @@ import * as repo from "../../repositories/learningXapiRepository.js";
 import { generateLrsSecret, basicAuthValue, type ResolvedLrsCredential } from "./lrs-service.js";
 import { forwardStatementForUser } from "./lrs-forwarder.js";
 
+export { LRS_PERMISSIONS } from "../../db/schema/learning.js";
+
 /**
  * Canonical base URL of the conformant xAPI LRS — the value shown to users to
  * paste into external xAPI tools. `/api/xapi` remains mounted as an alias for

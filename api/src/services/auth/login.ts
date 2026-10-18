@@ -1,12 +1,13 @@
 // handleLogin — password login use case (rate limit, captcha soft check,
 // lockout, brute-force counter, adaptive MFA challenge, session + JWT).
 
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { schema } from "../../db/index.js";
+import { AuthTokensRepository } from "../../repositories/authTokensRepository.js";
 import { LoginSchema } from "./schemas.js";
 import { verifyPassword } from "./password.js";
 import { markUserLogin } from "./loginStamp.js";
-import { createSession } from "./sessions.js";
+import { createSession } from "./session-lifecycle.js";
 import { mintTwoFactorApproveToken } from "./twoFactorApprove.js";
 import { isAccountLocked } from "./lock.js";
 import { captchaSoftCheck } from "./signupGuard.js";
@@ -19,7 +20,7 @@ import type { AuthDeps } from "./authPorts.js";
 import { issueJwt } from "./jwt.js";
 import { recordLoginEvent } from "./loginEvents.js";
 
-const { users, twoFactorCodes } = schema;
+const { users } = schema;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleLogin
@@ -172,20 +173,16 @@ export async function handleLogin(deps: AuthDeps, body: unknown) {
 
   // MFA path — issue a pending 2FA challenge instead of a JWT.
   if (requiresMfa) {
-    // Invalidate any prior pending codes for this user.
-    await deps.db
-      .update(twoFactorCodes)
-      .set({ used: true } as any)
-      .where(and(eq(twoFactorCodes.userId, user.id), eq(twoFactorCodes.used, false)));
-
+    // Retire any prior pending codes for this user, then mint the challenge.
     const code = Array.from({ length: 6 })
       .map(() => String(Math.floor(Math.random() * 10)))
       .join("");
     const expiresAt = new Date(deps.now().getTime() + 10 * 60 * 1000);
-    const [entry] = await deps.db
-      .insert(twoFactorCodes)
-      .values({ userId: user.id, code, expiresAt, used: false } as any)
-      .returning();
+    const entry = await new AuthTokensRepository(deps.db, deps.now).reissueTwoFactorChallenge({
+      userId: user.id,
+      code,
+      expiresAt,
+    });
 
     // One-tap approve link (gap #2225) — a signed, stateless token bound
     // to this challenge row. Best-effort: a signing/secret failure just

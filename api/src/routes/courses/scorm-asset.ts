@@ -12,7 +12,6 @@ import { Hono } from "hono";
 import type { AppEnv } from "../../types/index.js";
 import { error } from "../../types/index.js";
 import { fetchScormAsset } from "../../services/courses/scormRuntimeService.js";
-import { handle } from "./shared.js";
 
 export const courseScormAssetRoutes = new Hono<AppEnv>();
 
@@ -25,15 +24,13 @@ courseScormAssetRoutes.get("/scorm-asset/:userId/:pkgId/*", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Malformed scorm-asset URL"), 400);
   }
   const relPath = c.req.path.slice(prefix.length);
-  return handle(c, async () => {
-    const asset = await fetchScormAsset(userId, pkgId, relPath);
-    return new Response(asset.body, {
-      status: 200,
-      headers: {
-        "Content-Type": asset.contentType,
-        "Cache-Control": "public, max-age=3600",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+  const asset = await fetchScormAsset(userId, pkgId, relPath);
+  return new Response(asset.body, {
+    status: 200,
+    headers: {
+      "Content-Type": asset.contentType,
+      "Cache-Control": "public, max-age=3600",
+      "X-Content-Type-Options": "nosniff",
+    },
   });
 });

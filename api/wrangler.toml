@@ -197,7 +197,8 @@ PAYMENT_PROVIDER = "helcim"
 # wrangler secret put TIKTOK_CONTENT_CLIENT_SECRET  # open.tiktokapis.com — distinct from TIKTOK_APP_ID (ads)
 # wrangler secret put X_CLIENT_ID                   # X developer portal (OAuth 2.0, paid tier) — PKCE
 # wrangler secret put X_CLIENT_SECRET
-# wrangler secret put SOCIAL_KMS_KEY                # token-column envelope key (falls back to PAID_MEDIA_KMS_KEY)
+# wrangler secret put SOCIAL_KMS_KEY                # legacy (read-only since W3-C): opens pre-merge social tokens until re-sealed
+# wrangler secret put CREDENTIALS_KMS_KEY           # THE key for every provider_connections secret (set by CI from secrets.CREDENTIALS_KMS_KEY)
 # wrangler secret put TURNSTILE_SECRET_KEY    # Cloudflare dashboard → Turnstile → site → Secret key.
                                               # Paired with the frontend's VITE_TURNSTILE_SITE_KEY (managed via
                                               # frontend/scripts/inject-build-env.mjs). Gates every unauthenticated

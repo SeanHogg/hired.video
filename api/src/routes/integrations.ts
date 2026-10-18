@@ -18,54 +18,23 @@ import { Hono } from "hono";
 import { requestEnv } from "../utils/env.js";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
-import { success, error } from "../types/index.js";
-import { getDb } from "../db/index.js";
-import { buildRepos } from "../repositories/index.js";
+import { success } from "../types/index.js";
 import { parseWorkspaceParam } from "../services/paid-media/oauth.js";
-import {
-  resolveWorkspaceForWrite,
-  WorkspaceForbiddenError,
-} from "../services/studio/workspace.js";
-import {
-  TenantIntegrationsService,
-  TenantIntegrationError,
-} from "../services/integrations/TenantIntegrationsService.js";
+import { resolveWorkspaceForWrite } from "../services/studio/workspace.js";
+import { tenantIntegrationsService } from "../services/integrations/TenantIntegrationsService.js";
 import type { OwnerScope } from "../repositories/tenantIntegrationsRepository.js";
+import { requireUser } from "./helpers/routerHelpers.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const integrationsRoutes = new Hono<AppEnv>();
 
-
-function buildService(c: any): TenantIntegrationsService {
-  return new TenantIntegrationsService({
-    repos: buildRepos(getDb()),
-    env: requestEnv(c),
-  });
-}
+const buildService = (c: unknown) => tenantIntegrationsService(requestEnv(c));
 
 /** Resolve + verify the workspace owner the integration belongs to. */
-async function resolveScope(c: any): Promise<OwnerScope> {
-  const userId = c.var.user.sub as string;
-  const selection = parseWorkspaceParam(c.req.query("workspace") ?? "personal");
-  const ctx = await resolveWorkspaceForWrite(userId, selection, { db: getDb() });
+async function resolveScope(workspace: string | undefined, userId: string): Promise<OwnerScope> {
+  const selection = parseWorkspaceParam(workspace ?? "personal");
+  const ctx = await resolveWorkspaceForWrite(userId, selection);
   return { userId: ctx.ownerUserId, companyId: ctx.ownerCompanyId };
-}
-
-function mapError(c: any, err: unknown) {
-  if (err instanceof WorkspaceForbiddenError) {
-    return c.json(error("WORKSPACE_FORBIDDEN", err.message), 403);
-  }
-  if (err instanceof TenantIntegrationError) {
-    const status =
-      err.code === "NOT_FOUND"
-        ? 404
-        : err.code === "FORBIDDEN"
-          ? 403
-          : err.code === "CONFLICT"
-            ? 409
-            : 400;
-    return c.json(error(err.code, err.message), status as 400 | 403 | 404 | 409);
-  }
-  throw err;
 }
 
 const CreateSchema = z.object({
@@ -85,71 +54,38 @@ const UpdateSchema = z
 
 // ─── GET / — list ──────────────────────────────────────────────────────────
 integrationsRoutes.get("/", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  try {
-    const scope = await resolveScope(c);
-    const integrations = await buildService(c).list(userId, scope);
-    return c.json(success({ integrations }), 200);
-  } catch (err) {
-    return mapError(c, err);
-  }
+  const userId = requireUser(c);
+  const scope = await resolveScope(c.req.query("workspace"), userId);
+  const integrations = await buildService(c).list(userId, scope);
+  return c.json(success({ integrations }), 200);
 });
 
 // ─── POST / — create ───────────────────────────────────────────────────────
-integrationsRoutes.post("/", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+integrationsRoutes.post("/", validateJson(CreateSchema, undefined, { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
 
-  const body = await c.req.json().catch(() => null);
-  const parsed = CreateSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  }
-  try {
-    const scope = await resolveScope(c);
-    const integration = await buildService(c).create(userId, scope, parsed.data);
-    return c.json(success({ integration }), 201);
-  } catch (err) {
-    return mapError(c, err);
-  }
+  const body = c.req.valid("json");
+  const scope = await resolveScope(c.req.query("workspace"), userId);
+  const integration = await buildService(c).create(userId, scope, body);
+  return c.json(success({ integration }), 201);
 });
 
 // ─── PATCH /:id — toggle active / rotate secret ────────────────────────────
-integrationsRoutes.patch("/:id", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+integrationsRoutes.patch("/:id", validateJson(UpdateSchema, undefined, { emptyBody: null }), async (c) => {
+  const userId = requireUser(c);
 
-  const body = await c.req.json().catch(() => null);
-  const parsed = UpdateSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  }
-  try {
-    const scope = await resolveScope(c);
-    const integration = await buildService(c).update(
-      userId,
-      scope,
-      c.req.param("id"),
-      parsed.data,
-    );
-    return c.json(success({ integration }), 200);
-  } catch (err) {
-    return mapError(c, err);
-  }
+  const body = c.req.valid("json");
+  const scope = await resolveScope(c.req.query("workspace"), userId);
+  const integration = await buildService(c).update(userId, scope, c.req.param("id"), body);
+  return c.json(success({ integration }), 200);
 });
 
 // ─── DELETE /:id — remove ──────────────────────────────────────────────────
 integrationsRoutes.delete("/:id", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  try {
-    const scope = await resolveScope(c);
-    await buildService(c).remove(userId, scope, c.req.param("id"));
-    return c.json(success({ deleted: true }), 200);
-  } catch (err) {
-    return mapError(c, err);
-  }
+  const userId = requireUser(c);
+  const scope = await resolveScope(c.req.query("workspace"), userId);
+  await buildService(c).remove(userId, scope, c.req.param("id"));
+  return c.json(success({ deleted: true }), 200);
 });
 
 // NB: no `.all("*")` catch-all here. This sub-app is mounted at the

@@ -123,7 +123,7 @@ export const users = pgTable("users", {
   // extension is created by scripts/ensure-db-extensions.mjs before push.
   index("idx_users_email_trgm").using("gin", t.email.op("gin_trgm_ops")),
   index("idx_users_name_trgm").using("gin", t.name.op("gin_trgm_ops")),
-  // Exact lowercased-name lookup for @mention resolution (routes/feed.ts).
+  // Exact lowercased-name lookup for @mention resolution (repositories/feedEngagementRepository.ts).
   index("idx_users_name_lower").using("btree", sql`lower(${t.name})`),
   // #2305 — legacy UNIQUE (migration 0121_taxonomies_archive_versions.sql); duplicates resolved by 0518_dedupe_unique_indexes.sql.
   uniqueIndex("uq_users_resume_forwarding_slug")
@@ -156,57 +156,51 @@ export const passwordHistory = pgTable("password_history", {
 export type PasswordHistory = typeof passwordHistory.$inferSelect;
 export type NewPasswordHistory = typeof passwordHistory.$inferInsert;
 
-export const twoFactorCodes = pgTable("two_factor_codes", {
+/**
+ * One-time authentication tokens / codes (W3-B, migration 0591; replaces
+ * two_factor_codes, email_verification_tokens, password_reset_tokens and
+ * magic_link_tokens, archived by 0595). `purpose` is shared/auth-tokens.ts
+ * AUTH_TOKEN_PURPOSES. `token` is stored exactly as each flow always stored
+ * it (the random link token, or the 6-digit 2FA code); `used_at` replaces
+ * the old `used` flag (NULL = still usable).
+ *
+ * The two_factor purpose's row id doubles as the login `tempAuthToken`, so
+ * 0591 carries every old row id across.
+ */
+export const authTokens = pgTable("auth_tokens", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  code: varchar("code", { length: 10 }).notNull(),
+  purpose: varchar("purpose", { length: 24 }).notNull(),
+  /** NULL only for magic links, which are keyed by email (the account may
+   *  not exist yet when the link is minted). */
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  /** magic_link only. */
+  email: varchar("email", { length: 255 }),
+  token: text("token").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  used: boolean("used").default(false).notNull(),
-  // Number of wrong codes submitted against this challenge. The verify
-  // endpoint increments on mismatch and burns the row at 5 — caps the
-  // brute-force window from 10^6 down to 5 attempts.
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  /** Wrong codes submitted against a two_factor challenge. The verify
+   *  endpoint increments on mismatch and burns the row at 5 — caps the
+   *  brute-force window from 10^6 down to 5 attempts. */
   attempts: integer("attempts").default(0).notNull(),
+  /** magic_link only: where to land after sign-in. */
+  redirect: varchar("redirect", { length: 500 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  index("idx_two_factor_codes_user").on(t.userId),
-  // Retention sweep age axis (0541).
-  index("idx_two_factor_codes_expires").on(t.expiresAt),
+  // Link tokens are globally unique per purpose; 2FA codes are 6 digits and
+  // collide across users by design, so they are excluded.
+  uniqueIndex("uq_auth_tokens_purpose_token").on(t.purpose, t.token).where(sql`"purpose" <> 'two_factor'`),
+  index("idx_auth_tokens_user_purpose").on(t.userId, t.purpose),
+  index("idx_auth_tokens_email_purpose").on(t.email, t.purpose).where(sql`"email" IS NOT NULL`),
+  // Retention sweep age axis.
+  index("idx_auth_tokens_expires").on(t.expiresAt),
+  check(
+    "auth_tokens_purpose_check",
+    sql`${t.purpose} IN ('email_verification', 'password_reset', 'magic_link', 'two_factor')`,
+  ),
 ]);
 
-export type TwoFactorCode = typeof twoFactorCodes.$inferSelect;
-export type NewTwoFactorCode = typeof twoFactorCodes.$inferInsert;
-
-export const emailVerificationTokens = pgTable("email_verification_tokens", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  token: text("token").notNull().unique(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  used: boolean("used").default(false).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [
-  // Retention sweep age axis (0541).
-  index("idx_email_verification_tokens_expires").on(t.expiresAt),
-  index("idx_email_verification_tokens_user_id").on(t.userId),
-]);
-
-export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
-export type NewEmailVerificationToken = typeof emailVerificationTokens.$inferInsert;
-
-export const passwordResetTokens = pgTable("password_reset_tokens", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  token: text("token").notNull().unique(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  used: boolean("used").default(false).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [
-  // Retention sweep age axis (0541).
-  index("idx_password_reset_tokens_expires").on(t.expiresAt),
-  index("idx_password_reset_tokens_user_id").on(t.userId),
-]);
-
-export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
-export type NewPasswordResetToken = typeof passwordResetTokens.$inferInsert;
+export type AuthToken = typeof authTokens.$inferSelect;
+export type NewAuthToken = typeof authTokens.$inferInsert;
 
 export const refreshTokens = pgTable("refresh_tokens", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -311,9 +305,19 @@ export const userProfiles = pgTable("user_profiles", {
 export type UserProfile = typeof userProfiles.$inferSelect;
 export type NewUserProfile = typeof userProfiles.$inferInsert;
 
-export const accountPreferences = pgTable("account_preferences", {
+/**
+ * One settings row per user (W3-B, migration 0592; replaces
+ * account_preferences, privacy_preferences and cookie_preferences, archived
+ * by 0595). Three sections, each with a `*_saved_at` marker that is NULL
+ * until the user (or a flow on their behalf) first writes that section —
+ * readers treat an unsaved section exactly like the old missing row, so
+ * section defaults keep coming from code (services/user/settings.ts).
+ */
+export const userSettings = pgTable("user_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+
+  // ── account section (was account_preferences) ──
   emailNotificationsEnabled: boolean("email_notifications_enabled").default(true).notNull(),
   // marketing_emails_enabled (coarse opt-out) retired in 0487 (#1976) — the
   // authoritative marketing-consent store is the email-keyed
@@ -326,8 +330,7 @@ export const accountPreferences = pgTable("account_preferences", {
   // above are kept as derived projections for legacy readers. NULL until the
   // user saves — readers fall back to defaults via mergeNotificationPreferences.
   // Shape = shared/notification-preferences.ts NotificationPreferences. (#254)
-  notificationPreferences: jsonb("notification_preferences")
-    .$type<Record<string, boolean>>(),
+  notificationPreferences: jsonb("notification_preferences").$type<Record<string, boolean>>(),
   theme: varchar("theme", { length: 50 }).default("light").notNull(),
   language: varchar("language", { length: 10 }).default("en").notNull(),
   // IANA timezone name (e.g. "America/Los_Angeles", "Europe/London"). "UTC" is
@@ -337,20 +340,12 @@ export const accountPreferences = pgTable("account_preferences", {
   currency: varchar("currency", { length: 10 }).default("USD").notNull(),
   // Chrome-extension preferences, bundled as JSON so the two surfaces
   // (jobseeker + recruiter sidepanels and the /settings page) stay in
-  // sync. See routes/settings.ts extension-preferences handlers for the
-  // shape — keep adding nested keys here rather than new top-level
-  // columns so the shape can evolve without per-toggle migrations.
+  // sync. See services/settings/extensionSettings.ts for the shape — keep
+  // adding nested keys here rather than new top-level columns.
   extensionSettings: jsonb("extension_settings").default({}).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+  accountSavedAt: timestamp("account_saved_at", { withTimezone: true }),
 
-export type AccountPreferences = typeof accountPreferences.$inferSelect;
-export type NewAccountPreferences = typeof accountPreferences.$inferInsert;
-
-export const privacyPreferences = pgTable("privacy_preferences", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  // ── privacy section (was privacy_preferences) ──
   profileVisibleToPublic: boolean("profile_visible_to_public").default(true).notNull(),
   profileVisibleToRecruiters: boolean("profile_visible_to_recruiters").default(true).notNull(),
   allowSearchEngineIndexing: boolean("allow_search_engine_indexing").default(true).notNull(),
@@ -363,38 +358,31 @@ export const privacyPreferences = pgTable("privacy_preferences", {
   showLocation: boolean("show_location").default(false).notNull(),
   // Opt-in promotion mode for creators / service providers: when true,
   // unauthenticated visitors see the full /people/:slug page instead of
-  // the sign-in AuthOverlay. Default false so existing privacy behaviour
-  // is unchanged for everyone else. See migration 0097.
+  // the sign-in AuthOverlay. See migration 0097.
   promoteWithoutAuth: boolean("promote_without_auth").default(false).notNull(),
   allowMessaging: boolean("allow_messaging").default(true).notNull(),
   shareAnalyticsData: boolean("share_analytics_data").default(true).notNull(),
   shareUsageData: boolean("share_usage_data").default(true).notNull(),
   allowDataExport: boolean("allow_data_export").default(true).notNull(),
+  privacySavedAt: timestamp("privacy_saved_at", { withTimezone: true }),
+
+  // ── cookie section (was cookie_preferences) ──
+  // Essential cookies are required to run the site so they are not stored —
+  // only the optional categories a user can opt in/out of. consentedAt is
+  // the user's last deliberate choice, which the cookie banner uses to
+  // decide whether to re-prompt.
+  cookieAnalytics: boolean("cookie_analytics").default(false).notNull(),
+  cookieMarketing: boolean("cookie_marketing").default(false).notNull(),
+  cookiePersonalization: boolean("cookie_personalization").default(false).notNull(),
+  cookieConsentedAt: timestamp("cookie_consented_at", { withTimezone: true }),
+  cookiesSavedAt: timestamp("cookies_saved_at", { withTimezone: true }),
+
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export type PrivacyPreferences = typeof privacyPreferences.$inferSelect;
-export type NewPrivacyPreferences = typeof privacyPreferences.$inferInsert;
-
-// Cookie consent choices for the /cookies panel and Settings → Cookies tab.
-// Essential cookies are required to run the site so they are not stored —
-// only the optional categories a user can actually opt in/out of. consentedAt
-// is the timestamp of the user's last deliberate choice (not first-view auto
-// defaults), which the cookie banner uses to decide whether to re-prompt.
-export const cookiePreferences = pgTable("cookie_preferences", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
-  analytics: boolean("analytics").default(false).notNull(),
-  marketing: boolean("marketing").default(false).notNull(),
-  personalization: boolean("personalization").default(false).notNull(),
-  consentedAt: timestamp("consented_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
-
-export type CookiePreferences = typeof cookiePreferences.$inferSelect;
-export type NewCookiePreferences = typeof cookiePreferences.$inferInsert;
+export type UserSettings = typeof userSettings.$inferSelect;
+export type NewUserSettings = typeof userSettings.$inferInsert;
 
 export const accountInvitations = pgTable("account_invitations", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -492,22 +480,6 @@ export const loginEvents = pgTable("login_events", {
 
 export type LoginEvent = typeof loginEvents.$inferSelect;
 export type NewLoginEvent = typeof loginEvents.$inferInsert;
-
-export const magicLinkTokens = pgTable("magic_link_tokens", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  email: varchar("email", { length: 255 }).notNull(),
-  token: text("token").notNull().unique(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  used: boolean("used").default(false).notNull(),
-  redirect: varchar("redirect", { length: 500 }).default("/dashboard").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [
-  // Retention sweep age axis (0541).
-  index("idx_magic_link_tokens_expires").on(t.expiresAt),
-]);
-
-export type MagicLinkToken = typeof magicLinkTokens.$inferSelect;
-export type NewMagicLinkToken = typeof magicLinkTokens.$inferInsert;
 
 // Authoritative per-device session row. Replaces the stateless-JWT-only
 // model. Every successful login (password, OAuth, magic-link, post-2FA)

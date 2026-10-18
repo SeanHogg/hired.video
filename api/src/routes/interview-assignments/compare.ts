@@ -6,22 +6,24 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/index.js";
 import { compareInterviews, COMPARE_MAX_IDS } from "../../services/interview/assignment-review.js";
-import { canAssign, fail, ok, sendFailure } from "./shared.js";
+import { canAssign, sendFailure } from "./shared.js";
+import { success, error } from "../../types/index.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 
 export const interviewAssignmentCompareRoutes = new Hono<AppEnv>();
 
 interviewAssignmentCompareRoutes.get("/compare", async (c) => {
   const user = c.var.user;
-  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+  requireUser(c);
   if (!canAssign(user)) {
-    return c.json(fail("FORBIDDEN", "Only recruiters or employers can compare"), 403);
+    return c.json(error("FORBIDDEN", "Only recruiters or employers can compare"), 403);
   }
 
   const raw = c.req.query("ids") ?? "";
   const ids = raw.split(",").map((s) => s.trim()).filter(Boolean).slice(0, COMPARE_MAX_IDS);
-  if (ids.length < 2) return c.json(fail("VALIDATION_ERROR", "Pass at least 2 ids"), 400);
+  if (ids.length < 2) return c.json(error("VALIDATION_ERROR", "Pass at least 2 ids"), 400);
 
   const result = await compareInterviews(user.sub, ids);
-  if (!result.ok) return sendFailure(c, result);
-  return c.json(ok(result.data));
+  if (result.ok === false) return sendFailure(c, result);
+  return c.json(success(result.data));
 });

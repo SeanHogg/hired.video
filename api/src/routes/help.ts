@@ -20,12 +20,12 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb } from "../db/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
-import { HelpMappingService } from "../services/help/help-mapping-service.js";
+import { helpMappingService } from "../services/help/help-mapping-service.js";
 import { isSemanticHelpAvailable } from "../services/help/help-embeddings.js";
 import { AI_CONTEXT_TYPES } from "../../../shared/ai-context-types.js";
 import type { HelpContextKey } from "../../../shared/help.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const helpRoutes = new Hono<AppEnv>();
 
@@ -47,7 +47,7 @@ const ReindexSchema = z.object({
 // ── Public reads (meta only) ──────────────────────────────────────────
 
 helpRoutes.get("/contexts", async (c) => {
-  const svc = new HelpMappingService(getDb());
+  const svc = helpMappingService();
   return c.json(success({ contexts: await svc.listActiveContextKeys() }));
 });
 
@@ -56,51 +56,45 @@ helpRoutes.get("/resolve", async (c) => {
   if (!parsed.success) {
     return c.json(error("VALIDATION_ERROR", "Unknown or missing context key"), 400);
   }
-  const svc = new HelpMappingService(getDb());
+  const svc = helpMappingService();
   const slugs = await svc.resolveForContext(parsed.data as HelpContextKey);
   return c.json(success({ context: parsed.data, slugs }));
 });
 
 helpRoutes.get("/search", async (c) => {
   const q = c.req.query("q") ?? "";
-  const svc = new HelpMappingService(getDb());
+  const svc = helpMappingService();
   return c.json(success(await svc.searchSemantic(q)));
 });
 
 // ── SuperAdmin curation ───────────────────────────────────────────────
 
 helpRoutes.get("/mappings", superAdminMiddleware, async (c) => {
-  const svc = new HelpMappingService(getDb());
+  const svc = helpMappingService();
   return c.json(success({ mappings: await svc.listAll() }));
 });
 
-helpRoutes.post("/mappings", superAdminMiddleware, async (c) => {
-  const parsed = SetMappingSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  }
-  const svc = new HelpMappingService(getDb());
+helpRoutes.post("/mappings", superAdminMiddleware, validateJson(SetMappingSchema, undefined, { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  const svc = helpMappingService();
   await svc.set({
-    contextKey: parsed.data.contextKey as HelpContextKey,
-    slug: parsed.data.slug,
-    position: parsed.data.position,
-    userId: c.var.user!.sub!,
+    contextKey: body.contextKey as HelpContextKey,
+    slug: body.slug,
+    position: body.position,
+    userId: c.var.userId,
   });
-  return c.json(success({ contextKey: parsed.data.contextKey, slug: parsed.data.slug }), 201);
+  return c.json(success({ contextKey: body.contextKey, slug: body.slug }), 201);
 });
 
 helpRoutes.delete("/mappings/:id", superAdminMiddleware, async (c) => {
-  const svc = new HelpMappingService(getDb());
+  const svc = helpMappingService();
   const removed = await svc.remove(c.req.param("id"));
   return c.json(success({ id: c.req.param("id"), removed }));
 });
 
-helpRoutes.post("/reindex", superAdminMiddleware, async (c) => {
-  const parsed = ReindexSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  }
-  const svc = new HelpMappingService(getDb());
-  const indexed = await svc.reindex(parsed.data.items);
+helpRoutes.post("/reindex", superAdminMiddleware, validateJson(ReindexSchema, undefined, { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
+  const svc = helpMappingService();
+  const indexed = await svc.reindex(body.items);
   return c.json(success({ indexed, semantic: isSemanticHelpAvailable() }));
 });

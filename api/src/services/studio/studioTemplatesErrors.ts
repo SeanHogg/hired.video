@@ -1,6 +1,7 @@
-/** Typed sentinels the studio-template services throw; routes map `code` to
- *  an HTTP status. Own module so the publish and license services share it
+/** Typed sentinels the studio-template services throw — DomainErrors that
+ *  carry their own HTTP status. Own module so the publish and license services share it
  *  without importing each other. */
+import { DomainError, statusForErrorCode } from "../../domains/errors.js";
 
 export type StudioTemplatesErrorCode =
   | "NOT_FOUND"
@@ -11,9 +12,10 @@ export type StudioTemplatesErrorCode =
   | "PROGRAM_NOT_ACTIVE"
   | "INVALID_PRICE";
 
-export class StudioTemplatesError extends Error {
-  constructor(public readonly code: StudioTemplatesErrorCode, message: string) {
-    super(message);
+export class StudioTemplatesError extends DomainError {
+  declare readonly code: StudioTemplatesErrorCode;
+  constructor(code: StudioTemplatesErrorCode, message: string) {
+    super(statusForErrorCode(code, { NOT_A_CREATOR: 403, PROGRAM_NOT_ACTIVE: 403 }), code, message);
     this.name = "StudioTemplatesError";
   }
 }

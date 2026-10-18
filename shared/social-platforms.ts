@@ -13,8 +13,8 @@
  *
  * The three connection layers (PRD docs/prd/social-media-publishing-and-distribution.md §5.0):
  *   1. Platform developer app  → Worker Secrets (`*_CLIENT_ID/_SECRET`)   [config]
- *   2. hired.video brand account (Lane A, managed) → `managed_accounts`   [SuperAdmin]
- *   3. End-user account          (Lane B, self)    → `social_connections` [any account; posts count
+ *   2. hired.video brand account (Lane A, managed) → provider_connections "managed_social" [SuperAdmin]
+ *   3. End-user account          (Lane B, self)    → provider_connections "social_publish" [any account; posts count
  *                                                     toward the plan's channel cap — shared/pricing]
  *
  * Backend-only OAuth config (endpoints, scopes per lane, env key names)
@@ -159,8 +159,8 @@ export interface PlatformLaneAvailability {
 
 // ─── Video posting through the generic social publisher ──────────────────────
 //
-// Platforms whose connections live in `social_connections` (server-side
-// OAuth, encrypted tokens). Each id is ALSO a `PublishDestinationId`
+// Platforms whose connections are provider_connections purpose
+// "social_publish" (server-side OAuth, encrypted tokens). Each id is ALSO a `PublishDestinationId`
 // (shared/media-kinds), so a post records one publication row under the
 // same id.
 
@@ -181,8 +181,8 @@ export const LINKEDIN_POST_TEXT_MAX = 3000;
 // The ONE social publish route (POST /api/studio/projects/:id/publish/social/
 // :platform) and the publisher registry (api/src/services/social/publishers)
 // are keyed by this list. YouTube is a member like every other network; only
-// its token store differs (`youtube_accounts`, connected through
-// /api/youtube), which the API's token source hides behind the seam.
+// its connection purpose differs (provider_connections "youtube", connected
+// through /api/youtube), which the API's token source hides behind the seam.
 
 export const VIDEO_PUBLISH_PLATFORMS = ["youtube", ...SOCIAL_POST_PLATFORMS] as const;
 

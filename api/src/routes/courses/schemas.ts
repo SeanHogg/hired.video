@@ -8,8 +8,8 @@ import {
   COURSE_LESSON_SOURCE_TYPES,
   COURSE_DIFFICULTIES,
   SCORM_VERSIONS,
-} from "../../db/schema/courses.js";
-import { SCORM_COMPLETION_STATUSES } from "../../db/schema/learning.js";
+} from "../../repositories/coursesRepository.js";
+import { SCORM_COMPLETION_STATUSES } from "../../repositories/scormRepository.js";
 import { UuidLikeSchema } from "../../../../shared/validation.js";
 
 // #2150 — accept EITHER an absolute http(s) URL OR a leading-slash relative

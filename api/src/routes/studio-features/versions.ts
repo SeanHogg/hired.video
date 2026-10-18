@@ -3,87 +3,84 @@
  * routes/studio-features.ts barrel (split out of that file; paths unchanged).
  */
 import { Hono } from "hono";
-import { and, eq, desc, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { AppEnv } from "../../types/index.js";
-import { getDb } from "../../db/index.js";
-import { ok, fail, studioProjectVersions } from "./shared.js";
+import { UUID_LIKE_REGEX } from "../../../../shared/validation.js";
+import type { EntityVersionRow } from "../../repositories/entityVersionRepository.js";
+import { liveEntityVersions } from "../../services/studio/project-versions.js";
+import { success, error } from "../../types/index.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const versionRoutes = new Hono<AppEnv>();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ██  13. PROJECT VERSION HISTORY + AUTOSAVE — gap #131
 // ██
-// ██  Debounced autosave creates a `studio_project_versions` snapshot row.
-// ██  Caps: 50 versions per project, 30-day retention. Restoring writes a
-// ██  new "restored from vN" row rather than mutating history.
+// ██  Debounced autosave (solo + collab rooms) creates an `entity_versions`
+// ██  snapshot row (subject_type 'studio_project', W3-E migration 0640; was
+// ██  studio_project_versions). Caps: 50 autosaves per project, 30-day
+// ██  retention. Restoring writes a new "restored from vN" row rather than
+// ██  mutating history.
 // ═══════════════════════════════════════════════════════════════════════════════
 
+const SUBJECT = "studio_project" as const;
 const VERSIONS_PER_PROJECT_CAP = 50;
 const VERSION_RETENTION_DAYS = 30;
 
+/** `subject_id` is a uuid column — a malformed id can never match a project. */
+const isProjectId = (id: string) => UUID_LIKE_REGEX.test(id);
+
+/** An `entity_versions` studio row in the old studio_project_versions response shape. */
+function toProjectVersion(row: EntityVersionRow) {
+  return {
+    id: row.id,
+    projectId: row.subjectId,
+    userId: row.userId,
+    versionNumber: row.versionNumber,
+    label: row.label,
+    storyboard: row.payload,
+    isAutosave: row.isAutosave,
+    createdAt: row.createdAt,
+  };
+}
+
 // POST /api/studio/projects/:projectId/versions — create snapshot (autosave or manual)
-versionRoutes.post("/projects/:projectId/versions", async (c) => {
-  const user = c.var.user;
-  const projectId = c.req.param("projectId");
-  const body = await c.req.json().catch(() => null);
-  const parsed = z.object({
+versionRoutes.post("/projects/:projectId/versions", validateJson(z.object({
     storyboard: z.unknown(),
     label:      z.string().max(120).optional(),
     isAutosave: z.boolean().optional(),
-  }).safeParse(body);
+  }), (e) => error("VALIDATION_ERROR", "Invalid body", e.flatten()), { emptyBody: null }), async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const body = c.req.valid("json");
 
-  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
-  if (parsed.data.storyboard == null) return c.json(fail("VALIDATION_ERROR", "storyboard required"), 400);
+  if (body.storyboard == null) return c.json(error("VALIDATION_ERROR", "storyboard required"), 400);
+  if (!isProjectId(projectId)) return c.json(error("VALIDATION_ERROR", "Invalid project id"), 400);
 
-  const db = getDb();
-
-  // Compute next version number
-  const [latest] = await db
-    .select({ versionNumber: studioProjectVersions.versionNumber })
-    .from(studioProjectVersions)
-    .where(eq(studioProjectVersions.projectId, projectId))
-    .orderBy(desc(studioProjectVersions.versionNumber))
-    .limit(1);
-  const nextNumber = (latest?.versionNumber ?? 0) + 1;
-
-  const [version] = await db.insert(studioProjectVersions).values({
-    projectId,
+  const repo = liveEntityVersions();
+  const version = await repo.insertNext({
+    subjectType: SUBJECT,
+    subjectId: projectId,
     userId: user.sub,
-    versionNumber: nextNumber,
-    label: parsed.data.label ?? (parsed.data.isAutosave === false ? "manual" : "autosave"),
-    storyboard: parsed.data.storyboard,
-    isAutosave: parsed.data.isAutosave !== false,
-  } as any).returning();
+    label: body.label ?? (body.isAutosave === false ? "manual" : "autosave"),
+    payload: body.storyboard,
+    isAutosave: body.isAutosave !== false,
+  });
 
   // Enforce 50-version cap and 30-day retention by deleting old AUTOSAVE rows.
   // Manual snapshots are preserved beyond the cap.
-  const allAutosaves = await db
-    .select({ id: studioProjectVersions.id, createdAt: studioProjectVersions.createdAt })
-    .from(studioProjectVersions)
-    .where(and(
-      eq(studioProjectVersions.projectId, projectId),
-      eq(studioProjectVersions.isAutosave, true),
-    ))
-    .orderBy(desc(studioProjectVersions.createdAt));
+  const prunedCount = await repo.pruneAutosaves(SUBJECT, projectId, {
+    cap: VERSIONS_PER_PROJECT_CAP,
+    retentionDays: VERSION_RETENTION_DAYS,
+  });
 
-  const cutoff = Date.now() - VERSION_RETENTION_DAYS * 86400 * 1000;
-  const toDelete = allAutosaves
-    .filter((v, i) => i >= VERSIONS_PER_PROJECT_CAP || (v.createdAt && v.createdAt.getTime() < cutoff))
-    .map((v) => v.id);
-
-  if (toDelete.length > 0) {
-    await db.delete(studioProjectVersions)
-      .where(inArray(studioProjectVersions.id, toDelete));
-  }
-
-  return c.json(ok({
+  return c.json(success({
     id: version.id,
     versionNumber: version.versionNumber,
     label: version.label,
     isAutosave: version.isAutosave,
     createdAt: version.createdAt,
-    prunedCount: toDelete.length,
+    prunedCount,
   }), 201);
 });
 
@@ -91,25 +88,10 @@ versionRoutes.post("/projects/:projectId/versions", async (c) => {
 versionRoutes.get("/projects/:projectId/versions", async (c) => {
   const user = c.var.user;
   const projectId = c.req.param("projectId");
-  const db = getDb();
+  if (!isProjectId(projectId)) return c.json(success({ versions: [] }));
 
-  const versions = await db
-    .select({
-      id: studioProjectVersions.id,
-      versionNumber: studioProjectVersions.versionNumber,
-      label: studioProjectVersions.label,
-      isAutosave: studioProjectVersions.isAutosave,
-      createdAt: studioProjectVersions.createdAt,
-    })
-    .from(studioProjectVersions)
-    .where(and(
-      eq(studioProjectVersions.projectId, projectId),
-      eq(studioProjectVersions.userId, user.sub),
-    ))
-    .orderBy(desc(studioProjectVersions.versionNumber))
-    .limit(100);
-
-  return c.json(ok({ versions }));
+  const versions = await liveEntityVersions().list(SUBJECT, projectId, { userId: user.sub, limit: 100 });
+  return c.json(success({ versions }));
 });
 
 // GET /api/studio/projects/:projectId/versions/:versionId — fetch full snapshot
@@ -117,20 +99,13 @@ versionRoutes.get("/projects/:projectId/versions/:versionId", async (c) => {
   const user = c.var.user;
   const projectId = c.req.param("projectId");
   const versionId = c.req.param("versionId");
-  const db = getDb();
+  if (!isProjectId(projectId) || !UUID_LIKE_REGEX.test(versionId)) {
+    return c.json(error("NOT_FOUND", "Version not found"), 404);
+  }
 
-  const [version] = await db
-    .select()
-    .from(studioProjectVersions)
-    .where(and(
-      eq(studioProjectVersions.id, versionId),
-      eq(studioProjectVersions.projectId, projectId),
-      eq(studioProjectVersions.userId, user.sub),
-    ))
-    .limit(1);
-
-  if (!version) return c.json(fail("NOT_FOUND", "Version not found"), 404);
-  return c.json(ok(version));
+  const version = await liveEntityVersions().find(SUBJECT, projectId, versionId, { userId: user.sub });
+  if (!version) return c.json(error("NOT_FOUND", "Version not found"), 404);
+  return c.json(success(toProjectVersion(version)));
 });
 
 // POST /api/studio/projects/:projectId/versions/:versionId/restore
@@ -140,44 +115,30 @@ versionRoutes.post("/projects/:projectId/versions/:versionId/restore", async (c)
   const user = c.var.user;
   const projectId = c.req.param("projectId");
   const versionId = c.req.param("versionId");
-  const db = getDb();
+  if (!isProjectId(projectId) || !UUID_LIKE_REGEX.test(versionId)) {
+    return c.json(error("NOT_FOUND", "Version not found"), 404);
+  }
 
-  const [source] = await db
-    .select()
-    .from(studioProjectVersions)
-    .where(and(
-      eq(studioProjectVersions.id, versionId),
-      eq(studioProjectVersions.projectId, projectId),
-      eq(studioProjectVersions.userId, user.sub),
-    ))
-    .limit(1);
-  if (!source) return c.json(fail("NOT_FOUND", "Version not found"), 404);
+  const repo = liveEntityVersions();
+  const source = await repo.find(SUBJECT, projectId, versionId, { userId: user.sub });
+  if (!source) return c.json(error("NOT_FOUND", "Version not found"), 404);
 
-  // Compute next version number
-  const [latest] = await db
-    .select({ versionNumber: studioProjectVersions.versionNumber })
-    .from(studioProjectVersions)
-    .where(eq(studioProjectVersions.projectId, projectId))
-    .orderBy(desc(studioProjectVersions.versionNumber))
-    .limit(1);
-  const nextNumber = (latest?.versionNumber ?? 0) + 1;
-
-  const [restored] = await db.insert(studioProjectVersions).values({
-    projectId,
+  const restored = await repo.insertNext({
+    subjectType: SUBJECT,
+    subjectId: projectId,
     userId: user.sub,
-    versionNumber: nextNumber,
     label: `restored from v${source.versionNumber}`,
-    storyboard: source.storyboard,
+    payload: source.payload,
     isAutosave: false,
-  } as any).returning();
+  });
 
-  return c.json(ok({
+  return c.json(success({
     restoredVersion: {
       id: restored.id,
       versionNumber: restored.versionNumber,
       label: restored.label,
       createdAt: restored.createdAt,
     },
-    storyboard: source.storyboard,
+    storyboard: source.payload,
   }));
 });

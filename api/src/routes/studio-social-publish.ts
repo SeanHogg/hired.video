@@ -24,11 +24,11 @@ import { UuidLikeSchema } from "../../../shared/validation.js";
 import {
   publishProjectVideo,
   PublishProjectVideoError,
-  type PublishProjectVideoErrorKind,
 } from "../services/social/publish-project-video.js";
 import { channelLimitResponse } from "../services/studio/post-channel-gate.js";
 import { getTikTokCreatorInfo } from "../services/social/tiktok-creator-info.js";
 import { SocialPublishError } from "../services/social/publishers/index.js";
+import { validateJson } from "./helpers/validate.js";
 
 export const studioSocialPublishRoutes = new Hono<AppEnv>();
 
@@ -60,23 +60,11 @@ const BodySchema = z.object({
   variantVideoId: UuidLikeSchema.optional(),
 });
 
-const STATUS: Record<Exclude<PublishProjectVideoErrorKind, "CHANNEL_LIMIT">, 403 | 404 | 409 | 422 | 502> = {
-  PROJECT_NOT_FOUND: 404,
-  FORBIDDEN: 403,
-  VIDEO_NOT_READY: 409,
-  INVALID_VARIANT: 422,
-  CONSENT_REQUIRED: 403,
-  NOT_CONNECTED: 409,
-  ACCOUNT_UNSUPPORTED: 422,
-  PUBLISH_FAILED: 502,
-};
-
-studioSocialPublishRoutes.post("/projects/:projectId/publish/social/:platform", async (c) => {
+studioSocialPublishRoutes.post("/projects/:projectId/publish/social/:platform", validateJson(BodySchema, () => error("VALIDATION_ERROR", "Invalid publish request"), { emptyBody: null }), async (c) => {
   const platform = c.req.param("platform").toLowerCase();
   if (!isVideoPublishPlatform(platform)) return c.json(error("NOT_FOUND", `Unknown platform: ${platform}`), 404);
-  const parsed = BodySchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid publish request"), 400);
-  if (platform === "tiktok" && !parsed.data.tiktok) {
+  const body = c.req.valid("json");
+  if (platform === "tiktok" && !body.tiktok) {
     return c.json(error("VALIDATION_ERROR", "Choose your TikTok post settings first"), 400);
   }
 
@@ -86,26 +74,24 @@ studioSocialPublishRoutes.post("/projects/:projectId/publish/social/:platform", 
       actor: { userId: user.sub },
       projectId: c.req.param("projectId"),
       platform,
-      title: parsed.data.title,
-      caption: parsed.data.caption,
-      tiktok: parsed.data.tiktok,
-      youtube: parsed.data.youtube,
-      variantVideoId: parsed.data.variantVideoId,
+      title: body.title,
+      caption: body.caption,
+      tiktok: body.tiktok,
+      youtube: body.youtube,
+      variantVideoId: body.variantVideoId,
       env: c.env,
     });
     return c.json(success({ publication }));
   } catch (err) {
-    if (!(err instanceof PublishProjectVideoError)) throw err;
-    if (err.kind === "CHANNEL_LIMIT") return channelLimitResponse(c);
-    // NOT_CONNECTED carries the platform-specific code the dock maps to "connect again".
-    const code = err.kind === "NOT_CONNECTED" ? "SOCIAL_NOT_CONNECTED" : err.kind;
-    return c.json(error(code, err.message, err.details), STATUS[err.kind]);
+    // Every other PublishProjectVideoError is a DomainError (global handler).
+    if (err instanceof PublishProjectVideoError && err.kind === "CHANNEL_LIMIT") return channelLimitResponse(c);
+    throw err;
   }
 });
 
 studioSocialPublishRoutes.get("/social/tiktok/creator-info", async (c) => {
   try {
-    const creator = await getTikTokCreatorInfo(c.var.user.sub, c.env);
+    const creator = await getTikTokCreatorInfo(c.var.userId, c.env);
     if (!creator) return c.json(error("SOCIAL_NOT_CONNECTED", "Connect your TikTok account first."), 409);
     return c.json(success({ creator }));
   } catch (err) {

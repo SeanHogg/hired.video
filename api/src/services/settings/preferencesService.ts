@@ -8,7 +8,11 @@
 
 import { getDb } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
-import type { IPreferencesRepository, JobPreferencesRow } from "../../repositories/index.js";
+import type { IPreferencesRepository, JobPreferencesInsert, JobPreferencesRow } from "../../repositories/index.js";
+import { findProfileCols, type ProfileColsRow } from "../../repositories/usersProfileRepository.js";
+import { DomainError } from "../../domains/errors.js";
+import { upsertProfile } from "../user/myProfile.js";
+import { JobPreferencesPatchSchema, type JobPreferences } from "../../../../shared/settings.js";
 import { findUserMfaEnabled } from "../../repositories/userSettingsRepository.js";
 import {
   COOKIE_CATEGORY_FIELDS,
@@ -59,16 +63,47 @@ function bodyRecord(body: unknown): Record<string, unknown> {
 
 // ── Views ────────────────────────────────────────────────────────────────
 
-function jobPreferencesView(row: JobPreferencesRow | null) {
-  if (!row) return defaultJobPreferences();
+type ProfilePreferenceCols = Pick<ProfileColsRow, "preferredRoles" | "industries" | "salaryCurrency">;
+
+const CURRENCY_CODE = /^[A-Z]{3}$/;
+
+/** Stored jsonb lists may predate validation — keep only non-empty strings,
+ *  deduped case-insensitively, clamped to the contract's limits. */
+function toList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const v = item.trim().slice(0, 120);
+    const key = v.toLowerCase();
+    if (!v || seen.has(key)) continue;
+    seen.add(key);
+    out.push(v);
+  }
+  return out.slice(0, 50);
+}
+
+function toSalary(value: string | null | undefined): number | null {
+  if (value == null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** The saved state — `job_preferences` row + the `user_profiles` columns
+ *  that own roles / industries / currency (shared/settings.ts). */
+function jobPreferencesView(row: JobPreferencesRow | null, profile: ProfilePreferenceCols | null): JobPreferences {
+  const d = defaultJobPreferences();
+  const currency = profile?.salaryCurrency?.trim().toUpperCase() ?? "";
   return {
-    ...defaultJobPreferences(),
-    desiredTitle: row.desiredTitle,
-    desiredLocation: row.desiredLocation,
-    remoteOnly: row.remotePreference === "remote",
-    minSalaryExpectation: row.salaryMin ? Number(row.salaryMin) : null,
-    maxSalaryExpectation: row.salaryMax ? Number(row.salaryMax) : null,
-    isOpenToWork: row.isOpenToWork,
+    desiredTitle: row?.desiredTitle ?? d.desiredTitle,
+    desiredLocation: row?.desiredLocation ?? d.desiredLocation,
+    remoteOnly: row?.remotePreference === "remote",
+    minSalaryExpectation: toSalary(row?.salaryMin),
+    maxSalaryExpectation: toSalary(row?.salaryMax),
+    salaryCurrency: CURRENCY_CODE.test(currency) ? currency : d.salaryCurrency,
+    preferredRoles: toList(profile?.preferredRoles),
+    industries: toList(profile?.industries),
   };
 }
 
@@ -96,12 +131,11 @@ function cookieView(row: { analytics?: boolean | null; marketing?: boolean | nul
 export async function getAllSettings(userId: string) {
   const repo = prefsRepo();
   const prefs = await repo.findAccountByUserId(userId);
-  const jobPrefs = await repo.findJobByUserId(userId);
   const mfaEnabled = await findUserMfaEnabled(userId);
   return {
     notifications: prefs ? resolvePreferencesFromRow(prefs) : defaultNotificationPreferences(),
     privacy: await getPrivacy(userId),
-    jobPreferences: jobPreferencesView(jobPrefs),
+    jobPreferences: await getJobPreferences(userId),
     account: accountView(prefs),
     security: { twoFactorEnabled: mfaEnabled ?? false, loginNotifications: true, sessionTimeout: 30, allowedDevices: [] },
   };
@@ -170,21 +204,36 @@ export async function updateCookiePreferences(userId: string, body: unknown) {
 
 // ── Job preferences ──────────────────────────────────────────────────────
 
-export async function getJobPreferences(userId: string) {
-  return jobPreferencesView(await prefsRepo().findJobByUserId(userId));
+export async function getJobPreferences(userId: string): Promise<JobPreferences> {
+  const [row, profile] = await Promise.all([prefsRepo().findJobByUserId(userId), findProfileCols(userId)]);
+  return jobPreferencesView(row, profile);
 }
 
-export async function updateJobPreferences(userId: string, body: unknown) {
-  const b = bodyRecord(body) as Record<string, any>;
-  await prefsRepo().upsertJob(userId, {
-    desiredTitle: b.desiredTitle ?? null,
-    desiredLocation: b.desiredLocation ?? null,
-    remotePreference: b.remoteOnly ? "remote" : "any",
-    salaryMin: b.minSalaryExpectation ?? null,
-    salaryMax: b.maxSalaryExpectation ?? null,
-    isOpenToWork: b.isOpenToWork ?? false,
-  } as any);
-  return { ...defaultJobPreferences(), ...b };
+/** Partial update: only fields present in the (validated) body are written,
+ *  each to its one home — job_preferences via PreferencesRepository, roles /
+ *  industries / currency via the profile owner. Returns the state read back. */
+export async function updateJobPreferences(userId: string, body: unknown): Promise<JobPreferences> {
+  const parsed = JobPreferencesPatchSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new DomainError(400, "VALIDATION_ERROR", "Invalid job preferences", { issues: parsed.error.flatten() });
+  }
+  const p = parsed.data;
+
+  const job: Partial<JobPreferencesInsert> = {};
+  if (p.desiredTitle !== undefined) job.desiredTitle = p.desiredTitle || null;
+  if (p.desiredLocation !== undefined) job.desiredLocation = p.desiredLocation || null;
+  if (p.remoteOnly !== undefined) job.remotePreference = p.remoteOnly ? "remote" : "any";
+  if (p.minSalaryExpectation !== undefined) job.salaryMin = p.minSalaryExpectation == null ? null : String(p.minSalaryExpectation);
+  if (p.maxSalaryExpectation !== undefined) job.salaryMax = p.maxSalaryExpectation == null ? null : String(p.maxSalaryExpectation);
+
+  const profile: Record<string, unknown> = {};
+  if (p.preferredRoles !== undefined) profile.preferredRoles = toList(p.preferredRoles);
+  if (p.industries !== undefined) profile.industries = toList(p.industries);
+  if (p.salaryCurrency !== undefined) profile.salaryCurrency = p.salaryCurrency;
+
+  if (Object.keys(job).length > 0) await prefsRepo().upsertJob(userId, job);
+  if (Object.keys(profile).length > 0) await upsertProfile(userId, { ...profile, updatedAt: new Date() });
+  return getJobPreferences(userId);
 }
 
 // ── Account (theme / language / currency / timezone) ─────────────────────

@@ -21,7 +21,7 @@ import {
   listOwnedResumes,
   validateSlug,
 } from "../../services/resume/queries.js";
-import { flag, ownerId, respond, resumeDeps, viewerContext, type ResumeCtx } from "./shared.js";
+import { flag, respond, resumeDeps, viewerContext, type ResumeCtx } from "./shared.js";
 
 export const resumeCrudRoutes = new Hono<AppEnv>();
 
@@ -32,7 +32,7 @@ async function listForQuery(c: ResumeCtx) {
   if (!(RESUME_LIST_VIEWS as readonly string[]).includes(view)) {
     throw new DomainError(400, "VALIDATION_ERROR", `view must be one of ${RESUME_LIST_VIEWS.join(", ")}`);
   }
-  return listOwnedResumes(resumeDeps(c), ownerId(c), {
+  return listOwnedResumes(resumeDeps(c), c.var.userId, {
     view: view as ResumeListView,
     includeOwnership: (c.req.query("include") ?? "").split(",").includes("ownership"),
     includeArchived: flag(c.req.query("includeArchived")),
@@ -50,19 +50,19 @@ resumeCrudRoutes.get("/validateslug", (c) =>
 resumeCrudRoutes.get("/:id", (c) => respond(c, getResume(resumeDeps(c), viewerContext(c), c.req.param("id"))));
 
 resumeCrudRoutes.put("/:id", async (c) =>
-  respond(c, updateResume(resumeDeps(c), ownerId(c), c.req.param("id"), await c.req.json().catch(() => null))),
+  respond(c, updateResume(resumeDeps(c), c.var.userId, c.req.param("id"), await c.req.json().catch(() => null))),
 );
 
 resumeCrudRoutes.delete("/:id", (c) =>
-  respond(c, deleteResume(resumeDeps(c), ownerId(c), c.req.param("id")).then(() => undefined)),
+  respond(c, deleteResume(resumeDeps(c), c.var.userId, c.req.param("id")).then(() => undefined)),
 );
 
-resumeCrudRoutes.get("/:id/metadata", (c) => respond(c, getMetadata(resumeDeps(c), ownerId(c), c.req.param("id"))));
+resumeCrudRoutes.get("/:id/metadata", (c) => respond(c, getMetadata(resumeDeps(c), c.var.userId, c.req.param("id"))));
 
 resumeCrudRoutes.put("/:id/metadata", async (c) =>
-  respond(c, updateMetadata(resumeDeps(c), ownerId(c), c.req.param("id"), await c.req.json().catch(() => null))),
+  respond(c, updateMetadata(resumeDeps(c), c.var.userId, c.req.param("id"), await c.req.json().catch(() => null))),
 );
 
 resumeCrudRoutes.get("/:id/diff", (c) =>
-  respond(c, getResumeDiff(resumeDeps(c), ownerId(c), c.req.param("id"), c.req.query("compareId") ?? null)),
+  respond(c, getResumeDiff(resumeDeps(c), c.var.userId, c.req.param("id"), c.req.query("compareId") ?? null)),
 );

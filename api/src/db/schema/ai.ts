@@ -92,55 +92,12 @@ export const aiUsageRecords = pgTable("ai_usage_records", {
 export type AiUsageRecord = typeof aiUsageRecords.$inferSelect;
 export type NewAiUsageRecord = typeof aiUsageRecords.$inferInsert;
 
-/**
- * Per-user purchased token balance. Separate from the monthly subscription
- * allowance — these tokens come from one-off pack purchases (TOKEN_PACKS)
- * or SuperAdmin grants
- * and never expire. Decremented after each AI call once the user's monthly
- * allowance has been exhausted. One row per user (enforced via unique
- * constraint on user_id, not via primary key, because Drizzle's type
- * inference misbehaves when a column is both PK and a FK reference).
- */
-export const userTokenBalance = pgTable("user_token_balance", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
-    .notNull()
-    .unique()
-    .references(() => users.id, { onDelete: "cascade" }),
-  /** Total tokens currently available from all unexpired pack purchases. */
-  balance: integer("balance").default(0).notNull(),
-  /** Lifetime tokens ever granted via pack purchases (audit / analytics). */
-  lifetimeGranted: integer("lifetime_granted").default(0).notNull(),
-  /** Lifetime tokens ever consumed from the pack balance. */
-  lifetimeConsumed: integer("lifetime_consumed").default(0).notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
-
-export type UserTokenBalance = typeof userTokenBalance.$inferSelect;
-export type NewUserTokenBalance = typeof userTokenBalance.$inferInsert;
-
-/**
- * Per-COMPANY purchased token pool (gap #1679). The workspace analog of
- * userTokenBalance: top-up tokens an employer buys that all members draw
- * from once the monthly seat-derived allowance is exhausted. One row per
- * company. (The purchase/top-up flow itself is tracked separately — see the
- * gap register; today the balance is only debited, seeded by future top-ups.)
- */
-export const companyTokenBalance = pgTable("company_token_balance", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  companyId: uuid("company_id").notNull().unique(),
-  balance: integer("balance").default(0).notNull(),
-  lifetimeGranted: integer("lifetime_granted").default(0).notNull(),
-  lifetimeConsumed: integer("lifetime_consumed").default(0).notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
-
-export type CompanyTokenBalance = typeof companyTokenBalance.$inferSelect;
-export type NewCompanyTokenBalance = typeof companyTokenBalance.$inferInsert;
+// Purchased token balances (per-user packs + per-company pool) are
+// `ai_tokens` wallets — see wallets.ts (W3-B, migration 0590).
 
 /**
  * Audit log of token-pack purchases. One row per Stripe charge. Pack
- * top-ups are reflected in `userTokenBalance.balance`; this table is the
+ * top-ups are reflected in the user's `ai_tokens` wallet; this table is the
  * historical record (refunds, support questions, accounting).
  */
 export const tokenPackPurchases = pgTable("token_pack_purchases", {

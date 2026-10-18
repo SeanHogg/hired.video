@@ -14,19 +14,17 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
-import { resolveJobV2, resolveResumeV2, type MatchDeps } from "../job/match-handlers.js";
+import { resolveJobV2, resolveResumeV2 } from "../job/match-resolvers.js";
+import type { MatchDeps } from "../job/match-deps.js";
 import { handleTailor as tailorUseCase } from "../job/tailor-handler.js";
 import { asHandler } from "../../handlers/shared.js";
 
 // The use case returns data / throws DomainError; assert the routed envelope.
 const handleTailor = asHandler(tailorUseCase);
-import {
-  validateTailorOutput,
-  applyResumeEdits,
-  buildTailorPrompt,
-  strengthenPrompt,
-  type TailorEdit,
-} from "../job/tailor-edits.js";
+import { validateTailorOutput } from "../job/tailor-validation.js";
+import { applyResumeEdits } from "../job/tailor-apply.js";
+import { buildTailorPrompt, strengthenPrompt } from "../job/tailor-prompt.js";
+import type { TailorEdit } from "../job/tailor-edit-contract.js";
 import type { LLMClient } from "../../services/adapters/llm-client.js";
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
 import { ResumeContentSchema, type ResumeContent } from "../../../../shared/resume.js";

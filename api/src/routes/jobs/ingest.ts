@@ -16,7 +16,8 @@ import { success, error } from "../../types/index.js";
 import { attachTokenBudget } from "../../middleware/tierEnforcement.js";
 import { createJobFromFile, extractJobFromPage, refreshTrackedJob } from "../../services/jobs/jobIngest.js";
 import { extractCreateFromFilePayload } from "./payload.js";
-import { llmFor, withDomainErrors } from "./http.js";
+import { llmFor } from "./http.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 
 export const jobIngestRoutes = new Hono<AppEnv>();
 
@@ -24,47 +25,40 @@ export const jobIngestRoutes = new Hono<AppEnv>();
  *  extractAndClassifyJob + createTrackedJob pipeline the browser-extension
  *  ingress uses. */
 jobIngestRoutes.post("/createfromfile", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  return withDomainErrors(c, async () => {
-    const payload = await extractCreateFromFilePayload(c);
-    const created = await createJobFromFile(payload, userId, llmFor(c));
-    return c.json(success(created), 201);
-  });
+  const userId = requireUser(c);
+  const payload = await extractCreateFromFilePayload(c);
+  const created = await createJobFromFile(payload, userId, llmFor(c));
+  return c.json(success(created), 201);
 });
 
 /** POST /api/jobs/extract — track a job from a webpage. The extension sends
  *  `{ url, html, sourceUrl?, force?, track?, hintTitle?, hintCompany?, hintLocation? }`. */
 jobIngestRoutes.post("/extract", attachTokenBudget(), async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
 
   const body = await c.req.json().catch(() => null);
   const url: string = typeof body?.url === "string" ? body.url : "";
   const trackParam = c.req.query("track");
   const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 
-  return withDomainErrors(c, async () => {
-    const { status, data } = await extractJobFromPage({
-      userId,
-      html: typeof body?.html === "string" ? body.html : "",
-      sourceUrl: typeof body?.sourceUrl === "string" ? body.sourceUrl : url,
-      track: body?.track === false ? false : trackParam === "false" ? false : true,
-      force: body?.force === true,
-      hintTitle: str(body?.hintTitle),
-      hintCompany: str(body?.hintCompany),
-      hintLocation: str(body?.hintLocation),
-      llm: llmFor(c),
-    });
-    return c.json(success(data), status);
+  const { status, data } = await extractJobFromPage({
+    userId,
+    html: typeof body?.html === "string" ? body.html : "",
+    sourceUrl: typeof body?.sourceUrl === "string" ? body.sourceUrl : url,
+    track: body?.track === false ? false : trackParam === "false" ? false : true,
+    force: body?.force === true,
+    hintTitle: str(body?.hintTitle),
+    hintCompany: str(body?.hintCompany),
+    hintLocation: str(body?.hintLocation),
+    llm: llmFor(c),
   });
+  return c.json(success(data), status);
 });
 
 /** POST /api/jobs/:id/refresh — backfill missing fields from posted HTML.
  *  `missingFields` (optional) is a strict allow-list; absent = fill any null. */
 jobIngestRoutes.post("/:id/refresh", attachTokenBudget(), async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
 
   const jobId = c.req.param("id");
   const body = await c.req.json().catch(() => null);
@@ -75,8 +69,6 @@ jobIngestRoutes.post("/:id/refresh", attachTokenBudget(), async (c) => {
     : null;
   if (!html) return c.json(error("VALIDATION_ERROR", "html is required"), 400);
 
-  return withDomainErrors(c, async () => {
-    const data = await refreshTrackedJob({ userId, jobId, html, url, missingFields, llm: llmFor(c) });
-    return c.json(success(data), 200);
-  });
+  const data = await refreshTrackedJob({ userId, jobId, html, url, missingFields, llm: llmFor(c) });
+  return c.json(success(data), 200);
 });

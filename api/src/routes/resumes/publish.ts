@@ -13,7 +13,7 @@ import { requireActiveConnection } from "../../services/partner/connections.js";
 import { verifyEmbedToken } from "../../services/partner/tokens.js";
 import { exportResume, getResume, listPublicResumes } from "../../services/resume/queries.js";
 import { parsePagination } from "../../utils/pagination.js";
-import { ownerId, respond, resumeDeps, viewerContext } from "./shared.js";
+import { respond, resumeDeps, viewerContext } from "./shared.js";
 
 export const resumePublishRoutes = new Hono<AppEnv>();
 
@@ -21,7 +21,7 @@ resumePublishRoutes.get("/public", (c) => {
   const fields = parseFields(c.req.query("fields"), RESUME_LIST_FIELDS);
   const page = listPublicResumes(
     resumeDeps(c),
-    c.var.user?.sub ?? null,
+    c.var.userId ?? null,
     parsePagination(c, { defaultLimit: 20, maxLimit: 100 }),
   ).then((data) =>
     // Résumé `content` is a heavy JSONB blob; list views rarely need it.
@@ -50,7 +50,7 @@ async function partnerEmbedViewer(pt: string): Promise<string | null> {
 // re-check means a revoke cuts off live embeds.
 resumePublishRoutes.get("/embedded/:identifier", async (c) => {
   const pt = c.req.query("pt");
-  const viewerId = (pt ? await partnerEmbedViewer(pt) : null) ?? c.var.user?.sub ?? null;
+  const viewerId = (pt ? await partnerEmbedViewer(pt) : null) ?? c.var.userId ?? null;
   return respond(
     c,
     getResume(resumeDeps(c), viewerContext(c, viewerId), c.req.param("identifier"), { recordView: false }),
@@ -59,7 +59,7 @@ resumePublishRoutes.get("/embedded/:identifier", async (c) => {
 
 resumePublishRoutes.get("/:id/export", async (c) => {
   try {
-    const file = await exportResume(resumeDeps(c), ownerId(c), c.req.param("id"), c.req.query("format") ?? "json");
+    const file = await exportResume(resumeDeps(c), c.var.userId, c.req.param("id"), c.req.query("format") ?? "json");
     return new Response(file.body, {
       status: 200,
       headers: {

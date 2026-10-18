@@ -15,27 +15,26 @@ import {
   generateStoryboard,
 } from "../../services/studio/storyboard-generation.js";
 import { listAdTemplatesForUser } from "../../services/studio/ad-templates.js";
-import { fail, guardGenerationPrompt, ok } from "./http.js";
+import { guardGenerationPrompt } from "./http.js";
+import { success, error } from "../../types/index.js";
+import { requireUser } from "../helpers/routerHelpers.js";
+import { validateJson } from "../helpers/validate.js";
 
 export const studioStoryboardRoutes = new Hono<AppEnv>();
 
-studioStoryboardRoutes.post("/storyboard", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = GenerateStoryboardSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
-  }
+studioStoryboardRoutes.post("/storyboard", validateJson(GenerateStoryboardSchema, (e) => error("VALIDATION_ERROR", "Invalid request body", e.flatten()), { emptyBody: null }), async (c) => {
+  const body = c.req.valid("json");
 
   // Authoritative safety gate. The LLMClient net already screens this
   // input, but the "basic" scaffold never calls the LLM at all — screen
   // here so a blocked prompt is refused outright.
-  const { prompt, jobDescription, resumeText } = parsed.data;
+  const { prompt, jobDescription, resumeText } = body;
   const blocked = guardGenerationPrompt(c, prompt, jobDescription, resumeText);
   if (blocked) return blocked;
 
   try {
-    const script = await generateStoryboard(c.env, c.var.user, parsed.data);
-    return c.json(ok(script), 201);
+    const script = await generateStoryboard(c.env, c.var.user, body);
+    return c.json(success(script), 201);
   } catch (err) {
     // Configured-but-threw (or timed out) — surface a typed AI_* envelope
     // instead of silently serving a mock storyboard as if the AI made it.
@@ -47,14 +46,11 @@ studioStoryboardRoutes.post("/storyboard", async (c) => {
 });
 
 studioStoryboardRoutes.get("/ad-templates", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
-  return c.json(ok(await listAdTemplatesForUser(userId, c.req.query("purpose"))));
+  const userId = requireUser(c);
+  return c.json(success(await listAdTemplatesForUser(userId, c.req.query("purpose"))));
 });
 
-studioStoryboardRoutes.post("/edit-script", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = EditScriptSchema.safeParse(body);
-  if (!parsed.success) return c.json(fail("INVALID_REQUEST", "Invalid request", parsed.error.flatten()), 400);
-  return c.json(ok(await editStudioScript(c.env, c.var.user, parsed.data)));
+studioStoryboardRoutes.post("/edit-script", validateJson(EditScriptSchema, (e) => error("INVALID_REQUEST", "Invalid request", e.flatten())), async (c) => {
+  const body = c.req.valid("json");
+  return c.json(success(await editStudioScript(c.env, c.var.user, body)));
 });

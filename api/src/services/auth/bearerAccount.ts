@@ -19,7 +19,6 @@ import { AuthTokensRepository } from "../../repositories/authTokensRepository.js
 import {
   findUserContactById,
   findUserSummaryById,
-  retireEmailVerificationTokensForUser,
   type UserSummaryRow,
 } from "../../repositories/authFlowRepository.js";
 import { sendResendVerificationEmail } from "../adapters/email/senders/auth.js";
@@ -102,9 +101,10 @@ export async function resendEmailVerification(
   if (!user) throw new DomainError(404, "NOT_FOUND", "User not found");
   if (user.emailVerified) return { alreadyVerified: true, devToken: null };
 
-  await retireEmailVerificationTokensForUser(db, user.id);
+  const tokens = new AuthTokensRepository(db);
+  await tokens.retireEmailVerificationTokensForUser(user.id);
   const newToken = randomHex(32);
-  await new AuthTokensRepository(db).insertEmailVerificationToken({
+  await tokens.insertEmailVerificationToken({
     userId: user.id,
     token: newToken,
     expiresAt: new Date(Date.now() + DAY_MS),

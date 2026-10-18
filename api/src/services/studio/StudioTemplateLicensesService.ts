@@ -25,6 +25,9 @@ import { getDb } from "../../db/index.js";
 import type { GrantableTemplateKind } from "../../db/schema/studiotemplates.js";
 import { PLATFORM_FEE_BPS_DEFAULT, StudioTemplatesError } from "./studioTemplatesErrors.js";
 
+/** The kinds a new grant may be recorded under (validation for the license API). */
+export { GRANTABLE_TEMPLATE_KINDS } from "../../db/schema/studiotemplates.js";
+
 export interface StudioTemplateLicensesDeps {
   repos: { studioTemplates: IStudioTemplatesRepository };
 }

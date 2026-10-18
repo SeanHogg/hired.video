@@ -1,8 +1,7 @@
 import { Hono } from "hono";
-import { eq, and, desc } from "drizzle-orm";
-import type { Variables, AppEnv } from "../types/index.js";
-import { error } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
+import type { AppEnv } from "../types/index.js";
+import { listUnreadNotifications } from "../services/notifications/notificationFeed.js";
+import { requireUser } from "./helpers/routerHelpers.js";
 
 export const hubsRoutes = new Hono<AppEnv>();
 
@@ -36,16 +35,9 @@ hubsRoutes.post("/notifications/negotiate", (c) => {
 });
 
 hubsRoutes.get("/notifications", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
 
-  const db = getDb();
-  const unread = await db
-    .select()
-    .from(schema.notifications)
-    .where(and(eq(schema.notifications.userId, userId), eq(schema.notifications.isRead, false)))
-    .orderBy(desc(schema.notifications.createdAt))
-    .limit(50);
+  const unread = await listUnreadNotifications(userId, 50);
 
   // Build an SSE stream
   const encoder = new TextEncoder();
@@ -63,9 +55,9 @@ hubsRoutes.get("/notifications", async (c) => {
       for (const n of unread) {
         send("notification", {
           id: n.id,
-          type: (n as any).type ?? "info",
-          title: (n as any).title ?? "",
-          message: (n as any).message ?? "",
+          type: n.type ?? "info",
+          title: n.title ?? "",
+          message: n.message ?? "",
           isRead: n.isRead,
           createdAt: n.createdAt,
         });
@@ -90,7 +82,3 @@ hubsRoutes.get("/notifications", async (c) => {
 hubsRoutes.post("/notifications", async (c) => {
   return c.redirect("/api/hubs/notifications", 307);
 });
-
-hubsRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_FOUND", message: "Hub route not found" } }, 404),
-);

@@ -31,18 +31,3 @@ export function deriveApplyUrl(args: {
     undefined
   );
 }
-
-/**
- * True when a job's stored applyUrl is effectively "missing" — either
- * null/empty or identical to its sourceUrl (meaning the persisted
- * value is just the sourceUrl fallback, not a real direct-apply link).
- * Used by computeRefreshBackfill to decide whether a rescan should
- * attempt to replace the stored applyUrl with a fresh candidate.
- */
-export function isApplyUrlFallback(row: { applyUrl?: string | null; sourceUrl?: string | null }): boolean {
-  const apply = row.applyUrl;
-  const source = row.sourceUrl;
-  if (apply == null || apply === "") return true;
-  if (source && apply === source) return true;
-  return false;
-}

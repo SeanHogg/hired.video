@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Clock, Play, Square, Loader2, CalendarRange, Send, CheckCircle2, XCircle, Printer } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { formatDuration } from "@/lib/format";
 import { createRolePermissions } from "@/lib/role-utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +24,7 @@ import { workforceService, type TaskTimeEntry, type Timesheet } from "@/lib/serv
  * Phase 1 (#1349) — punch in/out + week view + submit week.
  */
 export function TimesheetTab() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const permissions = createRolePermissions(user?.role);
   if (!permissions.canPunchTime && !permissions.canManageWorkforce) return null;
@@ -32,10 +35,10 @@ export function TimesheetTab() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>No timesheet for you</CardTitle>
+          <CardTitle>{t("timesheet.noTimesheet.title")}</CardTitle>
           <CardDescription>
-            Workforce timesheets are punched by employees. To review your
-            employees' weekly submissions, go to <strong>Settings → Workforce</strong>.
+            {t("timesheet.noTimesheet.description")}{" "}
+            <strong>{t("timesheet.noTimesheet.settingsPath")}</strong>
           </CardDescription>
         </CardHeader>
       </Card>
@@ -54,15 +57,10 @@ function startOfWeekISO(date = new Date()): string {
   return d.toISOString().slice(0, 10);
 }
 
-function formatDuration(sec: number): string {
-  if (sec < 60) return `${sec}s`;
-  const m = Math.floor(sec / 60);
-  const h = Math.floor(m / 60);
-  const mm = m % 60;
-  return h > 0 ? `${h}h ${mm}m` : `${mm}m`;
-}
+const formatTimesheetDuration = (sec: number): string => formatDuration(sec, { style: "hoursMin" });
 
 function EmployeeTimesheetSurface() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [active, setActive] = useState<TaskTimeEntry | null>(null);
   const [weekEntries, setWeekEntries] = useState<TaskTimeEntry[]>([]);
@@ -77,20 +75,20 @@ function EmployeeTimesheetSurface() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [a, w, t] = await Promise.all([
+      const [a, w, mine] = await Promise.all([
         workforceService.getActive(),
         workforceService.getWeek(periodStart),
         workforceService.listMyTimesheets(),
       ]);
       setActive(a);
       setWeekEntries(w.entries);
-      setMyTimesheets(t.timesheets);
+      setMyTimesheets(mine.timesheets);
     } catch (e) {
-      toast({ title: "Failed to load timesheet", description: String((e as Error).message), variant: "destructive" });
+      toast({ title: t("timesheet.toast.loadFailed"), description: String((e as Error).message), variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [periodStart, toast]);
+  }, [periodStart, toast, t]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -115,7 +113,7 @@ function EmployeeTimesheetSurface() {
       setNotes("");
       await refresh();
     } catch (e) {
-      toast({ title: "Punch in failed", description: String((e as Error).message), variant: "destructive" });
+      toast({ title: t("timesheet.toast.punchInFailed"), description: String((e as Error).message), variant: "destructive" });
     } finally {
       setBusy(false);
     }
@@ -127,7 +125,7 @@ function EmployeeTimesheetSurface() {
       await workforceService.punchOut();
       await refresh();
     } catch (e) {
-      toast({ title: "Punch out failed", description: String((e as Error).message), variant: "destructive" });
+      toast({ title: t("timesheet.toast.punchOutFailed"), description: String((e as Error).message), variant: "destructive" });
     } finally {
       setBusy(false);
     }
@@ -137,10 +135,13 @@ function EmployeeTimesheetSurface() {
     setBusy(true);
     try {
       const ts = await workforceService.submitTimesheet(periodStart);
-      toast({ title: "Timesheet submitted", description: `Week of ${ts.periodStart} — ${ts.totalHours}h total` });
+      toast({
+        title: t("timesheet.toast.submitted"),
+        description: t("timesheet.toast.submittedDescription", { periodStart: ts.periodStart, hours: ts.totalHours }),
+      });
       await refresh();
     } catch (e) {
-      toast({ title: "Submit failed", description: String((e as Error).message), variant: "destructive" });
+      toast({ title: t("timesheet.toast.submitFailed"), description: String((e as Error).message), variant: "destructive" });
     } finally {
       setBusy(false);
     }
@@ -150,41 +151,42 @@ function EmployeeTimesheetSurface() {
   const submittedEntries = weekEntries.filter((e) => e.status === "submitted" || e.status === "approved");
   const weekTotalSec = weekEntries.reduce((s, e) => s + (e.durationSec ?? 0), 0);
   const weekBillableSec = weekEntries.filter((e) => e.billable).reduce((s, e) => s + (e.durationSec ?? 0), 0);
-  const existingThisWeek = myTimesheets.find((t) => t.periodStart === periodStart);
+  const existingThisWeek = myTimesheets.find((ts) => ts.periodStart === periodStart);
+  const statusLabel = (status: string) => t(`timesheet.status.${status}`, { defaultValue: status });
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Clock className="h-5 w-5 text-muted-foreground" />
-        <h2 className="text-2xl font-semibold">Timesheet</h2>
+        <h2 className="text-2xl font-semibold">{t("timesheet.title")}</h2>
       </div>
 
       {/* Punch widget */}
       <Card>
         <CardHeader>
-          <CardTitle>{active ? "Punched in" : "Ready to punch in"}</CardTitle>
+          <CardTitle>{active ? t("timesheet.punchedIn") : t("timesheet.readyToPunchIn")}</CardTitle>
           <CardDescription>
             {active
-              ? `Started ${new Date(active.startedAt).toLocaleString()}`
-              : "Capture time against your work — log goes to your weekly timesheet."}
+              ? t("timesheet.startedAt", { time: new Date(active.startedAt).toLocaleString() })
+              : t("timesheet.punchHint")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {active ? (
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div className="text-3xl font-mono tabular-nums">{formatDuration(elapsedSec)}</div>
+              <div className="text-3xl font-mono tabular-nums">{formatTimesheetDuration(elapsedSec)}</div>
               <Button variant="destructive" onClick={handlePunchOut} disabled={busy}>
                 {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Square className="h-4 w-4 mr-2" />}
-                Punch out
+                {t("timesheet.punchOut")}
               </Button>
             </div>
           ) : (
             <>
               <div className="space-y-2">
-                <Label htmlFor="punch-notes">Notes (optional)</Label>
+                <Label htmlFor="punch-notes">{t("timesheet.notesLabel")}</Label>
                 <Textarea
                   id="punch-notes"
-                  placeholder="What are you working on?"
+                  placeholder={t("timesheet.notesPlaceholder")}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   className="min-h-[60px]"
@@ -193,11 +195,11 @@ function EmployeeTimesheetSurface() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Switch id="billable" checked={billable} onCheckedChange={setBillable} />
-                  <Label htmlFor="billable">Billable</Label>
+                  <Label htmlFor="billable">{t("timesheet.billable")}</Label>
                 </div>
                 <Button onClick={handlePunchIn} disabled={busy}>
                   {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-                  Punch in
+                  {t("timesheet.punchIn")}
                 </Button>
               </div>
             </>
@@ -212,46 +214,49 @@ function EmployeeTimesheetSurface() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <CalendarRange className="h-5 w-5" />
-                This week ({periodStart})
+                {t("timesheet.thisWeek", { periodStart })}
               </CardTitle>
               <CardDescription>
-                {formatDuration(weekTotalSec)} total • {formatDuration(weekBillableSec)} billable
+                {t("timesheet.weekTotals", {
+                  total: formatTimesheetDuration(weekTotalSec),
+                  billable: formatTimesheetDuration(weekBillableSec),
+                })}
               </CardDescription>
             </div>
             {existingThisWeek ? (
               <Badge variant={existingThisWeek.status === "approved" ? "default" : existingThisWeek.status === "rejected" ? "destructive" : "secondary"}>
-                {existingThisWeek.status}
+                {statusLabel(existingThisWeek.status)}
               </Badge>
             ) : (
               <Button
                 onClick={handleSubmitWeek}
                 disabled={busy || closedEntries.length === 0 || !!active}
-                title={active ? "Punch out before submitting" : closedEntries.length === 0 ? "No closed entries to submit" : ""}
+                title={active ? t("timesheet.punchOutBeforeSubmit") : closedEntries.length === 0 ? t("timesheet.noClosedEntries") : ""}
               >
                 {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                Submit week
+                {t("timesheet.submitWeek")}
               </Button>
             )}
           </div>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-sm text-muted-foreground">Loading…</div>
+            <div className="text-sm text-muted-foreground">{t("timesheet.loading")}</div>
           ) : weekEntries.length === 0 ? (
-            <div className="text-sm text-muted-foreground">No time logged this week yet.</div>
+            <div className="text-sm text-muted-foreground">{t("timesheet.noTimeThisWeek")}</div>
           ) : (
             <div className="space-y-2">
               {weekEntries.map((e) => (
-                <div key={e.id} className="flex items-center justify-between border-b last:border-0 py-2 text-sm">
-                  <div className="flex-1">
+                <div key={e.id} className="flex items-center justify-between gap-2 border-b last:border-0 py-2 text-sm">
+                  <div className="flex-1 min-w-0">
                     <div className="font-medium">{new Date(e.startedAt).toLocaleString()}</div>
-                    {e.notes && <div className="text-muted-foreground text-xs mt-1">{e.notes}</div>}
+                    {e.notes && <div className="text-muted-foreground text-xs mt-1 break-words">{e.notes}</div>}
                   </div>
-                  <div className="flex items-center gap-2">
-                    {!e.billable && <Badge variant="outline" className="text-xs">non-billable</Badge>}
-                    <Badge variant="outline" className="text-xs">{e.status}</Badge>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {!e.billable && <Badge variant="outline" className="text-xs">{t("timesheet.nonBillable")}</Badge>}
+                    <Badge variant="outline" className="text-xs">{statusLabel(e.status)}</Badge>
                     <div className="font-mono tabular-nums w-20 text-right">
-                      {e.durationSec != null ? formatDuration(e.durationSec) : "active"}
+                      {e.durationSec != null ? formatTimesheetDuration(e.durationSec) : t("timesheet.activeEntry")}
                     </div>
                   </div>
                 </div>
@@ -265,30 +270,31 @@ function EmployeeTimesheetSurface() {
       {myTimesheets.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>My timesheets</CardTitle>
-            <CardDescription>{myTimesheets.length} submitted</CardDescription>
+            <CardTitle>{t("timesheet.myTimesheets")}</CardTitle>
+            <CardDescription>{t("timesheet.submittedCount", { count: myTimesheets.length })}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {myTimesheets.slice(0, 8).map((t) => (
-                <div key={t.id} className="flex items-center justify-between border-b last:border-0 py-2 text-sm">
-                  <div>
-                    <div className="font-medium">Week of {t.periodStart}</div>
+              {myTimesheets.slice(0, 8).map((ts) => (
+                <div key={ts.id} className="flex items-center justify-between gap-2 border-b last:border-0 py-2 text-sm">
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("timesheet.weekOf", { periodStart: ts.periodStart })}</div>
                     <div className="text-xs text-muted-foreground">
-                      {t.totalHours}h total • {t.totalBillableHours}h billable
+                      {t("timesheet.historyTotals", { total: ts.totalHours, billable: ts.totalBillableHours })}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {t.status === "approved" && <CheckCircle2 className="h-4 w-4 text-green-600" />}
-                    {t.status === "rejected" && <XCircle className="h-4 w-4 text-red-600" />}
-                    <Badge variant={t.status === "approved" ? "default" : t.status === "rejected" ? "destructive" : "secondary"}>
-                      {t.status}
+                    {ts.status === "approved" && <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />}
+                    {ts.status === "rejected" && <XCircle className="h-4 w-4 text-destructive" />}
+                    <Badge variant={ts.status === "approved" ? "default" : ts.status === "rejected" ? "destructive" : "secondary"}>
+                      {statusLabel(ts.status)}
                     </Badge>
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => window.open(`/api/workforce/timesheets/${t.id}/print`, "_blank", "noopener")}
-                      title="Print / Save as PDF"
+                      onClick={() => window.open(`/api/workforce/timesheets/${ts.id}/print`, "_blank", "noopener")}
+                      title={t("timesheet.print")}
+                      aria-label={t("timesheet.print")}
                     >
                       <Printer className="h-4 w-4" />
                     </Button>
@@ -296,9 +302,9 @@ function EmployeeTimesheetSurface() {
                 </div>
               ))}
             </div>
-            {myTimesheets.some((t) => t.status === "rejected" && t.rejectionReason) && (
+            {myTimesheets.some((ts) => ts.status === "rejected" && ts.rejectionReason) && (
               <div className="mt-4 text-xs text-muted-foreground">
-                Rejected timesheets unlock their entries so you can edit + re-submit.
+                {t("timesheet.rejectedHint")}
               </div>
             )}
           </CardContent>

@@ -1,43 +1,24 @@
 /**
- * Comprehensive API client with type safety, error handling, and interceptors
+ * Comprehensive API client with type safety, error handling, and interceptors.
+ *
+ * Facade: the client class + default instance live here; the building blocks
+ * live under lib/api/* —
+ *   - types.ts         request/client config + interceptor contracts
+ *   - interceptors.ts  ordered request/response/error interceptor chains
+ *   - transport.ts     fetch round-trip (headers, body, timeout, abort)
+ *   - envelope.ts      JSON body read, `{ success, data }` mapping, raw parse
+ *   - error-mapping.ts API error body → typed AppError (+ auth side effects)
+ *   - error-events.ts  global `hired:api-error` event + silence policy
+ *   - raw-request.ts   non-envelope endpoints (getRaw / requestRaw)
+ *   - streaming.ts     SSE / NDJSON streamed responses (openStream)
+ * Every export this module has always had is still exported from here.
  */
 
 import type { z } from "zod";
-import type {
-  ApiResponse,
-  ApiErrorResponse,
-  ApiSuccessResponse,
-} from "@shared/api";
-import {
-  validateApiResponse,
-  ApiResponseSchema,
-  ApiErrorResponseSchema,
-  // Raw validation helper to normalize nulls
-  nullToUndefined,
-} from "@shared/api";
-import type { AppError } from "./errors";
-import {
-  NetworkError,
-  ValidationError,
-  AuthenticationError,
-  AuthorizationError,
-  NotFoundError,
-  normalizeError,
-  UnverifiedAccountError,
-  RateLimitError,
-  AIUsageLimitError,
-} from "./errors";
+import type { ApiSuccessResponse } from "@shared/api";
+import { NetworkError, normalizeError } from "./errors";
 import { logApiCall } from "./logger";
-import i18next from "i18next";
-import { EXPLICIT_CONTENT_CODE, explicitContentMessage, explicitInfoFrom } from "./moderation/explicit-content-error";
-import { signalBadgeRefresh } from "./badges/refresh";
-import {
-  emulationHeaders,
-  getAuthToken,
-  getEmulationToken,
-  REFRESH_TOKEN_KEY,
-  AUTH_TOKEN_KEY,
-} from "./api/auth-token";
+import { getAuthToken, getEmulationToken } from "./api/auth-token";
 import { buildApiUrl, getApiBaseUrl } from "./api/base-url";
 import { ensureFreshToken } from "./api/token-refresh";
 import {
@@ -45,8 +26,22 @@ import {
   pushApiLogEntry,
   recordLogEntryError,
   recordLogEntryResponse,
-  truncateBodyForLog,
 } from "./api/request-log";
+import { InterceptorChain } from "./api/interceptors";
+import { executeRequest as executeFetch, requestIdOf } from "./api/transport";
+import { readJsonBody, toSuccessEnvelope } from "./api/envelope";
+import { emitApiError } from "./api/error-events";
+import { requestRawBody } from "./api/raw-request";
+import { openStreamRequest } from "./api/streaming";
+import { isFinalFailure, maxAttemptsFor, waitBeforeRetry } from "./api/retry-policy";
+import type {
+  ApiClientConfig,
+  ErrorInterceptor,
+  RequestConfig,
+  RequestInterceptor,
+  RequestPipeline,
+  ResponseInterceptor,
+} from "./api/types";
 
 export {
   setEmulationTokenGetter,
@@ -60,276 +55,14 @@ export {
   getPendingApiRequests,
   getRecentApiFailures,
 } from "./api/request-log";
-import {
-  API_ERROR_EVENT,
-  type ApiErrorEvent,
-} from "@shared/errors/apiErrorEvent";
-
-/**
- * Context stamped on a NetworkError when `fetch()` itself threw — i.e. the
- * browser never received an HTTP response at all (offline, DNS, TLS, a CORS
- * preflight rejection, connection refused, or the client-side timeout abort).
- * `cause` is the raw browser error message ("Failed to fetch" / "Load failed" /
- * "timeout") — the single most diagnostic field. `online` snapshots
- * navigator.onLine so an offline user is obvious in the emailed report.
- * `transport: true` is the flag eventFieldsFromError keys on so these are NOT
- * mislabeled as an HTTP 500 (NetworkError.statusCode hardcodes 500).
- */
-function transportErrorContext(cause: string): Record<string, unknown> {
-  return {
-    transport: true,
-    cause,
-    online: typeof navigator !== "undefined" ? navigator.onLine : undefined,
-  };
-}
-
-/** Cap on the non-JSON body snippet we attach to an error report — enough to
- *  carry the Cloudflare ray id / error-page title without bloating the report. */
-const MAX_NONJSON_BODY_SNIPPET = 1024;
-
-/**
- * Read a response body as JSON. Reads the raw text first so that, when the body
- * ISN'T valid JSON (an HTML 502/504 from the edge, a truncated gateway page),
- * we can attach the real HTTP status + a capped snippet of the ACTUAL body to
- * the NetworkError. That snippet (Cloudflare ray id, gateway error-page title)
- * is the single most diagnostic bit for an edge/gateway failure — without it
- * these collapse into an opaque "Invalid JSON response" with a fabricated 500,
- * leaving the emailed error report with nothing to act on. Single source of
- * truth for "parse the body, or fail with diagnostics" so handleResponse /
- * getRaw / requestRaw can't drift on what context a non-JSON failure carries.
- */
-async function readJsonBody(response: Response): Promise<unknown> {
-  const text = await response.text();
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    throw new NetworkError(
-      "Invalid JSON response",
-      error instanceof Error ? error : undefined,
-      {
-        httpStatus: response.status,
-        statusText: response.statusText,
-        bodyText: text.slice(0, MAX_NONJSON_BODY_SNIPPET),
-      },
-    );
-  }
-}
-
-/**
- * Broadcast a piggy-backed token-budget envelope so the AI-tokens pill
- * updates without a second round-trip. Returns whether `raw` was a budget.
- * Shared by the JSON envelope path and streamed endpoints (which carry the
- * budget on their final event).
- */
-export function broadcastTokenBudget(raw: unknown): boolean {
-  if (!raw || typeof raw !== "object") return false;
-  if (typeof window !== "undefined") {
-    try {
-      window.dispatchEvent(new CustomEvent("token-budget:update", { detail: raw }));
-    } catch {
-      // Non-DOM environment (tests, SSR); skip.
-    }
-  }
-  return true;
-}
-
-/**
- * Dispatch an API error event on `window`. Automatically stamps the event
- * with an ISO timestamp. Frontend-only — lives here (not in shared/)
- * because `window` / `CustomEvent` are DOM-only types and the API
- * compilation pulls shared/ in.
- */
-function dispatchApiError(event: Omit<ApiErrorEvent, "timestamp">): void {
-  window.dispatchEvent(
-    new CustomEvent<ApiErrorEvent>(API_ERROR_EVENT, {
-      detail: { ...event, timestamp: new Date().toISOString() },
-    }),
-  );
-}
-
-/**
- * Build the dispatch payload from a normalized AppError. When
- * createErrorFromResponse stashes the server's original code in
- * `context.serverCode` (e.g. INTERNAL_ERROR collapsed into NetworkError),
- * surface that as the event code so the dev toast and "copy support
- * ticket" output show the real backend code instead of the generic
- * NETWORK_ERROR / NOT_FOUND_ERROR / etc. that the AppError class carries.
- */
-function eventFieldsFromError(
-  error: AppError,
-): Pick<ApiErrorEvent, "status" | "code" | "message" | "details"> {
-  const ctx = (error.context ?? {}) as Record<string, unknown>;
-  const serverCode = typeof ctx.serverCode === "string" ? ctx.serverCode : undefined;
-  // Prefer the actual HTTP status when createErrorFromResponse stashed it,
-  // otherwise fall back to AppError's class-default (e.g. NetworkError = 500).
-  // Without this, a 402 QUOTA_EXCEEDED reads as 500 in the dev toast.
-  const httpStatus = typeof ctx.httpStatus === "number" ? ctx.httpStatus : undefined;
-
-  // Transport failures — fetch() itself threw, so the browser never received an
-  // HTTP response. NetworkError hardcodes statusCode 500, which makes these
-  // read identically to a genuine server crash in the dev toast AND the emailed
-  // error report. They are NOT the same: a transport failure means the API was
-  // unreachable (offline, DNS, TLS, CORS preflight, connection refused). Report
-  // them as status 0 ("no response") under a distinct code, and fold the real
-  // browser cause into the message so the maintainer can tell the two apart at a
-  // glance instead of chasing a phantom backend 500.
-  if (ctx.transport === true) {
-    const cause = typeof ctx.cause === "string" ? ctx.cause : undefined;
-    return {
-      status: 0,
-      code: "NETWORK_UNREACHABLE",
-      message: cause ? `${error.message}: ${cause}` : error.message,
-      details: error.context,
-    };
-  }
-
-  return {
-    status: httpStatus ?? error.statusCode,
-    code: serverCode ?? error.code,
-    message: error.message,
-    details: error.context,
-  };
-}
-
-/**
- * Some upstream error responses use a loose `{ error: { code, message, ... } }`
- * shape WITHOUT a `success: false` envelope — notably anything thrown from
- * the API's globalErrorHandler (e.g. drizzle "relation does not exist"
- * surfacing as INTERNAL_ERROR). Without this extractor we'd fail strict
- * schema validation and fall through to a generic
- * `new NetworkError("HTTP 500: Request failed")`, dropping the actionable
- * server code, message, and `_source` stack frame.
- */
-function extractLooseErrorEnvelope(
-  data: unknown,
-): { code: string; message: string; details: Record<string, unknown> } | null {
-  if (!data || typeof data !== "object" || !("error" in data)) return null;
-  const errObj = (data as { error: unknown }).error;
-  if (!errObj || typeof errObj !== "object") return null;
-  const e = errObj as Record<string, unknown>;
-  if (typeof e.code !== "string" || typeof e.message !== "string") return null;
-
-  const baseDetails =
-    e.details && typeof e.details === "object" && !Array.isArray(e.details)
-      ? (e.details as Record<string, unknown>)
-      : {};
-  const details: Record<string, unknown> = { ...baseDetails };
-  // Preserve `_source` (server-side stack frame) and any sibling diagnostic
-  // fields so SuperAdmin can see the originating function/file/line.
-  for (const [key, value] of Object.entries(e)) {
-    if (key === "code" || key === "message" || key === "details") continue;
-    details[key] = value;
-  }
-  return { code: e.code, message: e.message, details };
-}
-
-/**
- * Errors we never want to surface as a global toast:
- *   • Anonymous 401 — auth-required side calls on a public page; the caller
- *     swallows the rejection. Without this, every public page that fires an
- *     auxiliary auth call shows a red "An error has occurred" toast.
- *   • Unverified 403 — every authed-but-unverified user is parked on
- *     /verify-email, but background pollers (comm hub, notifications,
- *     connections) keep firing and each rejection would spawn a toast. The
- *     auth-email-unverified event still fires in createErrorFromResponse,
- *     so the verify-email gate still works.
- *
- * AIUsageLimitError IS dispatched (the inline `<GlobalAIUsageBanner>`
- * subscribes to the same `API_ERROR_EVENT` and renders an upgrade CTA);
- * `<GlobalErrorHandler>` filters that code out of its red-toast queue so
- * users only see one surface for it.
- */
-function isExpectedSilentError(error: AppError): boolean {
-  if (error instanceof UnverifiedAccountError) return true;
-  if (error instanceof AuthenticationError && !getAuthToken()) return true;
-  const serverCode = (error.context as { serverCode?: string } | undefined)?.serverCode;
-  // `MAILBOX_REAUTH_REQUIRED` is user-state, not a server fault — Google /
-  // Microsoft rejected the stored refresh token (revoked, password change,
-  // Testing-app 7-day expiry). The route already flipped the account row
-  // to `status: "error"` and the Inbox / Settings surfaces render their
-  // own "Reconnect" CTA off that, so suppressing the red global toast
-  // avoids a "Support Ticket" prompt for what's a one-click reconnect.
-  if (serverCode === "MAILBOX_REAUTH_REQUIRED") return true;
-  // `PRO_REQUIRED` (402) is an entitlement signal, not a fault — every
-  // Pro-gated surface (Hiring & Onboarding, ProfileAudit, …) catches it and
-  // renders its own inline upgrade prompt. Dispatching the global red toast
-  // on top of that double-surfaces the gate and, worse, hands the user a
-  // "Report this error" button that emails the maintainer a non-bug. Treat
-  // it like the AI usage-limit gate: the consuming page owns the upgrade UX.
-  if (serverCode === "PRO_REQUIRED") return true;
-  return false;
-}
-
-/**
- * Tear down auth state and redirect — but only when the caller actually had
- * a session. An anonymous visitor calling an auth-required side endpoint
- * (e.g. /resumes/<id> firing a follow-up analytics fetch) must NOT be
- * redirected; the page should keep rendering and the caller can swallow
- * the AuthenticationError. Without this gate, any public page that fires
- * an auxiliary auth-required call bounces anonymous visitors to /login.
- *
- * Returns true when a session was torn down, false when the caller was
- * already anonymous and nothing happened.
- */
-function handleSessionInvalidation(): boolean {
-  const hadToken = !!getAuthToken();
-  if (!hadToken) return false;
-
-  localStorage.removeItem(AUTH_TOKEN_KEY);
-  localStorage.removeItem("current_user");
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-  window.dispatchEvent(new CustomEvent("auth-logout"));
-  setTimeout(() => {
-    window.location.replace("/");
-  }, 100);
-  return true;
-}
-
-// ============================================================================
-// TYPES AND INTERFACES
-// ============================================================================
-
-export interface RequestConfig {
-  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  headers?: Record<string, string>;
-  body?: unknown;
-  timeout?: number;
-  retries?: number;
-  validateResponse?: boolean;
-  // Skip dispatching the global `hired:api-error` event on failure.
-  // Used by the error reporter (lib/error-report.ts) to avoid a feedback
-  // loop: a failed report would otherwise re-trigger GlobalErrorHandler's
-  // toast, which the user could click "Report" on, etc.
-  suppressErrorEvent?: boolean;
-  /** Caller-side abort (e.g. a stream reader torn down before headers). */
-  signal?: AbortSignal;
-}
-
-export interface ApiClientConfig {
-  baseUrl?: string;
-  timeout?: number;
-  retries?: number;
-  headers?: Record<string, string>;
-  onRequest?: (config: RequestConfig) => RequestConfig | Promise<RequestConfig>;
-  onResponse?: <T>(
-    response: ApiSuccessResponse<T>,
-  ) => ApiSuccessResponse<T> | Promise<ApiSuccessResponse<T>>;
-  onError?: (error: AppError) => AppError | Promise<AppError>;
-}
-
-export interface RequestInterceptor {
-  (config: RequestConfig): RequestConfig | Promise<RequestConfig>;
-}
-
-export interface ResponseInterceptor {
-  <T>(
-    response: ApiSuccessResponse<T>,
-  ): ApiSuccessResponse<T> | Promise<ApiSuccessResponse<T>>;
-}
-
-export interface ErrorInterceptor {
-  (error: AppError): AppError | Promise<AppError>;
-}
+export { broadcastTokenBudget } from "./api/envelope";
+export type {
+  ApiClientConfig,
+  ErrorInterceptor,
+  RequestConfig,
+  RequestInterceptor,
+  ResponseInterceptor,
+} from "./api/types";
 
 // ============================================================================
 // API CLIENT CLASS
@@ -340,9 +73,7 @@ export class ApiClient {
   private timeout: number;
   private retries: number;
   private defaultHeaders: Record<string, string>;
-  private requestInterceptors: RequestInterceptor[] = [];
-  private responseInterceptors: ResponseInterceptor[] = [];
-  private errorInterceptors: ErrorInterceptor[] = [];
+  private interceptors = new InterceptorChain();
   // In-flight GET coalescing. Concurrent identical GETs share one network
   // round-trip + one resolved value; the entry is cleared on settle. This
   // collapses the duplicate fetches that fire when several components each
@@ -381,58 +112,16 @@ export class ApiClient {
     if (config.onError) this.addErrorInterceptor(config.onError);
   }
 
-  // ============================================================================
-  // INTERCEPTOR MANAGEMENT
-  // ============================================================================
-
   addRequestInterceptor(interceptor: RequestInterceptor): void {
-    this.requestInterceptors.push(interceptor);
+    this.interceptors.addRequest(interceptor);
   }
 
   addResponseInterceptor(interceptor: ResponseInterceptor): void {
-    this.responseInterceptors.push(interceptor);
+    this.interceptors.addResponse(interceptor);
   }
 
   addErrorInterceptor(interceptor: ErrorInterceptor): void {
-    this.errorInterceptors.push(interceptor);
-  }
-
-  // ============================================================================
-  // PRIVATE METHODS
-  // ============================================================================
-
-  private async applyRequestInterceptors(
-    config: RequestConfig,
-  ): Promise<RequestConfig> {
-    let processedConfig = config;
-
-    for (const interceptor of this.requestInterceptors) {
-      processedConfig = await interceptor(processedConfig);
-    }
-
-    return processedConfig;
-  }
-
-  private async applyResponseInterceptors<T>(
-    response: ApiSuccessResponse<T>,
-  ): Promise<ApiSuccessResponse<T>> {
-    let processedResponse = response;
-
-    for (const interceptor of this.responseInterceptors) {
-      processedResponse = await interceptor(processedResponse);
-    }
-
-    return processedResponse;
-  }
-
-  private async applyErrorInterceptors(error: AppError): Promise<AppError> {
-    let processedError = error;
-
-    for (const interceptor of this.errorInterceptors) {
-      processedError = await interceptor(processedError);
-    }
-
-    return processedError;
+    this.interceptors.addError(interceptor);
   }
 
   /** Paths go out verbatim — routes are case-sensitive and ids/tokens in
@@ -441,306 +130,18 @@ export class ApiClient {
     return buildApiUrl(endpoint, this.baseUrl);
   }
 
-  private async executeRequest(
-    url: string,
-    config: RequestConfig,
-  ): Promise<Response> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      config.timeout || this.timeout,
-    );
-    const onCallerAbort = () => controller.abort();
-    if (config.signal?.aborted) controller.abort();
-    else config.signal?.addEventListener("abort", onCallerAbort, { once: true });
-
-    try {
-      // Prepare headers
-      const headers = { ...this.defaultHeaders, ...config.headers };
-
-      // Prepare body
-      let body: string | FormData | undefined;
-      if (config.body !== undefined && config.body !== null) {
-        if (config.body instanceof FormData) {
-          // For FormData, don't set Content-Type (let browser set it with boundary)
-          delete headers["Content-Type"];
-          body = config.body;
-        } else if (typeof config.body === "string") {
-          // If the caller already provided a string body, pass it through as-is
-          body = config.body;
-        } else {
-          // For regular objects, stringify as JSON
-          body = JSON.stringify(config.body);
-        }
-      }
-      // Avoid sending Content-Type on requests with no body (e.g., GET) to satisfy servers with strict content negotiation
-      if (body === undefined) {
-        delete headers["Content-Type"];
-      }
-
-      // Attach X-Emulation-Token for active impersonation sessions — but never
-      // to /api/admin/* endpoints (those require the real SA bearer).
-      Object.assign(headers, emulationHeaders(url));
-
-      const response = await fetch(url, {
-        method: config.method || "GET",
-        headers,
-        body,
-        credentials: "include",
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-      config.signal?.removeEventListener("abort", onCallerAbort);
-      return response;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      config.signal?.removeEventListener("abort", onCallerAbort);
-
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new NetworkError("Request timeout", error, transportErrorContext("timeout"));
-      }
-
-      const cause = error instanceof Error ? error.message : String(error);
-      throw new NetworkError(
-        "Network request failed",
-        error instanceof Error ? error : undefined,
-        transportErrorContext(cause),
-      );
-    }
+  private executeRequest(url: string, config: RequestConfig): Promise<Response> {
+    return executeFetch(url, config, {
+      headers: this.defaultHeaders,
+      timeout: this.timeout,
+    });
   }
 
-  /** Map an already-parsed body (read ONCE by the caller, which also logs
-   *  it) onto the typed success envelope, or throw the typed error. */
-  private async handleResponse<T>(
-    response: Response,
-    responseData: unknown,
-    schema?: z.ZodType<T>,
-  ): Promise<ApiSuccessResponse<T>> {
-    if (!response.ok) {
-      return this.handleErrorResponse(response.status, responseData);
-    }
-
-    const validationResult = validateApiResponse(
-      responseData,
-      ApiResponseSchema,
-    );
-    if (!validationResult.success) {
-      const errorMessage =
-        "error" in validationResult
-          ? validationResult.error
-          : "Unknown validation error";
-      throw new ValidationError(
-        `Invalid API response structure: ${errorMessage}`,
-      );
-    }
-
-    const apiResponse = validationResult.data;
-    if (!apiResponse.success) {
-      throw this.createErrorFromResponse(apiResponse as ApiErrorResponse);
-    }
-
-    const successResponse: ApiSuccessResponse<T> = {
-      success: true,
-      data: apiResponse.data as T,
-      message: apiResponse.message,
-      timestamp: apiResponse.timestamp,
-    };
-
-    // Piggy-back token-budget envelope — AI-metered endpoints include a
-    // `tokenBudget` field on every response so the AI-tokens pill updates
-    // in real time without a second round-trip. Preserve it on the typed
-    // response AND broadcast via a window event so hooks/components can
-    // react without prop drilling.
-    const rawBudget = (apiResponse as { tokenBudget?: unknown }).tokenBudget;
-    if (broadcastTokenBudget(rawBudget)) {
-      successResponse.tokenBudget = rawBudget as ApiSuccessResponse<T>["tokenBudget"];
-    }
-
-    // #1135 — any award-firing endpoint that echoes `badgesUnlocked`
-    // (top-level or on its data payload) triggers an immediate badge-list
-    // refresh, so the unlock celebration fires within the same render cycle.
-    // DRY seam: routes opt in just by returning the field.
-    const unlocked =
-      (apiResponse as { badgesUnlocked?: unknown }).badgesUnlocked ??
-      (apiResponse.data as { badgesUnlocked?: unknown } | null | undefined)?.badgesUnlocked;
-    if (Array.isArray(unlocked) && unlocked.length > 0) {
-      signalBadgeRefresh();
-    }
-
-    if (schema) {
-      const dataValidation = validateApiResponse(successResponse.data, schema);
-      if (!dataValidation.success) {
-        const errorMessage =
-          "error" in dataValidation
-            ? dataValidation.error
-            : "Unknown validation error";
-        console.error(
-          "ApiClient.handleResponse: Data validation failed",
-          errorMessage,
-          successResponse.data,
-        );
-        throw new ValidationError(`Invalid response data: ${errorMessage}`);
-      }
-      successResponse.data = dataValidation.data;
-    }
-
-    return successResponse;
-  }
-
-  private handleErrorResponse(status: number, data: unknown): never {
-
-    // Try to parse as API error response
-    const errorValidation = validateApiResponse(data, ApiErrorResponseSchema);
-
-    if (errorValidation.success) {
-      throw this.createErrorFromResponse(errorValidation.data, status);
-    }
-
-    // Loose envelope: `{ error: { code, message, ... } }` with no `success`
-    // field. The API's globalErrorHandler returns this shape for unhandled
-    // exceptions (incl. the `_source` stack frame), and previously we'd
-    // collapse it to "HTTP 500: Request failed" — dropping every actionable
-    // detail. Forward to createErrorFromResponse so callers see the real
-    // code, message, and diagnostics.
-    const loose = extractLooseErrorEnvelope(data);
-    if (loose) {
-      throw this.createErrorFromResponse({ success: false, error: loose }, status);
-    }
-
-    // Note: ACCOUNT_DELETED errors are handled in createErrorFromResponse
-    // since they come as structured API responses with success: false
-
-    // Fallback to HTTP status-based errors
-    switch (status) {
-      case 401:
-        handleSessionInvalidation();
-        throw new AuthenticationError("Authentication required");
-      case 403:
-        throw new AuthorizationError("Access forbidden");
-      case 404:
-        throw new NotFoundError("Resource not found");
-      case 429: {
-        // Rate limit exceeded - try to extract details from data
-        const rlData = data as any;
-        const errorCode = rlData?.error?.code;
-        // If the server sent USAGE_LIMIT_EXCEEDED, surface it as AIUsageLimitError
-        if (errorCode === "USAGE_LIMIT_EXCEEDED" || errorCode === "AI_USAGE_LIMIT_REACHED") {
-          const usageInfo = rlData?.error?.usage || {};
-          throw new AIUsageLimitError(
-            rlData?.error?.message || "AI usage limit exceeded",
-            rlData?.error?.upgradeUrl || "/pricing",
-            usageInfo.used,
-            usageInfo.limit,
-          );
-        }
-        throw new RateLimitError(
-          rlData?.message || "Rate limit exceeded",
-          rlData?.data?.upgradeUrl,
-          rlData?.data?.used,
-          rlData?.data?.limit,
-          rlData?.data?.remaining,
-        );
-      }
-      default:
-        // Preserve the raw response body so the dev toast can still show
-        // whatever the server emitted, even if it doesn't match either
-        // envelope shape.
-        throw new NetworkError(`HTTP ${status}: Request failed`, undefined, {
-          httpStatus: status,
-          responseBody: truncateBodyForLog(data),
-        });
-    }
-  }
-
-  private createErrorFromResponse(errorResponse: ApiErrorResponse, httpStatus?: number): AppError {
-    const { error } = errorResponse;
-
-    switch (error.code) {
-      case "VALIDATION_ERROR":
-        return new ValidationError(error.message, undefined, error.details);
-      case "ACCOUNT_UNVERIFIED":
-      case "EMAIL_NOT_VERIFIED":
-        // Broadcast so AuthProvider can flip isEmailVerified and the global
-        // gate can take over. Do NOT clear auth or redirect here.
-        try {
-          window.dispatchEvent(new CustomEvent("auth-email-unverified"));
-        } catch {
-          // no-op (SSR / non-browser)
-        }
-        return new UnverifiedAccountError(error.message, error.details);
-      case "AI_USAGE_LIMIT_REACHED":
-      case "USAGE_LIMIT_EXCEEDED":
-      case "TOKEN_BUDGET_EXCEEDED": {
-        // AI usage limit exceeded - extract upgrade info from data. The
-        // per-user TOKEN_BUDGET_EXCEEDED case (#528) carries the limit
-        // numbers on `error.budget`; vendor-plan paths put them on `data`.
-        // Both land on AIUsageLimitError so `<GlobalAIUsageBanner>` and
-        // `<GlobalErrorHandler>` agree on the upgrade-prompt path.
-        const aiData = (errorResponse as any).data || {};
-        const budget = (error as any).budget || {};
-        return new AIUsageLimitError(
-          error.message,
-          aiData.upgradeUrl || "/pricing",
-          // TOKEN_BUDGET_EXCEEDED's budget block uses monthly* names
-          // (domains/billing/token-ledger.ts buildTokenBudgetExceededResponse).
-          aiData.used ?? budget.monthlyUsed,
-          aiData.limit ?? budget.monthlyLimit,
-          aiData.remaining ?? budget.totalAvailable,
-          error.details,
-        );
-      }
-      case "RATE_LIMIT_EXCEEDED":
-        // General rate limit exceeded
-        const rateLimitData = (errorResponse as any).data || {};
-        return new RateLimitError(
-          error.message,
-          rateLimitData.upgradeUrl || "/pricing",
-          rateLimitData.used,
-          rateLimitData.limit,
-          rateLimitData.remaining,
-          error.details,
-        );
-      case "AUTHENTICATION_ERROR":
-      case "UNAUTHORIZED":
-      case "ACCOUNT_DELETED":
-        handleSessionInvalidation();
-        return new AuthenticationError(error.message, error.details);
-      case "AUTHORIZATION_ERROR":
-        return new AuthorizationError(error.message, error.details);
-      case "NOT_FOUND":
-      case "NOT_FOUND_ERROR":
-      case "RESUME_PRIVATE": {
-        // Preserve the server-sent code in context so callers can distinguish
-        // "doesn't exist" from "exists but restricted" (e.g. private resumes).
-        const detailsObj = error.details && typeof error.details === "object" ? error.details : {};
-        return new NotFoundError(error.message, { ...detailsObj, serverCode: error.code });
-      }
-      default: {
-        // Stash the server's original error code AND the real HTTP status
-        // in context. Without httpStatus the toast would always read "500"
-        // because NetworkError hardcodes 500 — a 402 quota rejection from
-        // the upload route then misleadingly reads as a server crash. The
-        // dispatched event prefers `httpStatus` from context when present.
-        const detailsObj =
-          error.details && typeof error.details === "object" ? error.details : {};
-        // Explicit-content gate: never surface the API's English sentence —
-        // rebuild it from the category ids in the viewer's language.
-        const message = error.code === EXPLICIT_CONTENT_CODE
-          ? explicitContentMessage(explicitInfoFrom(detailsObj), (key, opts) => String(i18next.t(key, opts)), i18next.language || "en")
-          : error.message;
-        return new NetworkError(message, undefined, {
-          ...detailsObj,
-          serverCode: error.code,
-          httpStatus,
-        });
-      }
-    }
-  }
-
-  // ============================================================================
-  // PUBLIC METHODS
-  // ============================================================================
+  /** The interceptor + transport seam the raw / streaming paths run through. */
+  private readonly pipeline: RequestPipeline = {
+    applyRequestInterceptors: (config) => this.interceptors.applyRequest(config),
+    execute: (url, config) => this.executeRequest(url, config),
+  };
 
   async request<T>(
     endpoint: string,
@@ -782,20 +183,10 @@ export class ApiClient {
     const url = this.createUrl(endpoint);
     let attempt = 0;
 
-    // Only GET is safely retriable. POST/PUT/PATCH/DELETE are NOT idempotent
-    // at the protocol level, and retrying them on network timeouts has caused
-    // duplicate resume uploads (2026-04-20: two `isMaster=true` rows created
-    // from a single upload when the 30s LLM parse exceeded the client
-    // deadline and the retry fired while the backend was still processing).
-    // Callers that want retries on a write can pass `retries: N` explicitly
-    // — implying they've made the endpoint idempotent (via an idempotency
-    // key or a dedupe index).
-    const requestMethod = (config.method ?? "GET").toUpperCase();
-    const defaultRetries = requestMethod === "GET" ? this.retries : 0;
-    const maxAttempts = (config.retries ?? defaultRetries) + 1;
+    const maxAttempts = maxAttemptsFor(config.method, config.retries, this.retries);
 
     // Apply request interceptors
-    const processedConfig = await this.applyRequestInterceptors(config);
+    const processedConfig = await this.interceptors.applyRequest(config);
 
     let lastRequestId: string | undefined;
 
@@ -819,7 +210,7 @@ export class ApiClient {
         });
 
         const response = await this.executeRequest(url, processedConfig);
-        lastRequestId = response.headers.get("x-request-id") ?? undefined;
+        lastRequestId = requestIdOf(response);
 
         // Parse the body ONCE — the same value feeds the diagnostics log
         // and the envelope mapping (no clone + second JSON.parse).
@@ -832,13 +223,13 @@ export class ApiClient {
         }
         recordLogEntryResponse(logId, response.status, responseData, startTime);
 
-        const apiResponse = await this.handleResponse<T>(response, responseData, schema);
+        const apiResponse = await toSuccessEnvelope<T>(response, responseData, schema);
 
         logApiCall(method, url, response.status);
 
         // Apply response interceptors
         const processedResponse =
-          await this.applyResponseInterceptors(apiResponse);
+          await this.interceptors.applyResponse(apiResponse);
 
         return processedResponse;
       } catch (error) {
@@ -853,50 +244,20 @@ export class ApiClient {
           error: normalizedError.message,
         });
 
-        // Retry policy: only retry when the failure looks like a
-        // transient transport problem (fetch threw, DNS/TCP failure,
-        // timeout) — i.e. NetworkError with NO httpStatus in context.
-        // Any HTTP response the server actually emitted — incl. 5xx —
-        // is a signal that hammering further will amplify the fire.
-        // Production tail (2026-05-26) showed `/api/resumes/embedded/:id`
-        // returning 503 on Worker CPU exhaustion, and the original
-        // retry policy of "retry 3× with exponential backoff on
-        // everything except 4xx" multiplied each user retry by 4 and
-        // sustained the worker-CPU overload that originally triggered
-        // the failure.
-        const errorHttpStatus =
-          typeof (normalizedError.context as any)?.httpStatus === "number"
-            ? ((normalizedError.context as any).httpStatus as number)
-            : undefined;
-        const hasServerResponse =
-          errorHttpStatus !== undefined ||
-          /^HTTP \d{3}:/.test(normalizedError.message);
-        if (
-          normalizedError instanceof ValidationError ||
-          normalizedError instanceof AuthenticationError ||
-          normalizedError instanceof AuthorizationError ||
-          hasServerResponse ||
-          attempt >= maxAttempts
-        ) {
+        if (isFinalFailure(normalizedError, attempt, maxAttempts)) {
           const processedError =
-            await this.applyErrorInterceptors(normalizedError);
+            await this.interceptors.applyError(normalizedError);
 
-          if (!isExpectedSilentError(processedError) && !config.suppressErrorEvent) {
-            dispatchApiError({
-              method,
-              url,
-              ...eventFieldsFromError(processedError),
-              requestId: lastRequestId,
-            });
-          }
+          emitApiError(
+            processedError,
+            { method, url, requestId: lastRequestId },
+            config.suppressErrorEvent,
+          );
 
           throw processedError;
         }
 
-        // Wait before retry (exponential backoff + jitter, so the parallel
-        // calls of one page don't all re-land on the same isolate at once)
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000) + Math.random() * 750;
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await waitBeforeRetry(attempt);
       }
     }
 
@@ -930,60 +291,8 @@ export class ApiClient {
     endpoint: string,
     schema?: z.ZodSchema<T>,
   ): Promise<{ data: T }> {
-    const url = this.createUrl(endpoint);
-    const logId = nextLogId();
-    const startTime = Date.now();
-
-    pushApiLogEntry({
-      id: logId,
-      method: "GET",
-      url,
-      timestamp: new Date().toISOString(),
-    });
-
-    let responseData: unknown;
-    let lastRequestId: string | undefined;
-    try {
-      const response = await this.executeRequest(url, { method: "GET" });
-      lastRequestId = response.headers.get("x-request-id") ?? undefined;
-
-      responseData = await readJsonBody(response);
-
-      recordLogEntryResponse(logId, response.status, responseData, startTime);
-
-      if (!response.ok) {
-        this.handleErrorResponse(response.status, responseData);
-      }
-
-      if (schema) {
-        // `nullToUndefined` removed 2026-04-20 — the canonical shared
-        // schemas use `.nullable()` which accepts `T | null`, not
-        // `T | undefined`. Preprocessing was breaking them.
-        const validation = schema.safeParse(responseData);
-        if (!validation.success) {
-          throw new ValidationError(
-            `Invalid response data: ${validation.error.issues.map((i) => i.message).join(", ")}`,
-          );
-        }
-        return { data: validation.data };
-      }
-
-      return { data: responseData as T };
-    } catch (error) {
-      const normalized = normalizeError(error);
-      recordLogEntryError(logId, normalized.message, startTime);
-
-      if (!isExpectedSilentError(normalized)) {
-        dispatchApiError({
-          method: "GET",
-          url,
-          ...eventFieldsFromError(normalized),
-          requestId: lastRequestId,
-        });
-      }
-
-      throw error;
-    }
+    // No request interceptors on this path (historical behaviour).
+    return requestRawBody<T>(this.pipeline, this.createUrl(endpoint), { method: "GET" }, schema, false);
   }
   // (getRaw has no `config` parameter, so no suppressErrorEvent gate is needed —
   // its callers don't have the feedback-loop concern that error-report.ts does.)
@@ -994,64 +303,7 @@ export class ApiClient {
     config: RequestConfig = {},
     schema?: z.ZodSchema<T>,
   ): Promise<{ data: T }> {
-    const url = this.createUrl(endpoint);
-    const logId = nextLogId();
-    const startTime = Date.now();
-    const method = config.method || "GET";
-
-    pushApiLogEntry({
-      id: logId,
-      method,
-      url,
-      requestBody: config.body,
-      timestamp: new Date().toISOString(),
-    });
-
-    let lastRequestId: string | undefined;
-    try {
-      // Apply request interceptors (e.g., Authorization header injection)
-      const processedConfig = await this.applyRequestInterceptors(config);
-
-      const response = await this.executeRequest(url, processedConfig);
-      lastRequestId = response.headers.get("x-request-id") ?? undefined;
-
-      const responseData = await readJsonBody(response);
-
-      recordLogEntryResponse(logId, response.status, responseData, startTime);
-
-      if (!response.ok) {
-        this.handleErrorResponse(response.status, responseData);
-      }
-
-      if (schema) {
-        // `nullToUndefined` removed 2026-04-20 — the canonical shared
-        // schemas use `.nullable()` which accepts `T | null`, not
-        // `T | undefined`. Preprocessing was breaking them.
-        const validation = schema.safeParse(responseData);
-        if (!validation.success) {
-          throw new ValidationError(
-            `Invalid response data: ${validation.error.issues.map((i) => i.message).join(", ")}`,
-          );
-        }
-        return { data: validation.data };
-      }
-
-      return { data: responseData as T };
-    } catch (error) {
-      const normalized = normalizeError(error);
-      recordLogEntryError(logId, normalized.message, startTime);
-
-      if (!config.suppressErrorEvent && !isExpectedSilentError(normalized)) {
-        dispatchApiError({
-          method,
-          url,
-          ...eventFieldsFromError(normalized),
-          requestId: lastRequestId,
-        });
-      }
-
-      throw error;
-    }
+    return requestRawBody<T>(this.pipeline, this.createUrl(endpoint), config, schema, true);
   }
 
   /**
@@ -1061,31 +313,7 @@ export class ApiClient {
    * idle deadline on). A non-2xx response throws the usual typed error.
    */
   async openStream(endpoint: string, config: RequestConfig = {}): Promise<Response> {
-    const url = this.createUrl(endpoint);
-    const logId = nextLogId();
-    const startTime = Date.now();
-    const method = config.method || "GET";
-    pushApiLogEntry({ id: logId, method, url, requestBody: config.body, timestamp: new Date().toISOString() });
-
-    let lastRequestId: string | undefined;
-    try {
-      const response = await this.executeRequest(url, await this.applyRequestInterceptors(config));
-      lastRequestId = response.headers.get("x-request-id") ?? undefined;
-      if (!response.ok) {
-        const responseData = await readJsonBody(response);
-        recordLogEntryResponse(logId, response.status, responseData, startTime);
-        this.handleErrorResponse(response.status, responseData);
-      }
-      recordLogEntryResponse(logId, response.status, undefined, startTime);
-      return response;
-    } catch (error) {
-      const normalized = normalizeError(error);
-      recordLogEntryError(logId, normalized.message, startTime);
-      if (!config.suppressErrorEvent && !isExpectedSilentError(normalized)) {
-        dispatchApiError({ method, url, ...eventFieldsFromError(normalized), requestId: lastRequestId });
-      }
-      throw normalized;
-    }
+    return openStreamRequest(this.pipeline, this.createUrl(endpoint), config);
   }
 
   async post<T>(

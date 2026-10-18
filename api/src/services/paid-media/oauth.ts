@@ -8,7 +8,8 @@
  *      and redirect the browser to adapter.buildAuthUrl(state).
  *   3. Platform redirects back to /api/paid-media/oauth/callback?state=...&code=...
  *   4. We verify state, exchange code for tokens via adapter.exchangeAuthCode,
- *      encrypt + persist into paid_media_connections, then list ad accounts
+ *      seal + persist into provider_connections (purpose "ads", via the
+ *      ad-connections adapter), then list ad accounts
  *      via adapter.listAdAccounts and seed paid_media_accounts.
  *
  * The state JWT replaces session storage — Cloudflare Workers are
@@ -17,9 +18,8 @@
  */
 
 import { SignJWT, jwtVerify } from "jose";
-import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
-import { encryptSecret } from "./secrets.js";
+import { AdConnections } from "../provider-connections/ad-connections.js";
 import { getAdapter, assertPlatform, type PaidMediaEnv } from "./ports/registry.js";
 import { resolveWorkspaceForWrite, type WorkspaceSelection } from "../studio/workspace.js";
 import type { PaidMediaPlatform } from "../../db/schema/paidmedia.js";
@@ -96,52 +96,13 @@ export async function completeOAuth(
   const ws = parseWorkspaceParam(claims.workspace);
   const ctx = await resolveWorkspaceForWrite(claims.userId, ws, { db: d });
 
-  const accessTokenEnc = await encryptSecret(deps.env, tokens.accessToken);
-  const refreshTokenEnc = tokens.refreshToken ? await encryptSecret(deps.env, tokens.refreshToken) : null;
-
   // Upsert connection — one per (workspace, platform).
-  const existing = await d.select().from(schema.paidMediaConnections).where(
-    and(
-      eq(schema.paidMediaConnections.userId, ctx.ownerUserId),
-      ctx.ownerCompanyId
-        ? eq(schema.paidMediaConnections.companyId, ctx.ownerCompanyId)
-        : eq(schema.paidMediaConnections.platform, claims.platform), // companyId IS NULL check below
-      eq(schema.paidMediaConnections.platform, claims.platform),
-    ),
-  ).limit(1);
-
-  let connectionId: string;
-  if (existing.length && ((existing[0]!.companyId ?? null) === (ctx.ownerCompanyId ?? null))) {
-    const row = existing[0]!;
-    await d.update(schema.paidMediaConnections)
-      .set({
-        externalUserId:     tokens.externalUserId ?? row.externalUserId,
-        externalUserHandle: tokens.externalUserHandle ?? row.externalUserHandle,
-        accessTokenEnc,
-        refreshTokenEnc:    refreshTokenEnc ?? row.refreshTokenEnc,
-        accessTokenExpiresAt: tokens.expiresAt,
-        scopes:             tokens.scopes,
-        status:             "active",
-        lastError:          null,
-        updatedAt:          new Date(),
-      })
-      .where(eq(schema.paidMediaConnections.id, row.id));
-    connectionId = row.id;
-  } else {
-    const [row] = await d.insert(schema.paidMediaConnections).values({
-      userId:               ctx.ownerUserId,
-      companyId:            ctx.ownerCompanyId,
-      platform:             claims.platform,
-      externalUserId:       tokens.externalUserId ?? null,
-      externalUserHandle:   tokens.externalUserHandle ?? null,
-      accessTokenEnc,
-      refreshTokenEnc,
-      accessTokenExpiresAt: tokens.expiresAt,
-      scopes:               tokens.scopes,
-      status:               "active",
-    } as any).returning({ id: schema.paidMediaConnections.id });
-    connectionId = row!.id;
-  }
+  const adConnections = new AdConnections(d);
+  const connectionId = await adConnections.saveOAuth(
+    { userId: ctx.ownerUserId, companyId: ctx.ownerCompanyId ?? null },
+    claims.platform,
+    tokens,
+  );
 
   // Discover and seed ad accounts.
   let accountCount = 0;
@@ -164,9 +125,7 @@ export async function completeOAuth(
   } catch (err) {
     // Account listing failed — connection still persisted; surface a
     // soft error so user sees "Connected, but no accounts discovered".
-    await d.update(schema.paidMediaConnections)
-      .set({ lastError: err instanceof Error ? err.message : String(err), updatedAt: new Date() })
-      .where(eq(schema.paidMediaConnections.id, connectionId));
+    await adConnections.setLastError(connectionId, err instanceof Error ? err.message : String(err));
   }
 
   return { connectionId, platform: claims.platform, accountCount };

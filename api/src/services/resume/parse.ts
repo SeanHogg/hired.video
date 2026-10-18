@@ -6,18 +6,6 @@
  * Extracted from routes/resumes.ts so they can be unit-tested independently.
  */
 
-// ─── Key normalisation helpers ─────────────────────────────────────────────
-
-/** Case-insensitive property lookup: tries `key` then `Key`. */
-export function ciGet(obj: Record<string, unknown>, key: string): unknown {
-  return obj[key] ?? obj[key.charAt(0).toUpperCase() + key.slice(1)];
-}
-
-/** Same as ciGet but takes a full object and a key. */
-export function ciProp(obj: Record<string, unknown>, key: string): unknown {
-  return obj[key] ?? obj[key.charAt(0).toUpperCase() + key.slice(1)];
-}
-
 // ─── JSON Resume normaliser ────────────────────────────────────────────────
 
 /**
@@ -150,79 +138,6 @@ export function looksLikeBinaryText(text: string): boolean {
 export function stripResumeControlChars(text: string): string {
   // eslint-disable-next-line no-control-regex
   return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
-}
-
-// ─── metaResume builder ────────────────────────────────────────────────────
-
-function ensureId(
-  item: Record<string, unknown>,
-  resumeId: string,
-  section: string,
-  index: number,
-): Record<string, unknown> {
-  if (item.id || item.Id) return item;
-  return { ...item, id: `${resumeId}-${section}-${index}` };
-}
-
-/**
- * Build the legacy `metaResume` envelope from a raw content JSONB blob.
- * Handles both lowercase and PascalCase keys transparently.
- */
-export function buildMetaResume(
-  content: Record<string, unknown>,
-  resumeId: string,
-  rowTitle: string,
-) {
-  const c = content;
-  const ci = (key: string) => ciGet(c, key);
-  const prop = (obj: Record<string, unknown>, key: string) => ciProp(obj, key);
-
-  const basics = (ci("basics") ?? {}) as Record<string, unknown>;
-  const loc = prop(basics, "location") as Record<string, unknown> | null | undefined;
-
-  const ensureArr = (key: string) => {
-    const arr = ci(key);
-    return Array.isArray(arr)
-      ? arr.map((item: any, i: number) => ensureId(item, resumeId, key, i))
-      : [];
-  };
-
-  return {
-    basics: {
-      id: prop(basics, "id") || prop(basics, "Id") || `${resumeId}-basics-0`,
-      name: prop(basics, "name") ?? rowTitle ?? "",
-      label: prop(basics, "label") ?? "",
-      image: prop(basics, "image") ?? "",
-      email: prop(basics, "email") ?? "",
-      phone: prop(basics, "phone") ?? "",
-      url: prop(basics, "url") ?? "",
-      summary: prop(basics, "summary") ?? "",
-      location: loc
-        ? {
-            address: prop(loc, "address") ?? "",
-            postalCode: prop(loc, "postalCode") ?? "",
-            city: prop(loc, "city") ?? "",
-            countryCode: prop(loc, "countryCode") ?? "",
-            region: prop(loc, "region") ?? "",
-          }
-        : null,
-    },
-    work: ensureArr("work"),
-    education: ensureArr("education"),
-    volunteer: ensureArr("volunteer"),
-    awards: ensureArr("awards"),
-    certificates: ensureArr("certificates"),
-    publications: ensureArr("publications"),
-    skills: ensureArr("skills"),
-    languages: ensureArr("languages"),
-    interests: ensureArr("interests"),
-    references: ensureArr("references"),
-    projects: ensureArr("projects"),
-    // Opaque bag for renderer-level settings (assigned template id for default
-    // and embedded views, version hint, etc.). Passed through untouched so the
-    // client can persist and re-read it without a schema migration.
-    meta: (ci("meta") ?? ci("Meta") ?? null) as Record<string, unknown> | null,
-  };
 }
 
 // ─── extractJson ───────────────────────────────────────────────────────────

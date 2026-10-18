@@ -21,12 +21,9 @@ import {
   listMyPathEnrollments,
   listPublicPaths,
 } from "../../services/learning/learning-path-use-cases.js";
+import { requireUser } from "../helpers/routerHelpers.js";
 
 export const pathLearnerRoutes = new Hono<AppEnv>();
-
-function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
 
 pathLearnerRoutes.get("/paths/public", async (c) => {
   const limit = clampLimit(c.req.query("limit"), 20, 100);
@@ -40,21 +37,18 @@ pathLearnerRoutes.get("/paths/public/:id", async (c) => {
 });
 
 pathLearnerRoutes.get("/paths/me/enrollments", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   return c.json(success(await listMyPathEnrollments(userId)), 200);
 });
 
 pathLearnerRoutes.post("/paths/:id/enroll", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   const result = await enrollInPath(userId, c.req.param("id"));
   if (!result) return c.json(error("NOT_FOUND", "Path not found"), 404);
   return c.json(success(result.enrollment), result.created ? 201 : 200);
 });
 
 pathLearnerRoutes.get("/paths/:id/progress", async (c) => {
-  const userId = uid(c);
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const userId = requireUser(c);
   return c.json(success(await getPathProgress(userId, c.req.param("id"))), 200);
 });

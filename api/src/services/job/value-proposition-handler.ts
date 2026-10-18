@@ -18,13 +18,9 @@ import {
 import { getPrompt } from "../../../../shared/ai-prompts/index.js";
 import { DomainError, requireUserId } from "../../domains/errors.js";
 import type { LLMStreamSink } from "../adapters/llm-client.js";
-import {
-  TEXT_CAP,
-  resolveJob,
-  resolveResumeV2,
-  resumeContentToText,
-  type MatchDeps,
-} from "./match-handlers.js";
+import type { MatchDeps } from "./match-deps.js";
+import { TEXT_CAP, resumeContentToText } from "./match-text.js";
+import { resolveJob, resolveResumeV2 } from "./match-resolvers.js";
 
 const SYSTEM_PROMPT = getPrompt("value-proposition").render({});
 
