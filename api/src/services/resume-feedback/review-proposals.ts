@@ -12,7 +12,7 @@ import type {
   ResumeReviewAnnotationDTO,
   SuggestedEdit,
 } from "../../../../shared/resume-feedback.js";
-import { invalidateCachedKey } from "../../utils/edge-cache.js";
+import { invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import { annotationCacheKey, nameForAuthor } from "./annotation-authors.js";
 import { ContentEditError } from "./content-edit.js";
 import type { ResumeFeedbackServiceDeps } from "./deps.js";
@@ -58,7 +58,7 @@ export class ReviewProposals {
       resolvedByUserId: ownerId,
       resolvedAt: this.deps.now(),
     });
-    invalidateCachedKey(annotationCacheKey(review.id));
+    invalidateIsolateKey(annotationCacheKey(review.id));
     // reviewerId lets the route credit gamification points to the reviewer
     // who authored the accepted suggestion (#1952). Null for token-only
     // external reviewers with no platform account.

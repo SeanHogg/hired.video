@@ -23,9 +23,48 @@ export function listNotifications(
   return repo().listForUser(userId, fields, limit);
 }
 
-/** Newest unread notifications (the SSE hub's initial burst). */
-export function listUnreadNotifications(userId: string, limit = 50): Promise<NotificationRow[]> {
-  return repo().listUnreadForUser(userId, limit);
+/** Newest unread notifications (the SSE hub's burst). With `since` (the
+ *  client's poll cursor) only rows created at/after it — so a 60s re-poll
+ *  costs a tiny range scan instead of re-sending every unread row. */
+export function listUnreadNotifications(
+  userId: string,
+  limit = 50,
+  since: Date | null = null,
+): Promise<NotificationRow[]> {
+  return repo().listUnreadForUser(userId, limit, since);
+}
+
+/** Overlap applied to the client's cursor: an insert whose transaction
+ *  began before the previous poll (so its created_at is older than the
+ *  newest row that poll saw) but committed after it is still picked up.
+ *  The client dedupes the re-sent rows by id. */
+export const NOTIFICATION_CURSOR_OVERLAP_MS = 10_000;
+
+/** Parse the hub's `since` query param (an ISO timestamp) into the lower
+ *  bound for the poll, or null for a full unread burst. The bound is the
+ *  cursor minus the overlap, clamped to now so a bogus future cursor can't
+ *  hide new rows. */
+export function parseNotificationCursor(raw: string | undefined | null, now: Date = new Date()): Date | null {
+  if (!raw) return null;
+  const ms = Date.parse(raw);
+  if (!Number.isFinite(ms)) return null;
+  return new Date(Math.min(ms, now.getTime()) - NOTIFICATION_CURSOR_OVERLAP_MS);
+}
+
+/** The cursor the client should send next: the newest returned row's
+ *  createdAt, else the bound this poll used (overlap re-added), else null
+ *  (no unread rows yet — the next poll is a cheap full burst). */
+export function notificationCursorFrom(
+  rows: ReadonlyArray<{ createdAt: Date | string | null }>,
+  since: Date | null,
+): string | null {
+  let newest = -Infinity;
+  for (const r of rows) {
+    const ms = r.createdAt == null ? NaN : new Date(r.createdAt).getTime();
+    if (Number.isFinite(ms) && ms > newest) newest = ms;
+  }
+  if (Number.isFinite(newest)) return new Date(newest).toISOString();
+  return since ? new Date(since.getTime() + NOTIFICATION_CURSOR_OVERLAP_MS).toISOString() : null;
 }
 
 export function countUnreadNotifications(userId: string): Promise<number> {

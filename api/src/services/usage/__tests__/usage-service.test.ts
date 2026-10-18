@@ -110,7 +110,7 @@ describe("UsageService.recordBatches — one upsert per distinct visitor", () =>
     const res = await svc.recordBatches(
       [
         batch({ visitorId: "visitor-merge-1", context: { entryPath: "/first" }, events: [{ type: "page_view", path: "/a" }] }),
-        batch({ visitorId: "visitor-merge-1", context: { entryPath: "/second" }, events: [{ type: "click", path: "/b" }] }),
+        batch({ visitorId: "visitor-merge-1", context: { entryPath: "/second" }, events: [{ type: "cta_click", path: "/b" }] }),
         batch({ visitorId: "visitor-merge-2", events: [{ type: "page_view", path: "/c" }] }),
         batch({ visitorId: "visitor-merge-3", consent: false }),
       ],
@@ -121,7 +121,7 @@ describe("UsageService.recordBatches — one upsert per distinct visitor", () =>
     assert.equal(insertCalls, 2, "one events insert per distinct visitor");
     const merged = repo.sessions.find((s) => s.visitorId === "visitor-merge-1");
     assert.equal(merged?.entryPath, "/first", "entry context from the first batch");
-    assert.equal(merged?.lastEventType, "click", "latest activity from the last event");
+    assert.equal(merged?.lastEventType, "cta_click", "latest activity from the last event");
     assert.equal(merged?.lastPath, "/b");
     assert.equal(merged?.role, "employer");
     assert.deepEqual(

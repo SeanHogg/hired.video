@@ -22,6 +22,7 @@ import { artifactRefKey, planOwnerLookups, type ArtifactRef } from "../artifactO
 import type { ActivityLogInsert } from "../../../repositories/auditRepository.js";
 import type { NewArtifactView } from "../artifactView.js";
 import type { TrackUsageInput } from "../../../../../shared/usage.js";
+import type { UsageRequestContext } from "../../usage/UsageService.js";
 
 const OWNER = "11111111-1111-4111-8111-111111111111";
 const VIEWER = "22222222-2222-4222-8222-222222222222";
@@ -67,7 +68,7 @@ class FakeSink implements AnalyticsIngestSink {
   async insertArtifactViews(rows: readonly NewArtifactView[]) {
     this.viewCalls.push([...rows]);
   }
-  async recordUsage(batches: readonly TrackUsageInput[]) {
+  async recordUsage(batches: readonly TrackUsageInput[], _ctx: UsageRequestContext) {
     this.usageCalls.push([...batches]);
   }
 }

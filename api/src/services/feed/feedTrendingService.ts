@@ -7,7 +7,7 @@
 
 import { getDb } from "../../db/index.js";
 import { FEED_REACTIONS } from "../../../../shared/feed-reactions.js";
-import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 import {
   selectTrendingPosts,
   selectTrendingTags,
@@ -16,7 +16,7 @@ import {
 
 /** Top hashtags by post frequency (last 30 days). */
 export function getTrendingTags(limit: number): Promise<TrendingTagRow[]> {
-  return getOrSetCached<TrendingTagRow[]>({
+  return getOrSetIsolateCached<TrendingTagRow[]>({
     key: `feed:v1:trending-tags:${limit}`,
     ttlSeconds: 300,
     loader: () => selectTrendingTags(getDb(), limit),
@@ -31,7 +31,7 @@ export function getTrendingPosts(limit: number): Promise<Array<Record<string, un
   // (no user input), so raw interpolation is safe.
   const reactionWeightCase = FEED_REACTIONS.map((r) => `WHEN '${r.type}' THEN ${r.weight}`).join(" ");
 
-  return getOrSetCached<Array<Record<string, unknown>>>({
+  return getOrSetIsolateCached<Array<Record<string, unknown>>>({
     key: `feed:trending-posts:${limit}`,
     ttlSeconds: 300,
     loader: async () => {

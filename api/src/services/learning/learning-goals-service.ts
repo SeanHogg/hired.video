@@ -87,7 +87,6 @@ export async function recommendForGoal(userId: string, id: string, llm: GoalLlm 
       for (const cand of candidates) if (!orderedIds.includes(cand.id)) ranked.push(cand);
       return ranked.slice(0, 6);
     },
-    revive: (raw) => (Array.isArray(raw) ? raw : null),
   });
 }
 

@@ -17,7 +17,7 @@
 
 import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
-import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 
 export interface FeaturedCreator {
   userId: string;
@@ -141,7 +141,9 @@ export function getFeaturedCreators(opts: {
 }): Promise<FeaturedCreator[]> {
   const { limit, category, weights } = opts;
   if (!isDefaultWeights(weights)) return loadFeaturedCreators(limit, category, weights);
-  return getOrSetCached({
+  // Isolate-only: `category` is a free-text query param, so the keyspace is
+  // unbounded (a KV write per distinct value on Workers Free).
+  return getOrSetIsolateCached({
     key: `featured-creators:v1:${limit}:${category ?? ""}`,
     ttlSeconds: FEATURED_CREATORS_TTL_SECONDS,
     loader: () => loadFeaturedCreators(limit, category, weights),

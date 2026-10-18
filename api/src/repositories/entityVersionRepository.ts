@@ -9,6 +9,12 @@
  * guarded by the (subject_type, subject_id, version_number) unique index:
  * a concurrent writer that loses the race inserts nothing (ON CONFLICT DO
  * NOTHING) and is retried with the next number.
+ *
+ * Writes never RETURN `payload` (a whole resume / storyboard / article body):
+ * the caller already holds what it inserted, so inserts return metadata and
+ * the in-memory payload is stitched back on. Autosave retention rides in the
+ * SAME round-trip as the insert (`db.batch`, one HTTP call on neon-http);
+ * the prune never depends on the insert result.
  */
 import { and, desc, eq, isNotNull, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { schema } from "../db/index.js";
@@ -40,6 +46,31 @@ export interface NewEntityVersionInput {
   proposalStatus?: string | null;
 }
 
+/** Every column except `payload` — what writes RETURN. */
+export const ENTITY_VERSION_META_COLUMNS = {
+  id: versions.id,
+  subjectType: versions.subjectType,
+  subjectId: versions.subjectId,
+  userId: versions.userId,
+  versionNumber: versions.versionNumber,
+  label: versions.label,
+  isAutosave: versions.isAutosave,
+  proposedByUserId: versions.proposedByUserId,
+  reviewId: versions.reviewId,
+  proposalStatus: versions.proposalStatus,
+  createdAt: versions.createdAt,
+};
+
+export type EntityVersionMeta = Omit<EntityVersionRow, "payload">;
+
+/** Autosave retention policy: keep the newest `cap` autosaves, none older
+ *  than `retentionDays`. */
+export interface AutosavePrunePolicy {
+  cap: number;
+  retentionDays: number;
+  now?: Date;
+}
+
 /** Tries before giving up on a hot subject (each loss means another writer won). */
 const INSERT_ATTEMPTS = 3;
 
@@ -64,6 +95,60 @@ export async function insertWithNextVersion<T>(attempt: () => Promise<T | null>)
     if (row) return row;
   }
   return null;
+}
+
+/** INSERT at the subject's next version number, RETURNING metadata only. */
+export function buildInsertNextVersion(db: DbLike, input: NewEntityVersionInput) {
+  return db
+    .insert(versions)
+    .values({
+      subjectType: input.subjectType,
+      subjectId: input.subjectId,
+      userId: input.userId,
+      versionNumber: nextVersionNumberSql(input.subjectType, input.subjectId),
+      label: input.label,
+      payload: input.payload ?? null,
+      isAutosave: input.isAutosave,
+      proposedByUserId: input.proposedByUserId ?? null,
+      reviewId: input.reviewId ?? null,
+      proposalStatus: input.proposalStatus ?? null,
+    })
+    .onConflictDoNothing({ target: [versions.subjectType, versions.subjectId, versions.versionNumber] })
+    .returning(ENTITY_VERSION_META_COLUMNS);
+}
+
+/**
+ * Autosave retention as ONE DELETE: the subject's autosaves that are older
+ * than the window OR outside the newest `cap`. Labelled snapshots
+ * (is_autosave = false) are never touched. `guard` (e.g. an ownership
+ * EXISTS) is ANDed in so a batched prune can't act for a caller whose
+ * insert was refused. RETURNING ids gives the pruned count.
+ */
+export function buildPruneAutosaves(
+  db: DbLike,
+  subjectType: EntityVersionSubjectType,
+  subjectId: string,
+  policy: AutosavePrunePolicy,
+  guard?: SQL,
+) {
+  const now = policy.now ?? new Date();
+  const cutoff = new Date(now.getTime() - policy.retentionDays * 86_400_000);
+  const autosaves = and(subjectScope(subjectType, subjectId), eq(versions.isAutosave, true));
+  const newestToKeep = db
+    .select({ id: versions.id })
+    .from(versions)
+    .where(autosaves)
+    .orderBy(desc(versions.createdAt))
+    .limit(policy.cap);
+  const outOfPolicy = or(lt(versions.createdAt, cutoff), notInArray(versions.id, newestToKeep));
+  return db
+    .delete(versions)
+    .where(guard ? and(autosaves, outOfPolicy, guard) : and(autosaves, outOfPolicy))
+    .returning({ id: versions.id });
+}
+
+export function rowCount(rows: unknown): number {
+  return Array.isArray(rows) ? rows.length : 0;
 }
 
 export class EntityVersionRepository {
@@ -110,55 +195,53 @@ export class EntityVersionRepository {
     return (row as EntityVersionRow | undefined) ?? null;
   }
 
-  /** Insert at the subject's next version number (race-safe, see header). */
+  /** Insert at the subject's next version number (race-safe, see header).
+   *  The returned row's `payload` is the caller's input (not re-read). */
   async insertNext(input: NewEntityVersionInput): Promise<EntityVersionRow> {
-    const row = await insertWithNextVersion<EntityVersionRow>(async () => {
-      const [inserted] = await this.db
-        .insert(versions)
-        .values({
-          subjectType: input.subjectType,
-          subjectId: input.subjectId,
-          userId: input.userId,
-          versionNumber: nextVersionNumberSql(input.subjectType, input.subjectId),
-          label: input.label,
-          payload: input.payload ?? null,
-          isAutosave: input.isAutosave,
-          proposedByUserId: input.proposedByUserId ?? null,
-          reviewId: input.reviewId ?? null,
-          proposalStatus: input.proposalStatus ?? null,
-        })
-        .onConflictDoNothing({ target: [versions.subjectType, versions.subjectId, versions.versionNumber] })
-        .returning();
-      return (inserted as EntityVersionRow | undefined) ?? null;
-    });
-    if (!row) throw new Error(`entity_versions: could not allocate a version number for ${input.subjectType} ${input.subjectId}`);
+    const { row } = await this.insertNextAndPrune(input, null);
     return row;
   }
 
   /**
-   * Autosave retention in ONE statement: delete the subject's autosaves that
-   * are older than the window OR outside the newest `cap`. Labelled
-   * snapshots (is_autosave = false) are never touched. Returns the count.
+   * Insert the next version AND (when `prune` is set) apply autosave
+   * retention in ONE round-trip (`db.batch`). The prune is independent of
+   * the insert result, so it runs once even if a lost version-number race
+   * makes the insert retry alone. `prunedCount` is 0 when no prune ran.
    */
+  async insertNextAndPrune(
+    input: NewEntityVersionInput,
+    prune: AutosavePrunePolicy | null,
+  ): Promise<{ row: EntityVersionRow; prunedCount: number }> {
+    let prunedCount = 0;
+    let pendingPrune = prune;
+    const meta = await insertWithNextVersion<EntityVersionMeta>(async () => {
+      const insert = buildInsertNextVersion(this.db, input);
+      let inserted: unknown;
+      if (pendingPrune) {
+        const [ins, deleted] = await this.db.batch([
+          insert,
+          buildPruneAutosaves(this.db, input.subjectType, input.subjectId, pendingPrune),
+        ]);
+        pendingPrune = null;
+        prunedCount = rowCount(deleted);
+        inserted = ins;
+      } else {
+        inserted = await insert;
+      }
+      const [first] = Array.isArray(inserted) ? (inserted as EntityVersionMeta[]) : [];
+      return first ?? null;
+    });
+    if (!meta) throw new Error(`entity_versions: could not allocate a version number for ${input.subjectType} ${input.subjectId}`);
+    return { row: { ...meta, payload: input.payload ?? null }, prunedCount };
+  }
+
+  /** Autosave retention on its own (see buildPruneAutosaves). Returns the count. */
   async pruneAutosaves(
     subjectType: EntityVersionSubjectType,
     subjectId: string,
-    opts: { cap: number; retentionDays: number; now?: Date },
+    opts: AutosavePrunePolicy,
   ): Promise<number> {
-    const now = opts.now ?? new Date();
-    const cutoff = new Date(now.getTime() - opts.retentionDays * 86_400_000);
-    const autosaves = and(subjectScope(subjectType, subjectId), eq(versions.isAutosave, true));
-    const newestToKeep = this.db
-      .select({ id: versions.id })
-      .from(versions)
-      .where(autosaves)
-      .orderBy(desc(versions.createdAt))
-      .limit(opts.cap);
-    const deleted = await this.db
-      .delete(versions)
-      .where(and(autosaves, or(lt(versions.createdAt, cutoff), notInArray(versions.id, newestToKeep))))
-      .returning({ id: versions.id });
-    return Array.isArray(deleted) ? deleted.length : 0;
+    return rowCount(await buildPruneAutosaves(this.db, subjectType, subjectId, opts));
   }
 
   async setProposalStatus(versionId: string, status: string): Promise<EntityVersionRow | null> {

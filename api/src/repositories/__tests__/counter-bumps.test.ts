@@ -36,7 +36,7 @@ describe("ads.impressions — pick + count in one statement", () => {
     assert.match(sql, /"impressions" = "ads"\."impressions" \+ 1/);
     assert.match(sql, /"updated_at" = \$\d+/);
     assert.match(sql, /returning .*"headline".*"destination_url"/);
-    assert.equal((sql.match(/update/g) ?? []).length, 1, "one statement, no separate read");
+    assert.equal((sql.match(/\bupdate\b/g) ?? []).length, 1, "one statement, no separate read");
   });
 
   it("keeps the servable conditions (active ad, active ad set, placement) inside a LIMIT 1 subquery", () => {

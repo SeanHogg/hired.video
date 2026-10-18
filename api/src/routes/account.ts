@@ -40,7 +40,10 @@ function getCurrentUserRole(c: any) {
 accountRoutes.get("/users", async (c) => {
   const userId = requireUser(c);
   const userRole = getCurrentUserRole(c);
-  const users = await listAccountUsers(userId, userRole);
+  // Optional paging (`?limit=&offset=`); the repo clamps to its page cap.
+  const limit = Number(c.req.query("limit") ?? NaN);
+  const offset = Number(c.req.query("offset") ?? NaN);
+  const users = await listAccountUsers(userId, userRole, { limit, offset });
   return c.json(success({ result: users }), 200);
 });
 

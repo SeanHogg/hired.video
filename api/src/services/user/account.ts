@@ -33,6 +33,14 @@ import { BillingAddressRepository } from "../../repositories/billingAddressRepos
 import { AuthTokensRepository } from "../../repositories/authTokensRepository.js";
 import { PreferencesRepository } from "../../repositories/preferencesRepository.js";
 import { parseRoleAlias } from "../../../../shared/user-roles.js";
+import {
+  accountTeamInvitationColumns,
+  clampAccountTeamPage,
+  findAccountTeamUser,
+  listAccountTeamPage,
+  type AccountTeamInvitationRow,
+  type AccountTeamUserRow,
+} from "../../repositories/accountTeamRepository.js";
 
 /** Narrow Deps slice. account.ts touches both `users` (via UsersRepository)
  *  and `accountInvitations` (via PlatformRepository) plus assorted
@@ -145,7 +153,7 @@ function anonymizedHandles(userId: string): { name: string; email: string } {
  *  loop has something to render, and keep the raw `role` field for any
  *  callers that still want it. */
 function normalizeUser(
-  row: typeof users.$inferSelect,
+  row: AccountTeamUserRow,
   ctx: { currentUserId: string; currentUserRole: string },
 ): AccountUser {
   const { firstName, lastName } = splitPersonName(row.name);
@@ -192,7 +200,7 @@ function normalizeUser(
  *  marked `pending` past 14 days is treated as Expired so the UI badges
  *  it amber rather than green. */
 function normalizeInvitation(
-  row: typeof accountInvitations.$inferSelect,
+  row: AccountTeamInvitationRow,
   ctx: { currentUserRole: string },
 ): AccountUser {
   const viewerIsAdmin = ctx.currentUserRole?.toLowerCase() === "admin";
@@ -226,26 +234,16 @@ function normalizeInvitation(
 }
 
 export async function listAccountUsers(currentUserId: string, currentUserRole: string,
+  page: { limit?: number; offset?: number } = {},
   deps?: Partial<AccountDeps>): Promise<AccountUser[]> {
   const d = resolveDeps(deps); const db = d.db;
   const ctx = { currentUserId, currentUserRole };
-  // Admins see all users + every still-open invitation; non-admins see
+  // Admins see a page of users + open invitations; non-admins see
   // only their own row so they can confirm their join state in Team
   // Members without exposing the rest of the org.
   if (currentUserRole?.toLowerCase() === "admin") {
-    const [userRows, inviteRows] = await Promise.all([
-      db.select().from(users).orderBy(desc(users.createdAt)),
-      db
-        .select()
-        .from(accountInvitations)
-        .where(
-          or(
-            eq(accountInvitations.status, "pending"),
-            eq(accountInvitations.status, "cancelled"),
-          ),
-        )
-        .orderBy(desc(accountInvitations.createdAt)),
-    ]);
+    const { users: userRows, invitations: inviteRows } =
+      await listAccountTeamPage(db, clampAccountTeamPage(page));
     // De-dupe: if an invitation email already has a user row, the user
     // row is authoritative — drop the invitation copy.
     const userEmails = new Set(userRows.map((u) => u.email.toLowerCase()));
@@ -256,7 +254,7 @@ export async function listAccountUsers(currentUserId: string, currentUserRole: s
         .map((r) => normalizeInvitation(r, ctx)),
     ];
   }
-  const [row] = await db.select().from(users).where(eq(users.id, currentUserId)).limit(1);
+  const row = await findAccountTeamUser(db, currentUserId);
   return row ? [normalizeUser(row, ctx)] : [];
 }
 
@@ -669,7 +667,7 @@ export async function listPendingInvitations(currentUserId: string,
   }
 
   const invites = await db
-    .select()
+    .select(accountTeamInvitationColumns)
     .from(accountInvitations)
     .where(scope)
     .orderBy(desc(accountInvitations.createdAt))

@@ -1,6 +1,11 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
-import { listUnreadNotifications } from "../services/notifications/notificationFeed.js";
+import {
+  countUnreadNotifications,
+  listUnreadNotifications,
+  notificationCursorFrom,
+  parseNotificationCursor,
+} from "../services/notifications/notificationFeed.js";
 import { requireUser } from "./helpers/routerHelpers.js";
 
 export const hubsRoutes = new Hono<AppEnv>();
@@ -10,7 +15,10 @@ export const hubsRoutes = new Hono<AppEnv>();
 //
 // Replaces the legacy SignalR /negotiate + WebSocket pattern.
 // Cloudflare Workers support streaming responses natively. This endpoint:
-//   1. Immediately sends all unread notifications as SSE events.
+//   1. Immediately sends unread notifications as SSE events — all of them
+//      (newest 50) on a first poll, or only those created since the client's
+//      `?since=<ISO>` cursor on a re-poll (an indexed range scan instead of
+//      re-sending every unread row each minute).
 //   2. Sends a "connected" ping so clients know the stream is live.
 //   3. Closes — clients should reconnect on a short interval or use polling
 //      via GET /api/notifications for a simpler approach.
@@ -37,7 +45,12 @@ hubsRoutes.post("/notifications/negotiate", (c) => {
 hubsRoutes.get("/notifications", async (c) => {
   const userId = requireUser(c);
 
-  const unread = await listUnreadNotifications(userId, 50);
+  const since = parseNotificationCursor(c.req.query("since"));
+  const unread = await listUnreadNotifications(userId, 50, since);
+  // A cursored poll only carries the NEW rows, so the badge count comes from
+  // the (isolate-cached) unread count; a full burst keeps its legacy count.
+  const unreadCount = since ? await countUnreadNotifications(userId) : unread.length;
+  const cursor = notificationCursorFrom(unread, since);
 
   // Build an SSE stream
   const encoder = new TextEncoder();
@@ -64,7 +77,7 @@ hubsRoutes.get("/notifications", async (c) => {
       }
 
       // Emit a summary count event then close
-      send("summary", { unreadCount: unread.length });
+      send("summary", { unreadCount, cursor });
       controller.close();
     },
   });

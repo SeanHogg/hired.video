@@ -80,8 +80,10 @@ export function BadgeUnlockToaster() {
   }, [eligible, userId, refetch]);
 
   // Awards made server-side (workers, other tabs) arrive as badge/points
-  // notifications on the SSE hub. The hub re-sends every UNREAD row on each
-  // reconnect, so only rows created after mount (and not yet seen) refetch.
+  // notifications on the SSE hub. The first poll sends every UNREAD row and
+  // later polls re-send the cursor's overlap window (or, from a server
+  // without cursor support, every unread row again), so only rows created
+  // after mount and not yet seen refetch — never a duplicate celebration.
   useEffect(() => {
     if (!eligible || !userId) return;
     // Small skew allowance — the server clock stamps createdAt.

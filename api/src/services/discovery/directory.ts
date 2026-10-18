@@ -6,7 +6,7 @@
  */
 import { getDb } from "../../db/index.js";
 import { DomainError } from "../../domains/errors.js";
-import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 import {
   findProfileWithVerification,
   listPublicTalentProfiles,
@@ -96,10 +96,10 @@ async function loadCreatorLeaderboard(): Promise<CreatorLeaderboardEntry[]> {
 }
 
 /** Top creators by feed post count. Anonymous + shared, slow-moving →
- *  edge cache 300s (TTL-only). Loader errors propagate so they're never
+ *  isolate cache 300s (TTL-only; no KV writes). Loader errors propagate so they're never
  *  cached; the caller degrades to an empty list. */
 export function getCreatorLeaderboard(): Promise<CreatorLeaderboardEntry[]> {
-  return getOrSetCached({
+  return getOrSetIsolateCached({
     key: "discovery:v1:creator-leaderboard",
     ttlSeconds: 300,
     loader: loadCreatorLeaderboard,

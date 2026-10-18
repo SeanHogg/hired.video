@@ -6,7 +6,6 @@
  */
 import { getDb } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
-import { getOrSetCached } from "../../utils/edge-cache.js";
 import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 import { logger } from "../../lib/logger.js";
 import { CohortService } from "./cohort-service.js";
@@ -98,7 +97,7 @@ export async function getXpLeaderboard(
   // per fill); the global board (one key per limit) stays on the edge cache.
   const entries = scope === "cohort"
     ? await getOrSetIsolateCached<LeaderboardEntry[]>({ key: cacheKey, ttlSeconds: 120, loader: loadBoard })
-    : await getOrSetCached<LeaderboardEntry[]>({ key: cacheKey, ttlSeconds: 300, loader: loadBoard });
+    : await getOrSetIsolateCached<LeaderboardEntry[]>({ key: cacheKey, ttlSeconds: 300, loader: loadBoard });
 
   const myBalance = await repos.points.findBalance(userId);
   let viewer: { rank: number; points: number } | null = null;

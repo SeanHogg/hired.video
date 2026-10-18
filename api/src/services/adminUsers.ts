@@ -21,6 +21,7 @@ import { USER_ROLES } from "../../../shared/user-roles.js";
 import { reclaimVideoR2 } from "./storage/reclaim-video-r2.js";
 import { loadReferralsForUsers, countReferredUsers } from "./adminReferrals.js";
 import { onUserRoleChanged } from "./user/roleChangeEffects.js";
+import { publicUserColumns } from "../repositories/userColumns.js";
 
 /** Deps this module actually needs. Services declare a narrow `Pick<ApiDeps, …>`
  *  so tests mock only the surface the function touches (ISP). Production
@@ -272,7 +273,8 @@ export async function searchUsers(
 
 export async function getUserDetail(userId: string) {
   const db = getDb();
-  const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+  // Never select credentials — the row is returned to the admin client.
+  const [user] = await db.select(publicUserColumns).from(schema.users).where(eq(schema.users.id, userId)).limit(1);
   if (!user) return null;
 
   const [recentSessions, moduleAssignments, permissionOverrides] = await Promise.all([
@@ -303,8 +305,7 @@ export async function getUserDetail(userId: string) {
     db.select().from(schema.userPermissionOverrides).where(eq(schema.userPermissionOverrides.userId, userId)),
   ]);
 
-  const { passwordHash, mfaSecret, ...safeUser } = user;
-  return { user: safeUser, recentSessions, moduleAssignments, permissionOverrides };
+  return { user, recentSessions, moduleAssignments, permissionOverrides };
 }
 
 // ── Role / status changes ─────────────────────────────────────────────────────

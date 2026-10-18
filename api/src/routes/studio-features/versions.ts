@@ -57,22 +57,20 @@ versionRoutes.post("/projects/:projectId/versions", validateJson(z.object({
   if (body.storyboard == null) return c.json(error("VALIDATION_ERROR", "storyboard required"), 400);
   if (!isProjectId(projectId)) return c.json(error("VALIDATION_ERROR", "Invalid project id"), 400);
 
-  const repo = liveEntityVersions();
-  const version = await repo.insertNext({
-    subjectType: SUBJECT,
-    subjectId: projectId,
-    userId: user.sub,
-    label: body.label ?? (body.isAutosave === false ? "manual" : "autosave"),
-    payload: body.storyboard,
-    isAutosave: body.isAutosave !== false,
-  });
-
-  // Enforce 50-version cap and 30-day retention by deleting old AUTOSAVE rows.
-  // Manual snapshots are preserved beyond the cap.
-  const prunedCount = await repo.pruneAutosaves(SUBJECT, projectId, {
-    cap: VERSIONS_PER_PROJECT_CAP,
-    retentionDays: VERSION_RETENTION_DAYS,
-  });
+  // Enforce 50-version cap and 30-day retention by deleting old AUTOSAVE rows
+  // (manual snapshots are preserved beyond the cap) — in the SAME round-trip
+  // as the insert.
+  const { row: version, prunedCount } = await liveEntityVersions().insertNextAndPrune(
+    {
+      subjectType: SUBJECT,
+      subjectId: projectId,
+      userId: user.sub,
+      label: body.label ?? (body.isAutosave === false ? "manual" : "autosave"),
+      payload: body.storyboard,
+      isAutosave: body.isAutosave !== false,
+    },
+    { cap: VERSIONS_PER_PROJECT_CAP, retentionDays: VERSION_RETENTION_DAYS },
+  );
 
   return c.json(success({
     id: version.id,

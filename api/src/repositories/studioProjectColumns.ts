@@ -31,9 +31,17 @@ const {
 export const studioProjectColumns = liveColumns;
 
 /** The row every project read returns (no frozen legacy columns). */
-export type StudioProjectRow = {
-  [K in keyof typeof studioProjectColumns]: (typeof studioProjects.$inferSelect)[K];
-};
+export type StudioProjectRow = Omit<
+  typeof studioProjects.$inferSelect,
+  | "legacyTimelineSpec"
+  | "legacyGameState"
+  | "legacyComicState"
+  | "legacyImageState"
+  | "legacyAnimationState"
+  | "legacyCadState"
+  | "legacyCad3dState"
+  | "legacyDocumentState"
+>;
 
 /** Hard cap for list reads that previously had no LIMIT. */
 export const STUDIO_PROJECT_LIST_MAX = 500;

@@ -2,8 +2,9 @@
  * Unit tests for the canonical edge cache (utils/edge-cache.ts).
  *
  * Covers single-flight (concurrent misses share one loader), loader
- * failures not being cached, invalidation, and version tokens against a
- * fake KV binding.
+ * failures not being cached, invalidation, negative caching (null never
+ * written to KV), and version tokens (L1-cached reads, coalesced bumps)
+ * against a fake KV binding.
  *
  * Run: node --import tsx --test src/utils/__tests__/edge-cache.test.ts
  */
@@ -21,14 +22,18 @@ import {
 
 function fakeKv() {
   const store = new Map<string, string>();
+  const ops = { gets: 0, puts: 0 };
   return {
     store,
+    ops,
     async get(key: string, type?: string) {
+      ops.gets += 1;
       const raw = store.get(key);
       if (raw === undefined) return null;
       return type === "json" ? JSON.parse(raw) : raw;
     },
     async put(key: string, value: string) {
+      ops.puts += 1;
       store.set(key, value);
     },
     async delete(key: string) {
@@ -138,9 +143,76 @@ describe("getOrSetCached", () => {
   });
 });
 
-describe("version tokens", () => {
+describe("negative caching", () => {
+  beforeEach(() => {
+    __resetEdgeCacheForTests();
+  });
   afterEach(() => {
     (globalThis as any).__ENV = {};
+  });
+
+  it("serves a null result from L1 without re-running the loader, and never writes it to KV", async () => {
+    const kv = fakeKv();
+    (globalThis as any).__ENV = { KV_CACHE: kv };
+    let calls = 0;
+    const loader = async (): Promise<{ title: string } | null> => {
+      calls += 1;
+      return null; // e.g. a crawler 404 on an unknown OG id
+    };
+    assert.equal(await getOrSetCached({ key: "og:missing", ttlSeconds: 600, loader }), null);
+    assert.equal(await getOrSetCached({ key: "og:missing", ttlSeconds: 600, loader }), null);
+    await flush();
+    assert.equal(calls, 1);
+    assert.equal(kv.ops.puts, 0, "a null is never a KV write");
+  });
+
+  it("invalidation clears a negative entry (the entity now exists)", async () => {
+    (globalThis as any).__ENV = {};
+    await getOrSetCached({ key: "neg:2", ttlSeconds: 600, loader: async () => null });
+    invalidateCachedKey("neg:2");
+    assert.deepEqual(
+      await getOrSetCached({ key: "neg:2", ttlSeconds: 600, loader: async () => ({ ok: true }) }),
+      { ok: true },
+    );
+  });
+});
+
+describe("version tokens", () => {
+  beforeEach(() => {
+    __resetEdgeCacheForTests();
+  });
+  afterEach(() => {
+    (globalThis as any).__ENV = {};
+  });
+
+  it("serves repeat reads from L1 — one KV GET, not one per request", async () => {
+    const kv = fakeKv();
+    (globalThis as any).__ENV = { KV_CACHE: kv };
+    kv.store.set("cachever:ns-l1", "t1");
+    assert.equal(await getCacheVersion("ns-l1"), "t1");
+    assert.equal(await getCacheVersion("ns-l1"), "t1");
+    assert.equal(kv.ops.gets, 1);
+  });
+
+  it("coalesces a burst of bumps into one KV write, yet each bump is visible locally at once", async () => {
+    const kv = fakeKv();
+    (globalThis as any).__ENV = { KV_CACHE: kv };
+    const seen = new Set<string>();
+    seen.add(await getCacheVersion("ns-burst"));
+    for (let i = 0; i < 5; i++) {
+      bumpCacheVersion("ns-burst");
+      seen.add(await getCacheVersion("ns-burst"));
+    }
+    await flush();
+    assert.equal(seen.size, 6, "every bump rotated the local token");
+    assert.equal(kv.ops.puts, 1, "only the first bump in the window wrote KV");
+  });
+
+  it("without KV a bump still rotates the local token (dev / tests)", async () => {
+    (globalThis as any).__ENV = {};
+    const before = await getCacheVersion("ns-nokv");
+    bumpCacheVersion("ns-nokv");
+    assert.notEqual(await getCacheVersion("ns-nokv"), before);
   });
 
   it('defaults to "0" without a KV binding', async () => {

@@ -22,6 +22,7 @@ import { isNotRenderVariant } from "../../repositories/renderVariantRepository.j
 
 import type { Db } from "../../db/index.js";
 import { users, type User } from "../../db/schema/users.js";
+import { publicUserColumns, type PublicUserRow } from "../../repositories/userColumns.js";
 import { videos } from "../../db/schema/videos.js";
 import { creatorYoutubeIngests } from "../../db/schema/creators.js";
 
@@ -147,9 +148,9 @@ async function loadSignals(
 export async function findUserByHandle(
   db: Db,
   handle: string,
-): Promise<User | null> {
+): Promise<PublicUserRow | null> {
   const [row] = await db
-    .select()
+    .select(publicUserColumns)
     .from(users)
     .where(eq(users.externalPublicHandle, handle))
     .limit(1);

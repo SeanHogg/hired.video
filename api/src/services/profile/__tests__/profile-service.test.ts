@@ -175,6 +175,16 @@ describe("findUserByHandle", () => {
     });
     assert.equal(await findUserByHandle(db as never, "nope"), null);
   });
+
+  it("never returns credential columns on the public channel lookup", async () => {
+    const { db } = buildFakeDb({
+      users: [{ id: USER, name: "Ada", externalPublicHandle: "ada", passwordHash: "$argon2id$v=19$x", mfaSecret: "JBSWY3DPEHPK3PXP" }],
+    });
+    const row = await findUserByHandle(db as never, "ada");
+    assert.equal(row?.id, USER);
+    assert.ok(row && !("passwordHash" in row), "passwordHash must not be selected");
+    assert.ok(row && !("mfaSecret" in row), "mfaSecret must not be selected");
+  });
 });
 
 // ── 2a. extractYoutubeVideoId — the pure parser ──────────────────────────

@@ -4,7 +4,8 @@
  * Replaces the @microsoft/signalr client with a native fetch-based SSE reader.
  * Cloudflare Workers serve raw SSE (not SignalR-framed), so we parse events
  * directly.  The backend endpoint dumps unread notifications then closes, so
- * we reconnect on a configurable interval (heartbeat).
+ * we reconnect on a heartbeat, sending a `since` cursor so only newer rows
+ * come back (a server ignoring it re-sends all unread; consumers dedupe by id).
  *
  * Public API is kept compatible with the old SignalRService so that
  * `use-signalr.ts` and `use-comm-hub.ts` work without changes.
@@ -12,6 +13,7 @@
 
 import { apiClient } from "../api-client";
 import { getAuthToken } from "../api/auth-token";
+import { newerIso, notificationsHubPath, parseSseBlock, visibleRepollDelay } from "./notification-sse";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,6 +41,8 @@ export type ConnectionStateHandler = (state: ConnectionState) => void;
 /** The hub's `summary` event (sent after the unread dump). */
 export interface NotificationSummary {
   unreadCount: number;
+  /** Next poll's `since` cursor (servers without cursor support omit it). */
+  cursor?: string | null;
 }
 export type SummaryHandler = (summary: NotificationSummary) => void;
 
@@ -57,6 +61,8 @@ const MAX_BACKOFF_MS = 30_000;
 // The hub dumps unread notifications + a `summary` event and then closes, so a
 // NORMAL close is a poll cycle — re-poll on this heartbeat, not the error backoff.
 const HEARTBEAT_MS = 60_000;
+// Tab-visible re-polls early only past this gap (tab switching ≠ hammering).
+const VISIBLE_REPOLL_MIN_MS = 30_000;
 
 // ── Service ──────────────────────────────────────────────────────────────────
 
@@ -75,6 +81,12 @@ class NotificationSSEService {
   private stopped = false;
   // Bumped per connect(); a superseded connection never schedules a reconnect.
   private generation = 0;
+  // Newest createdAt seen (`?since=`); committed only when a poll's stream
+  // completes, so a cut stream (newest-first) never skips undelivered rows.
+  private cursor: string | null = null;
+  private pollCursor: string | null = null;
+  // When the last poll started (ms); gates the on-visible early re-poll.
+  private lastPollAt = 0;
 
   // ── Connection lifecycle ─────────────────────────────────────────────────
 
@@ -97,6 +109,10 @@ class NotificationSSEService {
   async stop(): Promise<void> {
     this.stopped = true;
     this.reconnectDeferred = false;
+    // Sign-out / user switch: the next session starts with a full burst.
+    this.cursor = null;
+    this.pollCursor = null;
+    this.lastPollAt = 0;
     if (typeof document !== "undefined") {
       document.removeEventListener("visibilitychange", this.handleVisibilityChange);
     }
@@ -127,8 +143,11 @@ class NotificationSSEService {
     const generation = ++this.generation;
     const superseded = () => this.stopped || generation !== this.generation;
 
+    this.lastPollAt = Date.now();
+    const path = notificationsHubPath(this.cursor);
+    this.pollCursor = this.cursor;
     try {
-      const res = await apiClient.openStream("/api/hubs/notifications", {
+      const res = await apiClient.openStream(path, {
         headers: { Accept: "text/event-stream" },
         // Background hub: a dropped connection just reconnects, never toasts.
         suppressErrorEvent: true,
@@ -142,6 +161,7 @@ class NotificationSSEService {
       this.setState(ConnectionState.Connected);
 
       await this.readStream(res);
+      if (!superseded()) this.cursor = this.pollCursor;
 
       // Stream closed normally — re-poll on the heartbeat for new events.
       if (!superseded()) {
@@ -200,30 +220,8 @@ class NotificationSSEService {
   }
 
   private parseSSEBlock(block: string): void {
-    let eventType = "message";
-    let dataLines: string[] = [];
-
-    for (const line of block.split("\n")) {
-      if (line.startsWith("event: ")) {
-        eventType = line.slice(7).trim();
-      } else if (line.startsWith("data: ")) {
-        dataLines.push(line.slice(6));
-      } else if (line.startsWith("data:")) {
-        dataLines.push(line.slice(5));
-      }
-    }
-
-    if (dataLines.length === 0) return;
-
-    const raw = dataLines.join("\n");
-    let data: any;
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      return; // skip malformed data
-    }
-
-    this.handleEvent(eventType, data);
+    const parsed = parseSseBlock(block);
+    if (parsed) this.handleEvent(parsed.event, parsed.data);
   }
 
   private handleEvent(eventType: string, data: any): void {
@@ -238,6 +236,8 @@ class NotificationSSEService {
           timestamp: data.createdAt ?? data.timestamp ?? new Date().toISOString(),
           isRead: data.isRead ?? false,
         };
+        // Only a server-stamped createdAt advances the cursor.
+        this.pollCursor = newerIso(this.pollCursor, typeof data.createdAt === "string" ? data.createdAt : null);
         this.notificationHandlers.forEach((h) => h(notification));
         break;
       }
@@ -252,7 +252,9 @@ class NotificationSSEService {
         break;
       }
       case "summary": {
-        const summary: NotificationSummary = { unreadCount: Number(data?.unreadCount) || 0 };
+        const cursor = typeof data?.cursor === "string" ? data.cursor : null;
+        this.pollCursor = newerIso(this.pollCursor, cursor);
+        const summary: NotificationSummary = { unreadCount: Number(data?.unreadCount) || 0, cursor };
         this.summaryHandlers.forEach((h) => h(summary));
         break;
       }
@@ -285,6 +287,12 @@ class NotificationSSEService {
       this.retryCount++;
     }
 
+    this.armReconnect(delay);
+  }
+
+  /** (Re)arm the reconnect timer; one that comes due while the tab is
+   *  hidden is deferred until it becomes visible. */
+  private armReconnect(delay: number): void {
     this.clearRetryTimer();
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
@@ -299,12 +307,21 @@ class NotificationSSEService {
   private handleVisibilityChange = (): void => {
     if (this.stopped || document.visibilityState !== "visible") return;
     // Back in view: run a deferred reconnect, or cut a pending heartbeat
-    // short so the unread state is fresh the moment the user looks.
-    if (this.reconnectDeferred || this.retryTimer != null) {
-      this.reconnectDeferred = false;
-      this.clearRetryTimer();
-      void this.connect();
+    // short so the unread state is fresh the moment the user looks — but
+    // never sooner than VISIBLE_REPOLL_MIN_MS after the last poll.
+    if (!this.reconnectDeferred && this.retryTimer == null) return;
+    const wait = visibleRepollDelay(this.lastPollAt, Date.now(), VISIBLE_REPOLL_MIN_MS);
+    if (wait > 0) {
+      // A pending timer fires on its own; a deferred one re-arms.
+      if (this.reconnectDeferred) {
+        this.reconnectDeferred = false;
+        this.armReconnect(wait);
+      }
+      return;
     }
+    this.reconnectDeferred = false;
+    this.clearRetryTimer();
+    void this.connect();
   };
 
   private clearRetryTimer(): void {

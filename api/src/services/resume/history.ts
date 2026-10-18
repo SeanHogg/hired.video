@@ -37,17 +37,17 @@ export async function listSnapshots(versions: ResumeVersionRepository, userId: s
 export async function createSnapshot(versions: ResumeVersionRepository, userId: string, resumeId: string, body: unknown) {
   const parsed = CreateSnapshotSchema.safeParse(body ?? {});
   if (!parsed.success) throw new DomainError(400, "VALIDATION_ERROR", "Invalid version payload");
-  const created = await versions.insertSnapshot(resumeId, userId, {
-    label: parsed.data.label ?? null,
-    isAutosave: parsed.data.isAutosave ?? false,
-  });
+  // Insert + (autosave) retention prune share ONE round-trip.
+  const created = await versions.insertSnapshot(
+    resumeId,
+    userId,
+    { label: parsed.data.label ?? null, isAutosave: parsed.data.isAutosave ?? false },
+    { cap: AUTOSAVE_CAP, retentionDays: AUTOSAVE_RETENTION_DAYS },
+  );
   if (!created) {
     // Zero rows = missing or not theirs; the probe picks the status code.
     await assertOwner(versions, resumeId, userId);
     throw resumeNotFound();
-  }
-  if (created.isAutosave) {
-    await versions.pruneAutosaves(resumeId, { cap: AUTOSAVE_CAP, retentionDays: AUTOSAVE_RETENTION_DAYS });
   }
   return { version: created };
 }

@@ -79,22 +79,19 @@ export async function snapshotArticleVersion(
     bodyMd: parent.bodyMd ?? null,
     bodyJson: parent.bodyJson ?? null,
   };
-  const created = await repo.insertNext({
-    subjectType: SUBJECT,
-    subjectId: articleId,
-    userId,
-    label: input.label ?? null,
-    payload,
-    isAutosave: input.isAutosave ?? false,
-  });
-
-  if (created.isAutosave) {
-    // Retention window + cap (drop oldest beyond the cap) in one statement.
-    await repo.pruneAutosaves(SUBJECT, articleId, {
-      cap: ARTICLE_AUTOSAVE_CAP,
-      retentionDays: ARTICLE_AUTOSAVE_RETENTION_DAYS,
-    });
-  }
+  const isAutosave = input.isAutosave ?? false;
+  // Autosaves apply the retention window + cap in the SAME round-trip.
+  const { row: created } = await repo.insertNextAndPrune(
+    {
+      subjectType: SUBJECT,
+      subjectId: articleId,
+      userId,
+      label: input.label ?? null,
+      payload,
+      isAutosave,
+    },
+    isAutosave ? { cap: ARTICLE_AUTOSAVE_CAP, retentionDays: ARTICLE_AUTOSAVE_RETENTION_DAYS } : null,
+  );
   return toArticleVersion(created);
 }
 

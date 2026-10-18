@@ -6,7 +6,7 @@
  * routes never touch the table directly (n-layer).
  */
 
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, gte } from "drizzle-orm";
 import { schema } from "../db/index.js";
 import { pickSelectShape } from "../../../shared/projection.js";
 import { bumpInboxFor } from "../services/messaging/inboxCacheVersion.js";
@@ -38,7 +38,9 @@ export interface INotificationsRepository {
   /** SQL COUNT — never ships the unread rows to the Worker. */
   countUnreadForUser(userId: string): Promise<number>;
   /** Newest unread rows (list columns), capped at `limit`. */
-  listUnreadForUser(userId: string, limit: number): Promise<NotificationRow[]>;
+  /** Newest unread rows; with `since`, only rows created at/after it (the
+   *  SSE hub's poll cursor — a range scan on idx_notifications_user_created). */
+  listUnreadForUser(userId: string, limit: number, since?: Date | null): Promise<NotificationRow[]>;
   markAllReadForUser(userId: string): Promise<void>;
   markReadForUser(userId: string, notificationId: string): Promise<void>;
   deleteForUser(userId: string, notificationId: string): Promise<void>;
@@ -87,11 +89,17 @@ export class NotificationsRepository implements INotificationsRepository {
     return Number(row?.n ?? 0);
   }
 
-  async listUnreadForUser(userId: string, limit: number): Promise<NotificationRow[]> {
+  async listUnreadForUser(userId: string, limit: number, since?: Date | null): Promise<NotificationRow[]> {
     return (await this.db
       .select(NOTIFICATION_SELECT_SHAPE)
       .from(notifications)
-      .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)))
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.isRead, false),
+        // Inclusive: a row stamped in the cursor's own millisecond is never
+        // lost; the client dedupes the boundary row by id.
+        since ? gte(notifications.createdAt, since) : undefined,
+      ))
       .orderBy(desc(notifications.createdAt))
       .limit(limit)) as NotificationRow[];
   }
