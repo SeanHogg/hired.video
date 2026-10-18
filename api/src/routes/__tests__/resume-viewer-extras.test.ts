@@ -170,6 +170,7 @@ describe("recordResumeView", () => {
     assert.equal(inserts.length, 1);
     assert.deepEqual(inserts[0].values, {
       artifactKind: "resume",
+      eventType: "view",
       artifactId: "resume-1",
       ownerUserId: "owner-1",
       viewerId: "someone-else",

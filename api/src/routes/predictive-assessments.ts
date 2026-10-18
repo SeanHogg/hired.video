@@ -30,11 +30,11 @@ import {
   isAssessmentKind,
 } from "../../../shared/assessments/kinds.js";
 import { getQuestionBank } from "../../../shared/assessments/question-banks.js";
-import { AssessmentRunsRepository } from "../repositories/assessmentRunsRepository.js";
 import {
   completePredictiveRun,
   getPredictiveRun,
   isProEligible,
+  listPredictiveRuns,
   matchResumeToPredictiveIndex,
   respondToPredictiveRun,
   startPredictiveRun,
@@ -112,7 +112,7 @@ predictiveAssessmentRoutes.post("/:id/complete", async (c) => {
 
 predictiveAssessmentRoutes.get("/runs", async (c) => {
   const uid = requireUser(c);
-  const rows = await new AssessmentRunsRepository().listRecentForUser(uid, 50);
+  const rows = await listPredictiveRuns(uid);
   return c.json(success(rows), 200);
 });
 

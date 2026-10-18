@@ -57,6 +57,11 @@ export async function getPredictiveRun(userId: string, id: string, repo = new As
   return requireOwnedRun(repo, userId, id);
 }
 
+/** The user's 50 most recent runs (history list). */
+export function listPredictiveRuns(userId: string, repo = new AssessmentRunsRepository()): Promise<AssessmentRun[]> {
+  return repo.listRecentForUser(userId, 50);
+}
+
 export async function respondToPredictiveRun(
   userId: string,
   id: string,
