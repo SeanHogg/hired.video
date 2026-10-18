@@ -26,6 +26,10 @@ export interface NextDueParams {
   tokenPackRecheckGapMs: number;
   /** Social publish: a `running` job is re-claimable after this (ms). */
   socialStaleRunningMs: number;
+  /** Post metrics: networks whose published posts get a daily snapshot. */
+  metricsDestinations: readonly string[];
+  /** Post metrics: posts older than this many days are no longer synced. */
+  metricsWindowDays: number;
 }
 
 export type NextDueTimes = Record<WorkQueue, Date | null>;
@@ -40,6 +44,9 @@ const {
   partnerPayouts: pp,
   recruiterAgentFollowups: raf,
   jobBoardSources: jbs,
+  postingAgentSettings: pas,
+  studioProjectPublications: pub,
+  externalPostMetrics: epm,
 } = schema;
 
 const ms = (n: number) => sql.raw(`interval '${Math.max(0, Math.floor(n))} milliseconds'`);
@@ -50,6 +57,10 @@ export class WorkQueueRepository {
   async nextDueTimes(p: NextDueParams): Promise<NextDueTimes> {
     const offsets = sql.raw(`ARRAY[${p.reminderOffsetsMin.map((n) => Math.floor(n)).join(",")}]::int[]`);
     const windowMin = Math.floor(p.reminderWindowMin);
+    const destinations = p.metricsDestinations.length > 0
+      ? sql.join(p.metricsDestinations.map((d) => sql`${d}`), sql`, `)
+      : sql`NULL`;
+    const metricsWindow = sql.raw(`interval '${Math.max(0, Math.floor(p.metricsWindowDays))} days'`);
     const result = await this.db.execute(sql`
       SELECT
         (SELECT min(${fu.nextSendAt}) FROM ${fu}
@@ -78,7 +89,29 @@ export class WorkQueueRepository {
                          ELSE ${sp.lockedAt} + ${ms(p.socialStaleRunningMs)} END)
            FROM ${sp} WHERE ${sp.status} IN ('scheduled', 'running')) AS social_publish,
         (SELECT min(${pp.holdUntil}) FROM ${pp} WHERE ${pp.status} = 'pending') AS partner_payouts,
-        (SELECT min(${raf.scheduledFor}) FROM ${raf} WHERE ${raf.status} = 'pending') AS recruiter_agent_followups
+        (SELECT min(${raf.scheduledFor}) FROM ${raf} WHERE ${raf.status} = 'pending') AS recruiter_agent_followups,
+        -- posting agent (processPostingAgent): plan due enabled agents,
+        -- expire agent drafts whose run_at passed
+        least(
+          (SELECT min(coalesce(${pas.nextPlanAt}, now())) FROM ${pas} WHERE ${pas.enabled} = true),
+          (SELECT min(${sp.runAt}) FROM ${sp} WHERE ${sp.source} = 'agent' AND ${sp.status} = 'draft')
+        ) AS posting_agent,
+        -- post metrics (listDueForSync): a published post in the window with
+        -- no snapshot today is due now; if every one is synced, tomorrow
+        CASE
+          WHEN EXISTS (SELECT 1 FROM ${pub}
+                 WHERE ${pub.status} = 'published' AND ${pub.externalId} IS NOT NULL
+                   AND ${pub.destination} IN (${destinations})
+                   AND ${pub.publishedAt} >= now() - ${metricsWindow}
+                   AND NOT EXISTS (SELECT 1 FROM ${epm} m
+                         WHERE m.publication_id = ${pub.id} AND m.metric_date = (now() AT TIME ZONE 'UTC')::date))
+            THEN now()
+          WHEN EXISTS (SELECT 1 FROM ${pub}
+                 WHERE ${pub.status} = 'published' AND ${pub.externalId} IS NOT NULL
+                   AND ${pub.destination} IN (${destinations})
+                   AND ${pub.publishedAt} >= now() - ${metricsWindow})
+            THEN (date_trunc('day', now() AT TIME ZONE 'UTC') + interval '1 day') AT TIME ZONE 'UTC'
+        END AS post_metrics
     `);
     const rows: Array<Record<string, unknown>> = Array.isArray(result) ? result : (result?.rows ?? []);
     const row = rows[0] ?? {};
@@ -92,10 +125,12 @@ export class WorkQueueRepository {
       "social-publish": at(row.social_publish),
       "partner-payouts": at(row.partner_payouts),
       "recruiter-agent-followups": at(row.recruiter_agent_followups),
+      "posting-agent": at(row.posting_agent),
+      "post-metrics": at(row.post_metrics),
     };
   }
 
-  /** Active job-board sources — the hourly cron records whether the
+  /** Active job-board sources — the reconcile records whether the
    *  :00/:30 scrape has anything to do. */
   async countActiveJobBoardSources(): Promise<number> {
     const result = await this.db.execute(sql`SELECT count(*)::int AS n FROM ${jbs} WHERE ${jbs.isActive} = true`);

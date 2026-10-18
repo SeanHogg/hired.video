@@ -25,6 +25,10 @@ export interface IsolateCacheOptions<T> {
   key: string;
   ttlSeconds: number;
   loader: () => Promise<T>;
+  /** Optional: false keeps a loaded value out of the cache (it is still
+   *  returned) — for transient answers a write elsewhere flips, e.g. a watch
+   *  page's "pending" placeholder. */
+  shouldCache?: (value: T) => boolean;
 }
 
 export async function getOrSetIsolateCached<T>(opts: IsolateCacheOptions<T>): Promise<T> {
@@ -46,7 +50,7 @@ export async function getOrSetIsolateCached<T>(opts: IsolateCacheOptions<T>): Pr
     .loader()
     .then((value) => {
       // An invalidation while loading must not be undone by this result.
-      if (isCurrent()) {
+      if (isCurrent() && (!opts.shouldCache || opts.shouldCache(value))) {
         if (_entries.size >= MAX_ENTRIES) {
           const oldest = _entries.keys().next();
           if (!oldest.done) _entries.delete(oldest.value);

@@ -3,7 +3,8 @@
  *
  * The classifier/ingest path resolves the active profile for a mailbox
  * through `resolveAccountProfile`, which serves a read-through cache
- * (getOrSetCached — L1 isolate Map + L2 KV) keyed on the profile id.
+ * (getOrSetIsolateCached — isolate-only, zero KV writes; per-profile keys
+ * are unbounded) keyed on the profile id.
  * Profile reads are hot (every sync chunk) and slow-changing, so caching
  * them is a first-class requirement; the cache is invalidated explicitly
  * whenever a profile is edited or deleted (`invalidateInboxProfile`).
@@ -17,7 +18,7 @@
 import type { Repos } from "../../repositories/index.js";
 import type { InboxProfileRow } from "../../repositories/inboxProfilesRepository.js";
 import type { ExternalEmailAccountRow } from "../../repositories/externalEmailAccountsRepository.js";
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import {
   decodeInboxProfile,
   type InboxProfileShape,
@@ -26,7 +27,8 @@ import {
   PRESET_IDS,
 } from "../../../../shared/email-classification/index.js";
 
-const CACHE_TTL_SECONDS = 300;
+/** Short: invalidation clears this isolate only; others converge in TTL. */
+const CACHE_TTL_SECONDS = 120;
 
 function cacheKey(profileId: string): string {
   return `inbox-profile:${profileId}`;
@@ -66,7 +68,7 @@ export async function getInboxProfileById(
   repos: ProfileRepos,
   profileId: string,
 ): Promise<InboxProfileShape | null> {
-  return getOrSetCached<InboxProfileShape | null>({
+  return getOrSetIsolateCached<InboxProfileShape | null>({
     key: cacheKey(profileId),
     ttlSeconds: CACHE_TTL_SECONDS,
     loader: async () => {
@@ -97,5 +99,5 @@ export async function resolveAccountProfile(
 /** Drop a profile from the cache. MUST be called by every mutation that
  *  edits or deletes a profile (the builder + onboarding seeding). */
 export function invalidateInboxProfile(profileId: string): void {
-  invalidateCachedKey(cacheKey(profileId));
+  invalidateIsolateKey(cacheKey(profileId));
 }

@@ -4,11 +4,18 @@
 import { asc, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { getOrSetCached } from "../../utils/edge-cache.js";
-// Per-user gig lists are isolate-local (no KV write per miss on Workers
-// Free); shared reads (open grid, project detail, version token) stay on
-// the edge cache.
+// Per-user gig lists and per-project detail are isolate-local (no KV write
+// per miss on Workers Free); only the shared open grid stays on the edge
+// cache.
 import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
-import { bumpGigVersion, gigCacheVersion, GigError, GIG_TTL_SECONDS, type CreateGigInput } from "./gigShared.js";
+import {
+  bumpGigVersion,
+  gigCacheVersion,
+  GigError,
+  GIG_OPEN_GRID_TTL_SECONDS,
+  GIG_TTL_SECONDS,
+  type CreateGigInput,
+} from "./gigShared.js";
 
 const { gigProjects, gigMilestones } = schema;
 
@@ -61,7 +68,7 @@ export async function listOpenProjects(limit = 100) {
   const v = await gigCacheVersion();
   return getOrSetCached<(typeof gigProjects.$inferSelect)[]>({
     key: `gigs:open:v1:${limit}:${v}`,
-    ttlSeconds: GIG_TTL_SECONDS,
+    ttlSeconds: GIG_OPEN_GRID_TTL_SECONDS,
     loader: () =>
       getDb()
         .select()
@@ -90,7 +97,7 @@ export async function listMyProjects(ownerUserId: string) {
 /** Project + its deliverable items. Public read (bids are owner-gated). Cached. */
 export async function getProject(projectId: string) {
   const v = await gigCacheVersion();
-  const cached = await getOrSetCached<{
+  const cached = await getOrSetIsolateCached<{
     project: typeof gigProjects.$inferSelect;
     milestones: (typeof gigMilestones.$inferSelect)[];
   } | null>({

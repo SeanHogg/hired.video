@@ -47,6 +47,8 @@ export interface IAuditRepository {
   endImpersonationSession(id: string, endReason: string): Promise<void>;
   insertImpersonationRoleSwitch(input: ImpersonationRoleSwitchInsert): Promise<void>;
   insertActivity(input: ActivityLogInsert): Promise<void>;
+  /** Multi-row insert (one statement) — the analytics beacon batches. */
+  insertActivities(rows: readonly ActivityLogInsert[]): Promise<void>;
   findActivityForUser(userId: string, limit?: number): Promise<ActivityLogRow[]>;
 }
 
@@ -107,6 +109,11 @@ export class AuditRepository implements IAuditRepository {
 
   async insertActivity(input: ActivityLogInsert): Promise<void> {
     await this.db.insert(activityLogs).values(input as any);
+  }
+
+  async insertActivities(rows: readonly ActivityLogInsert[]): Promise<void> {
+    if (rows.length === 0) return;
+    await this.db.insert(activityLogs).values([...rows]);
   }
 
   async findActivityForUser(userId: string, limit = 50): Promise<ActivityLogRow[]> {

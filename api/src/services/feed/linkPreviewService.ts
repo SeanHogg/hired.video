@@ -8,13 +8,14 @@
  *   • Bounded: FETCH_TIMEOUT_MS wall clock, and at most MAX_HTML_BYTES of
  *     the body are read (the <head> with the OG tags is at the top, so a
  *     truncated read still parses).
- *   • Cached through the canonical getOrSetCached, keyed by the
+ *   • Cached in the isolate (getOrSetIsolateCached — per-URL keys are
+ *     unbounded, so no KV write per miss), keyed by the
  *     normalized URL, for PREVIEW_TTL_SECONDS. Transient failures
  *     (network error, timeout, 5xx) throw so they are NOT cached; a
  *     definitive answer (non-HTML, 4xx) caches as the empty preview.
  */
 
-import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 import { fetchPublicUrl, parseProxyTarget } from "../../utils/image-proxy.js";
 import { logger } from "../../lib/logger.js";
 import {
@@ -113,7 +114,7 @@ export async function getLinkPreview(
   if (!normalized || !target) return { ok: false, reason: "INVALID_URL" };
 
   try {
-    const preview = await getOrSetCached<LinkPreview>({
+    const preview = await getOrSetIsolateCached<LinkPreview>({
       key: `${CACHE_PREFIX}${normalized}`,
       ttlSeconds: PREVIEW_TTL_SECONDS,
       loader: () => scrapeLinkPreview(target, fetchImpl),

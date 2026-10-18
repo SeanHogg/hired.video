@@ -5,14 +5,16 @@
  * here and redirects. Same visibility rules as the public read-by-slug:
  * published, verified author, creator visible.
  *
- * Cached (L1 + KV) for a short TTL rather than invalidated on write: a slug
+ * Cached in the ISOLATE (one key per article id — an unbounded keyspace, so
+ * a KV write per miss would burn the Workers Free quota) for a short TTL
+ * rather than invalidated on write: a slug
  * change or unpublish is rare, and a stale answer only lands the viewer on
  * the article page's own not-found state for at most the TTL.
  */
 import { and, eq } from "drizzle-orm";
 import { publicArticlePath } from "../../../../shared/public-paths.js";
 import { schema, type Db } from "../../db/index.js";
-import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 import { isCreatorVisible } from "../creators/visibility.js";
 
 const { articles, users, userProfiles } = schema;
@@ -44,7 +46,7 @@ export function publicArticlePathById(
   id: string,
   isVisible: CreatorVisibility = isCreatorVisible,
 ): Promise<string | null> {
-  return getOrSetCached({
+  return getOrSetIsolateCached({
     key: publicArticlePathCacheKey(id),
     ttlSeconds: PUBLIC_ARTICLE_PATH_TTL_SECONDS,
     loader: () => loadPublicArticlePath(db, id, isVisible),

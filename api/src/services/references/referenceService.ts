@@ -6,7 +6,7 @@
  */
 import { getDb } from "../../db/index.js";
 import { DomainError } from "../../domains/errors.js";
-import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 import {
   invalidatePublicReferences,
   publicReferencesCacheKey,
@@ -119,13 +119,14 @@ export async function deleteContact(ownerUserId: string, id: string): Promise<vo
 
 /**
  * Non-PII summaries for the user's profile References section — empty unless
- * the owner opted the `references` section in. Read-through cached (120s),
- * invalidated on every contact mutation / section / role change.
+ * the owner opted the `references` section in. Isolate-cached (60s — short,
+ * because a hidden section must stop showing promptly in OTHER isolates
+ * too), invalidated here on every contact mutation / section / role change.
  */
 export function listPublicSummaries(userId: string): Promise<ReferenceContactSummary[]> {
-  return getOrSetCached({
+  return getOrSetIsolateCached({
     key: publicReferencesCacheKey(userId),
-    ttlSeconds: 120,
+    ttlSeconds: 60,
     loader: async () => {
       const owner = await findRoleAndProfileSections(userId);
       if (!owner) return [];

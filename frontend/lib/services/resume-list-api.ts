@@ -196,15 +196,26 @@ function toOwnership(r: Resume): ResumeWithOwnership {
   };
 }
 
+export interface ResumesForDisplayOptions {
+  includeArchived?: boolean;
+  /** Master groups the caller already fetched (or is fetching) for its own
+   *  use — passed through so the groups request fires once per load instead
+   *  of twice in parallel. A rejected promise falls back to no groups here;
+   *  the caller still sees the rejection on its own handle. */
+  groups?: MasterResumeGroup[] | Promise<MasterResumeGroup[]>;
+}
+
 /**
  * Consolidated fetch for the /resumes page — ResumeWithOwnership[]; when
  * the ownership list is empty, falls back to master groups (masters +
  * variations) flattened into the same shape.
  */
-export async function getResumesForDisplay(opts: { includeArchived?: boolean } = {}): Promise<ResumeWithOwnership[]> {
+export async function getResumesForDisplay(opts: ResumesForDisplayOptions = {}): Promise<ResumeWithOwnership[]> {
+  const { groups: providedGroups, ...listOpts } = opts;
+  const groupsRequest = providedGroups === undefined ? getMasterResumeGroups() : Promise.resolve(providedGroups);
   const [owned, groups] = await Promise.all([
-    getResumesWithOwnership(opts).catch((): ResumeWithOwnership[] => []),
-    getMasterResumeGroups().catch((): MasterResumeGroup[] => []),
+    getResumesWithOwnership(listOpts).catch((): ResumeWithOwnership[] => []),
+    groupsRequest.catch((): MasterResumeGroup[] => []),
   ]);
   if (owned.length > 0) return owned;
 

@@ -15,7 +15,7 @@ import type {
   IBookingOfferingReader,
   IBookingReservationReader,
 } from "../../repositories/bookingsRepository.js";
-import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 import { BookingsServiceError } from "./errors.js";
 import { offeringToDto } from "./dto.js";
 import { getHostCacheVersion } from "./cache.js";
@@ -69,7 +69,10 @@ export async function listPublicSlots(
 
   const cacheVersion = await getHostCacheVersion(host.userId);
   const cacheKey = `bookings:slots:v1:${host.userId}:${offeringRow.id}:${args.fromUtc}:${args.toUtc}:${cacheVersion}`;
-  const slots = await getOrSetCached<PublicSlotDTO[]>({
+  // Isolate-only: the key (host × offering × window) is unbounded, so a KV
+  // fill per miss would burn the Workers Free write quota. The host's KV
+  // version token still orphans it across isolates on a write.
+  const slots = await getOrSetIsolateCached<PublicSlotDTO[]>({
     key: cacheKey,
     ttlSeconds: 60, // short — write invalidates the version token immediately
     loader: () => computeSlotsUncached(deps, host, offeringRow, args.fromUtc, args.toUtc),

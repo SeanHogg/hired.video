@@ -294,7 +294,12 @@ export const queueJobToProcess = pgTable("queue_job_to_process", {
   error: text("error"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  // Retention sweep age scan over terminal jobs only (mig 0652).
+  index("idx_queue_job_to_process_terminal_updated")
+    .on(t.updatedAt)
+    .where(sql`status IN ('completed', 'failed')`),
+]);
 
 export type QueueJobToProcess = typeof queueJobToProcess.$inferSelect;
 export type NewQueueJobToProcess = typeof queueJobToProcess.$inferInsert;
@@ -345,6 +350,7 @@ export const recruiterAgentRuns = pgTable("recruiter_agent_runs", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_recruiter_agent_runs_recruiter_id").on(t.recruiterId),
+  index("idx_recruiter_agent_runs_created_at").on(t.createdAt),
 ]);
 
 export type RecruiterAgentRun = typeof recruiterAgentRuns.$inferSelect;

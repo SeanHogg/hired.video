@@ -16,7 +16,7 @@ import { and, desc, eq, gte, sql, type SQL } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 const { artifactViews } = schema;
-type ListingKind = "job" | "company";
+export type ListingKind = "job" | "company";
 
 export type DbLike = any;
 
@@ -54,6 +54,27 @@ export interface JobAnalyticsRollup {
 
 const toCount = (v: unknown) => Number(v) || 0;
 
+/** The artifact_views row for one listing view (pure — the batched beacon
+ *  ingest folds these into its single artifact_views INSERT). */
+export function listingViewRow(
+  kind: ListingKind,
+  entityId: string,
+  input: ViewEventInsert,
+): typeof artifactViews.$inferInsert {
+  return {
+    artifactKind: kind,
+    artifactId: entityId,
+    eventType: "listing_view",
+    viewerId: input.viewerUserId,
+    ipCountry: input.countryCode,
+    region: input.region,
+    referrer: input.referrer,
+    source: input.source,
+    userAgent: input.userAgent,
+    engagementUnit: "%",
+  };
+}
+
 export class ListingViewsRepository {
   constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}
 
@@ -74,18 +95,7 @@ export class ListingViewsRepository {
   }
 
   private async insertListingView(kind: ListingKind, entityId: string, input: ViewEventInsert): Promise<void> {
-    await this.db.insert(artifactViews).values({
-      artifactKind: kind,
-      artifactId: entityId,
-      eventType: "listing_view",
-      viewerId: input.viewerUserId,
-      ipCountry: input.countryCode,
-      region: input.region,
-      referrer: input.referrer,
-      source: input.source,
-      userAgent: input.userAgent,
-      engagementUnit: "%",
-    });
+    await this.db.insert(artifactViews).values(listingViewRow(kind, entityId, input));
   }
 
   /** One listing's `listing_view` rows inside the 30-day window. */

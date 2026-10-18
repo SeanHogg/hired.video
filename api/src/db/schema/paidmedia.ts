@@ -258,6 +258,8 @@ export const paidMediaSyncRuns = pgTable(
   (t) => [
     index("idx_paid_media_sync_runs_platform").on(t.platform, t.createdAt),
     index("idx_paid_media_sync_runs_internal").on(t.internalId),
+    // Retention sweep age scan (mig 0652).
+    index("idx_paid_media_sync_runs_created_at").on(t.createdAt),
     uniqueIndex("uq_paid_media_sync_idempotency")
       .on(t.platform, t.idempotencyKey)
       .where(sql`${t.idempotencyKey} IS NOT NULL`),

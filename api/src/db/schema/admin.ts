@@ -32,6 +32,7 @@ export const impersonationSessions = pgTable("impersonation_sessions", {
   index("idx_impersonation_sessions_admin").on(t.superAdminId),
   index("idx_impersonation_sessions_target").on(t.targetUserId),
   index("idx_impersonation_sessions_active").on(t.superAdminId).where(sql`ended_at IS NULL`),
+  index("idx_impersonation_sessions_ended_at").on(t.endedAt).where(sql`ended_at IS NOT NULL`),
 ]);
 
 export type ImpersonationSession = typeof impersonationSessions.$inferSelect;

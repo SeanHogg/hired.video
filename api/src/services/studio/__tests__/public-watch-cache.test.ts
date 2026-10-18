@@ -7,6 +7,7 @@
 import { beforeEach, describe, it } from "node:test";
 import { strict as assert } from "node:assert";
 import { __resetEdgeCacheForTests } from "../../../utils/edge-cache.js";
+import { __resetIsolateCacheForTests } from "../../../utils/isolate-cache.js";
 import { bumpPublicWatchCache, getPublicWatchCached } from "../public-watch-cache.js";
 
 /** A minimal in-memory Workers KV (get json / text, put, delete). */
@@ -31,10 +32,14 @@ function fakeKv() {
 const PROJECT_ID = "4f1c9a2b-7e3d-4c8a-b6f0-1d2e3a4b5c6d";
 const SLUG = "my-video-resume";
 
+let kv: ReturnType<typeof fakeKv>;
+
 describe("public watch cache", () => {
   beforeEach(() => {
     __resetEdgeCacheForTests();
-    (globalThis as any).__ENV = { KV_CACHE: fakeKv() };
+    __resetIsolateCacheForTests();
+    kv = fakeKv();
+    (globalThis as any).__ENV = { KV_CACHE: kv };
   });
 
   it("serves a warm lookup without re-running the loader", async () => {
@@ -55,7 +60,7 @@ describe("public watch cache", () => {
     let slugCalls = 0;
     await getPublicWatchCached(PROJECT_ID, async () => (projectCalls++, { id: PROJECT_ID }));
     await getPublicWatchCached(SLUG, async () => (slugCalls++, { id: SLUG }));
-    // The fake KV's put writes synchronously, so the bump is visible now.
+    // Invalidation clears this isolate's entry synchronously.
     bumpPublicWatchCache(PROJECT_ID, PROJECT_ID, null, undefined);
     await getPublicWatchCached(PROJECT_ID, async () => (projectCalls++, { id: "reloaded" }));
     await getPublicWatchCached(SLUG, async () => (slugCalls++, { id: SLUG }));
@@ -73,6 +78,13 @@ describe("public watch cache", () => {
     await getPublicWatchCached(SLUG, async () => (slugCalls++, { via: "slug-2" }));
     assert.equal(projectCalls, 2);
     assert.equal(slugCalls, 2);
+  });
+
+  it("never writes KV — neither a fill nor an invalidation (Workers Free quota)", async () => {
+    await getPublicWatchCached(PROJECT_ID, async () => ({ id: PROJECT_ID }));
+    bumpPublicWatchCache(PROJECT_ID, SLUG);
+    await getPublicWatchCached(PROJECT_ID, async () => ({ id: PROJECT_ID }));
+    assert.equal(kv.store.size, 0);
   });
 
   it("a failed load is not cached (error case)", async () => {

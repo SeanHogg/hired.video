@@ -24,6 +24,7 @@ import {
 } from "../services/distribution/agent-pause-page.js";
 import { gateAgentDraftApprove } from "../services/distribution/gate-agent-draft.js";
 import { pausePostingAgent } from "../services/distribution/pause-posting-agent.js";
+import { signalWork } from "../services/scheduling/work-signals.js";
 import {
   getSettings,
   upsertSettings,
@@ -91,6 +92,7 @@ postingAgentRoutes.post("/posting-agent/settings", requirePro("AI Posting Agent"
   const body = c.req.valid("json");
 
   const settings = await upsertSettings(userId, body);
+  if (settings.enabled) await signalWork("posting-agent", settings.nextPlanAt ?? new Date());
   return c.json(success(settings));
 });
 
@@ -103,6 +105,7 @@ postingAgentRoutes.post("/posting-agent/start", requirePro("AI Posting Agent"), 
     if (parsed.success) await upsertSettings(userId, parsed.data);
   }
   const settings = await enableAgent(userId);
+  await signalWork("posting-agent", settings.nextPlanAt ?? new Date());
   return c.json(success(settings));
 });
 

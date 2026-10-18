@@ -2,7 +2,7 @@
 // vocabularies, platform-fee rate, and the global read-cache version token.
 // Every gig module (projects, bids, work, escrow, disputes) builds on these.
 
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { bumpCacheVersion, getCacheVersion } from "../../utils/edge-cache.js";
 import { DomainError } from "../../domains/errors.js";
 
 // Milestone states from which a dispute may be opened. 'pending' (not started)
@@ -17,8 +17,14 @@ export const GIG_PLATFORM_FEE_RATE = 0.1;
 // version token (bumped on every write) keeps all gig read keys fresh without
 // per-entity dependency tracking. The keyspace is unbounded (open-gig list,
 // per-user lists), so it rides the version token; the 60s TTL is a backstop.
-const GIG_VERSION_KEY = "gigs:version";
+// The token is the canonical KV version token (edge-cache.ts: L1-cached,
+// bumps coalesced) — it never expires, so it isn't re-written on a timer.
+// Per-user / per-project payloads are isolate-only; only the shared open
+// grid (bounded by `limit`) also sits in KV, with a long TTL since every
+// write orphans it via the token.
+const GIG_VERSION_NAMESPACE = "gigs";
 export const GIG_TTL_SECONDS = 60;
+export const GIG_OPEN_GRID_TTL_SECONDS = 3600;
 
 // ── status vocabularies ──────────────────────────────────────────────────
 // Personal-task status (frontend ProductivityItemStatus): ToDo=1, InProgress=3,
@@ -78,16 +84,12 @@ export class GigError extends DomainError {
 // ── cache version token ────────────────────────────────────────────────────
 
 /** Current global gig cache version (rotates on every write). */
-export async function gigCacheVersion(): Promise<string> {
-  return getOrSetCached<string>({
-    key: GIG_VERSION_KEY,
-    ttlSeconds: 600,
-    loader: async () => `${Date.now()}-${Math.floor(Math.random() * 1e9)}`,
-  });
+export function gigCacheVersion(): Promise<string> {
+  return getCacheVersion(GIG_VERSION_NAMESPACE);
 }
 
-/** Drop the version token so every cached gig read key becomes unreachable.
+/** Rotate the version token so every cached gig read key becomes unreachable.
  *  Called by every gig write (incl. the escrow-release route handler). */
 export function bumpGigVersion(): void {
-  invalidateCachedKey(GIG_VERSION_KEY);
+  bumpCacheVersion(GIG_VERSION_NAMESPACE);
 }

@@ -62,7 +62,8 @@ export type HousePixelConfig = PublicPixelConfig | { configured: false };
 // public `workspaceUserId` query values) stay uncached on purpose: caching
 // them would let any caller mint unbounded KV keys.
 const HOUSE_CACHE_KEY = "paid-media:pixels:public:v1:house";
-const HOUSE_CACHE_TTL_SECONDS = 300;
+// 3600s: every pixel-config write invalidates (tracking.ts) — every write path invalidates explicitly; long TTL = few KV refills.
+const HOUSE_CACHE_TTL_SECONDS = 3600;
 
 /** Drop the cached house config — call after any pixel-config write. Any
  *  write can change it: the fallback house row is "oldest companyId IS NULL". */

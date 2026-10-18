@@ -1,5 +1,6 @@
 /** Public / per-user job reads (job board search, poster's jobs, detail). */
-import { and, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
+import { jobItemCardColumns } from "../../repositories/jobListColumns.js";
 import { schema } from "../../db/index.js";
 import { normalizeEmploymentType } from "../../../../shared/employment-types.js";
 import { normalizeWorkSetting } from "../../../../shared/work-settings.js";
@@ -10,6 +11,26 @@ import { type JobServiceDeps, resolveDeps } from "./job-service-deps.js";
 import { type JobEntity, rowToJob } from "./job-entity.js";
 
 const { jobItems } = schema;
+
+type JobItemRow = typeof jobItems.$inferSelect;
+
+/** Cap on the poster's own-jobs list (`/getsummaryitems`, `/user-jobs`). */
+const USER_JOBS_MAX = 1000;
+
+/** One newest-first page of the public listing; card reads blank the body. */
+async function selectJobPage(
+  db: JobServiceDeps["db"],
+  where: SQL | undefined,
+  limit: number,
+  offset: number,
+  omitBody: boolean,
+): Promise<JobItemRow[]> {
+  if (omitBody) {
+    return db.select(jobItemCardColumns).from(jobItems).where(where)
+      .orderBy(desc(jobItems.createdAt)).limit(limit).offset(offset);
+  }
+  return db.select().from(jobItems).where(where).orderBy(desc(jobItems.createdAt)).limit(limit).offset(offset);
+}
 
 export interface JobQuery {
   page?: number;
@@ -36,6 +57,10 @@ export interface JobQuery {
    * applied but matched zero rows (return empty page).
    */
   entityIdAllowlist?: string[] | null;
+  /** Card-view read: skip the `description` / `details` body columns in SQL
+   *  (repositories/jobListColumns.ts). Only for callers whose response
+   *  projection drops every body-derived field. */
+  omitBody?: boolean;
 }
 
 export async function getPublicJobs(filters?: JobQuery,
@@ -107,7 +132,7 @@ export async function getPublicJobs(filters?: JobQuery,
     filters?.sector ? eq((jobItems as any).sector, filters.sector) : undefined);
 
   const [rows, countResult] = await Promise.all([
-    db.select().from(jobItems).where(whereClause).orderBy(desc(jobItems.createdAt)).limit(limit).offset(offset),
+    selectJobPage(db, whereClause, limit, offset, filters?.omitBody === true),
     db.select({ count: sql<number>`count(*)` }).from(jobItems).where(whereClause),
   ]);
 
@@ -132,7 +157,9 @@ export async function getUserJobs(userId: string,
     .select()
     .from(jobItems)
     .where(eq((jobItems as any).postedByUserId, userId))
-    .orderBy(desc(jobItems.createdAt));
+    .orderBy(desc(jobItems.createdAt))
+    // Unbounded before; a poster's own list never needs more than this.
+    .limit(USER_JOBS_MAX);
   return rows.map(rowToJob);
 }
 

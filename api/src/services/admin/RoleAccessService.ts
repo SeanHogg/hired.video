@@ -31,7 +31,8 @@ import type { UserRole } from "../../../../shared/user-roles.js";
 import { DomainError } from "../../domains/errors.js";
 
 const CACHE_VERSION = "v1";
-const CACHE_TTL_SECONDS = 300;
+// 3600s: upsert/reset invalidate the role key — every write path invalidates explicitly; long TTL = few KV refills.
+const CACHE_TTL_SECONDS = 3600;
 const cacheKey = (role: string) => `role-access:${CACHE_VERSION}:${role}`;
 const userModulesKey = (userId: string) => `user-modules:${CACHE_VERSION}:${userId}`;
 

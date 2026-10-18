@@ -19,8 +19,9 @@ export type TagAxis = (typeof TAG_AXES)[number];
 
 export type { TaxonomyKind };
 
-/** Backstop TTL — every write path invalidates explicitly. */
-const TAXONOMY_TTL_SECONDS = 600;
+/** Backstop TTL — every write path invalidates explicitly, so it is long
+ *  (each refill is a KV write on Workers Free). */
+const TAXONOMY_TTL_SECONDS = 3600;
 
 export type WorkspaceTagDto = Omit<WorkspaceTag, "createdAt" | "updatedAt"> & {
   createdAt: string;

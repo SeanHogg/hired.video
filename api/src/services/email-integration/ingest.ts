@@ -59,7 +59,7 @@ import type { LLMClient } from "../adapters/llm-client.js";
 import type { ExternalEmailAccountRow } from "../../repositories/externalEmailAccountsRepository.js";
 import type {
   ExternalEmailMessageInsert,
-  ExternalEmailMessageRow,
+  IngestedMessageRow,
 } from "../../repositories/externalEmailMessagesRepository.js";
 import { describeDbError, runWithNeonRetry } from "../../db/errors.js";
 import { classifyEmail, summariseEmail } from "./classify.js";
@@ -262,7 +262,7 @@ export async function ingestForAccount(
     },
   );
 
-  let insertedRows: ExternalEmailMessageRow[];
+  let insertedRows: IngestedMessageRow[];
   try {
     insertedRows = await deps.repos.externalEmailMessages.insertMany(
       insertPayloads,
@@ -275,7 +275,7 @@ export async function ingestForAccount(
 
   // Map provider-message-id → row so the classification pass can pair
   // each wire message with its persisted row in O(1).
-  const rowByProviderId = new Map<string, ExternalEmailMessageRow>();
+  const rowByProviderId = new Map<string, IngestedMessageRow>();
   for (const row of insertedRows) {
     rowByProviderId.set(row.providerMessageId, row);
   }

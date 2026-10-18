@@ -34,13 +34,11 @@ export async function computeViewerExtras(
   viewerId: string | null | undefined,
 ): Promise<ResumeViewerExtras> {
   const isOwner = Boolean(viewerId && viewerId === row.userId);
-
-  let isWatched = false;
-  if (viewerId) {
-    isWatched = await repo.hasWatched(viewerId, row.id);
-  }
-  const viewCount = await repo.countViews(row.id);
-
+  // Independent reads — run concurrently.
+  const [isWatched, viewCount] = await Promise.all([
+    viewerId ? repo.hasWatched(viewerId, row.id) : Promise.resolve(false),
+    repo.countViews(row.id),
+  ]);
   return { isOwner, isWatched, viewCount };
 }
 

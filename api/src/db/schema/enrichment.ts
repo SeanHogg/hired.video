@@ -23,7 +23,10 @@ export const enrichmentProviderCalls = pgTable(
     errorMessage: text("error_message"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("idx_enrichment_provider_calls_user").on(t.userId, t.createdAt.desc())],
+  (t) => [
+    index("idx_enrichment_provider_calls_user").on(t.userId, t.createdAt.desc()),
+    index("idx_enrichment_provider_calls_created_at").on(t.createdAt),
+  ],
 );
 
 export type EnrichmentProviderCall = typeof enrichmentProviderCalls.$inferSelect;

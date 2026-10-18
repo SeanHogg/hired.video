@@ -544,6 +544,8 @@ export const accountLocks = pgTable("account_locks", {
   index("idx_account_locks_locked_by").on(t.lockedBy),
   index("idx_account_locks_unlocked_by").on(t.unlockedBy),
   index("idx_account_locks_user_id").on(t.userId),
+  // Retention sweep age scan over released locks only (mig 0652).
+  index("idx_account_locks_unlocked_at").on(t.unlockedAt).where(sql`active = false`),
 ]);
 
 export type AccountLock = typeof accountLocks.$inferSelect;
@@ -567,6 +569,8 @@ export const emailChangeRequests = pgTable("email_change_requests", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_email_change_requests_user").on(t.userId),
+  // Retention sweep age scan (mig 0652).
+  index("idx_email_change_requests_expires_at").on(t.expiresAt),
 ]);
 
 export type EmailChangeRequest = typeof emailChangeRequests.$inferSelect;

@@ -28,7 +28,7 @@ import { UsageService } from "../services/usage/UsageService.js";
 import { UsageReportService } from "../services/usage/UsageReportService.js";
 import { isManageableRole } from "../../../shared/role-access.js";
 import { toTrafficWindow } from "../../../shared/usage.js";
-import { getOrSetCached } from "../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../utils/isolate-cache.js";
 
 export const adminUsageRoutes = new Hono<AppEnv>();
 
@@ -71,7 +71,7 @@ adminUsageRoutes.get("/funnels/:id", async (c) => {
 // and is read rarely. ?route=/api/resumes/:id narrows the route sections.
 adminUsageRoutes.get("/api-health", async (c) => {
   const route = c.req.query("route")?.slice(0, 255) || undefined;
-  const report = await getOrSetCached({
+  const report = await getOrSetIsolateCached({
     key: `obs:api-health:${route ?? "*"}`,
     ttlSeconds: 60,
     loader: () => adminRepos().observability.apiHealthReport(new Date(), { route }),

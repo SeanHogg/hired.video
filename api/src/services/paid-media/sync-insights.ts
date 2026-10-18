@@ -24,6 +24,7 @@ import {
   type PendingReportArgs,
 } from "./sync-reports.js";
 import type { SyncDeps } from "./sync.js";
+import { wakeSweep } from "../scheduling/work-signals.js";
 
 /** Pull insights for a date range and persist them. Caller passes
  *  externalIds (typically all campaign external IDs in the account). */
@@ -53,6 +54,8 @@ export async function pullInsightsFromAccount(
           resourceKind: args.resourceKind, idempotencyKey: pendingReportKey(result.reportRequestId),
           request: args, response: { reportRequestId: result.reportRequestId }, success: true, durationMs: Date.now() - start,
         });
+        // A new open report: end the resume sweep's idle deferral.
+        await wakeSweep("paid-media-reports");
       }
       return { count: 0, pending: true };
     }

@@ -17,9 +17,11 @@
  */
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigationType, useParams, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { kitResumeId } from "@shared/studio-subject";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import { readAfterGuestAdoption } from "@/lib/guest-adoption";
+import { queryKeys } from "@/lib/query-keys";
 import { resolveWorkspaceRoute } from "@/lib/workspace/workspace-route";
 import StudioLoadingShell from "./StudioLoadingShell";
 
@@ -33,17 +35,25 @@ type Loaded = { id: string; project: StudioProject | null };
  *  its own "can't open this project" banner. Just signed in from a guest
  *  session: retried once the guest's work is claimed. */
 function useLoadedProject(projectId: string | null): Loaded | null {
+  const queryClient = useQueryClient();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   useEffect(() => {
     if (!projectId) return;
     let cancelled = false;
     readAfterGuestAdoption(() => studioService.getProject(projectId))
-      .then((res) => !cancelled && setLoaded({ id: projectId, project: res.data ?? null }))
+      .then((res) => {
+        const project = res.data ?? null;
+        // Seed the shared row (useStudioProjectRow — KitHeader, document
+        // layers) so the kit that mounts next doesn't GET the same project
+        // again. Only a real row: a failed read leaves the cache to retry.
+        if (project) queryClient.setQueryData(queryKeys.studioProject.byId(projectId), project);
+        if (!cancelled) setLoaded({ id: projectId, project });
+      })
       .catch(() => !cancelled && setLoaded({ id: projectId, project: null }));
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, queryClient]);
   return loaded && loaded.id === projectId ? loaded : null;
 }
 

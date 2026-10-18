@@ -13,8 +13,10 @@
  * cached (the loader throws, and throws are never cached).
  */
 
-import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 
+// Isolate-only: one key per email domain is unbounded (no KV write per
+// signup domain on Workers Free); the LRU bounds memory.
 const MX_CACHE_TTL_SECONDS = 6 * 60 * 60; // 6 hours
 const REQUEST_TIMEOUT_MS = 1500;
 
@@ -56,7 +58,7 @@ export async function verifyMxRecord(email: string): Promise<boolean> {
   if (!domain) return false;
 
   try {
-    return await getOrSetCached({
+    return await getOrSetIsolateCached({
       key: `mx:v1:${domain}`,
       ttlSeconds: MX_CACHE_TTL_SECONDS,
       loader: () => lookupMx(domain),

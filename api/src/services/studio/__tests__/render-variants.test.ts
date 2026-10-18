@@ -18,6 +18,7 @@ import {
   type RenderVariantDeps,
 } from "../render-variants.js";
 import { __resetEdgeCacheForTests } from "../../../utils/edge-cache.js";
+import { __resetIsolateCacheForTests } from "../../../utils/isolate-cache.js";
 
 const OWNER = "8f2c1a9e-4b7d-4e21-9c3a-1d5e6f7a8b9c";
 const PROJECT = "0b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d";
@@ -75,7 +76,10 @@ const upload = {
 };
 
 describe("storeRenderVariant", () => {
-  beforeEach(() => __resetEdgeCacheForTests());
+  beforeEach(() => {
+    __resetEdgeCacheForTests();
+    __resetIsolateCacheForTests();
+  });
 
   it("stores a new cut as a private video + variant row, then reclaims the superseded revision", async () => {
     const { db, log, remaining } = dbReturning(
@@ -168,24 +172,28 @@ describe("storeRenderVariant", () => {
 });
 
 describe("getRenderVariant", () => {
-  beforeEach(() => __resetEdgeCacheForTests());
+  beforeEach(() => {
+    __resetEdgeCacheForTests();
+    __resetIsolateCacheForTests();
+  });
   const ask = { actorUserId: OWNER, projectId: PROJECT, variantKey: "9x16-full", contentRevision: REVISION };
 
-  it("serves a repeat read from the cache, and a write invalidates it", async () => {
-    // First read: a miss (no cut yet) is cached.
+  it("never caches a miss — another isolate may store the cut", async () => {
     const first = dbReturning([project], []);
     assert.equal(await getRenderVariant(ask, { db: first.db }), null);
-    const second = dbReturning([project]);
+    const second = dbReturning([project], []);
     assert.equal(await getRenderVariant(ask, { db: second.db }), null);
-    assert.deepEqual(second.log, ["select"], "only the ownership check ran");
+    assert.deepEqual(second.log, ["select", "select"], "the variant lookup re-ran");
+  });
 
-    // Storing the cut invalidates the cached miss.
+  it("serves a repeat hit from the cache, and a write invalidates it", async () => {
     const write = dbReturning([project], [], [{ id: NEW_VIDEO }], [{ id: VARIANT }], []);
     await storeRenderVariant(upload, { db: write.db, ...storage().deps });
-    const third = dbReturning([project], [{ ...existingCut, videoId: NEW_VIDEO }]);
-    const dto = await getRenderVariant(ask, { db: third.db });
-    assert.equal(dto?.videoId, NEW_VIDEO);
-    assert.deepEqual(third.log, ["select", "select"]);
+    const first = dbReturning([project], [{ ...existingCut, videoId: NEW_VIDEO }]);
+    assert.equal((await getRenderVariant(ask, { db: first.db }))?.videoId, NEW_VIDEO);
+    const second = dbReturning([project]);
+    assert.equal((await getRenderVariant(ask, { db: second.db }))?.videoId, NEW_VIDEO);
+    assert.deepEqual(second.log, ["select"], "only the ownership check ran");
   });
 
   it("rejects a malformed revision (error case)", async () => {

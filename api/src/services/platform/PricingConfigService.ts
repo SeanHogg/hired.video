@@ -1,7 +1,7 @@
 /**
  * PricingConfigService — single source of truth for the runtime-editable
  * platform prices. Reads from `platform_pricing` (single-row config) through
- * the canonical edge cache (`getOrSetCached`, key `pricing-config:v1`, 300s).
+ * the canonical edge cache (`getOrSetCached`, key `pricing-config:v1`, 3600s).
  * Writes invalidate the cache.
  *
  * Used by:
@@ -30,7 +30,8 @@ export interface PricingConfig {
 
 const SINGLETON_ID = "singleton";
 const PRICING_CACHE_KEY = "pricing-config:v1";
-const PRICING_CACHE_TTL_SECONDS = 300;
+// 3600s: the SA pricing write invalidates — every write path invalidates explicitly; long TTL = few KV refills.
+const PRICING_CACHE_TTL_SECONDS = 3600;
 
 function defaults(): PricingConfig {
   return {

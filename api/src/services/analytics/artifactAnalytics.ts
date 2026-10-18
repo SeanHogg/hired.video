@@ -21,108 +21,10 @@ import {
 import { ROLLUP_EVENTS, rollupArtifactEvents, type ArtifactEventRollup } from "./artifactEventRollup.js";
 import { isArtifactView } from "../../repositories/artifactViewStreams.js";
 import { countStudioEventRows } from "../../repositories/videoAnalyticsRepository.js";
-import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 
-/** Owner-lookup table keyed on artifact kind. One join per kind; the
- *  beacon + analytics endpoints both call this to stamp owner_user_id
- *  on inserts and gate aggregate reads. */
-export async function lookupArtifactOwner(
-  kind: ArtifactKind,
-  artifactId: string,
-): Promise<string | null> {
-  const db = getDb();
-  // Every studio MediaKind keys on studio_projects.id — collapse the
-  // per-kind cases into one branch per the DRY rule. `isStudioArtifactKind`
-  // is the SSoT for "is this row in studio_projects?"; adding a new
-  // studio kind to ARTIFACT_KINDS auto-routes through this branch.
-  if (isStudioArtifactKind(kind)) {
-    const [r] = await db
-      .select({ userId: schema.studioProjects.userId })
-      .from(schema.studioProjects)
-      .where(eq(schema.studioProjects.id, artifactId))
-      .limit(1);
-    return r?.userId ?? null;
-  }
-  switch (kind) {
-    case "resume": {
-      const [r] = await db
-        .select({ userId: schema.resumeInformation.userId })
-        .from(schema.resumeInformation)
-        .where(eq(schema.resumeInformation.id, artifactId))
-        .limit(1);
-      return r?.userId ?? null;
-    }
-    case "company": {
-      const [r] = await db
-        .select({ userId: schema.companyProfiles.ownerId })
-        .from(schema.companyProfiles)
-        .where(eq(schema.companyProfiles.id, artifactId))
-        .limit(1);
-      return r?.userId ?? null;
-    }
-    case "profile": {
-      // Profile artifact_id IS the owning user id (users.id).
-      const [r] = await db
-        .select({ id: schema.users.id })
-        .from(schema.users)
-        .where(eq(schema.users.id, artifactId))
-        .limit(1);
-      return r?.id ?? null;
-    }
-    case "article": {
-      // articles may not exist in this PR's schema build yet — fall back
-      // to a select against the polymorphic owner stamp written by the
-      // first view event; ok to return null if no rows yet.
-      const [r] = await db
-        .select({ ownerUserId: schema.artifactViews.ownerUserId })
-        .from(schema.artifactViews)
-        .where(
-          and(
-            eq(schema.artifactViews.artifactKind, "article"),
-            eq(schema.artifactViews.artifactId, artifactId),
-          ),
-        )
-        .limit(1);
-      return r?.ownerUserId ?? null;
-    }
-    case "job": {
-      const [r] = await db
-        .select({ userId: schema.jobItems.postedByUserId })
-        .from(schema.jobItems)
-        .where(eq(schema.jobItems.id, artifactId))
-        .limit(1);
-      return r?.userId ?? null;
-    }
-    case "post": {
-      const [r] = await db
-        .select({ userId: schema.feedPosts.userId })
-        .from(schema.feedPosts)
-        .where(eq(schema.feedPosts.id, artifactId))
-        .limit(1);
-      return r?.userId ?? null;
-    }
-    case "studio_template":
-    case "service": {
-      // Same fallback as 'article' — read the owner stamp off the first
-      // recorded view if the corresponding entity table isn't reachable
-      // from here. Safe because the beacon endpoint stamps the owner
-      // at insert from this same function.
-      const [r] = await db
-        .select({ ownerUserId: schema.artifactViews.ownerUserId })
-        .from(schema.artifactViews)
-        .where(
-          and(
-            eq(schema.artifactViews.artifactKind, kind),
-            eq(schema.artifactViews.artifactId, artifactId),
-          ),
-        )
-        .limit(1);
-      return r?.ownerUserId ?? null;
-    }
-    default:
-      return null;
-  }
-}
+/** Owner lookup moved to artifactOwners.ts (batched); re-exported for callers. */
+export { lookupArtifactOwner } from "./artifactOwners.js";
 
 export interface ArtifactMetricsDTO {
   totalViews: number;
@@ -373,22 +275,19 @@ function metricsCacheKey(kind: ArtifactKind, artifactId: string): string {
 }
 
 /**
- * Owner-facing metrics read through the L1 + KV cache, with a short TTL and
- * NO per-view invalidation.
+ * Owner-facing metrics read through the ISOLATE cache (zero KV writes), with
+ * a short TTL and NO per-view invalidation.
  *
- * Why not invalidate on insert: Workers Free allows 1,000 KV writes/deletes
- * per day across the whole account, and every public view would cost one
- * delete — a single popular résumé could exhaust the quota. Why not a
- * version token: bumping it is also a KV write per view (or needs its own
- * throttle state). With a TTL only, KV writes happen on cache FILLS, which
- * are driven by owners opening their analytics (≤ 1 fill per artifact per
- * TTL window), not by viewers. The cost is up to METRICS_TTL_SECONDS of
- * staleness on a dashboard that is not real-time anyway.
+ * Why not invalidate on insert / a version token: either is a KV write per
+ * public view, and Workers Free allows ~1,000 KV writes/day account-wide
+ * (reserved for scheduler markers). Why not L1 + KV: the key is per
+ * artifact (unbounded), so every fill would be a KV PUT. The cost is up to
+ * METRICS_TTL_SECONDS of staleness on a dashboard that is not real-time.
  */
 export const METRICS_TTL_SECONDS = 120;
 
 export function getArtifactMetrics(kind: ArtifactKind, artifactId: string): Promise<ArtifactMetricsDTO> {
-  return getOrSetCached<ArtifactMetricsDTO>({
+  return getOrSetIsolateCached<ArtifactMetricsDTO>({
     key: metricsCacheKey(kind, artifactId),
     ttlSeconds: METRICS_TTL_SECONDS,
     loader: () => buildArtifactMetrics(kind, artifactId),

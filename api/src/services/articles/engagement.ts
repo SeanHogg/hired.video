@@ -5,7 +5,11 @@
  */
 import { getDb } from "../../db/index.js";
 import { DomainError } from "../../domains/errors.js";
-import { ArticleEngagementRepository, type ArticleRow } from "../../repositories/articleEngagementRepository.js";
+import {
+  ArticleEngagementRepository,
+  type ArticleRow,
+  type IArticleEngagementRepository,
+} from "../../repositories/articleEngagementRepository.js";
 import { findClapTotal, upsertClapTotal } from "../../repositories/articleClapsRepository.js";
 import { UsersRepository } from "../../repositories/usersRepository.js";
 import { bumpSearchVersion } from "../../utils/search-cache.js";
@@ -22,12 +26,13 @@ async function requirePublished(repo: ArticleEngagementRepository, articleId: st
   if (!art || art.status !== "published") throw notFound();
 }
 
-/** View-count beacon (#858) — bumps the denormalised `articles.view_count`. */
-export async function recordArticleView(articleId: string): Promise<void> {
-  const db = getDb();
-  const repo = new ArticleEngagementRepository(db);
-  await requirePublished(repo, articleId);
-  await repo.incrementViewCount(articleId);
+/** View-count beacon (#858) — bumps the denormalised `articles.view_count`
+ *  in ONE statement; the published check lives in its WHERE (404 otherwise). */
+export async function recordArticleView(
+  articleId: string,
+  repo: Pick<IArticleEngagementRepository, "incrementPublishedViewCount"> = new ArticleEngagementRepository(getDb()),
+): Promise<void> {
+  if (!(await repo.incrementPublishedViewCount(articleId))) throw notFound();
 }
 
 /** Read-progress beacon. Only an authenticated AND email-verified reader's

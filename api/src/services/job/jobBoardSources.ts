@@ -5,6 +5,7 @@
  */
 import { getDb } from "../../db/index.js";
 import { DomainError } from "../../domains/errors.js";
+import { signalScrapeSourcesActive } from "../scheduling/work-signals.js";
 import {
   JobBoardSourcesRepository,
   type JobBoardSourceInsert,
@@ -53,14 +54,20 @@ export function listAllJobSources(): Promise<JobBoardSourceRow[]> {
   return repo().listAll();
 }
 
-export function createGlobalJobSource(input: JobSourceInput, userId: string | null | undefined): Promise<JobBoardSourceRow> {
-  return repo().insert(toInsert(input, userId, "global"));
+/** A source that can be scraped now wakes the :00/:30 scrape. */
+async function signalIfActive(row: JobBoardSourceRow): Promise<JobBoardSourceRow> {
+  if (row.isActive) await signalScrapeSourcesActive();
+  return row;
+}
+
+export async function createGlobalJobSource(input: JobSourceInput, userId: string | null | undefined): Promise<JobBoardSourceRow> {
+  return signalIfActive(await repo().insert(toInsert(input, userId, "global")));
 }
 
 export async function updateJobSource(id: string, body: unknown): Promise<JobBoardSourceRow> {
   const updated = await repo().update(id, buildPatch(body, true));
   if (!updated) throw notFound();
-  return updated;
+  return signalIfActive(updated);
 }
 
 export function deleteJobSource(id: string): Promise<void> {
@@ -88,13 +95,13 @@ export async function createMyJobSource(userId: string, input: JobSourceInput): 
   if ((await r.countByCreator(userId)) >= MAX_CUSTOM_SOURCES_PER_USER) {
     throw new DomainError(429, "LIMIT_EXCEEDED", `Maximum of ${MAX_CUSTOM_SOURCES_PER_USER} custom job sources per user`);
   }
-  return r.insert(toInsert(input, userId, "recruiter"));
+  return signalIfActive(await r.insert(toInsert(input, userId, "recruiter")));
 }
 
 export async function updateMyJobSource(userId: string, id: string, body: unknown): Promise<JobBoardSourceRow> {
   const updated = await repo().update(id, buildPatch(body, false), userId);
   if (!updated) throw notFound();
-  return updated;
+  return signalIfActive(updated);
 }
 
 export function deleteMyJobSource(userId: string, id: string): Promise<void> {

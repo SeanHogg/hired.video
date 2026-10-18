@@ -7,9 +7,11 @@
  *     queue-gated worker's work marker. Only when one is due does the
  *     dispatcher read worker_runs — ONE DISTINCT ON query for every worker.
  *   - explicit-scan backfill / paid-media report resume: idle back-off —
- *     a run that finds nothing defers the sweep to the next hour.
- *   - job-board scrape: :00/:30 only, skipped while the hourly reconcile
- *     has recorded zero active sources.
+ *     a run that finds nothing defers the sweep to the next reconcile hour
+ *     (writers that create work call `wakeSweep`).
+ *   - job-board scrape: :00/:30 only, skipped while the reconcile has
+ *     recorded zero active sources (a new / reactivated source flips the
+ *     flag back via `signalScrapeSourcesActive`).
  */
 import { logger } from "../../lib/logger.js";
 import { getKvNamespace } from "../../utils/edge-cache.js";
@@ -23,16 +25,14 @@ import {
 } from "../../workers/runner.js";
 import type { WorkerDefinition } from "../../workers/types.js";
 import { isHalfHourInterval } from "./cron-plan.js";
-import { deferSweepToNextHour, dueQueues, isSweepDeferred, readWorkMarkers } from "./work-signals.js";
+import { deferSweepUntilReconcile, dueQueues, isSweepDeferred, readWorkMarkers, SCRAPE_SOURCES_KEY } from "./work-signals.js";
 import { loadNextDueTimes, settleAllMarkers } from "./work-queues.js";
 
 type Env = Record<string, string | undefined>;
 const workerEnv = (): Env => (globalThis as { __ENV?: Env }).__ENV ?? {};
 
 const WORKERS_NEXT_DUE_KEY = "work:workers:next-due";
-/** KV flag written by the hourly reconcile: "0" = no active job-board
- *  sources, so the :00/:30 scrape can skip its query. */
-export const SCRAPE_SOURCES_KEY = "work:scrape:active-sources";
+export { SCRAPE_SOURCES_KEY };
 
 /** Explicit-scan backfill batch (migration 0505) — one or more model calls
  *  per video, so small. */
@@ -120,7 +120,7 @@ export async function processExplicitScanBackfill(): Promise<void> {
   const { createExplicitScanDeps } = await import("../moderation/explicit/deps.js");
   const { scanned } = await backfillVideoScans(createExplicitScanDeps(workerEnv() as never), EXPLICIT_SCAN_BATCH);
   if (scanned > 0) logger.info(`[scheduled] explicit-scan backfill scanned ${scanned} videos`);
-  else await deferSweepToNextHour("explicit-scan");
+  else await deferSweepUntilReconcile("explicit-scan");
 }
 
 /** Pending Microsoft Ads reports (submit → poll → download): each open
@@ -129,7 +129,7 @@ export async function processPaidMediaReportResume(): Promise<void> {
   if (await isSweepDeferred("paid-media-reports")) return;
   const { resumePendingInsightReports } = await import("../paid-media/sync.js");
   const { checked } = await resumePendingInsightReports({ env: workerEnv() as never }, 3);
-  if (checked === 0) await deferSweepToNextHour("paid-media-reports");
+  if (checked === 0) await deferSweepUntilReconcile("paid-media-reports");
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ export async function processJobBoardScrape(now: Date = new Date()): Promise<voi
   await scrapeAllActiveSources();
 }
 
-/** Hourly: record whether any job-board source is active, so the :00/:30
+/** Reconcile: record whether any job-board source is active, so the :00/:30
  *  scrape can skip its query when none is. Written only when it changes. */
 export async function refreshScrapeSourcesFlag(activeSources: number): Promise<void> {
   const value = activeSources > 0 ? "1" : "0";

@@ -10,11 +10,11 @@
  * when no mutuals exist so the parent doesn't have to pre-check.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2, Users, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/lib/auth";
 import { graphService, type PersonRef } from "@/lib/services/graph-service";
+import { useMutualConnections } from "@/hooks/queries/use-mutual-connections";
 
 interface MutualsRowProps {
   targetUserId: string;
@@ -22,32 +22,14 @@ interface MutualsRowProps {
 
 export default function MutualConnectionsRow({ targetUserId }: MutualsRowProps) {
   // Mutuals are computed between ME and the target, so the query is
-  // meaningless — and 401s — for a signed-out viewer. Self-gate on auth so a
-  // public profile view never fires the auth-required graph call.
-  const { isAuthenticated } = useAuth();
-  const [mutuals, setMutuals] = useState<PersonRef[] | null>(null);
-  const [loadingMutuals, setLoadingMutuals] = useState(true);
+  // meaningless — and 401s — for a signed-out viewer. The shared hook
+  // self-gates on auth so a public profile view never fires the graph call,
+  // and shares one request/cache with WarmIntroRequestButton.
+  const mutualsQuery = useMutualConnections(targetUserId);
+  const loadingMutuals = mutualsQuery.isLoading;
+  const mutuals: PersonRef[] = mutualsQuery.data?.mutuals ?? [];
   const [path, setPath] = useState<PersonRef[] | null>(null);
   const [loadingPath, setLoadingPath] = useState(false);
-
-  useEffect(() => {
-    if (!targetUserId || !isAuthenticated) {
-      setLoadingMutuals(false);
-      return;
-    }
-    let cancelled = false;
-    graphService
-      .mutuals(targetUserId)
-      .then((body) => {
-        if (cancelled) return;
-        setMutuals(body?.mutuals ?? []);
-      })
-      .catch(() => {
-        if (!cancelled) setMutuals([]);
-      })
-      .finally(() => !cancelled && setLoadingMutuals(false));
-    return () => { cancelled = true; };
-  }, [targetUserId, isAuthenticated]);
 
   const showPath = async () => {
     if (path) return;
@@ -70,7 +52,7 @@ export default function MutualConnectionsRow({ targetUserId }: MutualsRowProps) 
       </div>
     );
   }
-  if (!mutuals || mutuals.length === 0) {
+  if (mutuals.length === 0) {
     return null;
   }
 

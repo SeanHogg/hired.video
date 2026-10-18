@@ -6,6 +6,7 @@
 import { getDb } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
 import { insertAutoApplications } from "../../repositories/autoApplyRepository.js";
+import { findAutoApplyResumeForOwner } from "../../repositories/resumeAutoApplyReads.js";
 import type { LLMClient } from "../adapters/llm-client.js";
 import { tryExtractJson } from "../../../../shared/extract-json.js";
 
@@ -29,7 +30,7 @@ export async function startAutoApply(llm: LLMClient | null, userId: string, inpu
   try {
     const resume = resumeId
       ? await repos.resumes.findByIdForOwner(resumeId, userId)
-      : (await repos.resumes.findAllForOwner(userId))[0] ?? null;
+      : await findAutoApplyResumeForOwner(db, userId);
     if (resume) {
       resumeContent = (resume as any).content ?? (resume as any).rawText ?? "";
       resolvedResumeId = resume.id;
@@ -111,7 +112,7 @@ export async function rankAutoApplyMatches(llm: () => LLMClient | null, userId: 
 
   let resumeSummary = "";
   try {
-    const resume = (await repos.resumes.findAllForOwner(userId))[0];
+    const resume = await findAutoApplyResumeForOwner(getDb(), userId);
     resumeSummary = (resume as any)?.content ?? (resume as any)?.rawText ?? "";
   } catch { /* keep empty */ }
 

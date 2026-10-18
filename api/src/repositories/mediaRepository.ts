@@ -15,6 +15,7 @@ import { schema } from "../db/index.js";
 import { isNotRenderVariant } from "./renderVariantRepository.js";
 import { syncFeedPostHashtags } from "./feedPostTagsRepository.js";
 import { invalidatePublicVideoFeed } from "../services/studio/public-video-feed.js";
+import { studioProjectColumns, STUDIO_PROJECT_LIST_MAX, type StudioProjectRow } from "./studioProjectColumns.js";
 
 const {
   videos,
@@ -31,7 +32,7 @@ export type VideoRow = typeof videos.$inferSelect;
 export type VideoInsert = typeof videos.$inferInsert;
 export type StudioVoiceCloneRow = typeof studioVoiceClones.$inferSelect;
 export type StudioVoiceCloneInsert = typeof studioVoiceClones.$inferInsert;
-export type StudioProjectRow = typeof studioProjects.$inferSelect;
+export type { StudioProjectRow };
 export type StudioProjectInsert = typeof studioProjects.$inferInsert;
 export type PitchDeckRow = typeof pitchDecks.$inferSelect;
 export type PitchDeckInsert = typeof pitchDecks.$inferInsert;
@@ -59,7 +60,8 @@ export interface IMediaVoiceCloneRepository {
 /** Studio projects. */
 export interface IMediaStudioProjectRepository {
   findStudioProjectById(id: string): Promise<StudioProjectRow | null>;
-  findStudioProjectsForUser(userId: string): Promise<StudioProjectRow[]>;
+  /** The owner's newest projects (capped at `limit`, default/max 500). */
+  findStudioProjectsForUser(userId: string, limit?: number): Promise<StudioProjectRow[]>;
   insertStudioProject(input: StudioProjectInsert): Promise<StudioProjectRow>;
   updateStudioProjectById(id: string, userId: string, patch: Partial<StudioProjectInsert>): Promise<void>;
   /** The `limit` most-recently-updated projects matching `where`, returned
@@ -182,20 +184,21 @@ export class MediaRepository implements IMediaRepository {
   // ── studio projects ───────────────────────────────────────────────────────
 
   async findStudioProjectById(id: string): Promise<StudioProjectRow | null> {
-    const [row] = await this.db.select().from(studioProjects).where(eq(studioProjects.id, id)).limit(1);
+    const [row] = await this.db.select(studioProjectColumns).from(studioProjects).where(eq(studioProjects.id, id)).limit(1);
     return (row as StudioProjectRow) ?? null;
   }
 
-  async findStudioProjectsForUser(userId: string): Promise<StudioProjectRow[]> {
+  async findStudioProjectsForUser(userId: string, limit = STUDIO_PROJECT_LIST_MAX): Promise<StudioProjectRow[]> {
     return (await this.db
-      .select()
+      .select(studioProjectColumns)
       .from(studioProjects)
       .where(eq(studioProjects.userId, userId))
-      .orderBy(desc(studioProjects.createdAt))) as StudioProjectRow[];
+      .orderBy(desc(studioProjects.createdAt))
+      .limit(Math.min(STUDIO_PROJECT_LIST_MAX, Math.max(1, limit)))) as StudioProjectRow[];
   }
 
   async insertStudioProject(input: StudioProjectInsert): Promise<StudioProjectRow> {
-    const [row] = await this.db.insert(studioProjects).values(input as any).returning();
+    const [row] = await this.db.insert(studioProjects).values(input as any).returning(studioProjectColumns);
     return row as StudioProjectRow;
   }
 
@@ -235,7 +238,7 @@ export class MediaRepository implements IMediaRepository {
 
   async findStudioProjectsWhere(where: SQL | undefined, limit = 500): Promise<StudioProjectRow[]> {
     const rows = (await this.db
-      .select()
+      .select(studioProjectColumns)
       .from(studioProjects)
       .where(where)
       .orderBy(desc(studioProjects.updatedAt))

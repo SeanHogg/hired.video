@@ -4,7 +4,8 @@
  *
  * The editor's Save menu and Details drawer both ask "list the destinations
  * this project went to (with their view URLs)". That read is served through
- * the canonical read-through cache (getOrSetCached) keyed per project and
+ * the isolate read-through cache (getOrSetIsolateCached — zero KV writes)
+ * keyed per project and
  * invalidated on every record/upsert — the keyspace is bounded (one key per
  * project) so a stable key is fine (no version token needed).
  *
@@ -19,7 +20,8 @@
  */
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
+import { signalWork } from "../scheduling/work-signals.js";
 
 const { studioProjectPublications } = schema;
 
@@ -54,14 +56,15 @@ export interface RecordPublicationInput {
   publishedBy?: string | null;
 }
 
-const TTL_SECONDS = 300;
+/** Short: invalidation clears this isolate only; others converge in TTL. */
+const TTL_SECONDS = 120;
 
 function cacheKey(projectId: string): string {
   return `studio:pubs:${projectId}`;
 }
 
 export function invalidatePublicationsCache(projectId: string): void {
-  invalidateCachedKey(cacheKey(projectId));
+  invalidateIsolateKey(cacheKey(projectId));
 }
 
 /**
@@ -106,6 +109,7 @@ export async function recordPublication(
     .returning();
 
   invalidatePublicationsCache(input.projectId);
+  if (row.status === "published" && row.externalId) await signalWork("post-metrics");
   return toRecord(row);
 }
 
@@ -117,7 +121,7 @@ export async function listPublications(
   projectId: string,
   db: Db = getDb(),
 ): Promise<PublicationRecord[]> {
-  return getOrSetCached<PublicationRecord[]>({
+  return getOrSetIsolateCached<PublicationRecord[]>({
     key: cacheKey(projectId),
     ttlSeconds: TTL_SECONDS,
     loader: async () => {

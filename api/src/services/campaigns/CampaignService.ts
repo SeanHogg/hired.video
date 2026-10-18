@@ -11,7 +11,7 @@
  */
 import { and, eq, inArray, isNotNull, like } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import { getEmailProvider } from "../adapters/email/transport.js";
 import { MarketingConsentService } from "../email/MarketingConsentService.js";
 import { rewriteLinksForClickTracking } from "./campaign-links.js";
@@ -138,10 +138,11 @@ export class CampaignService {
   }
 
   // ── Reads ─────────────────────────────────────────────────────────────────
-  /** Cached list (read-through L1+L2, invalidated on every write). One grouped
-   *  stats query — no N+1. */
+  /** Cached list (isolate-only — the 60s TTL tracks live send stats, and a
+   *  KV refill a minute was pure write cost; invalidated on every write in
+   *  this isolate). One grouped stats query — no N+1. */
   async list(): Promise<CampaignDTO[]> {
-    return getOrSetCached<CampaignDTO[]>({
+    return getOrSetIsolateCached<CampaignDTO[]>({
       key: LIST_CACHE_KEY,
       ttlSeconds: LIST_CACHE_TTL,
       loader: async () => {
@@ -607,6 +608,6 @@ export class CampaignService {
   }
 
   private bust(): void {
-    invalidateCachedKey(LIST_CACHE_KEY);
+    invalidateIsolateKey(LIST_CACHE_KEY);
   }
 }

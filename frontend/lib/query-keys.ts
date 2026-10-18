@@ -56,4 +56,17 @@ export const queryKeys = {
     all: ["role-access"] as const,
     byRole: (userId: Id, role: string) => ["role-access", userId ?? null, role] as const,
   },
+  graphMutuals: {
+    all: ["graph-mutuals"] as const,
+    byTarget: (userId: Id, targetUserId: Id) =>
+      ["graph-mutuals", userId ?? null, targetUserId ?? null] as const,
+  },
+  cookiePreferences: {
+    all: ["cookie-preferences"] as const,
+    byUser: (userId: Id) => ["cookie-preferences", userId ?? null] as const,
+  },
+  activeUsers: {
+    all: ["active-users"] as const,
+    byUser: (userId: Id) => ["active-users", userId ?? null] as const,
+  },
 } as const;

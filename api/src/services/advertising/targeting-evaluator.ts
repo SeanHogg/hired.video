@@ -22,7 +22,7 @@ import {
   type DevicePlatform,
 } from "../../../../shared/ad-targeting.js";
 import { AdTargetingRepository } from "../../repositories/adTargetingRepository.js";
-import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 import { buildTargetingWhere } from "./targeting-sql.js";
 import { sha256Hex } from "../../utils/crypto.js";
 
@@ -136,7 +136,9 @@ export interface ReachEstimate {
 
 /** Reach shifts slowly (sign-ups, profile edits); a 10-minute TTL keeps the
  *  inspector live without re-counting on every keystroke. Nothing writes a
- *  spec-keyed value, so there is no write to invalidate on. */
+ *  spec-keyed value, so there is no write to invalidate on. Isolate-only:
+ *  one key per targeting spec is an unbounded keyspace (no KV write per
+ *  fill on Workers Free). */
 const REACH_TTL_SECONDS = 600;
 
 export async function estimateActualReach(
@@ -144,7 +146,7 @@ export async function estimateActualReach(
   repo?: AdTargetingRepository,
 ): Promise<ReachEstimate> {
   const key = await targetingCacheKey(targeting);
-  return getOrSetCached<ReachEstimate>({
+  return getOrSetIsolateCached<ReachEstimate>({
     key,
     ttlSeconds: REACH_TTL_SECONDS,
     loader: async () => ({

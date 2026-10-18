@@ -10,7 +10,7 @@
  */
 import { and, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
-import { invalidateCachedKey } from "../../utils/edge-cache.js";
+import { invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import type {
   PartnerConnectionSource,
   PartnerScope,
@@ -63,7 +63,7 @@ export async function invalidatePartnerProfilesForUser(userId: string, db = getD
     .from(partnerConnections)
     .where(eq(partnerConnections.userId, userId));
   for (const r of rows as Array<{ partnerId: string }>) {
-    invalidateCachedKey(partnerProfileCacheKey(r.partnerId, userId));
+    invalidateIsolateKey(partnerProfileCacheKey(r.partnerId, userId));
   }
 }
 
@@ -152,7 +152,7 @@ export async function upsertConnection(
       } as any)
       .where(eq(partnerConnections.id, existing.id))
       .returning();
-    invalidateCachedKey(partnerProfileCacheKey(input.partnerId, input.userId));
+    invalidateIsolateKey(partnerProfileCacheKey(input.partnerId, input.userId));
     return row as PartnerConnectionRow;
   }
   const [row] = await db
@@ -189,7 +189,7 @@ export async function activateConnection(
     .where(eq(partnerConnections.id, connectionId))
     .returning();
   if (row) {
-    invalidateCachedKey(
+    invalidateIsolateKey(
       partnerProfileCacheKey((row as PartnerConnectionRow).partnerId, (row as PartnerConnectionRow).userId),
     );
   }
@@ -207,7 +207,7 @@ export async function revokeConnection(
     .where(eq(partnerConnections.id, connectionId))
     .returning();
   if (row) {
-    invalidateCachedKey(
+    invalidateIsolateKey(
       partnerProfileCacheKey((row as PartnerConnectionRow).partnerId, (row as PartnerConnectionRow).userId),
     );
   }

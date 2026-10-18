@@ -5,7 +5,8 @@
  * This is i-Ready's core teacher value prop: per-member progress across
  * every assignment, with overdue flags + a cohort summary. It's an
  * expensive fan-out (members × assignments × enrollments), so it is served
- * through the canonical read-through cache (getOrSetCached) and recomputed
+ * through the isolate read-through cache (getOrSetIsolateCached — per-cohort
+ * keys, zero KV writes) and recomputed
  * with FULLY BATCHED queries — O(1) round-trips regardless of cohort size.
  *
  * Cache strategy: structural changes (member add/remove, assignment
@@ -20,7 +21,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { getDb } from "../../db/index.js";
 import { schema } from "../../db/index.js";
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import type { LessonProgress } from "../../db/schema/courses.js";
 
 type DbHandle = ReturnType<typeof getDb>;
@@ -43,7 +44,7 @@ const cacheKey = (cohortId: string) => `cohort-analytics:${cohortId}`;
 /** Drop the cached roll-up for a cohort. Called by every structural
  *  mutation in CohortService / AssignmentService. */
 export function invalidateCohortAnalyticsCache(cohortId: string): void {
-  invalidateCachedKey(cacheKey(cohortId));
+  invalidateIsolateKey(cacheKey(cohortId));
 }
 
 export type LearnerItemStatus = "not_started" | "in_progress" | "completed" | "not_linked";
@@ -111,7 +112,7 @@ export class CohortAnalyticsService {
   /** Cached roll-up. The caller has already verified the actor may manage
    *  this cohort. */
   getAnalytics(cohortId: string): Promise<CohortAnalytics> {
-    return getOrSetCached<CohortAnalytics>({
+    return getOrSetIsolateCached<CohortAnalytics>({
       key: cacheKey(cohortId),
       ttlSeconds: ANALYTICS_TTL_SECONDS,
       loader: () => this.compute(cohortId),

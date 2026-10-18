@@ -13,7 +13,7 @@
  * mutual (see services/graph/professionalGraph.requestWarmIntro), so a
  * stale cache here cannot fabricate a forwarding chain.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -30,7 +30,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
-import { graphService, type PersonRef } from "@/lib/services/graph-service";
+import { graphService } from "@/lib/services/graph-service";
+import { useMutualConnections } from "@/hooks/queries/use-mutual-connections";
 import { initials } from "@/lib/format";
 
 interface WarmIntroRequestButtonProps {
@@ -49,40 +50,24 @@ export function WarmIntroRequestButton({
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [mutuals, setMutuals] = useState<PersonRef[] | null>(null);
-  const [mutualCount, setMutualCount] = useState<number | null>(null);
-  const [hideButton, setHideButton] = useState(false);
   const [selectedViaId, setSelectedViaId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<"created" | "deduped" | null>(null);
 
-  // Probe for mutuals on mount. If there are none (or the call fails), we
-  // self-hide rather than render a CTA that always errors. Unauthed
-  // viewers don't probe — they get the button and a login redirect on
-  // click, matching GrabCoffeeButton's pattern.
-  useEffect(() => {
-    if (isSelf || !isAuthenticated || !targetUserId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const result = await graphService.mutuals(targetUserId);
-        if (cancelled) return;
-        setMutualCount(result.mutualCount);
-        setMutuals(result.mutuals);
-        if (result.mutualCount === 0 || result.isDirectConnection) {
-          // Direct connection: warm-intro doesn't apply — they can just DM.
-          // Zero mutuals: there's no one to ask.
-          setHideButton(true);
-        }
-      } catch {
-        setHideButton(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isSelf, isAuthenticated, targetUserId]);
+  // Probe for mutuals (shared query with MutualConnectionsRow — one request
+  // per profile). If there are none (or the call fails), we self-hide rather
+  // than render a CTA that always errors. Unauthed viewers don't probe — they
+  // get the button and a login redirect on click, matching GrabCoffeeButton.
+  const mutualsQuery = useMutualConnections(targetUserId, !isSelf && isAuthenticated);
+  const mutuals = mutualsQuery.data?.mutuals ?? null;
+  const mutualCount = mutualsQuery.data?.mutualCount ?? null;
+  // Direct connection: warm-intro doesn't apply — they can just DM.
+  // Zero mutuals: there's no one to ask.
+  const hideButton =
+    mutualsQuery.isError ||
+    (mutualsQuery.data !== undefined &&
+      (mutualsQuery.data.mutualCount === 0 || mutualsQuery.data.isDirectConnection));
 
   if (isSelf || hideButton) return null;
 

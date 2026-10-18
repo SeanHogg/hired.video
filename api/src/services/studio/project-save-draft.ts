@@ -26,7 +26,7 @@ import { slugify, SLUG_PATTERN } from "../../../../shared/slugify.js";
 import { OptionalUrlSchema, UuidLikeSchema } from "../../../../shared/validation.js";
 import { MediaRepository } from "../../repositories/mediaRepository.js";
 import {
-  findProjectById,
+  findProjectForSaveDraft,
   insertProject,
   updateProjectIfRevision,
   type StudioProjectPatch,
@@ -36,7 +36,7 @@ import { enforceCandidateVideoConsent } from "../candidate-consent/candidate-con
 import { assertCanWrite } from "./workspace.js";
 import { resolveWorkspaceFromBody } from "./workspace-request.js";
 import { studioPurposeSchema } from "./video-script.js";
-import { carryBakedStamp } from "./baked-stamp.js";
+import { carryBakedHash } from "./baked-stamp.js";
 import { storyboardScriptKeys } from "./storyboard-meta.js";
 import type { StudioProjectDto } from "./project-dto.js";
 import { forceProjectUnlisted, loadProjectSubjects } from "./project-visibility.js";
@@ -106,7 +106,7 @@ async function ensureUniqueProjectSlug(db: Db, baseSlug: string, selfProjectId: 
  *  effective mediaKind owns (the request's, else the row's). */
 function editorKindPatch(
   input: SaveDraftInput,
-  prior: { mediaKind: string | null; state: unknown } | null,
+  prior: { mediaKind: string | null; bakedStamp: string | null } | null,
 ): StudioProjectPatch {
   const { kind, mediaKind, timelineSpec, interactiveComicState } = input;
   const touched =
@@ -116,7 +116,7 @@ function editorKindPatch(
   const patch: StudioProjectPatch = { kind: kind ?? (timelineSpec !== undefined ? "nle" : undefined) };
   if (mediaKind !== undefined) patch.mediaKind = mediaKind;
   const state = stateFromFields(mediaKind ?? prior?.mediaKind ?? undefined, input);
-  if (state !== undefined) patch.state = carryBakedStamp(prior?.state ?? null, state);
+  if (state !== undefined) patch.state = carryBakedHash(prior?.bakedStamp ?? null, state);
   if (interactiveComicState !== undefined) patch.interactiveComicState = interactiveComicState;
   return patch;
 }
@@ -155,7 +155,7 @@ export async function saveProjectDraft(
   const { name, resumeText, script, projectId, prompt, jobDescription, purpose, subjects, metaDescription, keywords, socialCardImage, baseRevision } = input;
   const db = getDb();
 
-  const prior = projectId ? await findProjectById(db, projectId) : null;
+  const prior = projectId ? await findProjectForSaveDraft(db, projectId) : null;
   const priorMeta: Record<string, unknown> =
     prior?.storyboard && typeof prior.storyboard === "object" ? (prior.storyboard as Record<string, unknown>) : {};
   // Prefer the indexed column; fall back to the JSONB mirror for pre-0141 rows.

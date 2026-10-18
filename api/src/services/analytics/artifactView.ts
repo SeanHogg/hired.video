@@ -32,7 +32,7 @@ import { detectCountry } from "../auth/geo.js";
 import type { ArtifactKind } from "../../../../shared/artifact-views.js";
 
 const { artifactViews } = schema;
-type NewArtifactView = typeof artifactViews.$inferInsert;
+export type NewArtifactView = typeof artifactViews.$inferInsert;
 
 export interface RecordArtifactViewArgs {
   artifactKind: ArtifactKind;
@@ -53,21 +53,14 @@ export interface RecordArtifactViewArgs {
   dropOffBucket?: number | null;
 }
 
-/** Record a single artifact view. No-op when the viewer IS the owner —
- *  see header. Safe to fire-and-forget; the function never throws
- *  because telemetry must not break a page load. */
-export async function recordArtifactView(
-  args: RecordArtifactViewArgs,
-): Promise<void> {
-  if (
-    args.viewerId &&
-    args.ownerUserId &&
-    args.viewerId === args.ownerUserId
-  ) {
-    return;
+/** Build the artifact_views row for one view, or null when the viewer IS
+ *  the owner (see header — owners never inflate their own metrics). Pure;
+ *  shared by the single-view writer and the batched beacon ingest. */
+export function buildArtifactViewRow(args: RecordArtifactViewArgs): NewArtifactView | null {
+  if (args.viewerId && args.ownerUserId && args.viewerId === args.ownerUserId) {
+    return null;
   }
-
-  const row: NewArtifactView = {
+  return {
     artifactKind: args.artifactKind,
     artifactId: args.artifactId,
     ownerUserId: args.ownerUserId,
@@ -86,15 +79,30 @@ export async function recordArtifactView(
     percentConsumed: args.percentConsumed ?? 0,
     dropOffBucket: args.dropOffBucket ?? null,
   };
+}
 
+/** Record a single artifact view. No-op when the viewer IS the owner —
+ *  see header. Safe to fire-and-forget; the function never throws
+ *  because telemetry must not break a page load. */
+export async function recordArtifactView(
+  args: RecordArtifactViewArgs,
+): Promise<void> {
+  const row = buildArtifactViewRow(args);
+  if (!row) return;
   try {
-    const db = getDb();
-    // No cache invalidation here: owner metrics use a short TTL instead
-    // (artifactAnalytics.getArtifactMetrics — KV write quota).
-    await db.insert(artifactViews).values(row);
+    await insertArtifactViewRows([row]);
   } catch {
     // Telemetry must never break the request — swallow.
   }
+}
+
+/** ONE multi-row INSERT into artifact_views (no-op for an empty list).
+ *  Throws on failure — callers decide whether telemetry may fail loudly.
+ *  No cache invalidation: owner metrics use a short TTL instead
+ *  (artifactAnalytics.getArtifactMetrics — KV write quota). */
+export async function insertArtifactViewRows(rows: readonly NewArtifactView[]): Promise<void> {
+  if (rows.length === 0) return;
+  await getDb().insert(artifactViews).values([...rows]);
 }
 
 /** Extract ip-country from a Hono context. Hono header API differs from

@@ -15,16 +15,19 @@ export async function insertAtsPackage(db: Db, values: AtsPackageInsert): Promis
   return row;
 }
 
-export async function findActiveAtsPackageBySlug(db: Db, slug: string): Promise<AtsPackageRow | null> {
-  const [row] = await db.select().from(studioAtsPackages)
-    .where(and(eq(studioAtsPackages.slug, slug), eq(studioAtsPackages.isActive, true)))
-    .limit(1);
+/** Count a view of the ACTIVE package behind `slug` and return the updated
+ *  row — ONE statement (`UPDATE … SET view_count = view_count + 1 WHERE
+ *  slug = $1 AND is_active RETURNING *`). Null when no active package. */
+export async function incrementActiveAtsPackageViewBySlug(db: Db, slug: string): Promise<AtsPackageRow | null> {
+  const [row] = await buildActiveAtsPackageViewBump(db, slug);
   return row ?? null;
 }
 
-/** Atomic `view_count + 1` (one statement). */
-export async function incrementAtsPackageViewCount(db: Db, id: string): Promise<void> {
-  await db.update(studioAtsPackages)
+/** The statement behind incrementActiveAtsPackageViewBySlug (exported so
+ *  tests can pin the SQL via drizzle.mock). */
+export function buildActiveAtsPackageViewBump(db: Db, slug: string) {
+  return db.update(studioAtsPackages)
     .set({ viewCount: sql`${studioAtsPackages.viewCount} + 1` })
-    .where(eq(studioAtsPackages.id, id));
+    .where(and(eq(studioAtsPackages.slug, slug), eq(studioAtsPackages.isActive, true)))
+    .returning();
 }

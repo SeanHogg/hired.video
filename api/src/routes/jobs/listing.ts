@@ -15,7 +15,7 @@ import { Hono } from "hono";
 import type { AppContext, AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
 import * as jobService from "../../services/job/JobService.js";
-import { publicJobsFromQuery } from "../../services/jobs/publicJobsQuery.js";
+import { projectionOmitsJobBody, publicJobsFromQuery } from "../../services/jobs/publicJobsQuery.js";
 import { JOB_LIST_FIELDS, parseFields, projectRows } from "../../../../shared/projection.js";
 import { jobViewerOf } from "./http.js";
 import { requireUser } from "../helpers/routerHelpers.js";
@@ -26,8 +26,12 @@ export const jobListingRoutes = new Hono<AppEnv>();
  *  list views don't drag the full job body over the wire — descriptions +
  *  JSONB blobs alone are usually 10× the size of the card-view fields. */
 async function publicListing(c: AppContext): Promise<Response> {
-  const data = await publicJobsFromQuery(c.req.query(), (c.env ?? {}) as Record<string, string | undefined>);
   const fields = parseFields(c.req.query("fields"), JOB_LIST_FIELDS);
+  const data = await publicJobsFromQuery(
+    c.req.query(),
+    (c.env ?? {}) as Record<string, string | undefined>,
+    { omitBody: projectionOmitsJobBody(fields) },
+  );
   return c.json(success({ ...data, items: projectRows(data.items as unknown as Array<Record<string, unknown>>, fields) }));
 }
 

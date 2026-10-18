@@ -1,15 +1,18 @@
 /**
  * HOURLY cron (hh:02) — runs every job `hourlyJobsFor(now)` selects, in
- * order. The every-hour ones (marker reconcile, config snapshot, posting
- * agent, off-platform metrics) share the Neon wake-up the hourly workers
- * already cause; the daily / weekly / monthly ones run in their hour.
+ * order. Every hour: the config snapshot (KV-deduped, no query when the
+ * release is unchanged) and the marker-gated hourly queues (posting agent,
+ * off-platform metrics — KV reads only unless a marker is due). On the
+ * reconcile hours: the marker reconcile. The daily / weekly / monthly jobs
+ * run in their hour. So an idle non-reconcile hour never wakes Neon.
  */
 import { getDb } from "../../db/index.js";
 import { logger } from "../../lib/logger.js";
 import { buildRepos } from "../../repositories/index.js";
 import { WorkQueueRepository } from "../../repositories/workQueueRepository.js";
 import { hourlyJobsFor, type HourlyJob } from "./cron-plan.js";
-import { reconcileWorkMarkers } from "./work-queues.js";
+import { loadNextDueTimes, reconcileWorkMarkers, settleAllMarkers } from "./work-queues.js";
+import { dueQueues, HOURLY_QUEUES, readWorkMarkers, type WorkQueue } from "./work-signals.js";
 import { refreshScrapeSourcesFlag } from "./interval-jobs.js";
 import {
   runArticleEngagementPayout,
@@ -50,11 +53,42 @@ async function externalPostMetrics(): Promise<void> {
   await processExternalPostMetrics(workerEnv() as never);
 }
 
+const HOURLY_QUEUE_RUNNERS: Record<(typeof HOURLY_QUEUES)[number], () => Promise<void>> = {
+  "posting-agent": postingAgent,
+  "post-metrics": externalPostMetrics,
+};
+
+/** Run each hourly queue whose KV marker is due, then re-derive the
+ *  markers in one query. No due marker → KV reads only, no Postgres.
+ *  KV unavailable (dev / outage) → every hourly queue runs, as before. */
+export async function runHourlyQueues(now: Date = new Date()): Promise<WorkQueue[]> {
+  const markers = await readWorkMarkers(HOURLY_QUEUES);
+  const due = dueQueues(markers, now.getTime(), HOURLY_QUEUES) as Array<(typeof HOURLY_QUEUES)[number]>;
+  if (due.length === 0) return [];
+  for (const queue of due) {
+    try {
+      await HOURLY_QUEUE_RUNNERS[queue]();
+    } catch (err) {
+      logger.error(`[scheduled] hourly queue ${queue} failed`, err);
+    }
+  }
+  if (markers) {
+    try {
+      const all = await readWorkMarkers();
+      await settleAllMarkers(all, await loadNextDueTimes(), Date.now());
+    } catch (err) {
+      logger.error("[scheduled] hourly queue marker settle failed", err);
+    }
+  }
+  return due;
+}
+
 const HOURLY_RUNNERS: Record<HourlyJob, (now: Date) => Promise<void>> = {
   "reconcile-markers": reconcile,
   "config-snapshot": configSnapshot,
-  "posting-agent": postingAgent,
-  "external-post-metrics": externalPostMetrics,
+  "hourly-queues": async (now) => {
+    await runHourlyQueues(now);
+  },
   "seed-superadmin": runSeedSuperAdmin,
   maintenance: runDailyMaintenance,
   "model-catalog-drift": runModelCatalogDrift,

@@ -22,9 +22,16 @@
  * warm isolates keep their L1 copy until it expires, which is why the L1
  * TTL is capped at `L1_MAX_TTL_SECONDS` regardless of the caller's TTL.
  *
+ * Every L2 miss is a KV PUT, and the account is on Workers Free (~1,000
+ * KV writes/day, reserved for scheduler work markers). So this helper is
+ * ONLY for shared, slow-changing, bounded keys with long TTLs (≥ 300s,
+ * ideally ≥ 3600s + explicit invalidation). Per-user, per-entity or
+ * free-text keys go through utils/isolate-cache.ts (zero KV writes).
+ *
  * For unbounded keyspaces (search, per-host slot windows) use the
  * version-token pair `getCacheVersion` / `bumpCacheVersion`: embed the
- * version in the key and bump it on write to orphan every old entry.
+ * version in the key (payload in the isolate cache) and bump it on write
+ * to orphan every old entry.
  *
  * This is the canonical pattern; do not inline Map+KV+TTL in service
  * files.
@@ -36,6 +43,11 @@ const L1_MAX_ENTRIES = 5_000;
  *  staleness after an invalidation in a different isolate. L2 (KV) keeps
  *  the caller's full TTL. */
 const L1_MAX_TTL_SECONDS = 30;
+/** Negative caching: a null/undefined loader result (a crawler 404 on an
+ *  OG/meta lookup, an unknown id) is held in L1 only — never written to KV
+ *  (that would be a KV write per miss on Workers Free) — for up to this
+ *  long, so repeat misses don't each hit Neon. Invalidation clears it. */
+export const NEGATIVE_TTL_SECONDS = 300;
 
 const _memoryCache = new Map<string, { value: unknown; expiresAt: number }>();
 const _inFlight = new Map<string, Promise<unknown>>();
@@ -45,8 +57,8 @@ function getKv(): KVNamespace | undefined {
 }
 
 /** The shared Workers KV binding (`KV_CACHE`). Exported so other primitives
- *  that legitimately need raw KV — e.g. the best-effort rate limiter
- *  ([rate-limit.ts](./rate-limit.ts)) — reach it through ONE accessor instead
+ *  that legitimately need raw KV — e.g. the scheduler work markers
+ *  (services/scheduling/work-signals.ts) — reach it through ONE accessor instead
  *  of re-reading `globalThis.__ENV` (DRY). Returns undefined in dev/tests
  *  where the binding isn't present. */
 export function getKvNamespace(): KVNamespace | undefined {
@@ -67,7 +79,10 @@ function l1Get(key: string, now: number): { hit: true; value: unknown } | { hit:
 }
 
 function l1Set(key: string, value: unknown, ttlSeconds: number, now: number): void {
-  const ttl = Math.min(ttlSeconds, L1_MAX_TTL_SECONDS);
+  // Null results get the (longer) negative TTL; positive values the L1 cap.
+  const ttl = value == null
+    ? Math.min(ttlSeconds, NEGATIVE_TTL_SECONDS)
+    : Math.min(ttlSeconds, L1_MAX_TTL_SECONDS);
   _memoryCache.delete(key);
   if (_memoryCache.size >= L1_MAX_ENTRIES) {
     const oldest = _memoryCache.keys().next();
@@ -113,7 +128,9 @@ async function loadThrough<T>(opts: EdgeCacheOptions<T>, isCurrent: () => boolea
   const value = await opts.loader();
   if (!isCurrent() || (opts.shouldCache && !opts.shouldCache(value))) return value;
   l1Set(opts.key, value, opts.ttlSeconds, Date.now());
-  if (kv) {
+  // Null is negative-cached in L1 only (see NEGATIVE_TTL_SECONDS): KV can't
+  // serve it back anyway (a JSON null reads as a miss), so a put is pure cost.
+  if (kv && value != null) {
     kv.put(opts.key, JSON.stringify(value), { expirationTtl: Math.max(60, opts.ttlSeconds) })
       .catch(() => undefined);
   }
@@ -152,8 +169,54 @@ export function invalidateCachedKey(key: string): void {
 // Version tokens — invalidation for unbounded keyspaces
 // ---------------------------------------------------------------------------
 
+/** How long this isolate trusts its copy of a version token before
+ *  re-reading KV. KV itself is eventually consistent (~60s across colos),
+ *  so 30s adds little cross-isolate staleness while sparing a KV GET on
+ *  every request. */
+const VERSION_L1_TTL_MS = 30_000;
+/** A namespace's token is written to KV at most once per this window per
+ *  isolate; bumps inside the window rotate the LOCAL token immediately and
+ *  leave a pending write that the next read/bump after the window flushes. */
+const VERSION_BUMP_COALESCE_MS = 30_000;
+/** Bound on tracked namespaces (per-entity namespaces are unbounded). */
+const VERSION_MAX_ENTRIES = 5_000;
+
+interface VersionState {
+  token: string;
+  /** When `token` was last read from KV or set locally. */
+  readAt: number;
+  /** When this isolate last wrote this namespace's token to KV. */
+  lastPutAt: number;
+  /** A local bump not yet written to KV (coalesced). */
+  pending: boolean;
+}
+
+const _versions = new Map<string, VersionState>();
+
 function versionKey(namespace: string): string {
   return `cachever:${namespace}`;
+}
+
+function newVersionToken(): string {
+  return `${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+}
+
+function setVersionState(namespace: string, state: VersionState): void {
+  _versions.delete(namespace);
+  if (_versions.size >= VERSION_MAX_ENTRIES) {
+    // Prefer evicting the oldest SETTLED entry over a pending bump.
+    for (const [ns, st] of _versions) {
+      if (!st.pending) {
+        _versions.delete(ns);
+        break;
+      }
+    }
+  }
+  _versions.set(namespace, state);
+}
+
+function putVersion(kv: KVNamespace, namespace: string, token: string): void {
+  kv.put(versionKey(namespace), token).catch(() => undefined);
 }
 
 /**
@@ -161,30 +224,65 @@ function versionKey(namespace: string): string {
  * `bookings:<hostId>`). Embed it in the payload key; `bumpCacheVersion`
  * orphans every key built from the previous token.
  *
- * Read straight from KV — never L1 — so a bump in another isolate is
- * honoured on the very next request rather than after an isolate-local
- * TTL. Defaults to "0" when KV is unbound (dev / tests / outage); the
- * payload cache then degrades to a pure TTL cache, still correct.
+ * A bump in THIS isolate is visible to the very next read here. A bump in
+ * another isolate is honoured once this isolate's copy ages out
+ * (`VERSION_L1_TTL_MS`). Defaults to "0" when nothing is known (dev /
+ * tests / KV outage); the payload cache then degrades to a TTL cache.
  */
 export async function getCacheVersion(namespace: string): Promise<string> {
+  const now = Date.now();
   const kv = getKv();
+  const local = _versions.get(namespace);
+  if (local?.pending) {
+    if (kv && now - local.lastPutAt >= VERSION_BUMP_COALESCE_MS) {
+      putVersion(kv, namespace, local.token);
+      setVersionState(namespace, { token: local.token, readAt: now, lastPutAt: now, pending: false });
+    }
+    return local.token;
+  }
+  if (local && (!kv || now - local.readAt < VERSION_L1_TTL_MS)) return local.token;
   if (!kv) return "0";
+
   const raw = await kv.get(versionKey(namespace)).catch(() => null);
-  return raw ?? "0";
+  const current = _versions.get(namespace);
+  // A local bump landed while the KV read was in flight — it wins.
+  if (current && current.readAt > now) return current.token;
+  const token = raw ?? "0";
+  setVersionState(namespace, { token, readAt: now, lastPutAt: current?.lastPutAt ?? 0, pending: false });
+  return token;
 }
 
 /** Rotate a namespace's version token. Fire-and-forget; never throws
  *  into the caller's write path. The token only has to DIFFER from the
- *  previous one, so a timestamp + random suffix is enough. */
+ *  previous one, so a timestamp + random suffix is enough.
+ *
+ *  Coalesced: the local token rotates immediately (reads in this isolate
+ *  see the write at once), but KV is written at most once per
+ *  `VERSION_BUMP_COALESCE_MS` per namespace per isolate — a burst of
+ *  writes (the many search bump sites, autosaves) costs one KV PUT, not
+ *  one per write. A pending bump flushes on the next read or bump after
+ *  the window; if the isolate dies first, other isolates converge on the
+ *  payload TTL instead. */
 export function bumpCacheVersion(namespace: string): void {
+  const now = Date.now();
   const kv = getKv();
-  if (!kv) return;
-  kv.put(versionKey(namespace), `${Date.now()}-${Math.floor(Math.random() * 1e9)}`)
-    .catch(() => undefined);
+  const token = newVersionToken();
+  const prev = _versions.get(namespace);
+  const canPut = !!kv && (!prev || now - prev.lastPutAt >= VERSION_BUMP_COALESCE_MS);
+  if (kv && canPut) putVersion(kv, namespace, token);
+  setVersionState(namespace, {
+    token,
+    // +1 so a getCacheVersion KV read started in this same millisecond
+    // still treats the bump as newer than its own start.
+    readAt: now + 1,
+    lastPutAt: canPut ? now : (prev?.lastPutAt ?? 0),
+    pending: !!kv && !canPut,
+  });
 }
 
-/** Test-only: clear both in-process maps so cases don't leak state. */
+/** Test-only: clear every in-process map so cases don't leak state. */
 export function __resetEdgeCacheForTests(): void {
   _memoryCache.clear();
   _inFlight.clear();
+  _versions.clear();
 }

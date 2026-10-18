@@ -19,7 +19,10 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApiReady } from "@/lib/auth";
+import { queryKeys } from "@/lib/query-keys";
+import { useViewerId } from "@/hooks/queries/use-viewer-id";
 import {
   type CookiePreferences,
   settingsService,
@@ -94,9 +97,33 @@ export type UseCookiePreferencesApi = {
   rejectOptional: () => Promise<void>;
 };
 
+/** Server read for a signed-in viewer. If the server has no record yet and
+ *  the anonymous visitor had already made a choice, push the local choice up
+ *  so they don't have to re-consent after logging in. Runs ONCE per identity
+ *  (shared React Query entry) no matter how many surfaces mount the hook —
+ *  the banner, Settings, /cookies and /privacy/opt-out all read it. */
+async function fetchServerPreferences(): Promise<CookiePreferences> {
+  const server = await settingsService.getCookiePreferences();
+  const local = readLocal();
+  const resolved =
+    !server.consentedAt && local.consentedAt
+      ? await settingsService.updateCookiePreferences({
+          analytics: local.analytics,
+          marketing: local.marketing,
+          personalization: local.personalization,
+        })
+      : server;
+  writeLocal(resolved);
+  applyConsentToTagManagers(resolved);
+  return resolved;
+}
+
 export function useCookiePreferences(): UseCookiePreferencesApi {
   const apiReady = useApiReady();
-  const [preferences, setPreferences] = useState<CookiePreferences>(() => {
+  const viewerId = useViewerId();
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.cookiePreferences.byUser(viewerId);
+  const [localPreferences, setLocalPreferences] = useState<CookiePreferences>(() => {
     const initial = readLocal();
     // Fan out the bootstrap state to Consent Mode v2 immediately so any
     // tag that loaded between the index.html consent default and this hook
@@ -104,7 +131,17 @@ export function useCookiePreferences(): UseCookiePreferencesApi {
     applyConsentToTagManagers(initial);
     return initial;
   });
-  const [loading, setLoading] = useState<boolean>(apiReady);
+
+  // Prefs only change through this hook's `commit` (which writes the cache),
+  // so the server row never goes stale within a session.
+  const serverQuery = useQuery<CookiePreferences>({
+    queryKey,
+    queryFn: fetchServerPreferences,
+    enabled: apiReady,
+    staleTime: Infinity,
+  });
+  const preferences = apiReady && serverQuery.data ? serverQuery.data : localPreferences;
+  const loading = apiReady && serverQuery.isPending;
 
   // If the visitor was bootstrapped via GPC into an implicit reject, persist
   // that to localStorage immediately so subsequent reads short-circuit and
@@ -116,51 +153,11 @@ export function useCookiePreferences(): UseCookiePreferencesApi {
     writeLocal(preferences);
   }, [preferences]);
 
-  // On api-ready transition: pull server prefs. If the server has no record
-  // yet and the anonymous visitor had already made a choice, push the local
-  // choice up so they don't have to re-consent after logging in.
+  // Signed out (or api not ready / failed server read): fall back to the
+  // latest localStorage choice.
   useEffect(() => {
-    if (!apiReady) {
-      setPreferences(readLocal());
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    settingsService
-      .getCookiePreferences()
-      .then(async (server) => {
-        if (cancelled) return;
-        const local = readLocal();
-        const serverHasChoice = !!server.consentedAt;
-        const localHasChoice = !!local.consentedAt;
-        if (!serverHasChoice && localHasChoice) {
-          const synced = await settingsService.updateCookiePreferences({
-            analytics: local.analytics,
-            marketing: local.marketing,
-            personalization: local.personalization,
-          });
-          if (cancelled) return;
-          setPreferences(synced);
-          writeLocal(synced);
-          applyConsentToTagManagers(synced);
-        } else {
-          setPreferences(server);
-          writeLocal(server);
-          applyConsentToTagManagers(server);
-        }
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setPreferences(readLocal());
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apiReady]);
+    if (!apiReady || serverQuery.isError) setLocalPreferences(readLocal());
+  }, [apiReady, serverQuery.isError]);
 
   const commit = useCallback(
     async (next: Pick<CookiePreferences, OptionalCategory>) => {
@@ -169,13 +166,17 @@ export function useCookiePreferences(): UseCookiePreferencesApi {
         ...next,
         consentedAt: new Date().toISOString(),
       };
-      setPreferences(stamped);
+      setLocalPreferences(stamped);
       writeLocal(stamped);
       applyConsentToTagManagers(stamped);
       if (apiReady) {
+        // Drop any in-flight read so it can't overwrite the new choice.
+        await queryClient.cancelQueries({ queryKey });
+        queryClient.setQueryData<CookiePreferences>(queryKey, stamped);
         try {
           const saved = await settingsService.updateCookiePreferences(next);
-          setPreferences(saved);
+          queryClient.setQueryData<CookiePreferences>(queryKey, saved);
+          setLocalPreferences(saved);
           writeLocal(saved);
           applyConsentToTagManagers(saved);
         } catch (e) {
@@ -183,7 +184,9 @@ export function useCookiePreferences(): UseCookiePreferencesApi {
         }
       }
     },
-    [apiReady],
+    // queryKey is derived from viewerId (a fresh array each render), so the
+    // stable viewerId stands in for it.
+    [apiReady, queryClient, viewerId],
   );
 
   const setCategory = useCallback(

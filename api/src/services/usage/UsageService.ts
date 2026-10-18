@@ -11,7 +11,8 @@ import type {
   IUsageTrackingRepository,
   InsertEventInput,
 } from "../../repositories/usageTrackingRepository.js";
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import { resolveAccessRole } from "../../../../shared/role-access.js";
 import {
   ACTIVE_WINDOW_MINUTES,
@@ -41,43 +42,64 @@ export class UsageService {
     input: TrackUsageInput,
     ctx: UsageRequestContext,
   ): Promise<{ stored: boolean }> {
-    if (!input.consent) return { stored: false };
+    const { stored } = await this.recordBatches([input], ctx);
+    return { stored: stored > 0 };
+  }
 
-    const role = ctx.roles ? resolveAccessRole(ctx.roles) : null;
-    const last = input.events[input.events.length - 1];
+  /**
+   * Ingest several batches from ONE request (the analytics beacon carries up
+   * to 50). Consent-false batches are dropped; the rest are merged per
+   * visitor so each distinct session costs exactly one upsert + one events
+   * insert, however many batches it arrived in. Entry context comes from the
+   * visitor's first batch (it is only set on insert anyway); the "latest
+   * activity" stamp comes from the visitor's last event. Returns how many
+   * input batches were stored.
+   */
+  async recordBatches(
+    inputs: readonly TrackUsageInput[],
+    ctx: UsageRequestContext,
+  ): Promise<{ stored: number }> {
+    const merged = mergeByVisitor(inputs.filter((i) => i.consent));
+    if (merged.length === 0) return { stored: 0 };
 
-    const sessionId = await this.repo.upsertSession({
-      visitorId: input.visitorId,
-      userId: ctx.userId ?? null,
-      isAuthenticated: !!ctx.userId,
-      role: ctx.userId ? role : null,
-      entryPath: input.context?.entryPath ?? null,
-      referrer: input.context?.referrer ?? null,
-      utmSource: input.context?.utmSource ?? null,
-      utmMedium: input.context?.utmMedium ?? null,
-      utmCampaign: input.context?.utmCampaign ?? null,
-      country: ctx.country ?? null,
-      userAgent: ctx.userAgent ?? null,
-      lastEventType: last?.type ?? null,
-      lastPath: last?.path ?? null,
-    });
-
-    const events: InsertEventInput[] = input.events.map((e) => ({
-      type: e.type,
-      path: e.path,
-      featureKey: e.featureKey ?? null,
-      payload: e.payload ?? null,
-      occurredAt: parseDate(e.occurredAt),
-    }));
-    await this.repo.insertEvents(sessionId, events);
-
-    return { stored: true };
+    const role = ctx.userId && ctx.roles ? resolveAccessRole(ctx.roles) : null;
+    await Promise.all(
+      merged.map(async (m) => {
+        const last = m.events[m.events.length - 1];
+        const sessionId = await this.repo.upsertSession({
+          visitorId: m.visitorId,
+          userId: ctx.userId ?? null,
+          isAuthenticated: !!ctx.userId,
+          role,
+          entryPath: m.context?.entryPath ?? null,
+          referrer: m.context?.referrer ?? null,
+          utmSource: m.context?.utmSource ?? null,
+          utmMedium: m.context?.utmMedium ?? null,
+          utmCampaign: m.context?.utmCampaign ?? null,
+          country: ctx.country ?? null,
+          userAgent: ctx.userAgent ?? null,
+          lastEventType: last?.type ?? null,
+          lastPath: last?.path ?? null,
+        });
+        const events: InsertEventInput[] = m.events.map((e) => ({
+          type: e.type,
+          path: e.path,
+          featureKey: e.featureKey ?? null,
+          payload: e.payload ?? null,
+          occurredAt: parseDate(e.occurredAt),
+        }));
+        await this.repo.insertEvents(sessionId, events);
+      }),
+    );
+    return { stored: merged.reduce((n, m) => n + m.batchCount, 0) };
   }
 
   /** "Active now" sessions for staff. Cached (short TTL); a few seconds stale
    *  is fine for presence, and not invalidating per write avoids thrash. */
   async getActiveSessions(): Promise<ActiveSessionDto[]> {
-    return getOrSetCached<ActiveSessionDto[]>({
+    // Isolate-only: a 15s shared KV key refilled under staff polling was a
+    // KV write every 15s.
+    return getOrSetIsolateCached<ActiveSessionDto[]>({
       key: ACTIVE_CACHE_KEY,
       ttlSeconds: ACTIVE_TTL_SECONDS,
       loader: async () => {
@@ -116,16 +138,44 @@ export class UsageService {
   /** DSR — erase a visitor's session + events (cascade). */
   async eraseForVisitor(visitorId: string): Promise<number> {
     const n = await this.repo.eraseByVisitor(visitorId);
-    invalidateCachedKey(ACTIVE_CACHE_KEY);
+    invalidateIsolateKey(ACTIVE_CACHE_KEY);
     return n;
   }
 
   /** DSR — erase all usage rows for a user (called on account erasure). */
   async eraseForUser(userId: string): Promise<number> {
     const n = await this.repo.eraseByUser(userId);
-    invalidateCachedKey(ACTIVE_CACHE_KEY);
+    invalidateIsolateKey(ACTIVE_CACHE_KEY);
     return n;
   }
+}
+
+interface MergedVisitorBatch {
+  visitorId: string;
+  context: TrackUsageInput["context"];
+  events: TrackUsageInput["events"];
+  batchCount: number;
+}
+
+/** Fold batches sharing a visitorId into one (order preserved). */
+function mergeByVisitor(inputs: readonly TrackUsageInput[]): MergedVisitorBatch[] {
+  const byVisitor = new Map<string, MergedVisitorBatch>();
+  for (const input of inputs) {
+    const existing = byVisitor.get(input.visitorId);
+    if (existing) {
+      existing.events = [...existing.events, ...input.events];
+      existing.context = existing.context ?? input.context;
+      existing.batchCount++;
+    } else {
+      byVisitor.set(input.visitorId, {
+        visitorId: input.visitorId,
+        context: input.context,
+        events: [...input.events],
+        batchCount: 1,
+      });
+    }
+  }
+  return [...byVisitor.values()];
 }
 
 function parseDate(iso: string | undefined): Date {

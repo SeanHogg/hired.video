@@ -241,11 +241,12 @@ export function useResumeActions(data: ResumesData, dialogs: ResumeDialogState) 
   };
 
   const handleMergeComplete = async () => {
-    const updated = await getResumesForDisplay();
+    // One groups request feeds both the display fallback and the groups state.
+    const groupsRequest = resumeService.getMasterResumeGroups();
+    const updated = await getResumesForDisplay(groupsRequest);
     setResumes(updated);
     try {
-      const groups = await resumeService.getMasterResumeGroups();
-      setMasterResumeGroups(groups);
+      setMasterResumeGroups(await groupsRequest);
     } catch {}
   };
 

@@ -123,6 +123,29 @@ describe('resumeService.getResumesForDisplay', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ id: 'm1', ownership: 'owned', summary: expect.stringContaining('Summary') });
   });
+
+  it('uses caller-provided groups instead of re-fetching them', async () => {
+    apiClient.get.mockResolvedValueOnce({ data: [] });
+
+    const groups = [mkGroup('m2')] as unknown as MasterResumeGroup[];
+    const result = await resumeService.getResumesForDisplay({ groups: Promise.resolve(groups) });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: 'm2', ownership: 'owned' });
+    expect(apiClient.get).toHaveBeenCalledTimes(1);
+    expect(apiClient.get).not.toHaveBeenCalledWith('/api/resumes?owner=me&view=groups', expect.anything());
+  });
+
+  it('treats a rejected provided-groups promise as no groups', async () => {
+    apiClient.get.mockResolvedValueOnce({ data: [] });
+
+    const result = await resumeService.getResumesForDisplay({
+      groups: Promise.reject(new Error('groups down')),
+    });
+
+    expect(result).toEqual([]);
+    expect(apiClient.get).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('resumeService.setResumePrivacy', () => {

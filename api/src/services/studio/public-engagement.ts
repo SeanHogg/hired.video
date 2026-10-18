@@ -9,7 +9,7 @@
  *   2. visibility — one PK lookup, deliberately NOT cached: `is_public` has
  *      many writers (visibility toggle, publish, template review, creators)
  *      and un-publishing must hide the assets on the very next request;
- *   3. assets — through `getOrSetCached` (L1 + KV), keyed per project and
+ *   3. assets — through the isolate cache (zero KV writes), keyed per project and
  *      invalidated by EVERY write to that project's forms, chapters and
  *      thumbnails (`invalidatePublicEngagement`, called by
  *      routes/studio-features/{forms,chapters,thumbnails}.ts). The TTL is only a backstop.
@@ -19,7 +19,7 @@
  */
 import { getDb } from "../../db/index.js";
 import { UUID_LIKE_REGEX } from "../../../../shared/validation.js";
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import {
   isPublicStudioProject,
   listPublicEngagementAssets,
@@ -29,8 +29,9 @@ import { ownsByStudioProject } from "../../repositories/toolRunOwnershipReposito
 
 export type { PublicEngagementAssets } from "../../repositories/studioPublicEngagementRepository.js";
 
-/** Backstop only — every writer invalidates. */
-const PUBLIC_ENGAGEMENT_TTL_SECONDS = 600;
+/** Every writer invalidates — but only in its own isolate, so this TTL
+ *  bounds how long OTHER isolates may serve a pre-edit payload. */
+const PUBLIC_ENGAGEMENT_TTL_SECONDS = 120;
 
 export const publicEngagementCacheKey = (projectId: string) => `studio:v1:engagement-public:${projectId}`;
 
@@ -60,7 +61,7 @@ export async function readPublicEngagement(
 ): Promise<PublicEngagementAssets | null> {
   if (!UUID_LIKE_REGEX.test(projectId)) return null;
   if (!(await source.isPublicProject(projectId))) return null;
-  return getOrSetCached({
+  return getOrSetIsolateCached({
     key: publicEngagementCacheKey(projectId),
     ttlSeconds: PUBLIC_ENGAGEMENT_TTL_SECONDS,
     loader: () => source.listAssets(projectId),
@@ -70,7 +71,7 @@ export async function readPublicEngagement(
 /** Drop a project's cached public engagement payload. Call after ANY write
  *  to its forms, chapters or thumbnails. */
 export function invalidatePublicEngagement(projectId: string | null | undefined): void {
-  if (projectId) invalidateCachedKey(publicEngagementCacheKey(projectId));
+  if (projectId) invalidateIsolateKey(publicEngagementCacheKey(projectId));
 }
 
 /**

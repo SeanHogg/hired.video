@@ -15,7 +15,8 @@ import { requestLoggerMiddleware } from "./middleware/requestLogger.js";
 import { getRelease } from "./utils/release.js";
 import type { Variables } from "./types/index.js";
 import { errorSourceFilterMiddleware } from "./middleware/errorSourceFilter.js";
-import { getDb, schema } from "./db/index.js";
+import { sql } from "drizzle-orm";
+import { getDb } from "./db/index.js";
 
 import { clickIdCaptureMiddleware } from "./middleware/clickIdCapture.js";
 import { moduleGateByPath } from "./middleware/moduleGate.js";
@@ -541,30 +542,16 @@ export function createApp() {
   // disabled. Must run after auth so the admin/SA bypass can see c.var.user.
   app.use("/api/*", moduleGateByPath(MODULE_ROUTE_REGISTRY));
 
-  // Simple health check (includes DB connectivity)
-  const healthHandler = async (c: any) => {
+  // Health check. Liveness by default — no Postgres query, so an uptime
+  // monitor never wakes Neon. `?deep=1` adds a `SELECT 1` connectivity check.
+  const healthHandler = async (c: Context) => {
+    const base = { release: getRelease(), timestamp: new Date().toISOString() };
+    if (c.req.query("deep") !== "1") return c.json({ status: "ok", ...base });
     try {
-      const db = getDb();
-      // Check connectivity with a minimal query that doesn't depend on app tables.
-      // This avoids failing health checks when the schema is not yet set up.
-      const raw = (db as any).execute || (db as any).query || (db as any).run;
-      if (typeof raw === "function") {
-        await raw.call(db, "SELECT 1");
-      } else {
-        // Fallback to a simple table query (existing behavior).
-        await db.select().from(schema.users).limit(1);
-      }
-      return c.json({ status: "ok", release: getRelease(), timestamp: new Date().toISOString() });
-    } catch (error: any) {
-      return c.json(
-        {
-          status: "error",
-          release: getRelease(),
-          timestamp: new Date().toISOString(),
-          error: String(error?.message ?? error),
-        },
-        503,
-      );
+      await getDb().execute(sql`SELECT 1`);
+      return c.json({ status: "ok", db: "ok", ...base });
+    } catch (err) {
+      return c.json({ status: "error", db: "error", ...base, error: err instanceof Error ? err.message : String(err) }, 503);
     }
   };
 

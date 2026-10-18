@@ -71,6 +71,10 @@ export const socialPublishJobs = pgTable(
     index("idx_social_publish_jobs_promotion").on(t.promotionSubmissionId),
     index("idx_social_publish_jobs_feed_post").on(t.feedPostId),
     index("idx_social_publish_jobs_source").on(t.source),
+    // Retention sweep age scan over terminal jobs only (mig 0652).
+    index("idx_social_publish_jobs_terminal_updated")
+      .on(t.updatedAt)
+      .where(sql`status IN ('failed', 'cancelled', 'expired')`),
     uniqueIndex("uq_social_publish_jobs_open")
       .on(t.projectId, t.destination, t.lane)
       .where(sql`status IN ('scheduled', 'running')`),

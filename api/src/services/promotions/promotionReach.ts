@@ -9,6 +9,7 @@
  * the summary key.
  */
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import type { PromotionPlatform } from "../../../../shared/promotions.js";
 import { PROMOTION_PLATFORMS } from "../../../../shared/promotions.js";
 import { SOCIAL_VIEW_READERS, type SocialViewReader } from "../social/publishers/index.js";
@@ -58,7 +59,8 @@ export function projectReach(
   env: SocialEnv | undefined,
 ): Promise<Record<string, number | null>> {
   if (!rows.some((r) => r.status === "published")) return Promise.resolve({});
-  return getOrSetCached({ key: projectKey(projectId), ttlSeconds: TTL_SECONDS, loader: () => readViews(rows, env) });
+  // Per-project → isolate-only (unbounded keys; no KV write per fill).
+  return getOrSetIsolateCached({ key: projectKey(projectId), ttlSeconds: TTL_SECONDS, loader: () => readViews(rows, env) });
 }
 
 export interface ReachSummary {
@@ -87,5 +89,5 @@ export function reachSummary(env: SocialEnv | undefined): Promise<ReachSummary> 
 /** Drop cached reach after a new publish so it shows up on the next read. */
 export function invalidateReach(projectId: string): void {
   invalidateCachedKey(SUMMARY_KEY);
-  invalidateCachedKey(projectKey(projectId));
+  invalidateIsolateKey(projectKey(projectId));
 }

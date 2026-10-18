@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { Db } from "../../../db/index.js";
 import { __resetEdgeCacheForTests } from "../../../utils/edge-cache.js";
+import { __resetIsolateCacheForTests } from "../../../utils/isolate-cache.js";
 import type { PublicationMetricsRow, SyncablePublication } from "../../../repositories/externalPostMetricsRepository.js";
 import type { PostMetrics, SocialMetricsReader } from "../../social/publishers/index.js";
 import { metricsVersionNamespace, syncPublicationMetrics } from "../metrics/sync-post-metrics.js";
@@ -54,12 +55,14 @@ function fakeKv() {
 let kv: ReturnType<typeof fakeKv>;
 beforeEach(() => {
   __resetEdgeCacheForTests();
+  __resetIsolateCacheForTests();
   kv = fakeKv();
   (globalThis as { __ENV?: Record<string, unknown> }).__ENV = { KV_CACHE: kv.kv };
 });
 afterEach(() => {
   delete (globalThis as { __ENV?: unknown }).__ENV;
   __resetEdgeCacheForTests();
+  __resetIsolateCacheForTests();
 });
 
 function readerReturning(counts: Record<string, PostMetrics>, calls: string[][]): SocialMetricsReader {
@@ -202,7 +205,7 @@ describe("projectOffPlatformReach — versioned cache", () => {
     assert.equal(loads, 1);
     assert.equal(second.totals.views, 1234);
     assert.deepEqual(first, second);
-    assert.ok(kv.store.has(`social-metrics:${PROJECT}:0`), "cached under social-metrics:{projectId}:{version}");
+    assert.ok(![...kv.store.keys()].some((k) => k.startsWith("social-metrics:")), "the payload never lands in KV");
 
     // A sync stores new counts for the project → bumps its version.
     views = 1502;
@@ -218,7 +221,7 @@ describe("projectOffPlatformReach — versioned cache", () => {
     const third = await projectOffPlatformReach(MAYA, PROJECT, deps);
     assert.equal(loads, 2);
     assert.equal(third.totals.views, 1502);
-    assert.ok(kv.store.has(`social-metrics:${PROJECT}:${kv.store.get(versionKey)}`));
+    assert.ok(![...kv.store.keys()].some((k) => k.startsWith("social-metrics:")));
   });
 });
 

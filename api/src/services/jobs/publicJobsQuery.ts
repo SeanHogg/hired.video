@@ -13,12 +13,17 @@ import { LocationService } from "../location/LocationService.js";
 import { parsePagination } from "../../utils/pagination.js";
 import { getCachedSearch } from "../../utils/search-cache.js";
 
+/** Re-exported so the route decides card-vs-full without reaching the repository layer. */
+export { projectionOmitsJobBody } from "../../repositories/jobListColumns.js";
+
 export type PublicJobsPage = Awaited<ReturnType<typeof getPublicJobs>>;
 
 export async function publicJobsFromQuery(
   query: Record<string, string | undefined>,
   env: Record<string, string | undefined>,
+  opts: { omitBody?: boolean } = {},
 ): Promise<PublicJobsPage> {
+  const omitBody = opts.omitBody === true;
   // Anonymous + shared result → versioned search cache. Pagination is
   // applied in SQL, so page/limit ARE part of the key. Every job write
   // calls bumpSearchVersion(), which orphans these entries. Items are
@@ -28,13 +33,16 @@ export async function publicJobsFromQuery(
     query.employmentType ?? "", query.experienceLevel ?? "", query.isRemote ?? "",
     query.salaryMin ?? "", query.salaryMax ?? "", query.workSetting ?? "", query.sector ?? "",
     query.countryId ?? "", query.stateId ?? "", query.cityId ?? "", query.radiusKm ?? "",
+    // A body-less (card) page must never answer a full-row request.
+    omitBody ? "card" : "full",
   ])}`;
-  return getCachedSearch(paramKey, () => loadPublicJobsFromQuery(query, env));
+  return getCachedSearch(paramKey, () => loadPublicJobsFromQuery(query, env, omitBody));
 }
 
 async function loadPublicJobsFromQuery(
   query: Record<string, string | undefined>,
   env: Record<string, string | undefined>,
+  omitBody: boolean,
 ): Promise<PublicJobsPage> {
   const hasGeo = Boolean(query.countryId || query.stateId || query.cityId);
   let allow: string[] | null = null;
@@ -69,5 +77,6 @@ async function loadPublicJobsFromQuery(
     workSetting: query.workSetting || undefined,
     sector: query.sector || undefined,
     entityIdAllowlist: allow,
+    omitBody,
   });
 }

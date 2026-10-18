@@ -3,7 +3,7 @@
  * behind GET/POST /api/studio/projects/:projectId/render-variants/:variantKey.
  *
  *   getRenderVariant      the cut for (project, key, content revision), or
- *                         null — a cached read (getOrSetCached, one key per
+ *                         null — a cached read (isolate cache, one key per
  *                         identity, invalidated on every write), so the Post
  *                         dock asks before it renders and never re-renders
  *                         a cut that exists
@@ -23,7 +23,7 @@
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { isVariantOfMaster, parseVariantKey } from "../../../../shared/publish-presets.js";
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import { cdnUrl } from "../../utils/cdn.js";
 import { putObject } from "../storage/object-store.js";
 import { deleteR2Keys } from "../storage/r2-delete.js";
@@ -35,7 +35,10 @@ type Db = ReturnType<typeof getDb>;
 
 /** A content revision: the master's timeline hash (+ branding), from the client. */
 const REVISION_RE = /^[A-Za-z0-9._-]{1,64}$/;
-const TTL_SECONDS = 600;
+/** Isolate-only cache (per identity — unbounded keys, zero KV writes). A
+ *  null ("no cut yet") is NOT cached: another isolate may store the cut,
+ *  and serving a stale null would make the dock re-render it. */
+const TTL_SECONDS = 300;
 
 export type RenderVariantErrorKind = "PROJECT_NOT_FOUND" | "INVALID_VARIANT" | "STORAGE_UNAVAILABLE";
 
@@ -113,13 +116,14 @@ export async function getRenderVariant(
   const db = deps.db ?? getDb();
   const id = validIdentity(args.projectId, args.variantKey, args.contentRevision);
   await loadWritableProject(db, args.actorUserId, args.projectId, deps);
-  return getOrSetCached<RenderVariantDto | null>({
+  return getOrSetIsolateCached<RenderVariantDto | null>({
     key: cacheKey(id),
     ttlSeconds: TTL_SECONDS,
     loader: async () => {
       const row = await repo.findVariant(db, id);
       return row ? toDto(row) : null;
     },
+    shouldCache: (dto) => dto !== null,
   });
 }
 
@@ -177,7 +181,7 @@ export async function storeRenderVariant(
     if (!winner) throw new RenderVariantError("INVALID_VARIANT", "The cut could not be saved.");
     return toDto(winner);
   }
-  invalidateCachedKey(cacheKey(id));
+  invalidateIsolateKey(cacheKey(id));
   await reclaimSuperseded(db, id, deps);
   return toDto({ id: created.id, ...id, videoId: video.id, r2Key, branded: args.branded });
 }
@@ -190,7 +194,7 @@ async function reclaimSuperseded(db: Db, keep: repo.VariantIdentity, deps: Rende
   const { videos } = schema;
   for (const s of stale) {
     await db.delete(videos).where(eq(videos.id, s.videoId));
-    invalidateCachedKey(cacheKey({ ...keep, contentRevision: s.contentRevision }));
+    invalidateIsolateKey(cacheKey({ ...keep, contentRevision: s.contentRevision }));
   }
   await (deps.deleteKeys ?? deleteR2Keys)(stale.map((s) => s.r2Key));
 }

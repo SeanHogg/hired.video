@@ -21,11 +21,12 @@ import { invalidatePublicVideoFeed } from "./public-video-feed.js";
 import { invalidatePublicProjectsForSubjects } from "./public-projects-cache.js";
 import { bumpPublicWatchCache } from "./public-watch-cache.js";
 import { removePublication } from "./publication-service.js";
+import { studioProjectColumns, type StudioProjectRow } from "../../repositories/studioProjectColumns.js";
 
 const { studioProjects, studioProjectSubjects, videos } = schema;
 
 type Db = ReturnType<typeof getDb>;
-type ProjectRow = typeof studioProjects.$inferSelect;
+type ProjectRow = StudioProjectRow;
 
 /** Read all subject links for a single project, in stable creation order. */
 export async function loadProjectSubjects(db: Db, projectId: string): Promise<Array<{ kind: string; id: string }>> {
@@ -52,7 +53,7 @@ export async function applyProjectVisibility(
     .update(studioProjects)
     .set({ isPublic, updatedAt: new Date() })
     .where(eq(studioProjects.id, project.id))
-    .returning();
+    .returning(studioProjectColumns);
 
   // `videos.privacy_status` is the SSoT on the video side — the redundant
   // `videos.is_public` boolean was dropped in migration 0086 after it drifted.

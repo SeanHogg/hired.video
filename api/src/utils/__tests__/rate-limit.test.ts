@@ -1,34 +1,26 @@
 /**
- * checkRateLimit tests (#1828) — the best-effort fixed-window limiter behind
- * the embed data API. Verifies it allows up to `limit` hits per window, blocks
- * past it (with a Retry-After), and no-ops when KV is unbound.
+ * checkRateLimit tests (#1828) — the best-effort, isolate-local fixed-window
+ * limiter behind the embed data API. Verifies it allows up to `limit` hits per
+ * window, blocks past it (with a Retry-After), isolates dimensions, and never
+ * writes KV (Workers Free write budget is reserved for scheduler markers).
  *
  * Run: node --import tsx --test src/utils/__tests__/rate-limit.test.ts
  */
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { checkRateLimit } from "../rate-limit.js";
+import { checkRateLimit, __resetRateLimitForTests } from "../rate-limit.js";
 
-function installMockKv() {
-  const store = new Map<string, string>();
-  (globalThis as any).__ENV = {
-    KV_CACHE: {
-      get: async (k: string) => store.get(k) ?? null,
-      put: async (k: string, v: string) => {
-        store.set(k, v);
-      },
-    },
-  };
-  return store;
-}
+type EnvHolder = { __ENV?: Record<string, unknown> };
 
 describe("checkRateLimit", () => {
+  beforeEach(() => {
+    __resetRateLimitForTests();
+  });
   afterEach(() => {
-    delete (globalThis as any).__ENV;
+    delete (globalThis as EnvHolder).__ENV;
   });
 
   it("allows up to the limit, then blocks with a Retry-After", async () => {
-    installMockKv();
     const dim = "test:allow-then-block";
     const r1 = await checkRateLimit(dim, 3, 60);
     assert.equal(r1.allowed, true);
@@ -42,7 +34,6 @@ describe("checkRateLimit", () => {
   });
 
   it("isolates dimensions (one key's burst doesn't throttle another)", async () => {
-    installMockKv();
     await checkRateLimit("test:a", 1, 60);
     const a = await checkRateLimit("test:a", 1, 60);
     const b = await checkRateLimit("test:b", 1, 60);
@@ -50,10 +41,19 @@ describe("checkRateLimit", () => {
     assert.equal(b.allowed, true);
   });
 
-  it("no-ops (always allows) when KV is unbound", async () => {
-    delete (globalThis as any).__ENV;
-    const r = await checkRateLimit("test:no-kv", 1, 60);
-    assert.equal(r.allowed, true);
-    assert.equal(r.remaining, 1);
+  it("never touches KV, even when the binding is present", async () => {
+    let kvCalls = 0;
+    const touch = async () => {
+      kvCalls += 1;
+      return null;
+    };
+    (globalThis as EnvHolder).__ENV = { KV_CACHE: { get: touch, put: touch, delete: touch } };
+    for (let i = 0; i < 5; i++) await checkRateLimit("test:no-kv", 10, 60);
+    assert.equal(kvCalls, 0);
+  });
+
+  it("a limit of 0 blocks immediately (boundary)", async () => {
+    const r = await checkRateLimit("test:zero", 0, 60);
+    assert.equal(r.allowed, false);
   });
 });

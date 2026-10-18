@@ -104,6 +104,7 @@ export const inboxActionRuns = pgTable(
     statusCheck: check("inbox_action_runs_status_check", sql`${t.status} IN ('success', 'error', 'skipped')`),
     actionIdFkIdx: index("idx_inbox_action_runs_action_id").on(t.actionId),
     profileIdFkIdx: index("idx_inbox_action_runs_profile_id").on(t.profileId),
+    createdIdx: index("idx_inbox_action_runs_created_at").on(t.createdAt),
   }),
 );
 

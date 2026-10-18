@@ -6,7 +6,7 @@
  */
 import { getDb } from "../../db/index.js";
 import type { LearningGoal } from "../../db/schema/learning.js";
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import { slugify } from "../../../../shared/slugify.js";
 import {
   deleteGoal as deleteGoalRow,
@@ -49,7 +49,7 @@ export async function updateGoal(
   if (input.status !== undefined) patch.status = input.status;
   const updated = await updateGoalRow(db, id, patch);
   // Goal text drives the cached recommendation set.
-  if (input.goalText !== undefined) invalidateCachedKey(recsCacheKey(id));
+  if (input.goalText !== undefined) invalidateIsolateKey(recsCacheKey(id));
   return updated;
 }
 
@@ -57,7 +57,7 @@ export async function deleteGoal(userId: string, id: string): Promise<boolean> {
   const db = getDb();
   if (!(await findOwnedGoal(db, userId, id))) return false;
   await deleteGoalRow(db, id);
-  invalidateCachedKey(recsCacheKey(id));
+  invalidateIsolateKey(recsCacheKey(id));
   return true;
 }
 
@@ -67,7 +67,7 @@ export async function recommendForGoal(userId: string, id: string, llm: GoalLlm 
   const goal = await findOwnedGoal(getDb(), userId, id);
   if (!goal) return null;
 
-  return getOrSetCached<unknown[]>({
+  return getOrSetIsolateCached<unknown[]>({
     key: recsCacheKey(id),
     ttlSeconds: 600,
     loader: async () => {

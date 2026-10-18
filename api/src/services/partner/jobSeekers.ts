@@ -12,7 +12,7 @@ import { getDb, schema } from "../../db/index.js";
 import { hashPassword } from "../auth/password.js";
 import { mintMagicLinkToken } from "../../repositories/authFlowRepository.js";
 import { publicAppBaseUrl } from "../../utils/public-urls.js";
-import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 import { buildRepos } from "../../repositories/index.js";
 import { getVisiblePitch } from "../pitch/pitchService.js";
 import { rowToResume } from "../../handlers/resume-serializer.js";
@@ -429,15 +429,19 @@ export async function getPrimaryResumeId(userId: string, db = getDb()): Promise<
  * Read-through cached profile payload for the partner API. Cached until a write
  * (resume create / connection change) busts `partnerProfileCacheKey`, so
  * profile edits still surface promptly while repeated partner reads stay cheap.
+ * Isolate-only (per partner × user — an unbounded keyspace; a KV write per
+ * fill would burn the Workers Free quota), so the TTL is short: another
+ * isolate converges within it. Revocation is enforced by the route's live
+ * `activeConnectionParam` gate, never by this cache.
  */
 export async function getProfileForPartner(
   partnerId: string,
   userId: string,
   db = getDb(),
 ): Promise<PartnerProfilePayload | null> {
-  return getOrSetCached({
+  return getOrSetIsolateCached({
     key: partnerProfileCacheKey(partnerId, userId),
-    ttlSeconds: 300,
+    ttlSeconds: 120,
     loader: () => buildPartnerProfilePayload(userId, { includeEmail: true }, db),
   });
 }

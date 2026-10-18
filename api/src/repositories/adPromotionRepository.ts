@@ -6,7 +6,7 @@
  */
 
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { schema } from "../db/index.js";
+import { schema, type Db } from "../db/index.js";
 
 const { jobBoosts, ads, adSets, jobItems, boostCheckouts, tokenPackPurchases, courseCheckouts } = schema;
 
@@ -19,6 +19,30 @@ export type AdRow = typeof ads.$inferSelect;
 export type NewJobBoostRow = typeof jobBoosts.$inferInsert;
 export type NewAdRow = typeof ads.$inferInsert;
 export type ServableAd = Pick<AdRow, "id" | "headline" | "description" | "imageUrl" | "ctaText" | "ctaUrl" | "destinationUrl">;
+
+/** The single-statement "pick a servable ad + count its impression" query
+ *  (exported so tests can pin the SQL via drizzle.mock). */
+export function buildServeAdImpression(db: Db, placements: string[]) {
+  const pick = db
+    .select({ id: ads.id })
+    .from(ads)
+    .innerJoin(adSets, eq(ads.adSetId, adSets.id))
+    .where(and(eq(ads.status, "active"), eq(adSets.status, "active"), inArray(adSets.placementType, placements)))
+    .limit(1);
+  return db
+    .update(ads)
+    .set({ impressions: sql`${ads.impressions} + 1`, updatedAt: new Date() })
+    .where(inArray(ads.id, pick))
+    .returning({
+      id: ads.id,
+      headline: ads.headline,
+      description: ads.description,
+      imageUrl: ads.imageUrl,
+      ctaText: ads.ctaText,
+      ctaUrl: ads.ctaUrl,
+      destinationUrl: ads.destinationUrl,
+    });
+}
 
 export class AdPromotionRepository {
   constructor(private readonly db: DbLike) {}
@@ -178,29 +202,12 @@ export class AdPromotionRepository {
     return deleted.length > 0;
   }
 
-  /** One active creative in an active ad set whose placement is one of `placements`. */
-  async findServableAd(placements: string[]): Promise<ServableAd | null> {
-    const [row] = await this.db
-      .select({
-        id: ads.id,
-        headline: ads.headline,
-        description: ads.description,
-        imageUrl: ads.imageUrl,
-        ctaText: ads.ctaText,
-        ctaUrl: ads.ctaUrl,
-        destinationUrl: ads.destinationUrl,
-      })
-      .from(ads)
-      .innerJoin(adSets, eq(ads.adSetId, adSets.id))
-      .where(and(eq(ads.status, "active"), eq(adSets.status, "active"), inArray(adSets.placementType, placements)))
-      .limit(1);
+  /** Pick one active creative in an active ad set whose placement is one of
+   *  `placements` AND count its impression — ONE statement
+   *  (`UPDATE … WHERE id IN (SELECT … LIMIT 1) RETURNING …`), not a SELECT
+   *  followed by an UPDATE. Null when nothing is servable. */
+  async serveAdImpression(placements: string[]): Promise<ServableAd | null> {
+    const [row] = await buildServeAdImpression(this.db, placements);
     return row ?? null;
-  }
-
-  async incrementAdImpressions(adId: string): Promise<void> {
-    await this.db
-      .update(ads)
-      .set({ impressions: sql`${ads.impressions} + 1`, updatedAt: new Date() })
-      .where(eq(ads.id, adId));
   }
 }

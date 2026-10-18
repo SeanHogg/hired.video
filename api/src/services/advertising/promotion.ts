@@ -140,11 +140,12 @@ export async function deleteAd(userId: string, adId: string, repo?: AdPromotionR
  * #2396 — one active internal creative for a named page slot, counting the
  * impression. Not owner-filtered: ads are shown TO the viewer.
  */
-export async function serveAdForSlot(slot: string, repo?: AdPromotionRepository): Promise<ServableAd | null> {
-  const r = repoOf(repo);
-  const ad = await r.findServableAd([...placementsForSlot(slot)]);
-  if (ad) await r.incrementAdImpressions(ad.id);
-  return ad;
+export async function serveAdForSlot(
+  slot: string,
+  repo?: Pick<AdPromotionRepository, "serveAdImpression">,
+): Promise<ServableAd | null> {
+  // Pick + count in one statement (repository).
+  return (repo ?? repoOf()).serveAdImpression([...placementsForSlot(slot)]);
 }
 
 export async function listAds(

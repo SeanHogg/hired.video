@@ -4,7 +4,8 @@
 // affordance lives) so staff can engage while intent is hot; anonymous
 // visitors can be erased (DSR).
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { publicProfilePath } from "@shared/public-paths";
 import { Link } from "react-router-dom";
 import { Activity, Loader2, MessageSquare, Trash2, RefreshCw } from "lucide-react";
@@ -12,28 +13,29 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { usageService } from "@/lib/services/usage-service";
+import { queryKeys } from "@/lib/query-keys";
+import { useViewerId } from "@/hooks/queries/use-viewer-id";
 import { ACTIVE_WINDOW_MINUTES, type ActiveSessionDto } from "@shared/usage";
 
 export default function ActiveUsers() {
-  const [sessions, setSessions] = useState<ActiveSessionDto[]>([]);
-  const [loading, setLoading] = useState(true);
+  const viewerId = useViewerId();
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  // Presence is short-lived; poll while the page is open (cheap, cached read).
+  // Polling pauses while the tab is hidden and resumes when it's visible.
+  const activeQuery = useQuery<ActiveSessionDto[]>({
+    queryKey: queryKeys.activeUsers.byUser(viewerId),
+    queryFn: () => usageService.adminActive(),
+    enabled: !!viewerId,
+    staleTime: 0,
+    refetchInterval: 20_000,
+    refetchIntervalInBackground: false,
+  });
+  const sessions = activeQuery.data ?? [];
+  const loading = activeQuery.isFetching || activeQuery.isPending;
   const refresh = async () => {
-    setLoading(true);
-    try {
-      setSessions(await usageService.adminActive());
-    } finally {
-      setLoading(false);
-    }
+    await activeQuery.refetch();
   };
-
-  useEffect(() => {
-    void refresh();
-    // Presence is short-lived; poll while the page is open (cheap, cached read).
-    const t = setInterval(refresh, 20_000);
-    return () => clearInterval(t);
-  }, []);
 
   const erase = async (s: ActiveSessionDto) => {
     setBusyId(s.sessionId);

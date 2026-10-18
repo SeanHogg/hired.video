@@ -26,6 +26,7 @@ import {
   publicStudioProjectWhere,
 } from "../../../repositories/studioPublicEngagementRepository.js";
 import { __resetEdgeCacheForTests } from "../../../utils/edge-cache.js";
+import { __resetIsolateCacheForTests } from "../../../utils/isolate-cache.js";
 
 const OWNER = "5b0c7a9e-1f43-4c4e-9a51-2d7f3c1e8a10";
 const STRANGER = "9e2d4f61-7a8b-4c3d-8e9f-0a1b2c3d4e5f";
@@ -94,7 +95,11 @@ function source(): PublicEngagementSource & { visibilityChecks: number; assetLoa
   };
 }
 
-beforeEach(() => __resetEdgeCacheForTests());
+beforeEach(() => {
+  __resetEdgeCacheForTests();
+  __resetIsolateCacheForTests();
+  __resetIsolateCacheForTests();
+});
 
 describe("readPublicEngagement", () => {
   it("serves a public project's forms, chapters and thumbnails — and never review comments", async () => {

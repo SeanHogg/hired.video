@@ -13,10 +13,13 @@
  *   INTERVAL  every 15 min  registered workers (KV next-due gate), explicit-
  *                           scan backfill + paid-media resume (idle back-off),
  *                           job-board scrape on :00/:30
- *   HOURLY    hh:02         marker reconcile, config snapshot, posting agent,
- *                           off-platform metrics, and the daily / weekly /
- *                           monthly jobs selected by UTC hour + date below.
- *                           :02 so it never overlaps a TICK invocation.
+ *   HOURLY    hh:02         config snapshot (KV-deduped), the marker-gated
+ *                           hourly queues (posting agent, off-platform
+ *                           metrics), the marker reconcile on RECONCILE
+ *                           hours only, and the daily / weekly / monthly
+ *                           jobs selected by UTC hour + date below. :02 so
+ *                           it never overlaps a TICK invocation. An idle
+ *                           non-reconcile hour makes zero Postgres queries.
  *
  * Keep CRON_SCHEDULES and wrangler.toml [triggers].crons identical.
  */
@@ -57,6 +60,25 @@ export function isHalfHourInterval(d: Date): boolean {
 // ---------------------------------------------------------------------------
 // HOURLY windows (the HOURLY cron fires once per UTC hour, at :02)
 // ---------------------------------------------------------------------------
+
+/** UTC hours the marker reconcile runs (and the idle-deferred interval
+ *  sweeps wake). 04 is the maintenance hour, so one of the four shares a
+ *  wake-up that happens anyway. Every 6h bounds the latency of a writer
+ *  that forgot to `signalWork`. */
+export const RECONCILE_HOURS: readonly number[] = [4, 10, 16, 22];
+
+export function isReconcileHour(d: Date): boolean {
+  return RECONCILE_HOURS.includes(d.getUTCHours());
+}
+
+const HOUR_MS = 60 * 60 * 1000;
+
+/** Epoch ms of the top of the next reconcile hour strictly after `nowMs`. */
+export function nextReconcileMs(nowMs: number): number {
+  let t = Math.floor(nowMs / HOUR_MS) * HOUR_MS + HOUR_MS;
+  while (!RECONCILE_HOURS.includes(new Date(t).getUTCHours())) t += HOUR_MS;
+  return t;
+}
 
 /** 03:xx — SuperAdmin / platform-company / sector-article seed (gap #1593). */
 export function isSeedSuperAdminHour(d: Date): boolean {
@@ -104,8 +126,7 @@ export function isPayoutReleaseWindow(d: Date): boolean {
 export type HourlyJob =
   | "reconcile-markers"
   | "config-snapshot"
-  | "posting-agent"
-  | "external-post-metrics"
+  | "hourly-queues"
   | "seed-superadmin"
   | "maintenance"
   | "model-catalog-drift"
@@ -118,7 +139,9 @@ export type HourlyJob =
 
 /** Every job the HOURLY invocation at `d` runs, in run order. */
 export function hourlyJobsFor(d: Date): HourlyJob[] {
-  const jobs: HourlyJob[] = ["reconcile-markers", "config-snapshot", "posting-agent", "external-post-metrics"];
+  const jobs: HourlyJob[] = [];
+  if (isReconcileHour(d)) jobs.push("reconcile-markers");
+  jobs.push("config-snapshot", "hourly-queues");
   if (isSeedSuperAdminHour(d)) jobs.push("seed-superadmin");
   if (isMaintenanceHour(d)) jobs.push("maintenance");
   if (isCatalogAndGeocoderHour(d)) jobs.push("model-catalog-drift", "geocoder-refresh");

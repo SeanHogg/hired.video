@@ -156,12 +156,16 @@ export async function loadNextDueTimes(): Promise<NextDueTimes> {
     "../billing/token-packs/tokenPackReconcile.js"
   );
   const { STALE_RUNNING_MS } = await import("../distribution/drain-publish-jobs.js");
+  const { METRICS_SYNC_WINDOW_DAYS } = await import("../../repositories/externalPostMetricsRepository.js");
+  const { VIDEO_PUBLISH_PLATFORMS } = await import("../../../../shared/social-platforms.js");
   return new WorkQueueRepository(getDb()).nextDueTimes({
     reminderOffsetsMin: Object.values(REMINDER_OFFSETS_MIN),
     reminderWindowMin: EVENT_REMINDER_WINDOW_MIN,
     tokenPackMinAgeMs: TOKEN_PACK_RECONCILE_MIN_AGE_MS,
     tokenPackRecheckGapMs: TOKEN_PACK_RECHECK_GAP_MS,
     socialStaleRunningMs: STALE_RUNNING_MS,
+    metricsDestinations: VIDEO_PUBLISH_PLATFORMS,
+    metricsWindowDays: METRICS_SYNC_WINDOW_DAYS,
   });
 }
 
@@ -173,7 +177,9 @@ export async function settleAllMarkers(
   nowMs: number,
   stuck: ReadonlySet<WorkQueue> = new Set(),
 ): Promise<void> {
-  const disabled = new Set(TICK_QUEUES.filter((q) => q.enabled && !q.enabled()).map((q) => q.name));
+  const disabled = new Set<WorkQueue>(TICK_QUEUES.filter((q) => q.enabled && !q.enabled()).map((q) => q.name));
+  // Hourly queue switched off by env: clear its marker so it never wakes Neon.
+  if (workerEnv().POSTING_AGENT_ENABLED === "false") disabled.add("posting-agent");
   await Promise.all(
     WORK_QUEUES.map((queue) => {
       let due = disabled.has(queue) ? null : nextDue[queue];
@@ -224,8 +230,9 @@ export async function runWorkQueueTick(now: Date = new Date()): Promise<TickSumm
   return { ran: toRun.map((q) => q.name), handled };
 }
 
-/** Hourly: re-derive every marker from Postgres (one query). Repairs
- *  markers a writer forgot to set or a failed KV write lost. */
+/** Reconcile hours (cron-plan.ts RECONCILE_HOURS): re-derive every marker
+ *  from Postgres (one query). Repairs markers a writer forgot to set or a
+ *  failed KV write lost. */
 export async function reconcileWorkMarkers(now: Date = new Date()): Promise<void> {
   const markers = await readWorkMarkers();
   if (!markers) return;

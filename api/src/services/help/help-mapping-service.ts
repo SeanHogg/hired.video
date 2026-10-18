@@ -14,6 +14,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "../../db/index.js";
 import { helpMappings } from "../../db/schema/helpMappings.js";
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 import {
   deleteHelpEmbeddings,
   getIndexedHelpSlugs,
@@ -31,8 +32,10 @@ import { logger } from "../../lib/logger.js";
 
 type Db = ReturnType<typeof getDb>;
 
-const RESOLVE_TTL_SECONDS = 300;
-const CONTEXTS_TTL_SECONDS = 600;
+// Long: every mapping write invalidates both keys (see `invalidate`), and
+// each refill is a KV write on Workers Free.
+const RESOLVE_TTL_SECONDS = 3600;
+const CONTEXTS_TTL_SECONDS = 3600;
 
 const ctxCacheKey = (contextKey: string) => `help:ctx:${contextKey}`;
 const CONTEXTS_KEY = "help:contexts";
@@ -90,11 +93,12 @@ export class HelpMappingService {
     if (q.length < 2) return { slugs: [], semantic: false };
     // Read-through cache: a semantic hit costs a Workers-AI embed + a
     // Vectorize query, so identical queries must not re-run that per request.
-    // Keyspace is unbounded (free text) → TTL backstop; `avail` in the key so
+    // Keyspace is unbounded (free text) → isolate-only (no KV write per
+    // miss) with a TTL backstop; `avail` in the key so
     // provisioning Vectorize doesn't keep serving cached "unavailable" misses.
     const avail = isSemanticHelpAvailable() ? "1" : "0";
     return this.safeRead(`search`, { slugs: [], semantic: false }, () =>
-      getOrSetCached<{ slugs: string[]; semantic: boolean }>({
+      getOrSetIsolateCached<{ slugs: string[]; semantic: boolean }>({
         key: `help:sem:${avail}:${limit}:${q.toLowerCase()}`,
         ttlSeconds: 300,
         loader: async () => {

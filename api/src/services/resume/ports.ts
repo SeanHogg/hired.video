@@ -35,6 +35,10 @@ export interface ResumeDeps {
   now: () => Date;
   /** Owner promotion flag reader (#887). Optional for tests. */
   ownerFlags?: OwnerPromotionPort;
+  /** Runs telemetry off the response path (Workers `waitUntil`). When absent
+   *  the task still runs detached — it just isn't kept alive past the
+   *  response. Tests inject one to await the work deterministically. */
+  runDetached?: (task: Promise<void>) => void;
 }
 
 /** Per-request context the route strips out of Hono's c. */

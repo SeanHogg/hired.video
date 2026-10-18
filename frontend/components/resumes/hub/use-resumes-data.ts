@@ -32,9 +32,13 @@ export function useResumesData(id: string | undefined, isAuthenticated: boolean)
   const [includeArchived, setIncludeArchived] = useState(false);
 
   // Consolidated fetch
-  const getResumesForDisplay = async (): Promise<ResumeWithOwnership[]> => {
+  // `groups` lets loadResumes hand over its in-flight master-groups request
+  // so the page issues ONE groups call per load, not two in parallel.
+  const getResumesForDisplay = async (
+    groups?: Promise<MasterResumeGroup[]>,
+  ): Promise<ResumeWithOwnership[]> => {
     try {
-      return await resumeService.getResumesForDisplay({ includeArchived });
+      return await resumeService.getResumesForDisplay({ includeArchived, groups });
     } catch (error) {
       console.error("Error fetching resumes:", error);
       return [];
@@ -46,9 +50,10 @@ export function useResumesData(id: string | undefined, isAuthenticated: boolean)
     setError(null);
     if (opts?.notifyExtension) notifyExtension("resume-changed");
     try {
+      const groupsRequest = resumeService.getMasterResumeGroups();
       const [masterGroups, finalResumes] = await Promise.all([
-        resumeService.getMasterResumeGroups(),
-        getResumesForDisplay(),
+        groupsRequest,
+        getResumesForDisplay(groupsRequest),
       ]);
 
       setResumes(finalResumes);

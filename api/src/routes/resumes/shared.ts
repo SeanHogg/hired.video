@@ -35,7 +35,16 @@ export function invalidResumeBodyHook(err: ZodError): never {
 
 /** Live deps; résumé text the parser port sees goes through the AI parse. */
 export function resumeDeps(c: ResumeCtx): ResumeDeps {
-  return buildResumeDeps((text) => parseResumeTextWithAI(c, text));
+  return {
+    ...buildResumeDeps((text) => parseResumeTextWithAI(c, text)),
+    runDetached: (task) => {
+      try {
+        c.executionCtx.waitUntil(task);
+      } catch {
+        // No ExecutionContext (Node tests) — the promise still runs detached.
+      }
+    },
+  };
 }
 
 export function viewerContext(c: ResumeCtx, viewerId: string | null = c.var.userId ?? null): ResumeRequestContext {

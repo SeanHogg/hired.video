@@ -13,7 +13,8 @@
  * budget doesn't reach is picked up by the next run, so per-table state
  * isn't required.
  *
- * DRY: every retention policy in the codebase MUST be declared here.
+ * DRY: every retention policy in the codebase MUST be declared in
+ * RETENTION_POLICIES (retention-policies.ts).
  * Adding `processFooRetention` as a separate cron job
  * is the anti-pattern this module exists to prevent — the runner is
  * generic; the configs are data.
@@ -30,144 +31,18 @@
  * minimum 12 months admin-action audit retention; archive to cold
  * storage prior to delete is the long-term move (separately tracked).
  *
- * Adding a row here is a load-bearing change: review the table's audit
+ * Adding a policy row is a load-bearing change: review the table's audit
  * + product semantics before extending.
  */
 
 import { sql } from "drizzle-orm";
 import { getDb } from "../../db/index.js";
-import { SHARE_LINK_ORPHAN_SQL } from "../../db/schema/shareLinks.js";
+import { RETENTION_POLICIES, type RetentionPolicy } from "./retention-policies.js";
 
-export interface RetentionPolicy {
-  /** Postgres table name (NOT the Drizzle TS export name). */
-  table: string;
-  /** Timestamptz column(s) used as the "age" axis. created_at for
-   *  append-only logs, updated_at / last_hit_at for LRU caches. With more
-   *  than one column a row is expired when ANY of them is past the window
-   *  (NULLs never match) — e.g. sessions: revoked OR expired long ago. */
-  ageColumns: readonly string[];
-  /** Rows older than this many days are deleted. */
-  retentionDays: number;
-  /** Optional static SQL predicate ANDed with the age test — scopes the
-   *  policy to a slice of the table (e.g. guest users only). Literal from
-   *  this file only; never user input. */
-  scope?: string;
-  /** Rows deleted per DELETE statement. Bounds any single statement
-   *  (lock duration, WAL burst, neon-http response time); the runner
-   *  issues as many batches as the time budget allows. */
-  batchSize: number;
-}
-
-/**
- * Single source of truth for retention windows. Justifications inline.
- *
- * Every single-column `ageColumns` entry needs an index leading with that
- * column (migration 0495 added the missing ones) — the batch's
- * ORDER BY … LIMIT must be an index range scan, not a full-table sort.
- */
-export const RETENTION_POLICIES: readonly RetentionPolicy[] = [
-  // AI scratchpad + tool history — users can re-run; 90 days covers the
-  // "look up what I did last quarter" use case.
-  // Tool runs made in a studio session (studio_project_id set, mig 0510)
-  // live as long as the session — FK cascade removes them with it.
-  { table: "tool_runs",         ageColumns: ["created_at"], retentionDays: 90, batchSize: 5000, scope: "studio_project_id IS NULL" },
-  { table: "ai_chat_messages",  ageColumns: ["created_at"], retentionDays: 90, batchSize: 5000 },
-
-  // Vendor API call logs — operational telemetry; 30 days for debugging
-  // recent failures, beyond that it's just storage cost.
-  { table: "profile_sync_runs", ageColumns: ["created_at"], retentionDays: 30, batchSize: 5000 },
-  { table: "worker_runs",       ageColumns: ["started_at"], retentionDays: 30, batchSize: 5000 },
-
-  // Request-level telemetry — 30 days matches typical Worker log retention.
-  { table: "request_logs",      ageColumns: ["created_at"], retentionDays: 30, batchSize: 5000 },
-  { table: "activity_logs",     ageColumns: ["created_at"], retentionDays: 90, batchSize: 5000 },
-
-  // Extension session/event telemetry. Sessions are LRU (`updated_at`)
-  // so an active reconnect resets the clock; events use creation time.
-  { table: "extension_sessions", ageColumns: ["updated_at"], retentionDays: 14, batchSize: 5000 },
-  { table: "extension_events",   ageColumns: ["created_at"], retentionDays: 30, batchSize: 5000 },
-
-  // Mapbox geocoder cache is a true LRU — eviction by last_hit_at, not
-  // creation date. A row that's still being hit weekly stays forever.
-  { table: "geocoder_cache",     ageColumns: ["last_hit_at"], retentionDays: 90, batchSize: 5000 },
-
-  // Notifications — once a user has dismissed an old notification or
-  // the platform-wide retention window passes, drop. 90 days matches
-  // the "unread badge would have been seen by now" assumption. Stale
-  // unread notifications also drop so the table stays bounded — if
-  // the user hasn't read it in 90 days, the notification is dead.
-  { table: "notifications",      ageColumns: ["created_at"], retentionDays: 90, batchSize: 5000 },
-
-  // Auth sessions (services/auth/sessions.ts) — every login, refresh
-  // rotation and revoke leaves a row behind and nothing ever deleted them.
-  // A row is dead once it was revoked or passed its absolute expiry; the
-  // 30-day grace keeps recently revoked/rotated rows for the device list
-  // and refresh-token reuse forensics. Live sessions (revoked_at NULL,
-  // expires_at in the future) can never match.
-  { table: "sessions",           ageColumns: ["revoked_at", "expires_at"], retentionDays: 30, batchSize: 5000 },
-
-  // admin_audit_log — 365d (SOC 2 floor for admin-action retention).
-  // Beyond a year, the row is unlikely to be referenced by an active
-  // compliance review. #1613 deferred the cold-storage archive path —
-  // when that lands, this retention becomes "delete after S3 export
-  // confirms." Today it's a straight delete.
-  { table: "admin_audit_log",    ageColumns: ["created_at"], retentionDays: 365, batchSize: 5000 },
-
-  // Unclaimed guest accounts (mig 0496) — a signed-out visitor's silent
-  // identity. The guest JWT lives 30 days (GUEST_TOKEN_TTL); after that
-  // nobody can sign back into it, so the account and everything it owns
-  // (FK cascade) is dead. Claimed guests are deleted at adoption.
-  { table: "users",              ageColumns: ["created_at"], retentionDays: 30, batchSize: 500, scope: "is_guest" },
-
-  // First-party usage analytics (mig 0490s). The longest /admin/insights
-  // traffic window is 90 days (shared/usage.ts TRAFFIC_WINDOW_DAYS), so 95
-  // keeps every window whole. Sessions are LRU by last_seen (deleting one
-  // cascades its events); long-lived visitor sessions keep only recent events.
-  { table: "usage_events",       ageColumns: ["occurred_at"], retentionDays: 95, batchSize: 5000 },
-  { table: "usage_sessions",     ageColumns: ["last_seen"],   retentionDays: 95, batchSize: 2000 },
-
-  // Raw job/company listing-traffic events (artifact_views event_type
-  // 'listing_view'; were job_view_events / company_view_events until W3-A
-  // 0580) — every reader windows them to 30 days
-  // (repositories/listingViewsRepository.ts) and no counter cache is
-  // recomputed from them, so 180 days is pure headroom. Only that stream is
-  // swept; idx_artifact_views_event_viewed backs the scoped age scan.
-  { table: "artifact_views",     ageColumns: ["viewed_at"], retentionDays: 180, batchSize: 5000, scope: "event_type = 'listing_view'" },
-
-  // Security telemetry. bot_block_events backs the 7/30-day admin
-  // security charts; login_events backs brute-force / risk windows (hours
-  // to days) and the per-user sign-in history.
-  { table: "bot_block_events",   ageColumns: ["created_at"], retentionDays: 30,  batchSize: 5000 },
-  { table: "login_events",       ageColumns: ["created_at"], retentionDays: 180, batchSize: 5000 },
-
-  // One-time auth tokens/codes of every purpose (auth_tokens, W3-B 0591) —
-  // dead the moment they expire (every row carries an expiry; used rows
-  // expire too). One day of grace keeps a just-expired link explainable in
-  // support. idx_auth_tokens_expires backs the age scan.
-  { table: "auth_tokens",               ageColumns: ["expires_at"], retentionDays: 1, batchSize: 5000 },
-
-  // Share links whose subject is gone (W3-A, mig 0583). share_links is
-  // polymorphic, so the per-kind FK cascades the six old tables had (deck,
-  // résumé, job, project, owner deleted → links deleted) are done
-  // immediately by AFTER DELETE triggers on each subject table (mig 0650);
-  // this policy is only the backstop for anything a trigger missed.
-  // retentionDays 0 = any age; the scope is the whole test. The table is
-  // small (one row per link a person minted) — no created_at index needed.
-  { table: "share_links",       ageColumns: ["created_at"], retentionDays: 0, batchSize: 1000, scope: SHARE_LINK_ORPHAN_SQL },
-
-  // Deliberately NOT here (W1-B review, 2026-10-17):
-  //   - artifact_views streams other than listing_view: lifetime counts
-  //     are computed by COUNT(*) over the raw rows (profile totalViews,
-  //     resume / company view counts, studio CTA counts, and
-  //     counter-recompute's articles.view_count), so pruning would silently
-  //     shrink them. They need a lifetime rollup column first.
-  //   - article_engagement: already the per-(article, day) rollup that the
-  //     partner pool + engagement payout read.
-  //   - job_items: the scraper never deactivates or expires the rows it
-  //     inserts, so an "inactive scraped job" policy would match nothing;
-  //     it needs a scraper-side expiry first.
-  //   - xAPI / LRS statements: learning records.
-] as const;
+// The policy table lives in retention-policies.ts (kept separate so the data
+// can grow without bloating the runner); re-exported so callers import the
+// sweep's whole surface from here.
+export { RETENTION_POLICIES, type RetentionPolicy };
 
 /** Wall-clock budget for one sweep run. Nearly all of it is spent awaiting
  *  Postgres (not Worker CPU), but the sweep shares the 04:xx HOURLY cron

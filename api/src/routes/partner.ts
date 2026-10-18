@@ -22,7 +22,7 @@ import { z } from "zod";
 import type { Context, MiddlewareHandler } from "hono";
 import type { AppEnv, JwtPayload } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { invalidateCachedKey } from "../utils/edge-cache.js";
+import { invalidateIsolateKey } from "../utils/isolate-cache.js";
 import { partnerAuth } from "../middleware/partnerAuth.js";
 import { getPartner } from "../services/partner/partners.js";
 import {
@@ -280,7 +280,7 @@ partnerRoutes.post("/v1/job-seekers", partnerAuth("write:job_seekers"), validate
     });
     if (res.status === 201) {
       resumeId = (res.body as any)?.data?.id ?? null;
-      invalidateCachedKey(partnerProfileCacheKey(partnerId, result.userId));
+      invalidateIsolateKey(partnerProfileCacheKey(partnerId, result.userId));
     }
   }
 
@@ -308,7 +308,7 @@ partnerRoutes.post("/v1/job-seekers/:userId/resumes", partnerAuth("write:resumes
 
   const res = await handleCreateResume(partnerResumeDeps(c, partnerId, userId), userId, resolved.data);
   if (res.status === 201) {
-    invalidateCachedKey(partnerProfileCacheKey(partnerId, userId));
+    invalidateIsolateKey(partnerProfileCacheKey(partnerId, userId));
   }
   return c.json(res.body as any, res.status as any);
 });

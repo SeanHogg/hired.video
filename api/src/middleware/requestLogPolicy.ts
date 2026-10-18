@@ -9,19 +9,25 @@
  *   - never logged: preflights / HEAD probes, health checks, crawler and
  *     beacon traffic (OG cards, sitemaps, embed runtime, usage/analytics
  *     beacons), and self-identified bots;
- *   - always logged (weight 1): every non-GET, every 4xx/5xx, every slow
- *     request, and the first request a signed-in user makes in this isolate
- *     each UTC day (keeps DAU/WAU/MAU, which count DISTINCT user_id, honest);
- *   - everything else (fast, successful GETs) is sampled 1 in
- *     SUCCESS_GET_SAMPLE_RATE and written with that weight, so weighted
- *     aggregates stay unbiased.
+ *   - always logged (weight 1): every 5xx, every slow request, every 4xx
+ *     that is NOT routine noise (400/409/422/… — real client/contract bugs),
+ *     and the first request a signed-in user makes in this isolate each UTC
+ *     day (keeps DAU/WAU/MAU, which count DISTINCT user_id, honest);
+ *   - everything else — fast 2xx/3xx of ANY method (writes included) and
+ *     the high-volume auth/not-found/rate-limit statuses (SAMPLED_STATUSES:
+ *     401/403/404/429) — is sampled 1 in SAMPLE_RATE and written with
+ *     sample_weight = SAMPLE_RATE, so weighted counts / error rates stay
+ *     unbiased estimates.
  *
  * Pure apart from the bounded isolate-local "seen today" set; the random
  * source is injectable for tests.
  */
 
-/** 1 in N fast successful GETs is written (with sample_weight = N). */
-export const SUCCESS_GET_SAMPLE_RATE = 10;
+/** 1 in N sampled requests is written (with sample_weight = N). */
+export const SAMPLE_RATE = 10;
+/** Routine, high-volume 4xx (expired sessions, missing perms, dead links,
+ *  throttling) — sampled like successes instead of always written. */
+export const SAMPLED_STATUSES: ReadonlySet<number> = new Set([401, 403, 404, 429]);
 /** Requests at least this slow are always written. */
 export const SLOW_REQUEST_MS = 1_000;
 
@@ -73,15 +79,12 @@ export function decideRequestLog(
   now: Date = new Date(),
 ): RequestLogDecision {
   if (isUnloggedRequest(input.method, input.path, input.userAgent)) return { log: false };
-  if (input.method !== "GET" || input.status >= 400 || input.durationMs >= SLOW_REQUEST_MS) {
-    return { log: true, weight: 1 };
-  }
+  if (input.status >= 500 || input.durationMs >= SLOW_REQUEST_MS) return { log: true, weight: 1 };
+  if (input.status >= 400 && !SAMPLED_STATUSES.has(input.status)) return { log: true, weight: 1 };
   if (input.userId && firstSightingToday(input.userId, now.toISOString().slice(0, 10))) {
     return { log: true, weight: 1 };
   }
-  return random() * SUCCESS_GET_SAMPLE_RATE < 1
-    ? { log: true, weight: SUCCESS_GET_SAMPLE_RATE }
-    : { log: false };
+  return random() * SAMPLE_RATE < 1 ? { log: true, weight: SAMPLE_RATE } : { log: false };
 }
 
 /** Test-only: forget the per-isolate "seen today" set. */

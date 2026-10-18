@@ -32,6 +32,130 @@ export type CourseRow = typeof courses.$inferSelect;
 export type VideoRow = typeof videos.$inferSelect;
 export type ScheduledEventRow = typeof scheduledEvents.$inferSelect;
 
+// ─── Card projections ───────────────────────────────────────────────────────
+// Each kind selects ONLY what its card mapper (services/search/
+// searchItemMappers.ts) reads: template `video_script`, article bodies,
+// course outlines, company long-form JSONB and every users secret
+// (password_hash, mfa_secret) never leave the database on a public search.
+
+export const companySearchColumns = {
+  id: companyProfiles.id,
+  name: companyProfiles.name,
+  description: companyProfiles.description,
+  industry: companyProfiles.industry,
+  headquarters: companyProfiles.headquarters,
+  logoUrl: companyProfiles.logoUrl,
+  size: companyProfiles.size,
+  foundedYear: companyProfiles.foundedYear,
+  createdAt: companyProfiles.createdAt,
+  updatedAt: companyProfiles.updatedAt,
+};
+
+export const peopleSearchColumns = {
+  user: {
+    id: users.id,
+    name: users.name,
+    role: users.role,
+    createdAt: users.createdAt,
+    updatedAt: users.updatedAt,
+  },
+  profile: {
+    avatarUrl: userProfiles.avatarUrl,
+    headline: userProfiles.headline,
+    location: userProfiles.location,
+  },
+};
+
+export const voiceSearchColumns = {
+  id: studioVoiceClones.id,
+  name: studioVoiceClones.name,
+  description: studioVoiceClones.description,
+  createdAt: studioVoiceClones.createdAt,
+  updatedAt: studioVoiceClones.updatedAt,
+  previewAudioUrl: studioVoiceClones.previewAudioUrl,
+  priceCents: studioVoiceClones.priceCents,
+  currency: studioVoiceClones.currency,
+  language: studioVoiceClones.language,
+  gender: studioVoiceClones.gender,
+  accent: studioVoiceClones.accent,
+  listingSlug: studioVoiceClones.listingSlug,
+  userId: studioVoiceClones.userId,
+  playCount: studioVoiceClones.playCount,
+  purchaseCount: studioVoiceClones.purchaseCount,
+};
+
+export const templateSearchColumns = {
+  id: studioTemplates.id,
+  name: studioTemplates.name,
+  description: studioTemplates.description,
+  thumbnailUrl: studioTemplates.thumbnailUrl,
+  previewVideoUrl: studioTemplates.previewVideoUrl,
+  mediaKind: studioTemplates.mediaKind,
+  documentKind: studioTemplates.documentKind,
+  listingSlug: studioTemplates.listingSlug,
+  priceCents: studioTemplates.priceCents,
+  currency: studioTemplates.currency,
+  durationSec: studioTemplates.durationSec,
+  motion: studioTemplates.motion,
+  language: studioTemplates.language,
+  tags: studioTemplates.tags,
+  creatorId: studioTemplates.creatorId,
+  companyId: studioTemplates.companyId,
+  viewCount: studioTemplates.viewCount,
+  purchaseCount: studioTemplates.purchaseCount,
+  publishedAt: studioTemplates.publishedAt,
+  createdAt: studioTemplates.createdAt,
+  updatedAt: studioTemplates.updatedAt,
+};
+
+export const mediaSearchVideoColumns = {
+  id: videos.id,
+  title: videos.title,
+  description: videos.description,
+  userId: videos.userId,
+  resumeId: videos.resumeId,
+  youtubeUrl: videos.youtubeUrl,
+  r2Key: videos.r2Key,
+  thumbnailUrl: videos.thumbnailUrl,
+  createdAt: videos.createdAt,
+};
+
+export const articleSearchColumns = {
+  id: articles.id,
+  title: articles.title,
+  summary: articles.summary,
+  coverImageUrl: articles.coverImageUrl,
+  category: articles.category,
+  kind: articles.kind,
+  readMinutes: articles.readMinutes,
+  userId: articles.userId,
+  publishedAt: articles.publishedAt,
+  createdAt: articles.createdAt,
+  updatedAt: articles.updatedAt,
+};
+
+export const courseSearchColumns = {
+  id: courses.id,
+  title: courses.title,
+  summary: courses.summary,
+  coverImageUrl: courses.coverImageUrl,
+  category: courses.category,
+  difficulty: courses.difficulty,
+  estimatedMinutes: courses.estimatedMinutes,
+  publishedAt: courses.publishedAt,
+  createdAt: courses.createdAt,
+  updatedAt: courses.updatedAt,
+};
+
+export type CompanySearchRow = Pick<CompanyRow, keyof typeof companySearchColumns>;
+export type PeopleSearchUserRow = Pick<UserRow, keyof typeof peopleSearchColumns.user>;
+export type PeopleSearchProfileRow = Pick<UserProfileRow, keyof typeof peopleSearchColumns.profile>;
+export type VoiceSearchRow = Pick<VoiceCloneRow, keyof typeof voiceSearchColumns>;
+export type TemplateSearchRow = Pick<StudioTemplateRow, keyof typeof templateSearchColumns>;
+export type MediaSearchVideoRow = Pick<VideoRow, keyof typeof mediaSearchVideoColumns>;
+export type ArticleSearchRow = Pick<ArticleRow, keyof typeof articleSearchColumns>;
+export type CourseSearchRow = Pick<CourseRow, keyof typeof courseSearchColumns>;
+
 /** Every kind returns at most this many rows into the in-memory merge. */
 const PER_KIND_LIMIT = 100;
 
@@ -58,12 +182,12 @@ function whereParts(gate: Array<SQL | undefined>, search: SQL | undefined, allow
 }
 
 export interface PeopleSearchRow {
-  user: UserRow;
-  profile: UserProfileRow | null;
+  user: PeopleSearchUserRow;
+  profile: PeopleSearchProfileRow | null;
 }
 
 export interface MediaSearchRow {
-  video: VideoRow;
+  video: MediaSearchVideoRow;
   ownerName: string | null;
 }
 
@@ -76,14 +200,14 @@ export class PublicSearchRepository {
   constructor(private readonly db: DbHandle) {}
 
   /** Active company profiles only (soft-deleted / hidden stay out). */
-  async searchCompanies(search: string, allow: EntityAllowlist): Promise<CompanyRow[]> {
+  async searchCompanies(search: string, allow: EntityAllowlist): Promise<CompanySearchRow[]> {
     const parts = whereParts(
       [eq(companyProfiles.isActive, true)],
       search ? matchEither(search, companyProfiles.name, companyProfiles.description) : undefined,
       allowClause(companyProfiles.id, allow),
     );
     return this.db
-      .select()
+      .select(companySearchColumns)
       .from(companyProfiles)
       .where(and(...parts))
       .orderBy(desc(companyProfiles.createdAt))
@@ -112,7 +236,7 @@ export class PublicSearchRepository {
       allowClause(users.id, allow),
     );
     return this.db
-      .select({ user: users, profile: userProfiles })
+      .select(peopleSearchColumns)
       .from(users)
       .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
       .where(and(...parts))
@@ -121,14 +245,14 @@ export class PublicSearchRepository {
   }
 
   /** Voice marketplace listings — public clones only. */
-  async searchVoices(search: string, allow: EntityAllowlist): Promise<VoiceCloneRow[]> {
+  async searchVoices(search: string, allow: EntityAllowlist): Promise<VoiceSearchRow[]> {
     const parts = whereParts(
       [eq(studioVoiceClones.visibility, "public")],
       search ? matchEither(search, studioVoiceClones.name, studioVoiceClones.description) : undefined,
       allowClause(studioVoiceClones.id, allow),
     );
     return this.db
-      .select()
+      .select(voiceSearchColumns)
       .from(studioVoiceClones)
       .where(and(...parts))
       .orderBy(desc(studioVoiceClones.createdAt))
@@ -136,9 +260,9 @@ export class PublicSearchRepository {
   }
 
   /** Studio template marketplace — public templates, most recently
-   *  published first. Selects every column, so `media_kind` and
-   *  `document_kind` (what the template makes) come back on each row. */
-  async searchTemplates(search: string, allow: EntityAllowlist, opts: TemplateSearchOptions): Promise<StudioTemplateRow[]> {
+   *  published first. The card projection carries `media_kind` and
+   *  `document_kind` (what the template makes) but never `video_script`. */
+  async searchTemplates(search: string, allow: EntityAllowlist, opts: TemplateSearchOptions): Promise<TemplateSearchRow[]> {
     const parts: Array<SQL | undefined> = [eq(studioTemplates.visibility, "public")];
     if (search) parts.push(matchEither(search, studioTemplates.name, studioTemplates.description));
     if (opts.companyId) parts.push(eq(studioTemplates.companyId, opts.companyId));
@@ -146,7 +270,7 @@ export class PublicSearchRepository {
     if (allowCl) parts.push(allowCl);
     const where = parts.length === 1 ? parts[0] : and(...parts);
     return this.db
-      .select()
+      .select(templateSearchColumns)
       .from(studioTemplates)
       .where(where)
       .orderBy(desc(studioTemplates.publishedAt))
@@ -161,7 +285,7 @@ export class PublicSearchRepository {
       allowClause(videos.id, allow),
     );
     return this.db
-      .select({ video: videos, ownerName: users.name })
+      .select({ video: mediaSearchVideoColumns, ownerName: users.name })
       .from(videos)
       .innerJoin(users, eq(videos.userId, users.id))
       .where(and(...parts))
@@ -170,14 +294,14 @@ export class PublicSearchRepository {
   }
 
   /** Creator-authored published articles. */
-  async searchArticles(search: string, allow: EntityAllowlist): Promise<ArticleRow[]> {
+  async searchArticles(search: string, allow: EntityAllowlist): Promise<ArticleSearchRow[]> {
     const parts = whereParts(
       [eq(articles.status, "published")],
       search ? matchEither(search, articles.title, articles.summary) : undefined,
       allowClause(articles.id, allow),
     );
     return this.db
-      .select()
+      .select(articleSearchColumns)
       .from(articles)
       .where(and(...parts))
       .orderBy(desc(articles.publishedAt))
@@ -185,14 +309,14 @@ export class PublicSearchRepository {
   }
 
   /** Published LMS courses — surfaced as `learning_path` (#1667). */
-  async searchLearningPaths(search: string, allow: EntityAllowlist): Promise<CourseRow[]> {
+  async searchLearningPaths(search: string, allow: EntityAllowlist): Promise<CourseSearchRow[]> {
     const parts = whereParts(
       [eq(courses.status, "published")],
       search ? matchEither(search, courses.title, courses.summary) : undefined,
       allowClause(courses.id, allow),
     );
     return this.db
-      .select()
+      .select(courseSearchColumns)
       .from(courses)
       .where(and(...parts))
       .orderBy(desc(courses.publishedAt))

@@ -1,17 +1,17 @@
 /**
  * Best-effort per-dimension rate limiter (#1828) — a fixed-window counter
- * backed by the shared Workers KV binding. KV is eventually consistent, so
- * this is a SOFT throttle for abuse mitigation on read-only / unauthenticated
- * surfaces (e.g. the public embed data API), NOT a hard quota: under burst
- * concurrency a few extra requests can slip through a window boundary. When KV
- * is unbound (dev / tests) it no-ops (always allows), so it never blocks local
- * work.
+ * held in THIS isolate's memory. It is a SOFT throttle for abuse mitigation
+ * on read-only / unauthenticated surfaces (e.g. the public embed data API),
+ * NOT a hard quota: each warm isolate counts on its own, so a caller spread
+ * across N isolates can get up to N × `limit` per window.
  *
- * Fixed-window (not sliding) for cost: one KV read + one write per request,
- * keyed by `floor(now / window)`. The counter key self-expires after the
- * window via `expirationTtl`, so there's no sweep.
+ * Why not KV: a KV-backed counter costs one KV WRITE per request, and the
+ * account runs on Workers Free (~1,000 KV writes/day) whose write budget is
+ * reserved for the scheduler's work markers (services/scheduling/
+ * work-signals.ts) — a busy embed would exhaust it and keep Neon awake.
+ * A hammering client almost always lands on the same warm isolate, which
+ * is exactly the case this throttle exists for.
  */
-import { getKvNamespace } from "./edge-cache.js";
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -21,6 +21,11 @@ export interface RateLimitResult {
   /** Seconds until the window resets — surface as `Retry-After` on a 429. */
   retryAfterSeconds: number;
 }
+
+/** Bound on tracked windows per isolate (oldest evicted past this). */
+const MAX_WINDOWS = 5_000;
+
+const _windows = new Map<string, { count: number; expiresAt: number }>();
 
 /**
  * Count one hit against `dimension` and report whether it's within `limit` per
@@ -32,23 +37,33 @@ export async function checkRateLimit(
   limit: number,
   windowSeconds: number,
 ): Promise<RateLimitResult> {
-  const kv = getKvNamespace();
-  if (!kv) return { allowed: true, limit, remaining: limit, retryAfterSeconds: 0 };
-
-  const nowSec = Math.floor(Date.now() / 1000);
+  const nowMs = Date.now();
+  const nowSec = Math.floor(nowMs / 1000);
   const windowIndex = Math.floor(nowSec / windowSeconds);
-  const key = `ratelimit:${dimension}:${windowIndex}`;
+  const key = `${dimension}:${windowIndex}`;
   const resetIn = windowSeconds - (nowSec % windowSeconds);
 
-  const current = Number((await kv.get(key).catch(() => null)) ?? 0);
-  if (current >= limit) {
+  let entry = _windows.get(key);
+  if (entry && entry.expiresAt <= nowMs) {
+    _windows.delete(key);
+    entry = undefined;
+  }
+  if (!entry) {
+    if (_windows.size >= MAX_WINDOWS) {
+      const oldest = _windows.keys().next();
+      if (!oldest.done) _windows.delete(oldest.value);
+    }
+    entry = { count: 0, expiresAt: nowMs + resetIn * 1000 };
+    _windows.set(key, entry);
+  }
+  if (entry.count >= limit) {
     return { allowed: false, limit, remaining: 0, retryAfterSeconds: resetIn };
   }
-  // Fire-and-forget the increment — a lost write under a race only UNDER-counts
-  // (fails open), which is the safe direction for a soft throttle. TTL is the
-  // window + a small grace so the key is gone well before it could be reused.
-  await kv
-    .put(key, String(current + 1), { expirationTtl: windowSeconds + 5 })
-    .catch(() => undefined);
-  return { allowed: true, limit, remaining: limit - current - 1, retryAfterSeconds: resetIn };
+  entry.count += 1;
+  return { allowed: true, limit, remaining: limit - entry.count, retryAfterSeconds: resetIn };
+}
+
+/** Test-only: forget every window so cases don't leak state. */
+export function __resetRateLimitForTests(): void {
+  _windows.clear();
 }

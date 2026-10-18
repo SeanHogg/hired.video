@@ -21,7 +21,8 @@ import {
 } from "../../../../shared/feed-features.js";
 
 const CACHE_VERSION = "v1";
-const CACHE_TTL_SECONDS = 300;
+// 3600s: upsert/update/remove invalidate every role key — every write path invalidates explicitly; long TTL = few KV refills.
+const CACHE_TTL_SECONDS = 3600;
 const cacheKey = (role: string) => `feed:features:${CACHE_VERSION}:${role}`;
 
 /** Admin-facing DTO — the full row plus nothing hidden (the embed_payload

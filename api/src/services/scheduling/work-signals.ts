@@ -13,15 +13,19 @@
  *   - After a run the tick re-derives each queue's real next-due time in ONE
  *     query and `settleWorkMarker` rewrites a marker only when it moved
  *     (deleted when the queue drained; set when the next item is far out).
- *   - The hourly cron re-derives every marker from Postgres too, so a writer
- *     that forgot to signal (or a KV write that failed) costs at most an
- *     hour of latency, never lost work.
+ *   - The hourly cron re-derives every marker from Postgres on the
+ *     RECONCILE hours (cron-plan.ts `isReconcileHour`, every 6h), so a
+ *     writer that forgot to signal (or a KV write that failed) costs at most
+ *     six hours of latency, never lost work. Between reconciles an idle
+ *     platform makes zero Postgres queries, so Neon can suspend.
  *
  * KV is eventually consistent (~60s) and best-effort; every function here
  * swallows KV errors. Missing binding (dev/tests) → every queue reads as due,
  * which is the pre-marker behaviour.
  */
 import { getKvNamespace } from "../../utils/edge-cache.js";
+import { logger } from "../../lib/logger.js";
+import { nextReconcileMs } from "./cron-plan.js";
 
 export const WORK_QUEUES = [
   "followups", // the ONE sequence engine: nurture drips + recruiter outreach
@@ -32,8 +36,15 @@ export const WORK_QUEUES = [
   "social-publish",
   "partner-payouts",
   "recruiter-agent-followups",
+  // Run by the HOURLY cron (not the tick), gated by the same markers:
+  "posting-agent", // AI Posting Agent: plan due users, expire stale drafts
+  "post-metrics", // off-platform reach sync for published posts
 ] as const;
 export type WorkQueue = (typeof WORK_QUEUES)[number];
+
+/** Queues the HOURLY cron runs (when their marker is due). Every other
+ *  queue belongs to the 5-minute tick. */
+export const HOURLY_QUEUES = ["posting-agent", "post-metrics"] as const satisfies readonly WorkQueue[];
 
 /** A queue whose next item is due within this window is treated as due
  *  now — it will be picked up by the very next tick anyway, and leaving the
@@ -112,8 +123,11 @@ export async function settleWorkMarker(
   try {
     if (action.kind === "delete") await kv.delete(markerKey(queue));
     else if (action.kind === "put") await kv.put(markerKey(queue), String(action.value));
-  } catch {
-    // Best-effort — next settle / hourly reconcile retries.
+  } catch (err) {
+    // Best-effort — the next settle / reconcile retries. Logged because a
+    // marker that cannot settle stays "due" and wakes Neon every tick
+    // (the usual cause is the Workers Free daily KV write quota).
+    logger.warn("[work-signals] marker settle failed", { queue, action: action.kind, error: err });
   }
 }
 
@@ -132,11 +146,42 @@ export function nextMarkerAction(current: number | null, nextDueMs: number | nul
 // ---------------------------------------------------------------------------
 //
 // Sweeps with no cheap "next due" signal (explicit-scan backfill, paid-media
-// report resume) defer themselves to the top of the next hour when a run
-// finds nothing to do. The key self-expires (absolute KV expiration), so
-// there is one put per idle hour and no delete.
+// report resume) defer themselves to the next RECONCILE hour when a run
+// finds nothing to do — that :00 interval run shares the wake-up the
+// reconcile causes anyway. The key self-expires (absolute KV expiration),
+// so there is one put per idle window. A writer that creates work for a
+// sweep calls `wakeSweep` to end the deferral early.
 
 const idleKey = (sweep: string) => `work:idle:${sweep}`;
+
+/** KV flag the reconcile writes: "0" = no active job-board sources, so the
+ *  :00/:30 scrape can skip its query. */
+export const SCRAPE_SOURCES_KEY = "work:scrape:active-sources";
+
+/** Writer side: a job-board source was created or (re)activated. Flips the
+ *  flag to "1" (one read, at most one put) so the next :00/:30 scrape runs
+ *  without waiting for the reconcile. Never throws. */
+export async function signalScrapeSourcesActive(): Promise<void> {
+  const kv = getKvNamespace();
+  if (!kv) return;
+  try {
+    if ((await kv.get(SCRAPE_SOURCES_KEY)) !== "1") await kv.put(SCRAPE_SOURCES_KEY, "1");
+  } catch {
+    // Best-effort — the reconcile recounts active sources.
+  }
+}
+
+/** A writer just created work for `sweep`: end its deferral so the next
+ *  interval run picks it up. One KV delete; never throws. */
+export async function wakeSweep(sweep: string): Promise<void> {
+  const kv = getKvNamespace();
+  if (!kv) return;
+  try {
+    await kv.delete(idleKey(sweep));
+  } catch {
+    // Best-effort — the sweep runs at the next reconcile window anyway.
+  }
+}
 
 /** True while `sweep` is deferred. KV unavailable → never deferred. */
 export async function isSweepDeferred(sweep: string): Promise<boolean> {
@@ -149,11 +194,11 @@ export async function isSweepDeferred(sweep: string): Promise<boolean> {
   }
 }
 
-/** Defer `sweep` until just before the top of the next UTC hour, so the
+/** Defer `sweep` until just before the next reconcile hour, so that hour's
  *  :00 interval run (shared with the hourly cron, while Neon is awake
  *  anyway) sees the key gone. Two minutes of lead absorbs KV's edge-cache
- *  staleness; KV's expiration must be ≥ 60s ahead, else the hour after. */
-export async function deferSweepToNextHour(sweep: string, now: Date = new Date()): Promise<void> {
+ *  staleness; KV's expiration must be ≥ 60s ahead, else the window after. */
+export async function deferSweepUntilReconcile(sweep: string, now: Date = new Date()): Promise<void> {
   const kv = getKvNamespace();
   if (!kv) return;
   try {
@@ -163,11 +208,11 @@ export async function deferSweepToNextHour(sweep: string, now: Date = new Date()
   }
 }
 
-const HOUR_MS = 60 * 60 * 1000;
 const IDLE_LEAD_MS = 2 * 60 * 1000;
 
+/** Two minutes before the next reconcile hour that is at least 60s away. */
 export function idleUntilMs(nowMs: number): number {
-  let until = Math.ceil((nowMs + 1) / HOUR_MS) * HOUR_MS - IDLE_LEAD_MS;
-  while (until - nowMs < 60_000) until += HOUR_MS;
+  let until = nextReconcileMs(nowMs) - IDLE_LEAD_MS;
+  while (until - nowMs < 60_000) until = nextReconcileMs(until + IDLE_LEAD_MS + 1) - IDLE_LEAD_MS;
   return until;
 }

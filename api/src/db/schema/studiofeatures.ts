@@ -507,6 +507,8 @@ export const studioVideoHeatmap = pgTable(
   (t) => [
     index("idx_studio_video_heatmap_project").on(t.studioProjectId),
     index("idx_video_heatmap_viewer").on(t.viewerId),
+    // Retention sweep age scan (mig 0652).
+    index("idx_studio_video_heatmap_created_at").on(t.createdAt),
   ],
 );
 

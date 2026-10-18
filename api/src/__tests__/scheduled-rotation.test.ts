@@ -21,12 +21,17 @@ import {
   cronKind,
   hourlyJobsFor,
   isHalfHourInterval,
+  isReconcileHour,
+  nextReconcileMs,
+  RECONCILE_HOURS,
   isMonthlyCloseWindow,
   isPartnerPoolCloseWindow,
   isPayoutReleaseWindow,
 } from "../services/scheduling/cron-plan.js";
 import {
+  HOURLY_QUEUES,
   WORK_DUE_SLACK_MS,
+  WORK_QUEUES,
   dueQueues,
   idleUntilMs,
   nextMarkerAction,
@@ -76,8 +81,22 @@ describe("hourlyJobsFor — daily jobs run exactly once a day", () => {
   const countOver24h = (job: string) =>
     Array.from({ length: 24 }, (_, h) => hourlyJobsFor(day(h))).filter((jobs) => jobs.includes(job as never)).length;
 
-  it("every hour reconciles markers first", () => {
-    for (let h = 0; h < 24; h++) assert.equal(hourlyJobsFor(day(h))[0], "reconcile-markers");
+  it("reconciles markers only on the reconcile hours, first in the run", () => {
+    for (let h = 0; h < 24; h++) {
+      const jobs = hourlyJobsFor(day(h));
+      if (RECONCILE_HOURS.includes(h)) assert.equal(jobs[0], "reconcile-markers", `hour ${h}`);
+      else assert.ok(!jobs.includes("reconcile-markers"), `hour ${h} must not reconcile`);
+    }
+    assert.equal(countOver24h("reconcile-markers"), RECONCILE_HOURS.length);
+  });
+  it("every hour runs only KV-gated work besides the calendar jobs", () => {
+    // An idle non-reconcile, non-calendar hour must not wake Neon: only the
+    // KV-deduped config snapshot and the marker-gated hourly queues run.
+    assert.deepEqual(hourlyJobsFor(day(13)), ["config-snapshot", "hourly-queues"]);
+  });
+  it("reconcile hours share a wake with the maintenance hour", () => {
+    assert.ok(RECONCILE_HOURS.includes(4));
+    assert.equal(RECONCILE_HOURS.length, 4);
   });
   it("seed, maintenance (retention → counters → fraud), drift, geocoder, placement: once per day", () => {
     for (const job of ["seed-superadmin", "maintenance", "model-catalog-drift", "geocoder-refresh", "placement-stage-events"]) {
@@ -137,11 +156,22 @@ describe("work markers — KV writes only on a change of state", () => {
     assert.deepEqual(dueQueues(markers, now, ["followups", "campaigns", "job-queue"]), ["followups"]);
     assert.deepEqual(dueQueues(null, now, ["followups", "campaigns"]), ["followups", "campaigns"]);
   });
-  it("idle back-off expires just before the next top of hour, ≥ 60s ahead", () => {
+  it("idle back-off expires just before the next reconcile hour, ≥ 60s ahead", () => {
     const at = Date.parse("2026-05-26T12:15:00Z");
-    assert.equal(idleUntilMs(at), Date.parse("2026-05-26T12:58:00Z"));
-    const late = Date.parse("2026-05-26T12:57:30Z");
-    assert.equal(idleUntilMs(late), Date.parse("2026-05-26T13:58:00Z"));
+    assert.equal(idleUntilMs(at), Date.parse("2026-05-26T15:58:00Z"));
+    const late = Date.parse("2026-05-26T15:57:30Z");
+    assert.equal(idleUntilMs(late), Date.parse("2026-05-26T21:58:00Z"));
+    const overnight = Date.parse("2026-05-26T23:10:00Z");
+    assert.equal(idleUntilMs(overnight), Date.parse("2026-05-27T03:58:00Z"));
+  });
+  it("nextReconcileMs / isReconcileHour", () => {
+    assert.equal(nextReconcileMs(Date.parse("2026-05-26T04:30:00Z")), Date.parse("2026-05-26T10:00:00Z"));
+    assert.equal(nextReconcileMs(Date.parse("2026-05-26T22:00:00Z")), Date.parse("2026-05-27T04:00:00Z"));
+    assert.equal(isReconcileHour(utc("2026-05-26T16:02:00Z")), true);
+    assert.equal(isReconcileHour(utc("2026-05-26T17:02:00Z")), false);
+  });
+  it("hourly queues are work queues (settled with the rest)", () => {
+    for (const q of HOURLY_QUEUES) assert.ok((WORK_QUEUES as readonly string[]).includes(q));
   });
 });
 

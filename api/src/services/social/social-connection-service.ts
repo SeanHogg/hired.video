@@ -57,7 +57,7 @@ import { DomainError } from "../../domains/errors.js";
  *  getEnv) to open tokens not yet re-sealed. */
 export type SocialEnv = { CREDENTIALS_KMS_KEY?: string; SOCIAL_KMS_KEY?: string; PAID_MEDIA_KMS_KEY?: string };
 
-const MANAGED_READY_TTL = 300;       // brand-account presence changes rarely
+const MANAGED_READY_TTL = 3600;      // brand-account presence; connect/disconnect/token refresh invalidate
 const SELF_STATUS_TTL = 120;         // per-user connection set
 
 function managedReadyKey(): string {

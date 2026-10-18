@@ -7,6 +7,7 @@
 import { beforeEach, describe, it } from "node:test";
 import { strict as assert } from "node:assert";
 import { __resetEdgeCacheForTests } from "../../../utils/edge-cache.js";
+import { __resetIsolateCacheForTests } from "../../../utils/isolate-cache.js";
 import { getPublicProjectsCached, invalidatePublicProjectsForSubjects } from "../public-projects-cache.js";
 
 /** A minimal in-memory Workers KV (get json / text, put, delete). */
@@ -31,10 +32,14 @@ function fakeKv() {
 const JOB = { kind: "job", id: "4f1c9a2b-7e3d-4c8a-b6f0-1d2e3a4b5c6d" };
 const COMPANY = { kind: "company", id: "c7a1e5d3-2b4f-4a6c-8e9d-0f1a2b3c4d5e" };
 
+let kv: ReturnType<typeof fakeKv>;
+
 describe("public projects cache", () => {
   beforeEach(() => {
     __resetEdgeCacheForTests();
-    (globalThis as any).__ENV = { KV_CACHE: fakeKv() };
+    __resetIsolateCacheForTests();
+    kv = fakeKv();
+    (globalThis as any).__ENV = { KV_CACHE: kv };
   });
 
   it("serves a warm subject without re-running the loader", async () => {
@@ -53,12 +58,19 @@ describe("public projects cache", () => {
     let companyCalls = 0;
     await getPublicProjectsCached(JOB, async () => (jobCalls++, []));
     await getPublicProjectsCached(COMPANY, async () => (companyCalls++, []));
-    // The fake KV's put writes synchronously, so the bump is visible now.
+    // Invalidation clears this isolate's entry synchronously.
     invalidatePublicProjectsForSubjects([JOB, JOB]);
     await getPublicProjectsCached(JOB, async () => (jobCalls++, [{ id: "p2" }]));
     await getPublicProjectsCached(COMPANY, async () => (companyCalls++, []));
     assert.equal(jobCalls, 2);
     assert.equal(companyCalls, 1);
+  });
+
+  it("never writes KV — neither a fill nor an invalidation (Workers Free quota)", async () => {
+    await getPublicProjectsCached(JOB, async () => []);
+    invalidatePublicProjectsForSubjects([JOB]);
+    await getPublicProjectsCached(JOB, async () => []);
+    assert.equal(kv.store.size, 0);
   });
 
   it("a failed load is not cached (error case)", async () => {

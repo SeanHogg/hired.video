@@ -7,15 +7,15 @@
  */
 
 import type {
-  ArticleRow,
-  CompanyRow,
-  CourseRow,
+  ArticleSearchRow,
+  CompanySearchRow,
+  CourseSearchRow,
+  MediaSearchVideoRow,
+  PeopleSearchProfileRow,
+  PeopleSearchUserRow,
   ScheduledEventRow,
-  StudioTemplateRow,
-  UserProfileRow,
-  UserRow,
-  VideoRow,
-  VoiceCloneRow,
+  TemplateSearchRow,
+  VoiceSearchRow,
 } from "../../repositories/publicSearchRepository.js";
 import type { ResumeRow } from "../../repositories/resumeRepository.js";
 import type { JobEntity } from "../job/job-entity.js";
@@ -37,7 +37,7 @@ export function toSearchItem(job: JobEntity) {
   };
 }
 
-export function toCompanyItem(company: CompanyRow) {
+export function toCompanyItem(company: CompanySearchRow) {
   const hq = company.headquarters;
   const location = hq
     ? [hq.city, hq.state, hq.country].filter(Boolean).join(", ") || hq.address || null
@@ -58,7 +58,7 @@ export function toCompanyItem(company: CompanyRow) {
   };
 }
 
-export function toPeopleItem(user: UserRow, profile?: UserProfileRow | null) {
+export function toPeopleItem(user: PeopleSearchUserRow, profile?: PeopleSearchProfileRow | null) {
   return {
     id: user.id,
     type: "people" as const,
@@ -87,7 +87,7 @@ export function toResumeItem(resume: ResumeRow) {
   };
 }
 
-export function toVoiceItem(clone: VoiceCloneRow) {
+export function toVoiceItem(clone: VoiceSearchRow) {
   // Voice clone listings appear in the homepage media catalog as type "voice".
   // The cart consumes priceCents directly via the embedded `voice` field.
   return {
@@ -115,7 +115,7 @@ export function toVoiceItem(clone: VoiceCloneRow) {
   };
 }
 
-export function toTemplateItem(t: StudioTemplateRow, hvCommunityCompanyId: string | null) {
+export function toTemplateItem(t: TemplateSearchRow, hvCommunityCompanyId: string | null) {
   // Marketplace card payload. The cart consumes priceCents directly via the
   // embedded `template` field, mirroring how voice clones expose `voice`.
   // `firstParty` flags templates owned by the Hired.VIDEO Community company
@@ -159,7 +159,7 @@ export function toTemplateItem(t: StudioTemplateRow, hvCommunityCompanyId: strin
   };
 }
 
-export function toArticleItem(a: ArticleRow) {
+export function toArticleItem(a: ArticleSearchRow) {
   // Articles surface in the unified results so location-tagged creator
   // content shows up alongside jobs / videos / services for viewers in
   // the same region. Only `published` articles ever reach here (filter
@@ -183,7 +183,7 @@ export function toArticleItem(a: ArticleRow) {
   };
 }
 
-export function toLearningPathItem(course: CourseRow) {
+export function toLearningPathItem(course: CourseSearchRow) {
   // Published LMS courses surface under the `learning_path` kind so the
   // Resource Map's "Learning paths" bucket can populate (#1667). The kind
   // discriminator is `learning_path` to match content_audiences tags +
@@ -204,7 +204,7 @@ export function toLearningPathItem(course: CourseRow) {
   };
 }
 
-export function toMediaItem(video: VideoRow, ownerName: string | null) {
+export function toMediaItem(video: MediaSearchVideoRow, ownerName: string | null) {
   const title = video.title || `${ownerName ?? "Unknown"}'s Video Resume`;
   return {
     id: video.id,

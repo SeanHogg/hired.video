@@ -9,13 +9,13 @@ function versionNamespace(userId: string): string {
 
 /** Single seam for host-side cache invalidation. Bumps the host's
  *  version token so every cached slot-grid key for that host becomes
- *  unreachable on the next read. Cheap (one KV delete). */
+ *  unreachable on the next read. Cheap (≤ one KV put per 30s — coalesced). */
 export function invalidateHostCaches(host: BookingHostIdentity): void {
   bumpCacheVersion(versionNamespace(host.userId));
 }
 
 export function getHostCacheVersion(userId: string): Promise<string> {
-  // Shared version-token primitive: read from KV (never L1) so a write in
-  // one isolate orphans cached slot windows in every isolate immediately.
+  // Shared version-token primitive (KV, L1-cached ~30s): a write in this
+  // isolate orphans its slot windows at once; other isolates within ~30s.
   return getCacheVersion(versionNamespace(userId));
 }

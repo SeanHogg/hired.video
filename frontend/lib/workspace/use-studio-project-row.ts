@@ -6,11 +6,16 @@
  * use-kit-document-layers share a single GET /api/studio/projects/:id.
  * `setProject` writes the cache so every reader stays in step after an edit.
  * Null until there is a project and it loaded (or when the read fails).
+ * StudioWorkspace seeds the entry from its own first read of /studio/:id.
  */
 import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
+
+/** A row this young counts as fresh — long enough to cover the seed → kit
+ *  mount hand-off, short enough that any later kit open re-reads. */
+const JUST_READ_MS = 5_000;
 
 export function useStudioProjectRow(projectId: string | null) {
   const queryClient = useQueryClient();
@@ -26,8 +31,10 @@ export function useStudioProjectRow(projectId: string | null) {
     },
     enabled: !!projectId,
     // Re-read on each kit open (as before), but concurrent readers on the
-    // same page share the one in-flight request.
-    staleTime: 0,
+    // same page share the one in-flight request, and a row read moments ago
+    // (StudioWorkspace seeds it from its kit-vs-format read of /studio/:id)
+    // isn't fetched a second time on the kit's first mount.
+    staleTime: JUST_READ_MS,
   });
 
   const setProject = useCallback(

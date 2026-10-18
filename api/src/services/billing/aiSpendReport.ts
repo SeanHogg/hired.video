@@ -17,7 +17,7 @@ import {
 import { aiModelRate } from "../../../../shared/ai-model-rates.js";
 import { PRO_MONTHLY_PRICE } from "../../../../shared/pricing.js";
 import type { ITokensRepository } from "../../repositories/tokensRepository.js";
-import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 
 const CACHE_TTL_SECONDS = 120;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -97,7 +97,7 @@ export async function buildAiSpendReport(deps: AiSpendReportDeps, days: AiSpendW
 }
 
 export function getAiSpendReport(deps: AiSpendReportDeps, days: AiSpendWindow): Promise<AiSpendReportDTO> {
-  return getOrSetCached({
+  return getOrSetIsolateCached({
     key: `ai-spend:v1:${days}`,
     ttlSeconds: CACHE_TTL_SECONDS,
     loader: () => buildAiSpendReport(deps, days),

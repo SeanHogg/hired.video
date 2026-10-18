@@ -12,10 +12,11 @@ import type { WorkspaceRestriction } from "../services/studio/workspace-request.
 import { MediaRepository } from "./mediaRepository.js";
 import { stateWrite } from "../services/studio/project-state.js";
 import { MEDIA_KIND_STATE_FIELD, type StudioStateField } from "../../../shared/studio-project-state.js";
+import { studioProjectColumns, type StudioProjectRow } from "./studioProjectColumns.js";
 
 const { studioProjects, videos } = schema;
 
-export type StudioProjectRow = typeof studioProjects.$inferSelect;
+export type { StudioProjectRow };
 export type StudioProjectInsert = typeof studioProjects.$inferInsert;
 export type StudioProjectPatch = Partial<StudioProjectInsert>;
 export type LinkedVideoRow = typeof videos.$inferSelect;
@@ -28,14 +29,49 @@ export interface ProjectWithVideo {
 }
 
 export async function findProjectById(db: Db, projectId: string): Promise<StudioProjectRow | null> {
-  const [row] = await db.select().from(studioProjects).where(eq(studioProjects.id, projectId)).limit(1);
+  const [row] = await db.select(studioProjectColumns).from(studioProjects).where(eq(studioProjects.id, projectId)).limit(1);
+  return row ?? null;
+}
+
+/** What save-draft needs from the prior row: ownership, the carried-forward
+ *  storyboard meta / slug / purpose, the revision, and the prior render stamp
+ *  (`state._meta.bakedHash`, extracted in SQL so the full state never ships). */
+export interface SaveDraftPriorRow {
+  id: string;
+  userId: string;
+  companyId: string | null;
+  storyboard: unknown;
+  slug: string | null;
+  mediaKind: StudioProjectRow["mediaKind"];
+  purpose: string | null;
+  revision: number;
+  bakedStamp: string | null;
+}
+
+export async function findProjectForSaveDraft(db: Db, projectId: string): Promise<SaveDraftPriorRow | null> {
+  const stamp = sql`${studioProjects.state} -> '_meta' -> 'bakedHash'`;
+  const [row] = await db
+    .select({
+      id: studioProjects.id,
+      userId: studioProjects.userId,
+      companyId: studioProjects.companyId,
+      storyboard: studioProjects.storyboard,
+      slug: studioProjects.slug,
+      mediaKind: studioProjects.mediaKind,
+      purpose: studioProjects.purpose,
+      revision: studioProjects.revision,
+      bakedStamp: sql<string | null>`CASE WHEN jsonb_typeof(${stamp}) = 'string' THEN NULLIF(${stamp} #>> '{}', '') END`,
+    })
+    .from(studioProjects)
+    .where(eq(studioProjects.id, projectId))
+    .limit(1);
   return row ?? null;
 }
 
 /** The project and its linked render in ONE round-trip (left join). */
 export async function findProjectWithVideo(db: Db, projectId: string): Promise<ProjectWithVideo | null> {
   const [row] = await db
-    .select({ project: studioProjects, video: videos })
+    .select({ project: studioProjectColumns, video: videos })
     .from(studioProjects)
     .leftJoin(videos, eq(videos.id, studioProjects.videoId))
     .where(eq(studioProjects.id, projectId))
@@ -106,7 +142,7 @@ function withDerivedColumns<T extends StudioProjectPatch>(patch: T): T {
 }
 
 export async function insertProject(db: Db, values: StudioProjectInsert): Promise<StudioProjectRow> {
-  const [created] = await db.insert(studioProjects).values(withDerivedColumns(values)).returning();
+  const [created] = await db.insert(studioProjects).values(withDerivedColumns(values)).returning(studioProjectColumns);
   return created;
 }
 
@@ -119,7 +155,7 @@ export async function updateProject(
     .update(studioProjects)
     .set(withDerivedColumns(patch))
     .where(eq(studioProjects.id, projectId))
-    .returning();
+    .returning(studioProjectColumns);
   return updated ?? null;
 }
 
@@ -137,7 +173,7 @@ export async function updateProjectIfRevision(
   projectId: string,
   patch: StudioProjectPatch,
   expectedRevision: number | undefined,
-): Promise<StudioProjectRow | null> {
+): Promise<{ id: string; isPublic: boolean; status: string } | null> {
   const where =
     expectedRevision === undefined
       ? eq(studioProjects.id, projectId)
@@ -145,7 +181,12 @@ export async function updateProjectIfRevision(
           eq(studioProjects.id, projectId),
           eq(studioProjects.revision, expectedRevision),
         );
-  const [updated] = await db.update(studioProjects).set(withDerivedColumns(patch)).where(where).returning();
+  // save-draft re-reads the DTO afterwards — RETURNING only what it branches on.
+  const [updated] = await db
+    .update(studioProjects)
+    .set(withDerivedColumns(patch))
+    .where(where)
+    .returning({ id: studioProjects.id, isPublic: studioProjects.isPublic, status: studioProjects.status });
   return updated ?? null;
 }
 
@@ -193,7 +234,7 @@ export async function updateProjectBumpingRevision(
     .update(studioProjects)
     .set({ ...withDerivedColumns(patch), revision: sql`${studioProjects.revision} + 1` })
     .where(eq(studioProjects.id, projectId))
-    .returning();
+    .returning(studioProjectColumns);
   return updated ?? null;
 }
 

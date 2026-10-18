@@ -9,7 +9,7 @@ import type {
   ResumeReviewAnnotationDTO,
   UpdateAnnotationInput,
 } from "../../../../shared/resume-feedback.js";
-import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached, invalidateIsolateKey } from "../../utils/isolate-cache.js";
 import {
   ANNOTATION_CACHE_TTL,
   annotationCacheKey,
@@ -33,7 +33,7 @@ export class ReviewAnnotations {
     token?: string,
   ): Promise<ResumeReviewAnnotationDTO[]> {
     const { review } = await this.access.resolveAccess({ reviewId }, actor, token);
-    return getOrSetCached({
+    return getOrSetIsolateCached({
       key: annotationCacheKey(reviewId),
       ttlSeconds: ANNOTATION_CACHE_TTL,
       loader: async () => {
@@ -72,7 +72,7 @@ export class ReviewAnnotations {
       suggestedEdit: input.suggestedEdit ?? null,
       parentAnnotationId: input.parentAnnotationId ?? null,
     });
-    invalidateCachedKey(annotationCacheKey(reviewId));
+    invalidateIsolateKey(annotationCacheKey(reviewId));
     return toAnnotationDTO(row, await nameForAuthor(this.deps.repo, row.authorId, review));
   }
 
@@ -103,7 +103,7 @@ export class ReviewAnnotations {
       ...(patch.status !== undefined ? { status: patch.status } : {}),
       ...resolved,
     });
-    invalidateCachedKey(annotationCacheKey(review.id));
+    invalidateIsolateKey(annotationCacheKey(review.id));
     return toAnnotationDTO(updated!, await nameForAuthor(this.deps.repo, updated!.authorId, review));
   }
 
@@ -113,6 +113,6 @@ export class ReviewAnnotations {
       throw new ResumeFeedbackServiceError("FORBIDDEN", "Cannot delete this note");
     }
     await this.deps.repo.deleteAnnotation(annotationId);
-    invalidateCachedKey(annotationCacheKey(review.id));
+    invalidateIsolateKey(annotationCacheKey(review.id));
   }
 }

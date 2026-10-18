@@ -78,26 +78,27 @@ export async function getXpLeaderboard(
   }
 
   const cacheKey = scope === "cohort" ? `lb:xp:cohort:${cohortId}:${limit}` : `lb:xp:global:${limit}`;
-  const entries = await getOrSetCached<LeaderboardEntry[]>({
-    key: cacheKey,
-    ttlSeconds: scope === "cohort" ? 120 : 300,
-    loader: async () => {
-      const top = await repos.points.topByLifetimeEarned(limit, scopedUserIds);
-      if (top.length === 0) return [];
-      const actors = await repos.users.findActorsByIds(top.map((t) => t.userId));
-      const byId = new Map(actors.map((a) => [a.id, a]));
-      return top.map((t, i) => {
-        const a = byId.get(t.userId);
-        return {
-          rank: i + 1,
-          userId: t.userId,
-          name: a?.name?.trim() || "Learner",
-          avatarUrl: a?.avatarUrl ?? null,
-          points: t.lifetimeEarned,
-        };
-      });
-    },
-  });
+  const loadBoard = async (): Promise<LeaderboardEntry[]> => {
+    const top = await repos.points.topByLifetimeEarned(limit, scopedUserIds);
+    if (top.length === 0) return [];
+    const actors = await repos.users.findActorsByIds(top.map((t) => t.userId));
+    const byId = new Map(actors.map((a) => [a.id, a]));
+    return top.map((t, i) => {
+      const a = byId.get(t.userId);
+      return {
+        rank: i + 1,
+        userId: t.userId,
+        name: a?.name?.trim() || "Learner",
+        avatarUrl: a?.avatarUrl ?? null,
+        points: t.lifetimeEarned,
+      };
+    });
+  };
+  // Per-cohort boards are an unbounded keyspace → isolate-only (no KV write
+  // per fill); the global board (one key per limit) stays on the edge cache.
+  const entries = scope === "cohort"
+    ? await getOrSetIsolateCached<LeaderboardEntry[]>({ key: cacheKey, ttlSeconds: 120, loader: loadBoard })
+    : await getOrSetCached<LeaderboardEntry[]>({ key: cacheKey, ttlSeconds: 300, loader: loadBoard });
 
   const myBalance = await repos.points.findBalance(userId);
   let viewer: { rank: number; points: number } | null = null;

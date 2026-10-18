@@ -20,7 +20,8 @@ export interface ModuleStatusDeps {
 // (which calls `invalidateModuleStatusCache`) propagates across isolates
 // via KV instead of waiting out a per-isolate Map TTL.
 const CACHE_KEY = "modules:status:v1";
-const CACHE_TTL_SECONDS = 300;
+// 3600s: the admin toggle invalidates (adminModules.ts) — every write path invalidates explicitly; long TTL = few KV refills.
+const CACHE_TTL_SECONDS = 3600;
 
 /** Test override — when set, returned instead of the cache/DB. */
 let _testMap: Map<string, boolean> | null = null;

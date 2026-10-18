@@ -74,6 +74,7 @@ export const jobBoardSyncLog = pgTable("job_board_sync_log", {
   errorMessage: text("error_message"),
 }, (t) => [
   index("idx_job_board_sync_log_source_id").on(t.sourceId),
+  index("idx_job_board_sync_log_started_at").on(t.startedAt),
 ]);
 
 export type JobBoardSyncLog = typeof jobBoardSyncLog.$inferSelect;

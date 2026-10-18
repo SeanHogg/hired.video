@@ -20,6 +20,21 @@ export type DbLike = any;
 export type ExternalEmailMessageRow = typeof externalEmailMessages.$inferSelect;
 export type ExternalEmailMessageInsert = typeof externalEmailMessages.$inferInsert;
 
+/** The columns the ingest pipeline reads back after a bulk insert (pairing
+ *  by provider id + the already-classified idempotency check). Bodies
+ *  (`body_html` / `body_text`) are the widest columns and the caller already
+ *  holds them from the wire, so they never round-trip back. */
+export const ingestedMessageColumns = {
+  id: externalEmailMessages.id,
+  providerMessageId: externalEmailMessages.providerMessageId,
+  category: externalEmailMessages.category,
+  linkedJobId: externalEmailMessages.linkedJobId,
+  dedupScore: externalEmailMessages.dedupScore,
+  score: externalEmailMessages.score,
+};
+
+export type IngestedMessageRow = Pick<ExternalEmailMessageRow, keyof typeof ingestedMessageColumns>;
+
 /** Read-side projection used by the inbox aggregator. The plain message row
  *  doesn't carry the human-readable account label, so this view joins it in.
  *  Also stamps the linked job's title + company name when `linkedJobId` is
@@ -84,7 +99,7 @@ export interface IExternalEmailMessagesRepository {
    *  input. Single source of truth for "ingest a chunk of messages" —
    *  the per-message `insert()` path on top is for callers (legacy cron
    *  + tests) that aren't chunked. */
-  insertMany(inputs: ExternalEmailMessageInsert[]): Promise<ExternalEmailMessageRow[]>;
+  insertMany(inputs: ExternalEmailMessageInsert[]): Promise<IngestedMessageRow[]>;
   patch(id: string, patch: Partial<ExternalEmailMessageInsert>): Promise<void>;
   /** Apply per-row patches in one round-trip via a `VALUES(...) JOIN`
    *  UPDATE. Single source of truth for batched ingest finals so the
@@ -294,7 +309,7 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
 
   async insertMany(
     inputs: ExternalEmailMessageInsert[],
-  ): Promise<ExternalEmailMessageRow[]> {
+  ): Promise<IngestedMessageRow[]> {
     if (inputs.length === 0) return [];
     // Step 1 — bulk INSERT with conflict-skip. `returning *` covers
     // the freshly-inserted rows but NOT conflicted ones, so we do a
@@ -308,7 +323,7 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
       .onConflictDoNothing({
         target: [externalEmailMessages.accountId, externalEmailMessages.providerMessageId],
       })
-      .returning()) as ExternalEmailMessageRow[];
+      .returning(ingestedMessageColumns)) as IngestedMessageRow[];
 
     if (inserted.length === inputs.length) return inserted;
 
@@ -330,17 +345,17 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
       arr.push(c.providerMessageId as string);
       byAccount.set(accountId, arr);
     }
-    const existing: ExternalEmailMessageRow[] = [];
+    const existing: IngestedMessageRow[] = [];
     for (const [accountId, providerMessageIds] of byAccount) {
       const rows = (await this.db
-        .select()
+        .select(ingestedMessageColumns)
         .from(externalEmailMessages)
         .where(
           and(
             eq(externalEmailMessages.accountId, accountId),
             inArray(externalEmailMessages.providerMessageId, providerMessageIds),
           ),
-        )) as ExternalEmailMessageRow[];
+        )) as IngestedMessageRow[];
       existing.push(...rows);
     }
     return [...inserted, ...existing];

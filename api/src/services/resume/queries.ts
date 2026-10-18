@@ -17,15 +17,17 @@ type ResumeRow = Awaited<ReturnType<ResumeDeps["repo"]["findAllForOwner"]>>[numb
 
 /** Record a view — ONE artifact_views row (kind 'resume', W3-A 0580) that
  *  backs both the résumé `viewCount` and the creator-stats dashboard (#1019).
- *  Telemetry never breaks the page load. */
-async function recordView(deps: ResumeDeps, row: ResumeRow, ctx: ResumeRequestContext): Promise<void> {
-  await recordResumeView(deps.repo, row.id, row.userId, {
+ *  Runs OFF the response path (deps.runDetached → waitUntil); telemetry
+ *  never breaks or delays the page load. */
+function recordViewDetached(deps: ResumeDeps, row: ResumeRow, ctx: ResumeRequestContext): void {
+  const task = recordResumeView(deps.repo, row.id, row.userId, {
     userId: ctx.viewerId,
     ipHash: ctx.ipHash,
     ipCountry: ctx.ipCountry,
     referrer: ctx.referrer,
     userAgent: ctx.userAgent,
   }).catch(() => undefined);
+  deps.runDetached?.(task);
 }
 
 /** One résumé by id or slug. Owner always wins; anyone else only sees a
@@ -44,13 +46,17 @@ export async function getResume(
     throw new DomainError(404, "RESUME_PRIVATE", "This resume is private. Ask the owner to share it with you.");
   }
   // Embeds skip view recording — every page load would inflate analytics.
-  if (opts.recordView !== false) await recordView(deps, row, ctx);
+  if (opts.recordView !== false) recordViewDetached(deps, row, ctx);
 
-  const resume = rowToResume(row, await computeViewerExtras(deps.repo, row, ctx.viewerId));
-  // Only anonymous viewers are log-walled, so only they need the flag.
-  if (!ctx.viewerId && deps.ownerFlags) {
-    resume.ownerPromoteWithoutAuth = await deps.ownerFlags.isPromotedWithoutAuth(row.userId);
-  }
+  // Independent reads run concurrently (one round-trip of latency, not three).
+  // Only anonymous viewers are log-walled, so only they need the promote flag.
+  const ownerFlags = !ctx.viewerId ? deps.ownerFlags : undefined;
+  const [extras, promoteWithoutAuth] = await Promise.all([
+    computeViewerExtras(deps.repo, row, ctx.viewerId),
+    ownerFlags ? ownerFlags.isPromotedWithoutAuth(row.userId) : Promise.resolve(undefined),
+  ]);
+  const resume = rowToResume(row, extras);
+  if (promoteWithoutAuth !== undefined) resume.ownerPromoteWithoutAuth = promoteWithoutAuth;
   return resume;
 }
 

@@ -267,6 +267,8 @@ export const emailSyncRuns = pgTable(
   (t) => ({
     userStartedIdx: index("email_sync_runs_user_started_idx").on(t.userId, t.startedAt),
     accountStartedIdx: index("email_sync_runs_account_started_idx").on(t.accountId, t.startedAt),
+    // Retention sweep age scan (mig 0652).
+    startedIdx: index("idx_email_sync_runs_started_at").on(t.startedAt),
     // #2305 — legacy UNIQUE (migration 0095_email_sync_runs_session_id.sql); duplicates resolved by 0518_dedupe_unique_indexes.sql.
     sessionUnq: uniqueIndex("email_sync_runs_session_unq")
       .on(t.accountId, t.syncSessionId)

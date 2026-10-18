@@ -2,16 +2,19 @@
  * A project's off-platform reach (#2048) for its analytics panel: every
  * network post with its latest snapshot, plus the summed totals.
  *
- * Cached read-through (getOrSetCached, L1 + KV) under
- * `social-metrics:{projectId}:{version}`; the version token is bumped when
- * a sync or webhook stores new counts for the project, so a view never
- * writes KV and a fresh sync is visible on the next read.
+ * Cached read-through in the ISOLATE (per-project keys — a KV fill per miss
+ * would burn the Workers Free write quota) under
+ * `social-metrics:{projectId}:{version}`. The version token stays in KV
+ * because the bump comes from the cron sync / webhook — usually another
+ * isolate — so a view never writes KV and a fresh sync is visible within
+ * the token's ~30s L1 window.
  */
 import { eq } from "drizzle-orm";
 import { getDb, type Db } from "../../../db/index.js";
 import { studioProjects } from "../../../db/schema/resumes.js";
 import type { PostMetricCounts } from "../../../../../shared/social-publish-jobs.js";
-import { getCacheVersion, getOrSetCached } from "../../../utils/edge-cache.js";
+import { getCacheVersion } from "../../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../../utils/isolate-cache.js";
 import * as metricsRepo from "../../../repositories/externalPostMetricsRepository.js";
 import { assertCanWrite, WorkspaceForbiddenError } from "../../studio/workspace.js";
 import { metricsVersionNamespace } from "./sync-post-metrics.js";
@@ -91,7 +94,7 @@ export async function projectOffPlatformReach(
     throw e;
   }
   const version = await getCacheVersion(metricsVersionNamespace(projectId));
-  return getOrSetCached<OffPlatformReach>({
+  return getOrSetIsolateCached<OffPlatformReach>({
     key: `social-metrics:${projectId}:${version}`,
     ttlSeconds: TTL_SECONDS,
     loader: async () => toReach(await (deps.load ?? metricsRepo.latestForProject)(projectId, db)),

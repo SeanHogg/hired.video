@@ -6,7 +6,7 @@
 import { DomainError } from "../../domains/errors.js";
 import { getDb } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
-import { getOrSetCached } from "../../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../../utils/isolate-cache.js";
 import { USER_LIST_FIELDS, parseFields, projectRows } from "../../../../shared/projection.js";
 import { isSuperAdmin } from "../../middleware/superAdmin.js";
 import { projectUserResumes } from "../../handlers/resume-serializer.js";
@@ -39,10 +39,11 @@ export async function listPublicUsers(page: number, limit: number, fieldsQuery: 
   // Real global count (NOT the current page size) so the frontend pagination
   // UI shows the correct number of pages (#904). The directory's membership
   // changes only on signup/verify/visibility edits, so a short read-through
-  // TTL is plenty and avoids a COUNT(*) on every page request.
-  const total = await getOrSetCached({
+  // TTL is plenty and avoids a COUNT(*) on every page request. Isolate-only:
+  // a shared 60s KV key under traffic was ~1 KV write a minute.
+  const total = await getOrSetIsolateCached({
     key: "users:public:count",
-    ttlSeconds: 60,
+    ttlSeconds: 300,
     loader: countPublicDirectory,
   });
   return { items: projected, total, page, limit };

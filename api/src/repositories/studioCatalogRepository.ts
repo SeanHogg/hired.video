@@ -10,10 +10,10 @@
 import { and, desc, eq, inArray, notInArray, or, sql } from "drizzle-orm";
 import { schema, type Db } from "../db/index.js";
 import { publicStudioProjectWhere } from "./studioPublicEngagementRepository.js";
+import { studioProjectColumns, type StudioProjectRow } from "./studioProjectColumns.js";
 
 const { studioProjects, studioProjectSubjects, videos, users, resumeInformation } = schema;
 
-type StudioProjectRow = typeof studioProjects.$inferSelect;
 type VideoRow = typeof videos.$inferSelect;
 
 /** mediaKind + runtime state every rail ships (#1215) so the client
@@ -134,8 +134,12 @@ export async function listFeaturedRows(db: Db) {
     .limit(20);
 }
 
+/** Cap on a subject's public project list (the public card surface; the
+ *  list is cached per subject, so this bounds the cached payload too). */
+export const PUBLIC_SUBJECT_PROJECTS_LIMIT = 100;
+
 /** A subject's public, watchable (non-failed) projects + their linked
- *  videos, newest first. Empty when nothing is linked. */
+ *  videos, newest first (capped). Empty when nothing is linked. */
 export async function listPublicProjectsForSubject(
   db: Db,
   subject: { kind: string; id: string },
@@ -146,14 +150,15 @@ export async function listPublicProjectsForSubject(
     .where(and(eq(studioProjectSubjects.subjectKind, subject.kind), eq(studioProjectSubjects.subjectId, subject.id)));
   if (subjectRows.length === 0) return { projects: [], videoById: new Map() };
   const projects = await db
-    .select()
+    .select(studioProjectColumns)
     .from(studioProjects)
     .where(and(
       inArray(studioProjects.id, subjectRows.map((r) => r.projectId)),
       publicStudioProjectWhere(),
       notInArray(studioProjects.status, ["failed", "publish_failed"]),
     ))
-    .orderBy(desc(studioProjects.updatedAt));
+    .orderBy(desc(studioProjects.updatedAt))
+    .limit(PUBLIC_SUBJECT_PROJECTS_LIMIT);
   // Linked videos belong to projects already vetted as public — no extra
   // ownership check needed.
   const videoIds = projects.map((p) => p.videoId).filter((id): id is string => Boolean(id));

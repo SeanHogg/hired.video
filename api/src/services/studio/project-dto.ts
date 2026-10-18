@@ -7,8 +7,8 @@ import { schema } from "../../db/index.js";
 import { cdnUrl } from "../../utils/cdn.js";
 import { normalizeStoryboard, VideoScriptSchema } from "./video-script.js";
 import { projectStateDto } from "./project-state.js";
+import type { StudioProjectRow } from "../../repositories/studioProjectColumns.js";
 
-type StudioProjectRow = typeof schema.studioProjects.$inferSelect;
 type VideoRow = typeof schema.videos.$inferSelect;
 
 export type StudioStatus = "Draft" | "Processing" | "Exported" | "Publishing" | "Completed" | "Published" | "Failed";

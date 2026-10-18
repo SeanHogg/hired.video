@@ -16,7 +16,7 @@
 import { count, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getDb, schema } from "../db/index.js";
-import { getOrSetCached } from "../utils/edge-cache.js";
+import { getOrSetIsolateCached } from "../utils/isolate-cache.js";
 import { logger } from "../lib/logger.js";
 
 const { affiliateReferrals, affiliateProfiles, users } = schema;
@@ -198,7 +198,7 @@ const GROUPED_CACHE_KEY = "admin:referrals:grouped:v1";
  * an analytics view is acceptable.
  */
 export async function getReferredUsersGrouped(): Promise<ReferredUsersGrouped> {
-  return getOrSetCached<ReferredUsersGrouped>({
+  return getOrSetIsolateCached<ReferredUsersGrouped>({
     key: GROUPED_CACHE_KEY,
     ttlSeconds: 60,
     loader: loadReferredUsersGrouped,

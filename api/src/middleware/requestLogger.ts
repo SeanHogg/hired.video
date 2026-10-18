@@ -14,8 +14,9 @@ import { decideRequestLog } from "./requestLogPolicy.js";
  * it. That is enough to prove a route is live on the latest code and
  * working — or to show exactly where it fails.
  *
- * Not every request is written: crawler/beacon traffic is skipped and fast
- * successful GETs are sampled (see requestLogPolicy.ts). Each row carries
+ * Not every request is written: crawler/beacon traffic is skipped; fast
+ * 2xx/3xx (any method) and routine 401/403/404/429 are sampled; 5xx, other
+ * 4xx and slow requests are always kept (see requestLogPolicy.ts). Each row carries
  * `sample_weight`, so readers sum weights instead of counting rows.
  */
 export const requestLoggerMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {

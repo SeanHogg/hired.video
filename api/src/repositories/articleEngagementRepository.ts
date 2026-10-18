@@ -4,7 +4,7 @@
  * rollup (read seconds / claps / shares) and the `article_shares` log.
  * Every rollup bump is ONE upsert statement keyed on (article_id, day).
  */
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { schema, type Db } from "../db/index.js";
 
 const { articles, articleEngagement, articleShares } = schema;
@@ -16,13 +16,24 @@ export interface IArticleEngagementRepository {
   findStatus(articleId: string): Promise<{ status: string | null } | null>;
   findOwnerId(articleId: string): Promise<{ userId: string } | null>;
   findById(articleId: string): Promise<ArticleRow | null>;
-  incrementViewCount(articleId: string): Promise<void>;
+  /** `view_count + 1` on a PUBLISHED article — one statement; false when the
+   *  article is missing or not published. */
+  incrementPublishedViewCount(articleId: string): Promise<boolean>;
   addReadSeconds(articleId: string, day: string, seconds: number, verified: boolean): Promise<void>;
   addClaps(articleId: string, day: string, delta: number): Promise<void>;
   insertShare(row: { articleId: string; userId: string | null | undefined; channel: string; userAgent: string | null }): Promise<void>;
   addShare(articleId: string, day: string): Promise<void>;
   listRollups(articleId: string, limit: number): Promise<ArticleEngagementRow[]>;
   updateArticle(articleId: string, patch: Record<string, unknown>): Promise<ArticleRow | undefined>;
+}
+
+/** `UPDATE articles SET view_count = view_count + 1 WHERE id = $1 AND
+ *  status = 'published' RETURNING id` (exported so tests can pin the SQL). */
+export function buildPublishedViewBump(db: Db, articleId: string) {
+  return db.update(articles)
+    .set({ viewCount: sql`${articles.viewCount} + 1` })
+    .where(and(eq(articles.id, articleId), eq(articles.status, "published")))
+    .returning({ id: articles.id });
 }
 
 export class ArticleEngagementRepository implements IArticleEngagementRepository {
@@ -45,10 +56,9 @@ export class ArticleEngagementRepository implements IArticleEngagementRepository
     return row ?? null;
   }
 
-  async incrementViewCount(articleId: string): Promise<void> {
-    await this.db.update(articles)
-      .set({ viewCount: sql`${articles.viewCount} + 1` } as any)
-      .where(eq(articles.id, articleId));
+  async incrementPublishedViewCount(articleId: string): Promise<boolean> {
+    const rows = await buildPublishedViewBump(this.db, articleId);
+    return rows.length > 0;
   }
 
   /** Verified readers accrue `read_seconds` (partner-pool paid); everyone
