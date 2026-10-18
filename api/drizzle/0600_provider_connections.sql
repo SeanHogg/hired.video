@@ -335,6 +335,9 @@ SELECT public.__mig_0600_copy('social_connections', $s$
          true, sc.last_error, NULL::timestamptz, sc.access_token_expires_at,
          '{}'::jsonb, NULL::numeric, NULL::uuid, sc.created_at, sc.updated_at
   FROM public.social_connections sc
+  -- social_connections.user_id never had an FK; rows left behind by deleted
+  -- users would violate provider_connections_user_id_users_id_fk.
+  WHERE sc.user_id IS NULL OR EXISTS (SELECT 1 FROM public.users u WHERE u.id = sc.user_id)
 $s$);
 
 SELECT public.__mig_0600_copy('managed_accounts', $s$
