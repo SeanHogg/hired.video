@@ -42,7 +42,7 @@ export type ReviewSubjectType = (typeof REVIEW_SUBJECT_TYPES)[number];
 
 /** The kinds with a content adapter today — a review of any other kind is
  *  refused until its adapter lands. */
-export const WIRED_REVIEW_SUBJECT_TYPES = ["resume"] as const satisfies readonly ReviewSubjectType[];
+export const WIRED_REVIEW_SUBJECT_TYPES = ["resume", "job", "article"] as const satisfies readonly ReviewSubjectType[];
 export type WiredReviewSubjectType = (typeof WIRED_REVIEW_SUBJECT_TYPES)[number];
 
 export function isWiredReviewSubject(type: string): type is WiredReviewSubjectType {
@@ -172,7 +172,11 @@ export type SuggestedEdit = z.infer<typeof SuggestedEditSchema>;
 
 export const CreateReviewInputSchema = z
   .object({
-    resumeId: z.string().uuid(),
+    /** What is reviewed (#2254). Defaults to a résumé so `resumeId` callers keep working. */
+    subjectType: z.enum(REVIEW_SUBJECT_TYPES).optional(),
+    subjectId: z.string().uuid().optional(),
+    /** Legacy résumé-only alias of `subjectId` (subjectType "resume"). */
+    resumeId: z.string().uuid().optional(),
     /** Invite an existing platform user directly. */
     reviewerUserId: z.string().uuid().optional(),
     /** Invite by email (link-claim flow); ignored if `reviewerUserId` set. */
@@ -190,8 +194,21 @@ export const CreateReviewInputSchema = z
     /** Link/invite TTL in hours — the invite flow's native unit (default 42). */
     expiresInHours: z.number().int().positive().max(MAX_REVIEW_EXPIRY_HOURS).optional(),
   })
-  .strict();
+  .strict()
+  .refine((v) => !!(v.subjectId ?? v.resumeId), { message: "subjectId is required" })
+  .refine((v) => !(v.subjectType && v.subjectType !== "resume" && !v.subjectId), {
+    message: "subjectId is required for a non-résumé review",
+  });
 export type CreateReviewInput = z.infer<typeof CreateReviewInputSchema>;
+
+/** Resolve the (type, id) a create input names; résumé when only `resumeId` is given. */
+export function subjectOfCreateInput(input: {
+  subjectType?: ReviewSubjectType;
+  subjectId?: string;
+  resumeId?: string;
+}): { type: ReviewSubjectType; id: string } {
+  return { type: input.subjectType ?? "resume", id: (input.subjectId ?? input.resumeId) as string };
+}
 
 /** One invitee in a batch review-invite — a platform user (by id) OR an
  *  external person (by email). At least one of the two must be present. */
@@ -212,14 +229,21 @@ export type ReviewInvitee = z.infer<typeof ReviewInviteeSchema>;
  *  stays attributable per person. */
 export const InviteReviewersInputSchema = z
   .object({
-    resumeId: z.string().uuid(),
+    subjectType: z.enum(REVIEW_SUBJECT_TYPES).optional(),
+    subjectId: z.string().uuid().optional(),
+    /** Legacy résumé-only alias of `subjectId`. */
+    resumeId: z.string().uuid().optional(),
     invitees: z.array(ReviewInviteeSchema).min(1).max(50),
     title: z.string().trim().max(160).optional(),
     message: z.string().trim().max(4000).optional(),
     /** Comment window in hours; defaults to DEFAULT_REVIEW_EXPIRY_HOURS. */
     expiresInHours: z.number().int().positive().max(MAX_REVIEW_EXPIRY_HOURS).optional(),
   })
-  .strict();
+  .strict()
+  .refine((v) => !!(v.subjectId ?? v.resumeId), { message: "subjectId is required" })
+  .refine((v) => !(v.subjectType && v.subjectType !== "resume" && !v.subjectId), {
+    message: "subjectId is required for a non-résumé review",
+  });
 export type InviteReviewersInput = z.infer<typeof InviteReviewersInputSchema>;
 
 export const CreateAnnotationInputSchema = z
